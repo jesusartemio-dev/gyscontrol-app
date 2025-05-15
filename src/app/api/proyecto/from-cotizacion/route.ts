@@ -17,7 +17,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 })
     }
 
-    // ✅ Obtener la cotización con relaciones completas
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
       include: {
@@ -32,7 +31,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Cotización no válida o no aprobada' }, { status: 400 })
     }
 
-    // ✅ Crear proyecto base
     const proyecto = await prisma.proyecto.create({
       data: {
         clienteId: cotizacion.clienteId!,
@@ -40,7 +38,7 @@ export async function POST(req: Request) {
         gestorId,
         cotizacionId,
         nombre: cotizacion.nombre,
-        codigo: '', // puedes calcularlo después
+        codigo: '',
         estado: 'activo',
         fechaInicio: new Date(fechaInicio),
 
@@ -61,12 +59,14 @@ export async function POST(req: Request) {
             responsableId: gestorId,
             items: {
               create: grupo.items.map((item) => ({
-                catalogoEquipoId: item.catalogoEquipoId,
-                responsableId: gestorId,
+                catalogoEquipo: item.catalogoEquipoId
+                  ? { connect: { id: item.catalogoEquipoId } }
+                  : undefined,
                 codigo: item.codigo,
-                nombre: item.descripcion,
                 descripcion: item.descripcion,
+                categoria: item.categoria,
                 unidad: item.unidad,
+                marca: item.marca,
                 cantidad: item.cantidad,
                 precioInterno: item.precioInterno,
                 precioCliente: item.precioCliente,
@@ -85,8 +85,9 @@ export async function POST(req: Request) {
             responsableId: gestorId,
             items: {
               create: grupo.items.map((item) => ({
-                catalogoServicioId: item.catalogoServicioId,
-                responsableId: gestorId,
+                catalogoServicio: item.catalogoServicioId
+                  ? { connect: { id: item.catalogoServicioId } }
+                  : undefined,
                 categoria: item.categoria,
                 costoHoraInterno: item.costoHora,
                 costoHoraCliente: item.costoHora * item.margen,

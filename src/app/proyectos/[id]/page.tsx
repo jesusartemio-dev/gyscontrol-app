@@ -1,74 +1,79 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+// ===================================================
+// 📁 Archivo: [id]/page.tsx
+// 📌 Descripción: Vista principal de un proyecto
+// ===================================================
+
 import { useParams } from 'next/navigation'
-import { getProyectoById, updateProyecto } from '@/lib/services/proyecto'
-import type { Proyecto, ProyectoEquipo, ProyectoEquipoItem } from '@/types'
-import ProyectoEquipoList from '@/components/proyectos/equipos/ProyectoEquipoList'
+import { useEffect, useState } from 'react'
+import { getProyectoById } from '@/lib/services/proyecto'
+import type { Proyecto } from '@/types'
+import ProyectoEquipoList from '@/components/proyectos/ProyectoEquipoList'
+import ProyectoEquipoItemList from '@/components/proyectos/ProyectoEquipoItemList'
+import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 
 export default function ProyectoDetallePage() {
   const { id } = useParams()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (typeof id === 'string') {
-      getProyectoById(id)
-        .then(setProyecto)
-        .catch(() => setError('Error al cargar proyecto'))
-    }
+    if (!id) return
+    getProyectoById(id as string)
+      .then((data) => {
+        if (!data) {
+          toast.error('No se encontró el proyecto')
+          return
+        }
+        setProyecto(data)
+      })
+      .catch(() => toast.error('Error al obtener el proyecto'))
+      .finally(() => setLoading(false))
   }, [id])
 
-  const handleEquipoItemChange = (equipoId: string, items: ProyectoEquipoItem[]) => {
-    if (!proyecto) return
-    const nuevosEquipos = proyecto.equipos.map(eq =>
-      eq.id === equipoId ? { ...eq, items } : eq
-    )
-    setProyecto({ ...proyecto, equipos: nuevosEquipos })
-  }
-
-  const handleActualizarNombreEquipo = (equipoId: string, nuevo: string) => {
-    if (!proyecto) return
-    const nuevosEquipos = proyecto.equipos.map(eq =>
-      eq.id === equipoId ? { ...eq, nombre: nuevo } : eq
-    )
-    setProyecto({ ...proyecto, equipos: nuevosEquipos })
-  }
-
-  const handleEliminarGrupoEquipo = (equipoId: string) => {
-    if (!proyecto) return
-    const nuevosEquipos = proyecto.equipos.filter(eq => eq.id !== equipoId)
-    setProyecto({ ...proyecto, equipos: nuevosEquipos })
-  }
-
-  const handleEquipoChange = (equipoId: string, changes: Partial<ProyectoEquipo>) => {
-    if (!proyecto) return
-    const nuevosEquipos = proyecto.equipos.map(eq =>
-      eq.id === equipoId ? { ...eq, ...changes } : eq
-    )
-    setProyecto({ ...proyecto, equipos: nuevosEquipos })
-  }
-
-  if (error) return <p className="text-red-500">{error}</p>
-  if (!proyecto) return <p className="text-gray-500">Cargando proyecto...</p>
+  if (loading) return <Skeleton className="h-40 w-full rounded-xl" />
+  if (!proyecto) return <p className="text-gray-500">No se encontró el proyecto</p>
 
   return (
-    <div className="p-6 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold">{proyecto.nombre}</h1>
-        <p className="text-sm text-gray-500">Código: {proyecto.codigo} | Estado: {proyecto.estado}</p>
+    <div className="space-y-6 p-6">
+      <h1 className="text-2xl font-bold">🧱 Equipos Técnicos del Proyecto</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+        <p><strong>Cliente:</strong> {proyecto.cliente?.nombre ?? '—'}</p>
+        <p><strong>Comercial:</strong> {proyecto.comercial?.name ?? '—'}</p>
+        <p><strong>Gestor:</strong> {proyecto.gestor?.name ?? '—'}</p>
+        <p><strong>Código:</strong> {proyecto.codigo}</p>
+        <p><strong>Estado:</strong> {proyecto.estado}</p>
+        <p><strong>Inicio:</strong> {new Date(proyecto.fechaInicio).toLocaleDateString()}</p>
       </div>
 
-      <section>
-        <h2 className="text-xl font-semibold">Equipos</h2>
-        <ProyectoEquipoList
-          equipos={proyecto.equipos}
-          onItemChange={handleEquipoItemChange}
-          onUpdatedNombre={handleActualizarNombreEquipo}
-          onDeletedGrupo={handleEliminarGrupoEquipo}
-          onChange={handleEquipoChange}
-        />
-      </section>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-800 bg-gray-50 p-4 rounded-lg shadow-inner">
+        <p><strong>💰 Total Cliente:</strong> S/ {proyecto.totalCliente.toFixed(2)}</p>
+        <p><strong>🧩 Equipos:</strong> S/ {proyecto.totalEquiposInterno.toFixed(2)}</p>
+        <p><strong>⚙️ Servicios:</strong> S/ {proyecto.totalServiciosInterno.toFixed(2)}</p>
+        <p><strong>🧾 Gastos:</strong> S/ {proyecto.totalGastosInterno.toFixed(2)}</p>
+        <p><strong>🔻 Descuento:</strong> {proyecto.descuento}%</p>
+        <p><strong>📊 Gran Total:</strong> S/ {proyecto.grandTotal.toFixed(2)}</p>
+      </div>
+
+      <ProyectoEquipoList
+        proyectoId={proyecto.id}
+        onCreated={() => toast.success('Grupo creado')}
+      />
+
+      <Card>
+        <CardContent className="p-4">
+          <ProyectoEquipoItemList
+            proyectoId={proyecto.id}
+            filtroEquipoId={undefined}
+            modoRevision={true}
+            onUpdated={() => toast.success('Ítem actualizado')}
+          />
+        </CardContent>
+      </Card>
     </div>
   )
 }

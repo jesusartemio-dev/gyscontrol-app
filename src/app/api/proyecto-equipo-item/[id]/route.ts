@@ -21,7 +21,6 @@ export async function GET(_: NextRequest, context: { params: { id: string } }) {
     const item = await prisma.proyectoEquipoItem.findUnique({
       where: { id },
       include: {
-        responsable: true,
         catalogoEquipo: true,
         proyectoEquipo: true,
       },

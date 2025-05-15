@@ -1,38 +1,23 @@
-// ===================================================
-// 📁 Archivo: page.tsx
-// 📌 Ubicación: src/app/proyectos/page.tsx
-// 🔧 Descripción: Página principal de listado de proyectos
-//
-// 🧠 Uso: Muestra los proyectos creados y permite crear nuevos
-// ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-05-08
-// ===================================================
-
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getProyectos, deleteProyecto, createProyecto } from '@/lib/services/proyecto'
+import type { Proyecto, ProyectoPayload } from '@/types'
 import { toast } from 'sonner'
-
-interface Proyecto {
-  id: string
-  nombre: string
-  codigo: string
-  totalCliente: number
-}
 
 export default function ProyectosPage() {
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [nombre, setNombre] = useState('')
   const [codigo, setCodigo] = useState('')
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     getProyectos()
       .then(setProyectos)
-      .catch(() => setError('Error al cargar proyectos.'))
+      .catch(() => toast.error('Error al cargar proyectos.'))
   }, [])
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -42,27 +27,43 @@ export default function ProyectosPage() {
       return
     }
 
+    setLoading(true)
     try {
-      const nuevo = await createProyecto({
+      const payload: ProyectoPayload = {
+        clienteId: '',
+        comercialId: '',
+        gestorId: '',
         nombre,
         codigo,
         totalCliente: 0,
-        totalInterno: 0
-      })
-      setProyectos([...proyectos, nuevo])
-      setNombre('')
-      setCodigo('')
-      setError(null)
-      toast.success('Proyecto creado exitosamente')
+        totalInterno: 0,
+        totalEquiposInterno: 0,
+        totalServiciosInterno: 0,
+        totalGastosInterno: 0,
+        descuento: 0,
+        grandTotal: 0,
+        estado: 'activo',
+        fechaInicio: new Date().toISOString()
+      }
+
+      const nuevo = await createProyecto(payload)
+      if (nuevo) {
+        setProyectos([...proyectos, nuevo])
+        setNombre('')
+        setCodigo('')
+        toast.success('Proyecto creado exitosamente')
+      }
     } catch {
       toast.error('Error al crear proyecto.')
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleDelete = async (id: string) => {
     try {
       await deleteProyecto(id)
-      setProyectos(proyectos.filter(p => p.id !== id))
+      setProyectos((prev) => prev.filter((p) => p.id !== id))
       toast.success('Proyecto eliminado.')
     } catch {
       toast.error('Error al eliminar proyecto.')
@@ -88,9 +89,10 @@ export default function ProyectosPage() {
         />
         <button
           type="submit"
+          disabled={loading}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
         >
-          Agregar
+          {loading ? 'Creando...' : 'Agregar'}
         </button>
         {error && <span className="text-red-500 text-sm ml-2">{error}</span>}
       </form>
@@ -101,6 +103,10 @@ export default function ProyectosPage() {
             <tr>
               <th className="p-3">Código</th>
               <th className="p-3">Nombre</th>
+              <th className="p-3">Cliente</th>
+              <th className="p-3">Comercial</th>
+              <th className="p-3">Estado</th>
+              <th className="p-3">Inicio</th>
               <th className="p-3 text-right">Total Cliente</th>
               <th className="p-3 text-right">Acciones</th>
             </tr>
@@ -108,7 +114,7 @@ export default function ProyectosPage() {
           <tbody>
             {proyectos.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center py-6 text-gray-500">
+                <td colSpan={8} className="text-center py-6 text-gray-500">
                   No hay proyectos registrados.
                 </td>
               </tr>
@@ -116,9 +122,16 @@ export default function ProyectosPage() {
               proyectos.map((p) => (
                 <tr key={p.id} className="border-t hover:bg-gray-50">
                   <td className="p-3 font-medium">{p.codigo}</td>
-                  <td className="p-3 text-blue-600 underline cursor-pointer" onClick={() => router.push(`/proyectos/${p.id}`)}>
+                  <td
+                    className="p-3 text-blue-600 underline cursor-pointer"
+                    onClick={() => router.push(`/proyectos/${p.id}`)}
+                  >
                     {p.nombre}
                   </td>
+                  <td className="p-3">{p.cliente?.nombre ?? '—'}</td>
+                  <td className="p-3">{p.comercial?.name ?? '—'}</td>
+                  <td className="p-3">{p.estado}</td>
+                  <td className="p-3">{p.fechaInicio?.split('T')[0]}</td>
                   <td className="p-3 text-right">S/ {p.totalCliente.toFixed(2)}</td>
                   <td className="p-3 text-right">
                     <button

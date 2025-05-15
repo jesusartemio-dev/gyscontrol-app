@@ -312,23 +312,26 @@ export interface ProyectoEquipoUpdatePayload extends Partial<ProyectoEquipoPaylo
 export interface ProyectoEquipoItemPayload {
   proyectoEquipoId: string
   catalogoEquipoId?: string
-  responsableId: string
-
   codigo: string
-  nombre: string
-  descripcion?: string
-  unidad?: string
+  descripcion: string
+  categoria: string
+  unidad: string
+  marca: string
   cantidad: number
   precioInterno: number
   precioCliente: number
   costoInterno: number
   costoCliente: number
-
   aprobado?: boolean
   motivoCambio?: string
   costoReal?: number
   nuevo?: boolean
+
+  // ✅ Nuevo campo para asociar con ListaEquipos
+  listaId?: string
 }
+
+
 
 export interface ProyectoEquipoItemUpdatePayload extends Partial<ProyectoEquipoItemPayload> {}
 
@@ -390,4 +393,144 @@ export interface ProyectoGastoItemPayload {
 }
 
 export interface ProyectoGastoItemUpdatePayload extends Partial<ProyectoGastoItemPayload> {}
+
+
+
+// ============================
+// 🏗️ GESTION EQUIPOS
+// ============================
+
+export interface ListaEquiposPayload {
+  proyectoId: string
+  nombre: string
+  descripcion?: string
+  estado?: string
+}
+
+export interface ListaEquiposUpdatePayload extends Partial<ListaEquiposPayload> {}
+
+export interface ListaEquiposItemPayload {
+  listaId: string
+  proyectoEquipoItemId?: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  precioReferencial?: number
+}
+
+export interface ListaEquiposItemUpdatePayload extends Partial<ListaEquiposItemPayload> {}
+
+export interface CotizacionProveedorPayload {
+  proyectoId: string
+  nombre: string
+  ruc?: string
+  contacto?: string
+  estado?: string
+}
+
+export interface CotizacionProveedorUpdatePayload extends Partial<CotizacionProveedorPayload> {}
+
+export interface CotizacionProveedorItemPayload {
+  cotizacionId: string
+  listaItemId: string
+  precioUnitario: number
+  tiempoEntrega: number
+  seleccionado?: boolean
+}
+
+export interface CotizacionProveedorItemUpdatePayload extends Partial<CotizacionProveedorItemPayload> {}
+
+export interface ListaRequerimientoPayload {
+  proyectoId: string
+  nombre: string
+  descripcion?: string
+  estado?: string
+  fechaAprobacion?: string
+}
+
+export interface ListaRequerimientoUpdatePayload extends Partial<ListaRequerimientoPayload> {}
+
+export interface ListaRequerimientoItemPayload {
+  listaId: string
+  proyectoEquipoItemId: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  precioUnitario?: number
+  costoTotal?: number
+  fechaRequerida?: string
+  estado?: string
+  observaciones?: string
+  nuevo?: boolean
+}
+
+export interface ListaRequerimientoItemUpdatePayload extends Partial<ListaRequerimientoItemPayload> {}
+
+export interface PaqueteCompraPayload {
+  proyectoId: string
+  nombre: string
+  descripcion?: string
+  estado?: string
+  fechaEnvio?: string
+  fechaEntregaEstimada?: string
+}
+
+export interface PaqueteCompraUpdatePayload extends Partial<PaqueteCompraPayload> {}
+
+export interface PaqueteCompraItemPayload {
+  paqueteId: string
+  requerimientoItemId: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  proveedor?: string
+  precioUnitario?: number
+  precioReferencial?: number
+  precioCotizado?: number
+  costoTotal?: number
+  fechaEntrega?: string
+}
+
+export interface PaqueteCompraItemUpdatePayload extends Partial<PaqueteCompraItemPayload> {}
+
+// ============================
+// 💲 Valorización Payloads
+// ============================
+
+export interface ValorizacionPayload {
+  proyectoId: string
+  nombre: string
+  descripcion?: string
+  periodoInicio: string
+  periodoFin: string
+  estado?: string
+  montoTotal: number
+}
+
+export interface ValorizacionUpdatePayload extends Partial<ValorizacionPayload> {}
+
+
+// ============================
+// ⏱️ Registro de Horas Payloads
+// ============================
+
+export interface RegistroHorasPayload {
+  proyectoId: string
+  proyectoServicioId: string
+  categoria: string
+  nombreServicio: string
+  recursoId: string
+  recursoNombre: string
+  usuarioId: string
+  fechaTrabajo: string
+  horasTrabajadas: number
+  descripcion?: string
+  observaciones?: string
+  aprobado?: boolean
+}
+
+export interface RegistroHorasUpdatePayload extends Partial<RegistroHorasPayload> {}
 
