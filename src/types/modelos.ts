@@ -13,6 +13,49 @@
 // Tipos generales
 export type Estado = 'pendiente' | 'aprobado' | 'rechazado'
 export type TipoFormula = 'Fijo' | 'Proporcional' | 'Escalonada'
+export type RolUsuario =
+  | 'colaborador'
+  | 'comercial'
+  | 'presupuestos'
+  | 'proyectos'
+  | 'coordinador'
+  | 'logistico'
+  | 'gestor'
+  | 'gerente'
+  | 'admin'
+
+export type EstadoEquipo =
+  | 'pendiente'
+  | 'revisado_tecnico'
+  | 'aprobado_coordinador'
+  | 'aprobado_gestor'
+  | 'en_lista'
+  | 'comprado'
+  | 'reemplazado'
+  | 'entregado'
+
+export type EstadoListaEquipo =
+  | 'borrador'
+  | 'por_revisar'
+  | 'por_cotizar'
+  | 'por_validar'
+  | 'por_aprobar'
+  | 'aprobado'
+  | 'rechazado'
+
+export type EstadoPedido =
+  | 'borrador'
+  | 'enviado'
+  | 'atendido'
+  | 'parcial'
+  | 'entregado'
+  | 'cancelado'
+
+export type EstadoPedidoItem =
+  | 'pendiente'
+  | 'atendido'
+  | 'parcial'
+  | 'entregado'
 
 
 // ============================
@@ -24,7 +67,7 @@ export interface User {
   email: string
   emailVerified?: string | null
   password: string
-  role: string
+  role: RolUsuario
   image?: string | null
 
   // Relaciones
@@ -562,11 +605,9 @@ export interface Proyecto {
   equipos: ProyectoEquipo[]
   servicios: ProyectoServicio[]
   gastos: ProyectoGasto[]
-  listaEquipos: ListaEquipos[]
-  listaRequerimientos: ListaRequerimiento[]
+  ListaEquipo: ListaEquipo[]
   cotizacionesProveedor: CotizacionProveedor[]
   valorizaciones: Valorizacion[]
-  paquetesCompra: PaqueteCompra[]
   registrosHoras: RegistroHoras[]
 }
 
@@ -587,53 +628,55 @@ export interface ProyectoEquipo {
   items: ProyectoEquipoItem[]
 }
 
-export type EstadoEquipo =
-  | 'pendiente'
-  | 'revisado_tecnico'
-  | 'aprobado_coordinador'
-  | 'aprobado_gestor'
-  | 'en_lista'
-  | 'comprado'
-  | 'reemplazado'
-  | 'entregado'
-
 export interface ProyectoEquipoItem {
   id: string
   proyectoEquipoId: string
   catalogoEquipoId?: string
+  listaId?: string
+  equipoOriginalId?: string // 🆕 ID del equipo original si este es un reemplazo
+
   codigo: string
   descripcion: string
   categoria: string
   unidad: string
   marca: string
+
   precioInterno: number
   precioCliente: number
   cantidad: number
   costoInterno: number
   costoCliente: number
+
   precioReal: number
   cantidadReal: number
   costoReal: number
+
   tiempoEntrega?: number
   fechaEntregaEstimada?: string
+
   estado: EstadoEquipo
   aprobado: boolean
   motivoCambio?: string
   nuevo: boolean
+
   createdAt: string
   updatedAt: string
 
+  // Relaciones
   proyectoEquipo: ProyectoEquipo
   catalogoEquipo?: CatalogoEquipo
-  listaRequerimientos: ListaRequerimientoItem[]
-  listaEquipos: ListaEquiposItem[]
+  ListaEquipo: ListaEquipoItem[]
 
-  // ✅ Nueva propiedad para la relación directa con ListaEquipos
   lista?: {
     id: string
     nombre: string
   }
+
+  // 🆕 Relaciones adicionales para reemplazo
+  equipoOriginal?: ProyectoEquipoItem      // si este ítem es reemplazo de otro
+  reemplazos?: ProyectoEquipoItem[]        // si este ítem fue reemplazado por otros
 }
+
 
 
 export interface ProyectoServicio {
@@ -721,112 +764,108 @@ export interface ProyectoGastoItem {
 // 🏗️ GESTION EQUIPOS
 // ============================
 
-
-export interface ListaEquipos {
+export interface ListaEquipo {
   id: string
   proyectoId: string
   nombre: string
   descripcion?: string
-  estado: string
+  estado: EstadoListaEquipo
   createdAt: string
   updatedAt: string
-  items: ListaEquiposItem[]
+  items: ListaEquipoItem[]
 }
 
-export interface ListaEquiposItem {
+export interface ListaEquipoItem {
   id: string
   listaId: string
   proyectoEquipoItemId?: string
+  proveedorId?: string
   codigo: string
   descripcion: string
   unidad: string
   cantidad: number
-  precioReferencial?: number
-  lista: ListaEquipos
+  verificado: boolean
+  comentarioRevision?: string
+  presupuesto?: number
+  precioElegido?: number
+  costoElegido?: number
+  costoPedido?: number
+  costoReal?: number
+  cantidadPedida?: number
+  cantidadEntregada?: number
+
+  lista: ListaEquipo
+
+  createdAt: string
+  updatedAt: string
   cotizaciones: CotizacionProveedorItem[]
+  pedidos: PedidoEquipoItem[]
+
+  proyectoEquipoItem?: {
+    proyectoEquipo?: {
+      nombre: string
+    }
+  }
+  proveedor?: Proveedor
+}
+
+export interface Proveedor {
+  id: string
+  nombre: string
+  ruc?: string
 }
 
 export interface CotizacionProveedor {
   id: string
+  proveedorId: string
   proyectoId: string
   nombre: string
-  ruc?: string
-  contacto?: string
-  estado: string
-  createdAt: string
-  updatedAt: string
+  fecha: string
+  proveedor: Proveedor
+  proyecto:  Proyecto
   items: CotizacionProveedorItem[]
 }
 
 export interface CotizacionProveedorItem {
   id: string
   cotizacionId: string
-  listaItemId: string
+  listaEquipoItemId: string
   precioUnitario: number
-  tiempoEntrega: number
-  seleccionado: boolean
-  listaItem: ListaEquiposItem
+  cantidad: number
+  costoTotal: number
+  tiempoEntrega?: string
+  esSeleccionada?: boolean
   cotizacion: CotizacionProveedor
+  listaEquipoItem: ListaEquipoItem
 }
 
-export interface ListaRequerimiento {
+export interface PedidoEquipo {
   id: string
   proyectoId: string
-  nombre: string
-  descripcion?: string
-  estado: string
-  fechaAprobacion?: string
-  createdAt: string
-  updatedAt: string
-  items: ListaRequerimientoItem[]
-}
-
-export interface ListaRequerimientoItem {
-  id: string
+  responsableId: string
   listaId: string
-  proyectoEquipoItemId: string
-  codigo: string
-  descripcion: string
-  unidad: string
-  cantidad: number
-  precioUnitario?: number
-  costoTotal?: number
-  fechaRequerida?: string
-  estado: string
-  cantidadComprada?: number
-  cantidadPendiente?: number
-  observaciones?: string
-  nuevo: boolean
-}
-
-export interface PaqueteCompra {
-  id: string
-  proyectoId: string
-  nombre: string
-  descripcion?: string
-  estado: string
-  fechaEnvio?: string
+  codigo?: string
+  estado: EstadoPedido
+  fechaPedido: string
+  observacion?: string
   fechaEntregaEstimada?: string
-  createdAt: string
-  updatedAt: string
-  items: PaqueteCompraItem[]
+  fechaEntregaReal?: string
+  items: PedidoEquipoItem[]
 }
 
-export interface PaqueteCompraItem {
+export interface PedidoEquipoItem {
   id: string
-  paqueteId: string
-  requerimientoItemId: string
-  codigo: string
-  descripcion: string
-  unidad: string
-  cantidad: number
-  proveedor?: string
+  pedidoId: string
+  listaEquipoItemId: string
+  cantidadPedida: number
   precioUnitario?: number
-  precioReferencial?: number
-  precioCotizado?: number
   costoTotal?: number
-  fechaEntrega?: string
+  fechaNecesaria: string
+  estado: EstadoPedidoItem
+  cantidadAtendida?: number
+  comentarioLogistica?: string
 }
+
 
 // ============================
 // 📊 Valorización de Proyectos

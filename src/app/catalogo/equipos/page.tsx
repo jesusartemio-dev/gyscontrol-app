@@ -1,21 +1,19 @@
 // ===================================================
 // 📁 Archivo: page.tsx
 // 📌 Ubicación: src/app/catalogo/equipos/
-// 🔧 Descripción: Gestión de catálogo de equipos con importación, sobrescritura optimizada y control de actualización automática.
-// 🧠 Uso: Página en /catalogo/equipos para administrar equipos.
-// ✍️ Autor: Jesús Artemio
-// 🗓️ Última actualización: 2025-04-25
+// 🔧 Descripción: Gestión de catálogo de equipos con importación, acordeón de formulario y botones centralizados
 // ===================================================
 
 'use client'
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
+import CatalogoEquipoCrearAcordeon from '@/components/catalogo/CatalogoEquipoCrearAcordeon'
 import CatalogoEquipoList from '@/components/catalogo/CatalogoEquipoList'
+import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { exportarEquiposAExcel, importarEquiposDesdeExcel } from '@/lib/utils/equiposExcel'
 import { importarEquiposDesdeExcelValidado } from '@/lib/utils/equiposImportUtils'
-import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo' // ✅ Se agrega para recalculo
+import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo'
 import { getCategoriaEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
 import { createEquipo, updateEquipo, getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
@@ -45,17 +43,9 @@ export default function CatalogoEquipoPage() {
     cargarEquipos()
   }, [])
 
-  const handleCreated = async () => {
-    await cargarEquipos()
-  }
-
-  const handleUpdated = async () => {
-    await cargarEquipos()
-  }
-
-  const handleDeleted = async () => {
-    await cargarEquipos()
-  }
+  const handleCreated = () => cargarEquipos()
+  const handleUpdated = () => cargarEquipos()
+  const handleDeleted = () => cargarEquipos()
 
   const handleExportar = async () => {
     try {
@@ -182,21 +172,10 @@ export default function CatalogoEquipoPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Catálogo de Equipos</h1>
-        <div className="flex gap-4">
-          <button
-            onClick={handleExportar}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          >
-            📤 Exportar Excel
-          </button>
-          <label className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 cursor-pointer">
-            📥 Importar Excel
-            <input type="file" accept=".xlsx" onChange={handleImportar} className="hidden" />
-          </label>
-        </div>
+        <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
       </div>
 
-      <CatalogoEquipoForm onCreated={handleCreated} />
+      <CatalogoEquipoCrearAcordeon onCreated={handleCreated} />
 
       {equipos.length === 0 ? (
         <p className="text-gray-500 text-sm italic mt-4">No hay equipos registrados aún.</p>

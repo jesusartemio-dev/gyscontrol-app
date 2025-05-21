@@ -15,7 +15,7 @@ import { getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
 import { getCategoriaEquipo } from '@/lib/services/categoriaEquipo'
 import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
 import { createProyectoEquipoItem } from '@/lib/services/proyectoEquipoItem'
-import { createListaEquiposItem } from '@/lib/services/listaEquiposItem'
+import { createListaEquipoItem } from '@/lib/services/listaEquipoItem'
 import type {
   CatalogoEquipo,
   CategoriaEquipo,
@@ -30,7 +30,12 @@ interface Props {
   onCreated?: () => void
 }
 
-export default function ModalAgregarItemDesdeCatalogo({ proyectoId, listaId, onClose, onCreated }: Props) {
+export default function ModalAgregarItemDesdeCatalogo({
+  proyectoId,
+  listaId,
+  onClose,
+  onCreated,
+}: Props) {
   const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])
   const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
   const [secciones, setSecciones] = useState<ProyectoEquipo[]>([])
@@ -67,35 +72,39 @@ export default function ModalAgregarItemDesdeCatalogo({ proyectoId, listaId, onC
       return
     }
 
+    const precio = selected.precioVenta || 0
+    const categoria = selected.categoria?.nombre || 'SIN-CATEGORIA'
+    const unidad = selected.unidad?.nombre || 'UND'
+
     const payload: ProyectoEquipoItemPayload = {
       proyectoEquipoId,
       catalogoEquipoId: selected.id,
       codigo: selected.codigo,
       descripcion: selected.descripcion,
-      categoria: selected.categoria?.nombre ?? 'SIN-CATEGORIA',
-      unidad: selected.unidad?.nombre ?? 'UND',
-      marca: selected.marca ?? 'SIN-MARCA',
+      categoria,
+      unidad,
+      marca: selected.marca,
       cantidad,
-      precioInterno: selected.precioVenta,
-      precioCliente: selected.precioVenta,
-      costoInterno: cantidad * selected.precioVenta,
-      costoCliente: cantidad * selected.precioVenta,
+      precioInterno: precio,
+      precioCliente: precio,
+      costoInterno: cantidad * precio,
+      costoCliente: cantidad * precio,
       nuevo: true,
       motivoCambio,
-      listaId, // ✅ Se incluye listaId
+      listaId,
     }
 
     try {
       setLoading(true)
       const nuevoItem = await createProyectoEquipoItem(payload)
-      await createListaEquiposItem({
+      await createListaEquipoItem({
         listaId,
         proyectoEquipoItemId: nuevoItem.id,
         codigo: nuevoItem.codigo,
         descripcion: nuevoItem.descripcion,
         unidad: nuevoItem.unidad,
         cantidad: nuevoItem.cantidad,
-        precioReferencial: nuevoItem.precioInterno,
+        presupuesto: nuevoItem.precioInterno,
       })
       toast.success('✅ Equipo agregado al proyecto y a la lista')
       onCreated?.()
@@ -151,7 +160,7 @@ export default function ModalAgregarItemDesdeCatalogo({ proyectoId, listaId, onC
                 <th className="p-2">Código</th>
                 <th className="p-2">Descripción</th>
                 <th className="p-2">Unidad</th>
-                <th className="p-2">Precio Venta</th>
+                <th className="p-2">Precio</th>
                 <th className="p-2 text-center">Seleccionar</th>
               </tr>
             </thead>
@@ -163,7 +172,7 @@ export default function ModalAgregarItemDesdeCatalogo({ proyectoId, listaId, onC
                 >
                   <td className="p-2">{equipo.codigo}</td>
                   <td className="p-2">{equipo.descripcion}</td>
-                  <td className="p-2">{equipo.unidad.nombre}</td>
+                  <td className="p-2">{equipo.unidad?.nombre}</td>
                   <td className="p-2">S/. {equipo.precioVenta.toFixed(2)}</td>
                   <td className="p-2 text-center">
                     <Button size="sm" variant="outline" onClick={() => handleSeleccionar(equipo)}>
@@ -194,7 +203,7 @@ export default function ModalAgregarItemDesdeCatalogo({ proyectoId, listaId, onC
                 value={proyectoEquipoId}
                 onChange={(e) => setProyectoEquipoId(e.target.value)}
               >
-                <option value="">— Selecciona equipo del proyecto —</option>
+                <option value="">— Selecciona grupo del proyecto —</option>
                 {secciones.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.nombre}

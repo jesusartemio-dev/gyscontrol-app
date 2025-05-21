@@ -1,19 +1,13 @@
 'use client'
 
-// ===================================================
-// 📁 Archivo: [id]/page.tsx
-// 📌 Descripción: Vista principal de un proyecto
-// ===================================================
-
-import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
 import type { Proyecto } from '@/types'
-import ProyectoEquipoList from '@/components/proyectos/ProyectoEquipoList'
-import ProyectoEquipoItemList from '@/components/proyectos/ProyectoEquipoItemList'
-import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
+import ProyectoEquipoAccordion from '@/components/proyectos/ProyectoEquipoAccordion'
 
 export default function ProyectoDetallePage() {
   const { id } = useParams()
@@ -39,7 +33,8 @@ export default function ProyectoDetallePage() {
 
   return (
     <div className="space-y-6 p-6">
-      <h1 className="text-2xl font-bold">🧱 Equipos Técnicos del Proyecto</h1>
+      <h1 className="text-3xl font-bold">{proyecto.nombre}</h1>
+      <p className="text-gray-600 text-sm">🧱 Equipos Técnicos del Proyecto</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
         <p><strong>Cliente:</strong> {proyecto.cliente?.nombre ?? '—'}</p>
@@ -59,21 +54,17 @@ export default function ProyectoDetallePage() {
         <p><strong>📊 Gran Total:</strong> S/ {proyecto.grandTotal.toFixed(2)}</p>
       </div>
 
-      <ProyectoEquipoList
-        proyectoId={proyecto.id}
-        onCreated={() => toast.success('Grupo creado')}
-      />
-
-      <Card>
-        <CardContent className="p-4">
-          <ProyectoEquipoItemList
-            proyectoId={proyecto.id}
-            filtroEquipoId={undefined}
+      {/* Nuevo renderizado de acordeones por grupo de equipo */}
+      <div className="space-y-4">
+        {proyecto.equipos.map((equipo) => (
+          <ProyectoEquipoAccordion
+            key={equipo.id}
+            equipo={equipo}
             modoRevision={true}
-            onUpdated={() => toast.success('Ítem actualizado')}
+            onUpdatedItem={() => toast.success('Ítem actualizado')}
           />
-        </CardContent>
-      </Card>
+        ))}
+      </div>
     </div>
   )
 }

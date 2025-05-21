@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { useState } from 'react'
 import Image from 'next/image'
 import LogoutButton from './LogoutButton'
+import type { RolUsuario } from '@/types/modelos'
 
 export default function Sidebar() {
   const { data: session } = useSession()
@@ -35,7 +36,6 @@ export default function Sidebar() {
     { href: '/catalogo/servicios', label: '🔧 Catálogo Servicios' },
     { href: '/catalogo/categorias-equipo', label: '📁 Categorías Equipo' },
     { href: '/catalogo/categorias-servicio', label: '📂 Categorías Servicio' },
-    //{ href: '/catalogo/niveles-servicio', label: '📊 Niveles Servicio' },
     { href: '/catalogo/unidades', label: '📏 Unidades' },
     { href: '/catalogo/unidades-servicio', label: '📏 Unidades Servicio' },
     { href: '/catalogo/recursos', label: '🛠️ Recursos' },
@@ -62,11 +62,12 @@ export default function Sidebar() {
     { href: '/admin/usuarios', label: '👤 Usuarios' },
   ]
 
-  let links: {
-    [key: string]: { href: string; label: string }[]
-  } = {}
+  let links: Record<string, { href: string; label: string }[]> = {}
+  const role = session?.user.role as RolUsuario | undefined
 
-  if (session?.user.role === 'admin') {
+  if (!role) {
+    links = {}
+  } else if (role === 'admin' || role === 'gerente') {
     links = {
       configuracion: configuracionLinks,
       admin: adminLinks,
@@ -76,22 +77,18 @@ export default function Sidebar() {
       proyectos: proyectosLinks,
       logistica: logisticaLinks,
     }
-  } else if (session?.user.role === 'comercial') {
+  } else if (role === 'comercial' || role === 'presupuestos') {
     links = {
-      configuracion: configuracionLinks,
-      catalogo: catalogoLinks,
       plantillas: plantillasLinks,
       cotizaciones: cotizacionesLinks,
     }
-  } else if (session?.user.role === 'proyectos') {
+  } else if (role === 'logistico') {
     links = {
-      configuracion: configuracionLinks,
-      proyectos: proyectosLinks,
-    }
-  } else if (session?.user.role === 'logistica') {
-    links = {
-      configuracion: configuracionLinks,
       logistica: logisticaLinks,
+    }
+  } else if (['proyectos', 'coordinador', 'gestor'].includes(role)) {
+    links = {
+      proyectos: proyectosLinks,
     }
   }
 

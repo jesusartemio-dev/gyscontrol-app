@@ -2,18 +2,39 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { getProyectos, deleteProyecto, createProyecto } from '@/lib/services/proyecto'
 import type { Proyecto, ProyectoPayload } from '@/types'
 import { toast } from 'sonner'
 
+// Roles permitidos para acceder a la página de Proyectos
+const ALLOWED_ROLES = [
+  'proyectos',
+  'coordinador',
+  'gestor',
+  'gerente',
+  'admin',
+]
+
 export default function ProyectosPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [nombre, setNombre] = useState('')
   const [codigo, setCodigo] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
 
+  // 🔐 Protección de ruta por rol
+  useEffect(() => {
+    if (status === 'loading') return
+    const role = session?.user.role
+    if (!role || !ALLOWED_ROLES.includes(role)) {
+      router.replace('/denied')
+    }
+  }, [session, status, router])
+
+  // 🔄 Cargar proyectos
   useEffect(() => {
     getProyectos()
       .then(setProyectos)
@@ -43,7 +64,7 @@ export default function ProyectosPage() {
         descuento: 0,
         grandTotal: 0,
         estado: 'activo',
-        fechaInicio: new Date().toISOString()
+        fechaInicio: new Date().toISOString(),
       }
 
       const nuevo = await createProyecto(payload)
@@ -74,6 +95,7 @@ export default function ProyectosPage() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">📁 Proyectos</h1>
 
+      {/* Formulario para agregar proyecto */}
       <form onSubmit={handleCreate} className="flex gap-2 items-center flex-wrap">
         <input
           value={nombre}
@@ -97,6 +119,7 @@ export default function ProyectosPage() {
         {error && <span className="text-red-500 text-sm ml-2">{error}</span>}
       </form>
 
+      {/* Tabla de proyectos */}
       <div className="overflow-auto border rounded-md">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 text-left">

@@ -11,39 +11,46 @@
 // ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
 // 📅 Última actualización: 2025-04-19
 // ===================================================
-import type { TipoFormula } from './modelos'  // Asegúrate de importar
+import type { TipoFormula, EstadoEquipo, EstadoListaEquipo, EstadoPedido, EstadoPedidoItem } from './modelos' 
 
 
-// ------------------------------------
-// 📦 UnidadServicio Payloads
-// ------------------------------------
+// ✅ Unidad
+export interface UnidadPayload {
+  nombre: string
+}
+export interface UnidadUpdatePayload extends UnidadPayload {}
+
+// ✅ UnidadServicio
 export interface UnidadServicioPayload {
   nombre: string
 }
+export interface UnidadServicioUpdatePayload extends UnidadServicioPayload {}
 
-export interface UnidadServicioUpdatePayload {
+// ✅ CategoriaEquipo
+export interface CategoriaEquipoPayload {
   nombre: string
 }
+export interface CategoriaEquipoUpdatePayload extends CategoriaEquipoPayload {}
 
-// ------------------------------------
-// 📦 CategoriaServicio Payloads
-// ------------------------------------
+// ✅ NivelServicio
+export interface NivelServicioPayload {
+  nombre: string
+}
+export interface NivelServicioUpdatePayload extends NivelServicioPayload {}
+
+// ✅ CategoriaServicio
 export interface CategoriaServicioPayload {
   nombre: string
 }
+export interface CategoriaServicioUpdatePayload extends CategoriaServicioPayload {}
 
-export interface CategoriaServicioUpdatePayload {
-  nombre: string
-}
-
-// ------------------------------------
-// 📦 Recurso Payloads
-// ------------------------------------
-
+// ✅ Recurso
 export interface RecursoPayload {
   nombre: string
   costoHora: number
 }
+export interface RecursoUpdatePayload extends RecursoPayload {}
+
 
 
 // ------------------------------------
@@ -312,6 +319,7 @@ export interface ProyectoEquipoUpdatePayload extends Partial<ProyectoEquipoPaylo
 export interface ProyectoEquipoItemPayload {
   proyectoEquipoId: string
   catalogoEquipoId?: string
+  equipoOriginalId?: string
   codigo: string
   descripcion: string
   categoria: string
@@ -326,10 +334,14 @@ export interface ProyectoEquipoItemPayload {
   motivoCambio?: string
   costoReal?: number
   nuevo?: boolean
-
-  // ✅ Nuevo campo para asociar con ListaEquipos
   listaId?: string
+
+  // ✅ Aquí lo agregas
+  estado?: EstadoEquipo
+  precioReal?: number
+  cantidadReal?: number
 }
+
 
 
 
@@ -400,101 +412,85 @@ export interface ProyectoGastoItemUpdatePayload extends Partial<ProyectoGastoIte
 // 🏗️ GESTION EQUIPOS
 // ============================
 
-export interface ListaEquiposPayload {
+export interface ListaEquipoPayload {
   proyectoId: string
   nombre: string
   descripcion?: string
-  estado?: string
+  estado?: EstadoListaEquipo
 }
+export interface ListaEquipoUpdatePayload extends Partial<ListaEquipoPayload> {}
 
-export interface ListaEquiposUpdatePayload extends Partial<ListaEquiposPayload> {}
-
-export interface ListaEquiposItemPayload {
+export interface ListaEquipoItemPayload {
   listaId: string
   proyectoEquipoItemId?: string
+  proveedorId?: string
   codigo: string
   descripcion: string
   unidad: string
   cantidad: number
-  precioReferencial?: number
+  verificado?: boolean
+  comentarioRevision?: string
+  presupuesto?: number
+  precioElegido?: number
+  costoElegido?: number
+  costoPedido?: number
+  costoReal?: number
+  cantidadPedida?: number
+  cantidadEntregada?: number
 }
+export interface ListaEquipoItemUpdatePayload extends Partial<ListaEquipoItemPayload> {}
 
-export interface ListaEquiposItemUpdatePayload extends Partial<ListaEquiposItemPayload> {}
 
-export interface CotizacionProveedorPayload {
-  proyectoId: string
+export interface ProveedorPayload {
   nombre: string
   ruc?: string
-  contacto?: string
-  estado?: string
 }
+export interface ProveedorUpdatePayload extends Partial<ProveedorPayload> {}
 
+export interface CotizacionProveedorPayload {
+  proveedorId: string
+  proyectoId: string
+  nombre: string
+  fecha: string
+}
 export interface CotizacionProveedorUpdatePayload extends Partial<CotizacionProveedorPayload> {}
 
 export interface CotizacionProveedorItemPayload {
   cotizacionId: string
-  listaItemId: string
+  listaEquipoItemId: string
   precioUnitario: number
-  tiempoEntrega: number
-  seleccionado?: boolean
+  cantidad: number
+  costoTotal: number
+  tiempoEntrega?: string
+  esSeleccionada?: boolean
 }
-
 export interface CotizacionProveedorItemUpdatePayload extends Partial<CotizacionProveedorItemPayload> {}
 
-export interface ListaRequerimientoPayload {
+export interface PedidoEquipoPayload {
   proyectoId: string
-  nombre: string
-  descripcion?: string
-  estado?: string
-  fechaAprobacion?: string
-}
-
-export interface ListaRequerimientoUpdatePayload extends Partial<ListaRequerimientoPayload> {}
-
-export interface ListaRequerimientoItemPayload {
+  responsableId: string
   listaId: string
-  proyectoEquipoItemId: string
-  codigo: string
-  descripcion: string
-  unidad: string
-  cantidad: number
-  precioUnitario?: number
-  costoTotal?: number
-  fechaRequerida?: string
-  estado?: string
-  observaciones?: string
-  nuevo?: boolean
-}
-
-export interface ListaRequerimientoItemUpdatePayload extends Partial<ListaRequerimientoItemPayload> {}
-
-export interface PaqueteCompraPayload {
-  proyectoId: string
-  nombre: string
-  descripcion?: string
-  estado?: string
-  fechaEnvio?: string
+  codigo?: string
+  estado?: EstadoPedido
+  observacion?: string
+  fechaPedido?: string  
   fechaEntregaEstimada?: string
+  fechaEntregaReal?: string
 }
+export interface PedidoEquipoUpdatePayload extends Partial<PedidoEquipoPayload> {}
 
-export interface PaqueteCompraUpdatePayload extends Partial<PaqueteCompraPayload> {}
-
-export interface PaqueteCompraItemPayload {
-  paqueteId: string
-  requerimientoItemId: string
-  codigo: string
-  descripcion: string
-  unidad: string
-  cantidad: number
-  proveedor?: string
+export interface PedidoEquipoItemPayload {
+  pedidoId: string
+  listaEquipoItemId: string
+  cantidadPedida: number
   precioUnitario?: number
-  precioReferencial?: number
-  precioCotizado?: number
   costoTotal?: number
-  fechaEntrega?: string
+  fechaNecesaria: string
+  estado?: EstadoPedidoItem
+  cantidadAtendida?: number
+  comentarioLogistica?: string
 }
-
-export interface PaqueteCompraItemUpdatePayload extends Partial<PaqueteCompraItemPayload> {}
+export interface PedidoEquipoItemUpdatePayload extends Partial<PedidoEquipoItemPayload> {}
 
 // ============================
 // 💲 Valorización Payloads

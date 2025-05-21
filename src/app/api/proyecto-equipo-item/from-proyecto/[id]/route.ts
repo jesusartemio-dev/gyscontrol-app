@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic' // 🛡️ Evita caché de rutas
 
 export async function GET(_: Request, context: { params: { id: string } }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
 
     const items = await prisma.proyectoEquipoItem.findMany({
       where: {

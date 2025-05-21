@@ -11,9 +11,26 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { cotizacionId, gestorId, fechaInicio } = body
+    const {
+      cotizacionId,
+      gestorId,
+      clienteId,
+      comercialId,
+      nombre,
+      codigo,
+      estado = 'pendiente',
+      fechaInicio,
+      fechaFin,
+      totalEquiposInterno,
+      totalServiciosInterno,
+      totalGastosInterno,
+      totalInterno,
+      totalCliente,
+      descuento,
+      grandTotal
+    } = body
 
-    if (!cotizacionId || !gestorId || !fechaInicio) {
+    if (!cotizacionId || !gestorId || !fechaInicio || !nombre || !codigo) {
       return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 })
     }
 
@@ -33,22 +50,23 @@ export async function POST(req: Request) {
 
     const proyecto = await prisma.proyecto.create({
       data: {
-        clienteId: cotizacion.clienteId!,
-        comercialId: cotizacion.comercialId!,
+        clienteId,
+        comercialId,
         gestorId,
         cotizacionId,
-        nombre: cotizacion.nombre,
-        codigo: '',
-        estado: 'activo',
+        nombre,
+        codigo,
+        estado,
         fechaInicio: new Date(fechaInicio),
+        fechaFin: fechaFin ? new Date(fechaFin) : undefined,
 
-        totalEquiposInterno: cotizacion.totalEquiposInterno,
-        totalServiciosInterno: cotizacion.totalServiciosInterno,
-        totalGastosInterno: cotizacion.totalGastosInterno,
-        totalInterno: cotizacion.totalInterno,
-        totalCliente: cotizacion.totalCliente,
-        descuento: cotizacion.descuento,
-        grandTotal: cotizacion.grandTotal,
+        totalEquiposInterno,
+        totalServiciosInterno,
+        totalGastosInterno,
+        totalInterno,
+        totalCliente,
+        descuento,
+        grandTotal,
 
         equipos: {
           create: cotizacion.equipos.map((grupo) => ({

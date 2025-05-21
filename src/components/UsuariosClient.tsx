@@ -4,16 +4,29 @@ import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import type { RolUsuario } from '@/types/modelos'
+
+// 👇 Lista centralizada
+const roles: RolUsuario[] = [
+  'admin',
+  'comercial',
+  'presupuestos',
+  'proyectos', // ✅ FALTABA ESTE
+  'coordinador',
+  'logistico',
+  'gestor',
+  'gerente',
+  'colaborador',
+]
 
 
+// 📦 Zod Schema con los roles centralizados
 export const schema = z.object({
   id: z.string().optional(),
   email: z.string().email({ message: 'Correo inválido' }),
   name: z.string().min(2, { message: 'Nombre debe tener al menos 2 caracteres' }),
   password: z.string().min(4, { message: 'La contraseña debe tener al menos 4 caracteres' }).optional(),
-  role: z.enum(['admin', 'comercial', 'proyectos', 'logistica'], {
-    required_error: 'Elige un rol',
-  }),
+  role: z.enum(roles as [RolUsuario, ...RolUsuario[]], { required_error: 'Elige un rol' }),
 }).refine(data => {
   if (!data.id && !data.password) return false
   if (data.id && data.password && data.password.length < 4) return false
@@ -25,7 +38,13 @@ export const schema = z.object({
 
 export default function UsuariosClient() {
   const [usuarios, setUsuarios] = useState<any[]>([])
-  const [form, setForm] = useState({ id: '', email: '', name: '', password: '', role: 'comercial' })
+  const [form, setForm] = useState({
+    id: '',
+    email: '',
+    name: '',
+    password: '',
+    role: 'comercial' as RolUsuario,
+  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -44,12 +63,8 @@ export default function UsuariosClient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
     const dataToSend: any = { ...form }
-
-    if (form.id && !form.password) {
-      delete dataToSend.password
-    }
+    if (form.id && !form.password) delete dataToSend.password
 
     const valid = schema.safeParse(dataToSend)
     if (!valid.success) {
@@ -59,7 +74,6 @@ export default function UsuariosClient() {
 
     setError('')
     setLoading(true)
-
     const method = form.id ? 'PUT' : 'POST'
     const res = await fetch('/api/admin/usuarios', {
       method,
@@ -76,8 +90,8 @@ export default function UsuariosClient() {
     }
 
     toast.success(method === 'POST' ? 'Usuario creado' : 'Usuario actualizado')
-
     const data = await res.json()
+
     if (method === 'POST') {
       setUsuarios([...usuarios, data])
     } else {
@@ -124,10 +138,11 @@ export default function UsuariosClient() {
             <p className="text-sm text-gray-500 col-span-2">Deja la contraseña vacía si no deseas cambiarla.</p>
           )}
           <select name="role" className="border p-2 rounded" value={form.role} onChange={handleChange}>
-            <option value="admin">Administrador</option>
-            <option value="comercial">Comercial</option>
-            <option value="proyectos">Proyectos</option>
-            <option value="logistica">Logística</option>
+            {roles.map((r) => (
+              <option key={r} value={r}>
+                {r.charAt(0).toUpperCase() + r.slice(1)}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -145,7 +160,6 @@ export default function UsuariosClient() {
               ? 'Actualizar Usuario'
               : 'Crear Usuario'}
           </button>
-
           {form.id && (
             <button
               type="button"
@@ -189,16 +203,15 @@ export default function UsuariosClient() {
                 >
                   Editar
                 </button>
-
                 <ConfirmDialog
-                    title="¿Eliminar usuario?"
-                    description={`¿Estás seguro de eliminar a ${u.name}?`}
-                    onConfirm={() => handleDelete(u.id)}
-                    trigger={
-                        <button className="text-sm text-red-500 hover:underline">
-                        Eliminar
-                        </button>
-                    }
+                  title="¿Eliminar usuario?"
+                  description={`¿Estás seguro de eliminar a ${u.name}?`}
+                  onConfirm={() => handleDelete(u.id)}
+                  trigger={
+                    <button className="text-sm text-red-500 hover:underline">
+                      Eliminar
+                    </button>
+                  }
                 />
               </td>
             </tr>

@@ -8,9 +8,9 @@
 Paso 1: Modelos base
 Primero te paso el bloque Prisma con los modelos nuevos clave:
 
-ListaEquipos
+ListaEquipo
 
-ListaEquiposItem
+ListaEquipoItem
 
 CotizacionProveedor
 
@@ -39,7 +39,7 @@ Con page.tsx iniciales para cada ruta clave.
 Diseñamos:
 
 Módulo	Componente principal
-Lista técnica	ListaEquiposItemTable.tsx
+Lista técnica	ListaEquipoItemTable.tsx
 Cotizaciones	CotizacionComparador.tsx
 Requerimientos	ListaRequerimientoForm.tsx
 Paquetes de compra	PaqueteCompraTable.tsx
@@ -68,9 +68,9 @@ Exportar reportes por proyecto o proveedor
 Paso FLUJO GYS	Adaptado para gestión de equipos
 Paso 0.1	Convenciones para proyecto-equipo, lista-equipos, cotizacion-proveedor, paquete-compra, etc.
 Paso 1	Tailwind con UI clara: Validaciones inline, botones de aprobación, listas agrupadas
-Paso 2	Modelos en schema.prisma: ListaEquipos, CotizacionProveedorItem, PaqueteCompraItem, etc.
-Paso 3	Tipos en types/modelos.ts: ListaEquipos, ProyectoEquipoItem con .include()
-Paso 4	Payloads en types/payloads.ts: ListaEquiposPayload, CotizacionProveedorItemPayload, etc.
+Paso 2	Modelos en schema.prisma: ListaEquipo, CotizacionProveedorItem, PaqueteCompraItem, etc.
+Paso 3	Tipos en types/modelos.ts: ListaEquipo, ProyectoEquipoItem con .include()
+Paso 4	Payloads en types/payloads.ts: ListaEquipoPayload, CotizacionProveedorItemPayload, etc.
 Paso 5	APIs:
 
 /api/lista-equipos/
@@ -82,14 +82,14 @@ Paso 5	APIs:
 etc. |
 | Paso 6 | Servicios:
 
-listaEquipos.ts
+ListaEquipo.ts
 
 cotizacionProveedorItem.ts
 
 proyectoEquipoItem.ts |
 | Paso 7 | Componentes cliente:
 
-ListaEquiposForm.tsx, ListaEquiposItemList.tsx
+ListaEquipoForm.tsx, ListaEquipoItemList.tsx
 
 CotizacionProveedorTable.tsx
 
@@ -121,13 +121,13 @@ ProyectoEquipoItemList.tsx → lista de ítems de un grupo (ProyectoEquipoItem)
 
 📂 src/components/equipos/
 📋 Listas Técnicas
-ListaEquiposList.tsx → muestra todas las listas técnicas
+ListaEquipoList.tsx → muestra todas las listas técnicas
 
-ListaEquiposItemList.tsx → lista de ítems por lista técnica
+ListaEquipoItemList.tsx → lista de ítems por lista técnica
 
-ListaEquiposItemForm.tsx → formulario para agregar ítems técnicos
+ListaEquipoItemForm.tsx → formulario para agregar ítems técnicos
 
-ListaEquiposResumenTotales.tsx → visualización de costos referenciales, proveedor sugerido, etc.
+ListaEquipoResumenTotales.tsx → visualización de costos referenciales, proveedor sugerido, etc.
 
 📂 src/components/logistica/
 📩 Cotizaciones a Proveedores
@@ -155,7 +155,7 @@ ValorizacionList.tsx → valorizaciones por proyecto
 RegistroHorasList.tsx → listado de horas registradas por técnico y fecha
 
 Bonus:
-Si quieres centralizar formularios reutilizables (por ejemplo, para ProyectoEquipoItem o ListaEquiposItem), puedes incluir también:
+Si quieres centralizar formularios reutilizables (por ejemplo, para ProyectoEquipoItem o ListaEquipoItem), puedes incluir también:
 
 ProyectoEquipoItemForm.tsx
 
@@ -192,19 +192,19 @@ onUpdated?: (item) => void
 
 🧩 Componentes:
 
-ListaEquiposForm
+ListaEquipoForm
 
 proyectoId: string
 
-onCreated: (lista: ListaEquiposPayload) => void
+onCreated: (lista: ListaEquipoPayload) => void
 
-ListaEquiposList
+ListaEquipoList
 
 proyectoId: string
 
 onSelect: (listaId: string) => void
 
-ListaEquiposItemList
+ListaEquipoItemList
 
 listaId: string
 
@@ -212,13 +212,13 @@ editable?: boolean
 
 onUpdated?: (item) => void
 
-ListaEquiposItemForm
+ListaEquipoItemForm
 
 listaId: string
 
 onCreated?: () => void
 
-ListaEquiposResumenTotales
+ListaEquipoResumenTotales
 
 listaId: string
 

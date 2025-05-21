@@ -1,66 +1,64 @@
 // ===================================================
 // 📁 Archivo: [id]/route.ts
-// 📌 Ubicación: src/app/api/cotizacion-proveedor-item/[id]/route.ts
-// 🔧 Descripción: API para obtener, actualizar o eliminar ítems de cotización de proveedor
+// 📌 Ubicación: src/app/api/cotizacion-proveedor-item/[id]
+// 🔧 Descripción: API para ver, actualizar o eliminar un ítem de cotización
 //
-// 🧠 Uso: Gestión de ítems asociados a una cotización por proveedor
+// 🧠 Uso: Logística puede ajustar precio, entrega o eliminar ítem
+// ✍️ Autor: Jesús Artemio
+// 📅 Última actualización: 2025-05-20
 // ===================================================
 
-import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import type { CotizacionProveedorItemPayload } from '@/types'
+import { NextResponse } from 'next/server'
+import type { CotizacionProveedorItemUpdatePayload } from '@/types'
 
-// ✅ Obtener ítem por ID
 export async function GET(context: { params: { id: string } }) {
   try {
     const { id } = await context.params
-
-    const item = await prisma.cotizacionProveedorItem.findUnique({
+    const data = await prisma.cotizacionProveedorItem.findUnique({
       where: { id },
       include: {
         cotizacion: true,
-        listaItem: true
-      }
+        listaEquipoItem: true,
+      },
     })
-
-    return NextResponse.json(item)
+    return NextResponse.json(data)
   } catch (error) {
-    return NextResponse.json({ error: 'Error al obtener ítem de cotización de proveedor' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Error al obtener el ítem: ' + String(error) },
+      { status: 500 }
+    )
   }
 }
 
-// ✅ Actualizar ítem
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(context: { params: { id: string }; request: Request }) {
   try {
     const { id } = await context.params
-    const payload: Partial<CotizacionProveedorItemPayload> = await request.json()
+    const body: CotizacionProveedorItemUpdatePayload = await context.request.json()
 
-    const actualizado = await prisma.cotizacionProveedorItem.update({
+    const data = await prisma.cotizacionProveedorItem.update({
       where: { id },
-      data: {
-        precioUnitario: payload.precioUnitario,
-        tiempoEntrega: payload.tiempoEntrega,
-        seleccionado: payload.seleccionado
-      }
+      data: body,
     })
 
-    return NextResponse.json(actualizado)
+    return NextResponse.json(data)
   } catch (error) {
-    return NextResponse.json({ error: 'Error al actualizar ítem de cotización de proveedor' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Error al actualizar el ítem: ' + String(error) },
+      { status: 500 }
+    )
   }
 }
 
-// ✅ Eliminar ítem
 export async function DELETE(context: { params: { id: string } }) {
   try {
     const { id } = await context.params
-
-    await prisma.cotizacionProveedorItem.delete({
-      where: { id }
-    })
-
+    await prisma.cotizacionProveedorItem.delete({ where: { id } })
     return NextResponse.json({ status: 'OK' })
   } catch (error) {
-    return NextResponse.json({ error: 'Error al eliminar ítem de cotización de proveedor' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Error al eliminar el ítem: ' + String(error) },
+      { status: 500 }
+    )
   }
 }

@@ -1,7 +1,7 @@
 // ===================================================
 // 📁 Archivo: ProyectoEquipoSeleccionModal.tsx
 // 📌 Descripción: Modal para seleccionar ProyectoEquipoItems no vinculados
-// 🧠 Uso: Se usa en ListaEquiposPage para asociar equipos a una lista
+// 🧠 Uso: Se usa en ListaEquipoPage para asociar equipos a una lista
 // ✍️ Autor: Asistente IA GYS
 // 📅 Creado: 2025-05-10
 // ===================================================

@@ -1,4 +1,4 @@
-import type { Proyecto } from '@/types'
+import type { Proyecto, ProyectoPayload } from '@/types'
 
 // Obtener todos los proyectos
 export async function getProyectos(): Promise<Proyecto[]> {
@@ -37,13 +37,10 @@ export async function deleteProyecto(id: string): Promise<void> {
   if (!res.ok) throw new Error('Error al eliminar proyecto')
 }
 
-// ✅ Crear proyecto desde cotización (nuevo flujo)
+// ✅ Crear proyecto desde cotización (nuevo flujo con payload completo)
 export async function crearProyectoDesdeCotizacion(
   cotizacionId: string,
-  data: {
-    gestorId: string
-    fechaInicio: Date
-  }
+  data: ProyectoPayload
 ): Promise<Proyecto> {
   const res = await fetch('/api/proyecto/from-cotizacion', {
     method: 'POST',

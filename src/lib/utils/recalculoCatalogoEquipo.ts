@@ -22,7 +22,7 @@ export function calcularPrecioVenta(precioInterno: number, margen: number): numb
  * @param equipos lista de equipos con precioInterno y margen
  * @returns nueva lista con precios de venta recalculados
  */
-export function recalcularListaEquipos<T extends { precioInterno: number; margen: number } & Record<string, any>>(
+export function recalcularListaEquipo<T extends { precioInterno: number; margen: number } & Record<string, any>>(
   equipos: T[]
 ): T[] {
   return equipos.map(eq => ({

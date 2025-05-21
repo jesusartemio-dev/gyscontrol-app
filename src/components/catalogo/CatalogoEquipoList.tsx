@@ -1,7 +1,7 @@
 // ===================================================
 // 💽 Archivo: CatalogoEquipoList.tsx (Avanzado)
 // 📋 Ubicación: src/components/catalogo/
-// 🔧 Descripción: Listado editable de Catálogo de Equipos optimizado.
+// 🔧 Descripción: Listado editable de Catálogo de Equipos optimizado con filtros accesibles.
 // ✍️ Autor: Jesús Artemio
 // 🗓️ Última actualización: 2025-04-25
 // ===================================================
@@ -104,45 +104,63 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
 
   return (
     <div>
-      <div className="flex flex-wrap gap-4 mb-4">
-        <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
-          <SelectTrigger className="w-60">
-            <SelectValue placeholder="Categoría" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__ALL__">Todas las categorías</SelectItem>
-            {categorias.map(cat => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap gap-4 mb-4 items-end">
+        <div className="flex flex-col space-y-1">
+          <label htmlFor="categoria" className="text-sm font-medium text-gray-700">Categoría</label>
+          <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+            <SelectTrigger id="categoria" className="w-60">
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todas las categorías</SelectItem>
+              {categorias.map(cat => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Select value={unidadFiltro} onValueChange={setUnidadFiltro}>
-          <SelectTrigger className="w-60">
-            <SelectValue placeholder="Unidad" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__ALL__">Todas las unidades</SelectItem>
-            {unidades.map(u => (
-              <SelectItem key={u} value={u}>{u}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col space-y-1">
+          <label htmlFor="unidad" className="text-sm font-medium text-gray-700">Unidad</label>
+          <Select value={unidadFiltro} onValueChange={setUnidadFiltro}>
+            <SelectTrigger id="unidad" className="w-60">
+              <SelectValue placeholder="Unidad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todas las unidades</SelectItem>
+              {unidades.map(u => (
+                <SelectItem key={u} value={u}>{u}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Input
-          type="text"
-          placeholder="Buscar código o descripción"
-          value={textoFiltro}
-          onChange={e => setTextoFiltro(e.target.value)}
-          className="w-80"
-        />
+        <div className="flex flex-col space-y-1">
+          <label htmlFor="buscar" className="text-sm font-medium text-gray-700">Buscar</label>
+          <Input
+            id="buscar"
+            type="text"
+            placeholder="Buscar código o descripción"
+            value={textoFiltro}
+            onChange={e => setTextoFiltro(e.target.value)}
+            className="w-80"
+          />
+        </div>
+
+        <Button variant="outline" onClick={() => {
+          setCategoriaFiltro('__ALL__')
+          setUnidadFiltro('__ALL__')
+          setTextoFiltro('')
+        }}>
+          Limpiar filtros
+        </Button>
       </div>
 
       <div className="overflow-x-auto">
         <table className="table-auto w-full border mt-4 text-sm">
           <thead className="bg-gray-100">
             <tr>
-              {['Código', 'Descripción', 'Categoría', 'Unidad', 'Marca', 'Precio Interno', 'Margen', 'Precio Venta', 'Estado', 'Creado', 'Actualizado', 'Acciones'].map(th => (
+              {['Código', 'Descripción', 'Categoría', 'Unidad', 'Marca', 'Precio Interno', 'Margen', 'Precio Venta', 'Estado', 'Acciones'].map(th => (
                 <th key={th} className="border px-2 py-1">{th}</th>
               ))}
             </tr>
@@ -192,8 +210,6 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                     <option value="rechazado">Rechazado</option>
                   </select>
                 </td>
-                <td className="border px-2 py-1 text-gray-500">{new Date(eq.createdAt).toLocaleDateString()}</td>
-                <td className="border px-2 py-1 text-gray-500">{new Date(eq.updatedAt).toLocaleDateString()}</td>
                 <td className="border px-2 py-1 text-center">
                   {editandoId === eq.id ? (
                     <>

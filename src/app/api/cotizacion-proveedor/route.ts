@@ -1,53 +1,44 @@
 // ===================================================
 // 📁 Archivo: route.ts
-// 📌 Ubicación: src/app/api/cotizacion-proveedor/route.ts
-// 🔧 Descripción: API para obtener y crear cotizaciones de proveedores
+// 📌 Ubicación: src/app/api/cotizacion-proveedor/
+// 🔧 Descripción: API para crear y listar cotizaciones de proveedores
 //
-// 🧠 Uso: Manejo de cotizaciones por proveedor en las listas de equipos
+// 🧠 Uso: Usado por logística para registrar cotizaciones de equipos
+// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
+// 📅 Última actualización: 2025-05-20
 // ===================================================
 
-import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
 import type { CotizacionProveedorPayload } from '@/types'
 
-// ✅ Permite filtrar por proyectoId vía query param
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const proyectoId = searchParams.get('proyectoId')
-
     const data = await prisma.cotizacionProveedor.findMany({
-      where: proyectoId ? { proyectoId } : undefined,
       include: {
+        proveedor: true,
         proyecto: true,
-        items: {
-          include: {
-            listaItem: true
-          }
-        }
-      }
+        items: true,
+      },
     })
-
     return NextResponse.json(data)
   } catch (error) {
-    return NextResponse.json({ error: 'Error al obtener cotizaciones' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Error al obtener cotizaciones: ' + String(error) },
+      { status: 500 }
+    )
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const payload: CotizacionProveedorPayload = await request.json()
-    const nueva = await prisma.cotizacionProveedor.create({
-      data: {
-        proyectoId: payload.proyectoId,
-        nombre: payload.nombre,
-        ruc: payload.ruc,
-        contacto: payload.contacto,
-        estado: payload.estado ?? 'enviado'
-      }
-    })
-    return NextResponse.json(nueva)
+    const body: CotizacionProveedorPayload = await request.json()
+    const data = await prisma.cotizacionProveedor.create({ data: body })
+    return NextResponse.json(data)
   } catch (error) {
-    return NextResponse.json({ error: 'Error al crear la cotización del proveedor' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Error al crear cotización: ' + String(error) },
+      { status: 500 }
+    )
   }
 }

@@ -1,8 +1,3 @@
-// ===================================================
-// 📁 Archivo: ModalAgregarItemDesdeEquipo.tsx
-// 📌 Descripción: Modal para seleccionar e insertar ProyectoEquipoItem a una ListaEquipos
-// ===================================================
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ProyectoEquipoItem } from '@/types'
-import { createListaEquiposItemFromProyecto } from '@/lib/services/listaEquiposItem'
+import { createListaEquipoItemFromProyecto } from '@/lib/services/listaEquipoItem'
 import { getProyectoEquipoItemsDisponibles } from '@/lib/services/proyectoEquipoItem'
 import { toast } from 'sonner'
 
@@ -51,7 +46,7 @@ export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClo
       setLoading(true)
       await Promise.all(
         seleccionados.map((itemId) =>
-          createListaEquiposItemFromProyecto(listaId, itemId)
+          createListaEquipoItemFromProyecto(listaId, itemId)
         )
       )
       toast.success('✅ Ítems agregados a la lista')
@@ -66,20 +61,21 @@ export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClo
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>➕ Agregar Equipos Técnicos a la Lista</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="h-96">
+        <ScrollArea className="h-[450px]">
           <table className="w-full text-sm border">
-            <thead className="bg-gray-100">
+            <thead className="bg-gray-100 text-gray-800">
               <tr>
-                <th className="p-2">✔</th>
+                <th className="p-2 text-center">✔</th>
                 <th className="p-2 text-left">Código</th>
                 <th className="p-2 text-left">Descripción</th>
-                <th className="p-2">Unidad</th>
-                <th className="p-2">Cantidad</th>
+                <th className="p-2 text-left">Unidad</th>
+                <th className="p-2 text-center">Cantidad</th>
+                <th className="p-2 text-left">Grupo</th>
               </tr>
             </thead>
             <tbody>
@@ -95,6 +91,9 @@ export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClo
                   <td className="p-2 text-gray-700">{item.descripcion}</td>
                   <td className="p-2 text-center">{item.unidad}</td>
                   <td className="p-2 text-center">{item.cantidad}</td>
+                  <td className="p-2 text-sm text-gray-600">
+                    {item.proyectoEquipo?.nombre || '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -3,89 +3,115 @@
 import { useEffect, useState } from 'react'
 import {
   getCategoriaEquipo,
-  createCategoriaEquipo,
-  deleteCategoriaEquipo
+  createCategoriaEquipo
 } from '@/lib/services/categoriaEquipo'
-
-interface Categoria {
-  id: string
-  nombre: string
-}
+import { toast } from 'sonner'
+import { exportarCategoriasEquipoAExcel } from '@/lib/utils/categoriaEquipoExcel'
+import {
+  leerCategoriasEquipoDesdeExcel,
+  validarCategoriasEquipo
+} from '@/lib/utils/categoriaEquipoImportUtils'
+import type { CategoriaEquipo } from '@/types'
+import CategoriaEquipoForm from '@/components/catalogo/CategoriaEquipoForm'
+import CategoriaEquipoList from '@/components/catalogo/CategoriaEquipoList'
+import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 
 export default function CategoriasEquipoPage() {
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [nuevaCategoria, setNuevaCategoria] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
+  const [importando, setImportando] = useState(false)
+  const [errores, setErrores] = useState<string[]>([])
+
+  const cargarCategorias = async () => {
+    const data = await getCategoriaEquipo()
+    setCategorias(data)
+  }
 
   useEffect(() => {
-    getCategoriaEquipo()
-      .then(setCategorias)
-      .catch(() => setError('Error al cargar categorías'))
+    cargarCategorias()
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+  const handleCreated = (nueva: CategoriaEquipo) => {
+    setCategorias((prev) => [nueva, ...prev])
+  }
 
-    if (!nuevaCategoria.trim()) {
-      setError('Debes ingresar un nombre')
-      return
-    }
+  const handleUpdated = (actualizada: CategoriaEquipo) => {
+    setCategorias((prev) =>
+      prev.map((c) => (c.id === actualizada.id ? actualizada : c))
+    )
+  }
 
+  const handleDeleted = (id: string) => {
+    setCategorias((prev) => prev.filter((c) => c.id !== id))
+  }
+
+  const handleExportar = () => {
     try {
-      const creada = await createCategoriaEquipo({ nombre: nuevaCategoria })
-      setCategorias(prev => [...prev, creada])
-      setNuevaCategoria('')
+      exportarCategoriasEquipoAExcel(categorias)
+      toast.success('Categorías exportadas exitosamente')
     } catch (err) {
-      console.error(err)
-      setError('Error al crear la categoría')
+      toast.error('Error al exportar categorías')
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportando(true)
+    setErrores([])
+
     try {
-      await deleteCategoriaEquipo(id)
-      setCategorias(prev => prev.filter(cat => cat.id !== id))
+      const datos = await leerCategoriasEquipoDesdeExcel(file)
+      const nombresExistentes = categorias.map(c => c.nombre)
+      const { nuevas, errores: erroresImport } = validarCategoriasEquipo(datos, nombresExistentes)
+
+      if (erroresImport.length > 0) {
+        setErrores(erroresImport)
+        toast.error('Errores encontrados en la importación')
+        return
+      }
+
+      await Promise.all(nuevas.map(c => createCategoriaEquipo({ nombre: c.nombre })))
+      toast.success(`${nuevas.length} categorías importadas correctamente`)
+      cargarCategorias()
     } catch (err) {
-      console.error(err)
-      setError('Error al eliminar la categoría')
+      console.error('Error al importar categorías:', err)
+      toast.error('Error inesperado en la importación')
+    } finally {
+      setImportando(false)
+      e.target.value = ''
     }
   }
 
   return (
-    <div className="max-w-xl mx-auto mt-8">
-      <h1 className="text-2xl font-bold mb-4">Categorías de Equipos</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">🏷 Categorías de Equipos</h1>
+        <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
+      </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-2 mb-4">
-        <input
-          value={nuevaCategoria}
-          onChange={e => setNuevaCategoria(e.target.value)}
-          placeholder="Nueva categoría"
-          className="border px-2 py-1 rounded w-full"
+      {importando && <p className="text-sm text-gray-500">Importando categorías...</p>}
+
+      {errores.length > 0 && (
+        <div className="text-sm text-red-600 space-y-1 bg-red-100 p-3 rounded">
+          <p className="font-semibold">Errores al importar:</p>
+          <ul className="list-disc pl-5">
+            {errores.map((err, idx) => (
+              <li key={idx}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <CategoriaEquipoForm onCreated={handleCreated} />
+
+      <div className="bg-white p-4 rounded shadow">
+        <CategoriaEquipoList
+          data={categorias}
+          onUpdate={handleUpdated}
+          onDelete={handleDeleted}
+          onRefresh={cargarCategorias}
         />
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700"
-        >
-          Agregar
-        </button>
-      </form>
-
-      {error && <p className="text-red-500 mb-2">{error}</p>}
-
-      <ul className="pl-5 space-y-1">
-        {categorias.map(c => (
-          <li key={c.id} className="flex justify-between items-center border-b py-1">
-            <span>{c.nombre}</span>
-            <button
-              onClick={() => handleDelete(c.id)}
-              className="text-red-500 hover:text-red-700 text-sm"
-            >
-              Eliminar
-            </button>
-          </li>
-        ))}
-      </ul>
+      </div>
     </div>
   )
 }

@@ -3,7 +3,7 @@
 // ===================================================
 // 📁 Archivo: CatalogoServicioList.tsx
 // 📌 Ubicación: src/components/catalogo/
-// 🔧 Lista de servicios usando acordeones modernos.
+// 🔧 Lista de servicios usando acordeones modernos con filtros etiquetados.
 // ===================================================
 
 import { useEffect, useState } from 'react'
@@ -52,47 +52,63 @@ export default function CatalogoServicioList({ data, onUpdate, onDelete }: Props
     <div className="space-y-4">
       <h2 className="text-xl font-semibold">📋 Lista de Servicios</h2>
 
-      {/* Filtros superiores */}
-      <div className="flex flex-wrap gap-4">
-        <Input
-          placeholder="Buscar por nombre o descripción"
-          value={filtroTexto}
-          onChange={(e) => setFiltroTexto(e.target.value)}
-          className="w-60"
-        />
-        <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Categoría" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__ALL__">Todas</SelectItem>
-            {categorias.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filtroUnidad} onValueChange={setFiltroUnidad}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Unidad" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__ALL__">Todas</SelectItem>
-            {unidades.map((u) => (
-              <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filtroRecurso} onValueChange={setFiltroRecurso}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Recurso" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__ALL__">Todos</SelectItem>
-            {recursos.map((r) => (
-              <SelectItem key={r.id} value={r.id}>{r.nombre}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Filtros superiores con etiquetas */}
+      <div className="flex flex-wrap gap-4 items-end">
+        <div className="flex flex-col space-y-1">
+          <label htmlFor="filtroTexto" className="text-sm font-medium text-gray-700">Buscar</label>
+          <Input
+            id="filtroTexto"
+            placeholder="Nombre o descripción"
+            value={filtroTexto}
+            onChange={(e) => setFiltroTexto(e.target.value)}
+            className="w-60"
+          />
+        </div>
+
+        <div className="flex flex-col space-y-1">
+          <label className="text-sm font-medium text-gray-700">Categoría</label>
+          <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todas</SelectItem>
+              {categorias.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col space-y-1">
+          <label className="text-sm font-medium text-gray-700">Unidad</label>
+          <Select value={filtroUnidad} onValueChange={setFiltroUnidad}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Unidad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todas</SelectItem>
+              {unidades.map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col space-y-1">
+          <label className="text-sm font-medium text-gray-700">Recurso</label>
+          <Select value={filtroRecurso} onValueChange={setFiltroRecurso}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Recurso" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todos</SelectItem>
+              {recursos.map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Renderizado de servicios con acordeones */}

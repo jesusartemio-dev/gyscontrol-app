@@ -1,75 +1,91 @@
 // ===================================================
 // 📁 Archivo: cotizacionProveedor.ts
-// 📌 Ubicación: src/lib/services
-// 🔧 Descripción: Servicios para cotizaciones por proveedor
+// 📌 Ubicación: src/lib/services/
+// 🔧 Descripción: Funciones para consumir API de cotizaciones de proveedores
 //
-// 🧠 Uso: Llamadas a la API REST para gestionar CotizacionProveedor
+// 🧠 Uso: Se utiliza en vistas de logística para registrar y consultar cotizaciones.
+// ✍️ Autor: Jesús Artemio (GYS)
+// 📅 Última actualización: 2025-05-21
 // ===================================================
 
-import { CotizacionProveedor, CotizacionProveedorPayload } from '@/types'
+import {
+  CotizacionProveedor,
+  CotizacionProveedorPayload,
+  CotizacionProveedorUpdatePayload,
+} from '@/types'
 
 const BASE_URL = '/api/cotizacion-proveedor'
 
-// ✅ Nueva versión que permite pasar un proyectoId como filtro
-export async function getCotizacionesProveedor(proyectoId?: string): Promise<CotizacionProveedor[]> {
+// ✅ Obtener todas las cotizaciones
+export async function getCotizacionesProveedor(): Promise<CotizacionProveedor[] | null> {
   try {
-    const url = proyectoId ? `${BASE_URL}?proyectoId=${proyectoId}` : BASE_URL
-    const res = await fetch(url)
-    if (!res.ok) throw new Error('Error al obtener cotizaciones de proveedor')
-    return res.json()
+    const res = await fetch(BASE_URL)
+    if (!res.ok) throw new Error('Error al obtener cotizaciones')
+    return await res.json()
   } catch (error) {
-    console.error('getCotizacionesProveedor:', error)
-    return []
-  }
-}
-
-export async function getCotizacionProveedorById(id: string): Promise<CotizacionProveedor | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/${id}`)
-    if (!res.ok) throw new Error('Error al obtener cotización de proveedor')
-    return res.json()
-  } catch (error) {
-    console.error('getCotizacionProveedorById:', error)
+    console.error('❌ getCotizacionesProveedor:', error)
     return null
   }
 }
 
-export async function createCotizacionProveedor(payload: CotizacionProveedorPayload): Promise<CotizacionProveedor | null> {
+// ✅ Obtener una cotización por ID
+export async function getCotizacionProveedorById(id: string): Promise<CotizacionProveedor | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/${id}`)
+    if (!res.ok) throw new Error('Error al obtener la cotización')
+    return await res.json()
+  } catch (error) {
+    console.error('❌ getCotizacionProveedorById:', error)
+    return null
+  }
+}
+
+// ✅ Crear nueva cotización
+export async function createCotizacionProveedor(
+  payload: CotizacionProveedorPayload
+): Promise<CotizacionProveedor | null> {
   try {
     const res = await fetch(BASE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error('Error al crear cotización de proveedor')
-    return res.json()
+    if (!res.ok) throw new Error('Error al crear cotización')
+    return await res.json()
   } catch (error) {
-    console.error('createCotizacionProveedor:', error)
+    console.error('❌ createCotizacionProveedor:', error)
     return null
   }
 }
 
-export async function updateCotizacionProveedor(id: string, payload: Partial<CotizacionProveedorPayload>): Promise<CotizacionProveedor | null> {
+// ✅ Actualizar cotización
+export async function updateCotizacionProveedor(
+  id: string,
+  payload: CotizacionProveedorUpdatePayload
+): Promise<CotizacionProveedor | null> {
   try {
     const res = await fetch(`${BASE_URL}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error('Error al actualizar cotización de proveedor')
-    return res.json()
+    if (!res.ok) throw new Error('Error al actualizar cotización')
+    return await res.json()
   } catch (error) {
-    console.error('updateCotizacionProveedor:', error)
+    console.error('❌ updateCotizacionProveedor:', error)
     return null
   }
 }
 
+// ✅ Eliminar cotización
 export async function deleteCotizacionProveedor(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`, { method: 'DELETE' })
+    const res = await fetch(`${BASE_URL}/${id}`, {
+      method: 'DELETE',
+    })
     return res.ok
   } catch (error) {
-    console.error('deleteCotizacionProveedor:', error)
+    console.error('❌ deleteCotizacionProveedor:', error)
     return false
   }
 }

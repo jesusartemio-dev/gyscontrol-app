@@ -19,12 +19,15 @@ interface Props {
 }
 
 const subMenu = [
-  { label: '📦 Equipos Técnicos', path: 'equipos' },
-  { label: '📋 Listas Técnicas', path: 'equipos/lista-equipos' },
+  { label: '🏠 Proyecto', path: '' },
+  { label: '📦 Cotizados', path: 'equipos' },
+  { label: '📋 Listas', path: 'equipos/lista-equipos' },
+  { label: '📥 Pedidos', path: 'equipos/pedidos' }, // ✅ Agregado
   { label: '🧾 Requerimientos', path: 'requerimientos' },
   { label: '💰 Valorizaciones', path: 'gestion/valorizaciones' },
   { label: '🕓 Horas Hombre', path: 'gestion/horas' },
 ]
+
 
 export default function ProyectoSubMenu({ proyectoId }: Props) {
   const currentPath = usePathname()

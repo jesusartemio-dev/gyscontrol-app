@@ -44,29 +44,42 @@ export default function RecursoForm({ onCreated }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-xl font-semibold">➕ Nuevo Recurso</h2>
+<form onSubmit={handleSubmit} className="space-y-4">
+  <h2 className="text-xl font-semibold">➕ Nuevo Recurso</h2>
 
-      <Input
-        placeholder="Nombre del recurso (Ej: Ingeniero)"
-        value={nombre}
-        onChange={(e) => setNombre(e.target.value)}
-        required
-        disabled={loading}
-      />
+  <div className="space-y-1">
+    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">
+      Nombre del recurso
+    </label>
+    <Input
+      id="nombre"
+      placeholder="Ej: Ingeniero"
+      value={nombre}
+      onChange={(e) => setNombre(e.target.value)}
+      required
+      disabled={loading}
+    />
+  </div>
 
-      <Input
-        type="number"
-        placeholder="Costo por hora"
-        value={costoHora}
-        onChange={(e) => setCostoHora(parseFloat(e.target.value))}
-        required
-        disabled={loading}
-      />
+  <div className="space-y-1">
+    <label htmlFor="costoHora" className="block text-sm font-medium text-gray-700">
+      Costo por hora ( $ )
+    </label>
+    <Input
+      id="costoHora"
+      type="number"
+      placeholder="Ej: 80"
+      value={costoHora}
+      onChange={(e) => setCostoHora(parseFloat(e.target.value))}
+      required
+      disabled={loading}
+    />
+  </div>
 
-      <Button type="submit" disabled={loading}>
-        {loading ? 'Guardando...' : 'Crear'}
-      </Button>
-    </form>
+  <Button type="submit" disabled={loading}>
+    {loading ? 'Guardando...' : 'Crear'}
+  </Button>
+</form>
+
   )
 }

@@ -20,3 +20,32 @@ export async function DELETE(
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
+
+export async function PUT(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params
+    if (!id) {
+      return NextResponse.json({ error: 'ID es requerido' }, { status: 400 })
+    }
+
+    const body = await req.json()
+    const { nombre } = body
+
+    if (!nombre || typeof nombre !== 'string') {
+      return NextResponse.json({ error: 'Nombre inválido' }, { status: 400 })
+    }
+
+    const actualizada = await prisma.categoriaEquipo.update({
+      where: { id },
+      data: { nombre },
+    })
+
+    return NextResponse.json(actualizada)
+  } catch (error) {
+    console.error('❌ Error al actualizar categoría de equipo:', error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}

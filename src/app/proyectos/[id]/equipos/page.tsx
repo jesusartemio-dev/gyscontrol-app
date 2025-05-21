@@ -1,18 +1,15 @@
-// ===================================================
-// 📁 Archivo: page.tsx
-// 📌 Ubicación: /proyectos/[id]/equipos/page.tsx
-// 🔧 Descripción: Página para visualizar grupos de equipos e ítems técnicos del proyecto
-// ===================================================
-
 'use client'
+
+// ===================================================
+// 📁 Página: /proyectos/[id]/equipos/page.tsx
+// 📌 Descripción: Visualiza grupos de equipos con ítems anidados
+// ===================================================
 
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { getProyectoById } from '@/lib/services/proyecto'
-import ProyectoEquipoList from '@/components/proyectos/ProyectoEquipoList'
-import ProyectoEquipoItemList from '@/components/proyectos/ProyectoEquipoItemList'
-import { Proyecto } from '@/types'
-import { Card, CardContent } from '@/components/ui/card'
+import ProyectoEquipoAccordion from '@/components/proyectos/ProyectoEquipoAccordion'
+import type { Proyecto } from '@/types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 
@@ -38,13 +35,9 @@ export default function ProyectoEquiposPage() {
         🛠️ Equipos Técnicos del Proyecto: <span className="text-blue-600">{proyecto.nombre}</span>
       </h1>
 
-      <ProyectoEquipoList proyectoId={proyecto.id} />
-
-
-      <Card className="p-4">
-        <ProyectoEquipoItemList proyectoId={proyecto.id} />
-
-      </Card>
+      {proyecto.equipos.map((grupo) => (
+        <ProyectoEquipoAccordion key={grupo.id} equipo={grupo} />
+      ))}
     </div>
   )
 }

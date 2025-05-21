@@ -1,6 +1,6 @@
 // ===================================================
 // 📁 Archivo: /api/proyecto-equipo-item/disponibles/[proyectoId]/route.ts
-// 📌 Descripción: Retorna los ProyectoEquipoItem que NO están asociados a ListaEquiposItem
+// 📌 Descripción: Retorna los ProyectoEquipoItem que NO están asociados a ListaEquipoItem
 // ===================================================
 
 import { prisma } from '@/lib/prisma'

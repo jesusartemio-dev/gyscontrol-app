@@ -1,35 +1,31 @@
-// ===================================================
-// 📁 Archivo: page.tsx
-// 📍 Ubicación: src/app/proyectos/[id]/equipos/lista-equipos/page.tsx
-// 🔧 Descripción: Página para gestionar Listas Técnicas de Equipos (ListaEquipos)
-// ===================================================
-
+// src/app/proyectos/[id]/equipos/lista-equipos/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
 import {
-  getListaEquipos,
-  createListaEquipos,
-  updateListaEquipos,
-  deleteListaEquipos,
-} from '@/lib/services/listaEquipos'
+  getListaEquipo,
+  createListaEquipo,
+  updateListaEquipo,
+  deleteListaEquipo,
+} from '@/lib/services/listaEquipo'
 import type {
   Proyecto,
-  ListaEquipos,
-  ListaEquiposPayload,
-  ListaEquiposUpdatePayload,
+  ListaEquipo,
+  ListaEquipoPayload,
+  ListaEquipoUpdatePayload,
+  EstadoListaEquipo, // ✅ IMPORTANTE
 } from '@/types'
-import ListaEquiposForm from '@/components/equipos/ListaEquiposForm'
-import ListaEquiposList from '@/components/equipos/ListaEquiposList'
+import ListaEquipoForm from '@/components/equipos/ListaEquipoForm'
+import ListaEquipoList from '@/components/equipos/ListaEquipoList'
 import ModalAgregarItemDesdeEquipo from '@/components/equipos/ModalAgregarItemDesdeEquipo'
 import { toast } from 'sonner'
 
-export default function ListaEquiposPage() {
+export default function ListaEquipoPage() {
   const { id } = useParams<{ id: string }>()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
-  const [listas, setListas] = useState<ListaEquipos[]>([])
+  const [listas, setListas] = useState<ListaEquipo[]>([])
   const [modalListaId, setModalListaId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -37,24 +33,24 @@ export default function ListaEquiposPage() {
     const fetchData = async () => {
       const data = await getProyectoById(id)
       setProyecto(data)
-      const le = await getListaEquipos(id)
+      const le = await getListaEquipo(id)
       setListas(le)
     }
     fetchData()
   }, [id])
 
-  const handleCreate = async (payload: ListaEquiposPayload) => {
+  const handleCreate = async (payload: ListaEquipoPayload) => {
     try {
-      const nueva = await createListaEquipos(payload)
+      const nueva = await createListaEquipo(payload)
       if (nueva) setListas((prev) => [...prev, nueva])
     } catch (err) {
       toast.error('No se pudo crear la lista')
     }
   }
 
-  const handleUpdate = async (listaId: string, payload: ListaEquiposUpdatePayload) => {
+  const handleUpdate = async (listaId: string, payload: ListaEquipoUpdatePayload) => {
     try {
-      const actualizada = await updateListaEquipos(listaId, payload)
+      const actualizada = await updateListaEquipo(listaId, payload)
       if (actualizada) {
         setListas((prev) => prev.map((l) => (l.id === listaId ? actualizada : l)))
       }
@@ -65,7 +61,7 @@ export default function ListaEquiposPage() {
 
   const handleDelete = async (listaId: string) => {
     try {
-      await deleteListaEquipos(listaId)
+      await deleteListaEquipo(listaId)
       setListas((prev) => prev.filter((l) => l.id !== listaId))
     } catch (err) {
       toast.error('Error al eliminar la lista')
@@ -77,8 +73,15 @@ export default function ListaEquiposPage() {
   }
 
   const handleRefreshListas = async () => {
-    const nuevasListas = await getListaEquipos(id)
+    const nuevasListas = await getListaEquipo(id)
     setListas(nuevasListas)
+  }
+
+  // ✅ NUEVO - actualizar estado sin recargar toda la lista
+  const handleActualizarEstadoLista = (listaId: string, nuevoEstado: EstadoListaEquipo) => {
+    setListas((prev) =>
+      prev.map((l) => (l.id === listaId ? { ...l, estado: nuevoEstado } : l))
+    )
   }
 
   if (!proyecto) return <p className="p-4">Cargando...</p>
@@ -87,18 +90,19 @@ export default function ListaEquiposPage() {
     <div className="p-4 space-y-4">
       <h1 className="text-2xl font-bold">📋 Listas Técnicas de Equipos - {proyecto.nombre}</h1>
 
-      <ListaEquiposForm
+      <ListaEquipoForm
         proyectoId={id}
-        onCreated={(formPayload: ListaEquiposPayload) => handleCreate(formPayload)}
+        onCreated={(formPayload: ListaEquipoPayload) => handleCreate(formPayload)}
       />
 
-      <ListaEquiposList
+      <ListaEquipoList
         data={listas}
-        onCreate={(formPayload: ListaEquiposPayload) => handleCreate(formPayload)}
+        onCreate={handleCreate}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
         onAgregarEquipos={handleAgregarEquipos}
         onCreatedItem={handleRefreshListas}
+        onEstadoChange={handleActualizarEstadoLista} // ✅ ¡NUEVO!
       />
 
       {modalListaId && (

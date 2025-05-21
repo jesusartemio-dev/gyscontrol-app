@@ -75,7 +75,7 @@ export default function RecursoList({ data, onUpdate, onDelete }: Props) {
             ) : (
               <>
                 <span className="flex-1">{r.nombre}</span>
-                <span className="w-32 text-right">S/ {r.costoHora.toFixed(2)}</span>
+                <span className="w-32 text-right">$ {r.costoHora.toFixed(2)}</span>
                 <Button size="sm" onClick={() => iniciarEdicion(r)}>Editar</Button>
               </>
             )}

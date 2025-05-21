@@ -1,7 +1,7 @@
 // ===================================================
 // 📁 Archivo: route.ts
 // 📍 Ubicación: src/app/api/lista-equipos/item-from-proyecto/route.ts
-// 🔧 Descripción: Agrega un ProyectoEquipoItem a una ListaEquiposItem
+// 🔧 Descripción: Agrega un ProyectoEquipoItem a una ListaEquipoItem
 // ✍️ Autor: Asistente IA GYS
 // 📅 Última actualización: 2025-05-11
 // ===================================================
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     }
 
     // Crear el nuevo ítem en la lista técnica
-    const nuevo = await prisma.listaEquiposItem.create({
+    const nuevo = await prisma.listaEquipoItem.create({
       data: {
         listaId,
         proyectoEquipoItemId: item.id,
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     // Retornar el nuevo ítem creado
     return NextResponse.json(nuevo)
   } catch (error) {
-    console.error('❌ Error al copiar ProyectoEquipoItem a ListaEquiposItem:', error)
+    console.error('❌ Error al copiar ProyectoEquipoItem a ListaEquipoItem:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

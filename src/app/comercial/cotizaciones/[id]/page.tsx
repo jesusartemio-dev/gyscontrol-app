@@ -26,7 +26,7 @@ import CotizacionGastoForm from '@/components/cotizaciones/CotizacionGastoForm'
 import CotizacionEquipoAccordion from '@/components/cotizaciones/CotizacionEquipoAccordion'
 import CotizacionServicioAccordion from '@/components/cotizaciones/CotizacionServicioAccordion'
 import CotizacionGastoAccordion from '@/components/cotizaciones/CotizacionGastoAccordion'
-
+import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
 import EstadoCotizacionToolbar from '@/components/cotizaciones/EstadoCotizacionToolbar'
 import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
@@ -183,32 +183,6 @@ export default function CotizacionDetallePage() {
     })
   }
 
-  const handleCrearProyecto = async () => {
-      if (!cotizacion) return
-      setCreandoProyecto(true)
-    
-      try {
-
-            // 🟣 Log para depuración:
-          console.log('🟣 Enviando a crear proyecto desde cotización:', {
-            cotizacionId: cotizacion.id,
-            gestorId: cotizacion.comercial?.id,
-          })
-          
-        const proyecto = await crearProyectoDesdeCotizacion(cotizacion.id, {
-          gestorId: cotizacion.comercial?.id ?? '',
-          fechaInicio: new Date(), // por ahora la fecha actual
-        })
-        router.push(`/proyectos/${proyecto.id}`)
-      } catch (error) {
-        console.error('❌ Error al crear proyecto', error)
-        alert('Error al crear el proyecto. Intenta nuevamente.')
-      } finally {
-        setCreandoProyecto(false)
-      }
-    }
-  
-
   if (error) return <p className="text-red-500">{error}</p>
   if (!cotizacion) return <p className="text-gray-600">Cargando cotización...</p>
 
@@ -347,18 +321,9 @@ export default function CotizacionDetallePage() {
           ))}
         </div>
       </section>
-      {cotizacion.estado === "aprobada" && cotizacion.etapa === "cerrado" && (
-        <div className="pt-4 border-t">
-          <button
-            onClick={handleCrearProyecto}
-            disabled={creandoProyecto}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm"
-          >
-            {creandoProyecto ? 'Creando proyecto...' : 'Crear Proyecto'}
-          </button>
-        </div>
-      )}
-
+        {cotizacion.estado === 'aprobada' && cotizacion.etapa === 'cerrado' && (
+          <CrearProyectoDesdeCotizacionModal cotizacion={cotizacion} />
+        )}
     </div>
   )
 }
