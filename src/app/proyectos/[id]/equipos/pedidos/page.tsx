@@ -25,7 +25,7 @@ import {
 import { getListaEquipo } from '@/lib/services/listaEquipo'
 
 import PedidoEquipoForm from '@/components/equipos/PedidoEquipoForm'
-import PedidoEquipoList from '@/components/equipos/PedidoEquipoList'
+import PedidoEquipoAccordion from '@/components/equipos/PedidoEquipoAccordion'
 
 export default function PedidosProyectoPage() {
   const { id: proyectoId } = useParams<{ id: string }>()
@@ -117,13 +117,22 @@ export default function PedidosProyectoPage() {
         onCreated={handleCreate}
       />
 
-      <PedidoEquipoList
-        data={pedidos}
-        onUpdate={handleUpdate}
-        onDelete={handleDelete}
-        onUpdateItem={handleUpdateItem}
-        onDeleteItem={handleDeleteItem}
-      />
+      <h2 className="text-xl font-semibold text-gray-800">📋 Pedidos Realizados</h2>
+
+      {pedidos.length === 0 ? (
+        <p className="text-sm text-gray-500">No hay pedidos registrados aún.</p>
+      ) : (
+        pedidos.map(pedido => (
+          <PedidoEquipoAccordion
+            key={pedido.id}
+            pedido={pedido}
+            onUpdateItem={handleUpdateItem}
+            onDeleteItem={handleDeleteItem}
+            onDelete={handleDelete}
+            onUpdate={handleUpdate}
+          />
+        ))
+      )}
     </div>
   )
 }

@@ -850,6 +850,9 @@ export interface PedidoEquipo {
   observacion?: string
   fechaEntregaEstimada?: string
   fechaEntregaReal?: string
+
+  responsable?: User
+  lista?: ListaEquipo
   items: PedidoEquipoItem[]
 }
 
@@ -864,6 +867,7 @@ export interface PedidoEquipoItem {
   estado: EstadoPedidoItem
   cantidadAtendida?: number
   comentarioLogistica?: string
+  listaEquipoItem?: ListaEquipoItem
 }
 
 

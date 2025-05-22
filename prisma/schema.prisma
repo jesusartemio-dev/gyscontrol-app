@@ -754,7 +754,7 @@ model PedidoEquipoItem {
   estado EstadoPedidoItem @default(pendiente)
   cantidadAtendida  Float? // lo que logística entregó
   comentarioLogistica String? // comentario de logística
-  pedido            PedidoEquipo     @relation(fields: [pedidoId], references: [id])
+  pedido            PedidoEquipo @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   listaEquipoItem   ListaEquipoItem  @relation(fields: [listaEquipoItemId], references: [id])
 }
 

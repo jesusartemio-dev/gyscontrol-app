@@ -5,7 +5,7 @@
 //
 // 🧠 Uso: Proyectos genera pedidos; logística visualiza y gestiona
 // ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-05-20
+// 📅 Última actualización: 2025-05-21
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -23,7 +23,15 @@ export async function GET(request: Request) {
         responsable: true,
         proyecto: true,
         lista: true,
-        items: true,
+        items: {
+          include: {
+            listaEquipoItem: {
+              include: {
+                proveedor: true, // opcional, por si quieres mostrar nombre proveedor
+              },
+            },
+          },
+        },
       },
       orderBy: { fechaPedido: 'desc' },
     })
@@ -41,11 +49,44 @@ export async function POST(request: Request) {
   try {
     const body: PedidoEquipoPayload = await request.json()
 
-    const data = await prisma.pedidoEquipo.create({
-      data: body,
+    // Paso 1: Crear el pedido
+    const pedido = await prisma.pedidoEquipo.create({
+      data: {
+        proyecto: { connect: { id: body.proyectoId } },
+        responsable: { connect: { id: body.responsableId } },
+        lista: { connect: { id: body.listaId } },
+        codigo: body.codigo,
+        estado: body.estado,
+        observacion: body.observacion,
+        fechaPedido: body.fechaPedido ? new Date(body.fechaPedido) : undefined,
+        fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : undefined,
+        fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : undefined,
+      },
     })
 
-    return NextResponse.json(data)
+    // Paso 2: Obtener los ítems de la lista
+    const listaItems = await prisma.listaEquipoItem.findMany({
+      where: { listaId: body.listaId },
+    })
+
+    // Paso 3: Crear PedidoEquipoItem para cada ítem de la lista
+    for (const item of listaItems) {
+      await prisma.pedidoEquipoItem.create({
+        data: {
+          pedidoId: pedido.id,
+          listaEquipoItemId: item.id,
+          cantidadPedida: item.cantidad, // puedes iniciar con la misma cantidad
+          precioUnitario: item.precioElegido || 0,
+          costoTotal: (item.precioElegido || 0) * item.cantidad,
+          fechaNecesaria: body.fechaEntregaEstimada
+            ? new Date(body.fechaEntregaEstimada)
+            : new Date(),
+          estado: 'pendiente',
+        },
+      })
+    }
+
+    return NextResponse.json(pedido)
   } catch (error) {
     return NextResponse.json(
       { error: 'Error al crear pedido: ' + String(error) },
