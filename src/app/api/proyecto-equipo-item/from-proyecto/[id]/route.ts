@@ -1,22 +1,27 @@
 // ===================================================
 // 📁 Archivo: /api/proyecto-equipo-item/from-proyecto/[id]/route.ts
-// 📌 Descripción: Obtener todos los ProyectoEquipoItem de un proyecto con nombre de lista técnica
+// 📌 Descripción: Obtener ProyectoEquipoItems de un proyecto, opcionalmente solo los disponibles
+// ✅ Incluye listaEquipos con cantidad para calcular faltantes
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-export const dynamic = 'force-dynamic' // 🛡️ Evita caché de rutas
+export const dynamic = 'force-dynamic'
 
-export async function GET(_: Request, context: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: { params: { id: string } }) {
   try {
-    const { id } = await context.params
+    const { id } = context.params
+    const soloDisponibles = req.nextUrl.searchParams.get('soloDisponibles') === 'true'
 
     const items = await prisma.proyectoEquipoItem.findMany({
       where: {
         proyectoEquipo: {
           proyectoId: id,
         },
+        ...(soloDisponibles && {
+          listaId: null,
+        }),
       },
       include: {
         proyectoEquipo: {
@@ -29,7 +34,13 @@ export async function GET(_: Request, context: { params: { id: string } }) {
         lista: {
           select: {
             id: true,
-            nombre: true, // ✅ Solo los campos necesarios
+            nombre: true,
+          },
+        },
+        listaEquipos: {
+          select: {
+            id: true,
+            cantidad: true, // ✅ Trae cantidad para saber cuánto ya se listó
           },
         },
       },

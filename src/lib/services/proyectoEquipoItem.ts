@@ -2,10 +2,6 @@
 // 📁 Archivo: proyectoEquipoItem.ts
 // 📌 Ubicación: src/lib/services
 // 🔧 Descripción: Servicios para gestionar los ítems de equipos en proyectos
-//
-// 🧠 Uso: Se usa para obtener, crear, actualizar y eliminar ítems de equipos
-// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
-// 📅 Última actualización: 2025-05-08
 // ===================================================
 
 import type {
@@ -14,12 +10,17 @@ import type {
   ProyectoEquipoItemUpdatePayload,
 } from '@/types'
 
-// ✅ Obtener ítems de equipos
-export async function getProyectoEquipoItems(proyectoId: string): Promise<ProyectoEquipoItem[]> {
+// ✅ Obtener ítems de equipos del proyecto, con opción de filtrar solo disponibles
+export async function getProyectoEquipoItems(
+  proyectoId: string,
+  soloDisponibles: boolean = false
+): Promise<ProyectoEquipoItem[]> {
   try {
-    const res = await fetch(`/api/proyecto-equipo-item/from-proyecto/${proyectoId}`, {
-      cache: 'no-store',
-    })
+    const url = soloDisponibles
+      ? `/api/proyecto-equipo-item/from-proyecto/${proyectoId}?soloDisponibles=true`
+      : `/api/proyecto-equipo-item/from-proyecto/${proyectoId}`
+
+    const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error('Error al obtener ítems de equipos del proyecto')
     return await res.json()
   } catch (error) {
@@ -28,18 +29,9 @@ export async function getProyectoEquipoItems(proyectoId: string): Promise<Proyec
   }
 }
 
-// ✅ Obtener ítems disponibles (no asociados a ninguna lista técnica)
+// 🔁 Alias por compatibilidad: obtiene ítems sin lista técnica asignada
 export async function getProyectoEquipoItemsDisponibles(proyectoId: string): Promise<ProyectoEquipoItem[]> {
-  try {
-    const res = await fetch(`/api/proyecto-equipo-item/disponibles/${proyectoId}`, {
-      cache: 'no-store',
-    })
-    if (!res.ok) throw new Error('Error al obtener ítems disponibles')
-    return await res.json()
-  } catch (error) {
-    console.error('❌ getProyectoEquipoItemsDisponibles:', error)
-    return []
-  }
+  return getProyectoEquipoItems(proyectoId, true)
 }
 
 // ✅ Obtener un ítem por ID

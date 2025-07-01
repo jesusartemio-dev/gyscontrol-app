@@ -11,7 +11,7 @@
 // ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
 // 📅 Última actualización: 2025-04-19
 // ===================================================
-import type { TipoFormula, EstadoEquipo, EstadoListaEquipo, EstadoPedido, EstadoPedidoItem } from './modelos' 
+import type { TipoFormula, EstadoEquipoItem, EstadoListaItem, EstadoListaEquipo, EstadoPedido, EstadoPedidoItem, EstadoCotizacionProveedor, OrigenListaItem  } from './modelos' 
 
 
 // ✅ Unidad
@@ -337,7 +337,7 @@ export interface ProyectoEquipoItemPayload {
   listaId?: string
 
   // ✅ Aquí lo agregas
-  estado?: EstadoEquipo
+  estado?: EstadoEquipoItem
   precioReal?: number
   cantidadReal?: number
 }
@@ -414,16 +414,22 @@ export interface ProyectoGastoItemUpdatePayload extends Partial<ProyectoGastoIte
 
 export interface ListaEquipoPayload {
   proyectoId: string
+  codigo?: string                        // ✅ antes 'nombre', ahora usamos 'codigo'
   nombre: string
-  descripcion?: string
+  numeroSecuencia?: number               // ✅ número puro para control interno
   estado?: EstadoListaEquipo
 }
+
 export interface ListaEquipoUpdatePayload extends Partial<ListaEquipoPayload> {}
+
 
 export interface ListaEquipoItemPayload {
   listaId: string
   proyectoEquipoItemId?: string
+  proyectoEquipoId?: string        // 🆕 Nuevo campo
   proveedorId?: string
+  cotizacionSeleccionadaId?: string
+  reemplazaAId?: string // 
   codigo: string
   descripcion: string
   unidad: string
@@ -437,8 +443,13 @@ export interface ListaEquipoItemPayload {
   costoReal?: number
   cantidadPedida?: number
   cantidadEntregada?: number
+  estado?: EstadoListaItem
+  origen?: OrigenListaItem
 }
+
 export interface ListaEquipoItemUpdatePayload extends Partial<ListaEquipoItemPayload> {}
+
+
 
 
 export interface ProveedorPayload {
@@ -450,47 +461,67 @@ export interface ProveedorUpdatePayload extends Partial<ProveedorPayload> {}
 export interface CotizacionProveedorPayload {
   proveedorId: string
   proyectoId: string
-  nombre: string
+  codigo?: string                         // ✅ antes 'nombre', ahora es el código generado (ej. CJM27-COT-001)
+  numeroSecuencia?: number                // ✅ número puro para control interno
   fecha: string
+  estado?: EstadoCotizacionProveedor
 }
+
 export interface CotizacionProveedorUpdatePayload extends Partial<CotizacionProveedorPayload> {}
+
 
 export interface CotizacionProveedorItemPayload {
   cotizacionId: string
   listaEquipoItemId: string
-  precioUnitario: number
-  cantidad: number
-  costoTotal: number
+  // 💵 Datos cotizados (opcionales)
+  precioUnitario?: number
+  cantidad?: number
+  costoTotal?: number
   tiempoEntrega?: string
+  tiempoEntregaDias?: number
+  // ✅ Estado y selección
+  estado?: EstadoCotizacionProveedor  // 'pendiente' | 'cotizado' | etc.
   esSeleccionada?: boolean
 }
-export interface CotizacionProveedorItemUpdatePayload extends Partial<CotizacionProveedorItemPayload> {}
+
+export interface CotizacionProveedorItemUpdatePayload
+  extends Partial<CotizacionProveedorItemPayload> {}
 
 export interface PedidoEquipoPayload {
   proyectoId: string
   responsableId: string
   listaId: string
-  codigo?: string
+  codigo: string                         // ✅ ahora obligatorio, no opcional
+  numeroSecuencia: number                // ✅ número puro para control interno
   estado?: EstadoPedido
   observacion?: string
   fechaPedido?: string  
   fechaEntregaEstimada?: string
   fechaEntregaReal?: string
 }
+
 export interface PedidoEquipoUpdatePayload extends Partial<PedidoEquipoPayload> {}
+
 
 export interface PedidoEquipoItemPayload {
   pedidoId: string
   listaEquipoItemId: string
+  // 📦 Datos solicitados
   cantidadPedida: number
+  fechaNecesaria: string
+  // 💰 Datos económicos (opcionalmente copiados desde cotización seleccionada)
   precioUnitario?: number
   costoTotal?: number
-  fechaNecesaria: string
-  estado?: EstadoPedidoItem
+  // 🚦 Estado de atención
+  estado?: EstadoPedidoItem // 'pendiente' | 'atendido' | 'parcial' | 'entregado'
   cantidadAtendida?: number
   comentarioLogistica?: string
+  // 🔁 Referencia opcional al ítem de cotización seleccionado (si aplica)
+  cotizacionProveedorItemId?: string
 }
-export interface PedidoEquipoItemUpdatePayload extends Partial<PedidoEquipoItemPayload> {}
+
+export interface PedidoEquipoItemUpdatePayload
+  extends Partial<PedidoEquipoItemPayload> {}
 
 // ============================
 // 💲 Valorización Payloads

@@ -1,7 +1,7 @@
 // ===================================================
 // 📁 Archivo: route.ts
 // 📌 Ubicación: src/app/api/cotizacion-gasto-item/
-// 🔧 Descripción: Maneja GET todos y POST de CotizacionGastoItem
+// 🔧 Descripción: Maneja GET todos y POST de CotizacionGastoItem con mejoras
 // ===================================================
 
 import { NextResponse } from 'next/server'
@@ -9,13 +9,20 @@ import { prisma } from '@/lib/prisma'
 import { CotizacionGastoItemPayload } from '@/types/payloads'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const data = await prisma.cotizacionGastoItem.findMany({
-      include: {
-        gasto: true,
-      },
-    })
+    const { searchParams } = new URL(req.url)
+    const gastoId = searchParams.get('gastoId')
+
+    const data = gastoId
+      ? await prisma.cotizacionGastoItem.findMany({
+          where: { gastoId },
+          include: { gasto: true },
+        })
+      : await prisma.cotizacionGastoItem.findMany({
+          include: { gasto: true },
+        })
+
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error al obtener ítems de gasto:', error)
@@ -27,19 +34,20 @@ export async function POST(req: Request) {
   try {
     const payload: CotizacionGastoItemPayload = await req.json()
 
+    // Validar existencia del gasto
+    const gasto = await prisma.cotizacionGasto.findUnique({
+      where: { id: payload.gastoId },
+    })
+
+    if (!gasto) {
+      return NextResponse.json({ error: 'Gasto no encontrado para asignar ítem' }, { status: 404 })
+    }
+
     const data = await prisma.cotizacionGastoItem.create({
       data: payload,
     })
 
-    // 🔁 Recalcular totales después de agregar el ítem
-    const gasto = await prisma.cotizacionGasto.findUnique({
-      where: { id: payload.gastoId },
-      select: { cotizacionId: true },
-    })
-
-    if (gasto) {
-      await recalcularTotalesCotizacion(gasto.cotizacionId)
-    }
+    await recalcularTotalesCotizacion(gasto.cotizacionId)
 
     return NextResponse.json(data)
   } catch (error) {

@@ -4,8 +4,8 @@
 // 🔧 Descripción: API para ver, actualizar o eliminar un ítem de cotización
 //
 // 🧠 Uso: Logística puede ajustar precio, entrega o eliminar ítem
-// ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-05-20
+// ✍️ Autor: Jesús Artemio + IA GYS
+// 📅 Última actualización: 2025-05-22
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -18,7 +18,12 @@ export async function GET(context: { params: { id: string } }) {
     const data = await prisma.cotizacionProveedorItem.findUnique({
       where: { id },
       include: {
-        cotizacion: true,
+        cotizacion: {
+          include: {
+            proveedor: true,
+            proyecto: true,
+          },
+        },
         listaEquipoItem: true,
       },
     })
@@ -31,14 +36,21 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(context: { params: { id: string }; request: Request }) {
+export async function PUT(request: Request, context: { params: { id: string } }) {
   try {
     const { id } = await context.params
-    const body: CotizacionProveedorItemUpdatePayload = await context.request.json()
+    const body: CotizacionProveedorItemUpdatePayload = await request.json()
 
     const data = await prisma.cotizacionProveedorItem.update({
       where: { id },
-      data: body,
+      data: {
+        precioUnitario: body.precioUnitario ?? null,
+        cantidad: body.cantidad ?? null,
+        costoTotal: body.costoTotal ?? null,
+        tiempoEntrega: body.tiempoEntrega ?? null,
+        estado: body.estado,
+        esSeleccionada: body.esSeleccionada ?? false,
+      },
     })
 
     return NextResponse.json(data)

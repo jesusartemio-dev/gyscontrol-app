@@ -1,16 +1,5 @@
-// ===================================================
-// 📁 Archivo: CotizacionProveedorAccordion.tsx
-// 📌 Ubicación: src/components/logistica/
-// 🔧 Descripción: Acordeón para mostrar una cotización y sus ítems cotizados
-//
-// 🧠 Uso: Se usa para expandir y visualizar detalle de ítems en cada cotización
-// ✍️ Autor: Asistente IA GYS
-// 📅 Última actualización: 2025-05-21
-// ===================================================
-
-'use client'
-
-import { CotizacionProveedor, CotizacionProveedorUpdatePayload } from '@/types'
+import { useState, useEffect } from 'react'
+import { CotizacionProveedor, CotizacionProveedorUpdatePayload, EstadoCotizacionProveedor } from '@/types'
 import {
   Accordion,
   AccordionContent,
@@ -19,76 +8,138 @@ import {
 } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Pencil, Trash2 } from 'lucide-react'
+import CotizacionEnviarCorreoButton from './CotizacionEnviarCorreoButton'
+import CotizacionProveedorTabla from './CotizacionProveedorTabla'
+import { getCotizacionProveedorById } from '@/lib/services/cotizacionProveedor'
 
 interface Props {
   cotizacion: CotizacionProveedor
   onUpdate?: (id: string, payload: CotizacionProveedorUpdatePayload) => void
   onDelete?: (id: string) => void
+  onUpdatedItem?: () => void
 }
+
+const ESTADOS: EstadoCotizacionProveedor[] = [
+  'pendiente',
+  'solicitado',
+  'cotizado',
+  'rechazado',
+  'seleccionado',
+]
 
 export default function CotizacionProveedorAccordion({
   cotizacion,
   onUpdate,
   onDelete,
+  onUpdatedItem,
 }: Props) {
+  const [cotizacionData, setCotizacionData] = useState(cotizacion)
+
+  useEffect(() => {
+    setCotizacionData(cotizacion)
+  }, [cotizacion])
+
+  const handleChangeEstado = (nuevoEstado: EstadoCotizacionProveedor) => {
+    if (onUpdate) {
+      onUpdate(cotizacionData.id, { estado: nuevoEstado })
+    }
+  }
+
+  const handleRefetch = async () => {
+    try {
+      const updated = await getCotizacionProveedorById(cotizacion.id)
+      if (updated) {
+        setCotizacionData(updated)
+        onUpdatedItem?.()
+      } else {
+        console.warn('⚠️ No se encontró la cotización actualizada.')
+      }
+    } catch (error) {
+      console.error('❌ Error al hacer refetch de cotización:', error)
+    }
+  }
+
   return (
     <Accordion type="single" collapsible className="w-full border rounded-xl shadow-md">
-      <AccordionItem value={cotizacion.id}>
+      <AccordionItem value={cotizacionData.id}>
         <AccordionTrigger className="p-4 text-left">
-          <div className="flex justify-between w-full">
-            <span className="font-semibold">
-              {cotizacion.nombre} • {cotizacion.proveedor?.nombre}
+          <div className="flex flex-col md:flex-row md:justify-between w-full">
+            <div className="flex flex-col">
+              <span className="font-semibold">
+                {cotizacionData.codigo} • {cotizacionData.proveedor?.nombre}
+              </span>
+              <span className="text-sm text-gray-500">
+                Estado: {cotizacionData.estado?.toUpperCase() || 'N/A'}
+              </span>
+            </div>
+            <span className="text-sm text-gray-500">
+              {cotizacionData.fecha?.slice(0, 10)}
             </span>
-            <span className="text-sm text-gray-500">{cotizacion.fecha?.slice(0, 10)}</span>
           </div>
         </AccordionTrigger>
 
-        <AccordionContent className="bg-gray-50 px-4 py-2 space-y-2">
-          {cotizacion.items.map((item) => (
-            <div
-              key={item.id}
-              className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center border-b py-2 text-sm"
-            >
-              <div className="col-span-2">
-                <strong>{item.listaEquipoItem.descripcion}</strong>
-                <div className="text-xs text-gray-600">
-                  {item.listaEquipoItem.codigo} • {item.listaEquipoItem.unidad}
-                </div>
-              </div>
-              <div>S/. {item.precioUnitario.toFixed(2)}</div>
-              <div>{item.cantidad} {item.listaEquipoItem.unidad}</div>
-              <div className="text-right text-gray-600">
-                ⏱️ {item.tiempoEntrega || 'N/D'}
-              </div>
-            </div>
-          ))}
-
-          {(onUpdate || onDelete) && (
-            <div className="flex justify-end gap-2 pt-2">
-              {onUpdate && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onUpdate(cotizacion.id, {
-                    nombre: cotizacion.nombre,
-                    fecha: cotizacion.fecha,
-                  })}
-                >
-                  <Pencil className="w-4 h-4 mr-1" /> Editar
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-red-600"
-                  onClick={() => onDelete(cotizacion.id)}
-                >
-                  <Trash2 className="w-4 h-4 mr-1" /> Eliminar
-                </Button>
-              )}
-            </div>
+        <AccordionContent className="bg-gray-50 px-4 py-4 space-y-4">
+          {cotizacionData.items.length > 0 ? (
+            <CotizacionProveedorTabla
+              items={cotizacionData.items}
+              onUpdated={() => {
+                handleRefetch()
+                onUpdatedItem?.()
+              }}
+            />
+          ) : (
+            <p className="text-sm text-gray-500">
+              No hay ítems en esta cotización.
+            </p>
           )}
+
+          {/* 🏆 Submenú de estados */}
+          <div className="flex flex-wrap gap-2 pt-4">
+            {ESTADOS.map((estado) => (
+              <Button
+                key={estado}
+                size="sm"
+                className={
+                  cotizacionData.estado === estado
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700'
+                }
+                onClick={() => handleChangeEstado(estado)}
+              >
+                {estado.toUpperCase()}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 pt-4">
+            <CotizacionEnviarCorreoButton cotizacion={cotizacionData} />
+
+            {onUpdate && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  onUpdate(cotizacionData.id, {
+                    codigo: cotizacionData.codigo,
+                    fecha: cotizacionData.fecha,
+                  })
+                }
+              >
+                <Pencil className="w-4 h-4 mr-1" /> Editar
+              </Button>
+            )}
+
+            {onDelete && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-600"
+                onClick={() => onDelete(cotizacionData.id)}
+              >
+                <Trash2 className="w-4 h-4 mr-1" /> Eliminar
+              </Button>
+            )}
+          </div>
         </AccordionContent>
       </AccordionItem>
     </Accordion>

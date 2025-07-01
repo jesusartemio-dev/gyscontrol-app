@@ -7,6 +7,7 @@ import {
   ListaEquipoItem,
   ListaEquipoUpdatePayload,
   ListaEquipoPayload,
+  EstadoListaEquipo,
 } from '@/types'
 import { Pencil, Trash2, Plus, Rocket, Save, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,9 +19,6 @@ import ModalAgregarItemDesdeEquipo from './ModalAgregarItemDesdeEquipo'
 import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
 import ListaEstadoFlujo from './ListaEstadoFlujo'
 import { enviarListaARevision } from '@/lib/services/listaEquipo'
-import type {
-  EstadoListaEquipo // ✅ IMPORTANTE
-} from '@/types'
 
 interface Props {
   data: ListaEquipo[]
@@ -83,7 +81,6 @@ export default function ListaEquipoList({
     }
     onUpdate(id, {
       nombre: editValues[id]?.nombre || '',
-      descripcion: editValues[id]?.descripcion || '',
     })
     setEditModeId(null)
     setEditValues((prev) => {
@@ -96,9 +93,16 @@ export default function ListaEquipoList({
   const calcularTotal = (listaId: string): number => {
     const items = itemsPorLista[listaId] || []
     return items.reduce((acc, item) => {
-      const subtotal = (item.cantidad || 0) * (item.presupuesto || 0)
-      return acc + subtotal
+      if (!item.cotizacionSeleccionadaId || !item.cotizacionSeleccionada?.precioUnitario) return acc
+      const precio = item.cotizacionSeleccionada.precioUnitario
+      const cantidad = item.cantidad ?? 0
+      return acc + precio * cantidad
     }, 0)
+  }
+
+  const tieneCotizacionesSeleccionadas = (listaId: string): boolean => {
+    const items = itemsPorLista[listaId] || []
+    return items.every((item) => item.cotizacionSeleccionadaId)
   }
 
   return (
@@ -111,35 +115,36 @@ export default function ListaEquipoList({
           const edited = editValues[lista.id] || {}
           const items = itemsPorLista[lista.id] || []
           const todosVerificados = items.length > 0 && items.every((item) => item.verificado)
+          const todasCotizacionesElegidas = tieneCotizacionesSeleccionadas(lista.id)
 
           return (
             <div
               key={lista.id}
-              className="border rounded-xl p-4 shadow-md hover:shadow-lg transition space-y-2"
+              className="border rounded-xl p-4 shadow-md hover:shadow-lg transition space-y-2 bg-white"
             >
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
-                <div className="col-span-1">
+              <div className="flex flex-col gap-2">
+                <div>
+                  <div className="font-semibold text-indigo-700 text-base">{lista.codigo}</div>
                   {isEdit ? (
                     <Input
                       value={edited.nombre || ''}
                       onChange={(e) => handleChange(lista.id, 'nombre', e.target.value)}
                       placeholder="Nombre"
+                      className="mt-1"
                     />
                   ) : (
-                    <div className="font-semibold">{lista.nombre}</div>
+                    <div className="text-sm text-gray-700">{lista.nombre}</div>
                   )}
                 </div>
 
-                <div className="col-span-4">
-                  <ListaEstadoFlujo
-                    estado={lista.estado || 'borrador'}
-                    listaId={lista.id}
-                    onUpdated={(nuevoEstado) => {
-                      cargarItems()
-                      onEstadoChange?.(lista.id, nuevoEstado)
-                    }}
-                  />
-                </div>
+                <ListaEstadoFlujo
+                  estado={lista.estado || 'borrador'}
+                  listaId={lista.id}
+                  onUpdated={(nuevoEstado) => {
+                    cargarItems()
+                    onEstadoChange?.(lista.id, nuevoEstado)
+                  }}
+                />
               </div>
 
               <div className="mt-4 space-y-4">
@@ -150,8 +155,15 @@ export default function ListaEquipoList({
                   onCreated={cargarItems}
                   editable={lista.estado === 'borrador'}
                 />
+
+                {!todasCotizacionesElegidas && (
+                  <div className="text-xs text-red-500 text-right">
+                    ⚠️ Algunos ítems no tienen cotización seleccionada y no se incluyen en el total.
+                  </div>
+                )}
+
                 <div className="text-right text-sm text-gray-600 font-medium mt-2">
-                  Total estimado: S/. {calcularTotal(lista.id).toFixed(2)}
+                  Total estimado: $ {calcularTotal(lista.id).toFixed(2)}
                 </div>
               </div>
 
@@ -173,8 +185,7 @@ export default function ListaEquipoList({
                         setEditValues((prev) => ({
                           ...prev,
                           [lista.id]: {
-                            nombre: lista.nombre,
-                            descripcion: lista.descripcion || '',
+                            nombre: lista.nombre || '',
                           },
                         }))
                       }}
@@ -194,7 +205,10 @@ export default function ListaEquipoList({
                           <Plus className="w-4 h-4" /> Cotización
                         </Button>
                         <Button
-                          onClick={() => setModalCatalogoListaId(lista.id)}
+                          onClick={() => {
+                            setModalCatalogoListaId(lista.id)
+                            onAgregarEquipos?.(lista.id)
+                          }}
                           className="bg-green-600 text-white"
                         >
                           <Plus className="w-4 h-4" /> Nuevo

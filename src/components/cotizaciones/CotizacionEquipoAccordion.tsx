@@ -7,7 +7,7 @@ import {
   AccordionTrigger
 } from '@/components/ui/accordion'
 import CotizacionEquipoItemForm from './CotizacionEquipoItemForm'
-import CotizacionEquipoItemList from './CotizacionEquipoItemList'
+import CotizacionEquipoItemTable from './CotizacionEquipoItemTable'
 import type { CotizacionEquipo, CotizacionEquipoItem } from '@/types'
 import { useState, useEffect } from 'react'
 import { Pencil, Trash2, Briefcase } from 'lucide-react'
@@ -114,7 +114,7 @@ export default function CotizacionEquipoAccordion({
 
         <AccordionContent className="px-6 pb-6 space-y-4">
           <CotizacionEquipoItemForm cotizacionEquipoId={equipo.id} onCreated={onCreated} />
-          <CotizacionEquipoItemList items={equipo.items} onDeleted={onDeleted} onUpdated={onUpdated} />
+          <CotizacionEquipoItemTable items={equipo.items} onDeleted={onDeleted} onUpdated={onUpdated} />
         </AccordionContent>
       </AccordionItem>
     </Accordion>

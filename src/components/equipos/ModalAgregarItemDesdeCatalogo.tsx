@@ -10,16 +10,15 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
 import { getCategoriaEquipo } from '@/lib/services/categoriaEquipo'
 import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
-import { createProyectoEquipoItem } from '@/lib/services/proyectoEquipoItem'
 import { createListaEquipoItem } from '@/lib/services/listaEquipoItem'
 import type {
   CatalogoEquipo,
   CategoriaEquipo,
-  ProyectoEquipoItemPayload,
   ProyectoEquipo,
 } from '@/types'
 
@@ -41,11 +40,9 @@ export default function ModalAgregarItemDesdeCatalogo({
   const [secciones, setSecciones] = useState<ProyectoEquipo[]>([])
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas')
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<CatalogoEquipo | null>(null)
-  const [cantidad, setCantidad] = useState<number>(1)
-  const [motivoCambio, setMotivoCambio] = useState<string>('')
-  const [loading, setLoading] = useState(false)
+  const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({})
   const [proyectoEquipoId, setProyectoEquipoId] = useState<string>('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,57 +58,46 @@ export default function ModalAgregarItemDesdeCatalogo({
     fetchData()
   }, [proyectoId])
 
-  const handleSeleccionar = (equipo: CatalogoEquipo) => {
-    setSelected(equipo)
-    setCantidad(1)
+  const toggleSeleccion = (id: string) => {
+    setSeleccionados((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }))
   }
 
   const handleAgregar = async () => {
-    if (!selected || cantidad <= 0 || !proyectoEquipoId || !motivoCambio.trim()) {
-      toast.warning('Completa todos los campos requeridos')
+    const idsSeleccionados = Object.entries(seleccionados)
+      .filter(([_, value]) => value)
+      .map(([id]) => id)
+
+    if (idsSeleccionados.length === 0 || !proyectoEquipoId) {
+      toast.warning('Selecciona al menos un equipo y el grupo del proyecto')
       return
-    }
-
-    const precio = selected.precioVenta || 0
-    const categoria = selected.categoria?.nombre || 'SIN-CATEGORIA'
-    const unidad = selected.unidad?.nombre || 'UND'
-
-    const payload: ProyectoEquipoItemPayload = {
-      proyectoEquipoId,
-      catalogoEquipoId: selected.id,
-      codigo: selected.codigo,
-      descripcion: selected.descripcion,
-      categoria,
-      unidad,
-      marca: selected.marca,
-      cantidad,
-      precioInterno: precio,
-      precioCliente: precio,
-      costoInterno: cantidad * precio,
-      costoCliente: cantidad * precio,
-      nuevo: true,
-      motivoCambio,
-      listaId,
     }
 
     try {
       setLoading(true)
-      const nuevoItem = await createProyectoEquipoItem(payload)
-      await createListaEquipoItem({
-        listaId,
-        proyectoEquipoItemId: nuevoItem.id,
-        codigo: nuevoItem.codigo,
-        descripcion: nuevoItem.descripcion,
-        unidad: nuevoItem.unidad,
-        cantidad: nuevoItem.cantidad,
-        presupuesto: nuevoItem.precioInterno,
-      })
-      toast.success('✅ Equipo agregado al proyecto y a la lista')
+      for (const id of idsSeleccionados) {
+        const equipo = equipos.find((e) => e.id === id)
+        if (!equipo) continue
+
+        await createListaEquipoItem({
+          listaId,
+          proyectoEquipoId,
+          codigo: equipo.codigo,
+          descripcion: equipo.descripcion,
+          unidad: equipo.unidad?.nombre || 'UND',
+          cantidad: 1,
+          presupuesto: equipo.precioVenta,
+        })
+      }
+
+      toast.success('✅ Equipos agregados correctamente')
       onCreated?.()
       onClose()
     } catch (error) {
-      console.error('❌ Error al agregar el equipo:', error)
-      toast.error('❌ No se pudo agregar el equipo')
+      console.error('❌ Error al agregar los equipos:', error)
+      toast.error('❌ No se pudo agregar los equipos')
     } finally {
       setLoading(false)
     }
@@ -125,22 +111,24 @@ export default function ModalAgregarItemDesdeCatalogo({
     return coincideCategoria && coincideTexto
   })
 
+  const seleccionadosPreview = equipos.filter((e) => seleccionados[e.id])
+
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="w-full max-w-7xl">
+      <DialogContent className="w-full max-w-6xl">
         <DialogHeader>
-          <DialogTitle>➕ Agregar Equipo desde Catálogo</DialogTitle>
+          <DialogTitle>➕ Agregar Equipos desde Catálogo</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col md:flex-row gap-2 mb-2">
+        <div className="flex gap-2 mb-2">
           <Input
-            placeholder="🔍 Buscar por código o descripción"
+            placeholder="🔍 Buscar"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full"
+            className="w-full max-w-md"
           />
           <select
-            className="border rounded-md px-2 py-1 text-sm"
+            className="border rounded-md px-2 py-1 text-sm max-w-xs"
             value={categoriaFiltro}
             onChange={(e) => setCategoriaFiltro(e.target.value)}
           >
@@ -157,77 +145,63 @@ export default function ModalAgregarItemDesdeCatalogo({
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
+                <th className="p-2 text-center">✔</th>
                 <th className="p-2">Código</th>
                 <th className="p-2">Descripción</th>
                 <th className="p-2">Unidad</th>
-                <th className="p-2">Precio</th>
-                <th className="p-2 text-center">Seleccionar</th>
               </tr>
             </thead>
             <tbody>
               {equiposFiltrados.map((equipo) => (
-                <tr
-                  key={equipo.id}
-                  className={`border-t hover:bg-gray-50 ${selected?.id === equipo.id ? 'bg-blue-50' : ''}`}
-                >
+                <tr key={equipo.id} className="border-t hover:bg-gray-50">
+                  <td className="p-2 text-center">
+                    <Checkbox
+                      checked={!!seleccionados[equipo.id]}
+                      onCheckedChange={() => toggleSeleccion(equipo.id)}
+                    />
+                  </td>
                   <td className="p-2">{equipo.codigo}</td>
                   <td className="p-2">{equipo.descripcion}</td>
                   <td className="p-2">{equipo.unidad?.nombre}</td>
-                  <td className="p-2">S/. {equipo.precioVenta.toFixed(2)}</td>
-                  <td className="p-2 text-center">
-                    <Button size="sm" variant="outline" onClick={() => handleSeleccionar(equipo)}>
-                      Seleccionar
-                    </Button>
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </ScrollArea>
 
-        {selected && (
-          <div className="space-y-2 border-t pt-4">
-            <p className="text-sm text-gray-600">
-              <strong>Equipo seleccionado:</strong> {selected.descripcion}
-            </p>
-            <div className="flex flex-col md:flex-row gap-2">
-              <Input
-                type="number"
-                min={1}
-                value={cantidad}
-                onChange={(e) => setCantidad(parseInt(e.target.value))}
-                placeholder="Cantidad"
-              />
-              <select
-                className="border rounded-md px-2 py-1 text-sm"
-                value={proyectoEquipoId}
-                onChange={(e) => setProyectoEquipoId(e.target.value)}
-              >
-                <option value="">— Selecciona grupo del proyecto —</option>
-                {secciones.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <textarea
-                placeholder="Motivo del cambio o justificación técnica..."
-                value={motivoCambio}
-                onChange={(e) => setMotivoCambio(e.target.value)}
-                className="w-full border rounded-md p-2 text-sm"
-                rows={3}
-              />
-            </div>
-          </div>
-        )}
+        <div className="border-t pt-4 space-y-2">
+          <p className="text-sm text-gray-600">
+            <strong>Equipos seleccionados:</strong> {seleccionadosPreview.length}
+          </p>
+          {seleccionadosPreview.length > 0 && (
+            <ul className="text-sm list-disc list-inside text-gray-700">
+              {seleccionadosPreview.map((e) => (
+                <li key={e.id}>
+                  {e.codigo} - {e.descripcion}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <select
+            className="border rounded-md px-2 py-1 text-sm w-full"
+            value={proyectoEquipoId}
+            onChange={(e) => setProyectoEquipoId(e.target.value)}
+          >
+            <option value="">— Selecciona grupo del proyecto —</option>
+            {secciones.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={handleAgregar} disabled={!selected || loading || !motivoCambio.trim()}>
+          <Button onClick={handleAgregar} disabled={loading || seleccionadosPreview.length === 0 || !proyectoEquipoId}>
             {loading ? 'Agregando...' : 'Agregar a la Lista'}
           </Button>
         </div>

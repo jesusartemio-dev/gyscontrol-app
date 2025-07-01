@@ -4,8 +4,8 @@
 // 🔧 Descripción: API para ver, editar o eliminar un ítem de pedido de equipo
 //
 // 🧠 Uso: Para actualizar entrega, costos, comentarios desde logística
-// ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-05-20
+// ✍️ Autor: Jesús Artemio + IA GYS
+// 📅 Última actualización: 2025-05-23
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -14,13 +14,23 @@ import type { PedidoEquipoItemUpdatePayload } from '@/types'
 
 export async function GET(context: { params: { id: string } }) {
   try {
-    const { id } = await context.params
+    const { id } = context.params
 
     const data = await prisma.pedidoEquipoItem.findUnique({
       where: { id },
       include: {
-        pedido: true,
-        listaEquipoItem: true,
+        pedido: {
+          include: {
+            proyecto: true,
+            responsable: true,
+          },
+        },
+        listaEquipoItem: {
+          include: {
+            proveedor: true,
+            cotizacionSeleccionada: true,
+          },
+        },
       },
     })
 
@@ -33,14 +43,22 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(context: { params: { id: string }; request: Request }) {
+export async function PUT(request: Request, context: { params: { id: string } }) {
   try {
-    const { id } = await context.params
-    const body: PedidoEquipoItemUpdatePayload = await context.request.json()
+    const { id } = context.params
+    const body: PedidoEquipoItemUpdatePayload = await request.json()
 
     const data = await prisma.pedidoEquipoItem.update({
       where: { id },
-      data: body,
+      data: {
+        cantidadPedida: body.cantidadPedida,
+        precioUnitario: body.precioUnitario ?? null,
+        costoTotal: body.costoTotal ?? null,
+        fechaNecesaria: body.fechaNecesaria,
+        estado: body.estado ?? 'pendiente',
+        cantidadAtendida: body.cantidadAtendida ?? null,
+        comentarioLogistica: body.comentarioLogistica ?? null,
+      },
     })
 
     return NextResponse.json(data)
@@ -54,8 +72,10 @@ export async function PUT(context: { params: { id: string }; request: Request })
 
 export async function DELETE(context: { params: { id: string } }) {
   try {
-    const { id } = await context.params
-    await prisma.pedidoEquipoItem.delete({ where: { id } })
+    const { id } = context.params
+    await prisma.pedidoEquipoItem.delete({
+      where: { id },
+    })
     return NextResponse.json({ status: 'OK' })
   } catch (error) {
     return NextResponse.json(

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ProyectoEquipoItem, EstadoEquipo } from '@/types'
+import type { ProyectoEquipoItem, EstadoEquipoItem } from '@/types'
 import { getProyectoEquipoItems } from '@/lib/services/proyectoEquipoItem'
 
 import { Badge } from '@/components/ui/badge'
@@ -14,15 +14,11 @@ interface Props {
   onUpdated?: (item: ProyectoEquipoItem) => void
 }
 
-const coloresEstado: Record<EstadoEquipo, string> = {
+const coloresEstado: Record<EstadoEquipoItem, string> = {
   pendiente: 'bg-gray-300',
-  revisado_tecnico: 'bg-blue-400',
-  aprobado_coordinador: 'bg-yellow-400 text-black',
-  aprobado_gestor: 'bg-green-500',
-  en_lista: 'bg-indigo-500',
-  comprado: 'bg-orange-600',
-  reemplazado: 'bg-red-600',
-  entregado: 'bg-emerald-600',
+  en_lista: 'bg-blue-400',
+  reemplazado: 'bg-yellow-400 text-black',
+  descartado: 'bg-red-600',
 }
 
 export default function ProyectoEquipoItemList({ proyectoId, filtroEquipoId, modoRevision }: Props) {

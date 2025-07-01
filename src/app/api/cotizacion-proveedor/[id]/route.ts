@@ -1,16 +1,15 @@
-// ===================================================
-// 📁 Archivo: [id]/route.ts
-// 📌 Ubicación: src/app/api/cotizacion-proveedor/[id]
-// 🔧 Descripción: API para ver, actualizar y eliminar una cotización de proveedor por ID
-// ===================================================
-
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { CotizacionProveedorUpdatePayload } from '@/types'
 
-export async function GET(context: { params: { id: string } }) {
+// GET → Obtener cotización por ID
+export async function GET(
+  req: Request,
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = await context.params
+    const { id } = context.params // ✅ quitamos 'await'
+
     const data = await prisma.cotizacionProveedor.findUnique({
       where: { id },
       include: {
@@ -20,11 +19,23 @@ export async function GET(context: { params: { id: string } }) {
           include: {
             listaEquipoItem: true,
           },
+          orderBy: {
+            codigo: 'asc', // ✅ Ordena por código ascendente
+          },
         },
       },
     })
+
+    if (!data) {
+      return NextResponse.json(
+        { error: 'Cotización no encontrada' },
+        { status: 404 }
+      )
+    }
+
     return NextResponse.json(data)
   } catch (error) {
+    console.error('❌ Error al obtener la cotización:', error)
     return NextResponse.json(
       { error: 'Error al obtener la cotización: ' + String(error) },
       { status: 500 }
@@ -32,10 +43,14 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(context: { params: { id: string }; request: Request }) {
+// PUT → Actualizar cotización por ID
+export async function PUT(
+  req: Request,
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = await context.params
-    const body: CotizacionProveedorUpdatePayload = await context.request.json()
+    const { id } = context.params // ✅ quitamos 'await'
+    const body: CotizacionProveedorUpdatePayload = await req.json()
 
     const data = await prisma.cotizacionProveedor.update({
       where: { id },
@@ -44,6 +59,7 @@ export async function PUT(context: { params: { id: string }; request: Request })
 
     return NextResponse.json(data)
   } catch (error) {
+    console.error('❌ Error al actualizar la cotización:', error)
     return NextResponse.json(
       { error: 'Error al actualizar la cotización: ' + String(error) },
       { status: 500 }
@@ -51,12 +67,25 @@ export async function PUT(context: { params: { id: string }; request: Request })
   }
 }
 
-export async function DELETE(context: { params: { id: string } }) {
+// DELETE → Eliminar cotización por ID
+export async function DELETE(
+  req: Request,
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = await context.params
-    await prisma.cotizacionProveedor.delete({ where: { id } })
+    const { id } = context.params // ✅ quitamos 'await'
+
+    await prisma.cotizacionProveedorItem.deleteMany({
+      where: { cotizacionId: id },
+    })
+
+    await prisma.cotizacionProveedor.delete({
+      where: { id },
+    })
+
     return NextResponse.json({ status: 'OK' })
   } catch (error) {
+    console.error('❌ Error al eliminar la cotización:', error)
     return NextResponse.json(
       { error: 'Error al eliminar la cotización: ' + String(error) },
       { status: 500 }

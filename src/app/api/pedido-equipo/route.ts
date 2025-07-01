@@ -1,11 +1,10 @@
 // ===================================================
 // 📁 Archivo: route.ts
 // 📌 Ubicación: src/app/api/pedido-equipo/
-// 🔧 Descripción: API para crear y listar pedidos de equipo por proyecto
-//
+// 🔧 Descripción: API para crear y listar pedidos de equipo por proyecto con código secuencial
 // 🧠 Uso: Proyectos genera pedidos; logística visualiza y gestiona
 // ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-05-21
+// 📅 Última actualización: 2025-05-29
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -27,7 +26,7 @@ export async function GET(request: Request) {
           include: {
             listaEquipoItem: {
               include: {
-                proveedor: true, // opcional, por si quieres mostrar nombre proveedor
+                proveedor: true,
               },
             },
           },
@@ -49,13 +48,34 @@ export async function POST(request: Request) {
   try {
     const body: PedidoEquipoPayload = await request.json()
 
-    // Paso 1: Crear el pedido
+    const proyecto = await prisma.proyecto.findUnique({
+      where: { id: body.proyectoId },
+    })
+
+    if (!proyecto) {
+      return NextResponse.json(
+        { error: 'Proyecto no encontrado' },
+        { status: 404 }
+      )
+    }
+
+    // Obtener último numeroSecuencia de pedidos para este proyecto
+    const ultimoPedido = await prisma.pedidoEquipo.findFirst({
+      where: { proyectoId: body.proyectoId },
+      orderBy: { numeroSecuencia: 'desc' },
+    })
+
+    const nuevoNumero = ultimoPedido ? ultimoPedido.numeroSecuencia + 1 : 1
+    const codigoGenerado = `${proyecto.codigo}-PED-${String(nuevoNumero).padStart(3, '0')}`
+
+    // Paso 1: Crear el pedido con código automático
     const pedido = await prisma.pedidoEquipo.create({
       data: {
-        proyecto: { connect: { id: body.proyectoId } },
-        responsable: { connect: { id: body.responsableId } },
-        lista: { connect: { id: body.listaId } },
-        codigo: body.codigo,
+        proyectoId: body.proyectoId,
+        responsableId: body.responsableId,
+        listaId: body.listaId,
+        codigo: codigoGenerado,
+        numeroSecuencia: nuevoNumero,
         estado: body.estado,
         observacion: body.observacion,
         fechaPedido: body.fechaPedido ? new Date(body.fechaPedido) : undefined,
@@ -69,25 +89,33 @@ export async function POST(request: Request) {
       where: { listaId: body.listaId },
     })
 
-    // Paso 3: Crear PedidoEquipoItem para cada ítem de la lista
+    // Paso 3: Crear PedidoEquipoItem para cada ítem de la lista y actualizar cantidadPedida
     for (const item of listaItems) {
       await prisma.pedidoEquipoItem.create({
         data: {
           pedidoId: pedido.id,
           listaEquipoItemId: item.id,
-          cantidadPedida: item.cantidad, // puedes iniciar con la misma cantidad
+          cantidadPedida: item.cantidad,
           precioUnitario: item.precioElegido || 0,
           costoTotal: (item.precioElegido || 0) * item.cantidad,
-          fechaNecesaria: body.fechaEntregaEstimada
-            ? new Date(body.fechaEntregaEstimada)
-            : new Date(),
+          fechaNecesaria: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : new Date(),
           estado: 'pendiente',
+        },
+      })
+
+      await prisma.listaEquipoItem.update({
+        where: { id: item.id },
+        data: {
+          cantidadPedida: {
+            increment: item.cantidad,
+          },
         },
       })
     }
 
     return NextResponse.json(pedido)
   } catch (error) {
+    console.error('❌ Error al crear pedido:', error)
     return NextResponse.json(
       { error: 'Error al crear pedido: ' + String(error) },
       { status: 500 }

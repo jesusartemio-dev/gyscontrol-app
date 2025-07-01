@@ -76,9 +76,9 @@ const CotizacionPDF = ({ cotizacion }: Props) => (
         <Text style={styles.celda}>Total (S/)</Text>
       </View>
 
-      {cotizacion.equipos?.flatMap(equipo =>
-        equipo.items.map(item => (
-          <View key={item.id} style={styles.tablaRow}>
+      {cotizacion.equipos?.flatMap((equipo, equipoIndex) =>
+        equipo.items.map((item, itemIndex) => (
+          <View key={`equipo-${item.id || `${item.codigo}-${itemIndex}`}`} style={styles.tablaRow}>
             <Text style={[styles.celda, { flex: 3 }]}>
               {safeText(item.codigo)} - {safeText(item.descripcion)}
             </Text>
@@ -88,9 +88,9 @@ const CotizacionPDF = ({ cotizacion }: Props) => (
         ))
       )}
 
-      {cotizacion.servicios?.flatMap(servicio =>
-        servicio.items.map(item => (
-          <View key={item.id} style={styles.tablaRow}>
+      {cotizacion.servicios?.flatMap((servicio, servicioIndex) =>
+        servicio.items.map((item, itemIndex) => (
+          <View key={`servicio-${item.id || `${item.nombre}-${itemIndex}`}`} style={styles.tablaRow}>
             <Text style={[styles.celda, { flex: 3 }]}>
               {safeText(item.nombre)} - {safeText(item.descripcion)}
             </Text>
@@ -99,6 +99,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => (
           </View>
         ))
       )}
+
 
       <Text style={styles.total}>
         Total Cliente: S/ {cotizacion.totalCliente?.toFixed(2) ?? '0.00'}

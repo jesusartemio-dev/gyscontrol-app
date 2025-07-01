@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import {
   getCotizacionById,
   updateCotizacion
@@ -18,7 +18,11 @@ import {
   deleteCotizacionGasto,
   updateCotizacionGasto
 } from '@/lib/services/cotizacionGasto'
-import { deleteCotizacionGastoItem } from '@/lib/services/cotizacionGastoItem'
+import {
+  deleteCotizacionGastoItem,
+  updateCotizacionGastoItem
+} from '@/lib/services/cotizacionGastoItem'
+import { deleteCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 
 import CotizacionEquipoForm from '@/components/cotizaciones/CotizacionEquipoForm'
 import CotizacionServicioForm from '@/components/cotizaciones/CotizacionServicioForm'
@@ -31,8 +35,6 @@ import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCo
 import EstadoCotizacionToolbar from '@/components/cotizaciones/EstadoCotizacionToolbar'
 import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
-import { crearProyectoDesdeCotizacion } from '@/lib/services/proyecto'
-import { useRouter } from 'next/navigation'
 
 import type {
   Cotizacion,
@@ -47,10 +49,8 @@ export default function CotizacionDetallePage() {
   const [error, setError] = useState<string | null>(null)
   const [renderPDF, setRenderPDF] = useState(true)
   const [showForm, setShowForm] = useState({ equipo: false, servicio: false, gasto: false })
-
   const router = useRouter()
   const [creandoProyecto, setCreandoProyecto] = useState(false)
-
 
   useEffect(() => {
     if (typeof id === 'string') {
@@ -151,11 +151,6 @@ export default function CotizacionDetallePage() {
     setTimeout(() => setRenderPDF(true), 100)
   }
 
-  const handleEliminarItemGasto = async (gastoId: string, itemId: string) => {
-    await deleteCotizacionGastoItem(itemId)
-    actualizarGasto(gastoId, items => items.filter(i => i.id !== itemId))
-  }
-
   const handleActualizarNombreEquipo = async (id: string, nuevo: string) => {
     if (!cotizacion) return
     await updateCotizacionEquipo(id, { nombre: nuevo })
@@ -198,6 +193,7 @@ export default function CotizacionDetallePage() {
 
   return (
     <div className="p-6 space-y-8">
+      {/* Cabecera */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">{cotizacion.nombre}</h1>
         {renderPDF && puedeRenderizarPDF && <DescargarPDFButton cotizacion={cotizacion} />}
@@ -258,7 +254,7 @@ export default function CotizacionDetallePage() {
             className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm flex items-center gap-1"
             onClick={() => setShowForm(prev => ({ ...prev, servicio: !prev.servicio }))}
           >
-            <span className="text-lg">＋</span> Servicio
+            <span className="text-lg">＋</span> Crear Servicio
           </button>
         </div>
         {showForm.servicio && (
@@ -276,7 +272,10 @@ export default function CotizacionDetallePage() {
               servicio={s}
               onCreated={i => actualizarServicio(s.id, items => [...items, i])}
               onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))}
-              onDeleted={id => actualizarServicio(s.id, items => items.filter(i => i.id !== id))}
+              onDeleted={async id => {
+                await deleteCotizacionServicioItem(id)
+                actualizarServicio(s.id, items => items.filter(i => i.id !== id))
+              }}
               onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)}
               onUpdatedNombre={nuevo => handleActualizarNombreServicio(s.id, nuevo)}
             />
@@ -311,19 +310,18 @@ export default function CotizacionDetallePage() {
               key={g.id}
               gasto={g}
               onCreated={i => actualizarGasto(g.id, items => [...items, i])}
-              onUpdated={(id, changes) =>
-                actualizarGasto(g.id, items => items.map(i => i.id === id ? { ...i, ...changes } : i))
-              }
-              onDeleted={id => handleEliminarItemGasto(g.id, id)}
+              onUpdated={item => actualizarGasto(g.id, items => items.map(i => i.id === item.id ? item : i))}
+              onDeleted={id => actualizarGasto(g.id, items => items.filter(i => i.id !== id))}
               onDeletedGrupo={() => handleEliminarGrupoGasto(g.id)}
               onUpdatedNombre={nuevo => handleActualizarNombreGasto(g.id, nuevo)}
             />
           ))}
         </div>
       </section>
-        {cotizacion.estado === 'aprobada' && cotizacion.etapa === 'cerrado' && (
-          <CrearProyectoDesdeCotizacionModal cotizacion={cotizacion} />
-        )}
+
+      {cotizacion.estado === 'aprobada' && cotizacion.etapa === 'cerrado' && (
+        <CrearProyectoDesdeCotizacionModal cotizacion={cotizacion} />
+      )}
     </div>
   )
 }

@@ -1,11 +1,3 @@
-// ===================================================
-// 💽 Archivo: CatalogoEquipoList.tsx (Avanzado)
-// 📋 Ubicación: src/components/catalogo/
-// 🔧 Descripción: Listado editable de Catálogo de Equipos optimizado con filtros accesibles.
-// ✍️ Autor: Jesús Artemio
-// 🗓️ Última actualización: 2025-04-25
-// ===================================================
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -15,6 +7,7 @@ import { CatalogoEquipo } from '@/types'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Pencil, Save, Trash2, X } from 'lucide-react'
 
 interface Props {
   data: CatalogoEquipo[]
@@ -35,8 +28,8 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
 
   useEffect(() => {
     setEquipos(data)
-    setCategorias([...new Set(data.map(eq => eq.categoria?.nombre).filter(Boolean))] as string[])
-    setUnidades([...new Set(data.map(eq => eq.unidad?.nombre).filter(Boolean))] as string[])
+    setCategorias([...new Set(data.map(eq => eq.categoria?.nombre).filter(Boolean))])
+    setUnidades([...new Set(data.map(eq => eq.unidad?.nombre).filter(Boolean))])
   }, [data])
 
   const handleEditField = async (id: string, field: keyof CatalogoEquipo, value: string | number) => {
@@ -104,15 +97,16 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
 
   return (
     <div>
+      {/* 🔍 Filtros */}
       <div className="flex flex-wrap gap-4 mb-4 items-end">
         <div className="flex flex-col space-y-1">
-          <label htmlFor="categoria" className="text-sm font-medium text-gray-700">Categoría</label>
+          <label className="text-sm font-medium">Categoría</label>
           <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
-            <SelectTrigger id="categoria" className="w-60">
+            <SelectTrigger className="w-44">
               <SelectValue placeholder="Categoría" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__ALL__">Todas las categorías</SelectItem>
+              <SelectItem value="__ALL__">Todas</SelectItem>
               {categorias.map(cat => (
                 <SelectItem key={cat} value={cat}>{cat}</SelectItem>
               ))}
@@ -121,13 +115,13 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
         </div>
 
         <div className="flex flex-col space-y-1">
-          <label htmlFor="unidad" className="text-sm font-medium text-gray-700">Unidad</label>
+          <label className="text-sm font-medium">Unidad</label>
           <Select value={unidadFiltro} onValueChange={setUnidadFiltro}>
-            <SelectTrigger id="unidad" className="w-60">
+            <SelectTrigger className="w-44">
               <SelectValue placeholder="Unidad" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__ALL__">Todas las unidades</SelectItem>
+              <SelectItem value="__ALL__">Todas</SelectItem>
               {unidades.map(u => (
                 <SelectItem key={u} value={u}>{u}</SelectItem>
               ))}
@@ -136,44 +130,47 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
         </div>
 
         <div className="flex flex-col space-y-1">
-          <label htmlFor="buscar" className="text-sm font-medium text-gray-700">Buscar</label>
+          <label className="text-sm font-medium">Buscar</label>
           <Input
-            id="buscar"
             type="text"
-            placeholder="Buscar código o descripción"
+            placeholder="Código o descripción"
             value={textoFiltro}
             onChange={e => setTextoFiltro(e.target.value)}
-            className="w-80"
+            className="w-64"
           />
         </div>
 
-        <Button variant="outline" onClick={() => {
-          setCategoriaFiltro('__ALL__')
-          setUnidadFiltro('__ALL__')
-          setTextoFiltro('')
-        }}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setCategoriaFiltro('__ALL__')
+            setUnidadFiltro('__ALL__')
+            setTextoFiltro('')
+          }}
+        >
           Limpiar filtros
         </Button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="table-auto w-full border mt-4 text-sm">
-          <thead className="bg-gray-100">
+      {/* 📋 Tabla */}
+      <div className="overflow-x-auto rounded shadow border">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               {['Código', 'Descripción', 'Categoría', 'Unidad', 'Marca', 'Precio Interno', 'Margen', 'Precio Venta', 'Estado', 'Acciones'].map(th => (
-                <th key={th} className="border px-2 py-1">{th}</th>
+                <th key={th} className="px-3 py-2 text-left font-semibold text-gray-700 border-b">{th}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {equiposFiltrados.map(eq => (
-              <tr key={eq.id}>
-                <td className="border px-2 py-1">{eq.codigo}</td>
-                <td className="border px-2 py-1">{eq.descripcion}</td>
-                <td className="border px-2 py-1">{eq.categoria?.nombre}</td>
-                <td className="border px-2 py-1">{eq.unidad?.nombre}</td>
-                <td className="border px-2 py-1">{eq.marca}</td>
-                <td className="border px-2 py-1">
+              <tr key={eq.id} className="hover:bg-gray-100">
+                <td className="px-3 py-2 border-b">{eq.codigo}</td>
+                <td className="px-3 py-2 border-b">{eq.descripcion}</td>
+                <td className="px-3 py-2 border-b">{eq.categoria?.nombre}</td>
+                <td className="px-3 py-2 border-b">{eq.unidad?.nombre}</td>
+                <td className="px-3 py-2 border-b">{eq.marca}</td>
+                <td className="px-3 py-2 border-b">
                   {editandoId === eq.id ? (
                     <Input
                       type="number"
@@ -185,7 +182,7 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                     eq.precioInterno.toFixed(2)
                   )}
                 </td>
-                <td className="border px-2 py-1">
+                <td className="px-3 py-2 border-b">
                   {editandoId === eq.id ? (
                     <Input
                       type="number"
@@ -198,10 +195,10 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                     `${(eq.margen * 100).toFixed(0)}%`
                   )}
                 </td>
-                <td className="border px-2 py-1 font-semibold text-green-700">S/ {eq.precioVenta.toFixed(2)}</td>
-                <td className="border px-2 py-1">
+                <td className="px-3 py-2 border-b font-semibold text-green-700">S/ {eq.precioVenta.toFixed(2)}</td>
+                <td className="px-3 py-2 border-b">
                   <select
-                    className="text-sm"
+                    className="text-sm border rounded px-1"
                     value={eq.estado}
                     onChange={e => handleEditField(eq.id, 'estado', e.target.value)}
                   >
@@ -210,20 +207,28 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                     <option value="rechazado">Rechazado</option>
                   </select>
                 </td>
-                <td className="border px-2 py-1 text-center">
+                <td className="px-3 py-2 border-b flex gap-1">
                   {editandoId === eq.id ? (
                     <>
-                      <Button
-                        size="sm"
-                        onClick={() => guardarEdicion(eq)}
-                        disabled={nuevoPrecio === eq.precioInterno && nuevoMargen === eq.margen}
-                      >💾</Button>
-                      <Button size="sm" variant="ghost" onClick={cancelarEdicion}>❌</Button>
+                      <Button size="icon" onClick={() => guardarEdicion(eq)}>
+                        <Save className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="outline" onClick={cancelarEdicion}>
+                        <X className="w-4 h-4" />
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <Button size="sm" onClick={() => { setEditandoId(eq.id); setNuevoPrecio(eq.precioInterno); setNuevoMargen(eq.margen); }}>✏️</Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDelete(eq.id)}>🗑️</Button>
+                      <Button size="icon" variant="outline" onClick={() => {
+                        setEditandoId(eq.id)
+                        setNuevoPrecio(eq.precioInterno)
+                        setNuevoMargen(eq.margen)
+                      }}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="destructive" onClick={() => handleDelete(eq.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </>
                   )}
                 </td>

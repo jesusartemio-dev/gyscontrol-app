@@ -1,7 +1,7 @@
 // ===================================================
 // 📁 Archivo: [id]/route.ts
 // 📌 Ubicación: src/app/api/cotizacion-gasto-item/[id]
-// 🔧 Descripción: Maneja GET, PUT y DELETE de CotizacionGastoItem
+// 🔧 Descripción: Maneja GET, PUT y DELETE de CotizacionGastoItem con mejoras
 // ===================================================
 
 import { NextResponse } from 'next/server'
@@ -12,12 +12,16 @@ import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 export async function GET(context: { params: { id: string } }) {
   try {
     const { id } = context.params
+
     const data = await prisma.cotizacionGastoItem.findUnique({
       where: { id },
-      include: {
-        gasto: true,
-      },
+      include: { gasto: true },
     })
+
+    if (!data) {
+      return NextResponse.json({ error: 'Ítem de gasto no encontrado' }, { status: 404 })
+    }
+
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error al obtener ítem de gasto:', error)
@@ -27,55 +31,54 @@ export async function GET(context: { params: { id: string } }) {
 
 export async function PUT(req: Request, context: { params: { id: string } }) {
   try {
-    const { id } = context.params
-    const payload: CotizacionGastoItemUpdatePayload = await req.json()
+    const { id } = await context.params // ✅ CORREGIDO: await context.params
 
-    const actualizado = await prisma.cotizacionGastoItem.update({
+    const payload: Partial<CotizacionGastoItemUpdatePayload> = await req.json()
+
+    const existing = await prisma.cotizacionGastoItem.findUnique({
+      where: { id },
+      include: { gasto: { select: { cotizacionId: true } } },
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Ítem de gasto no encontrado para actualizar' }, { status: 404 })
+    }
+
+    const data = await prisma.cotizacionGastoItem.update({
       where: { id },
       data: payload,
     })
 
-    const gasto = await prisma.cotizacionGasto.findUnique({
-      where: { id: actualizado.gastoId },
-      select: { cotizacionId: true },
-    })
+    await recalcularTotalesCotizacion(existing.gasto.cotizacionId)
 
-    if (gasto?.cotizacionId) {
-      await recalcularTotalesCotizacion(gasto.cotizacionId)
-    }
-
-    return NextResponse.json(actualizado)
+    return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error al actualizar ítem de gasto:', error)
     return NextResponse.json({ error: 'Error al actualizar ítem de gasto' }, { status: 500 })
   }
 }
 
+
 export async function DELETE(_: Request, context: { params: { id: string } }) {
   try {
     const { id } = context.params
 
-    const item = await prisma.cotizacionGastoItem.findUnique({
+    const existing = await prisma.cotizacionGastoItem.findUnique({
       where: { id },
-      select: { gastoId: true },
+      include: { gasto: { select: { cotizacionId: true } } },
     })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Ítem de gasto no encontrado para eliminar' }, { status: 404 })
+    }
 
     await prisma.cotizacionGastoItem.delete({
       where: { id },
     })
 
-    if (item?.gastoId) {
-      const gasto = await prisma.cotizacionGasto.findUnique({
-        where: { id: item.gastoId },
-        select: { cotizacionId: true },
-      })
+    await recalcularTotalesCotizacion(existing.gasto.cotizacionId)
 
-      if (gasto?.cotizacionId) {
-        await recalcularTotalesCotizacion(gasto.cotizacionId)
-      }
-    }
-
-    return NextResponse.json({ status: 'ok' })
+    return NextResponse.json({ status: 'ok', deletedId: id })
   } catch (error) {
     console.error('❌ Error al eliminar ítem de gasto:', error)
     return NextResponse.json({ error: 'Error al eliminar ítem de gasto' }, { status: 500 })

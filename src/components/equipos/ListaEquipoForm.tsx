@@ -14,7 +14,6 @@ interface Props {
 
 export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
   const [nombre, setNombre] = useState('')
-  const [descripcion, setDescripcion] = useState('')
   const [loading, setLoading] = useState(false)
   const [visible, setVisible] = useState(false)
 
@@ -26,9 +25,15 @@ export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
 
     try {
       setLoading(true)
-      onCreated({ proyectoId, nombre, descripcion })
+
+      onCreated({
+        proyectoId,
+        nombre,
+        codigo: undefined,          // generado en backend
+        numeroSecuencia: undefined, // generado en backend
+      })
+
       setNombre('')
-      setDescripcion('')
       setVisible(false)
       toast.success('Lista creada correctamente')
     } catch {
@@ -50,9 +55,11 @@ export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
       )}
 
       {visible && (
-        <div className="border rounded-xl p-4 shadow-md space-y-4">
+        <div className="border rounded-xl p-4 shadow-md space-y-4 bg-white">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold">➕ Crear Nueva Lista Técnica</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              ➕ Crear Nueva Lista Técnica
+            </h2>
             <Button variant="ghost" onClick={() => setVisible(false)}>
               <X className="w-5 h-5 text-red-500" />
             </Button>
@@ -63,11 +70,7 @@ export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Nombre de la lista"
-            />
-            <Input
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Descripción (opcional)"
+              className="w-full"
             />
             <Button
               className="bg-blue-600 text-white"

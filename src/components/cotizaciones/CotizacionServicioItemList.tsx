@@ -1,12 +1,3 @@
-// ===================================================
-// 📁 Archivo: CotizacionServicioItemList.tsx
-// 📌 Ubicación: src/components/cotizaciones/
-// 🔧 Descripción: Lista editable de ítems de servicio en cotización
-// 🧠 Uso: Se muestra dentro del acordeón de servicios para ver y editar ítems
-// ✍️ Autor: Asistente IA GYS
-// 📅 Última actualización: 2025-04-23
-// ===================================================
-
 'use client'
 
 import { useState } from 'react'
@@ -102,10 +93,10 @@ export default function CotizacionServicioItemList({ items, onUpdated, onDeleted
               <div className="text-gray-500">{item.recursoNombre} • {item.unidadServicioNombre}</div>
               <div className="text-xs text-gray-500 italic">Categoría: {item.categoria} • Fórmula: {item.formula}</div>
               <div className="text-xs text-gray-600">
-                Costo/Hr: S/ {item.costoHora.toFixed(2)} • FS: {item.factorSeguridad}
+                Costo/Hr: $ {item.costoHora.toFixed(2)} • FS: {item.factorSeguridad}
               </div>
               <div className="text-xs text-gray-600">
-                C. Interno: <span className="font-medium">S/ {item.costoInterno.toFixed(2)}</span> • Margen: {item.margen} • Cliente: <span className="text-green-700 font-semibold">S/ {item.costoCliente.toFixed(2)}</span>
+                C. Interno: <span className="font-medium">$ {item.costoInterno.toFixed(2)}</span> • Margen: {item.margen} • Cliente: <span className="text-green-700 font-semibold">$ {item.costoCliente.toFixed(2)}</span>
               </div>
             </div>
 
@@ -148,7 +139,7 @@ export default function CotizacionServicioItemList({ items, onUpdated, onDeleted
                   </div>
 
                   <div className="text-xs text-gray-500 pt-1">
-                    C. Interno: S/ {costoInternoEditado.toFixed(2)} • Cliente: <span className="text-green-600 font-semibold">S/ {costoClienteEditado.toFixed(2)}</span>
+                    C. Interno: $ {costoInternoEditado.toFixed(2)} • Cliente: <span className="text-green-600 font-semibold">$ {costoClienteEditado.toFixed(2)}</span>
                   </div>
 
                   <div className="flex justify-end gap-3 pt-2">
@@ -175,7 +166,7 @@ export default function CotizacionServicioItemList({ items, onUpdated, onDeleted
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-gray-500">Cliente</div>
-                    <div className="text-green-700 font-semibold">S/ {item.costoCliente.toFixed(2)}</div>
+                    <div className="text-green-700 font-semibold">$ {item.costoCliente.toFixed(2)}</div>
                   </div>
                   <button onClick={() => iniciarEdicion(item)} className="text-blue-600">✏️</button>
                   <button

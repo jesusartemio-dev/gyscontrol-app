@@ -28,16 +28,32 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
     const body = await req.json()
-    const data = await prisma.catalogoServicio.update({
+
+    const data = {
+      nombre: body.nombre,
+      descripcion: body.descripcion,
+      formula: body.formula,
+      horaBase: body.horaBase,
+      horaRepetido: body.horaRepetido,
+      horaUnidad: body.horaUnidad,
+      horaFijo: body.horaFijo,
+      categoria: { connect: { id: body.categoriaId } },
+      unidadServicio: { connect: { id: body.unidadServicioId } },
+      recurso: { connect: { id: body.recursoId } },
+    }
+
+    const updated = await prisma.catalogoServicio.update({
       where: { id: params.id },
-      data: body,
+      data,
     })
-    return NextResponse.json(data)
+
+    return NextResponse.json(updated)
   } catch (error) {
     console.error('❌ Error en PUT /catalogo-servicio/[id]:', error)
     return NextResponse.json({ error: 'Error al actualizar servicio' }, { status: 500 })
   }
 }
+
 
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
   try {

@@ -1,7 +1,7 @@
 'use client'
 
 // ===================================================
-// 📁 Archivo: page.tsx (Actualizado PRO con eliminación funcional)
+// 📁 Archivo: page.tsx (Actualizado con edición funcional)
 // 📍 Ubicación: src/app/catalogo/servicios/
 // ===================================================
 
@@ -24,7 +24,7 @@ import {
 } from '@/lib/utils/serviciosImportUtils'
 
 import CatalogoServicioCrearAcordeon from '@/components/catalogo/CatalogoServicioCrearAcordeon'
-import CatalogoServicioList from '@/components/catalogo/CatalogoServicioList'
+import CatalogoServicioTable from '@/components/catalogo/CatalogoServicioTable'
 import ModalDuplicadosServicios from '@/components/catalogo/ModalDuplicadosServicios'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 
@@ -53,12 +53,20 @@ export default function CatalogoServicioPage() {
   }, [])
 
   const handleCreated = () => cargarServicios()
-  const handleUpdated = () => cargarServicios()
 
-  // ✅ Esta es la función corregida para eliminar
+  const actualizarServicio = async (servicio: CatalogoServicio) => {
+    try {
+      await updateCatalogoServicio(servicio.id, servicio)
+      toast.success('Servicio actualizado')
+      await cargarServicios()
+    } catch (err) {
+      toast.error('Error al actualizar servicio')
+      console.error('❌ Error al actualizar servicio:', err)
+    }
+  }
+
   const eliminarServicio = async (id: string) => {
     try {
-      console.log('🧨 Eliminando servicio desde page.tsx con ID:', id)
       await deleteCatalogoServicio(id)
       toast.success('Servicio eliminado')
       await cargarServicios()
@@ -161,9 +169,9 @@ export default function CatalogoServicioPage() {
       <CatalogoServicioCrearAcordeon onCreated={handleCreated} />
 
       <div className="bg-white p-4 rounded shadow">
-        <CatalogoServicioList
+        <CatalogoServicioTable
           data={servicios}
-          onUpdate={handleUpdated}
+          onUpdate={actualizarServicio}
           onDelete={eliminarServicio}
         />
       </div>

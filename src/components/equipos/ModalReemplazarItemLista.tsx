@@ -1,3 +1,5 @@
+// src/components/equipos/ModalReemplazarItemLista.tsx
+
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -14,15 +16,15 @@ import { toast } from 'sonner'
 import { getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
 import { getCategoriaEquipo } from '@/lib/services/categoriaEquipo'
 import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
-import { createProyectoEquipoItem, updateProyectoEquipoItem } from '@/lib/services/proyectoEquipoItem'
-import { updateListaEquipoItem, deleteListaEquipoItemByProyectoItemId } from '@/lib/services/listaEquipoItem'
+import { updateProyectoEquipoItem, deleteProyectoEquipoItem } from '@/lib/services/proyectoEquipoItem'
+import { reemplazarItemLista, updateListaEquipoItem } from '@/lib/services/listaEquipoItem'
 import type {
   CatalogoEquipo,
   CategoriaEquipo,
-  ProyectoEquipoItemPayload,
   ProyectoEquipo,
   ListaEquipoItem,
 } from '@/types'
+import { EstadoListaItem } from '@/types'
 
 interface Props {
   open: boolean
@@ -30,6 +32,7 @@ interface Props {
   item: ListaEquipoItem
   listaId: string
   proyectoId: string
+  tipoReemplazo: 'original' | 'reemplazo'
   onUpdated?: () => void
 }
 
@@ -39,6 +42,7 @@ export default function ModalReemplazarItemListaCatalogo({
   item,
   listaId,
   proyectoId,
+  tipoReemplazo,
   onUpdated,
 }: Props) {
   const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])
@@ -71,66 +75,95 @@ export default function ModalReemplazarItemListaCatalogo({
     setCantidad(1)
   }
 
-  const handleReemplazar = async () => {
-    if (!selected || cantidad <= 0 || !proyectoEquipoId || !motivoCambio.trim()) {
-      toast.warning('Completa todos los campos requeridos')
-      return
+const handleReemplazar = async () => {
+  if (!selected || cantidad <= 0 || !motivoCambio.trim() || !proyectoEquipoId) {
+    toast.warning('Completa todos los campos requeridos')
+    return
+  }
+
+  try {
+    setLoading(true)
+
+    let idAntiguo: string | undefined = item.proyectoEquipoItemId ?? undefined
+    let nuevoPEIId = ''
+
+    if (idAntiguo) {
+      if (tipoReemplazo === 'original') {
+        await updateProyectoEquipoItem(idAntiguo, {
+          estado: 'reemplazado',
+          nuevo: false,
+        })
+      } else if (tipoReemplazo === 'reemplazo') {
+        await deleteProyectoEquipoItem(idAntiguo)
+        idAntiguo = item.reemplazaAId ?? undefined
+      }
     }
 
-    try {
-      setLoading(true)
-
-      const payload: ProyectoEquipoItemPayload = {
+    const nuevoItemPEI = await fetch('/api/proyecto-equipo-item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         proyectoEquipoId,
         catalogoEquipoId: selected.id,
+        equipoOriginalId: idAntiguo,
         codigo: selected.codigo,
         descripcion: selected.descripcion,
-        categoria: selected.categoria?.nombre ?? 'SIN-CATEGORIA',
         unidad: selected.unidad?.nombre ?? 'UND',
+        categoria: selected.categoria?.nombre ?? 'SIN-CATEGORIA',
         marca: selected.marca ?? 'SIN-MARCA',
         cantidad,
-        precioInterno: selected.precioVenta,
-        precioCliente: selected.precioVenta,
-        costoInterno: cantidad * selected.precioVenta,
-        costoCliente: cantidad * selected.precioVenta,
+        precioInterno: selected.precioInterno ?? 0,
+        precioCliente: selected.precioVenta ?? 0,
+        costoInterno: (selected.precioInterno ?? 0) * cantidad,
+        costoCliente: (selected.precioVenta ?? 0) * cantidad,
+        estado: 'reemplazado',
         nuevo: true,
         motivoCambio,
-        listaId,
-        estado: 'en_lista',
-        equipoOriginalId: item.proyectoEquipoItemId || undefined,
-      }
+      }),
+    }).then((res) => res.json())
 
-      const nuevoEquipo = await createProyectoEquipoItem(payload)
+    nuevoPEIId = nuevoItemPEI.id
 
-      // ✅ Eliminar el item anterior de la lista técnica
-      if (item.proyectoEquipoItemId) {
-        await updateProyectoEquipoItem(item.proyectoEquipoItemId, {
-          estado: 'reemplazado',
-        })
-
-        await deleteListaEquipoItemByProyectoItemId(item.proyectoEquipoItemId)
-      }
-
-      // ✅ Crear el nuevo ítem de lista
-      await updateListaEquipoItem(item.id, {
-        proyectoEquipoItemId: nuevoEquipo.id,
-        codigo: selected.codigo,
-        descripcion: selected.descripcion,
-        unidad: selected.unidad?.nombre ?? 'UND',
-        cantidad: cantidad,
-        presupuesto: selected.precioVenta,
-      })
-
-      toast.success('✅ Equipo reemplazado correctamente')
-      onUpdated?.()
-      onClose()
-    } catch (error) {
-      console.error('❌ Error al reemplazar equipo:', error)
-      toast.error('❌ No se pudo reemplazar el equipo')
-    } finally {
-      setLoading(false)
+    // Este es el payload para reemplazar en la lista
+    const payloadReemplazo = {
+      codigo: selected.codigo,
+      descripcion: selected.descripcion,
+      unidad: selected.unidad?.nombre ?? 'UND',
+      cantidad,
+      presupuesto: selected.precioVenta ?? 0,
+      comentarioRevision: motivoCambio,
+      estado: 'reemplazo' as EstadoListaItem,
+      proyectoEquipoItemId: nuevoPEIId,
+      reemplazaAId: idAntiguo,
+      listaId,
     }
+
+    console.log('📦 Payload enviado a reemplazarItemLista:', {
+      id: item.id,
+      ...payloadReemplazo,
+    })
+
+    // Reemplaza el ítem de la lista
+    await reemplazarItemLista(item.id, payloadReemplazo)
+
+    // Actualiza el estado en la lista
+    await updateListaEquipoItem(item.id, {
+      estado: 'reemplazo' as EstadoListaItem,
+    })
+
+    toast.success('✅ Equipo reemplazado correctamente')
+    onUpdated?.()
+    onClose()
+  } catch (error) {
+    console.error('❌ Error al reemplazar equipo:', error)
+    toast.error('❌ No se pudo reemplazar el equipo')
+  } finally {
+    setLoading(false)
   }
+}
+
+
+
 
   const equiposFiltrados = equipos.filter((e) => {
     const coincideCategoria = categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro

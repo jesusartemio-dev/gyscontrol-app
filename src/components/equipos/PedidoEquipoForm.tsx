@@ -1,13 +1,3 @@
-// ===================================================
-// 📁 Archivo: PedidoEquipoForm.tsx
-// 📌 Ubicación: src/components/proyectos/
-// 🔧 Descripción: Formulario para crear un nuevo pedido de equipos desde proyectos
-//
-// 🧠 Uso: Usado en la vista del proyecto para solicitar pedidos vinculados a listas técnicas
-// ✍️ Autor: Asistente IA GYS
-// 🗓️ Última actualización: 2025-05-21
-// ===================================================
-
 'use client'
 
 import { useState } from 'react'
@@ -23,6 +13,7 @@ interface Props {
   proyectoId: string
   responsableId: string
   onCreated: (payload: PedidoEquipoPayload) => void
+  onRefreshListas?: () => void
 }
 
 export default function PedidoEquipoForm({
@@ -30,7 +21,9 @@ export default function PedidoEquipoForm({
   proyectoId,
   responsableId,
   onCreated,
+  onRefreshListas,
 }: Props) {
+  const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [listaId, setListaId] = useState('')
   const [observacion, setObservacion] = useState('')
   const [fechaNecesaria, setFechaNecesaria] = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -48,9 +41,28 @@ export default function PedidoEquipoForm({
     return cantidad * (item.precioElegido || 0)
   }
 
+  const tieneItemsPendientes = listaSeleccionada
+    ? listaSeleccionada.items.some(
+        (item) => (item.cantidad - (item.cantidadPedida || 0)) > 0
+      )
+    : false
+
   const handleSubmit = async () => {
     if (!listaId) {
       toast.error('Debe seleccionar una lista técnica')
+      return
+    }
+
+    const excedidos = listaSeleccionada?.items.some((item) => {
+      const requerido = item.cantidad
+      const yaPedido = item.cantidadPedida || 0
+      const pendiente = requerido - yaPedido
+      const aPedir = cantidades[item.id] || 0
+      return aPedir > pendiente
+    })
+
+    if (excedidos) {
+      toast.error('No puedes pedir más cantidad de la disponible')
       return
     }
 
@@ -63,11 +75,13 @@ export default function PedidoEquipoForm({
         observacion,
         fechaEntregaEstimada: fechaNecesaria,
       }
-      onCreated(payload)
+      await onCreated(payload)
       toast.success('Pedido creado correctamente')
       setListaId('')
       setObservacion('')
       setCantidades({})
+      setMostrarFormulario(false)
+      onRefreshListas?.()
     } catch (err) {
       toast.error('Error al crear el pedido')
     } finally {
@@ -75,9 +89,28 @@ export default function PedidoEquipoForm({
     }
   }
 
+  if (!mostrarFormulario) {
+    return (
+      <Button
+        className="bg-blue-600 text-white"
+        onClick={() => setMostrarFormulario(true)}
+      >
+        ➕ Crear Pedido de Equipos
+      </Button>
+    )
+  }
+
   return (
     <div className="border rounded-xl p-4 shadow-md space-y-4">
-      <h2 className="text-lg font-semibold text-blue-600">📦 Crear Pedido de Equipos</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold text-blue-600">📦 Crear Pedido de Equipos</h2>
+        <Button
+          variant="outline"
+          onClick={() => setMostrarFormulario(false)}
+        >
+          Cancelar
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <select
@@ -111,7 +144,7 @@ export default function PedidoEquipoForm({
 
         <Button
           className="bg-green-600 text-white"
-          disabled={loading}
+          disabled={loading || !tieneItemsPendientes}
           onClick={handleSubmit}
         >
           Crear Pedido

@@ -20,13 +20,15 @@ interface Props {
 
 const subMenu = [
   { label: '🏠 Proyecto', path: '' },
-  { label: '📦 Cotizados', path: 'equipos' },
+  { label: '📦 Equipos', path: 'equipos' },
   { label: '📋 Listas', path: 'equipos/lista-equipos' },
-  { label: '📥 Pedidos', path: 'equipos/pedidos' }, // ✅ Agregado
+  { label: '🔍 Comparación', path: 'equipos/comparacion' }, // ✅ Nuevo ítem
+  { label: '📥 Pedidos', path: 'equipos/pedidos' },
   { label: '🧾 Requerimientos', path: 'requerimientos' },
   { label: '💰 Valorizaciones', path: 'gestion/valorizaciones' },
   { label: '🕓 Horas Hombre', path: 'gestion/horas' },
 ]
+
 
 
 export default function ProyectoSubMenu({ proyectoId }: Props) {

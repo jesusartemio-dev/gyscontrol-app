@@ -36,25 +36,67 @@ export default function ProyectoDetallePage() {
       <h1 className="text-3xl font-bold">{proyecto.nombre}</h1>
       <p className="text-gray-600 text-sm">🧱 Equipos Técnicos del Proyecto</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-        <p><strong>Cliente:</strong> {proyecto.cliente?.nombre ?? '—'}</p>
-        <p><strong>Comercial:</strong> {proyecto.comercial?.name ?? '—'}</p>
-        <p><strong>Gestor:</strong> {proyecto.gestor?.name ?? '—'}</p>
-        <p><strong>Código:</strong> {proyecto.codigo}</p>
-        <p><strong>Estado:</strong> {proyecto.estado}</p>
-        <p><strong>Inicio:</strong> {new Date(proyecto.fechaInicio).toLocaleDateString()}</p>
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-6">
+        {/* Datos generales */}
+        <div className="text-sm text-gray-700 space-y-1">
+          <p><span className="font-semibold">Cliente:</span> {proyecto.cliente?.nombre ?? '—'}</p>
+          <p><span className="font-semibold">Comercial:</span> {proyecto.comercial?.name ?? '—'}</p>
+          <p><span className="font-semibold">Gestor:</span> {proyecto.gestor?.name ?? '—'}</p>
+          <p><span className="font-semibold">Código:</span> {proyecto.codigo}</p>
+          <p><span className="font-semibold">Estado:</span> {proyecto.estado}</p>
+          <p><span className="font-semibold">Inicio:</span> {new Date(proyecto.fechaInicio).toLocaleDateString()}</p>
+        </div>
+
+        {/* Resumen de costos */}
+        <Card className="w-full max-w-md bg-white border rounded-xl shadow-sm text-sm">
+          <CardContent className="p-4 space-y-3 text-gray-800">
+
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                🧩 <strong>Equipos:</strong>
+              </span>
+              <span className="text-gray-700">${proyecto.totalEquiposInterno.toFixed(2)}</span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                ⚙️ <strong>Servicios:</strong>
+              </span>
+              <span className="text-gray-700">${proyecto.totalServiciosInterno.toFixed(2)}</span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                🧾 <strong>Gastos:</strong>
+              </span>
+              <span className="text-gray-700">${proyecto.totalGastosInterno.toFixed(2)}</span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                💰 <strong>Total Cliente:</strong>
+              </span>
+              <span className="font-medium text-gray-900">${proyecto.totalCliente.toFixed(2)}</span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                🔻 <strong>Descuento:</strong>
+              </span>
+              <span>{proyecto.descuento}%</span>
+            </div>
+
+            <div className="flex items-center justify-between border-t pt-2 font-semibold">
+              <span className="flex items-center gap-2">
+                📊 <strong>Gran Total:</strong>
+              </span>
+              <span className="text-green-700">${proyecto.grandTotal.toFixed(2)}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-800 bg-gray-50 p-4 rounded-lg shadow-inner">
-        <p><strong>💰 Total Cliente:</strong> S/ {proyecto.totalCliente.toFixed(2)}</p>
-        <p><strong>🧩 Equipos:</strong> S/ {proyecto.totalEquiposInterno.toFixed(2)}</p>
-        <p><strong>⚙️ Servicios:</strong> S/ {proyecto.totalServiciosInterno.toFixed(2)}</p>
-        <p><strong>🧾 Gastos:</strong> S/ {proyecto.totalGastosInterno.toFixed(2)}</p>
-        <p><strong>🔻 Descuento:</strong> {proyecto.descuento}%</p>
-        <p><strong>📊 Gran Total:</strong> S/ {proyecto.grandTotal.toFixed(2)}</p>
-      </div>
-
-      {/* Nuevo renderizado de acordeones por grupo de equipo */}
+      {/* Equipos */}
       <div className="space-y-4">
         {proyecto.equipos.map((equipo) => (
           <ProyectoEquipoAccordion

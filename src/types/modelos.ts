@@ -34,6 +34,26 @@ export type EstadoEquipo =
   | 'reemplazado'
   | 'entregado'
 
+  export type EstadoEquipoItem =
+  | 'pendiente'
+  | 'en_lista'
+  | 'reemplazado'
+  | 'descartado'
+
+export type EstadoListaItem =
+  | 'borrador'
+  | 'por_revisar'
+  | 'por_cotizar'
+  | 'por_validar'
+  | 'por_aprobar'
+  | 'aprobado'
+  | 'rechazado'
+
+export type OrigenListaItem =
+  | 'cotizado'
+  | 'nuevo'
+  | 'reemplazo'
+
 export type EstadoListaEquipo =
   | 'borrador'
   | 'por_revisar'
@@ -57,7 +77,13 @@ export type EstadoPedidoItem =
   | 'parcial'
   | 'entregado'
 
-
+export type EstadoCotizacionProveedor =
+  | 'pendiente'
+  | 'solicitado'
+  | 'cotizado'
+  | 'rechazado'
+  | 'seleccionado'
+  
 // ============================
 // 🛡️ Autenticación y Sesión
 // ============================
@@ -654,7 +680,7 @@ export interface ProyectoEquipoItem {
   tiempoEntrega?: number
   fechaEntregaEstimada?: string
 
-  estado: EstadoEquipo
+  estado: EstadoEquipoItem
   aprobado: boolean
   motivoCambio?: string
   nuevo: boolean
@@ -665,7 +691,7 @@ export interface ProyectoEquipoItem {
   // Relaciones
   proyectoEquipo: ProyectoEquipo
   catalogoEquipo?: CatalogoEquipo
-  ListaEquipo: ListaEquipoItem[]
+  listaEquipos: ListaEquipoItem[]
 
   lista?: {
     id: string
@@ -767,19 +793,26 @@ export interface ProyectoGastoItem {
 export interface ListaEquipo {
   id: string
   proyectoId: string
+  codigo: string                   // ✅ antes era 'nombre', ahora es el código único (ej. CJM27-LST-001)
   nombre: string
-  descripcion?: string
+  numeroSecuencia: number          // ✅ número crudo, usado para construir el código
   estado: EstadoListaEquipo
   createdAt: string
   updatedAt: string
   items: ListaEquipoItem[]
+  proyecto?: Proyecto | null       // ✅ incluye info del proyecto si se hace include en la API
 }
+
+
 
 export interface ListaEquipoItem {
   id: string
   listaId: string
   proyectoEquipoItemId?: string
+  proyectoEquipoId?: string        // 🆕 Nuevo campo
   proveedorId?: string
+  cotizacionSeleccionadaId?: string
+  reemplazaAId?: string // <- aquí
   codigo: string
   descripcion: string
   unidad: string
@@ -793,21 +826,28 @@ export interface ListaEquipoItem {
   costoReal?: number
   cantidadPedida?: number
   cantidadEntregada?: number
-
-  lista: ListaEquipo
-
+  estado: EstadoListaItem
   createdAt: string
   updatedAt: string
+
+  // 🔗 Relaciones
+  lista: ListaEquipo
+  proveedor?: Proveedor
   cotizaciones: CotizacionProveedorItem[]
   pedidos: PedidoEquipoItem[]
-
   proyectoEquipoItem?: {
     proyectoEquipo?: {
       nombre: string
     }
   }
-  proveedor?: Proveedor
+  proyectoEquipo?: {
+    nombre: string  // 🆕 Nombre del grupo lógico
+  }
+
+  cotizacionSeleccionada?: CotizacionProveedorItem
 }
+
+
 
 export interface Proveedor {
   id: string
@@ -819,22 +859,36 @@ export interface CotizacionProveedor {
   id: string
   proveedorId: string
   proyectoId: string
-  nombre: string
+  codigo: string                               // ✅ antes 'nombre', ahora es el código único (ej. CJM27-COT-001)
+  numeroSecuencia: number                      // ✅ número puro para control interno
   fecha: string
+  estado: EstadoCotizacionProveedor  // ✅ nuevo
   proveedor: Proveedor
-  proyecto:  Proyecto
+  proyecto: Proyecto
   items: CotizacionProveedorItem[]
 }
+
 
 export interface CotizacionProveedorItem {
   id: string
   cotizacionId: string
   listaEquipoItemId: string
-  precioUnitario: number
-  cantidad: number
-  costoTotal: number
+  // 📋 Copiados de ListaEquipoItem (para trazabilidad)
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidadOriginal: number
+  presupuesto?: number
+  // 💵 Datos cotizados (pueden ser llenados luego)
+  precioUnitario?: number
+  cantidad?: number
+  costoTotal?: number
   tiempoEntrega?: string
+  tiempoEntregaDias?: number
+  // ✅ Estado y selección
+  estado: EstadoCotizacionProveedor
   esSeleccionada?: boolean
+  // 🔗 Relaciones
   cotizacion: CotizacionProveedor
   listaEquipoItem: ListaEquipoItem
 }
@@ -844,17 +898,18 @@ export interface PedidoEquipo {
   proyectoId: string
   responsableId: string
   listaId: string
-  codigo?: string
+  codigo: string                         // ✅ ahora obligatorio, antes era opcional
+  numeroSecuencia: number                // ✅ número puro usado para construir el código (ej. 1 → PED-001)
   estado: EstadoPedido
   fechaPedido: string
   observacion?: string
   fechaEntregaEstimada?: string
   fechaEntregaReal?: string
-
   responsable?: User
   lista?: ListaEquipo
   items: PedidoEquipoItem[]
 }
+
 
 export interface PedidoEquipoItem {
   id: string

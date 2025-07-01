@@ -12,7 +12,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function PUT(req: NextRequest, context: { params: { id: string } }) {
-  const id = context.params?.id
+  const { id } = await context.params
 
   if (!id) {
     return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 })
@@ -52,7 +52,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 export async function DELETE(_req: NextRequest, context: { params: { id: string } }) {
-  const id = context.params?.id
+  const {id} = await context.params
 
   if (!id) {
     return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 })

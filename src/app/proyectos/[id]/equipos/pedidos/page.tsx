@@ -18,11 +18,13 @@ import {
   updatePedidoEquipo,
   deletePedidoEquipo,
 } from '@/lib/services/pedidoEquipo'
+
 import {
   updatePedidoEquipoItem,
   deletePedidoEquipoItem,
 } from '@/lib/services/pedidoEquipoItem'
-import { getListaEquipo } from '@/lib/services/listaEquipo'
+
+import { getListaEquiposPorProyecto } from '@/lib/services/listaEquipo'
 
 import PedidoEquipoForm from '@/components/equipos/PedidoEquipoForm'
 import PedidoEquipoAccordion from '@/components/equipos/PedidoEquipoAccordion'
@@ -45,8 +47,12 @@ export default function PedidosProyectoPage() {
   }
 
   const cargarListas = async () => {
-    const data = await getListaEquipo(proyectoId)
-    setListas(data || [])
+    try {
+      const data = await getListaEquiposPorProyecto(proyectoId)
+      setListas(data || [])
+    } catch {
+      toast.error('Error al cargar listas')
+    }
   }
 
   useEffect(() => {
@@ -60,7 +66,8 @@ export default function PedidosProyectoPage() {
     const nuevo = await createPedidoEquipo(payload)
     if (nuevo) {
       toast.success('Pedido registrado')
-      cargarPedidos()
+      await cargarPedidos()
+      await cargarListas() // ✅ refrescar listas para actualizar cantidades
     } else {
       toast.error('Error al registrar pedido')
     }
@@ -89,7 +96,7 @@ export default function PedidosProyectoPage() {
   const handleUpdateItem = async (id: string, payload: PedidoEquipoItemUpdatePayload) => {
     const actualizado = await updatePedidoEquipoItem(id, payload)
     if (actualizado) {
-      toast.success('Item actualizado')
+      toast.success('Ítem actualizado')
       cargarPedidos()
     } else {
       toast.error('Error al actualizar ítem')
@@ -115,6 +122,7 @@ export default function PedidosProyectoPage() {
         proyectoId={proyectoId}
         responsableId={session?.user.id || ''}
         onCreated={handleCreate}
+        onRefreshListas={cargarListas} // ✅ pasar prop al formulario
       />
 
       <h2 className="text-xl font-semibold text-gray-800">📋 Pedidos Realizados</h2>

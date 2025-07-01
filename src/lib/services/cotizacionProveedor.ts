@@ -5,13 +5,14 @@
 //
 // 🧠 Uso: Se utiliza en vistas de logística para registrar y consultar cotizaciones.
 // ✍️ Autor: Jesús Artemio (GYS)
-// 📅 Última actualización: 2025-05-21
+// 📅 Última actualización: 2025-05-26
 // ===================================================
 
 import {
   CotizacionProveedor,
   CotizacionProveedorPayload,
   CotizacionProveedorUpdatePayload,
+  CotizacionProveedorItemPayload,
 } from '@/types'
 
 const BASE_URL = '/api/cotizacion-proveedor'
@@ -55,6 +56,23 @@ export async function createCotizacionProveedor(
   } catch (error) {
     console.error('❌ createCotizacionProveedor:', error)
     return null
+  }
+}
+
+// ✅ Crear ítem para cotización proveedor (nuevo)
+export async function createCotizacionProveedorItem(
+  payload: CotizacionProveedorItemPayload
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/item`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    return res.ok
+  } catch (error) {
+    console.error('❌ createCotizacionProveedorItem:', error)
+    return false
   }
 }
 

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
 import {
-  getListaEquipo,
+  getListaEquiposPorProyecto, // ✅ corregido
   createListaEquipo,
   updateListaEquipo,
   deleteListaEquipo,
@@ -15,7 +15,7 @@ import type {
   ListaEquipo,
   ListaEquipoPayload,
   ListaEquipoUpdatePayload,
-  EstadoListaEquipo, // ✅ IMPORTANTE
+  EstadoListaEquipo,
 } from '@/types'
 import ListaEquipoForm from '@/components/equipos/ListaEquipoForm'
 import ListaEquipoList from '@/components/equipos/ListaEquipoList'
@@ -33,7 +33,7 @@ export default function ListaEquipoPage() {
     const fetchData = async () => {
       const data = await getProyectoById(id)
       setProyecto(data)
-      const le = await getListaEquipo(id)
+      const le = await getListaEquiposPorProyecto(id) // ✅ corregido
       setListas(le)
     }
     fetchData()
@@ -73,11 +73,10 @@ export default function ListaEquipoPage() {
   }
 
   const handleRefreshListas = async () => {
-    const nuevasListas = await getListaEquipo(id)
+    const nuevasListas = await getListaEquiposPorProyecto(id) // ✅ corregido
     setListas(nuevasListas)
   }
 
-  // ✅ NUEVO - actualizar estado sin recargar toda la lista
   const handleActualizarEstadoLista = (listaId: string, nuevoEstado: EstadoListaEquipo) => {
     setListas((prev) =>
       prev.map((l) => (l.id === listaId ? { ...l, estado: nuevoEstado } : l))
@@ -102,20 +101,9 @@ export default function ListaEquipoPage() {
         onDelete={handleDelete}
         onAgregarEquipos={handleAgregarEquipos}
         onCreatedItem={handleRefreshListas}
-        onEstadoChange={handleActualizarEstadoLista} // ✅ ¡NUEVO!
+        onEstadoChange={handleActualizarEstadoLista}
       />
 
-      {modalListaId && (
-        <ModalAgregarItemDesdeEquipo
-          proyectoId={id}
-          listaId={modalListaId}
-          onClose={() => {
-            setModalListaId(null)
-            handleRefreshListas()
-          }}
-          onCreated={handleRefreshListas}
-        />
-      )}
     </div>
   )
 }

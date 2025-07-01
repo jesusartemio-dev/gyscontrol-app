@@ -21,23 +21,55 @@ interface Props {
   onCreated?: () => void
 }
 
-export default function ListaEquipoItemList({ listaId, proyectoId, items, editable = true, onCreated }: Props) {
-  const [editItemId, setEditItemId] = useState<string | null>(null)
-  const [editValues, setEditValues] = useState<Record<string, string>>({})
+const labelEstado: Record<string, string> = {
+  de_cotizacion: 'Cotización',
+  nuevo: 'Nuevo',
+  reemplazo: 'Reemplazo',
+}
+
+export default function ListaEquipoItemList({
+  listaId,
+  proyectoId,
+  items,
+  editable = true,
+  onCreated,
+}: Props) {
+  const [editCantidadItemId, setEditCantidadItemId] = useState<string | null>(null)
+  const [editCantidadValues, setEditCantidadValues] = useState<Record<string, string>>({})
+  const [editComentarioItemId, setEditComentarioItemId] = useState<string | null>(null)
+  const [editComentarioValues, setEditComentarioValues] = useState<Record<string, string>>({})
   const [itemReemplazo, setItemReemplazo] = useState<ListaEquipoItem | null>(null)
 
-  const handleChangeComentario = (itemId: string, value: string) => {
-    setEditValues((prev) => ({ ...prev, [itemId]: value }))
+  const handleSaveCantidad = async (itemId: string) => {
+    try {
+      const cantidad = parseFloat(editCantidadValues[itemId] || '')
+      if (isNaN(cantidad)) {
+        toast.error('Cantidad inválida')
+        return
+      }
+
+      await updateListaEquipoItem(itemId, { cantidad })
+      toast.success('Cantidad actualizada')
+      setEditCantidadItemId(null)
+      setEditCantidadValues((prev) => {
+        const updated = { ...prev }
+        delete updated[itemId]
+        return updated
+      })
+      onCreated?.()
+    } catch {
+      toast.error('Error al guardar cantidad')
+    }
   }
 
   const handleSaveComentario = async (itemId: string) => {
     try {
       await updateListaEquipoItem(itemId, {
-        comentarioRevision: editValues[itemId] || '',
+        comentarioRevision: editComentarioValues[itemId] || '',
       })
       toast.success('Comentario guardado')
-      setEditItemId(null)
-      setEditValues((prev) => {
+      setEditComentarioItemId(null)
+      setEditComentarioValues((prev) => {
         const updated = { ...prev }
         delete updated[itemId]
         return updated
@@ -51,28 +83,23 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   const handleVerificado = async (item: ListaEquipoItem, checked: boolean) => {
     try {
       const updateData: any = { verificado: checked }
-      if (!checked) updateData.comentarioRevision = null
 
       await updateListaEquipoItem(item.id, updateData)
 
       if (checked) {
-        const valorActual = editValues[item.id] ?? item.comentarioRevision ?? ''
-        const nuevoValor = valorActual.trim() === '' ? 'Verificado' : valorActual
-
-        setEditValues((prev) => ({ ...prev, [item.id]: nuevoValor }))
-        setEditItemId(item.id)
+        const comentarioActual = item.comentarioRevision ?? ''
+        setEditComentarioValues((prev) => ({
+          ...prev,
+          [item.id]: comentarioActual.trim() === '' ? 'Verificado' : comentarioActual,
+        }))
+        setEditComentarioItemId(item.id)
 
         setTimeout(() => {
           const input = document.querySelector<HTMLInputElement>(`#comentario-${item.id}`)
           if (input) input.focus()
         }, 50)
       } else {
-        setEditItemId(null)
-        setEditValues((prev) => {
-          const copy = { ...prev }
-          delete copy[item.id]
-          return copy
-        })
+        setEditComentarioItemId(null)
       }
 
       onCreated?.()
@@ -106,21 +133,76 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
             <th className="p-2 text-left">Descripción</th>
             <th className="p-2 text-left">Unidad</th>
             <th className="p-2 text-left">Cantidad</th>
+            <th className="p-2 text-left">💰 Cotización</th>
+            <th className="p-2 text-right">💵 Costo USD</th>
+            <th className="p-2 text-center">⏱ Tiempo Entrega</th>
+            <th className="p-2 text-left">Estado</th>
             <th className="p-2 text-center">✔</th>
             <th className="p-2 text-left">Comentario</th>
             <th className="p-2 text-left">Equipo</th>
             <th className="p-2 text-center">Acciones</th>
           </tr>
         </thead>
+
         <tbody>
           {sortedItems.map((item) => {
-            const isEditing = editItemId === item.id
+            const isEditingCantidad = editCantidadItemId === item.id
+            const isEditingComentario = editComentarioItemId === item.id
+            const precio = item.cotizacionSeleccionada?.precioUnitario ?? 0
+            const cantidad = item.cantidad ?? 0
+            const costoTotal = precio * cantidad
+
             return (
               <tr key={item.id} className="border-t">
                 <td className="p-2">{item.codigo}</td>
                 <td className="p-2">{item.descripcion}</td>
                 <td className="p-2">{item.unidad}</td>
-                <td className="p-2">{item.cantidad}</td>
+                <td className="p-2">
+                  {isEditingCantidad ? (
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        type="number"
+                        value={editCantidadValues[item.id] ?? item.cantidad?.toString() ?? ''}
+                        onChange={(e) =>
+                          setEditCantidadValues((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        }
+                        className="w-20"
+                      />
+                      <Button size="icon" onClick={() => handleSaveCantidad(item.id)}>
+                        <CheckCircle2 size={16} />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => setEditCantidadItemId(null)}>
+                        <X size={16} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      className="flex items-center gap-1 text-gray-900 cursor-pointer"
+                      onClick={() => editable && setEditCantidadItemId(item.id)}
+                    >
+                      {item.cantidad}
+                      {editable && <Pencil size={14} className="text-muted-foreground" />}
+                    </div>
+                  )}
+                </td>
+                <td className="p-2 text-gray-700">
+                  {item.cotizacionSeleccionada ? (
+                    <div className="text-green-700 font-medium">
+                      {item.cotizacionSeleccionada.cotizacion?.codigo || 'Sin código'}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 italic">No seleccionada</span>
+                  )}
+                </td>
+                <td className="p-2 text-right text-gray-900 font-semibold">
+                  {item.cotizacionSeleccionada ? `US$ ${costoTotal.toFixed(2)}` : '—'}
+                </td>
+                <td className="p-2 text-center text-gray-700">
+                  {item.cotizacionSeleccionada?.tiempoEntrega ?? <span className="text-gray-400 italic">—</span>}
+                </td>
+                <td className="p-2 font-medium text-indigo-700">
+                  {labelEstado[item.estado] || item.estado}
+                </td>
                 <td className="p-2 text-center">
                   <Checkbox
                     checked={item.verificado}
@@ -130,26 +212,31 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                 </td>
                 <td className="p-2">
                   {item.verificado ? (
-                    isEditing && editable ? (
+                    isEditingComentario && editable ? (
                       <div className="flex gap-2 items-center">
                         <Input
                           id={`comentario-${item.id}`}
-                          value={editValues[item.id] ?? item.comentarioRevision ?? ''}
-                          onChange={(e) => handleChangeComentario(item.id, e.target.value)}
+                          value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
+                          onChange={(e) =>
+                            setEditComentarioValues((prev) => ({
+                              ...prev,
+                              [item.id]: e.target.value,
+                            }))
+                          }
                           onKeyDown={(e) => e.key === 'Enter' && handleSaveComentario(item.id)}
                           className="w-full"
                         />
                         <Button size="icon" onClick={() => handleSaveComentario(item.id)}>
                           <CheckCircle2 size={16} />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => setEditItemId(null)}>
+                        <Button size="icon" variant="ghost" onClick={() => setEditComentarioItemId(null)}>
                           <X size={16} />
                         </Button>
                       </div>
                     ) : (
                       <div
-                        onClick={() => editable && setEditItemId(item.id)}
-                        className={editable ? "text-gray-700 cursor-pointer hover:underline" : "text-gray-700"}
+                        onClick={() => editable && setEditComentarioItemId(item.id)}
+                        className={editable ? 'text-gray-700 cursor-pointer hover:underline' : 'text-gray-700'}
                       >
                         {item.comentarioRevision || '—'}
                       </div>
@@ -159,17 +246,35 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                   )}
                 </td>
                 <td className="p-2 text-gray-600">
-                  {item.proyectoEquipoItem?.proyectoEquipo?.nombre || '—'}
+                  {item.proyectoEquipoItem?.proyectoEquipo?.nombre ||
+                    item.proyectoEquipo?.nombre ||
+                    '—'}
                 </td>
                 <td className="p-2 text-center flex justify-center gap-2">
-                  <Button size="sm" onClick={() => setItemReemplazo(item)} variant="outline" disabled={!editable}>
-                    <RefreshCcw size={16} />
-                  </Button>
+                  {!item.reemplazaAId ? (
+                    <Button
+                      size="sm"
+                      onClick={() => setItemReemplazo(item)}
+                      variant="outline"
+                      disabled={!editable}
+                    >
+                      🔄 Reemplazar Nuevo
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => setItemReemplazo(item)}
+                      variant="secondary"
+                      disabled={!editable}
+                    >
+                      ♻️ Reemplazar reemplazo
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="destructive"
                     onClick={() => handleDelete(item.id)}
-                    disabled={!editable}
+                    disabled={!editable || !!item.cotizacionSeleccionada}
                   >
                     <Trash2 size={16} />
                   </Button>
@@ -178,6 +283,33 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
             )
           })}
         </tbody>
+
+        <tfoot>
+          <tr className="bg-gray-50 font-semibold text-sm text-gray-800">
+            <td className="p-2" colSpan={5}>Resumen:</td>
+            <td className="p-2 text-green-700">
+              US$ {items.reduce(
+                (acc, item) =>
+                  acc +
+                  (item.cotizacionSeleccionada?.precioUnitario ?? 0) *
+                    (item.cantidad ?? 0),
+                0
+              ).toFixed(2)}
+            </td>
+            <td className="p-2 text-gray-700">
+              Máx: {
+                Math.max(
+                  ...items.map((item) => {
+                    const t = item.cotizacionSeleccionada?.tiempoEntrega
+                    const parsed = parseInt(t ?? '')
+                    return isNaN(parsed) ? 0 : parsed
+                  })
+                )
+              } días
+            </td>
+            <td colSpan={4}></td>
+          </tr>
+        </tfoot>
       </table>
 
       {itemReemplazo && (
@@ -188,6 +320,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
           onUpdated={onCreated}
           listaId={listaId}
           proyectoId={proyectoId}
+          tipoReemplazo={itemReemplazo?.reemplazaAId ? 'reemplazo' : 'original'}
         />
       )}
     </div>

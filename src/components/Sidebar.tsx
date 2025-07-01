@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import clsx from 'clsx'
 import { useState } from 'react'
 import Image from 'next/image'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import LogoutButton from './LogoutButton'
 import type { RolUsuario } from '@/types/modelos'
 
@@ -13,147 +14,147 @@ export default function Sidebar() {
   const { data: session } = useSession()
   const pathname = usePathname()
 
+  const [collapsed, setCollapsed] = useState(false)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     configuracion: true,
-    admin: true,
-    catalogo: true,
-    plantillas: true,
-    cotizaciones: true,
+    comercial: true,
     proyectos: true,
     logistica: true,
+    gestion: true,
   })
 
   const toggleSection = (key: string) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
 
-  const configuracionLinks = [
-    { href: '/comercial/clientes', label: '👥 Clientes' },
-    { href: '/admin/usuarios', label: '👤 Usuarios' },
+  const toggleSidebar = () => setCollapsed((prev) => !prev)
+
+  const allSections = [
+    {
+      key: 'configuracion',
+      title: '⚙️ Configuración',
+      roles: ['admin', 'gerente'],
+      links: [
+        { href: '/admin/usuarios', label: '👤 Usuarios' },
+        { href: '/comercial/clientes', label: '👥 Clientes' },
+        { href: '/catalogo/equipos', label: '🛠 Catálogo Equipos' },
+        { href: '/catalogo/servicios', label: '🔧 Catálogo Servicios' },
+        { href: '/catalogo/categorias-equipo', label: '📁 Categorías Equipo' },
+        { href: '/catalogo/categorias-servicio', label: '📂 Categorías Servicio' },
+        { href: '/catalogo/unidades', label: '📏 Unidades' },
+        { href: '/catalogo/unidades-servicio', label: '📏 Unidades Servicio' },
+        { href: '/catalogo/recursos', label: '🛠️ Recursos' },
+      ],
+    },
+    {
+      key: 'comercial',
+      title: '📦 Comercial',
+      roles: ['admin', 'gerente', 'comercial', 'presupuestos'],
+      links: [
+        { href: '/comercial/plantillas', label: '📦 Plantillas' },
+        { href: '/comercial/cotizaciones', label: '🧾 Cotizaciones' },
+      ],
+    },
+    {
+      key: 'proyectos',
+      title: '📁 Proyectos',
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor'],
+      links: [{ href: '/proyectos', label: '📁 Ver Proyectos' }],
+    },
+    {
+      key: 'logistica',
+      title: '🚚 Logística',
+      roles: ['admin', 'gerente', 'logistico'],
+      links: [
+        { href: '/logistica', label: '🚚 Panel Logística' },
+        { href: '/logistica/catalogo', label: '🛠 Catálogo Equipos' },
+      ],
+    },
+    {
+      key: 'gestion',
+      title: '📊 Gestión',
+      roles: ['admin', 'gerente', 'gestor'],
+      links: [
+        { href: '/gestion/valorizaciones', label: '💰 Valorizaciones' },
+        { href: '/gestion/reportes', label: '📈 Reportes' },
+        { href: '/gestion/indicadores', label: '📊 Indicadores' },
+      ],
+    },
   ]
 
-  const catalogoLinks = [
-    { href: '/catalogo/equipos', label: '🛠 Catálogo Equipos' },
-    { href: '/catalogo/servicios', label: '🔧 Catálogo Servicios' },
-    { href: '/catalogo/categorias-equipo', label: '📁 Categorías Equipo' },
-    { href: '/catalogo/categorias-servicio', label: '📂 Categorías Servicio' },
-    { href: '/catalogo/unidades', label: '📏 Unidades' },
-    { href: '/catalogo/unidades-servicio', label: '📏 Unidades Servicio' },
-    { href: '/catalogo/recursos', label: '🛠️ Recursos' },
-  ]
-
-  const plantillasLinks = [
-    { href: '/comercial/dashboard', label: '📊 Dashboard' },
-    { href: '/comercial/plantillas', label: '📦 Plantillas' },
-  ]
-
-  const cotizacionesLinks = [
-    { href: '/comercial/cotizaciones', label: '🧾 Cotizaciones' },
-  ]
-
-  const proyectosLinks = [
-    { href: '/proyectos', label: '📁 Proyectos' },
-  ]
-
-  const logisticaLinks = [
-    { href: '/logistica', label: '🚚 Logística' },
-  ]
-
-  const adminLinks = [
-    { href: '/admin/usuarios', label: '👤 Usuarios' },
-  ]
-
-  let links: Record<string, { href: string; label: string }[]> = {}
   const role = session?.user.role as RolUsuario | undefined
 
-  if (!role) {
-    links = {}
-  } else if (role === 'admin' || role === 'gerente') {
-    links = {
-      configuracion: configuracionLinks,
-      admin: adminLinks,
-      catalogo: catalogoLinks,
-      plantillas: plantillasLinks,
-      cotizaciones: cotizacionesLinks,
-      proyectos: proyectosLinks,
-      logistica: logisticaLinks,
-    }
-  } else if (role === 'comercial' || role === 'presupuestos') {
-    links = {
-      plantillas: plantillasLinks,
-      cotizaciones: cotizacionesLinks,
-    }
-  } else if (role === 'logistico') {
-    links = {
-      logistica: logisticaLinks,
-    }
-  } else if (['proyectos', 'coordinador', 'gestor'].includes(role)) {
-    links = {
-      proyectos: proyectosLinks,
-    }
-  }
-
-  const renderSection = (
-    key: string,
-    title: string,
-    sectionLinks: { href: string; label: string }[]
-  ) => (
-    <div className="mb-4" key={key}>
-      <button
-        onClick={() => toggleSection(key)}
-        className="text-xs uppercase text-gray-400 mb-1 flex items-center justify-between w-full hover:text-white"
-      >
-        {title}
-        <span>{openSections[key] ? '−' : '+'}</span>
-      </button>
-
-      {openSections[key] && (
-        <div className="flex flex-col gap-1">
-          {sectionLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={clsx(
-                'px-3 py-2 rounded text-sm text-gray-300 hover:bg-gray-700 transition',
-                pathname.startsWith(link.href) &&
-                  'bg-gray-700 text-white font-semibold'
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
+  const visibleSections = allSections.filter((section) =>
+    role ? section.roles.includes(role) : false
   )
 
   return (
-    <aside className="w-64 bg-gray-900 text-white hidden md:flex flex-col h-screen">
-      <div className="p-4 border-b border-gray-700 flex flex-col items-center">
-        <Image
-          src="/logo.png"
-          alt="Logo GyS"
-          width={160}
-          height={50}
-          className="mb-2"
-        />
-        {session?.user && (
-          <div className="text-center">
-            <p className="text-xs text-gray-400">Bienvenido,</p>
-            <p className="text-sm font-semibold">{session.user.name}</p>
-          </div>
+    <aside className={clsx(
+      'bg-gray-900 text-white h-screen transition-all duration-300',
+      collapsed ? 'w-16' : 'w-64'
+    )}>
+      {/* Header */}
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+        {!collapsed && (
+          <Image
+            src="/logo.png"
+            alt="Logo GyS"
+            width={160}
+            height={50}
+            className="mb-2"
+          />
         )}
+        <button onClick={toggleSidebar} className="text-gray-400 hover:text-white">
+          {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+        </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-4 py-3">
-        {links.configuracion && renderSection('configuracion', 'Configuración', links.configuracion)}
-        {links.admin && renderSection('admin', 'Administración', links.admin)}
-        {links.catalogo && renderSection('catalogo', 'Catálogo', links.catalogo)}
-        {links.plantillas && renderSection('plantillas', 'Plantillas', links.plantillas)}
-        {links.cotizaciones && renderSection('cotizaciones', 'Cotizaciones', links.cotizaciones)}
-        {links.proyectos && renderSection('proyectos', 'Proyectos', links.proyectos)}
-        {links.logistica && renderSection('logistica', 'Logística', links.logistica)}
+      {/* User */}
+      {!collapsed && session?.user && (
+        <div className="px-4 text-center mt-2">
+          <p className="text-xs text-gray-400">Bienvenido,</p>
+          <p className="text-sm font-semibold">{session.user.name}</p>
+        </div>
+      )}
+
+      {/* Menú */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3">
+        {visibleSections.map(section => (
+          <div key={section.key} className="mb-4">
+            {!collapsed && (
+              <button
+                onClick={() => toggleSection(section.key)}
+                className="text-xs uppercase text-gray-400 mb-1 flex items-center justify-between w-full hover:text-white"
+              >
+                {section.title}
+                <span>{openSections[section.key] ? '−' : '+'}</span>
+              </button>
+            )}
+
+            {(openSections[section.key] || collapsed) && (
+              <div className="flex flex-col gap-1">
+                {section.links.map(link => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={clsx(
+                      'rounded px-2 py-2 text-sm hover:bg-gray-700 transition',
+                      pathname.startsWith(link.href)
+                        ? 'bg-gray-700 text-white font-semibold'
+                        : 'text-gray-300',
+                      collapsed && 'text-center px-1'
+                    )}
+                    title={collapsed ? link.label : undefined}
+                  >
+                    {collapsed ? link.label.split(' ')[0] : link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </nav>
 
+      {/* Footer */}
       <div className="p-4 border-t border-gray-700">
         {session?.user && (
           <LogoutButton className="bg-white text-gray-800 w-full py-2 rounded text-sm hover:bg-gray-100 flex justify-center items-center gap-2" />

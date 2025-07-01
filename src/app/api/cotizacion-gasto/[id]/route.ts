@@ -1,7 +1,7 @@
 // ===================================================
 // 📁 Archivo: [id]/route.ts
 // 📌 Ubicación: src/app/api/cotizacion-gasto/[id]
-// 🔧 Descripción: Maneja GET uno, PUT y DELETE de CotizacionGasto
+// 🔧 Descripción: Maneja GET uno, PUT y DELETE de CotizacionGasto con mejoras
 // ===================================================
 
 import { NextResponse } from 'next/server'
@@ -12,13 +12,16 @@ import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 export async function GET(context: { params: { id: string } }) {
   try {
     const { id } = await context.params
+
     const data = await prisma.cotizacionGasto.findUnique({
       where: { id },
-      include: {
-        items: true,
-        cotizacion: true,
-      },
+      include: { items: true, cotizacion: true },
     })
+
+    if (!data) {
+      return NextResponse.json({ error: 'Gasto no encontrado' }, { status: 404 })
+    }
+
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error al obtener gasto:', error)
@@ -31,20 +34,20 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
     const { id } = await context.params
     const payload: CotizacionGastoUpdatePayload = await req.json()
 
+    const existing = await prisma.cotizacionGasto.findUnique({
+      where: { id },
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Gasto no encontrado para actualizar' }, { status: 404 })
+    }
+
     const data = await prisma.cotizacionGasto.update({
       where: { id },
       data: payload,
     })
 
-    // 🔁 Recalcular totales de cotización después de actualizar
-    const gasto = await prisma.cotizacionGasto.findUnique({
-      where: { id },
-      select: { cotizacionId: true },
-    })
-
-    if (gasto) {
-      await recalcularTotalesCotizacion(gasto.cotizacionId)
-    }
+    await recalcularTotalesCotizacion(existing.cotizacionId)
 
     return NextResponse.json(data)
   } catch (error) {
@@ -57,21 +60,21 @@ export async function DELETE(_: Request, context: { params: { id: string } }) {
   try {
     const { id } = context.params
 
-    const gasto = await prisma.cotizacionGasto.findUnique({
+    const existing = await prisma.cotizacionGasto.findUnique({
       where: { id },
-      select: { cotizacionId: true },
     })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Gasto no encontrado para eliminar' }, { status: 404 })
+    }
 
     await prisma.cotizacionGasto.delete({
       where: { id },
     })
 
-    // 🔁 Recalcular totales
-    if (gasto) {
-      await recalcularTotalesCotizacion(gasto.cotizacionId)
-    }
+    await recalcularTotalesCotizacion(existing.cotizacionId)
 
-    return NextResponse.json({ status: 'ok' })
+    return NextResponse.json({ status: 'ok', deletedId: id })
   } catch (error) {
     console.error('❌ Error al eliminar gasto:', error)
     return NextResponse.json({ error: 'Error al eliminar gasto' }, { status: 500 })

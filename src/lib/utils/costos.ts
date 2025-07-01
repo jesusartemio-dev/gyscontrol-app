@@ -5,7 +5,7 @@
 //
 // 🧠 Uso: Reutilizado en recalculo de plantillas y cotizaciones
 // ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-04-23
+// 📅 Última actualización: 2025-06-03
 // ===================================================
 
 /**
@@ -25,37 +25,36 @@ export function calcularSubtotal(
 }
 
 /**
- * Calcula los totales generales de una plantilla o cotización combinando equipos y servicios.
+ * Calcula los totales generales de una plantilla o cotización combinando equipos, servicios y gastos.
  * Cada grupo debe tener los campos `subtotalInterno` y `subtotalCliente`.
  *
- * @param param0 Objeto con listas de equipos y servicios
+ * @param param0 Objeto con listas de equipos, servicios y gastos
  * @returns Totales: totalInterno y totalCliente
  */
 export function calcularTotal({
   equipos = [],
   servicios = [],
-  gastos = [], // ✅ añadido aquí
+  gastos = [],
 }: {
   equipos?: { subtotalCliente: number; subtotalInterno: number }[]
   servicios?: { subtotalCliente: number; subtotalInterno: number }[]
-  gastos?: { subtotalCliente: number; subtotalInterno: number }[] // ✅ añadido aquí
+  gastos?: { subtotalCliente: number; subtotalInterno: number }[]
 }): { totalInterno: number; totalCliente: number } {
   const totalInterno =
     equipos.reduce((acc, eq) => acc + eq.subtotalInterno, 0) +
     servicios.reduce((acc, sv) => acc + sv.subtotalInterno, 0) +
-    gastos.reduce((acc, gs) => acc + gs.subtotalInterno, 0) // ✅ suma de gastos
+    gastos.reduce((acc, gs) => acc + gs.subtotalInterno, 0)
 
   const totalCliente =
     equipos.reduce((acc, eq) => acc + eq.subtotalCliente, 0) +
     servicios.reduce((acc, sv) => acc + sv.subtotalCliente, 0) +
-    gastos.reduce((acc, gs) => acc + gs.subtotalCliente, 0) // ✅ suma de gastos
+    gastos.reduce((acc, gs) => acc + gs.subtotalCliente, 0)
 
   return { totalInterno, totalCliente }
 }
 
-
 /**
- * Calcula el total solo para cliente a partir de un arreglo de equipos.
+ * Calcula el total cliente a partir de un arreglo de equipos.
  */
 export function calcularTotalEquipos(
   equipos: { subtotalCliente?: number }[]
@@ -64,7 +63,7 @@ export function calcularTotalEquipos(
 }
 
 /**
- * Calcula el total solo para cliente a partir de un arreglo de servicios.
+ * Calcula el total cliente a partir de un arreglo de servicios.
  */
 export function calcularTotalServicios(
   servicios: { subtotalCliente?: number }[]
@@ -72,6 +71,9 @@ export function calcularTotalServicios(
   return servicios.reduce((acc, sv) => acc + (sv.subtotalCliente || 0), 0)
 }
 
+/**
+ * Calcula el total cliente a partir de un arreglo de gastos.
+ */
 export function calcularTotalGastos(
   gastos: { subtotalCliente?: number }[]
 ): number {

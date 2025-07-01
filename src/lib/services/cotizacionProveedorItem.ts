@@ -5,7 +5,7 @@
 //
 // 🧠 Uso: Logística registra cotizaciones por ítem técnico de lista
 // ✍️ Autor: Jesús Artemio (GYS)
-// 📅 Última actualización: 2025-05-21
+// 📅 Última actualización: 2025-05-26
 // ===================================================
 
 import {
@@ -20,7 +20,7 @@ const BASE_URL = '/api/cotizacion-proveedor-item'
 export async function getCotizacionProveedorItems(): Promise<CotizacionProveedorItem[] | null> {
   try {
     const res = await fetch(BASE_URL)
-    if (!res.ok) throw new Error('Error al obtener ítems')
+    if (!res.ok) throw new Error('Error al obtener ítems de cotización')
     return await res.json()
   } catch (error) {
     console.error('❌ getCotizacionProveedorItems:', error)
@@ -34,7 +34,7 @@ export async function getCotizacionProveedorItemById(
 ): Promise<CotizacionProveedorItem | null> {
   try {
     const res = await fetch(`${BASE_URL}/${id}`)
-    if (!res.ok) throw new Error('Error al obtener ítem')
+    if (!res.ok) throw new Error('Error al obtener ítem de cotización')
     return await res.json()
   } catch (error) {
     console.error('❌ getCotizacionProveedorItemById:', error)
@@ -52,11 +52,29 @@ export async function createCotizacionProveedorItem(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error('Error al crear ítem')
+    if (!res.ok) throw new Error('Error al crear ítem de cotización')
     return await res.json()
   } catch (error) {
     console.error('❌ createCotizacionProveedorItem:', error)
     return null
+  }
+}
+
+// ✅ Crear múltiples ítems de forma masiva (nuevo)
+export async function createMultipleCotizacionProveedorItems(
+  items: CotizacionProveedorItemPayload[]
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const res = await fetch(`${BASE_URL}/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    })
+    if (!res.ok) throw new Error('Error al crear ítems de forma masiva')
+    return { success: true }
+  } catch (error) {
+    console.error('❌ createMultipleCotizacionProveedorItems:', error)
+    return { success: false, message: String(error) }
   }
 }
 
@@ -71,7 +89,7 @@ export async function updateCotizacionProveedorItem(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error('Error al actualizar ítem')
+    if (!res.ok) throw new Error('Error al actualizar ítem de cotización')
     return await res.json()
   } catch (error) {
     console.error('❌ updateCotizacionProveedorItem:', error)

@@ -8,7 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
-export const dynamic = 'force-dynamic'  // ✅ Previene errores de caché en rutas dinámicas
+export const dynamic = 'force-dynamic' // ✅ Previene errores de caché en rutas dinámicas
 
 // ✅ Obtener cotización por ID
 export async function GET(_: NextRequest, context: { params: { id: string } }) {
@@ -32,6 +32,11 @@ export async function GET(_: NextRequest, context: { params: { id: string } }) {
               }
             }
           }
+        },
+        gastos: {
+          include: {
+            items: true
+          }
         }
       }
     })
@@ -50,7 +55,7 @@ export async function GET(_: NextRequest, context: { params: { id: string } }) {
 // ✅ Actualizar cotización
 export async function PUT(req: NextRequest, context: { params: { id: string } }) {
   try {
-    const { id } = await context.params // 👈 Se usa await aquí también
+    const { id } = await context.params
     const data = await req.json()
 
     if (!id || typeof id !== 'string') {
@@ -77,7 +82,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 // ✅ Eliminar cotización
 export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
   try {
-    const { id } = await context.params // 👈 También corregido
+    const { id } = await context.params
 
     await prisma.cotizacion.delete({ where: { id } })
 

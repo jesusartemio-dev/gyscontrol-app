@@ -1,7 +1,6 @@
 // ===================================================
 // 📁 Archivo: /api/proyecto-equipo-item/route.ts
-// 📌 Descripción: Ruta para crear un nuevo ProyectoEquipoItem
-// ✍️ Autor: Asistente IA GYS
+// 📌 Descripción: Ruta para crear un nuevo ProyectoEquipoItem con seguimiento
 // ===================================================
 
 import { NextResponse } from 'next/server'
@@ -9,17 +8,64 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(req: Request) {
   try {
-    const data = await req.json()
+    const body = await req.json()
+
+    console.log('📦 Payload recibido en POST /proyecto-equipo-item:', body)
+
+    const {
+      proyectoEquipoId,
+      catalogoEquipoId,
+      equipoOriginalId,
+      codigo,
+      descripcion,
+      unidad,
+      categoria,
+      marca,
+      cantidad,
+      precioInterno,
+      precioCliente,
+      costoInterno,
+      costoCliente,
+      estado,
+      nuevo,
+      motivoCambio,
+    } = body
+
+    // Log de valores antes de crear
+    console.log('🧾 Valores individuales:', {
+      proyectoEquipoId,
+      catalogoEquipoId,
+      equipoOriginalId,
+    })
 
     const nuevoItem = await prisma.proyectoEquipoItem.create({
-      data,
+      data: {
+        proyectoEquipoId,
+        catalogoEquipoId,
+        equipoOriginalId,
+        codigo,
+        descripcion,
+        unidad,
+        categoria,
+        marca,
+        cantidad,
+        precioInterno,
+        precioCliente,
+        costoInterno,
+        costoCliente,
+        estado,
+        nuevo,
+        motivoCambio,
+      },
     })
+
+    console.log('✅ ProyectoEquipoItem creado con éxito:', nuevoItem)
 
     return NextResponse.json(nuevoItem)
   } catch (error) {
     console.error('❌ Error al crear ProyectoEquipoItem:', error)
     return NextResponse.json(
-      { error: 'Error al crear ítem de equipo del proyecto' },
+      { error: 'Error al crear ítem de equipo del proyecto', detalle: error },
       { status: 500 }
     )
   }

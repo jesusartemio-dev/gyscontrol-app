@@ -7,19 +7,19 @@ import {
   AccordionTrigger
 } from '@/components/ui/accordion'
 import CotizacionGastoItemForm from './CotizacionGastoItemForm'
-import CotizacionGastoItemList from './CotizacionGastoItemList'
-import { useState, useEffect } from 'react'
+import CotizacionGastoItemTable from './CotizacionGastoItemTable'
+import { useState } from 'react'
 import { Pencil, Trash2, Coins } from 'lucide-react'
 import type {
   CotizacionGasto,
   CotizacionGastoItem,
-  CotizacionGastoItemPayload
 } from '@/types'
+import { calcularSubtotal } from '@/lib/utils/costos'
 
 interface Props {
   gasto: CotizacionGasto
   onCreated?: (item: CotizacionGastoItem) => void
-  onUpdated?: (id: string, changes: Partial<CotizacionGastoItemPayload>) => void
+  onUpdated?: (item: CotizacionGastoItem) => void
   onDeleted?: (id: string) => void
   onDeletedGrupo?: () => void
   onUpdatedNombre?: (nuevoNombre: string) => void
@@ -34,22 +34,12 @@ export default function CotizacionGastoAccordion({
   onUpdatedNombre
 }: Props) {
   const [editando, setEditando] = useState(false)
-  const [nuevoNombre, setNuevoNombre] = useState(gasto.nombre)
 
-  useEffect(() => {
-    setNuevoNombre(gasto.nombre)
-  }, [gasto.nombre])
-
-  const handleBlur = () => {
-    if (nuevoNombre.trim() && nuevoNombre !== gasto.nombre) {
-      onUpdatedNombre?.(nuevoNombre.trim())
-    }
-    setEditando(false)
-  }
+  const { subtotalInterno, subtotalCliente } = calcularSubtotal(gasto.items)
 
   const renta =
-    gasto.subtotalInterno > 0
-      ? ((gasto.subtotalCliente - gasto.subtotalInterno) / gasto.subtotalInterno) * 100
+    subtotalInterno > 0
+      ? ((subtotalCliente - subtotalInterno) / subtotalInterno) * 100
       : 0
 
   return (
@@ -62,9 +52,9 @@ export default function CotizacionGastoAccordion({
             {editando ? (
               <input
                 type="text"
-                value={nuevoNombre}
-                onChange={(e) => setNuevoNombre(e.target.value)}
-                onBlur={handleBlur}
+                value={gasto.nombre}
+                onChange={(e) => onUpdatedNombre?.(e.target.value)}
+                onBlur={() => setEditando(false)}
                 autoFocus
                 className="border px-2 py-1 text-sm rounded w-full"
               />
@@ -85,8 +75,8 @@ export default function CotizacionGastoAccordion({
           <div className="text-right text-sm leading-tight whitespace-nowrap">
             <div className="text-gray-400 text-xs font-medium">Interno / Cliente / % Rent</div>
             <div>
-              <span className="text-gray-700 font-medium">${gasto.subtotalInterno.toFixed(2)}</span>{' '}
-              / <span className="text-green-600 font-medium">${gasto.subtotalCliente.toFixed(2)}</span>{' '}
+              <span className="text-gray-700 font-medium">${subtotalInterno.toFixed(2)}</span>{' '}
+              / <span className="text-green-600 font-medium">${subtotalCliente.toFixed(2)}</span>{' '}
               / <span className="text-blue-600 font-medium">{renta.toFixed(1)}%</span>
             </div>
           </div>
@@ -113,7 +103,11 @@ export default function CotizacionGastoAccordion({
 
         <AccordionContent className="px-6 pb-6 space-y-4">
           <CotizacionGastoItemForm gastoId={gasto.id} onCreated={onCreated} />
-          <CotizacionGastoItemList items={gasto.items} onUpdate={onUpdated} onDelete={onDeleted} />
+          <CotizacionGastoItemTable
+            items={gasto.items}
+            onUpdate={onUpdated}
+            onDelete={onDeleted}
+          />
         </AccordionContent>
       </AccordionItem>
     </Accordion>
