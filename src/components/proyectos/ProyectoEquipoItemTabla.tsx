@@ -45,24 +45,25 @@ export default function ProyectoEquipoItemTabla({ items }: Props) {
             <th className="p-2 text-right text-green-700">Costo Real</th>
             <th className="p-2 text-center">Estado</th>
             <th className="p-2 text-center">Cambio</th>
-            <th className="p-2 text-center">¿Nuevo?</th>
-            <th className="p-2 text-center">Lista Técnica</th>
+            <th className="p-2 text-center">Item de Lista</th>
+            <th className="p-2 text-center">Lista</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item) => {
-            const fueReemplazo = !!item.equipoOriginalId
-            const estadoVisual = fueReemplazo ? 'pendiente' : item.estado
+            const fueReemplazo = !!item.listaEquipoSeleccionadoId
+            const estadoVisual = item.estado
+            const comentarioCambio =
+              item.listaEquipoSeleccionado?.comentarioRevision || item.motivoCambio || '—'
+
+            const reemplazadoTexto = item.listaEquipoSeleccionado
+              ? item.listaEquipoSeleccionado.codigo
+              : '—'
 
             return (
               <tr key={item.id} className="border-t hover:bg-gray-50">
                 <td className="p-2">
                   {item.codigo}{' '}
-                  {fueReemplazo && (
-                    <Badge className="ml-1 text-xs" variant="outline" title="Reemplaza al equipo original">
-                      Reemplazo
-                    </Badge>
-                  )}
                 </td>
                 <td className="p-2">{item.descripcion}</td>
                 <td className="p-2">{item.unidad}</td>
@@ -74,15 +75,15 @@ export default function ProyectoEquipoItemTabla({ items }: Props) {
                     {estadoVisual.replace('_', ' ')}
                   </Badge>
                 </td>
-                <td className="p-2 text-center text-gray-600">{item.motivoCambio || '—'}</td>
-                <td className="p-2 text-center">
-                  {item.nuevo ? (
-                    <Badge className="bg-green-100 text-green-700 border border-green-400 text-xs">Nuevo</Badge>
+                <td className="p-2 text-center text-gray-600">
+                  {comentarioCambio !== '—' ? (
+                    <span className="truncate max-w-[120px] inline-block">{comentarioCambio}</span>
                   ) : (
                     '—'
                   )}
                 </td>
-                <td className="p-2 text-center text-gray-600">{item.lista?.nombre || '—'}</td>
+                <td className="p-2 text-center text-gray-600">{reemplazadoTexto}</td>
+                <td className="p-2 text-center text-gray-600">{item.lista?.codigo  || '—'}</td>
               </tr>
             )
           })}

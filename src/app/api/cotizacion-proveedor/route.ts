@@ -18,7 +18,12 @@ export async function GET() {
       include: {
         proveedor: true,
         proyecto: true,
-        items: true,
+        items: {
+                include: {
+                  listaEquipoItem: true,
+                  lista: true,
+                },
+              },
       },
       orderBy: {
         codigo: 'asc', // ✅ Ordena los ítems por código ascendente
@@ -39,7 +44,7 @@ export async function POST(request: Request) {
     const body: CotizacionProveedorPayload = await request.json()
 
     // ✅ Validación básica
-    if (!body.proveedorId || !body.proyectoId || !body.fecha) {
+    if (!body.proveedorId || !body.proyectoId) {
       return NextResponse.json(
         { error: 'Faltan campos requeridos: proveedorId, proyectoId o fecha' },
         { status: 400 }
@@ -72,7 +77,6 @@ export async function POST(request: Request) {
         proyectoId: body.proyectoId,
         codigo: codigoGenerado,
         numeroSecuencia: nuevoNumero,
-        fecha: new Date(body.fecha),
       },
     })
 

@@ -11,15 +11,18 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import LogisticaListaDetalleItemComparativo from './LogisticaListaDetalleItemComparativo'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import React from 'react'
+
 
 interface Props {
   items: ListaEquipoItem[]
-  onUpdated?: () => void
+  onUpdated?: () => void // 🔄 Callback opcional que se ejecuta cuando hay una actualización
 }
 
 export default function LogisticaListaDetalleItemTable({ items, onUpdated }: Props) {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
 
+  // 🔄 Alternar expansión para mostrar/ocultar el comparativo de un ítem
   const toggleExpand = (itemId: string) => {
     setExpandedItemId(prev => (prev === itemId ? null : itemId))
   }
@@ -41,21 +44,26 @@ export default function LogisticaListaDetalleItemTable({ items, onUpdated }: Pro
             <th className="text-center px-3">Seleccionado</th>
           </tr>
         </thead>
+
         <tbody>
           {items.map((item) => {
             const cotizacionesCount = item.cotizaciones.length
             const selectedCot = item.cotizaciones.find(c => c.id === item.cotizacionSeleccionadaId)
 
             return (
-              <>
-                <tr key={item.id} className="border-b whitespace-nowrap">
+              // ✅ React.Fragment con key para evitar warning de "cada hijo debe tener una key única"
+              <React.Fragment key={item.id}>
+                {/* 🔽 Fila principal con datos del ítem */}
+                <tr className="border-b whitespace-nowrap">
                   <td>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => toggleExpand(item.id)}
                     >
-                      {expandedItemId === item.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      {expandedItemId === item.id
+                        ? <ChevronDown size={16} />
+                        : <ChevronRight size={16} />}
                     </Button>
                   </td>
                   <td className="font-semibold px-3">{item.codigo}</td>
@@ -75,14 +83,18 @@ export default function LogisticaListaDetalleItemTable({ items, onUpdated }: Pro
                   </td>
                 </tr>
 
+                {/* 🔍 Fila expandida para mostrar comparativo, solo si está expandido */}
                 {expandedItemId === item.id && (
-                  <tr>
+                  <tr key={`${item.id}-expanded`}>
                     <td colSpan={10} className="p-2 bg-gray-50 border-b">
-                      <LogisticaListaDetalleItemComparativo item={item} onUpdated={onUpdated} />
+                      <LogisticaListaDetalleItemComparativo
+                        item={item}
+                        onUpdated={onUpdated}
+                      />
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             )
           })}
         </tbody>

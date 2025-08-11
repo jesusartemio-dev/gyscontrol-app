@@ -319,33 +319,33 @@ export interface ProyectoEquipoUpdatePayload extends Partial<ProyectoEquipoPaylo
 export interface ProyectoEquipoItemPayload {
   proyectoEquipoId: string
   catalogoEquipoId?: string
-  equipoOriginalId?: string
+  listaId?: string
+
+  // 🆕 Nuevo campo que reemplaza a equipoOriginalId
+  listaEquipoSeleccionadoId?: string
+
   codigo: string
   descripcion: string
   categoria: string
   unidad: string
   marca: string
+
   cantidad: number
   precioInterno: number
   precioCliente: number
   costoInterno: number
   costoCliente: number
-  aprobado?: boolean
-  motivoCambio?: string
-  costoReal?: number
-  nuevo?: boolean
-  listaId?: string
 
-  // ✅ Aquí lo agregas
-  estado?: EstadoEquipoItem
+  costoReal?: number
   precioReal?: number
   cantidadReal?: number
+
+  motivoCambio?: string
+  estado?: EstadoEquipoItem
 }
 
-
-
-
 export interface ProyectoEquipoItemUpdatePayload extends Partial<ProyectoEquipoItemPayload> {}
+
 
 
 export interface ProyectoServicioPayload {
@@ -426,14 +426,17 @@ export interface ListaEquipoUpdatePayload extends Partial<ListaEquipoPayload> {}
 export interface ListaEquipoItemPayload {
   listaId: string
   proyectoEquipoItemId?: string
-  proyectoEquipoId?: string        // 🆕 Nuevo campo
+  proyectoEquipoId?: string
+  reemplazaProyectoEquipoItemId?: string // 🆕 Nuevo campo claro
+
   proveedorId?: string
   cotizacionSeleccionadaId?: string
-  reemplazaAId?: string // 
+
   codigo: string
   descripcion: string
   unidad: string
   cantidad: number
+
   verificado?: boolean
   comentarioRevision?: string
   presupuesto?: number
@@ -452,6 +455,7 @@ export interface ListaEquipoItemUpdatePayload extends Partial<ListaEquipoItemPay
 
 
 
+
 export interface ProveedorPayload {
   nombre: string
   ruc?: string
@@ -463,7 +467,6 @@ export interface CotizacionProveedorPayload {
   proyectoId: string
   codigo?: string                         // ✅ antes 'nombre', ahora es el código generado (ej. CJM27-COT-001)
   numeroSecuencia?: number                // ✅ número puro para control interno
-  fecha: string
   estado?: EstadoCotizacionProveedor
 }
 
@@ -473,6 +476,7 @@ export interface CotizacionProveedorUpdatePayload extends Partial<CotizacionProv
 export interface CotizacionProveedorItemPayload {
   cotizacionId: string
   listaEquipoItemId: string
+  listaId?: string
   // 💵 Datos cotizados (opcionales)
   precioUnitario?: number
   cantidad?: number
@@ -491,34 +495,42 @@ export interface PedidoEquipoPayload {
   proyectoId: string
   responsableId: string
   listaId: string
-  codigo: string                         // ✅ ahora obligatorio, no opcional
-  numeroSecuencia: number                // ✅ número puro para control interno
   estado?: EstadoPedido
   observacion?: string
-  fechaPedido?: string  
-  fechaEntregaEstimada?: string
-  fechaEntregaReal?: string
+  fechaPedido?: string         // ✅ se mantiene por compatibilidad
+  fechaNecesaria: string       // ✅ obligatoria: la fecha que PROYECTOS necesita el pedido
+  fechaEntregaEstimada?: string // logística propone esta fecha
+  fechaEntregaReal?: string     // fecha cuando se entregó
 }
+
 
 export interface PedidoEquipoUpdatePayload extends Partial<PedidoEquipoPayload> {}
 
 
 export interface PedidoEquipoItemPayload {
   pedidoId: string
-  listaEquipoItemId: string
+  listaId?: string
+  listaEquipoItemId?: string
   // 📦 Datos solicitados
   cantidadPedida: number
-  fechaNecesaria: string
   // 💰 Datos económicos (opcionalmente copiados desde cotización seleccionada)
   precioUnitario?: number
   costoTotal?: number
   // 🚦 Estado de atención
-  estado?: EstadoPedidoItem // 'pendiente' | 'atendido' | 'parcial' | 'entregado'
+  estado?: EstadoPedidoItem
   cantidadAtendida?: number
   comentarioLogistica?: string
-  // 🔁 Referencia opcional al ítem de cotización seleccionado (si aplica)
-  cotizacionProveedorItemId?: string
+  // 🔁 Copiados desde ListaEquipoItem
+  codigo: string
+  descripcion: string
+  unidad: string
+  tiempoEntrega?: string
+  tiempoEntregaDias?: number
+  // ⚠️ Este campo es calculado automáticamente en backend
+  fechaOrdenCompraRecomendada?: string 
 }
+
+
 
 export interface PedidoEquipoItemUpdatePayload
   extends Partial<PedidoEquipoItemPayload> {}

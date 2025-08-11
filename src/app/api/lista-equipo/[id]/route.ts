@@ -84,17 +84,65 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
 
 
 // ✅ Eliminar ListaEquipo (DELETE)
-export async function DELETE(context: { params: { id: string } }) {
+export async function DELETE(req: Request, context: { params: { id: string } }) {
+  const { id } = context.params;
+
   try {
-    const { id } = await context.params
+    await prisma.$transaction([
+      // 0. Desmarcar todas las cotizaciones seleccionadas relacionadas
+      prisma.cotizacionProveedorItem.updateMany({
+        where: {
+          listaEquipoItem: {
+            listaId: id,
+          },
+          esSeleccionada: true,
+        },
+        data: {
+          esSeleccionada: false,
+        },
+      }),
 
-    await prisma.listaEquipo.delete({ where: { id } })
+      // 1. Setear a null los campos relacionados con listaId
+      prisma.cotizacionProveedorItem.updateMany({
+        where: { listaId: id },
+        data: { listaId: null },
+      }),
+      prisma.pedidoEquipoItem.updateMany({
+        where: { listaId: id },
+        data: { listaId: null },
+      }),
 
-    return NextResponse.json({ status: 'OK' })
+      // 2. Buscar todos los items de la lista
+      prisma.cotizacionProveedorItem.updateMany({
+        where: {
+          listaEquipoItem: {
+            listaId: id,
+          },
+        },
+        data: {
+          listaEquipoItemId: null,
+        },
+      }),
+      prisma.pedidoEquipoItem.updateMany({
+        where: {
+          listaEquipoItem: {
+            listaId: id,
+          },
+        },
+        data: {
+          listaEquipoItemId: null,
+        },
+      }),
+
+      // 3. Eliminar la lista (esto eliminará los items por cascade)
+      prisma.listaEquipo.delete({
+        where: { id },
+      }),
+    ]);
+
+    return NextResponse.json({ message: "Lista eliminada correctamente" });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Error al eliminar la lista de equipos: ' + String(error) },
-      { status: 500 }
-    )
+    console.error("[LISTA_EQUIPO_DELETE]", error);
+    return new NextResponse("Error al eliminar Lista de Equipo", { status: 500 });
   }
 }

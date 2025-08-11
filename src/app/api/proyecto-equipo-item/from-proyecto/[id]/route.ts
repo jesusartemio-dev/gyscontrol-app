@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest, context: { params: { id: string } }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
     const soloDisponibles = req.nextUrl.searchParams.get('soloDisponibles') === 'true'
 
     const items = await prisma.proyectoEquipoItem.findMany({
@@ -41,6 +41,13 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
           select: {
             id: true,
             cantidad: true, // ✅ Trae cantidad para saber cuánto ya se listó
+          },
+        },
+        listaEquipoSeleccionado: {
+          select: {
+            id: true,
+            codigo: true,
+            descripcion: true,
           },
         },
       },

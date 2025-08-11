@@ -23,6 +23,7 @@ export async function GET() {
           },
         },
         listaEquipoItem: true,
+        lista: true,
       },
       orderBy: {
         codigo: 'asc', // ✅ Ordena los ítems por código ascendente
@@ -55,10 +56,11 @@ export async function POST(request: Request) {
     }
 
     // 📦 Crear nuevo ítem de cotización con copia de datos técnicos
-    const nuevoItem = await prisma.cotizacionProveedorItem.create({
+    const creado = await prisma.cotizacionProveedorItem.create({
       data: {
         cotizacionId: body.cotizacionId,
         listaEquipoItemId: body.listaEquipoItemId,
+        listaId: body.listaId ?? item.listaId,
 
         // 🧠 Copiados desde ListaEquipoItem
         codigo: item.codigo,
@@ -69,12 +71,28 @@ export async function POST(request: Request) {
 
         // 💰 Datos de cotización (pueden venir vacíos)
         precioUnitario: body.precioUnitario ?? null,
-        cantidad: body.cantidad ?? item.cantidad, // ✅ usa cantidad del ítem si no se pasa
+        cantidad: body.cantidad ?? item.cantidad,
         costoTotal: body.costoTotal ?? null,
         tiempoEntrega: body.tiempoEntrega ?? null,
+        tiempoEntregaDias: body.tiempoEntregaDias ?? null,
 
         estado: body.estado ?? 'pendiente',
         esSeleccionada: body.esSeleccionada ?? false,
+      },
+    })
+
+    // 🔄 Obtener el ítem creado con todas sus relaciones
+    const nuevoItem = await prisma.cotizacionProveedorItem.findUnique({
+      where: { id: creado.id },
+      include: {
+        cotizacion: {
+          include: {
+            proveedor: true,
+            proyecto: true,
+          },
+        },
+        listaEquipoItem: true,
+        lista: true,
       },
     })
 

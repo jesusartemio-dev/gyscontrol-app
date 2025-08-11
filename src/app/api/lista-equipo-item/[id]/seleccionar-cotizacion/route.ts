@@ -1,6 +1,7 @@
 // ===================================================
 // 📁 Archivo: [id]/seleccionar-cotizacion/route.ts
-// 📌 Descripción: Selecciona una cotización ganadora para un ítem (renombrado [itemId] → [id])
+// 📌 Descripción: Selecciona una cotización ganadora para un ítem (ListaEquipoItem)
+// 📌 Efecto: Marca una cotización como seleccionada, desmarca las otras, y actualiza datos clave del ítem
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -14,11 +15,12 @@ export async function PATCH(
     const { id } = params
     const { cotizacionProveedorItemId } = await req.json()
 
-    // Verificar que la cotización exista y pertenece a ese ítem
+    // ✅ Buscar la cotización seleccionada
     const cotizacionItem = await prisma.cotizacionProveedorItem.findUnique({
       where: { id: cotizacionProveedorItemId },
     })
 
+    // 🚫 Validación: que la cotización exista y pertenezca al ítem solicitado
     if (!cotizacionItem || cotizacionItem.listaEquipoItemId !== id) {
       return NextResponse.json(
         { error: 'Cotización no válida para este ítem' },
@@ -26,33 +28,40 @@ export async function PATCH(
       )
     }
 
-    // Primero: desmarcar todas las demás
+    // 🔄 Paso 1: desmarcar todas las cotizaciones previas del ítem
     await prisma.cotizacionProveedorItem.updateMany({
       where: { listaEquipoItemId: id },
       data: { esSeleccionada: false },
     })
 
-    // Segundo: marcar como seleccionada
+    // ✅ Paso 2: marcar como seleccionada la cotización elegida
     await prisma.cotizacionProveedorItem.update({
       where: { id: cotizacionProveedorItemId },
       data: { esSeleccionada: true },
     })
 
-    // Tercero: actualizar el ítem principal
+    // 🧮 Paso 3: calcular precio y costo total (unitario × cantidad)
     const precioUnitario = cotizacionItem.precioUnitario ?? 0
     const cantidad = cotizacionItem.cantidad ?? cotizacionItem.cantidadOriginal ?? 0
     const costoElegido = precioUnitario * cantidad
 
+    // 📦 Paso 4: obtener datos adicionales como tiempo de entrega
+    const tiempoEntrega = cotizacionItem.tiempoEntrega ?? null
+    const tiempoEntregaDias = cotizacionItem.tiempoEntregaDias ?? null
+
+    // 📝 Paso 5: actualizar el ListaEquipoItem con la información final
     const updatedItem = await prisma.listaEquipoItem.update({
       where: { id },
       data: {
         cotizacionSeleccionadaId: cotizacionProveedorItemId,
         precioElegido: precioUnitario,
         costoElegido,
-        // tiempoEntrega: cotizacionItem.tiempoEntrega, // descomenta si lo necesitas
+        tiempoEntrega,
+        tiempoEntregaDias,
       },
     })
 
+    // 🎉 Listo
     return NextResponse.json(updatedItem)
   } catch (error) {
     console.error('❌ Error al seleccionar cotización:', error)
@@ -63,6 +72,7 @@ export async function PATCH(
   }
 }
 
+// 🔁 POST reutiliza el PATCH por compatibilidad (en caso de ser usado como formulario)
 export async function POST(req: Request, context: { params: { id: string } }) {
   return PATCH(req, context)
 }

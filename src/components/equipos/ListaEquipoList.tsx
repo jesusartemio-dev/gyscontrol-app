@@ -20,6 +20,20 @@ import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
 import ListaEstadoFlujo from './ListaEstadoFlujo'
 import { enviarListaARevision } from '@/lib/services/listaEquipo'
 
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
+
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
 interface Props {
   data: ListaEquipo[]
   onCreate: (payload: ListaEquipoPayload) => void
@@ -46,6 +60,7 @@ export default function ListaEquipoList({
   const [modalCotizacionListaId, setModalCotizacionListaId] = useState<string | null>(null)
   const [modalCatalogoListaId, setModalCatalogoListaId] = useState<string | null>(null)
   const [proyectoId, setProyectoId] = useState<string>('')
+  const [deleteListaId, setDeleteListaId] = useState<string | null>(null)
 
   const cargarItems = async () => {
     const todos = await getListaEquipoItems()
@@ -93,7 +108,12 @@ export default function ListaEquipoList({
   const calcularTotal = (listaId: string): number => {
     const items = itemsPorLista[listaId] || []
     return items.reduce((acc, item) => {
-      if (!item.cotizacionSeleccionadaId || !item.cotizacionSeleccionada?.precioUnitario) return acc
+      if (
+        item.estado === 'rechazado' ||
+        !item.cotizacionSeleccionadaId ||
+        !item.cotizacionSeleccionada?.precioUnitario
+      )
+        return acc
       const precio = item.cotizacionSeleccionada.precioUnitario
       const cantidad = item.cantidad ?? 0
       return acc + precio * cantidad
@@ -165,6 +185,11 @@ export default function ListaEquipoList({
                 <div className="text-right text-sm text-gray-600 font-medium mt-2">
                   Total estimado: $ {calcularTotal(lista.id).toFixed(2)}
                 </div>
+                {items.some((item) => item.estado === 'rechazado') && (
+                  <div className="text-xs text-orange-500 text-right">
+                    ⚠️ Los ítems rechazados no se incluyen en el total estimado.
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 justify-end mt-2">
@@ -193,9 +218,20 @@ export default function ListaEquipoList({
                     >
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button onClick={() => onDelete(lista.id)} variant="ghost" className="text-red-600">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => setDeleteListaId(lista.id)}
+                          variant="ghost"
+                          className="text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Eliminar lista</TooltipContent>
+                    </Tooltip>
+
                     {lista.estado === 'borrador' && (
                       <>
                         <Button
@@ -239,6 +275,30 @@ export default function ListaEquipoList({
         })}
       </div>
 
+      <AlertDialog open={!!deleteListaId} onOpenChange={() => setDeleteListaId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar lista?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará la lista técnica y todos sus ítems asociados. ¿Deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteListaId) {
+                  onDelete(deleteListaId)
+                  setDeleteListaId(null)
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {modalCotizacionListaId && (
         <ModalAgregarItemDesdeEquipo
           proyectoId={proyectoId}
@@ -247,6 +307,7 @@ export default function ListaEquipoList({
           onCreated={cargarItems}
         />
       )}
+
       {modalCatalogoListaId && (
         <ModalAgregarItemDesdeCatalogo
           proyectoId={proyectoId}

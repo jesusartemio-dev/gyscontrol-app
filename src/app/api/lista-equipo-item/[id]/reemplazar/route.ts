@@ -1,74 +1,91 @@
-import { NextResponse } from 'next/server'
+// ===================================================
+// 📁 Archivo: [id]/reemplazar/route.ts
+// 📌 Descripción: API para reemplazar un ListaEquipoItem
+// ✍️ Autor: Jesús Artemio (Asistente IA GYS)
+// 📅 Última actualización: 2025-07-04
+// ===================================================
+
+import { NextResponse, NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export async function PATCH(
-  req: Request,
+  req: Request | NextRequest,
   context: { params: { id: string } }
 ) {
   try {
-    const { id: originalId } = await context.params // ✅ corregido con await
+    const { id: originalId } = await context.params
     const nuevo = await req.json()
 
-    console.log('📦 Payload recibido:', nuevo)
-
-    if (!originalId || !nuevo || !nuevo.listaId) {
+    if (!originalId || !nuevo) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
-    const lista = await prisma.listaEquipo.findUnique({
-      where: { id: nuevo.listaId },
+    // 1. Obtener ítem original
+    const original = await prisma.listaEquipoItem.findUnique({
+      where: { id: originalId },
     })
-    console.log('✅ Lista encontrada:', lista)
 
-    if (nuevo.proyectoEquipoItemId) {
-      const peItem = await prisma.proyectoEquipoItem.findUnique({
-        where: { id: nuevo.proyectoEquipoItemId },
-      })
-      console.log('🔍 ProyectoEquipoItem encontrado:', peItem)
+    if (!original) {
+      return NextResponse.json({ error: 'Ítem original no encontrado' }, { status: 404 })
     }
 
-    if (nuevo.cotizacionSeleccionadaId) {
-      const cotizacion = await prisma.cotizacionProveedorItem.findUnique({
-        where: { id: nuevo.cotizacionSeleccionadaId },
-      })
-      console.log('💰 Cotización seleccionada encontrada:', cotizacion)
+    // 2. Validar que el nuevo proyectoEquipoItem exista
+    if (!nuevo.proyectoEquipoItemId) {
+      return NextResponse.json({ error: 'proyectoEquipoItemId requerido' }, { status: 400 })
     }
 
-    // 1. Marcar ítem original como reemplazado
+    const proyectoItem = await prisma.proyectoEquipoItem.findUnique({
+      where: { id: nuevo.proyectoEquipoItemId },
+    })
+
+    if (!proyectoItem) {
+      return NextResponse.json({ error: 'ID de ProyectoEquipoItem no válido' }, { status: 400 })
+    }
+
+    // 3. Rechazar ítem original
     await prisma.listaEquipoItem.update({
       where: { id: originalId },
       data: {
-        estado: 'reemplazo',
+        estado: 'rechazado',
+        proyectoEquipoItemId: null,
+        reemplazaProyectoEquipoItemId: null,
         cotizacionSeleccionadaId: null,
       },
     })
 
-    // 2. Crear nuevo ítem
-const nuevoItem = await prisma.listaEquipoItem.create({
-  data: {
-    codigo: nuevo.codigo,
-    descripcion: nuevo.descripcion,
-    unidad: nuevo.unidad,
-    cantidad: nuevo.cantidad,
-    listaId: nuevo.listaId,
-    estado: 'reemplazo',
-    reemplazaAId: nuevo.proyectoEquipoItemId || undefined, // <- 🔧 aquí
-    cotizacionSeleccionadaId: nuevo.cotizacionSeleccionadaId || undefined,
-    proyectoEquipoItemId: nuevo.proyectoEquipoItemId || undefined,
-    comentarioRevision: nuevo.comentarioRevision || '',
-    verificado: false,
-  },
-})
+    // 4. Crear nuevo ítem de reemplazo
+    const nuevoItem = await prisma.listaEquipoItem.create({
+      data: {
+        codigo: nuevo.codigo,
+        descripcion: nuevo.descripcion,
+        unidad: nuevo.unidad,
+        cantidad: nuevo.cantidad,
+        listaId: original.listaId,
+        estado: 'borrador',
+        origen: 'reemplazo',
+        comentarioRevision: nuevo.comentarioRevision || '',
+        verificado: false,
+        cotizacionSeleccionadaId: nuevo.cotizacionSeleccionadaId || undefined,
+        proyectoEquipoItemId: nuevo.proyectoEquipoItemId,
+        reemplazaProyectoEquipoItemId: original.proyectoEquipoItemId || undefined, // ✅ nuevo campo correcto
+      },
+    })
 
-
-    console.log('✅ Nuevo ítem creado:', nuevoItem)
+    // 5. Actualizar ProyectoEquipoItem con el nuevo ítem
+    await prisma.proyectoEquipoItem.update({
+      where: { id: nuevo.proyectoEquipoItemId },
+      data: {
+        listaEquipoSeleccionadoId: nuevoItem.id,
+        estado: 'en_lista',
+        cantidadReal: nuevo.cantidad,
+        precioReal: nuevo.precioElegido ?? undefined,
+        costoReal: (nuevo.cantidad ?? 0) * (nuevo.precioElegido ?? 0),
+      },
+    })
 
     return NextResponse.json(nuevoItem)
   } catch (error) {
     console.error('[REEMPLAZAR_ITEM_ERROR]', error)
-    return NextResponse.json(
-      { error: 'Error al reemplazar ítem' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al reemplazar ítem' }, { status: 500 })
   }
 }

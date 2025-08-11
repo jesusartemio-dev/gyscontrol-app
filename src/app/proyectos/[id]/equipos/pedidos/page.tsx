@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
+
 import {
   PedidoEquipo,
   PedidoEquipoPayload,
   PedidoEquipoUpdatePayload,
   PedidoEquipoItemUpdatePayload,
+  PedidoEquipoItemPayload,
   ListaEquipo,
 } from '@/types'
 
@@ -20,13 +22,14 @@ import {
 } from '@/lib/services/pedidoEquipo'
 
 import {
+  createPedidoEquipoItem,
   updatePedidoEquipoItem,
   deletePedidoEquipoItem,
 } from '@/lib/services/pedidoEquipoItem'
 
 import { getListaEquiposPorProyecto } from '@/lib/services/listaEquipo'
 
-import PedidoEquipoForm from '@/components/equipos/PedidoEquipoForm'
+import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
 import PedidoEquipoAccordion from '@/components/equipos/PedidoEquipoAccordion'
 
 export default function PedidosProyectoPage() {
@@ -38,9 +41,8 @@ export default function PedidosProyectoPage() {
 
   const cargarPedidos = async () => {
     try {
-      const data = await getPedidoEquipos()
-      const pedidosProyecto = (data || []).filter(p => p.proyectoId === proyectoId)
-      setPedidos(pedidosProyecto)
+      const data = await getPedidoEquipos(proyectoId)
+      setPedidos(data || [])
     } catch {
       toast.error('Error al cargar pedidos')
     }
@@ -62,14 +64,26 @@ export default function PedidosProyectoPage() {
     }
   }, [proyectoId])
 
-  const handleCreate = async (payload: PedidoEquipoPayload) => {
+  const handleCreatePedido = async (payload: PedidoEquipoPayload) => {
     const nuevo = await createPedidoEquipo(payload)
     if (nuevo) {
       toast.success('Pedido registrado')
       await cargarPedidos()
-      await cargarListas() // ✅ refrescar listas para actualizar cantidades
+      await cargarListas()
+      return nuevo
     } else {
       toast.error('Error al registrar pedido')
+      return null
+    }
+  }
+
+  const handleCreateItem = async (payload: PedidoEquipoItemPayload) => {
+    const nuevo = await createPedidoEquipoItem(payload)
+    if (nuevo) {
+      toast.success('Ítem registrado')
+      await cargarPedidos()
+    } else {
+      toast.error('Error al registrar ítem')
     }
   }
 
@@ -114,15 +128,15 @@ export default function PedidosProyectoPage() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-6">
       <h1 className="text-2xl font-bold">📦 Pedidos de Equipos</h1>
 
-      <PedidoEquipoForm
+      <PedidoEquipoModalCrear
         listas={listas}
         proyectoId={proyectoId}
         responsableId={session?.user.id || ''}
-        onCreated={handleCreate}
-        onRefreshListas={cargarListas} // ✅ pasar prop al formulario
+        onCreated={handleCreatePedido}
+        onRefresh={cargarListas}
       />
 
       <h2 className="text-xl font-semibold text-gray-800">📋 Pedidos Realizados</h2>
@@ -130,10 +144,11 @@ export default function PedidosProyectoPage() {
       {pedidos.length === 0 ? (
         <p className="text-sm text-gray-500">No hay pedidos registrados aún.</p>
       ) : (
-        pedidos.map(pedido => (
+        pedidos.map((pedido) => (
           <PedidoEquipoAccordion
             key={pedido.id}
             pedido={pedido}
+            onCreateItem={handleCreateItem}
             onUpdateItem={handleUpdateItem}
             onDeleteItem={handleDeleteItem}
             onDelete={handleDelete}

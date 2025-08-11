@@ -11,9 +11,10 @@ import { ListaEquipo } from '@/types'
 const BASE_URL = '/api/logistica/listas'
 
 // ✅ Obtener todas las listas técnicas relevantes para logística
-export async function getLogisticaListas(): Promise<ListaEquipo[]> {
+export async function getLogisticaListas(proyectoId?: string): Promise<ListaEquipo[]> {
   try {
-    const res = await fetch(BASE_URL)
+    const url = proyectoId ? `${BASE_URL}?proyectoId=${proyectoId}` : BASE_URL
+    const res = await fetch(url)
     if (!res.ok) throw new Error('Error al obtener listas logísticas')
     return await res.json()
   } catch (error) {
@@ -21,6 +22,8 @@ export async function getLogisticaListas(): Promise<ListaEquipo[]> {
     return []
   }
 }
+
+
 
 // ✅ Obtener una lista técnica logística por ID
 export async function getLogisticaListaById(id: string): Promise<ListaEquipo | null> {

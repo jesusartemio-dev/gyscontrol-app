@@ -5,14 +5,15 @@ import { PedidoEquipoPayload, ListaEquipo, ListaEquipoItem } from '@/types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { Label } from '@/components/ui/label'
+import { createPedidoEquipoItem } from '@/lib/services/pedidoEquipoItem'
 
 interface Props {
   listas: ListaEquipo[]
   proyectoId: string
   responsableId: string
-  onCreated: (payload: PedidoEquipoPayload) => void
+  onCreated: (payload: PedidoEquipoPayload) => Promise<{ id: string } | null>
   onRefreshListas?: () => void
 }
 
@@ -68,6 +69,7 @@ export default function PedidoEquipoForm({
 
     try {
       setLoading(true)
+
       const payload: PedidoEquipoPayload = {
         proyectoId,
         responsableId,
@@ -75,7 +77,36 @@ export default function PedidoEquipoForm({
         observacion,
         fechaEntregaEstimada: fechaNecesaria,
       }
-      await onCreated(payload)
+
+      const pedidoCreado = await onCreated(payload)
+
+      if (!pedidoCreado?.id) throw new Error('No se pudo crear el pedido')
+
+      // Crear ítems asociados
+      for (const item of listaSeleccionada!.items) {
+        const cantidad = cantidades[item.id] || 0
+        if (cantidad <= 0) continue
+
+        const dias = item.tiempoEntregaDias || 0
+        const fechaEsperada = dias > 0 ? addDays(new Date(), dias) : undefined
+
+        await createPedidoEquipoItem({
+          pedidoId: pedidoCreado.id,
+          listaId,
+          listaEquipoItemId: item.id,
+          cantidadPedida: cantidad,
+          fechaNecesaria: new Date(fechaNecesaria).toISOString(),
+          precioUnitario: item.precioElegido ?? undefined,
+          costoTotal: cantidad * (item.precioElegido ?? 0),
+          codigo: item.codigo,
+          descripcion: item.descripcion,
+          unidad: item.unidad,
+          tiempoEntrega: item.tiempoEntrega ?? undefined,
+          tiempoEntregaDias: item.tiempoEntregaDias ?? undefined,
+          fechaEntregaEsperada: fechaEsperada?.toISOString(),
+        })
+      }
+
       toast.success('Pedido creado correctamente')
       setListaId('')
       setObservacion('')
@@ -104,10 +135,7 @@ export default function PedidoEquipoForm({
     <div className="border rounded-xl p-4 shadow-md space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold text-blue-600">📦 Crear Pedido de Equipos</h2>
-        <Button
-          variant="outline"
-          onClick={() => setMostrarFormulario(false)}
-        >
+        <Button variant="outline" onClick={() => setMostrarFormulario(false)}>
           Cancelar
         </Button>
       </div>

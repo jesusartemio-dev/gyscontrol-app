@@ -8,7 +8,7 @@ export async function GET(
   context: { params: { id: string } }
 ) {
   try {
-    const { id } = context.params // ✅ quitamos 'await'
+    const { id } = await context.params // ✅ quitamos 'await'
 
     const data = await prisma.cotizacionProveedor.findUnique({
       where: { id },
@@ -17,6 +17,7 @@ export async function GET(
         proyecto: true,
         items: {
           include: {
+            lista: true,
             listaEquipoItem: true,
           },
           orderBy: {

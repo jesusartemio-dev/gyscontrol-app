@@ -2,10 +2,6 @@
 // 📁 Archivo: [id]/route.ts
 // 📌 Ubicación: src/app/api/proyecto-equipo-item/[id]/route.ts
 // 🔧 Descripción: API para GET, PUT y DELETE de ítems de equipo del proyecto
-//
-// 🧠 Uso: Maneja un ítem individual dentro de un grupo de equipos de un proyecto
-// ✍️ Autor: Asistente IA GYS
-// 📅 Última actualización: 2025-05-08
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -23,6 +19,10 @@ export async function GET(_: NextRequest, context: { params: { id: string } }) {
       include: {
         catalogoEquipo: true,
         proyectoEquipo: true,
+        lista: true,
+        listaEquipoSeleccionado: true,
+        listaEquipos: true,
+        reemplazadoPor: true,
       },
     })
 

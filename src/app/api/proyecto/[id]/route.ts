@@ -26,6 +26,7 @@ export async function GET(_: NextRequest, context: { params: { id: string } }) {
             items: {
               include: {
                 lista: true, // ✅ Incluye la lista para mostrar item.lista?.nombre
+                listaEquipoSeleccionado: true
               },
             },
           },

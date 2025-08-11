@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(_req: Request, { params }: { params: { listaId: string } }) {
   try {
-    const { listaId } = params
+    const { listaId } = await params
 
     if (!listaId) {
       return NextResponse.json({ error: 'listaId es obligatorio' }, { status: 400 })
@@ -26,6 +26,7 @@ export async function GET(_req: Request, { params }: { params: { listaId: string
         proyectoEquipoItem: {
           include: {
             proyectoEquipo: true, // ✅ para obtener nombre del equipo padre desde el item
+            listaEquipoSeleccionado: true, // ✅ incluir la relación entera
           },
         },
       },

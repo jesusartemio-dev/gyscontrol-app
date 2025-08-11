@@ -1,3 +1,10 @@
+// ===================================================
+// 📁 ModalAgregarItemDesdeEquipo.tsx
+// 🔧 Lógica: Agrega ítems de ProyectoEquipoItem a la lista
+//           → origen: 'cotizado'
+//           → se usa createListaEquipoItemFromProyecto
+// ===================================================
+
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -7,7 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ProyectoEquipoItem } from '@/types'
 import { createListaEquipoItemFromProyecto } from '@/lib/services/listaEquipoItem'
-import { getProyectoEquipoItemsDisponibles } from '@/lib/services/proyectoEquipoItem'
+import { getProyectoEquipoItemsDisponibles, updateProyectoEquipoItem } from '@/lib/services/proyectoEquipoItem'
 import { toast } from 'sonner'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
@@ -38,28 +45,47 @@ export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClo
     )
   }
 
-  const handleAgregar = async () => {
-    if (seleccionados.length === 0) {
-      toast.warning('Debes seleccionar al menos un ítem.')
-      return
-    }
-
-    try {
-      setLoading(true)
-      await Promise.all(
-        seleccionados.map((itemId) =>
-          createListaEquipoItemFromProyecto(listaId, itemId)
-        )
-      )
-      toast.success('✅ Ítems agregados a la lista')
-      onCreated?.()
-      onClose()
-    } catch {
-      toast.error('❌ Error al agregar los ítems seleccionados')
-    } finally {
-      setLoading(false)
-    }
+const handleAgregar = async () => {
+  if (seleccionados.length === 0) {
+    toast.warning('Debes seleccionar al menos un ítem.')
+    return
   }
+
+  const seleccionadosValidos = seleccionados.filter((itemId) => {
+    const item = items.find((i) => i.id === itemId)
+    const cantidadAgregada = item?.listaEquipos?.reduce((sum, le) => sum + (le.cantidad || 0), 0) || 0
+    const faltan = (item?.cantidad || 0) - cantidadAgregada
+    return faltan > 0
+  })
+
+  if (seleccionadosValidos.length === 0) {
+    toast.warning('Todos los ítems seleccionados ya están completos.')
+    return
+  }
+
+  try {
+    setLoading(true)
+    await Promise.all(
+      seleccionadosValidos.map(async (itemId) => {
+        await createListaEquipoItemFromProyecto(listaId, itemId)
+        await updateProyectoEquipoItem(itemId, {
+          estado: 'en_lista',
+          listaId: listaId, // ✅ Asociar el ProyectoEquipoItem a la lista
+        })
+
+      })
+    )
+
+    toast.success('✅ Ítems agregados a la lista')
+    onCreated?.()
+    onClose()
+  } catch {
+    toast.error('❌ Error al agregar los ítems seleccionados')
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   const gruposUnicos = Array.from(
     new Set(items.map((item) => item.proyectoEquipo?.nombre).filter(Boolean))

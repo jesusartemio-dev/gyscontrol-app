@@ -38,10 +38,10 @@ export default function ModalAgregarItemDesdeCatalogo({
   const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])
   const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
   const [secciones, setSecciones] = useState<ProyectoEquipo[]>([])
-  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('todas')
   const [search, setSearch] = useState('')
   const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({})
-  const [proyectoEquipoId, setProyectoEquipoId] = useState<string>('')
+  const [proyectoEquipoId, setProyectoEquipoId] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -59,25 +59,22 @@ export default function ModalAgregarItemDesdeCatalogo({
   }, [proyectoId])
 
   const toggleSeleccion = (id: string) => {
-    setSeleccionados((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }))
+    setSeleccionados((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
   const handleAgregar = async () => {
-    const idsSeleccionados = Object.entries(seleccionados)
-      .filter(([_, value]) => value)
+    const ids = Object.entries(seleccionados)
+      .filter(([_, v]) => v)
       .map(([id]) => id)
 
-    if (idsSeleccionados.length === 0 || !proyectoEquipoId) {
+    if (ids.length === 0 || !proyectoEquipoId) {
       toast.warning('Selecciona al menos un equipo y el grupo del proyecto')
       return
     }
 
     try {
       setLoading(true)
-      for (const id of idsSeleccionados) {
+      for (const id of ids) {
         const equipo = equipos.find((e) => e.id === id)
         if (!equipo) continue
 
@@ -88,7 +85,9 @@ export default function ModalAgregarItemDesdeCatalogo({
           descripcion: equipo.descripcion,
           unidad: equipo.unidad?.nombre || 'UND',
           cantidad: 1,
-          presupuesto: equipo.precioVenta,
+          presupuesto: equipo.precioVenta ?? 0,
+          origen: 'nuevo',
+          estado: 'borrador',
         })
       }
 
@@ -104,11 +103,9 @@ export default function ModalAgregarItemDesdeCatalogo({
   }
 
   const equiposFiltrados = equipos.filter((e) => {
-    const coincideCategoria = categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro
-    const coincideTexto =
-      e.codigo.toLowerCase().includes(search.toLowerCase()) ||
-      e.descripcion.toLowerCase().includes(search.toLowerCase())
-    return coincideCategoria && coincideTexto
+    const matchCategoria = categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro
+    const matchSearch = e.codigo.toLowerCase().includes(search.toLowerCase()) || e.descripcion.toLowerCase().includes(search.toLowerCase())
+    return matchCategoria && matchSearch
   })
 
   const seleccionadosPreview = equipos.filter((e) => seleccionados[e.id])
@@ -120,6 +117,7 @@ export default function ModalAgregarItemDesdeCatalogo({
           <DialogTitle>➕ Agregar Equipos desde Catálogo</DialogTitle>
         </DialogHeader>
 
+        {/* Filtros */}
         <div className="flex gap-2 mb-2">
           <Input
             placeholder="🔍 Buscar"
@@ -141,6 +139,7 @@ export default function ModalAgregarItemDesdeCatalogo({
           </select>
         </div>
 
+        {/* Tabla */}
         <ScrollArea className="h-[350px] border rounded-md mb-4">
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
@@ -169,6 +168,7 @@ export default function ModalAgregarItemDesdeCatalogo({
           </table>
         </ScrollArea>
 
+        {/* Grupo del proyecto */}
         <div className="border-t pt-4 space-y-2">
           <p className="text-sm text-gray-600">
             <strong>Equipos seleccionados:</strong> {seleccionadosPreview.length}
@@ -176,9 +176,7 @@ export default function ModalAgregarItemDesdeCatalogo({
           {seleccionadosPreview.length > 0 && (
             <ul className="text-sm list-disc list-inside text-gray-700">
               {seleccionadosPreview.map((e) => (
-                <li key={e.id}>
-                  {e.codigo} - {e.descripcion}
-                </li>
+                <li key={e.id}>{e.codigo} - {e.descripcion}</li>
               ))}
             </ul>
           )}
@@ -197,6 +195,7 @@ export default function ModalAgregarItemDesdeCatalogo({
           </select>
         </div>
 
+        {/* Botones */}
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={onClose}>
             Cancelar

@@ -1,11 +1,8 @@
 // ===================================================
 // 📁 Archivo: pedidoEquipoItem.ts
 // 📌 Ubicación: src/lib/services/
-// 🔧 Descripción: Servicios para gestionar los ítems dentro de un PedidoEquipo
-//
-// 🧠 Uso: Proyectos agrega pedidos; logística registra atención y costos.
-// ✍️ Autor: Jesús Artemio (GYS)
-// 📅 Última actualización: 2025-05-21
+// 🔧 Descripción: Servicios CRUD simples para ítems de PedidoEquipo
+// 🧠 Lógica extra como actualizar cantidadPedida se gestiona en la API
 // ===================================================
 
 import {
@@ -16,7 +13,7 @@ import {
 
 const BASE_URL = '/api/pedido-equipo-item'
 
-// ✅ Obtener todos los ítems de pedido
+// ✅ Obtener todos los ítems (no se usa comúnmente)
 export async function getPedidoEquipoItems(): Promise<PedidoEquipoItem[] | null> {
   try {
     const res = await fetch(BASE_URL)
@@ -40,7 +37,7 @@ export async function getPedidoEquipoItemById(id: string): Promise<PedidoEquipoI
   }
 }
 
-// ✅ Crear ítem
+// ✅ Crear ítem de pedido (la API ya actualiza cantidadPedida)
 export async function createPedidoEquipoItem(
   payload: PedidoEquipoItemPayload
 ): Promise<PedidoEquipoItem | null> {
@@ -50,6 +47,7 @@ export async function createPedidoEquipoItem(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
+
     if (!res.ok) throw new Error('Error al crear ítem de pedido')
     return await res.json()
   } catch (error) {
@@ -58,7 +56,7 @@ export async function createPedidoEquipoItem(
   }
 }
 
-// ✅ Actualizar ítem
+// ✅ Actualizar ítem de pedido (la API ajusta la cantidadPedida según diferencia)
 export async function updatePedidoEquipoItem(
   id: string,
   payload: PedidoEquipoItemUpdatePayload
@@ -77,7 +75,7 @@ export async function updatePedidoEquipoItem(
   }
 }
 
-// ✅ Eliminar ítem
+// ✅ Eliminar ítem de pedido (la API descuenta la cantidadPedida)
 export async function deletePedidoEquipoItem(id: string): Promise<boolean> {
   try {
     const res = await fetch(`${BASE_URL}/${id}`, { method: 'DELETE' })

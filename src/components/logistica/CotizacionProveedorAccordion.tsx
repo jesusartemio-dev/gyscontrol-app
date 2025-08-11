@@ -1,5 +1,11 @@
+'use client'
+
 import { useState, useEffect } from 'react'
-import { CotizacionProveedor, CotizacionProveedorUpdatePayload, EstadoCotizacionProveedor } from '@/types'
+import {
+  CotizacionProveedor,
+  CotizacionProveedorUpdatePayload,
+  EstadoCotizacionProveedor,
+} from '@/types'
 import {
   Accordion,
   AccordionContent,
@@ -8,8 +14,10 @@ import {
 } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Pencil, Trash2 } from 'lucide-react'
+
 import CotizacionEnviarCorreoButton from './CotizacionEnviarCorreoButton'
 import CotizacionProveedorTabla from './CotizacionProveedorTabla'
+import ModalAgregarItemCotizacionProveedor from './ModalAgregarItemCotizacionProveedor'
 import { getCotizacionProveedorById } from '@/lib/services/cotizacionProveedor'
 
 interface Props {
@@ -34,6 +42,7 @@ export default function CotizacionProveedorAccordion({
   onUpdatedItem,
 }: Props) {
   const [cotizacionData, setCotizacionData] = useState(cotizacion)
+  const [showAgregarItems, setShowAgregarItems] = useState(false)
 
   useEffect(() => {
     setCotizacionData(cotizacion)
@@ -52,15 +61,21 @@ export default function CotizacionProveedorAccordion({
         setCotizacionData(updated)
         onUpdatedItem?.()
       } else {
-        console.warn('⚠️ No se encontró la cotización actualizada.')
+        console.warn('⚠️ Cotización no encontrada tras refetch.')
       }
     } catch (error) {
-      console.error('❌ Error al hacer refetch de cotización:', error)
+      console.error('❌ Error en refetch de cotización:', error)
     }
   }
 
+  const proyectoId = cotizacionData.proyecto?.id || ''
+
   return (
-    <Accordion type="single" collapsible className="w-full border rounded-xl shadow-md">
+    <Accordion
+      type="single"
+      collapsible
+      className="w-full border rounded-xl shadow-md"
+    >
       <AccordionItem value={cotizacionData.id}>
         <AccordionTrigger className="p-4 text-left">
           <div className="flex flex-col md:flex-row md:justify-between w-full">
@@ -72,9 +87,6 @@ export default function CotizacionProveedorAccordion({
                 Estado: {cotizacionData.estado?.toUpperCase() || 'N/A'}
               </span>
             </div>
-            <span className="text-sm text-gray-500">
-              {cotizacionData.fecha?.slice(0, 10)}
-            </span>
           </div>
         </AccordionTrigger>
 
@@ -93,7 +105,16 @@ export default function CotizacionProveedorAccordion({
             </p>
           )}
 
-          {/* 🏆 Submenú de estados */}
+          <div className="pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAgregarItems(true)}
+            >
+              ➕ Agregar Ítems
+            </Button>
+          </div>
+
           <div className="flex flex-wrap gap-2 pt-4">
             {ESTADOS.map((estado) => (
               <Button
@@ -113,7 +134,6 @@ export default function CotizacionProveedorAccordion({
 
           <div className="flex flex-wrap justify-end gap-2 pt-4">
             <CotizacionEnviarCorreoButton cotizacion={cotizacionData} />
-
             {onUpdate && (
               <Button
                 size="sm"
@@ -121,14 +141,12 @@ export default function CotizacionProveedorAccordion({
                 onClick={() =>
                   onUpdate(cotizacionData.id, {
                     codigo: cotizacionData.codigo,
-                    fecha: cotizacionData.fecha,
                   })
                 }
               >
                 <Pencil className="w-4 h-4 mr-1" /> Editar
               </Button>
             )}
-
             {onDelete && (
               <Button
                 size="sm"
@@ -140,6 +158,14 @@ export default function CotizacionProveedorAccordion({
               </Button>
             )}
           </div>
+
+          <ModalAgregarItemCotizacionProveedor
+            open={showAgregarItems}
+            onClose={() => setShowAgregarItems(false)}
+            cotizacion={cotizacionData}
+            proyectoId={proyectoId}
+            onAdded={handleRefetch}
+          />
         </AccordionContent>
       </AccordionItem>
     </Accordion>

@@ -12,23 +12,30 @@ export async function GET(_: Request, context: { params: { proyectoId: string } 
   const { proyectoId } = context.params
 
   try {
-    const items = await prisma.proyectoEquipoItem.findMany({
-      where: {
-        proyectoEquipo: {
-          proyectoId: proyectoId,
+      const items = await prisma.proyectoEquipoItem.findMany({
+        where: {
+          proyectoEquipo: {
+            proyectoId: proyectoId,
+          },
+          listaEquipos: {
+            none: {}, // ❌ No debe estar referenciado en ninguna lista
+          },
         },
-        listaEquipos: {
-          none: {}, // ❌ No debe estar referenciado en ninguna lista
+        include: {
+          proyectoEquipo: true,
+          catalogoEquipo: true,
+          listaEquipoSeleccionado: {
+            select: {
+              codigo: true,
+              descripcion: true,
+            },
+          },
         },
-      },
-      include: {
-        proyectoEquipo: true,
-        catalogoEquipo: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    })
+        orderBy: {
+          createdAt: 'asc',
+        },
+      })
+
 
     return NextResponse.json(items)
   } catch (error) {

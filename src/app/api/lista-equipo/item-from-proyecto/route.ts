@@ -1,9 +1,9 @@
 // ===================================================
 // 📁 Archivo: item-from-proyecto/route.ts
 // 📌 Descripción: API para insertar ProyectoEquipoItem en ListaEquipoItem
-//    y actualizar su estado, costos reales y listaId
+//    y actualizar su estado, costos reales y listaEquipoSeleccionadoId
 // ✍️ Autor: Asistente IA GYS
-// 📅 Última actualización: 2025-05-19
+// 📅 Última actualización: 2025-07-04
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -34,24 +34,27 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ 2. Crear el ListaEquipoItem (reemplazamos precioReferencial por presupuesto)
-    await prisma.listaEquipoItem.create({
+    // ✅ 2. Crear el ListaEquipoItem incluyendo proyectoEquipoId
+    const nuevo = await prisma.listaEquipoItem.create({
       data: {
         listaId,
         proyectoEquipoItemId,
+        proyectoEquipoId: item.proyectoEquipoId ?? null,
         codigo: item.codigo,
         descripcion: item.descripcion || '',
         unidad: item.unidad || '',
         cantidad: item.cantidad,
-        presupuesto: item.precioInterno, // ← CAMBIO AQUÍ
+        presupuesto: item.precioInterno,
+        origen: 'cotizado',
+        estado: 'borrador',
       },
     })
 
-    // ✅ 3. Actualizar ProyectoEquipoItem con estado y trazabilidad
+    // ✅ 3. Actualizar ProyectoEquipoItem
     await prisma.proyectoEquipoItem.update({
       where: { id: proyectoEquipoItemId },
       data: {
-        listaId,
+        listaEquipoSeleccionadoId: nuevo.id,
         estado: 'en_lista',
         cantidadReal: item.cantidad,
         precioReal: item.precioInterno,

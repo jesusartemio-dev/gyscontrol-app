@@ -2,6 +2,8 @@
 // 📁 Archivo: proyectoEquipoItem.ts
 // 📌 Ubicación: src/lib/services
 // 🔧 Descripción: Servicios para gestionar los ítems de equipos en proyectos
+// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
+// 📅 Última actualización: 2025-07-01
 // ===================================================
 
 import type {
@@ -46,7 +48,7 @@ export async function getProyectoEquipoItemById(id: string): Promise<ProyectoEqu
   }
 }
 
-// ✅ Crear ítem
+// ✅ Crear ítem (puede derivarse de un ítem anterior mediante listaEquipoSeleccionadoId)
 export async function createProyectoEquipoItem(
   data: ProyectoEquipoItemPayload
 ): Promise<ProyectoEquipoItem> {
@@ -64,7 +66,7 @@ export async function createProyectoEquipoItem(
   }
 }
 
-// ✅ Actualizar ítem
+// ✅ Actualizar ítem (incluye campo listaEquipoSeleccionadoId para trazabilidad)
 export async function updateProyectoEquipoItem(
   id: string,
   data: ProyectoEquipoItemUpdatePayload

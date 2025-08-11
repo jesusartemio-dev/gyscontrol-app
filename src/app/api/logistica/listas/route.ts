@@ -10,13 +10,17 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { EstadoCotizacionProveedor } from '@prisma/client'
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const proyectoId = searchParams.get('proyectoId')
+
   try {
     const listas = await prisma.listaEquipo.findMany({
       where: {
         estado: {
           in: ['por_cotizar', 'por_validar', 'por_aprobar'],
         },
+        ...(proyectoId && { proyectoId }), // ✅ aplicar filtro si existe
       },
       include: {
         proyecto: {
@@ -36,7 +40,6 @@ export async function GET() {
       },
     })
 
-    // 💡 Armar resumen por lista
     const listasConResumen = listas.map((lista) => {
       const totalItems = lista.items.length
       const cotizados = lista.items.filter(i => i.cotizaciones.length > 0).length

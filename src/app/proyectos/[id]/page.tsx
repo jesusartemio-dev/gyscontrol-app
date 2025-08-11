@@ -96,17 +96,6 @@ export default function ProyectoDetallePage() {
         </Card>
       </div>
 
-      {/* Equipos */}
-      <div className="space-y-4">
-        {proyecto.equipos.map((equipo) => (
-          <ProyectoEquipoAccordion
-            key={equipo.id}
-            equipo={equipo}
-            modoRevision={true}
-            onUpdatedItem={() => toast.success('Ítem actualizado')}
-          />
-        ))}
-      </div>
     </div>
   )
 }

@@ -11,9 +11,12 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
-import { Save, X, Pencil } from 'lucide-react'
+import { Save, X, Pencil, Trash2 } from 'lucide-react'
 import { CotizacionProveedorItem } from '@/types'
-import { updateCotizacionProveedorItem } from '@/lib/services/cotizacionProveedorItem'
+import {
+  updateCotizacionProveedorItem,
+  deleteCotizacionProveedorItem,
+} from '@/lib/services/cotizacionProveedorItem'
 import { toast } from 'sonner'
 
 // ✅ Extendemos para incluir campos solo locales
@@ -101,12 +104,24 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
     })
   }
 
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteCotizacionProveedorItem(id)
+      toast.success('🗑️ Ítem eliminado correctamente')
+      onUpdated?.()
+    } catch {
+      toast.error('❌ Error al eliminar ítem')
+    }
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border">
         <thead className="bg-gray-100 text-gray-700">
           <tr>
             <th className="p-2 text-left">Descripción</th>
+            <th className="p-2 text-center">Lista</th>
+            <th className="p-2 text-center">Item Lista</th>
             <th className="p-2 text-center">Cantidad</th>
             <th className="p-2 text-center">Presupuesto (USD)</th>
             <th className="p-2 text-center">Precio Unitario (USD)</th>
@@ -138,6 +153,27 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
                     <div className="text-xs text-gray-600">
                       {item.codigo} • {item.unidad}
                     </div>
+                  </td>
+                  <td className="p-2 text-center text-xs text-gray-700">
+                    {item.lista ? (
+                      <>
+                        <div className="font-semibold text-sm">
+                          {item.lista.nombre}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {item.lista.codigo}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-red-600">Eliminada</span>
+                    )}
+                  </td>
+                  <td className="p-2 text-center">
+                    {item.listaEquipoItemId ? (
+                      <Badge className="bg-green-600 text-white">🟢 Conectado</Badge>
+                    ) : (
+                      <Badge className="bg-red-600 text-white">🔴 Eliminado</Badge>
+                    )}
                   </td>
                   <td className="p-2 text-center">
                     {cantidad} / Orig. {item.cantidadOriginal}
@@ -179,11 +215,7 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
                         {(edited.tiempoEntregaModo === 'dias' || edited.tiempoEntregaModo === 'semanas') && (
                           <Input
                             type="number"
-                            value={
-                              edited.tiempoEntregaValor !== undefined && edited.tiempoEntregaValor !== null
-                                ? edited.tiempoEntregaValor.toString()
-                                : ''
-                            }
+                            value={edited.tiempoEntregaValor?.toString() ?? ''}
                             onChange={(e) =>
                               handleChange(item.id, 'tiempoEntregaValor', parseInt(e.target.value) || 0)
                             }
@@ -241,24 +273,34 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
                         </Button>
                       </>
                     ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditModeId(item.id)
-                          setEditValues((prev) => ({
-                            ...prev,
-                            [item.id]: {
-                              precioUnitario: item.precioUnitario,
-                              tiempoEntregaModo: 'stock',
-                              tiempoEntregaValor: 0,
-                              estado: item.estado,
-                            },
-                          }))
-                        }}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditModeId(item.id)
+                            setEditValues((prev) => ({
+                              ...prev,
+                              [item.id]: {
+                                precioUnitario: item.precioUnitario,
+                                tiempoEntregaModo: 'stock',
+                                tiempoEntregaValor: 0,
+                                estado: item.estado,
+                              },
+                            }))
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
                     )}
                   </td>
                 </tr>

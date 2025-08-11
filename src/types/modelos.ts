@@ -659,7 +659,7 @@ export interface ProyectoEquipoItem {
   proyectoEquipoId: string
   catalogoEquipoId?: string
   listaId?: string
-  equipoOriginalId?: string // 🆕 ID del equipo original si este es un reemplazo
+  listaEquipoSeleccionadoId?: string // 🆕 ID del ListaEquipoItem vigente seleccionado
 
   codigo: string
   descripcion: string
@@ -681,9 +681,7 @@ export interface ProyectoEquipoItem {
   fechaEntregaEstimada?: string
 
   estado: EstadoEquipoItem
-  aprobado: boolean
   motivoCambio?: string
-  nuevo: boolean
 
   createdAt: string
   updatedAt: string
@@ -692,15 +690,12 @@ export interface ProyectoEquipoItem {
   proyectoEquipo: ProyectoEquipo
   catalogoEquipo?: CatalogoEquipo
   listaEquipos: ListaEquipoItem[]
-
+  listaEquipoSeleccionado?: ListaEquipoItem // 🆕 El item vigente actual
   lista?: {
     id: string
     nombre: string
+    codigo?: string
   }
-
-  // 🆕 Relaciones adicionales para reemplazo
-  equipoOriginal?: ProyectoEquipoItem      // si este ítem es reemplazo de otro
-  reemplazos?: ProyectoEquipoItem[]        // si este ítem fue reemplazado por otros
 }
 
 
@@ -809,10 +804,12 @@ export interface ListaEquipoItem {
   id: string
   listaId: string
   proyectoEquipoItemId?: string
-  proyectoEquipoId?: string        // 🆕 Nuevo campo
+  proyectoEquipoId?: string
+  reemplazaProyectoEquipoItemId?: string // 🆕 Si este item reemplaza uno cotizado
+
   proveedorId?: string
   cotizacionSeleccionadaId?: string
-  reemplazaAId?: string // <- aquí
+
   codigo: string
   descripcion: string
   unidad: string
@@ -827,6 +824,9 @@ export interface ListaEquipoItem {
   cantidadPedida?: number
   cantidadEntregada?: number
   estado: EstadoListaItem
+  origen: OrigenListaItem
+  tiempoEntrega?: string
+  tiempoEntregaDias?: number
   createdAt: string
   updatedAt: string
 
@@ -835,17 +835,28 @@ export interface ListaEquipoItem {
   proveedor?: Proveedor
   cotizaciones: CotizacionProveedorItem[]
   pedidos: PedidoEquipoItem[]
+  cotizacionSeleccionada?: CotizacionProveedorItem
+
+  // 🧠 Relaciones de origen y reemplazo
   proyectoEquipoItem?: {
+    id: string
     proyectoEquipo?: {
       nombre: string
     }
   }
-  proyectoEquipo?: {
-    nombre: string  // 🆕 Nombre del grupo lógico
+
+  reemplazaProyectoEquipoItem?: {
+    id: string
+    proyectoEquipo?: {
+      nombre: string
+    }
   }
 
-  cotizacionSeleccionada?: CotizacionProveedorItem
+  proyectoEquipo?: {
+    nombre: string
+  }
 }
+
 
 
 
@@ -861,7 +872,6 @@ export interface CotizacionProveedor {
   proyectoId: string
   codigo: string                               // ✅ antes 'nombre', ahora es el código único (ej. CJM27-COT-001)
   numeroSecuencia: number                      // ✅ número puro para control interno
-  fecha: string
   estado: EstadoCotizacionProveedor  // ✅ nuevo
   proveedor: Proveedor
   proyecto: Proyecto
@@ -872,7 +882,9 @@ export interface CotizacionProveedor {
 export interface CotizacionProveedorItem {
   id: string
   cotizacionId: string
-  listaEquipoItemId: string
+  listaEquipoItemId?: string  // <- también opcional por si es null
+  listaId?: string            // ✅ nuevo campo opcional
+  lista?: ListaEquipo         // ✅ relación opcional
   // 📋 Copiados de ListaEquipoItem (para trazabilidad)
   codigo: string
   descripcion: string
@@ -890,21 +902,23 @@ export interface CotizacionProveedorItem {
   esSeleccionada?: boolean
   // 🔗 Relaciones
   cotizacion: CotizacionProveedor
-  listaEquipoItem: ListaEquipoItem
+  listaEquipoItem?: ListaEquipoItem
 }
 
 export interface PedidoEquipo {
   id: string
   proyectoId: string
   responsableId: string
-  listaId: string
-  codigo: string                         // ✅ ahora obligatorio, antes era opcional
-  numeroSecuencia: number                // ✅ número puro usado para construir el código (ej. 1 → PED-001)
+  listaId?: string
+  codigo: string                         // ✅ Código obligatorio
+  numeroSecuencia: number               // ✅ número puro usado para construir el código (ej. 1 → PED-001)
   estado: EstadoPedido
-  fechaPedido: string
+  fechaPedido: string                   // ✅ mantenido por compatibilidad
+  fechaNecesaria: string               // ✅ Proyectos indica esta fecha
+  fechaEntregaEstimada?: string        // Logística propone esta fecha
+  fechaEntregaReal?: string            // Fecha real de entrega
   observacion?: string
-  fechaEntregaEstimada?: string
-  fechaEntregaReal?: string
+
   responsable?: User
   lista?: ListaEquipo
   items: PedidoEquipoItem[]
@@ -914,16 +928,29 @@ export interface PedidoEquipo {
 export interface PedidoEquipoItem {
   id: string
   pedidoId: string
-  listaEquipoItemId: string
+  listaId?: string
+  listaEquipoItemId?: string
   cantidadPedida: number
+  cantidadAtendida?: number
   precioUnitario?: number
   costoTotal?: number
-  fechaNecesaria: string
   estado: EstadoPedidoItem
-  cantidadAtendida?: number
   comentarioLogistica?: string
+  // Copiados desde ListaEquipoItem
+  codigo: string
+  descripcion: string
+  unidad: string
+
+  tiempoEntrega?: string              // Ej: "stock", "7 días", etc.
+  tiempoEntregaDias?: number         // Ej: 0, 7, 14
+  fechaOrdenCompraRecomendada?: string // ⚠️ fechaNecesaria - tiempoEntregaDias
+
+  createdAt?: string
+  updatedAt?: string
+
   listaEquipoItem?: ListaEquipoItem
 }
+
 
 
 // ============================

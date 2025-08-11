@@ -12,6 +12,11 @@ Este documento resume la estructura actual del proyecto, incluyendo modelos, rut
 /src/
 ├── app/
 │ ├── api/
+│ │ ├── cotizacion-proveedor/
+│ │ ├── cotizacion-proveedor-item/
+│ │ ├── lista-por-proyecto/
+│ │ ├── lista-equipo/
+│ │ └── lista-equipo-item/
 │ ├── admin/
 │ ├── catalogo/
 │ ├── comercial/
@@ -28,6 +33,9 @@ Este documento resume la estructura actual del proyecto, incluyendo modelos, rut
 │ ├── equipos/
 │ ├── gestion/
 │ ├── logistica/
+│ │ ├── CotizacionProveedorAccordion.tsx
+│ │ ├── CotizacionProveedorTabla.tsx
+│ │ └── ModalAgregarItemCotizacionProveedor.tsx
 │ ├── pdf/
 │ ├── plantillas/
 │ ├── proyectos/
@@ -36,18 +44,20 @@ Este documento resume la estructura actual del proyecto, incluyendo modelos, rut
 │ └── Sidebar.tsx, Providers.tsx, LogoutButton.tsx
 ├── lib/
 │ ├── services/
+│ │ ├── cotizacionProveedor.ts
+│ │ ├── cotizacionProveedorItem.ts
+│ │ ├── listaPorProyecto.ts
+│ │ └── listaEquipoItem.ts
 │ ├── utils/
 │ └── validators/
 └── types/
-├── modelos.ts
-├── payloads.ts
-└── index.ts, auth.ts, prisma.ts
-
-
+    ├── modelos.ts
+    ├── payloads.ts
+    └── index.ts, auth.ts, prisma.ts
 
 ---
 
-## 🗂 Modelos Prisma (`prisma/schema.prisma`)
+## 📂 Modelos Prisma (`prisma/schema.prisma`)
 
 - User, Account, Session, VerificationToken
 - Cliente, Proveedor, Proyecto, Valorizacion
@@ -63,9 +73,10 @@ Este documento resume la estructura actual del proyecto, incluyendo modelos, rut
 
 - `/catalogo-equipo`, `/catalogo-servicio`, `/categoria-equipo`, `/categoria-servicio`, `/unidad`, `/unidad-servicio`, `/recurso`
 - `/plantilla`, `/plantilla-equipo`, `/plantilla-servicio`, `/plantilla-gasto`
-- `/cotizacion`, `/cotizacion-equipo`, `/cotizacion-servicio`, `/cotizacion-gasto`, `/cotizacion-proveedor`, `/cotizacion-proveedor-item`
+- `/cotizacion`, `/cotizacion-equipo`, `/cotizacion-servicio`, `/cotizacion-gasto`
+- `/cotizacion-proveedor`, `/cotizacion-proveedor-item`
 - `/proyecto`, `/proyecto-equipo`, `/proyecto-servicio`, `/proyecto-gasto`
-- `/lista-equipo`, `/lista-equipo-item`
+- `/lista-equipo`, `/lista-equipo-item`, `/lista-por-proyecto`
 - `/pedido-equipo`, `/pedido-equipo-item`
 - `/valorizacion`, `/registro-horas`
 
@@ -103,9 +114,9 @@ Organizados por dominio:
 ## 🔌 Servicios (`/src/lib/services`)
 
 Servicios API para manejar:
-- Catalogo (equipos, servicios, categorías, unidades)
+- Catálogo (equipos, servicios, categorías, unidades)
 - Plantillas (equipos, servicios, gastos)
-- Cotizaciones (equipos, servicios, gastos, proveedores)
+- Cotizaciones (equipos, servicios, gastos, proveedores, cotizaciones proveedor ítems)
 - Proyectos (equipos, servicios, gastos)
 - Listas, pedidos, valorizaciones, horas
 
@@ -133,7 +144,7 @@ Servicios API para manejar:
 
 ---
 
-## 🌟 Resumen final
+## ✨ Resumen final
 
 El proyecto **GYS App** es una plataforma modular de gestión de proyectos industriales con:
 - Backend en Prisma + PostgreSQL.
@@ -145,4 +156,4 @@ El proyecto **GYS App** es una plataforma modular de gestión de proyectos indus
 ---
 
 ✍️ Autor original de la estructura: Jesús Artemio (Master Experto 🧙‍♂️)  
-📅 Última actualización del resumen: 2025-05-28
+🗓 Última actualización del resumen: 2025-07-11

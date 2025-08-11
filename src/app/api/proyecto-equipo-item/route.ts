@@ -1,6 +1,6 @@
 // ===================================================
 // 📁 Archivo: /api/proyecto-equipo-item/route.ts
-// 📌 Descripción: Ruta para crear un nuevo ProyectoEquipoItem con seguimiento
+// 📌 Descripción: Ruta para crear un nuevo ProyectoEquipoItem
 // ===================================================
 
 import { NextResponse } from 'next/server'
@@ -15,7 +15,8 @@ export async function POST(req: Request) {
     const {
       proyectoEquipoId,
       catalogoEquipoId,
-      equipoOriginalId,
+      listaId,
+      listaEquipoSeleccionadoId, // 🆕 reemplaza equipoOriginalId
       codigo,
       descripcion,
       unidad,
@@ -27,22 +28,18 @@ export async function POST(req: Request) {
       costoInterno,
       costoCliente,
       estado,
-      nuevo,
       motivoCambio,
+      precioReal,
+      cantidadReal,
+      costoReal,
     } = body
-
-    // Log de valores antes de crear
-    console.log('🧾 Valores individuales:', {
-      proyectoEquipoId,
-      catalogoEquipoId,
-      equipoOriginalId,
-    })
 
     const nuevoItem = await prisma.proyectoEquipoItem.create({
       data: {
         proyectoEquipoId,
         catalogoEquipoId,
-        equipoOriginalId,
+        listaId,
+        listaEquipoSeleccionadoId,
         codigo,
         descripcion,
         unidad,
@@ -53,9 +50,11 @@ export async function POST(req: Request) {
         precioCliente,
         costoInterno,
         costoCliente,
-        estado,
-        nuevo,
+        estado,        
         motivoCambio,
+        precioReal,
+        cantidadReal,
+        costoReal,
       },
     })
 

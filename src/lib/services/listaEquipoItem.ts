@@ -182,4 +182,3 @@ export async function reemplazarItemLista(id: string, data: Partial<ListaEquipoI
 
   return res.json()
 }
-
