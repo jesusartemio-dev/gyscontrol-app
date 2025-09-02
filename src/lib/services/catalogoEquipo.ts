@@ -1,55 +1,97 @@
+import type { CatalogoEquipo } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
+
 // ===================================================
-// 📁 Archivo: catalogoEquipo.ts
-// 📌 Ubicación: src/lib/services/
-// 🔧 Descripción: Servicios para interactuar con el catálogo de equipos.
-// 🧠 Uso: GET, POST, PUT, DELETE para CatalogoEquipo
-// ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-04-25
+// 📁 Archivo: src/lib/services/catalogoEquipo.ts
+// 📌 Descripción: Servicios para gestionar catálogo de equipos
+// 🧠 Uso: CRUD completo para catálogo de equipos
+// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
+// 📅 Última actualización: 2025-05-25
 // ===================================================
 
-import type {
-  CatalogoEquipo,
-  CatalogoEquipoPayload,
-  CatalogoEquipoUpdatePayload
-} from '@/types'
+// ✅ Obtener catálogo por ID
+export async function getCatalogoEquipoById(id: string): Promise<CatalogoEquipo> {
+  try {
+    const res = await fetch(buildApiUrl(`/api/catalogo-equipo/${id}`))
+    if (!res.ok) throw new Error('Error al obtener catálogo de equipo por ID')
+    return await res.json()
+  } catch (error) {
+    console.error('Error en getCatalogoEquipoById:', error)
+    throw error
+  }
+}
 
+// ✅ Obtener todo el catálogo de equipos
 export async function getCatalogoEquipos(): Promise<CatalogoEquipo[]> {
-  const res = await fetch('/api/catalogo-equipo')
-  if (!res.ok) {
-    throw new Error('Error al obtener equipos')
+  try {
+    const res = await fetch(buildApiUrl('/api/catalogo-equipo'))
+    if (!res.ok) {
+      const errorData = await res.json()
+      throw new Error(errorData.error || 'Error al obtener catálogo de equipos')
+    }
+    return await res.json()
+  } catch (error) {
+    console.error('Error en getCatalogoEquipos:', error)
+    throw error
   }
-  return res.json()
 }
 
-export async function createEquipo(data: CatalogoEquipoPayload): Promise<CatalogoEquipo> {
-  const res = await fetch('/api/catalogo-equipo', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-
-  if (!res.ok) {
-    const errorText = await res.text()
-    console.error('❌ Detalle del error al crear equipo:', errorText)
-    throw new Error('Error al crear equipo')
+// ✅ Crear nuevo equipo en catálogo
+export async function createCatalogoEquipo(data: {
+  nombre: string
+  descripcion?: string
+  categoriaEquipoId: string
+  unidadId: string
+  precio?: number
+}): Promise<CatalogoEquipo> {
+  try {
+    const res = await fetch(buildApiUrl('/api/catalogo-equipo'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error('Error al crear equipo en catálogo')
+    return await res.json()
+  } catch (error) {
+    console.error('Error en createCatalogoEquipo:', error)
+    throw error
   }
-
-  return res.json()
 }
 
-export async function updateEquipo(id: string, data: CatalogoEquipoUpdatePayload): Promise<CatalogoEquipo> {
-  const res = await fetch(`/api/catalogo-equipo/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error('Error al actualizar equipo')
-  return res.json()
+// ✅ Actualizar equipo en catálogo
+export async function updateCatalogoEquipo(id: string, data: {
+  nombre?: string
+  descripcion?: string
+  categoriaEquipoId?: string
+  unidadId?: string
+  precio?: number
+  precioInterno?: number
+  margen?: number
+  precioVenta?: number
+}): Promise<CatalogoEquipo> {
+  try {
+    const res = await fetch(buildApiUrl(`/api/catalogo-equipo/${id}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error('Error al actualizar equipo en catálogo')
+    return await res.json()
+  } catch (error) {
+    console.error('Error en updateCatalogoEquipo:', error)
+    throw error
+  }
 }
 
-export async function deleteEquipo(id: string): Promise<void> {
-  const res = await fetch(`/api/catalogo-equipo/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Error al eliminar equipo')
+// ✅ Eliminar equipo del catálogo
+export async function deleteCatalogoEquipo(id: string): Promise<void> {
+  try {
+    const res = await fetch(buildApiUrl(`/api/catalogo-equipo/${id}`), {
+      method: 'DELETE',
+    })
+    if (!res.ok) throw new Error('Error al eliminar equipo del catálogo')
+  } catch (error) {
+    console.error('Error en deleteCatalogoEquipo:', error)
+    throw error
+  }
 }

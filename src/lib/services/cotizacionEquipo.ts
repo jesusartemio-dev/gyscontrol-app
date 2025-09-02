@@ -1,4 +1,13 @@
 import type { CotizacionEquipo } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
+
+// ===================================================
+// 📁 Archivo: src/lib/services/cotizacionEquipo.ts
+// 📌 Descripción: Servicios para gestionar cotizaciones de equipo
+// 🧠 Uso: CRUD completo para cotizaciones de equipo
+// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
+// 📅 Última actualización: 2025-05-25
+// ===================================================
 
 export async function getCotizacionEquipoById(id: string): Promise<CotizacionEquipo> {
   try {
@@ -11,21 +20,24 @@ export async function getCotizacionEquipoById(id: string): Promise<CotizacionEqu
   }
 }
 
+// ✅ Crear nueva cotización de equipo
 export async function createCotizacionEquipo(data: {
   cotizacionId: string
-  nombre: string
-  descripcion?: string
+  equipoId: string
+  cantidad: number
+  precioUnitario: number
+  observaciones?: string
 }): Promise<CotizacionEquipo> {
   try {
-    const res = await fetch('/api/cotizacion-equipo', {
+    const res = await fetch(buildApiUrl('/api/cotizacion-equipo'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Error al crear sección de equipos')
+    if (!res.ok) throw new Error('Error al crear cotización de equipo')
     return await res.json()
   } catch (error) {
-    console.error('❌ createCotizacionEquipo:', error)
+    console.error('Error en createCotizacionEquipo:', error)
     throw error
   }
 }

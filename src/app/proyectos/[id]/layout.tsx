@@ -13,13 +13,14 @@ import ProyectoSubMenu from '@/components/proyectos/ProyectoSubMenu'
 
 interface Props {
   children: ReactNode
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default function ProyectoLayout({ children, params }: Props) {
+export default async function ProyectoLayout({ children, params }: Props) {
+  const { id } = await params
   return (
     <div className="min-h-screen">
-      <ProyectoSubMenu proyectoId={params.id} />
+      <ProyectoSubMenu proyectoId={id} />
       <main className="p-6 bg-white">{children}</main>
     </div>
   )

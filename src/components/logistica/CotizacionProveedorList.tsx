@@ -35,14 +35,13 @@ export default function CotizacionProveedorList({ data, onUpdate, onDelete }: Pr
   }
 
   const handleSave = (id: string) => {
-    if (!editValues.nombre || !editValues.fecha) {
-      toast.error('Nombre y fecha son obligatorios')
+    if (!editValues.codigo) {
+      toast.error('Código es obligatorio')
       return
     }
 
     onUpdate(id, {
-      nombre: editValues.nombre,
-      fecha: editValues.fecha,
+      codigo: editValues.codigo,
     })
     setEditId(null)
     setEditValues({})
@@ -63,20 +62,16 @@ export default function CotizacionProveedorList({ data, onUpdate, onDelete }: Pr
                 <>
                   <Input
                     className="w-full"
-                    value={editValues.nombre || ''}
-                    onChange={(e) => handleChange('nombre', e.target.value)}
-                  />
-                  <Input
-                    type="date"
-                    value={editValues.fecha?.slice(0, 10) || ''}
-                    onChange={(e) => handleChange('fecha', e.target.value)}
+                    placeholder="Código de cotización"
+                    value={editValues.codigo || ''}
+                    onChange={(e) => handleChange('codigo', e.target.value)}
                   />
                 </>
               ) : (
                 <>
                   <div>
-                    <strong>{cot.nombre}</strong>
-                    <p className="text-xs text-gray-500">{cot.fecha?.slice(0, 10)}</p>
+                    <strong>{cot.codigo}</strong>
+                    <p className="text-xs text-gray-500">Estado: {cot.estado}</p>
                   </div>
                   <div className="text-sm text-gray-700 italic">
                     🧾 {cot.proveedor?.nombre || 'Proveedor no definido'}
@@ -102,8 +97,7 @@ export default function CotizacionProveedorList({ data, onUpdate, onDelete }: Pr
                     onClick={() => {
                       setEditId(cot.id)
                       setEditValues({
-                        nombre: cot.nombre,
-                        fecha: cot.fecha,
+                        codigo: cot.codigo,
                       })
                     }}
                   >

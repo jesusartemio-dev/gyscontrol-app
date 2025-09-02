@@ -6,6 +6,8 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import type { PedidoEquipoItemPayload } from '@/types'
 
 export async function GET() {
@@ -31,6 +33,23 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
+    // ✅ Asegurar que el ID del usuario existe
+    const userId = session.user.id
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'ID de usuario no válido' },
+        { status: 401 }
+      )
+    }
+
     const body: PedidoEquipoItemPayload = await request.json()
 
     // ✅ Validación: existencia del ítem de la lista
@@ -89,6 +108,7 @@ export async function POST(request: Request) {
     const nuevoItem = await prisma.pedidoEquipoItem.create({
       data: {
         pedidoId: body.pedidoId,
+        responsableId: userId,
         listaId: body.listaId ?? null,
         listaEquipoItemId: body.listaEquipoItemId,
         cantidadPedida: body.cantidadPedida,
@@ -106,15 +126,21 @@ export async function POST(request: Request) {
       },
     })
 
-    // ✅ Actualizar el acumulado de cantidadPedida en ListaEquipoItem
-    await prisma.listaEquipoItem.update({
-      where: { id: body.listaEquipoItemId },
-      data: {
-        cantidadPedida: {
-          increment: body.cantidadPedida,
-        },
-      },
-    })
+    // ✅ Actualizar el acumulado de cantidadPedida en ListaEquipoItem usando validación
+    const { sincronizarCantidadPedida } = await import('@/lib/utils/cantidadPedidaValidator')
+    
+    const resultado = await sincronizarCantidadPedida(
+      body.listaEquipoItemId,
+      'increment',
+      body.cantidadPedida
+    )
+
+    if (!resultado.exito) {
+      console.warn('⚠️ Advertencia al incrementar cantidadPedida:', resultado.mensaje)
+      // 🔄 Recalcular desde cero para corregir inconsistencias
+      const { recalcularCantidadPedida } = await import('@/lib/utils/cantidadPedidaValidator')
+      await recalcularCantidadPedida(body.listaEquipoItemId)
+    }
 
     return NextResponse.json(nuevoItem)
   } catch (error) {

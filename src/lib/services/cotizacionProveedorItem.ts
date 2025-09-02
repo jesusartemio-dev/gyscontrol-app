@@ -109,3 +109,25 @@ export async function deleteCotizacionProveedorItem(id: string): Promise<boolean
     return false
   }
 }
+
+// ✅ Seleccionar cotización para un ítem de lista de equipo
+export async function seleccionarCotizacion(
+  listaEquipoItemId: string,
+  cotizacionProveedorItemId: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/seleccionar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        listaEquipoItemId,
+        cotizacionProveedorItemId,
+      }),
+    })
+    if (!res.ok) throw new Error('Error al seleccionar cotización')
+    return true
+  } catch (error) {
+    console.error('❌ seleccionarCotizacion:', error)
+    return false
+  }
+}

@@ -11,7 +11,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
 
   if (!id) {
@@ -23,8 +23,8 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 
     // 🔎 Validación mínima de campos importantes (actualización parcial permitida)
     const allowedFields = [
-      'codigo', 'descripcion', 'marca', 'precioInterno',
-      'margen', 'precioVenta', 'categoriaId', 'unidadId', 'estado'
+      'nombre', 'descripcion', 'categoriaEquipoId', 'unidadId', 'precio',
+      'codigo', 'marca', 'precioInterno', 'margen', 'precioVenta', 'categoriaId', 'estado'
     ]
 
     const payload: Record<string, any> = {}
@@ -51,8 +51,8 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
   }
 }
 
-export async function DELETE(_req: NextRequest, context: { params: { id: string } }) {
-  const {id} = await context.params
+export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
 
   if (!id) {
     return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 })

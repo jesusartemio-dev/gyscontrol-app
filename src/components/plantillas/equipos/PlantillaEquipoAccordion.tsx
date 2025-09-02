@@ -37,7 +37,7 @@ export default function PlantillaEquipoAccordion({
             <div>
               <strong>{equipo.nombre}</strong>
               <div className="text-sm text-gray-500">
-                Cliente: S/ {equipo.subtotalCliente.toFixed(2)} | Interno: S/ {equipo.subtotalInterno.toFixed(2)}
+                Cliente: $ {equipo.subtotalCliente.toFixed(2)} | Interno: $ {equipo.subtotalInterno.toFixed(2)}
               </div>
             </div>
           </div>

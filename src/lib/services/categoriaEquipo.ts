@@ -1,24 +1,28 @@
 // src/lib/services/categoriaEquipo.ts
 
-export async function getCategoriaEquipo() {
-  const res = await fetch('/api/categoria-equipo')
-  if (!res.ok) throw new Error('Error al obtener categorías de equipo')
+import { buildApiUrl } from '@/lib/utils'
+
+export async function getCategoriasEquipo() {
+  const res = await fetch(buildApiUrl('/api/categoria-equipo'))
+  if (!res.ok) {
+    throw new Error('Failed to fetch categorias equipo')
+  }
   return res.json()
 }
 
-export async function createCategoriaEquipo(data: { nombre: string }) {
-  const res = await fetch('/api/categoria-equipo', {
+export async function createCategoriaEquipo(data: any) {
+  const res = await fetch(buildApiUrl('/api/categoria-equipo'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(data),
   })
-
+  
   if (!res.ok) {
-    const errorText = await res.text()
-    console.error('❌ Error al crear categoría de equipo:', errorText)
-    throw new Error('Error al crear categoría de equipo: ' + errorText)
+    throw new Error('Failed to create categoria equipo')
   }
-
+  
   return res.json()
 }
 

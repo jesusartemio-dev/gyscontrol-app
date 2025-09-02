@@ -21,7 +21,6 @@ export default function CotizacionProveedorItemForm({ cotizacionId, proyectoId, 
     <div className="space-y-4 p-4 border rounded-xl shadow-sm bg-white">
       <CotizacionSeleccionarItemsModal
         cotizacionId={cotizacionId}
-        proyectoId={proyectoId}
         onCreated={onCreated}
       />
     </div>

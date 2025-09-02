@@ -20,12 +20,12 @@ export default function CotizacionCard({ cotizacion }: Props) {
 
       <div className="flex justify-between pt-2 border-t mt-2 text-sm">
         <span>Total Cliente:</span>
-        <span className="text-green-600 font-semibold">S/ {cotizacion.totalCliente.toFixed(2)}</span>
+        <span className="text-green-600 font-semibold">$ {cotizacion.totalCliente.toFixed(2)}</span>
       </div>
 
       <div className="flex justify-between text-sm">
         <span>Total Interno:</span>
-        <span className="text-gray-500">S/ {cotizacion.totalInterno.toFixed(2)}</span>
+        <span className="text-gray-500">$ {cotizacion.totalInterno.toFixed(2)}</span>
       </div>
 
       <div className="pt-2">

@@ -11,14 +11,69 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { PedidoEquipoPayload } from '@/types'
 
-// ✅ Obtener todos los pedidos de un proyecto
+// ✅ Obtener todos los pedidos con filtros avanzados
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const proyectoId = searchParams.get('proyectoId')
+    const estado = searchParams.get('estado')
+    const responsableId = searchParams.get('responsableId')
+    const fechaDesde = searchParams.get('fechaDesde')
+    const fechaHasta = searchParams.get('fechaHasta')
+    const searchText = searchParams.get('searchText')
+    const fechaOCDesde = searchParams.get('fechaOCDesde')
+    const fechaOCHasta = searchParams.get('fechaOCHasta')
+    const soloVencidas = searchParams.get('soloVencidas') === 'true'
+
+    // Build where clause dynamically
+    const whereClause: any = {}
+    
+    if (proyectoId) {
+      whereClause.proyectoId = proyectoId
+    }
+    
+    if (estado) {
+      whereClause.estado = estado
+    }
+    
+    if (responsableId) {
+      whereClause.responsableId = responsableId
+    }
+    
+    if (fechaDesde || fechaHasta) {
+      whereClause.fechaPedido = {}
+      if (fechaDesde) {
+        whereClause.fechaPedido.gte = new Date(fechaDesde)
+      }
+      if (fechaHasta) {
+        whereClause.fechaPedido.lte = new Date(fechaHasta + 'T23:59:59.999Z')
+      }
+    }
+    
+    if (searchText) {
+      whereClause.OR = [
+        { codigo: { contains: searchText, mode: 'insensitive' } },
+        { observacion: { contains: searchText, mode: 'insensitive' } },
+        { lista: { nombre: { contains: searchText, mode: 'insensitive' } } },
+        { responsable: { name: { contains: searchText, mode: 'insensitive' } } },
+      ]
+    }
+
+    // Filtros por fecha OC recomendada
+    if (fechaOCDesde || fechaOCHasta || soloVencidas) {
+      whereClause.items = {
+        some: {
+          fechaOrdenCompraRecomendada: {
+            ...(fechaOCDesde && { gte: new Date(fechaOCDesde) }),
+            ...(fechaOCHasta && { lte: new Date(fechaOCHasta + 'T23:59:59.999Z') }),
+            ...(soloVencidas && { lt: new Date() })
+          }
+        }
+      }
+    }
 
     const data = await prisma.pedidoEquipo.findMany({
-      where: proyectoId ? { proyectoId } : undefined,
+      where: whereClause,
       include: {
         responsable: true,
         proyecto: true,

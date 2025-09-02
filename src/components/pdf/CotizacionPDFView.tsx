@@ -1,8 +1,13 @@
 'use client'
 
-import { PDFViewer } from '@react-pdf/renderer'
+import dynamic from 'next/dynamic'
 import CotizacionPDF from './CotizacionPDF'
 import type { Cotizacion } from '@/types'
+
+const PDFViewer = dynamic(
+  () => import('@react-pdf/renderer').then(mod => ({ default: mod.PDFViewer })),
+  { ssr: false }
+)
 
 interface Props {
   cotizacion: Cotizacion

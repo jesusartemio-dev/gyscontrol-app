@@ -3,15 +3,16 @@ import { NextResponse } from 'next/server'
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!params.id) {
+    const { id } = await params
+    if (!id) {
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 })
     }
 
     await prisma.categoriaEquipo.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ message: 'Categoría eliminada' })
@@ -23,10 +24,10 @@ export async function DELETE(
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     if (!id) {
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 })
     }

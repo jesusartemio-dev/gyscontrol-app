@@ -11,9 +11,10 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { ListaEquipoUpdatePayload } from '@/types/payloads'
+import type { EstadoListaEquipo } from '@prisma/client'
 
 // ✅ Obtener ListaEquipo por ID (GET)
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 
@@ -21,11 +22,16 @@ export async function GET(context: { params: { id: string } }) {
       where: { id },
       include: {
         proyecto: true,
+        responsable: true,
         items: {
           include: {
             proveedor: true,
             cotizaciones: true,
-            pedidos: true,
+            pedidos: {
+              include: {
+                pedido: true
+              }
+            },
             proyectoEquipoItem: {
               include: {
                 proyectoEquipo: true,
@@ -36,6 +42,20 @@ export async function GET(context: { params: { id: string } }) {
       },
     })
 
+    // 🔄 Calculate cantidadPedida for each item
+    if (data?.items) {
+      data.items = data.items.map(item => {
+        const cantidadPedida = item.pedidos.reduce((total, pedidoItem) => {
+          return total + (pedidoItem.cantidadPedida || 0)
+        }, 0)
+        
+        return {
+          ...item,
+          cantidadPedida
+        }
+      })
+    }
+
     return NextResponse.json(data)
   } catch (error) {
     return NextResponse.json(
@@ -45,7 +65,7 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(req: Request, context: { params: { id: string } }) {
+export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const body: ListaEquipoUpdatePayload = await req.json()
@@ -65,9 +85,42 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
       )
     }
 
+    // ✅ Preparar datos de actualización con fechas automáticas según cambio de estado
+    const updateData: any = { ...body }
+    const now = new Date()
+
+    // 🔄 Si hay cambio de estado, actualizar fechas automáticamente
+    if (body.estado && body.estado !== existe.estado) {
+      switch (body.estado) {
+        case 'por_revisar':
+          updateData.fechaEnvioRevision = now
+          break
+        case 'por_validar':
+          updateData.fechaValidacion = now
+          break
+        case 'por_aprobar':
+          updateData.fechaValidacion = now
+          break
+        case 'aprobado':
+          updateData.fechaAprobacionRevision = now
+          break
+        case 'por_cotizar':
+          updateData.fechaEnvioLogistica = now
+          break
+        case 'rechazado':
+          // No se actualiza ninguna fecha específica para rechazado
+          break
+      }
+    }
+
+    // 🔄 Convertir fechaNecesaria a Date si viene como string
+    if (updateData.fechaNecesaria && typeof updateData.fechaNecesaria === 'string') {
+      updateData.fechaNecesaria = new Date(updateData.fechaNecesaria)
+    }
+
     const data = await prisma.listaEquipo.update({
       where: { id },
-      data: body,
+      data: updateData,
     })
 
     return NextResponse.json(data)
@@ -84,8 +137,8 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
 
 
 // ✅ Eliminar ListaEquipo (DELETE)
-export async function DELETE(req: Request, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
 
   try {
     await prisma.$transaction([

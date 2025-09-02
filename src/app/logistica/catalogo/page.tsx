@@ -1,14 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { motion } from 'framer-motion'
 import LogisticaCatalogoEquipoCrearAcordeon from '@/components/logistica/LogisticaCatalogoEquipoCrearAcordeon'
 import LogisticaCatalogoEquipoList from '@/components/logistica/LogisticaCatalogoEquipoList'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { exportarEquiposAExcel, importarEquiposDesdeExcel } from '@/lib/utils/equiposExcel'
 import { importarEquiposDesdeExcelValidado } from '@/lib/utils/equiposImportUtils'
 import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo'
-import { getCategoriaEquipo } from '@/lib/services/categoriaEquipo'
+import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
 import {
   createEquipoLogistica,
@@ -18,24 +20,61 @@ import {
 } from '@/lib/services/logisticaCatalogoEquipo'
 import type { CatalogoEquipo, CatalogoEquipoPayload } from '@/types'
 
+// UI Components
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+
+// Icons
+import { 
+  ChevronRight, 
+  Settings, 
+  TrendingUp, 
+  AlertCircle, 
+  Package, 
+  Upload,
+  Download,
+  Share2,
+  Edit,
+  Loader2,
+  Truck,
+  Warehouse
+} from 'lucide-react'
+
 type CatalogoEquipoConId = CatalogoEquipoPayload & { id: string }
 
 export default function LogisticaCatalogoPage() {
   const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])
+  const [loading, setLoading] = useState(true)
   const [importando, setImportando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
   const [equiposNuevos, setEquiposNuevos] = useState<CatalogoEquipoPayload[]>([])
   const [equiposDuplicados, setEquiposDuplicados] = useState<CatalogoEquipoConId[]>([])
   const [mostrarModal, setMostrarModal] = useState(false)
+  const router = useRouter()
 
   const cargarEquipos = async () => {
     try {
+      setLoading(true)
       const data = await getCatalogoEquiposLogistica()
       setEquipos(data)
     } catch (err) {
       console.error('❌ Error al cargar equipos (Logística):', err)
       toast.error('Error al cargar equipos.')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  // Calcular estadísticas
+  const stats = {
+    total: equipos.length,
+    activos: equipos.filter(eq => eq.estado === 'Activo').length,
+    pendientes: equipos.filter(eq => eq.estado === 'Pendiente').length,
+    valorTotal: equipos.reduce((sum, eq) => sum + (eq.precioInterno || 0), 0)
   }
 
   useEffect(() => {
@@ -86,7 +125,7 @@ export default function LogisticaCatalogoPage() {
     try {
       const datos = await importarEquiposDesdeExcel(file)
       const [categorias, unidades, equiposExistentes] = await Promise.all([
-        getCategoriaEquipo(),
+        getCategoriasEquipo(),
         getUnidades(),
         getCatalogoEquiposLogistica(),
       ])
@@ -192,71 +231,296 @@ export default function LogisticaCatalogoPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Catálogo de Equipos (Logística)</h1>
-        <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
-      </div>
-
-      <LogisticaCatalogoEquipoCrearAcordeon onCreated={handleCreated} />
-
-      {equipos.length === 0 ? (
-        <p className="text-gray-500 text-sm italic mt-4">No hay equipos registrados aún.</p>
-      ) : (
-        <LogisticaCatalogoEquipoList
-          data={equipos}
-          onUpdate={handleUpdated}
-          onDelete={handleDeleted}
-        />
-      )}
-
-      {importando && (
-        <p className="text-sm text-gray-500">Importando datos, por favor espere...</p>
-      )}
-
-      {errores.length > 0 && (
-        <div className="text-sm text-red-600 space-y-1 bg-red-100 p-3 rounded">
-          <p className="font-semibold">Errores al importar:</p>
-          <ul className="list-disc pl-5">
-            {errores.map((err, idx) => (
-              <li key={idx}>{err}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-{mostrarModal && (
-  <div className="fixed inset-0 flex items-center justify-center bg-gray-100/60 backdrop-blur-sm z-50">
-    <div className="bg-white p-6 rounded-xl space-y-4 w-full max-w-md">
-      <h2 className="text-xl font-bold text-center">Equipos Duplicados</h2>
-      <p className="text-sm text-gray-700 text-center">
-        Se encontraron códigos ya existentes:
-      </p>
-      <div className="max-h-48 overflow-y-auto border rounded p-2">
-        <ul className="text-center text-gray-800 text-sm">
-          {equiposDuplicados.map((eq, idx) => (
-            <li key={idx}>{eq.codigo}</li>
-          ))}
-        </ul>
-      </div>
-      <div className="flex justify-center gap-4 mt-4">
-        <button
-          onClick={sobrescribirDuplicados}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="container mx-auto px-4 py-8 space-y-8">
+        {/* Breadcrumb Navigation */}
+        <motion.nav 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center space-x-2 text-sm text-muted-foreground"
         >
-          Sobreescribir
-        </button>
-        <button
-          onClick={cancelarImportacion}
-          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => router.push('/dashboard')}
+            className="hover:text-primary"
+          >
+            Dashboard
+          </Button>
+          <ChevronRight className="h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => router.push('/logistica')}
+            className="hover:text-primary"
+          >
+            Logística
+          </Button>
+          <ChevronRight className="h-4 w-4" />
+          <span className="font-medium text-foreground">Catálogo de Equipos</span>
+        </motion.nav>
 
+        {/* Header Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+        >
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Truck className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Catálogo de Equipos</h1>
+                <p className="text-muted-foreground">Gestión especializada para logística</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => router.push('/catalogo/equipos')}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              Catálogo Completo
+            </Button>
+            <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
+          </div>
+        </motion.div>
+
+        {/* Statistics Cards */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        >
+          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Equipos</p>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                </div>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Package className="h-5 w-5 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Equipos Activos</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.activos}</p>
+                </div>
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Pendientes</p>
+                  <p className="text-2xl font-bold text-amber-600">{stats.pendientes}</p>
+                </div>
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Valor Total</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    ${stats.valorTotal.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Warehouse className="h-5 w-5 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Create Equipment Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <LogisticaCatalogoEquipoCrearAcordeon onCreated={handleCreated} />
+        </motion.div>
+
+        {/* Equipment List Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="space-y-6"
+        >
+          {loading ? (
+            <Card className="border-0 shadow-md">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <CardTitle>Cargando equipos...</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center space-x-4">
+                    <Skeleton className="h-12 w-12 rounded" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-[250px]" />
+                      <Skeleton className="h-4 w-[200px]" />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : equipos.length === 0 ? (
+            <Card className="border-0 shadow-md">
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="p-4 bg-gray-100 rounded-full mb-4">
+                  <Package className="h-8 w-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">No hay equipos registrados</h3>
+                <p className="text-muted-foreground mb-4">
+                  Comienza agregando tu primer equipo al catálogo de logística
+                </p>
+                <Button onClick={() => (document.querySelector('[data-state="closed"]') as HTMLElement)?.click()}>
+                  <Package className="h-4 w-4 mr-2" />
+                  Agregar Primer Equipo
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-0 shadow-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Lista de Equipos ({equipos.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <LogisticaCatalogoEquipoList
+                  data={equipos}
+                  onUpdate={handleUpdated}
+                  onDelete={handleDeleted}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+
+        {/* Import Status */}
+        {importando && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Alert>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertDescription>
+                Importando datos, por favor espere...
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+
+        {/* Error Display */}
+        {errores.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-2">
+                  <p className="font-semibold">Errores al importar:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {errores.map((err, idx) => (
+                      <li key={idx}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+
+        {/* Modal de Duplicados */}
+        {mostrarModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white p-6 rounded-xl shadow-xl space-y-4 w-full max-w-md mx-4"
+            >
+              <div className="text-center space-y-2">
+                <div className="p-3 bg-amber-100 rounded-full w-fit mx-auto">
+                  <AlertCircle className="h-6 w-6 text-amber-600" />
+                </div>
+                <h2 className="text-xl font-bold">Equipos Duplicados</h2>
+                <p className="text-sm text-muted-foreground">
+                  Se encontraron códigos ya existentes:
+                </p>
+              </div>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {equiposDuplicados.map((eq, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                        <Package className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm font-medium">{eq.codigo}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <div className="flex gap-3 pt-2">
+                <Button
+                  onClick={sobrescribirDuplicados}
+                  className="flex-1"
+                >
+                  Sobreescribir
+                </Button>
+                <Button
+                  onClick={cancelarImportacion}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </div>
     </div>
   )
 }

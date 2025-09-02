@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react'
 import { Dialog } from '@headlessui/react'
 import { getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
-import { getCategoriaEquipo } from '@/lib/services/categoriaEquipo'
+import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import type { CatalogoEquipo, CategoriaEquipo } from '@/types'
 
 interface Props {
@@ -28,7 +28,7 @@ export default function EquipoCatalogoModal({ abierto, onClose, onSeleccionar }:
   useEffect(() => {
     if (abierto) {
       getCatalogoEquipos().then(setEquipos)
-      getCategoriaEquipo().then(setCategorias)
+      getCategoriasEquipo().then(setCategorias)
     }
   }, [abierto])
 
@@ -82,7 +82,7 @@ export default function EquipoCatalogoModal({ abierto, onClose, onSeleccionar }:
                     className="p-2 hover:bg-blue-100 border-b cursor-pointer text-sm flex justify-between"
                   >
                     <span>{eq.codigo} - {eq.descripcion}</span>
-                    <span className="text-green-700 font-medium">S/ {eq.precioVenta.toFixed(2)}</span>
+                    <span className="text-green-700 font-medium">$ {eq.precioVenta.toFixed(2)}</span>
                   </li>
                 ))}
               </ul>

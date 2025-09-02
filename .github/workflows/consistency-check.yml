@@ -1,0 +1,158 @@
+name: 🔍 Consistency Check
+
+# 🎯 Ejecutar en PRs y pushes a main/develop
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# 🔧 Configuración de jobs
+jobs:
+  consistency-audit:
+    name: 🔍 Database-API-Components Consistency
+    runs-on: ubuntu-latest
+    
+    steps:
+      # ✅ Checkout código
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        
+      # ✅ Setup Node.js
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      # ✅ Instalar dependencias
+      - name: 📦 Install dependencies
+        run: npm ci
+        
+      # ✅ Generar cliente Prisma
+      - name: 🗄️ Generate Prisma Client
+        run: npx prisma generate
+        
+      # 🔍 Auditoría de Consistencia
+      - name: 🔍 Run Consistency Audit
+        run: npm run audit:consistency
+        
+      # 🔍 Type Checking
+      - name: 🔍 TypeScript Type Check
+        run: npm run type-check
+        
+      # 📊 Generar reporte HTML (solo en fallo)
+      - name: 📊 Generate HTML Report
+        if: failure()
+        run: npm run audit:consistency:html
+        
+      # 📤 Subir reporte como artefacto
+      - name: 📤 Upload Consistency Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: consistency-report
+          path: |
+            consistency-report.html
+            consistency-report.json
+          retention-days: 7
+          
+      # 💬 Comentar en PR (si falla)
+      - name: 💬 Comment PR with Report
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Leer reporte JSON si existe
+            let reportSummary = '❌ **Auditoría de Consistencia Falló**\n\n';
+            
+            try {
+              const report = JSON.parse(fs.readFileSync('consistency-report.json', 'utf8'));
+              
+              reportSummary += `📊 **Resumen:**\n`;
+              reportSummary += `- Score General: ${report.summary.overallScore}%\n`;
+              reportSummary += `- Entidades Auditadas: ${report.summary.totalEntities}\n`;
+              reportSummary += `- Inconsistencias: ${report.summary.totalInconsistencies}\n\n`;
+              
+              if (report.summary.criticalIssues > 0) {
+                reportSummary += `🚨 **${report.summary.criticalIssues} Problemas Críticos Encontrados**\n\n`;
+              }
+              
+              reportSummary += `📋 **Acciones Requeridas:**\n`;
+              reportSummary += `1. Descargar el reporte detallado desde los artefactos\n`;
+              reportSummary += `2. Ejecutar \`npm run audit:consistency:html\` localmente\n`;
+              reportSummary += `3. Corregir las inconsistencias encontradas\n`;
+              reportSummary += `4. Ejecutar \`npm run audit:consistency\` para verificar\n\n`;
+              
+            } catch (error) {
+              reportSummary += `⚠️ No se pudo leer el reporte detallado.\n\n`;
+            }
+            
+            reportSummary += `🔗 **Enlaces Útiles:**\n`;
+            reportSummary += `- [Documentación de Consistencia](../docs/MEJORAS_PLAN_MAESTRO_CONSISTENCIA.md)\n`;
+            reportSummary += `- [Reporte Detallado](../../actions/runs/${context.runId})\n`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: reportSummary
+            });
+
+  # 🧪 Tests de Integración (opcional)
+  integration-tests:
+    name: 🧪 Integration Tests
+    runs-on: ubuntu-latest
+    needs: consistency-audit
+    if: success()
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: npm ci
+        
+      - name: 🗄️ Generate Prisma Client
+        run: npx prisma generate
+        
+      # 🧪 Ejecutar tests unitarios
+      - name: 🧪 Run Unit Tests
+        run: npm run test
+        
+      # 🧪 Ejecutar tests E2E (si están configurados)
+      - name: 🧪 Run E2E Tests
+        run: npm run test:e2e
+        continue-on-error: true
+
+  # 📊 Reporte de Estado
+  status-report:
+    name: 📊 Status Report
+    runs-on: ubuntu-latest
+    needs: [consistency-audit, integration-tests]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate Status Report
+        run: |
+          echo "🎯 **Pipeline Status Report**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Consistency Audit | ${{ needs.consistency-audit.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result == 'success' && '✅ Passed' || needs.integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.consistency-audit.result }}" == "success" ]]; then
+            echo "🎉 **¡Consistencia Verificada!** El código está listo para merge." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Acción Requerida:** Revisar y corregir inconsistencias antes del merge." >> $GITHUB_STEP_SUMMARY
+          fi

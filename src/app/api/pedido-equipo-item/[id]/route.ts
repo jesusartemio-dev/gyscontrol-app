@@ -9,10 +9,11 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { PedidoEquipoItemUpdatePayload } from '@/types'
+import { sincronizarCantidadPedida, recalcularCantidadPedida } from '@/lib/utils/cantidadPedidaValidator'
 
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
 
     const data = await prisma.pedidoEquipoItem.findUnique({
       where: { id },
@@ -26,7 +27,19 @@ export async function GET(context: { params: { id: string } }) {
         listaEquipoItem: {
           include: {
             proveedor: true,
-            cotizacionSeleccionada: true,
+            cotizacionSeleccionada: {
+              include: {
+                cotizacion: {
+                  select: {
+                    id: true,
+                    codigo: true,
+                    proveedor: {
+                      select: { nombre: true },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -42,9 +55,9 @@ export async function GET(context: { params: { id: string } }) {
 }
 
 // ✅ Actualizar un ítem de pedido por ID
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
     const body: PedidoEquipoItemUpdatePayload = await request.json()
 
     // 🔍 Buscar el ítem anterior
@@ -74,31 +87,43 @@ export async function PUT(request: Request, context: { params: { id: string } })
       fechaOC.setDate(fechaOC.getDate() - dias)
     }
 
-    // 🔧 Actualizar el ítem
-    const itemActualizado = await prisma.pedidoEquipoItem.update({
-      where: { id },
-      data: {
-        cantidadPedida: body.cantidadPedida,
-        tiempoEntregaDias: body.tiempoEntregaDias ?? itemAnterior.tiempoEntregaDias,
-        tiempoEntrega: body.tiempoEntrega ?? itemAnterior.tiempoEntrega,
-        fechaOrdenCompraRecomendada: fechaOC,
-        estado: body.estado ?? 'pendiente',
-        cantidadAtendida: body.cantidadAtendida ?? null,
-        comentarioLogistica: body.comentarioLogistica ?? null,
-        codigo: body.codigo,
-        descripcion: body.descripcion,
-        unidad: body.unidad,
-      },
-    })
+    // 🔄 Validar y actualizar cantidadPedida en ListaEquipoItem si hay diferencia
+    if (diferencia !== 0 && itemAnterior.listaEquipoItemId) {
+      const operacion = diferencia > 0 ? 'increment' : 'decrement'
+      const cantidadOperacion = Math.abs(diferencia)
+      
+      const resultado = await sincronizarCantidadPedida(
+        itemAnterior.listaEquipoItemId,
+        operacion,
+        cantidadOperacion
+      )
 
-    // 🔄 Actualizar acumulado en ListaEquipoItem
-    if (itemAnterior.listaEquipoItemId && diferencia !== 0) {
-      await prisma.listaEquipoItem.update({
-        where: { id: itemAnterior.listaEquipoItemId },
-        data: {
-          cantidadPedida: { increment: diferencia },
-        },
-      })
+      if (!resultado.exito) {
+        console.warn('⚠️ Advertencia al actualizar cantidadPedida:', resultado.mensaje)
+        // 🔄 Recalcular desde cero para corregir inconsistencias
+        await recalcularCantidadPedida(itemAnterior.listaEquipoItemId)
+      }
+    }
+
+    // 🔧 Actualizar el ítem
+    const itemActualizado = await prisma.pedidoEquipoItem.update({ 
+       where: { id }, 
+       data: { 
+         cantidadPedida: body.cantidadPedida, 
+         cantidadAtendida: body.cantidadAtendida, 
+         precioUnitario: body.precioUnitario, 
+         costoTotal: body.costoTotal, 
+         tiempoEntrega: body.tiempoEntrega, 
+         tiempoEntregaDias: body.tiempoEntregaDias, 
+         fechaOrdenCompraRecomendada: fechaOC, 
+         estado: body.estado, 
+         comentarioLogistica: body.comentarioLogistica, 
+       }, 
+     })
+
+    // 🔄 Recalcular cantidadPedida después de actualizar para asegurar consistencia
+    if (itemAnterior.listaEquipoItemId) {
+      await recalcularCantidadPedida(itemAnterior.listaEquipoItemId)
     }
 
     return NextResponse.json(itemActualizado)
@@ -111,7 +136,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
 }
 
 // ✅ Eliminar un ítem de pedido de equipo por ID
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     // ✅ Extraer el ID desde los parámetros de la URL
     const { id } = await  context.params
@@ -128,19 +153,28 @@ export async function DELETE(_: Request, context: { params: { id: string } }) {
       )
     }
 
+    // ✅ Si el ítem está vinculado a un ListaEquipoItem, validar y actualizar cantidad
+    if (item.listaEquipoItemId && item.cantidadPedida && item.cantidadPedida > 0) {
+      // ✅ Usar sincronización segura para decrementar
+      const resultado = await sincronizarCantidadPedida(
+        item.listaEquipoItemId,
+        'decrement',
+        item.cantidadPedida
+      )
+
+      if (!resultado.exito) {
+        console.warn('⚠️ Advertencia al decrementar cantidadPedida:', resultado.mensaje)
+        // 🔄 Recalcular desde cero para corregir inconsistencias
+        await recalcularCantidadPedida(item.listaEquipoItemId)
+      }
+    }
+
     // ✅ Eliminar el ítem de la tabla pedidoEquipoItem
     await prisma.pedidoEquipoItem.delete({ where: { id } })
 
-    // ✅ Si el ítem está vinculado a un ListaEquipoItem, restar la cantidad
-    if (item.listaEquipoItemId && item.cantidadPedida && item.cantidadPedida > 0) {
-      await prisma.listaEquipoItem.update({
-        where: { id: item.listaEquipoItemId },
-        data: {
-          cantidadPedida: {
-            decrement: item.cantidadPedida, // ✅ Resta la cantidad eliminada del total
-          },
-        },
-      })
+    // 🔄 Recalcular cantidadPedida después de eliminar para asegurar consistencia
+    if (item.listaEquipoItemId) {
+      await recalcularCantidadPedida(item.listaEquipoItemId)
     }
 
     // ✅ Confirmar éxito

@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic' // ✅ Previene errores de caché en rutas dinámicas
 
 // ✅ Obtener cotización por ID
-export async function GET(_: NextRequest, context: { params: { id: string } }) {
+export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params // 👈 Previene errores de acceso a params
 
@@ -53,7 +53,7 @@ export async function GET(_: NextRequest, context: { params: { id: string } }) {
 }
 
 // ✅ Actualizar cotización
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await req.json()
@@ -80,7 +80,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar cotización
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 

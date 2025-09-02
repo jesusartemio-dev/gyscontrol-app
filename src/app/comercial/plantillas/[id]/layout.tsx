@@ -5,7 +5,7 @@ export default function PlantillaLayout({
     params,
   }: {
     children: React.ReactNode
-    params: { id: string }
+    params: Promise<{ id: string }>
   }) {
     return (
       <div className="p-6">

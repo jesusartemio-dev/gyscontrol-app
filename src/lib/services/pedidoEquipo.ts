@@ -13,8 +13,22 @@ import {
   PedidoEquipoPayload,
   PedidoEquipoUpdatePayload,
 } from '@/types'
+import { logger } from '@/lib/logger'
 
 const BASE_URL = '/api/pedido-equipo'
+
+// Interface for advanced filters
+export interface PedidoEquipoFilters {
+  proyectoId?: string
+  estado?: string
+  responsableId?: string
+  fechaDesde?: string
+  fechaHasta?: string
+  searchText?: string
+  fechaOCDesde?: string
+  fechaOCHasta?: string
+  soloVencidas?: boolean
+}
 
 // ✅ Obtener pedidos filtrados por proyecto
 export async function getPedidoEquipos(proyectoId: string): Promise<PedidoEquipo[] | null> {
@@ -24,6 +38,31 @@ export async function getPedidoEquipos(proyectoId: string): Promise<PedidoEquipo
     return await res.json()
   } catch (error) {
     console.error('❌ getPedidoEquipos:', error)
+    return null
+  }
+}
+
+// ✅ Obtener todos los pedidos con filtros avanzados
+export async function getAllPedidoEquipos(filters?: PedidoEquipoFilters): Promise<PedidoEquipo[] | null> {
+  try {
+    const params = new URLSearchParams()
+    
+    if (filters?.proyectoId) params.append('proyectoId', filters.proyectoId)
+    if (filters?.estado && filters.estado !== '__ALL__') params.append('estado', filters.estado)
+    if (filters?.responsableId && filters.responsableId !== '__ALL__') params.append('responsableId', filters.responsableId)
+    if (filters?.fechaDesde) params.append('fechaDesde', filters.fechaDesde)
+    if (filters?.fechaHasta) params.append('fechaHasta', filters.fechaHasta)
+    if (filters?.searchText) params.append('searchText', filters.searchText)
+    if (filters?.fechaOCDesde) params.append('fechaOCDesde', filters.fechaOCDesde)
+    if (filters?.fechaOCHasta) params.append('fechaOCHasta', filters.fechaOCHasta)
+    if (filters?.soloVencidas) params.append('soloVencidas', filters.soloVencidas.toString())
+    
+    const url = params.toString() ? `${BASE_URL}?${params.toString()}` : BASE_URL
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('Error al obtener pedidos')
+    return await res.json()
+  } catch (error) {
+    console.error('❌ getAllPedidoEquipos:', error)
     return null
   }
 }
@@ -97,5 +136,38 @@ export async function deletePedidoEquipo(id: string): Promise<boolean> {
   } catch (error) {
     console.error('❌ deletePedidoEquipo:', error)
     return false
+  }
+}
+
+// ✅ Servicio específico para crear pedido desde lista contextual
+export const createPedidoDesdeListaContextual = async (payload: PedidoEquipoPayload): Promise<PedidoEquipo> => {
+  try {
+    logger.info('📡 Creando pedido desde lista contextual:', JSON.stringify(payload, null, 2))
+    
+    const response = await fetch(`${BASE_URL}/desde-lista`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+
+    logger.info('📡 Response status:', response.status)
+    logger.info('📡 Response headers:', Object.fromEntries(response.headers.entries()))
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      logger.error('❌ Error response text:', errorText)
+      const errorData = errorText ? JSON.parse(errorText) : {}
+      throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`)
+    }
+
+    const pedido = await response.json()
+    logger.info('✅ Pedido creado desde lista:', pedido.id)
+    return pedido
+  } catch (error) {
+    logger.error('❌ Error al crear pedido desde lista:', error)
+    logger.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack available')
+    throw error
   }
 }

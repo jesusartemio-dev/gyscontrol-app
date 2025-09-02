@@ -11,7 +11,7 @@ import { recalcularTotalesPlantilla } from '@/lib/utils/recalculoPlantilla'
 export const dynamic = 'force-dynamic'
 
 // ✅ Actualizar grupo de equipos
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await req.json()
@@ -35,11 +35,10 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar grupo de equipos
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
-  console.log('🗑️ DELETE ejecutado para ID:', context.params?.id)
-
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
+    console.log('🗑️ DELETE ejecutado para ID:', id)
 
     if (!id || typeof id !== 'string') {
       console.warn('⚠️ ID inválido en DELETE plantillaEquipo')

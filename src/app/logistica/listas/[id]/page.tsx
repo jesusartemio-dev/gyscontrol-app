@@ -11,8 +11,10 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { getLogisticaListaById } from '@/lib/services/logisticaLista'
-import LogisticaListaDetalleHeader from '@/components/logistica/LogisticaListaDetalleHeader'
-import LogisticaListaDetalleItemTable from '@/components/logistica/LogisticaListaDetalleItemTable'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { updateListaEstado } from '@/lib/services/listaEquipo'
+import LogisticaListaDetalleItemTableProfessional from '@/components/logistica/LogisticaListaDetalleItemTableProfessional'
 import type { ListaEquipo } from '@/types'
 
 export default function LogisticaListaDetallePage() {
@@ -37,10 +39,49 @@ export default function LogisticaListaDetallePage() {
 
   return (
     <div className="p-4 space-y-4">
-      <LogisticaListaDetalleHeader lista={lista} onEstadoCambiado={handleRefetch} />
+      {/* Header con información de la lista */}
+        <div className="p-4 border rounded-xl bg-white space-y-2">
+          <h1 className="text-2xl font-bold flex justify-between items-center">
+            {lista.codigo}
+            <Badge variant="outline">{lista.estado}</Badge>
+          </h1>
+          <p className="text-sm text-gray-700">
+            <strong>Proyecto:</strong> {lista.proyecto?.nombre || 'Sin proyecto'}
+          </p>
+          <p className="text-sm text-gray-700">
+            <strong>Fecha creación:</strong>{' '}
+            {new Date(lista.createdAt).toLocaleDateString()}
+          </p>
+          <p className="text-sm text-gray-700">
+            <strong>Costo Total Elegido:</strong>{' '}
+            $ {(lista.items?.reduce((total, item) => total + (item.costoElegido ?? 0), 0) ?? 0).toFixed(2)}
+          </p>
+          {lista.estado === 'por_cotizar' && (
+            <div className="pt-2">
+              <Button
+                onClick={async () => {
+                  try {
+                    const updated = await updateListaEstado(lista.id, 'por_validar')
+                    if (updated) {
+                      toast.success('Estado actualizado a por_validar')
+                      handleRefetch()
+                    } else {
+                      toast.error('Error al actualizar el estado')
+                    }
+                  } catch (error) {
+                    toast.error('Error al avanzar estado')
+                  }
+                }}
+                className="bg-green-600 text-white"
+              >
+                Avanzar a Por Validar
+              </Button>
+            </div>
+          )}
+        </div>
 
       {lista.items.length > 0 ? (
-        <LogisticaListaDetalleItemTable items={lista.items} onUpdated={handleRefetch} />
+        <LogisticaListaDetalleItemTableProfessional items={lista.items} onUpdated={handleRefetch} />
       ) : (
         <p className="text-gray-500">No hay ítems en esta lista.</p>
       )}

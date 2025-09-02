@@ -56,12 +56,12 @@ export default function CotizacionProveedorItemList({ items, onUpdated }: Props)
           )}
         >
           <div className="col-span-2">
-            {item.listaEquipoItem.descripcion}
-            <div className="text-xs text-gray-500">{item.listaEquipoItem.unidad}</div>
+            {item.listaEquipoItem?.descripcion || 'Sin descripción'}
+            <div className="text-xs text-gray-500">{item.listaEquipoItem?.unidad || 'N/A'}</div>
           </div>
-          <div>{item.listaEquipoItem.codigo}</div>
-          <div className="text-right">S/. {item.precioUnitario.toFixed(2)}</div>
-          <div className="text-right">{item.cantidad}</div>
+          <div>{item.listaEquipoItem?.codigo || 'N/A'}</div>
+          <div className="text-right">$ {(item.precioUnitario || 0).toFixed(2)}</div>
+          <div className="text-right">{item.cantidad || 0}</div>
           <div className="text-right">
             {item.esSeleccionada ? (
               <span className="text-green-600 font-semibold flex items-center justify-end gap-1">

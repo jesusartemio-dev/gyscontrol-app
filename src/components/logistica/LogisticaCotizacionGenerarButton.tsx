@@ -47,7 +47,6 @@ export default function LogisticaCotizacionGenerarButton({
       const cotizacion = await createCotizacionProveedor({
         proyectoId,
         proveedorId,
-        fecha: new Date().toISOString(),
       })
 
       if (!cotizacion) {
@@ -63,7 +62,6 @@ export default function LogisticaCotizacionGenerarButton({
         descripcion: item.descripcion,
         unidad: item.unidad,
         cantidadOriginal: item.cantidad,
-        presupuesto: item.presupuesto || 0,                  // ✅ presupuesto original
         precioUnitario: 0,                                   // ✅ inicia en cero
         cantidad,
         costoTotal: 0,                                       // ✅ inicia en cero

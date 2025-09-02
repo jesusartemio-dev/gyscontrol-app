@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { CotizacionProveedorItemUpdatePayload } from '@/types'
 
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await prisma.cotizacionProveedorItem.findUnique({
@@ -36,7 +36,7 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const body: CotizacionProveedorItemUpdatePayload = await request.json()
@@ -74,7 +74,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
   }
 }
 
-export async function DELETE(_request: Request, context: { params: { id: string } }) {
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 

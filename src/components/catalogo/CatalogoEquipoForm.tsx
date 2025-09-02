@@ -14,8 +14,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { toast } from 'sonner'
-import { createEquipo, getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
-import { getCategoriaEquipo } from '@/lib/services/categoriaEquipo'
+import { createCatalogoEquipo, getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
+import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -75,7 +75,7 @@ export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProp
     const cargarDatos = async () => {
       try {
         const [cats, unis, equipos] = await Promise.all([
-          getCategoriaEquipo(),
+          getCategoriasEquipo(),
           getUnidades(),
           getCatalogoEquipos()
         ])
@@ -96,7 +96,7 @@ export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProp
     }
 
     try {
-      const nuevo = await createEquipo({ ...values, precioVenta, estado: 'pendiente' })
+      const nuevo = await createCatalogoEquipo({ ...values, precioVenta, estado: 'pendiente' })
       onCreated(nuevo)
       reset()
       setPrecioVenta(0)

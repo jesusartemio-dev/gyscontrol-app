@@ -14,7 +14,7 @@ import type { NextRequest } from 'next/server'
 export const dynamic = 'force-dynamic' // ✅ Previene errores de caché en rutas dinámicas
 
 // ✅ Actualizar sección de servicios
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await req.json()
@@ -35,7 +35,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar sección de servicios + todos sus ítems relacionados
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 

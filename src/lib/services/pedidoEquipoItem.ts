@@ -16,7 +16,9 @@ const BASE_URL = '/api/pedido-equipo-item'
 // ✅ Obtener todos los ítems (no se usa comúnmente)
 export async function getPedidoEquipoItems(): Promise<PedidoEquipoItem[] | null> {
   try {
-    const res = await fetch(BASE_URL)
+    const res = await fetch(BASE_URL, {
+      credentials: 'include', // Include cookies for NextAuth
+    })
     if (!res.ok) throw new Error('Error al obtener ítems de pedido')
     return await res.json()
   } catch (error) {
@@ -28,7 +30,9 @@ export async function getPedidoEquipoItems(): Promise<PedidoEquipoItem[] | null>
 // ✅ Obtener ítem por ID
 export async function getPedidoEquipoItemById(id: string): Promise<PedidoEquipoItem | null> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`)
+    const res = await fetch(`${BASE_URL}/${id}`, {
+      credentials: 'include', // Include cookies for NextAuth
+    })
     if (!res.ok) throw new Error('Error al obtener ítem de pedido')
     return await res.json()
   } catch (error) {
@@ -45,6 +49,7 @@ export async function createPedidoEquipoItem(
     const res = await fetch(BASE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // Include cookies for NextAuth
       body: JSON.stringify(payload),
     })
 
@@ -65,8 +70,10 @@ export async function updatePedidoEquipoItem(
     const res = await fetch(`${BASE_URL}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // Include cookies for NextAuth
       body: JSON.stringify(payload),
     })
+
     if (!res.ok) throw new Error('Error al actualizar ítem de pedido')
     return await res.json()
   } catch (error) {
@@ -78,7 +85,10 @@ export async function updatePedidoEquipoItem(
 // ✅ Eliminar ítem de pedido (la API descuenta la cantidadPedida)
 export async function deletePedidoEquipoItem(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`, { method: 'DELETE' })
+    const res = await fetch(`${BASE_URL}/${id}`, {
+      method: 'DELETE',
+      credentials: 'include', // Include cookies for NextAuth
+    })
     return res.ok
   } catch (error) {
     console.error('❌ deletePedidoEquipoItem:', error)

@@ -11,8 +11,37 @@
 // ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
 // 📅 Última actualización: 2025-04-19
 // ===================================================
-import type { TipoFormula, EstadoEquipoItem, EstadoListaItem, EstadoListaEquipo, EstadoPedido, EstadoPedidoItem, EstadoCotizacionProveedor, OrigenListaItem  } from './modelos' 
+import type { 
+  TipoFormula, 
+  EstadoEquipoItem, 
+  EstadoListaItem, 
+  EstadoListaEquipo, 
+  EstadoPedido, 
+  EstadoPedidoItem, 
+  EstadoCotizacionProveedor, 
+  OrigenListaItem,
+  // ✅ Producto
+  Producto
+} from './modelos'
 
+// 🚚 Tipos de aprovisionamiento eliminados 
+
+
+// ✅ Producto
+export interface ProductoPayload {
+  codigo: string
+  nombre: string
+  descripcion?: string
+  categoria?: string
+  unidadMedida?: string
+  precioReferencia?: number
+  moneda?: string
+  especificaciones?: string
+  marca?: string
+  modelo?: string
+  activo?: boolean
+}
+export interface ProductoUpdatePayload extends Partial<ProductoPayload> {}
 
 // ✅ Unidad
 export interface UnidadPayload {
@@ -414,13 +443,18 @@ export interface ProyectoGastoItemUpdatePayload extends Partial<ProyectoGastoIte
 
 export interface ListaEquipoPayload {
   proyectoId: string
+  responsableId?: string                 // ✅ campo requerido en el modelo
   codigo?: string                        // ✅ antes 'nombre', ahora usamos 'codigo'
   nombre: string
   numeroSecuencia?: number               // ✅ número puro para control interno
   estado?: EstadoListaEquipo
+  fechaNecesaria?: string                // ✅ fecha límite para completar la lista (ISO string)
 }
 
-export interface ListaEquipoUpdatePayload extends Partial<ListaEquipoPayload> {}
+export interface ListaEquipoUpdatePayload extends Partial<ListaEquipoPayload> {
+  fechaNecesaria?: string                // ✅ permite actualizar fecha necesaria
+  // Las demás fechas se actualizan automáticamente por el backend según cambios de estado
+}
 
 
 export interface ListaEquipoItemPayload {
@@ -428,6 +462,7 @@ export interface ListaEquipoItemPayload {
   proyectoEquipoItemId?: string
   proyectoEquipoId?: string
   reemplazaProyectoEquipoItemId?: string // 🆕 Nuevo campo claro
+  responsableId?: string // 🆕 Campo para identificar quién registra el item
 
   proveedorId?: string
   cotizacionSeleccionadaId?: string
@@ -450,6 +485,7 @@ export interface ListaEquipoItemPayload {
   origen?: OrigenListaItem
 }
 
+export interface ListaEquipoItemCreatePayload extends ListaEquipoItemPayload {}
 export interface ListaEquipoItemUpdatePayload extends Partial<ListaEquipoItemPayload> {}
 
 
@@ -501,6 +537,12 @@ export interface PedidoEquipoPayload {
   fechaNecesaria: string       // ✅ obligatoria: la fecha que PROYECTOS necesita el pedido
   fechaEntregaEstimada?: string // logística propone esta fecha
   fechaEntregaReal?: string     // fecha cuando se entregó
+  prioridad?: 'baja' | 'media' | 'alta' | 'critica' // ✅ prioridad del pedido
+  esUrgente?: boolean          // ✅ marca si es urgente
+  itemsSeleccionados?: Array<{ // ✅ items seleccionados desde el modal contextual
+    listaEquipoItemId: string
+    cantidadPedida: number
+  }>
 }
 
 
@@ -509,8 +551,9 @@ export interface PedidoEquipoUpdatePayload extends Partial<PedidoEquipoPayload> 
 
 export interface PedidoEquipoItemPayload {
   pedidoId: string
+  responsableId: string
   listaId?: string
-  listaEquipoItemId?: string
+  listaEquipoItemId: string
   // 📦 Datos solicitados
   cantidadPedida: number
   // 💰 Datos económicos (opcionalmente copiados desde cotización seleccionada)
@@ -526,8 +569,7 @@ export interface PedidoEquipoItemPayload {
   unidad: string
   tiempoEntrega?: string
   tiempoEntregaDias?: number
-  // ⚠️ Este campo es calculado automáticamente en backend
-  fechaOrdenCompraRecomendada?: string 
+  // fechaOrdenCompraRecomendada removido
 }
 
 
@@ -572,4 +614,93 @@ export interface RegistroHorasPayload {
 }
 
 export interface RegistroHorasUpdatePayload extends Partial<RegistroHorasPayload> {}
+
+
+
+
+// 🚚 Payloads de aprovisionamiento eliminados
+
+// 📥 Payloads de recepción eliminados
+
+// 💳 Payloads de pago eliminados
+
+
+
+// 🔍 Filtros Completos
+
+// 🔍 Filtros de aprovisionamiento eliminados
+
+
+
+// ✅ Producto Filters
+export interface ProductoFilters {
+  codigo?: string;
+  nombre?: string;
+  categoria?: string;
+  unidadMedida?: string;
+  marca?: string;
+  modelo?: string;
+  activo?: boolean;
+  precioMinimo?: number;
+  precioMaximo?: number;
+  moneda?: string;
+}
+
+// 📈 Reportes de aprovisionamiento eliminados
+
+// 📄 Tipos de Respuesta API Estándar
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+  timestamp: string;
+}
+
+export interface ApiError {
+  code: string;
+  message: string;
+  details?: Record<string, any>;
+  field?: string;
+}
+
+export interface PaginatedResponse<T = any> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+// 🔍 Búsqueda y Filtros Avanzados
+export interface SearchParams {
+  query?: string;
+  filters?: Record<string, any>;
+  pagination?: PaginationParams;
+}
+
+
+// Tipos de respuesta de aprovisionamiento eliminados
+
+// ✅ Producto Response Types
+export type ProductoResponse = ApiResponse<Producto>;
+export type ProductoListResponse = PaginatedResponse<Producto>;
+export type ProductoMetricsResponse = ApiResponse<{
+  totalProductos: number;
+  productosActivos: number;
+  categorias: number;
+  marcas: number;
+}>;
+export type ProductoCategoriasResponse = ApiResponse<string[]>;
 

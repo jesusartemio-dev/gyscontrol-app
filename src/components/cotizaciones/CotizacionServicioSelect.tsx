@@ -69,6 +69,8 @@ export default function CotizacionServicioSelect({ grupoId, onCreated }: Props) 
             horaFijo={item.horaFijo}
             unidadServicioNombre={item.unidadServicio.nombre}
             recursoNombre={item.recurso.nombre}
+            unidadServicioId={item.unidadServicio.id}
+            recursoId={item.recurso.id}
             costoHora={item.recurso.costoHora}
             onCreated={onCreated}
           />

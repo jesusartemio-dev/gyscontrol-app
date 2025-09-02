@@ -6,11 +6,45 @@ import {
   AccordionItem,
   AccordionTrigger
 } from '@/components/ui/accordion'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import CotizacionEquipoItemForm from './CotizacionEquipoItemForm'
 import CotizacionEquipoItemTable from './CotizacionEquipoItemTable'
 import type { CotizacionEquipo, CotizacionEquipoItem } from '@/types'
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2, Briefcase } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { 
+  Pencil, 
+  Trash2, 
+  Package, 
+  TrendingUp, 
+  DollarSign,
+  Calculator,
+  AlertCircle
+} from 'lucide-react'
+
+// Utility functions for formatting
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'PEN',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
+
+const getRentabilityColor = (percentage: number): string => {
+  if (percentage >= 30) return 'text-green-600'
+  if (percentage >= 15) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
+const getRentabilityBadgeVariant = (percentage: number): "default" | "secondary" | "destructive" | "outline" => {
+  if (percentage >= 30) return 'default'
+  if (percentage >= 15) return 'secondary'
+  return 'destructive'
+}
 
 interface Props {
   equipo: CotizacionEquipo
@@ -43,80 +77,208 @@ export default function CotizacionEquipoAccordion({
     setEditando(false)
   }
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleBlur()
+    }
+    if (e.key === 'Escape') {
+      setNuevoNombre(equipo.nombre)
+      setEditando(false)
+    }
+  }
+
   const renta = equipo.subtotalInterno > 0
     ? ((equipo.subtotalCliente - equipo.subtotalInterno) / equipo.subtotalInterno) * 100
     : 0
 
   return (
-    <Accordion type="multiple" className="bg-white shadow-md rounded-2xl border border-gray-200 mb-2">
-      <AccordionItem value={equipo.id}>
-        <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center px-6 py-4 gap-4">
-          {/* Botón de expandir/contraer */}
-          <AccordionTrigger className="flex justify-start" />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="mb-4"
+    >
+      <Card className="overflow-hidden border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow duration-200">
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value={equipo.id} className="border-none">
+            {/* Header del Accordion */}
+            <div className="px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4 flex-1">
+                  <AccordionTrigger className="hover:no-underline p-0 [&[data-state=open]>svg]:rotate-90">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Package className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="text-left">
+                        {editando ? (
+                          <input
+                            type="text"
+                            value={nuevoNombre}
+                            onChange={(e) => setNuevoNombre(e.target.value)}
+                            onBlur={handleBlur}
+                            onKeyDown={handleKeyPress}
+                            autoFocus
+                            className="text-lg font-semibold bg-transparent border-b-2 border-primary focus:outline-none focus:border-primary-dark min-w-[200px]"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <h3 
+                            className="text-lg font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditando(true)
+                            }}
+                          >
+                            {equipo.nombre}
+                          </h3>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-xs">
+                            {equipo.items.length} ítem{equipo.items.length !== 1 ? 's' : ''}
+                          </Badge>
+                          {renta > 0 && (
+                            <Badge variant={getRentabilityBadgeVariant(renta) as "secondary" | "default" | "outline"} className="text-xs">
+                              <TrendingUp className="h-3 w-3 mr-1" />
+                              {renta.toFixed(1)}% rent.
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                </div>
 
-          {/* Nombre editable */}
-          <div className="flex items-center gap-2">
-            <Briefcase size={18} className="text-gray-600" />
-            {editando ? (
-              <input
-                type="text"
-                value={nuevoNombre}
-                onChange={(e) => setNuevoNombre(e.target.value)}
-                onBlur={handleBlur}
-                autoFocus
-                className="border px-2 py-1 text-sm rounded w-full"
-              />
-            ) : (
-              <span
-                onClick={() => setEditando(true)}
-                className="font-semibold text-base text-gray-800 cursor-pointer hover:underline"
-              >
-                {equipo.nombre}
-              </span>
-            )}
-          </div>
+                {/* Métricas Financieras */}
+                <div className="hidden md:flex items-center gap-6">
+                  <div className="text-center">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                      <Calculator className="h-3 w-3" />
+                      Interno
+                    </div>
+                    <div className="font-semibold text-sm">
+                      {formatCurrency(equipo.subtotalInterno)}
+                    </div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                      <DollarSign className="h-3 w-3" />
+                      Cliente
+                    </div>
+                    <div className="font-semibold text-sm text-green-600">
+                      {formatCurrency(equipo.subtotalCliente)}
+                    </div>
+                  </div>
 
-          {/* Cantidad de ítems */}
-          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-            {equipo.items.length} ítem{equipo.items.length !== 1 ? 's' : ''}
-          </span>
+                  {renta > 0 && (
+                    <div className="text-center">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                        <TrendingUp className="h-3 w-3" />
+                        Rentabilidad
+                      </div>
+                      <div className={`font-semibold text-sm ${getRentabilityColor(renta)}`}>
+                        {renta.toFixed(1)}%
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-          {/* Totales */}
-          <div className="text-right text-sm">
-            <div className="text-gray-400 text-xs leading-tight">Interno / Cliente / % Rent</div>
-            <div className="flex gap-1 justify-end">
-              <span className="text-gray-700">${equipo.subtotalInterno.toFixed(2)}</span>
-              <span className="text-green-600">${equipo.subtotalCliente.toFixed(2)}</span>
-              <span className="text-blue-600">{renta.toFixed(1)}%</span>
+                {/* Acciones */}
+                <div className="flex items-center gap-2 ml-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditando(true)
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-primary/10"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (confirm('¿Estás seguro de que deseas eliminar este grupo de equipos?')) {
+                        onDeletedGrupo()
+                      }
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Métricas móviles */}
+              <div className="md:hidden mt-4 grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <div className="text-xs text-muted-foreground mb-1">Interno</div>
+                  <div className="font-semibold text-sm">
+                    {formatCurrency(equipo.subtotalInterno)}
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <div className="text-xs text-muted-foreground mb-1">Cliente</div>
+                  <div className="font-semibold text-sm text-green-600">
+                    {formatCurrency(equipo.subtotalCliente)}
+                  </div>
+                </div>
+                {renta > 0 && (
+                  <div className="text-center p-3 bg-muted/50 rounded-lg">
+                    <div className="text-xs text-muted-foreground mb-1">Rent.</div>
+                    <div className={`font-semibold text-sm ${getRentabilityColor(renta)}`}>
+                      {renta.toFixed(1)}%
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Acciones */}
-          <div className="flex gap-2 items-center">
-            <button
-              type="button"
-              onClick={() => setEditando(true)}
-              className="text-blue-600 hover:text-blue-800 transition text-xs"
-              title="Editar nombre"
-            >
-              <Pencil size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={onDeletedGrupo}
-              className="text-red-500 hover:text-red-700 transition text-xs"
-              title="Eliminar grupo"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </div>
-
-        <AccordionContent className="px-6 pb-6 space-y-4">
-          <CotizacionEquipoItemForm cotizacionEquipoId={equipo.id} onCreated={onCreated} />
-          <CotizacionEquipoItemTable items={equipo.items} onDeleted={onDeleted} onUpdated={onUpdated} />
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+            {/* Contenido del Accordion */}
+            <AccordionContent className="px-0 pb-0">
+              <Separator />
+              <div className="p-6 space-y-6 bg-muted/20">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                >
+                  <CotizacionEquipoItemForm 
+                    cotizacionEquipoId={equipo.id} 
+                    onCreated={onCreated} 
+                  />
+                </motion.div>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  {equipo.items.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No hay equipos agregados</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Agrega equipos a este grupo para comenzar
+                      </p>
+                    </div>
+                  ) : (
+                    <CotizacionEquipoItemTable 
+                      items={equipo.items} 
+                      onDeleted={onDeleted} 
+                      onUpdated={onUpdated} 
+                    />
+                  )}
+                </motion.div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </Card>
+    </motion.div>
   )
 }

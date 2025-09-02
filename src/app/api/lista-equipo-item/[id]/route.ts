@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma'
 import type { ListaEquipoItemUpdatePayload } from '@/types/payloads'
 
 // ✅ Obtener ítem por ID
-export async function GET(_: Request, context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 
@@ -28,7 +28,11 @@ export async function GET(_: Request, context: { params: { id: string } }) {
             },
           },
         },
-        pedidos: true,
+        pedidos: {
+          include: {
+            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+          }
+        },
         proyectoEquipoItem: {
           include: {
             proyectoEquipo: true,
@@ -49,7 +53,7 @@ export async function GET(_: Request, context: { params: { id: string } }) {
 // ✅ Actualizar ítem
 export async function PUT(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params
@@ -107,10 +111,93 @@ export async function PUT(
   }
 }
 
-// ✅ Eliminar ítem y revertir estado del ProyectoEquipoItem si aplica
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+// ✅ Actualizar parcialmente un ítem (PATCH para cotización seleccionada)
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
+    const { cotizacionSeleccionadaId } = await request.json()
+
+    // 🔍 Verificar que el item existe
+    const item = await prisma.listaEquipoItem.findUnique({
+      where: { id },
+      select: { id: true }
+    })
+
+    if (!item) {
+      return NextResponse.json({ error: 'Ítem no encontrado' }, { status: 404 })
+    }
+
+    // 🔍 Si se proporciona cotizacionSeleccionadaId, verificar que existe y pertenece al item
+    if (cotizacionSeleccionadaId) {
+      const cotizacion = await prisma.cotizacionProveedorItem.findFirst({
+        where: {
+          id: cotizacionSeleccionadaId,
+          listaEquipoItemId: id
+        },
+        select: {
+          id: true,
+          tiempoEntrega: true,
+          tiempoEntregaDias: true
+        }
+      })
+
+      if (!cotizacion) {
+        return NextResponse.json(
+          { error: 'Cotización no encontrada o no pertenece a este ítem' },
+          { status: 400 }
+        )
+      }
+
+      // 🔄 Actualizar el item con la nueva cotización seleccionada
+      const actualizado = await prisma.listaEquipoItem.update({
+        where: { id },
+        data: {
+          cotizacionSeleccionadaId,
+          tiempoEntrega: cotizacion.tiempoEntrega,
+          tiempoEntregaDias: cotizacion.tiempoEntregaDias
+        },
+        include: {
+          cotizacionSeleccionada: {
+            include: {
+              cotizacion: {
+                include: {
+                  proveedor: true
+                }
+              }
+            }
+          }
+        }
+      })
+
+      return NextResponse.json(actualizado)
+    }
+
+    // 🚫 Si no se proporciona cotizacionSeleccionadaId, limpiar la selección
+    const actualizado = await prisma.listaEquipoItem.update({
+      where: { id },
+      data: {
+        cotizacionSeleccionadaId: null,
+        tiempoEntrega: null,
+        tiempoEntregaDias: null
+      }
+    })
+
+    return NextResponse.json(actualizado)
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Error al actualizar la cotización seleccionada: ' + String(error) },
+      { status: 500 }
+    )
+  }
+}
+
+// ✅ Eliminar ítem y revertir estado del ProyectoEquipoItem si aplica
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await context.params
 
     const item = await prisma.listaEquipoItem.findUnique({
       where: { id },

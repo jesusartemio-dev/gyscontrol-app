@@ -10,6 +10,7 @@
 
 'use client'
 
+import React, { memo, useMemo } from 'react'
 import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
 import ProyectoEquipoItemRow from './ProyectoEquipoItemRow'
 
@@ -18,7 +19,7 @@ interface Props {
   onItemChange: (items: ProyectoEquipoItem[]) => void
 }
 
-export default function ProyectoEquipoItemTable({ equipo, onItemChange }: Props) {
+const ProyectoEquipoItemTable = memo(function ProyectoEquipoItemTable({ equipo, onItemChange }: Props) {
   // ✅ Actualizar un ítem por ID
   const handleUpdateItem = (id: string, changes: Partial<ProyectoEquipoItem>) => {
     const nuevosItems = equipo.items.map((item) =>
@@ -32,6 +33,12 @@ export default function ProyectoEquipoItemTable({ equipo, onItemChange }: Props)
     const nuevosItems = equipo.items.filter((item) => item.id !== id)
     onItemChange(nuevosItems)
   }
+
+  // 📊 Calcular totales con memoización
+  const { totalInterno, totalCliente } = useMemo(() => ({
+    totalInterno: equipo.items.reduce((sum, item) => sum + (item.cantidad * item.precioInterno), 0),
+    totalCliente: equipo.items.reduce((sum, item) => sum + (item.cantidad * item.precioCliente), 0)
+  }), [equipo.items])
 
   return (
     <div className="overflow-auto border rounded-md shadow-sm">
@@ -71,4 +78,6 @@ export default function ProyectoEquipoItemTable({ equipo, onItemChange }: Props)
       </table>
     </div>
   )
-}
+})
+
+export default ProyectoEquipoItemTable

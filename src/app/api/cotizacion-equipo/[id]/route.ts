@@ -7,7 +7,7 @@ import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 export const dynamic = 'force-dynamic'
 
 // ✅ Actualizar grupo de equipos
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await req.json()
@@ -30,7 +30,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar grupo de equipos
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 

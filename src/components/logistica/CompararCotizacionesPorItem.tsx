@@ -33,6 +33,8 @@ export default function CompararCotizacionesPorItem() {
       const agrupado: typeof agrupados = {}
       for (const c of data) {
         const id = c.listaEquipoItemId
+        if (!id || !c.listaEquipoItem) continue // Skip items without listaEquipoItemId or listaEquipoItem
+        
         if (!agrupado[id]) {
           agrupado[id] = {
             item: c.listaEquipoItem,
@@ -79,7 +81,7 @@ export default function CompararCotizacionesPorItem() {
               {cotizaciones.map((c) => (
                 <tr key={c.id} className="border-t">
                   <td className="p-2">{c.cotizacion.proveedor.nombre}</td>
-                  <td className="p-2 text-right">S/. {c.precioUnitario?.toFixed(2)}</td>
+                  <td className="p-2 text-right">$ {c.precioUnitario?.toFixed(2)}</td>
                   <td className="p-2 text-right">{c.cantidad}</td>
                   <td className="p-2 text-right">{c.tiempoEntrega}</td>
                   <td className="p-2 text-center">

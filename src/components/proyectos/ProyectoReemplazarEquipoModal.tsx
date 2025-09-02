@@ -85,7 +85,7 @@ export default function ProyectoReemplazarEquipoModal({ open, onClose, equipo, o
             </div>
           </div>
 
-          <p className="text-sm text-gray-600">Costo real calculado: <strong>S/ {costoReal.toFixed(2)}</strong></p>
+          <p className="text-sm text-gray-600">Costo real calculado: <strong>$ {costoReal.toFixed(2)}</strong></p>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>

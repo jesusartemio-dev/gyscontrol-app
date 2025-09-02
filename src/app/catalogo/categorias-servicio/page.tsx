@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import CategoriaServicioForm from '@/components/catalogo/CategoriaServicioForm'
 import CategoriaServicioList from '@/components/catalogo/CategoriaServicioList'
 import { getCategoriasServicio, createCategoriaServicio } from '@/lib/services/categoriaServicio'
@@ -12,15 +14,41 @@ import {
 } from '@/lib/utils/categoriaServicioImportUtils'
 import type { CategoriaServicio } from '@/types'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { 
+  ChevronRight, 
+  FolderOpen, 
+  Plus, 
+  BarChart3, 
+  FileText, 
+  AlertCircle,
+  Loader2,
+  Package
+} from 'lucide-react'
 
 export default function Page() {
+  const router = useRouter()
   const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [loading, setLoading] = useState(true)
   const [importando, setImportando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
 
   const cargarCategorias = async () => {
-    const data = await getCategoriasServicio()
-    setCategorias(data)
+    try {
+      setLoading(true)
+      const data = await getCategoriasServicio()
+      setCategorias(data)
+    } catch (error) {
+      console.error('Error al cargar categorías:', error)
+      toast.error('Error al cargar las categorías de servicio')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -79,35 +107,277 @@ export default function Page() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">📁 Categorías de Servicio</h1>
-        <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
-      </div>
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        duration: 0.3,
+        staggerChildren: 0.1
+      }
+    }
+  }
 
-      {importando && <p className="text-sm text-gray-500">Importando categorías...</p>}
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.3 }
+    }
+  }
 
-      {errores.length > 0 && (
-        <div className="text-sm text-red-600 space-y-1 bg-red-100 p-3 rounded">
-          <p className="font-semibold">Errores al importar:</p>
-          <ul className="list-disc pl-5">
-            {errores.map((err, idx) => (
-              <li key={idx}>{err}</li>
-            ))}
-          </ul>
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Breadcrumb Skeleton */}
+        <div className="flex items-center space-x-2">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-4" />
+          <Skeleton className="h-4 w-32" />
         </div>
+        
+        {/* Header Skeleton */}
+        <div className="flex justify-between items-start">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="flex items-center space-x-2">
+                  <Skeleton className="h-8 w-8" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-6 w-8" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        
+        {/* Form Skeleton */}
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-32" />
+          </CardContent>
+        </Card>
+        
+        {/* List Skeleton */}
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <motion.div 
+      className="space-y-6"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Breadcrumb Navigation */}
+      <motion.nav 
+        className="flex items-center space-x-2 text-sm text-muted-foreground"
+        variants={itemVariants}
+      >
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => router.push('/catalogo')}
+          className="h-auto p-0 font-normal"
+        >
+          Catálogo
+        </Button>
+        <ChevronRight className="h-4 w-4" />
+        <span className="font-medium text-foreground">Categorías de Servicio</span>
+      </motion.nav>
+
+      {/* Header Section */}
+      <motion.div 
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        variants={itemVariants}
+      >
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-6 w-6 text-blue-600" />
+            <h1 className="text-2xl font-bold tracking-tight">Categorías de Servicio</h1>
+          </div>
+          <p className="text-muted-foreground">
+            Gestiona las categorías para clasificar los servicios del catálogo
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
+        </div>
+      </motion.div>
+
+      {/* Quick Stats */}
+      <motion.div 
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        variants={itemVariants}
+      >
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Package className="h-4 w-4 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Categorías</p>
+                <p className="text-2xl font-bold">{categorias.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <BarChart3 className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Categorías Activas</p>
+                <p className="text-2xl font-bold">{categorias.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <FileText className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Estado</p>
+                <Badge variant="secondary" className="mt-1">
+                  Operativo
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Import Status */}
+      {importando && (
+        <motion.div variants={itemVariants}>
+          <Alert>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <AlertDescription>
+              Importando categorías, por favor espera...
+            </AlertDescription>
+          </Alert>
+        </motion.div>
       )}
 
-      <CategoriaServicioForm onCreated={handleCreated} />
+      {/* Import Errors */}
+      {errores.length > 0 && (
+        <motion.div variants={itemVariants}>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p className="font-semibold">Errores encontrados durante la importación:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  {errores.map((err, idx) => (
+                    <li key={idx} className="text-sm">{err}</li>
+                  ))}
+                </ul>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </motion.div>
+      )}
 
-      <div className="bg-white p-4 rounded shadow">
-        <CategoriaServicioList
-          data={categorias}
-          onUpdate={handleUpdated}
-          onDelete={handleDeleted}
-        />
-      </div>
-    </div>
+      {/* Create Form */}
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Nueva Categoría de Servicio
+            </CardTitle>
+            <CardDescription>
+              Crea una nueva categoría para organizar los servicios del catálogo
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CategoriaServicioForm onCreated={handleCreated} />
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <Separator />
+
+      {/* Categories List */}
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5" />
+              Categorías Existentes
+            </CardTitle>
+            <CardDescription>
+              {categorias.length === 0 
+                ? 'No hay categorías registradas aún'
+                : `${categorias.length} categoría${categorias.length !== 1 ? 's' : ''} registrada${categorias.length !== 1 ? 's' : ''}`
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {categorias.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <FolderOpen className="h-12 w-12 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  No hay categorías de servicio
+                </h3>
+                <p className="text-gray-500 mb-4 max-w-sm mx-auto">
+                  Comienza creando tu primera categoría de servicio para organizar el catálogo.
+                </p>
+                <Button variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear primera categoría
+                </Button>
+              </div>
+            ) : (
+              <CategoriaServicioList
+                data={categorias}
+                onUpdate={handleUpdated}
+                onDelete={handleDeleted}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
   )
 }

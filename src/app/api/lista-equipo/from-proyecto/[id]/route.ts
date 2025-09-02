@@ -8,13 +8,23 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(_: Request, context: { params: { id: string } }) {
+export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   const { id: proyectoId } = await context.params
 
   try {
+    // ✅ Obtener sesión del usuario
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
     // 1. Obtener todos los ProyectoEquipoItem del proyecto
     const items = await prisma.proyectoEquipoItem.findMany({
       where: { proyectoEquipo: { proyectoId } },
@@ -35,8 +45,10 @@ export async function POST(_: Request, context: { params: { id: string } }) {
       const nuevaLista = await tx.listaEquipo.create({
         data: {
           proyectoId,
+          responsableId: session.user.id,
+          codigo: `LST-${Date.now()}`, // Código único temporal
           nombre: 'Lista desde Cotización',
-          descripcion: 'Generada automáticamente desde los equipos técnicos',
+          numeroSecuencia: 1, // Número de secuencia inicial
         },
       })
 
@@ -45,11 +57,15 @@ export async function POST(_: Request, context: { params: { id: string } }) {
           data: {
             listaId: nuevaLista.id,
             proyectoEquipoItemId: item.id,
+            proyectoEquipoId: item.proyectoEquipoId,
+            responsableId: session.user.id,
             codigo: item.codigo,
-            descripcion: item.descripcion,
-            unidad: item.unidad,
+            descripcion: item.descripcion || '',
+            unidad: item.unidad || 'UND',
             cantidad: item.cantidad,
-            presupuesto: item.precioCliente, // 🟢 precioReferencial → presupuesto
+            presupuesto: item.precioCliente || 0,
+            origen: 'cotizado', // ✅ Campo requerido
+            estado: 'borrador', // ✅ Campo requerido
           },
         })
       )

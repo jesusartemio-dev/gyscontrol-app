@@ -46,11 +46,11 @@ export default function DashboardCardPlantilla({ plantilla }: Props) {
       <div className="text-sm space-y-1">
         <div className="flex justify-between">
           <span>🧰 Equipos:</span>
-          <span className="text-blue-600 font-medium">S/ {totalEquipos.toFixed(2)}</span>
+          <span className="text-blue-600 font-medium">$ {totalEquipos.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
           <span>🛠️ Servicios:</span>
-          <span className="text-indigo-600 font-medium">S/ {totalServicios.toFixed(2)}</span>
+          <span className="text-indigo-600 font-medium">$ {totalServicios.toFixed(2)}</span>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export default function DashboardCardPlantilla({ plantilla }: Props) {
       {/* Total final */}
       <div className="flex justify-between text-base font-semibold text-green-700">
         <span>💰 Total Cliente:</span>
-        <span className="text-lg">S/ {plantilla.totalCliente.toFixed(2)}</span>
+        <span className="text-lg">$ {plantilla.totalCliente.toFixed(2)}</span>
       </div>
 
       {/* Link a detalle */}

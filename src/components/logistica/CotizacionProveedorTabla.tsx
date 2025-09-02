@@ -28,9 +28,10 @@ type LocalEditCotizacion = Partial<CotizacionProveedorItem> & {
 interface Props {
   items: CotizacionProveedorItem[]
   onUpdated?: () => void
+  onItemUpdated?: (updatedItem: CotizacionProveedorItem) => void // ✅ Nueva prop para actualización local
 }
 
-export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
+export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdated }: Props) {
   const [editModeId, setEditModeId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, LocalEditCotizacion>>({})
   const [loadingItems, setLoadingItems] = useState<Record<string, boolean>>({})
@@ -77,7 +78,7 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
         esSeleccionada: item.esSeleccionada,
       }
 
-      await updateCotizacionProveedorItem(item.id, payload)
+      const updatedItem = await updateCotizacionProveedorItem(item.id, payload)
       toast.success(`✅ Ítem ${item.codigo} actualizado.`)
 
       setEditModeId(null)
@@ -87,7 +88,12 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
         return updatedPrev
       })
 
-      onUpdated?.()
+      // ✅ Priorizar actualización local sobre refetch completo
+      if (updatedItem && onItemUpdated) {
+        onItemUpdated(updatedItem)
+      } else {
+        onUpdated?.()
+      }
     } catch {
       toast.error('❌ Error al actualizar ítem.')
     } finally {
@@ -123,7 +129,6 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
             <th className="p-2 text-center">Lista</th>
             <th className="p-2 text-center">Item Lista</th>
             <th className="p-2 text-center">Cantidad</th>
-            <th className="p-2 text-center">Presupuesto (USD)</th>
             <th className="p-2 text-center">Precio Unitario (USD)</th>
             <th className="p-2 text-center">Costo Total (USD)</th>
             <th className="p-2 text-center">Tiempo Entrega</th>
@@ -135,7 +140,7 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
         <tbody>
           {items
             .slice()
-            .sort((a, b) => a.codigo.localeCompare(b.codigo))
+            .sort((a, b) => (a.listaEquipoItem?.codigo || '').localeCompare(b.listaEquipoItem?.codigo || ''))
             .map((item) => {
               const isEdit = editModeId === item.id
               const edited = editValues[item.id] || {}
@@ -179,10 +184,7 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
                     {cantidad} / Orig. {item.cantidadOriginal}
                   </td>
                   <td className="p-2 text-center">
-                    ${item.presupuesto?.toFixed(2) ?? '0.00'}
-                  </td>
-                  <td className="p-2 text-center">
-                    {isEdit ? (
+                    {isEdit && !item.esSeleccionada ? (
                       <Input
                         type="number"
                         value={edited.precioUnitario ?? item.precioUnitario ?? ''}
@@ -190,14 +192,19 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
                         className="w-24 text-center"
                       />
                     ) : (
-                      `$${item.precioUnitario?.toFixed(2) ?? '0.00'}`
+                      <div className="flex items-center justify-center gap-2">
+                        {`$${item.precioUnitario?.toFixed(2) ?? '0.00'}`}
+                        {item.esSeleccionada && (
+                          <Badge className="bg-green-100 text-green-700 text-xs px-1 py-0">✓ Seleccionada</Badge>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="p-2 text-center">
                     ${(precioEditado * cantidad).toFixed(2)}
                   </td>
                   <td className="p-2 text-center">
-                    {isEdit ? (
+                    {isEdit && !item.esSeleccionada ? (
                       <div className="flex gap-1 items-center">
                         <Select
                           value={edited.tiempoEntregaModo ?? 'stock'}
@@ -224,11 +231,16 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
                         )}
                       </div>
                     ) : (
-                      item.tiempoEntrega || 'N/D'
+                      <div className="flex items-center justify-center gap-2">
+                        {item.tiempoEntrega || 'N/D'}
+                        {item.esSeleccionada && (
+                          <span className="text-xs text-green-600 font-medium">🔒</span>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="p-2 text-center capitalize">
-                    {isEdit ? (
+                    {isEdit && !item.esSeleccionada ? (
                       <Select
                         value={edited.estado ?? item.estado}
                         onValueChange={(value) => handleChange(item.id, 'estado', value)}
@@ -247,7 +259,12 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Badge>{item.estado || 'N/D'}</Badge>
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge>{item.estado || 'N/D'}</Badge>
+                        {item.esSeleccionada && (
+                          <span className="text-xs text-green-600 font-medium">🔒</span>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="p-2 text-center">
@@ -277,18 +294,22 @@ export default function CotizacionProveedorTabla({ items, onUpdated }: Props) {
                         <Button
                           size="sm"
                           variant="outline"
+                          disabled={item.esSeleccionada}
                           onClick={() => {
-                            setEditModeId(item.id)
-                            setEditValues((prev) => ({
-                              ...prev,
-                              [item.id]: {
-                                precioUnitario: item.precioUnitario,
-                                tiempoEntregaModo: 'stock',
-                                tiempoEntregaValor: 0,
-                                estado: item.estado,
-                              },
-                            }))
+                            if (!item.esSeleccionada) {
+                              setEditModeId(item.id)
+                              setEditValues((prev) => ({
+                                ...prev,
+                                [item.id]: {
+                                  precioUnitario: item.precioUnitario,
+                                  tiempoEntregaModo: 'stock',
+                                  tiempoEntregaValor: 0,
+                                  estado: item.estado,
+                                },
+                              }))
+                            }
                           }}
+                          title={item.esSeleccionada ? 'No se puede editar una cotización seleccionada' : 'Editar cotización'}
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>

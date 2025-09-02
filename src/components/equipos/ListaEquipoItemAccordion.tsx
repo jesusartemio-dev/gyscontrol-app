@@ -26,13 +26,13 @@ export default function ListaEquipoItemAccordion({ item, onUpdate, onDelete }: P
   const [isEditing, setIsEditing] = useState(false)
   const [editedItem, setEditedItem] = useState({
     cantidad: item.cantidad,
-    precioReferencial: item.precioReferencial ?? 0,
+    precioElegido: item.precioElegido ?? 0,
   })
 
   const handleSave = () => {
     onUpdate(item.id, {
       cantidad: editedItem.cantidad,
-      precioReferencial: editedItem.precioReferencial,
+      precioElegido: editedItem.precioElegido,
     })
     setIsEditing(false)
   }
@@ -55,8 +55,8 @@ export default function ListaEquipoItemAccordion({ item, onUpdate, onDelete }: P
               />
               <Input
                 type="number"
-                value={editedItem.precioReferencial}
-                onChange={(e) => setEditedItem({ ...editedItem, precioReferencial: parseFloat(e.target.value) })}
+                value={editedItem.precioElegido}
+                onChange={(e) => setEditedItem({ ...editedItem, precioElegido: parseFloat(e.target.value) })}
                 className="w-32"
               />
               <Button onClick={handleSave} className="bg-blue-600 text-white">💾</Button>
@@ -64,7 +64,7 @@ export default function ListaEquipoItemAccordion({ item, onUpdate, onDelete }: P
             </>
           ) : (
             <>
-              <span className="text-sm">{item.cantidad} u. | S/ {item.precioReferencial?.toFixed(2) ?? '---'}</span>
+              <span className="text-sm">{item.cantidad} u. | $ {item.precioElegido?.toFixed(2) ?? '---'}</span>
               <Button size="icon" onClick={() => setIsEditing(true)}>
                 <Pencil className="w-4 h-4" />
               </Button>

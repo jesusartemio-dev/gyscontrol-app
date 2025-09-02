@@ -8,8 +8,8 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_: Request, context: { params: { proyectoId: string } }) {
-  const { proyectoId } = context.params
+export async function GET(_: Request, context: { params: Promise<{ proyectoId: string }> }) {
+  const { proyectoId } = await context.params
 
   try {
       const items = await prisma.proyectoEquipoItem.findMany({

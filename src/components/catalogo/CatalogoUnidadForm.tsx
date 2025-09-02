@@ -22,7 +22,7 @@ export default function CatalogoUnidadForm({ onCreated }: CatalogoUnidadFormProp
     }
 
     try {
-      const nueva = await createUnidad(nombre.trim())
+      const nueva = await createUnidad({ nombre: nombre.trim() })
       onCreated(nueva)
       setNombre('')
     } catch (err) {

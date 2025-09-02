@@ -14,7 +14,7 @@ import type { NextRequest } from 'next/server'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 
 // ✅ Actualizar grupo de servicios
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params // ✅ corrección por Next.js
 
@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar grupo de servicios
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params // ✅ corrección por Next.js
 

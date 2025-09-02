@@ -114,7 +114,7 @@ export default function PlantillaGastoItemList({ items, onUpdate, onDelete }: Pr
                   <div className="truncate">{item.nombre}</div>
                   <div className="truncate">{item.descripcion}</div>
                   <div>{item.cantidad}</div>
-                  <div>S/. {item.precioUnitario.toFixed(2)}</div>
+                  <div>$ {item.precioUnitario.toFixed(2)}</div>
                   <div>x{item.factorSeguridad}</div>
                   <div>+{item.margen}</div>
                 </>

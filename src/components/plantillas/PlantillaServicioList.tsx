@@ -91,7 +91,7 @@ export default function PlantillaServicioList({
               >
                 {loading === s.id ? 'Actualizando...' : s.nombre}
               </td>
-              <td className="border px-4 py-2">S/ {s.subtotalCliente.toFixed(2)}</td>
+              <td className="border px-4 py-2">$ {s.subtotalCliente.toFixed(2)}</td>
               <td className="border px-4 py-2 space-x-2">
                 <a
                   href={`/comercial/plantillas/${plantillaId}/servicio/${s.id}`}

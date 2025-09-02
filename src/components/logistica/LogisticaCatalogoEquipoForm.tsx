@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { toast } from 'sonner'
 import { createEquipoLogistica, getCatalogoEquiposLogistica } from '@/lib/services/logisticaCatalogoEquipo'
-import { getCategoriaEquipo } from '@/lib/services/categoriaEquipo'
+import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -65,7 +65,7 @@ export default function LogisticaCatalogoEquipoForm({ onCreated }: LogisticaCata
     const cargarDatos = async () => {
       try {
         const [cats, unis, equipos] = await Promise.all([
-          getCategoriaEquipo(),
+          getCategoriasEquipo(),
           getUnidades(),
           getCatalogoEquiposLogistica()
         ])

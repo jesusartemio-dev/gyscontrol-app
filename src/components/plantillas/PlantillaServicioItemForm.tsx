@@ -146,7 +146,7 @@ export default function PlantillaServicioItemForm({
           />
         </div>
         <div className="text-xs text-gray-500 pt-5">
-          Horas: {horas} • Cliente: S/ {costoCliente.toFixed(2)}
+          Horas: {horas} • Cliente: $ {costoCliente.toFixed(2)}
         </div>
       </div>
 

@@ -58,9 +58,8 @@ export default function ProyectoEquipoItemList({ proyectoId, filtroEquipoId, mod
             <th className="p-2">Unidad</th>
             <th className="p-2">Cant.</th>
             <th className="p-2">Estado</th>
-            <th className="p-2">Aprobado</th>
             <th className="p-2">Cambio</th>
-            <th className="p-2">¿Nuevo?</th>
+            <th className="p-2">Precio</th>
             <th className="p-2 text-left">Lista Técnica</th>
           </tr>
         </thead>
@@ -74,11 +73,8 @@ export default function ProyectoEquipoItemList({ proyectoId, filtroEquipoId, mod
               <td className="p-2 text-center">
                 <Badge className={`text-white px-2 py-1 text-xs rounded ${coloresEstado[item.estado]}`}>{item.estado.replaceAll('_', ' ')}</Badge>
               </td>
-              <td className="p-2 text-center">{item.aprobado ? '✅' : '—'}</td>
               <td className="p-2 text-center">{item.motivoCambio || '—'}</td>
-              <td className="p-2 text-center">
-                {item.nuevo ? <span className="bg-green-100 text-green-800 px-2 py-1 text-xs rounded">Nuevo</span> : '—'}
-              </td>
+              <td className="p-2 text-center">$ {item.precioInterno.toFixed(2)}</td>
               <td className="p-2 text-sm text-gray-600">
                 {item.lista?.nombre ?? '—'}
               </td>

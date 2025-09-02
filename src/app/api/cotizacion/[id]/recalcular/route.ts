@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server'
 
 export async function POST(
   _req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params
 

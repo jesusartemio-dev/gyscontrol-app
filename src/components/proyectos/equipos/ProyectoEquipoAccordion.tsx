@@ -10,7 +10,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import React, { memo, useMemo, useState } from 'react'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import ProyectoEquipoItemTable from './ProyectoEquipoItemTable'
 import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
@@ -23,7 +23,7 @@ interface Props {
   onChange: (changes: Partial<ProyectoEquipo>) => void
 }
 
-export default function ProyectoEquipoAccordion({
+const ProyectoEquipoAccordion = memo(function ProyectoEquipoAccordion({
   equipo,
   onItemChange,
   onUpdatedNombre,
@@ -32,15 +32,21 @@ export default function ProyectoEquipoAccordion({
 }: Props) {
   const [open, setOpen] = useState(false)
 
+  // 📊 Memoizar cálculos de subtotales
+  const subtotales = useMemo(() => ({
+    cliente: equipo.subtotalCliente,
+    interno: equipo.subtotalInterno
+  }), [equipo.subtotalCliente, equipo.subtotalInterno])
+
   return (
     <Accordion type="single" collapsible>
-      <AccordionItem value="item-1">
+      <AccordionItem value={`equipo-${equipo.id}`}>
         <AccordionTrigger onClick={() => setOpen(!open)}>
           <div className="flex justify-between w-full">
             <div>
               <strong>{equipo.nombre}</strong>
               <div className="text-sm text-gray-500">
-                Cliente: S/ {equipo.subtotalCliente.toFixed(2)} | Interno: S/ {equipo.subtotalInterno.toFixed(2)}
+                Cliente: $ {subtotales.cliente.toFixed(2)} | Interno: $ {subtotales.interno.toFixed(2)}
               </div>
             </div>
           </div>
@@ -76,4 +82,6 @@ export default function ProyectoEquipoAccordion({
       </AccordionItem>
     </Accordion>
   )
-}
+})
+
+export default ProyectoEquipoAccordion

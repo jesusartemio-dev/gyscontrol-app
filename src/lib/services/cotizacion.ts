@@ -1,9 +1,13 @@
 import type { Cotizacion } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
 
 // Obtener todas las cotizaciones
 export async function getCotizaciones(): Promise<Cotizacion[]> {
   try {
-    const res = await fetch('/api/cotizacion', { cache: 'no-store' })
+    const res = await fetch(buildApiUrl('/api/cotizacion'), { 
+      cache: 'no-store',
+      credentials: 'include' // ✅ Incluir cookies de sesión
+    })
     if (!res.ok) throw new Error('Error al obtener cotizaciones')
     return await res.json()
   } catch (error) {
@@ -15,7 +19,10 @@ export async function getCotizaciones(): Promise<Cotizacion[]> {
 // Obtener cotización por ID
 export async function getCotizacionById(id: string): Promise<Cotizacion> {
   try {
-    const res = await fetch(`/api/cotizacion/${id}`, { cache: 'no-store' })
+    const res = await fetch(buildApiUrl(`/api/cotizacion/${id}`), { 
+      cache: 'no-store',
+      credentials: 'include' // ✅ Incluir cookies de sesión
+    })
     if (!res.ok) throw new Error('Error al obtener cotización por ID')
     return await res.json()
   } catch (error) {
@@ -32,15 +39,16 @@ export async function createCotizacionFromPlantilla(data: {
   try {
     console.log('🚀 Enviando datos al backend:', data)
 
-    const res = await fetch('/api/cotizacion/from-plantilla', {
+    const response = await fetch(buildApiUrl('/api/cotizacion/from-plantilla'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ✅ Incluir cookies de sesión para autenticación
       body: JSON.stringify(data),
     })
 
-    const responseText = await res.text()
+    const responseText = await response.text()
 
-    if (!res.ok) {
+    if (!response.ok) {
       console.error('❌ Error en respuesta del backend:', responseText)
       throw new Error(`Error al crear cotización desde plantilla: ${responseText}`)
     }
@@ -59,9 +67,10 @@ export async function createCotizacion(data: {
   nombre: string
 }): Promise<Cotizacion> {
   try {
-    const res = await fetch('/api/cotizacion', {
+    const res = await fetch(buildApiUrl('/api/cotizacion'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ✅ Incluir cookies de sesión
       body: JSON.stringify(data),
     })
     if (!res.ok) throw new Error('Error al crear cotización')
@@ -78,9 +87,10 @@ export async function updateCotizacion(
   data: Partial<Cotizacion>
 ): Promise<Cotizacion> {
   try {
-    const res = await fetch(`/api/cotizacion/${id}`, {
+    const res = await fetch(buildApiUrl(`/api/cotizacion/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ✅ Incluir cookies de sesión
       body: JSON.stringify(data),
     })
     if (!res.ok) throw new Error('Error al actualizar cotización')
@@ -94,8 +104,9 @@ export async function updateCotizacion(
 // Eliminar cotización
 export async function deleteCotizacion(id: string): Promise<void> {
   try {
-    const res = await fetch(`/api/cotizacion/${id}`, {
+    const res = await fetch(buildApiUrl(`/api/cotizacion/${id}`), {
       method: 'DELETE',
+      credentials: 'include', // ✅ Incluir cookies de sesión
     })
     if (!res.ok) throw new Error('Error al eliminar cotización')
   } catch (error) {
@@ -107,7 +118,10 @@ export async function deleteCotizacion(id: string): Promise<void> {
 // Recalcular cotización
 export async function recalcularCotizacionDesdeAPI(id: string) {
   try {
-    const res = await fetch(`/api/cotizacion/${id}/recalcular`, { method: 'POST' })
+    const res = await fetch(buildApiUrl(`/api/cotizacion/${id}/recalcular`), { 
+      method: 'POST',
+      credentials: 'include' // ✅ Incluir cookies de sesión
+    })
     if (!res.ok) throw new Error('Error al recalcular totales de cotización desde API')
     return await res.json()
   } catch (error) {

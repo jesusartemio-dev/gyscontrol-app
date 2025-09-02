@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# 🔍 Auditoría de Consistencia BD-API-Componentes
+echo "🔍 Ejecutando auditoría de consistencia..."
+npm run audit:consistency
+
+if [ $? -ne 0 ]; then
+  echo "❌ Auditoría de consistencia falló. Commit cancelado."
+  echo "💡 Ejecuta 'npm run audit:consistency:html' para ver el reporte detallado"
+  exit 1
+fi
+
+echo "✅ Auditoría de consistencia completada"
+
+# Type checking
+echo "🔍 Verificando tipos TypeScript..."
+npm run type-check
+
+if [ $? -ne 0 ]; then
+  echo "❌ Type checking falló. Commit cancelado."
+  exit 1
+fi
+
+echo "✅ Type checking completado"
+echo "🚀 Commit permitido - Todo está consistente"

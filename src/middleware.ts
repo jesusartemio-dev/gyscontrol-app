@@ -27,6 +27,10 @@ const protectedRoutes = withAuth(
       return NextResponse.redirect(new URL('/denied', req.url))
     }
 
+    if (path.startsWith('/finanzas') && !['admin', 'gerente', 'finanzas', 'gestor'].includes(role || '')) {
+      return NextResponse.redirect(new URL('/denied', req.url))
+    }
+
     return NextResponse.next()
   },
   {
@@ -42,5 +46,5 @@ const protectedRoutes = withAuth(
 export default protectedRoutes
 
 export const config = {
-  matcher: ['/((?!login|api|_next|favicon.ico).*)'],
+  matcher: ['/((?!login|api/auth|_next/static|_next/image|favicon.ico).*)'],
 }

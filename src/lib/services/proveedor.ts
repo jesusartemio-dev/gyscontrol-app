@@ -61,3 +61,12 @@ export async function deleteProveedor(id: string): Promise<boolean> {
     return false
   }
 }
+
+// ===================================================
+// 🔄 Alias para compatibilidad
+// ===================================================
+
+/**
+ * Alias para getProveedores (compatibilidad con imports en español)
+ */
+export const obtenerProveedores = getProveedores

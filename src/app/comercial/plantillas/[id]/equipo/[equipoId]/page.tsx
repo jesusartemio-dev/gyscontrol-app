@@ -10,20 +10,7 @@ import {
 } from '@/lib/services/plantillaEquipoItem'
 import PlantillaEquipoItemForm from '@/components/plantillas/PlantillaEquipoItemForm'
 import PlantillaEquipoItemList from '@/components/plantillas/PlantillaEquipoItemList'
-
-interface PlantillaEquipoItem {
-  id: string
-  codigo: string
-  descripcion: string
-  cantidad: number
-  costoCliente: number
-}
-
-interface PlantillaEquipo {
-  id: string
-  nombre: string
-  items: PlantillaEquipoItem[]
-}
+import { PlantillaEquipo, PlantillaEquipoItem } from '@/types/modelos'
 
 export default function PlantillaEquipoDetallePage() {
   const { equipoId } = useParams()

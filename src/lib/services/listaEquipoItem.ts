@@ -21,8 +21,26 @@ export async function getListaEquipoItems(params?: { proyectoId?: string }): Pro
     let url = BASE_URL
     if (params?.proyectoId) url += `?proyectoId=${params.proyectoId}`
 
-    const res = await fetch(url, { cache: 'no-store' })
-    if (!res.ok) throw new Error('Error al obtener ítems de lista de equipos')
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include', // Incluir cookies de sesión
+      cache: 'no-store' // Siempre obtener datos frescos
+    })
+    
+    if (!res.ok) {
+      if (res.status === 401) {
+        // Redirigir al login si no está autenticado
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        return []
+      }
+      throw new Error(`Error ${res.status}: ${res.statusText}`)
+    }
+    
     return await res.json()
   } catch (error) {
     console.error('❌ getListaEquipoItems:', error)
@@ -170,15 +188,29 @@ export async function seleccionarCotizacion(listaEquipoItemId: string, cotizacio
 }
 
 export async function reemplazarItemLista(id: string, data: Partial<ListaEquipoItem>) {
-  const res = await fetch(`/api/lista-equipo-item/${id}/reemplazar`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
+  console.log('🔍 reemplazarItemLista called with:', { id, data })
+  
+  try {
+    const res = await fetch(`/api/lista-equipo-item/${id}/reemplazar`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
 
-  if (!res.ok) {
-    throw new Error('Error al reemplazar ítem de lista')
+    console.log('🔍 API Response status:', res.status)
+    console.log('🔍 API Response ok:', res.ok)
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      console.error('❌ API Error response:', errorText)
+      throw new Error(`Error al reemplazar ítem de lista: ${res.status} - ${errorText}`)
+    }
+
+    const result = await res.json()
+    console.log('✅ API Success response:', result)
+    return result
+  } catch (error) {
+    console.error('❌ reemplazarItemLista error:', error)
+    throw error
   }
-
-  return res.json()
 }

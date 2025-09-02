@@ -67,7 +67,6 @@ export async function POST(request: Request) {
         descripcion: item.descripcion,
         unidad: item.unidad,
         cantidadOriginal: item.cantidad,
-        presupuesto: item.presupuesto,
 
         // 💰 Datos de cotización (pueden venir vacíos)
         precioUnitario: body.precioUnitario ?? null,

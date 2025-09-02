@@ -1,36 +1,33 @@
+import type { CotizacionEquipoItem } from '@/types'
+import type { CotizacionEquipoItemUpdatePayload } from '@/types/payloads'
+import { buildApiUrl } from '@/lib/utils'
+
 // ===================================================
-// 📁 Archivo: cotizacionEquipoItem.ts
-// 📌 Ubicación: src/lib/services/
-// 🔧 Servicio CRUD para CotizacionEquipoItem (Frontend)
-// ✨ Métodos:
-// - createCotizacionEquipoItem()
-// - updateCotizacionEquipoItem()
-// - deleteCotizacionEquipoItem()
-// 🧠 Usa tipos desde: src/types
+// 📁 Archivo: src/lib/services/cotizacionEquipoItem.ts
+// 📌 Descripción: Servicios para gestionar items de cotización de equipo
+// 🧠 Uso: CRUD completo para items de cotización de equipo
+// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
+// 📅 Última actualización: 2025-05-25
 // ===================================================
 
-'use client'
-
-import type {
-  CotizacionEquipoItem,
-  CotizacionEquipoItemPayload,
-  CotizacionEquipoItemUpdatePayload
-} from '@/types'
-
-// ✅ Crear nuevo ítem de equipo
-export async function createCotizacionEquipoItem(
-  data: CotizacionEquipoItemPayload
-): Promise<CotizacionEquipoItem> {
+// ✅ Crear nuevo item de cotización de equipo
+export async function createCotizacionEquipoItem(data: {
+  cotizacionEquipoId: string
+  catalogoEquipoId: string
+  cantidad: number
+  precioUnitario: number
+  observaciones?: string
+}): Promise<CotizacionEquipoItem> {
   try {
-    const res = await fetch('/api/cotizacion-equipo-item', {
+    const res = await fetch(buildApiUrl('/api/cotizacion-equipo-item'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Error al agregar ítem de equipo')
+    if (!res.ok) throw new Error('Error al crear item de cotización de equipo')
     return await res.json()
   } catch (error) {
-    console.error('❌ createCotizacionEquipoItem:', error)
+    console.error('Error en createCotizacionEquipoItem:', error)
     throw error
   }
 }

@@ -7,12 +7,23 @@
 
 import { NextResponse, NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function PATCH(
   req: Request | NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ Obtener sesión del usuario
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id: originalId } = await context.params
     const nuevo = await req.json()
 
@@ -61,6 +72,7 @@ export async function PATCH(
         unidad: nuevo.unidad,
         cantidad: nuevo.cantidad,
         listaId: original.listaId,
+        responsableId: session.user.id,
         estado: 'borrador',
         origen: 'reemplazo',
         comentarioRevision: nuevo.comentarioRevision || '',

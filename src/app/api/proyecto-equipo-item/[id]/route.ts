@@ -11,7 +11,7 @@ import type { ProyectoEquipoItemUpdatePayload } from '@/types'
 export const dynamic = 'force-dynamic' // ✅ Para evitar problemas de caché en rutas dinámicas
 
 // ✅ Obtener un ítem de equipo por ID
-export async function GET(_: NextRequest, context: { params: { id: string } }) {
+export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const item = await prisma.proyectoEquipoItem.findUnique({
@@ -38,7 +38,7 @@ export async function GET(_: NextRequest, context: { params: { id: string } }) {
 }
 
 // ✅ Actualizar un ítem de equipo
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data: ProyectoEquipoItemUpdatePayload = await req.json()
@@ -56,7 +56,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar un ítem de equipo
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 

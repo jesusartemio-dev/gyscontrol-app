@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server'
 import type { PedidoEquipoUpdatePayload } from '@/types'
 
 // ✅ Obtener pedido por ID
-export async function GET(_: Request, context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 
@@ -62,7 +62,7 @@ export async function GET(_: Request, context: { params: { id: string } }) {
 }
 
 // ✅ Actualizar pedido
-export async function PUT(req: Request, context: { params: { id: string } }) {
+export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const body: PedidoEquipoUpdatePayload = await req.json()
@@ -103,7 +103,7 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
 }
 
 // ✅ Eliminar pedido
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 

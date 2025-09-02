@@ -10,6 +10,7 @@
 
 'use client'
 
+import React, { memo, useMemo } from 'react'
 import { useEffect, useState } from 'react'
 import type { ProyectoEquipoItem } from '@/types'
 import { Input } from '@/components/ui/input'
@@ -22,7 +23,7 @@ interface Props {
   onDelete: (id: string) => void
 }
 
-export default function ProyectoEquipoItemRow({ item, onUpdate, onDelete }: Props) {
+const ProyectoEquipoItemRow = memo(function ProyectoEquipoItemRow({ item, onUpdate, onDelete }: Props) {
   const [localItem, setLocalItem] = useState(item)
 
   // 🔁 Si el item cambia externamente, actualizamos localmente
@@ -50,11 +51,20 @@ export default function ProyectoEquipoItemRow({ item, onUpdate, onDelete }: Prop
     })
   }
 
+  // 🎯 Memoizar cálculos de costos para optimizar rendimiento
+  const costoInterno = useMemo(() => {
+    return localItem.cantidad * localItem.precioInterno
+  }, [localItem.cantidad, localItem.precioInterno])
+
+  const costoCliente = useMemo(() => {
+    return localItem.cantidad * localItem.precioCliente
+  }, [localItem.cantidad, localItem.precioCliente])
+
   return (
     <tr className="border-b text-sm hover:bg-gray-50 transition">
       <td className="p-2 font-mono text-gray-700">{item.codigo}</td>
-      <td className="p-2">{item.nombre}</td>
-      <td className="p-2 text-gray-500">{item.descripcion || '-'}</td>
+      <td className="p-2">{item.descripcion}</td>
+      <td className="p-2 text-gray-500">{item.categoria || '-'}</td>
       <td className="p-2 text-gray-500">{item.unidad || '-'}</td>
 
       <td className="p-2">
@@ -86,10 +96,10 @@ export default function ProyectoEquipoItemRow({ item, onUpdate, onDelete }: Prop
       </td>
 
       <td className="p-2 text-right text-blue-700 font-medium">
-        {localItem.costoInterno.toFixed(2)}
+        {costoInterno.toFixed(2)}
       </td>
       <td className="p-2 text-right text-green-700 font-medium">
-        {localItem.costoCliente.toFixed(2)}
+        {costoCliente.toFixed(2)}
       </td>
 
       <td className="p-2 text-right">
@@ -99,4 +109,6 @@ export default function ProyectoEquipoItemRow({ item, onUpdate, onDelete }: Prop
       </td>
     </tr>
   )
-}
+})
+
+export default ProyectoEquipoItemRow

@@ -8,12 +8,12 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import type { ListaRequerimientoPayload } from '@/types'
+import type { ListaEquipoPayload } from '@/types'
 
 // ✅ Obtener todas las listas
 export async function GET() {
   try {
-    const data = await prisma.listaRequerimiento.findMany({
+    const data = await prisma.listaEquipo.findMany({
       include: {
         items: true,
         proyecto: {
@@ -34,14 +34,16 @@ export async function GET() {
 // ✅ Crear nueva lista
 export async function POST(request: Request) {
   try {
-    const payload: ListaRequerimientoPayload = await request.json()
+    const payload: ListaEquipoPayload = await request.json()
 
-    const creada = await prisma.listaRequerimiento.create({
+    const creada = await prisma.listaEquipo.create({
       data: {
         proyectoId: payload.proyectoId,
+        responsableId: payload.responsableId || payload.proyectoId, // temporal fallback
+        codigo: payload.codigo || `LST-${Date.now()}`, // generar código si no se proporciona
         nombre: payload.nombre,
-        descripcion: payload.descripcion,
-        estado: payload.estado || 'pendiente'
+        numeroSecuencia: payload.numeroSecuencia || 1,
+        estado: payload.estado || 'borrador'
       }
     })
 

@@ -9,15 +9,21 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_: Request, context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 
     const secciones = await prisma.proyectoEquipo.findMany({
       where: { proyectoId: id },
-      select: {
-        id: true,
-        nombre: true,
+      include: {
+        responsable: true,
+        items: {
+          include: {
+            catalogoEquipo: true,
+            lista: true,
+            listaEquipoSeleccionado: true,
+          },
+        },
       },
       orderBy: {
         nombre: 'asc',

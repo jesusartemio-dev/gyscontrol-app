@@ -96,7 +96,7 @@ export default function CotizacionEquipoItemList({ items, onDeleted, onUpdated }
             </div>
 
             <div className="text-green-600 font-semibold ml-auto">
-              S/ {item.costoCliente.toFixed(2)}
+              $ {item.costoCliente.toFixed(2)}
             </div>
           </div>
 

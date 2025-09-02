@@ -9,6 +9,10 @@
 //    que necesite acceder a estructuras de datos tipadas.
 // ===================================================
 
+// 📋 Importaciones de tipos desde Prisma Client
+import type { 
+   Producto as PrismaProducto
+ } from '@prisma/client';
 
 // Tipos generales
 export type Estado = 'pendiente' | 'aprobado' | 'rechazado'
@@ -23,6 +27,29 @@ export type RolUsuario =
   | 'gestor'
   | 'gerente'
   | 'admin'
+
+// ✅ Tipos para el sistema de notificaciones del sidebar
+export type NotificationBadgeType = 
+  | 'ordenes-pendientes'
+  // recepciones-pendientes y pagos-vencidos removidos
+
+// ✅ Tipo para enlaces del sidebar con notificaciones
+export interface SidebarLink {
+  href: string
+  label: string
+  icon: any // Lucide icon component
+  badge?: NotificationBadgeType
+}
+
+// ✅ Tipo para secciones del sidebar
+export interface SidebarSection {
+  key: string
+  title: string
+  icon: any // Lucide icon component
+  color: string
+  roles: RolUsuario[]
+  links: SidebarLink[]
+}
 
 export type EstadoEquipo =
   | 'pendiente'
@@ -223,6 +250,9 @@ export interface CatalogoEquipo {
   estado: string
   createdAt: string
   updatedAt: string
+  
+  // 🔗 Relaciones
+  listaEquipoItems?: ListaEquipoItem[]
 }
 
 // ========================
@@ -314,17 +344,6 @@ export interface PlantillaEquipoItem {
   costoCliente: number
   createdAt: string
   updatedAt: string
-  // Relaciones opcionales si haces include
-  catalogoEquipo?: {
-    id: string
-    codigo: string
-    descripcion: string
-    categoria: string
-    unidad: string
-    marca: string
-    precioInterno: number
-    precioCliente: number
-  }
 }
 
 
@@ -451,6 +470,9 @@ export interface Cotizacion {
   cliente: {
     id: string
     nombre: string
+    ruc?: string
+    direccion?: string
+    correo?: string
   } | null
   comercial: {
     id: string
@@ -632,7 +654,7 @@ export interface Proyecto {
   servicios: ProyectoServicio[]
   gastos: ProyectoGasto[]
   ListaEquipo: ListaEquipo[]
-  cotizacionesProveedor: CotizacionProveedor[]
+  cotizaciones: CotizacionProveedor[]
   valorizaciones: Valorizacion[]
   registrosHoras: RegistroHoras[]
 }
@@ -794,6 +816,17 @@ export interface ListaEquipo {
   estado: EstadoListaEquipo
   createdAt: string
   updatedAt: string
+  
+  // ✅ Campos de fecha de seguimiento
+  fechaNecesaria?: string
+  fechaEnvioRevision?: string
+  fechaValidacion?: string
+  fechaAprobacionRevision?: string
+  fechaEnvioLogistica?: string
+  fechaInicioCotizacion?: string
+  fechaFinCotizacion?: string
+  fechaAprobacionFinal?: string
+  
   items: ListaEquipoItem[]
   proyecto?: Proyecto | null       // ✅ incluye info del proyecto si se hace include en la API
 }
@@ -806,6 +839,7 @@ export interface ListaEquipoItem {
   proyectoEquipoItemId?: string
   proyectoEquipoId?: string
   reemplazaProyectoEquipoItemId?: string // 🆕 Si este item reemplaza uno cotizado
+  catalogoEquipoId?: string
 
   proveedorId?: string
   cotizacionSeleccionadaId?: string
@@ -833,6 +867,7 @@ export interface ListaEquipoItem {
   // 🔗 Relaciones
   lista: ListaEquipo
   proveedor?: Proveedor
+  catalogoEquipo?: CatalogoEquipo
   cotizaciones: CotizacionProveedorItem[]
   pedidos: PedidoEquipoItem[]
   cotizacionSeleccionada?: CotizacionProveedorItem
@@ -873,6 +908,8 @@ export interface CotizacionProveedor {
   codigo: string                               // ✅ antes 'nombre', ahora es el código único (ej. CJM27-COT-001)
   numeroSecuencia: number                      // ✅ número puro para control interno
   estado: EstadoCotizacionProveedor  // ✅ nuevo
+  createdAt: string
+  updatedAt: string
   proveedor: Proveedor
   proyecto: Proyecto
   items: CotizacionProveedorItem[]
@@ -900,6 +937,8 @@ export interface CotizacionProveedorItem {
   // ✅ Estado y selección
   estado: EstadoCotizacionProveedor
   esSeleccionada?: boolean
+  createdAt: string
+  updatedAt: string
   // 🔗 Relaciones
   cotizacion: CotizacionProveedor
   listaEquipoItem?: ListaEquipoItem
@@ -943,12 +982,13 @@ export interface PedidoEquipoItem {
 
   tiempoEntrega?: string              // Ej: "stock", "7 días", etc.
   tiempoEntregaDias?: number         // Ej: 0, 7, 14
-  fechaOrdenCompraRecomendada?: string // ⚠️ fechaNecesaria - tiempoEntregaDias
+  // fechaOrdenCompraRecomendada removido
 
   createdAt?: string
   updatedAt?: string
 
   listaEquipoItem?: ListaEquipoItem
+  pedido?: PedidoEquipo              // ✅ Relación al pedido padre para acceder al código
 }
 
 
@@ -996,5 +1036,146 @@ export interface RegistroHoras {
   proyecto: Proyecto
   proyectoServicio: ProyectoServicio
   recurso: Recurso
-  usuario: User
+  usuario: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  }
 }
+
+// ============================
+// 🧾 Lista de Requerimientos
+// ============================
+export interface ListaRequerimiento {
+  id: string
+  proyectoId: string
+  nombre: string
+  descripcion?: string
+  estado: Estado
+  fechaAprobacion?: string
+  createdAt: string
+  updatedAt: string
+  items: ListaRequerimientoItem[]
+}
+
+export interface ListaRequerimientoItem {
+  id: string
+  listaRequerimientoId: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  estado: Estado
+  fechaRequerida?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// Payloads para crear/actualizar
+export interface ListaRequerimientoPayload {
+  proyectoId: string
+  nombre: string
+  descripcion?: string
+  estado?: Estado
+}
+
+export interface ListaRequerimientoItemPayload {
+  listaRequerimientoId: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  estado?: Estado
+  fechaRequerida?: string
+}
+
+// ============================
+// 📦 Paquetes de Compra
+// ============================
+export interface PaqueteCompra {
+  id: string
+  proyectoId: string
+  nombre: string
+  descripcion?: string
+  estado: Estado
+  fechaAprobacion?: string
+  montoTotal: number
+  createdAt: string
+  updatedAt: string
+  items: PaqueteCompraItem[]
+}
+
+export interface PaqueteCompraItem {
+  id: string
+  paqueteCompraId: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  precioUnitario: number
+  montoTotal: number
+  createdAt: string
+  updatedAt: string
+}
+
+// Payloads para crear/actualizar
+export interface PaqueteCompraPayload {
+  proyectoId: string
+  nombre: string
+  descripcion?: string
+  estado?: Estado
+  montoTotal?: number
+}
+
+export interface PaqueteCompraItemPayload {
+  paqueteCompraId: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  precioUnitario: number
+  montoTotal?: number
+}
+
+// ===== TIPOS BASE (ALIASES PARA MEJOR LEGIBILIDAD) =====
+
+/**
+ * 📦 Producto - Catálogo de productos para órdenes de compra
+ * @description Entidad que representa los productos disponibles en el sistema
+ */
+export type Producto = PrismaProducto;
+
+/**
+ * 🛒 Orden de Compra - Documento que formaliza la solicitud de productos/servicios a un proveedor
+ */
+// Tipos de aprovisionamiento eliminados
+
+// ===== ENUMS RE-EXPORTADOS PARA CONSISTENCIA =====
+
+// Enums de aprovisionamiento eliminados
+
+
+
+/**
+ * 🔄 Tipos de Movimiento - Clasificación de transacciones
+ */
+
+
+// ===== TIPOS COMPUESTOS CON RELACIONES =====
+
+// Tipos compuestos de aprovisionamiento eliminados
+
+// OrdenCompraConTodo type removido
+
+// RecepcionConItems type removido
+
+// RecepcionConTodo type removido
+
+// PagoConItems type removido
+
+// PagoConTodo type removido
+
+// ===== TIPOS PARA DASHBOARDS Y REPORTES =====
+
+// ✅ Reportes
+// Tipos de reportes de aprovisionamiento eliminados

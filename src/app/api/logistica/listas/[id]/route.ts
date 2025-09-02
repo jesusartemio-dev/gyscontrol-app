@@ -11,7 +11,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   req: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params
@@ -37,7 +37,11 @@ export async function GET(
               },
               orderBy: { codigo: 'asc' },
             },
-            pedidos: true,
+            pedidos: {
+              include: {
+                pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+              }
+            },
             proyectoEquipoItem: {
               include: { proyectoEquipo: true },
             },

@@ -65,9 +65,9 @@ export default function LogisticaListaDetalleItemComparativo({ item, onUpdated }
                 <tr key={cot.id} className="border-t hover:bg-gray-50">
                   <td className="p-2 border">{cot.cotizacion?.codigo || '—'}</td>
                   <td className="p-2 border">{cot.cotizacion?.proveedor?.nombre || '—'}</td>
-                  <td className="p-2 border text-right">S/. {precio.toFixed(2)}</td>
+                  <td className="p-2 border text-right">$ {precio.toFixed(2)}</td>
                   <td className="p-2 border text-center">{cantidad}</td>
-                  <td className="p-2 border text-right">S/. {costoTotal.toFixed(2)}</td>
+                  <td className="p-2 border text-right">$ {costoTotal.toFixed(2)}</td>
                   <td className="p-2 border text-center">{cot.tiempoEntrega || '—'}</td>
                   <td className="p-2 border text-center capitalize">{cot.estado}</td>
                   <td className="p-2 border text-center">

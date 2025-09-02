@@ -9,10 +9,10 @@ import { NextResponse } from 'next/server'
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const { cotizacionProveedorItemId } = await req.json()
 
     // ✅ Buscar la cotización seleccionada
@@ -73,6 +73,6 @@ export async function PATCH(
 }
 
 // 🔁 POST reutiliza el PATCH por compatibilidad (en caso de ser usado como formulario)
-export async function POST(req: Request, context: { params: { id: string } }) {
+export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   return PATCH(req, context)
 }

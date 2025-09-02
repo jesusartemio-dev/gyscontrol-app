@@ -11,6 +11,7 @@ import type {
   ProyectoEquipoItemPayload,
   ProyectoEquipoItemUpdatePayload,
 } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
 
 // ✅ Obtener ítems de equipos del proyecto, con opción de filtrar solo disponibles
 export async function getProyectoEquipoItems(
@@ -53,7 +54,7 @@ export async function createProyectoEquipoItem(
   data: ProyectoEquipoItemPayload
 ): Promise<ProyectoEquipoItem> {
   try {
-    const res = await fetch('/api/proyecto-equipo-item', {
+    const res = await fetch(buildApiUrl('/api/proyecto-equipo-item'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

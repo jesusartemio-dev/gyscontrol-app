@@ -1,27 +1,45 @@
-import type { PlantillaEquipo, PlantillaEquipoPayload } from '@/types'
+import type { PlantillaEquipo } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
 
+// ===================================================
+// 📁 Archivo: src/lib/services/plantillaEquipo.ts
+// 📌 Descripción: Servicios para gestionar plantillas de equipo
+// 🧠 Uso: CRUD completo para plantillas de equipo
+// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
+// 📅 Última actualización: 2025-05-25
+// ===================================================
+
+// ✅ Crear nueva plantilla de equipo
+// ✅ Obtener plantilla de equipo por ID
 export async function getPlantillaEquipoById(id: string): Promise<PlantillaEquipo> {
   try {
-    const res = await fetch(`/api/plantilla-equipo/${id}`)
-    if (!res.ok) throw new Error('Error al obtener la sección del equipo')
+    const res = await fetch(buildApiUrl(`/api/plantilla-equipo/${id}`), {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    if (!res.ok) throw new Error('Error al obtener plantilla de equipo')
     return await res.json()
   } catch (error) {
-    console.error('❌ getPlantillaEquipoById:', error)
+    console.error('Error en getPlantillaEquipoById:', error)
     throw error
   }
 }
 
-export async function createPlantillaEquipo(data: PlantillaEquipoPayload): Promise<PlantillaEquipo> {
+export async function createPlantillaEquipo(data: {
+  plantillaId: string
+  nombre: string
+  descripcion?: string
+}): Promise<PlantillaEquipo> {
   try {
-    const res = await fetch('/api/plantilla-equipo', {
+    const res = await fetch(buildApiUrl('/api/plantilla-equipo'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Error al crear sección de equipos')
+    if (!res.ok) throw new Error('Error al crear plantilla de equipo')
     return await res.json()
   } catch (error) {
-    console.error('❌ createPlantillaEquipo:', error)
+    console.error('Error en createPlantillaEquipo:', error)
     throw error
   }
 }

@@ -26,6 +26,7 @@ interface Props {
   onDelete?: (id: string) => void
   onUpdateItem?: (id: string, payload: PedidoEquipoItemUpdatePayload) => void
   onDeleteItem?: (id: string) => void
+  onRefresh?: () => Promise<void>
 }
 
 export default function PedidoEquipoList({
@@ -34,6 +35,7 @@ export default function PedidoEquipoList({
   onDelete,
   onUpdateItem,
   onDeleteItem,
+  onRefresh,
 }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -119,8 +121,10 @@ export default function PedidoEquipoList({
             {expandedId === pedido.id && (
               <PedidoEquipoAccordion
                 pedido={pedido}
+                responsableId={pedido.responsableId}
                 onUpdateItem={onUpdateItem}
                 onDeleteItem={onDeleteItem}
+                onRefresh={onRefresh}
               />
             )}
           </div>

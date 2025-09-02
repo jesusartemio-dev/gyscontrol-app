@@ -28,7 +28,7 @@ export default function LogisticaListaDetalleItemRow({
       <div>{item.codigo}</div>
       <div>{item.unidad}</div>
       <div>{item.cantidad}</div>
-      <div>S/. {item.presupuesto?.toFixed(2) || '0.00'}</div>
+      <div>$ {item.presupuesto?.toFixed(2) || '0.00'}</div>
       <input
         type="number"
         className="border p-1 rounded w-full"

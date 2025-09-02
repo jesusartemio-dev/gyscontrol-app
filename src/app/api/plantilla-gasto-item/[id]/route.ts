@@ -11,9 +11,9 @@ import { prisma } from '@/lib/prisma'
 import { PlantillaGastoItemUpdatePayload } from '@/types/payloads'
 import { recalcularTotalesPlantilla } from '@/lib/utils/recalculoPlantilla'
 
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
     const data = await prisma.plantillaGastoItem.findUnique({
       where: { id },
       include: {
@@ -26,9 +26,9 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(req: Request, context: { params: { id: string } }) {
+export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
     const payload: PlantillaGastoItemUpdatePayload = await req.json()
     const data = await prisma.plantillaGastoItem.update({
       where: { id },
@@ -51,9 +51,9 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
   }
 }
 
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
 
     const item = await prisma.plantillaGastoItem.findUnique({
       where: { id },

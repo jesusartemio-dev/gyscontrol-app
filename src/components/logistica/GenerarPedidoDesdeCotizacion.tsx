@@ -17,9 +17,10 @@ import { toast } from 'sonner'
 
 interface Props {
   pedidoId: string
+  responsableId: string
 }
 
-export default function GenerarPedidoDesdeCotizacion({ pedidoId }: Props) {
+export default function GenerarPedidoDesdeCotizacion({ pedidoId, responsableId }: Props) {
   const [itemsSeleccionados, setItemsSeleccionados] = useState<CotizacionProveedorItem[]>([])
 
   useEffect(() => {
@@ -41,12 +42,17 @@ export default function GenerarPedidoDesdeCotizacion({ pedidoId }: Props) {
       for (const item of itemsSeleccionados) {
         const payload: PedidoEquipoItemPayload = {
           pedidoId,
+          responsableId,
           listaEquipoItemId: item.listaEquipoItemId,
           cantidadPedida: item.cantidad || item.cantidadOriginal,
           precioUnitario: item.precioUnitario,
           costoTotal: item.costoTotal,
-          fechaNecesaria: new Date().toISOString().slice(0, 10),
+          fechaOrdenCompraRecomendada: new Date().toISOString().slice(0, 10),
           estado: 'pendiente',
+          // Required fields from the payload type
+          codigo: item.codigo || 'N/A',
+          descripcion: item.descripcion || 'Descripción no disponible',
+          unidad: item.unidad || 'pza',
         }
         await createPedidoEquipoItem(payload)
       }

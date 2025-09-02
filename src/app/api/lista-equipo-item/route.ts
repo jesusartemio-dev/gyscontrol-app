@@ -10,15 +10,36 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import type { ListaEquipoItemPayload } from '@/types/payloads'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 // ✅ Obtener todos los ítems
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const proyectoId = searchParams.get('proyectoId')
+    
+    // 🔍 Construir filtros dinámicamente
+    const whereClause: any = {}
+    
+    if (proyectoId) {
+      whereClause.lista = {
+        proyectoId: proyectoId
+      }
+    }
+    
+    console.log('🔍 DEBUG API lista-equipo-item - Filtros aplicados:', whereClause)
+    
     const items = await prisma.listaEquipoItem.findMany({
+      where: whereClause,
       include: {
         lista: true,
         proveedor: true,
-        pedidos: true,
+        pedidos: {
+          include: {
+            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+          }
+        },
         proyectoEquipoItem: {
           include: {
             proyectoEquipo: true,
@@ -73,6 +94,15 @@ export async function GET() {
 // ✅ Crear nuevo ítem
 export async function POST(request: Request) {
   try {
+    // ✅ Obtener sesión del usuario
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const body = (await request.json()) as ListaEquipoItemPayload
 
     // 📌 Validación básica de campos obligatorios
@@ -124,6 +154,7 @@ export async function POST(request: Request) {
         reemplazaProyectoEquipoItemId: body.reemplazaProyectoEquipoItemId || null, // ✅ actualizado
         proveedorId: body.proveedorId || null,
         cotizacionSeleccionadaId: body.cotizacionSeleccionadaId || null,
+        responsableId: session.user.id,
         codigo: body.codigo,
         descripcion: body.descripcion,
         unidad: body.unidad,
@@ -143,7 +174,11 @@ export async function POST(request: Request) {
       include: {
         lista: true,
         proveedor: true,
-        pedidos: true,
+        pedidos: {
+          include: {
+            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+          }
+        },
         proyectoEquipoItem: {
           include: {
             proyectoEquipo: true,

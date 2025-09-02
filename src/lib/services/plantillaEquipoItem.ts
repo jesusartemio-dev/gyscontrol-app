@@ -1,28 +1,32 @@
+import { PlantillaEquipoItem } from '@/types'
+import { PlantillaEquipoItemPayload, PlantillaEquipoItemUpdatePayload } from '@/types/payloads'
+import { buildApiUrl } from '@/lib/utils'
+
 // ===================================================
-// 📁 Archivo: plantillaEquipoItem.ts
-// 📌 Servicios para CRUD de ítems de equipo en plantilla
-// 🧠 Usa tipos: PlantillaEquipoItem, PlantillaEquipoItemPayload
+// 📁 Archivo: src/lib/services/plantillaEquipoItem.ts
+// 📌 Descripción: Servicios para gestionar items de plantilla de equipo
+// 🧠 Uso: CRUD completo para items de plantilla de equipo
+// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
+// 📅 Última actualización: 2025-05-25
 // ===================================================
 
-import type {
-  PlantillaEquipoItem,
-  PlantillaEquipoItemPayload
-} from '@/types'
-
-// ✅ Crear ítem
-export async function createPlantillaEquipoItem(
-  data: PlantillaEquipoItemPayload
-): Promise<PlantillaEquipoItem> {
+// ✅ Crear nuevo item de plantilla de equipo
+export async function createPlantillaEquipoItem(data: {
+  plantillaEquipoId: string
+  catalogoEquipoId: string
+  cantidad: number
+  observaciones?: string
+}): Promise<PlantillaEquipoItem> {
   try {
-    const res = await fetch('/api/plantilla-equipo-item', {
+    const res = await fetch(buildApiUrl('/api/plantilla-equipo-item'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Error al agregar ítem')
+    if (!res.ok) throw new Error('Error al crear item de plantilla de equipo')
     return await res.json()
   } catch (error) {
-    console.error('❌ createPlantillaEquipoItem:', error)
+    console.error('Error en createPlantillaEquipoItem:', error)
     throw error
   }
 }

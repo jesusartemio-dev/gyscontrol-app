@@ -11,7 +11,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(_: NextRequest, context: { params: { id: string } }) {
+export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id: proyectoId } = await context.params
 
   try {

@@ -11,7 +11,7 @@ import type { NextRequest } from 'next/server'
 export const dynamic = 'force-dynamic' // ✅ Previene errores de caché y SSR en rutas dinámicas
 
 // ✅ Actualizar ítem de servicio
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data: PlantillaServicioItemUpdatePayload = await req.json()
@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar ítem con logs y control de errores
-export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 

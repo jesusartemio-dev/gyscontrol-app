@@ -37,10 +37,10 @@ export default function LogisticaListaDetalleItemTable({ items, onUpdated }: Pro
             <th className="px-3">Descripción</th>
             <th className="px-3">Unidad</th>
             <th className="text-right px-3">Cantidad</th>
-            <th className="text-right px-3">Presupuesto Unit.</th>
+
             <th className="text-right px-3">Precio Elegido</th>
             <th className="text-right px-3">Costo Total</th>
-            <th className="text-center px-3"># Cots</th>
+            <th className="text-center px-3"># Cot</th>
             <th className="text-center px-3">Seleccionado</th>
           </tr>
         </thead>
@@ -70,9 +70,8 @@ export default function LogisticaListaDetalleItemTable({ items, onUpdated }: Pro
                   <td className="px-3">{item.descripcion}</td>
                   <td className="px-3">{item.unidad}</td>
                   <td className="text-right px-3">{item.cantidad}</td>
-                  <td className="text-right px-3">S/. {(item.presupuesto ?? 0).toFixed(2)}</td>
-                  <td className="text-right px-3">S/. {(item.precioElegido ?? 0).toFixed(2)}</td>
-                  <td className="text-right px-3">S/. {(item.costoElegido ?? 0).toFixed(2)}</td>
+                  <td className="text-right px-3">$ {(item.precioElegido ?? 0).toFixed(2)}</td>
+                  <td className="text-right px-3">$ {(item.costoElegido ?? 0).toFixed(2)}</td>
                   <td className="text-center px-3">
                     <Badge variant="outline">{cotizacionesCount}</Badge>
                   </td>
@@ -86,7 +85,7 @@ export default function LogisticaListaDetalleItemTable({ items, onUpdated }: Pro
                 {/* 🔍 Fila expandida para mostrar comparativo, solo si está expandido */}
                 {expandedItemId === item.id && (
                   <tr key={`${item.id}-expanded`}>
-                    <td colSpan={10} className="p-2 bg-gray-50 border-b">
+                    <td colSpan={9} className="p-2 bg-gray-50 border-b">
                       <LogisticaListaDetalleItemComparativo
                         item={item}
                         onUpdated={onUpdated}

@@ -64,7 +64,7 @@ export default function SeleccionarCotizacionPorItem({
                 </div>
                 <div>
                   <strong>Precio:</strong>{' '}
-                  S/. {cot.precioUnitario?.toFixed(2) || '-'}
+                  $ {cot.precioUnitario?.toFixed(2) || '-'}
                 </div>
                 <div>
                   <strong>Cantidad:</strong> {cot.cantidad || '-'}

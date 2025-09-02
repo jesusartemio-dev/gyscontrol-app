@@ -12,15 +12,16 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
 // ✅ GET: Obtener por ID
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    const item = await prisma.listaRequerimientoItem.findUnique({
+    const item = await prisma.listaEquipoItem.findUnique({
       where: { id },
       include: {
         lista: true,
         proyectoEquipoItem: true,
-        paquetes: true,
+        proveedor: true,
+        cotizaciones: true,
       },
     })
     return NextResponse.json(item)
@@ -30,11 +31,11 @@ export async function GET(context: { params: { id: string } }) {
 }
 
 // ✅ PUT: Actualizar por ID
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await request.json()
-    const item = await prisma.listaRequerimientoItem.update({
+    const item = await prisma.listaEquipoItem.update({
       where: { id },
       data,
     })
@@ -45,10 +46,10 @@ export async function PUT(request: Request, context: { params: { id: string } })
 }
 
 // ✅ DELETE: Eliminar por ID
-export async function DELETE(context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    const deleted = await prisma.listaRequerimientoItem.delete({ where: { id } })
+    const deleted = await prisma.listaEquipoItem.delete({ where: { id } })
     return NextResponse.json(deleted)
   } catch (error) {
     return NextResponse.json({ error: 'Error al eliminar item' }, { status: 500 })

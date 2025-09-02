@@ -73,7 +73,7 @@ export default function CotizacionProveedorItemImportar() {
                   <td className="px-2 py-1">{item.descripcion}</td>
                   <td className="px-2 py-1">{item.cantidad}</td>
                   <td className="px-2 py-1">{item.unidad}</td>
-                  <td className="px-2 py-1">S/. {item.precioUnitario?.toFixed(2)}</td>
+                  <td className="px-2 py-1">$ {item.precioUnitario?.toFixed(2)}</td>
                   <td className="px-2 py-1">{item.tiempoEntrega}</td>
                   <td className="px-2 py-1">
                     <Input

@@ -9,10 +9,10 @@ import { NextResponse } from 'next/server'
 // ✅ Eliminar unidad
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     if (!id) {
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 })
     }
@@ -29,10 +29,10 @@ export async function DELETE(
 // ✅ Editar unidad
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const { nombre } = await req.json()
 
     if (!nombre || typeof nombre !== 'string') {

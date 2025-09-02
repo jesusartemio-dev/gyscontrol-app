@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(_req: Request, { params }: { params: { listaId: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ listaId: string }> }) {
   try {
     const { listaId } = await params
 
@@ -20,15 +20,45 @@ export async function GET(_req: Request, { params }: { params: { listaId: string
       where: { listaId },
       include: {
         proveedor: true,
-        cotizaciones: true,
-        pedidos: true,
+        cotizaciones: {
+          include: {
+            cotizacion: {
+              select: {
+                id: true,
+                codigo: true,
+                proveedor: {
+                  select: { nombre: true },
+                },
+              },
+            },
+          },
+        },
+        cotizacionSeleccionada: {
+          include: {
+            cotizacion: {
+              select: {
+                id: true,
+                codigo: true,
+                proveedor: {
+                  select: { nombre: true },
+                },
+              },
+            },
+          },
+        },
+        pedidos: {
+          include: {
+            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+          }
+        },
         proyectoEquipo: true, // ✅ Agregado: para equipos nuevos sin proyectoEquipoItem
         proyectoEquipoItem: {
           include: {
             proyectoEquipo: true, // ✅ para obtener nombre del equipo padre desde el item
-            listaEquipoSeleccionado: true, // ✅ incluir la relación entera
           },
         },
+        lista: true, // ✅ Incluir información de la lista
+        responsable: true, // ✅ Incluir información del responsable
       },
       orderBy: { createdAt: 'desc' },
     })

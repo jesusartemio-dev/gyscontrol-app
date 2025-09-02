@@ -12,12 +12,12 @@
 import { ListaEquipo } from '@/types'
 import LogisticaListaTecnicaCard from './LogisticaListaTecnicaCard'
 
-interface Props {
+interface LogisticaListaTecnicaListProps {
   listas: ListaEquipo[]
   onRefresh?: () => void
 }
 
-export default function LogisticaListaTecnicaList({ listas, onRefresh }: Props) {
+export default function LogisticaListaTecnicaList({ listas, onRefresh }: LogisticaListaTecnicaListProps) {
   if (listas.length === 0) {
     return <p className="text-gray-500">No hay listas técnicas disponibles.</p>
   }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createCotizacion } from '@/lib/services/cotizacion'
 import { useSession } from 'next-auth/react'
 import type { Cotizacion } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
 
 interface Cliente {
   id: string
@@ -28,7 +29,7 @@ export default function CotizacionForm({ onCreated }: Props) {
   useEffect(() => {
     const fetchClientes = async () => {
       try {
-        const res = await fetch('/api/clientes')
+        const res = await fetch(buildApiUrl('/api/clientes'))
         if (!res.ok) throw new Error('Error al obtener clientes')
         const data = await res.json()
         setClientes(data)

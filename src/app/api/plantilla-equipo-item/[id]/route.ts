@@ -15,7 +15,7 @@ import { recalcularTotalesPlantilla } from '@/lib/utils/recalculoPlantilla'
 export const dynamic = 'force-dynamic' // ✅ Para rutas dinámicas en App Router
 
 // ✅ Actualizar ítem de equipo de plantilla
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data: Partial<PlantillaEquipoItemPayload> = await req.json()
@@ -62,7 +62,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar ítem de equipo de plantilla
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 

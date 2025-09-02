@@ -1,5 +1,7 @@
+import { buildApiUrl } from '@/lib/utils'
+
 export async function getNivelServicio() {
-  const res = await fetch('/api/nivel-servicio')
+  const res = await fetch(buildApiUrl('/api/nivel-servicio'))
   if (!res.ok) throw new Error('Error al obtener niveles de servicio')
   const data = await res.json()
 

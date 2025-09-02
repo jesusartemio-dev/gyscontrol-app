@@ -5,7 +5,7 @@ import type { CotizacionProveedorUpdatePayload } from '@/types'
 // GET → Obtener cotización por ID
 export async function GET(
   req: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params // ✅ quitamos 'await'
@@ -47,10 +47,10 @@ export async function GET(
 // PUT → Actualizar cotización por ID
 export async function PUT(
   req: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params // ✅ quitamos 'await'
+    const { id } = await context.params
     const body: CotizacionProveedorUpdatePayload = await req.json()
 
     const data = await prisma.cotizacionProveedor.update({
@@ -71,10 +71,10 @@ export async function PUT(
 // DELETE → Eliminar cotización por ID
 export async function DELETE(
   req: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params // ✅ quitamos 'await'
+    const { id } = await context.params
 
     await prisma.cotizacionProveedorItem.deleteMany({
       where: { cotizacionId: id },

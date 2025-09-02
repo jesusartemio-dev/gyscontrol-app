@@ -48,7 +48,7 @@ export default function LogisticaCotizacionResumen({
               className="flex justify-between items-center border-b py-1 text-sm"
             >
               <span>
-                {item.descripcion} ({item.codigo}) — {cantidad} unidades • S/.{' '}
+                {item.descripcion} ({item.codigo}) — {cantidad} unidades • ${' '}
                 {(item.presupuesto || 0).toFixed(2)} c/u
               </span>
               <button
@@ -63,7 +63,7 @@ export default function LogisticaCotizacionResumen({
       )}
 
       <div className="text-right font-bold text-base mt-2">
-        Total: S/. {total.toFixed(2)}
+        Total: $ {total.toFixed(2)}
       </div>
     </div>
   )

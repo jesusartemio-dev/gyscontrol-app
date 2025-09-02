@@ -10,7 +10,7 @@ import { PlantillaGastoUpdatePayload } from '@/types/payloads'
 import { recalcularTotalesPlantilla } from '@/lib/utils/recalculoPlantilla'
 
 
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await prisma.plantillaGasto.findUnique({
@@ -26,7 +26,7 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(req: Request, context: { params: { id: string } }) {
+export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const payload: PlantillaGastoUpdatePayload = await req.json()
@@ -40,9 +40,9 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
   }
 }
 
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
 
     const gasto = await prisma.plantillaGasto.findUnique({
       where: { id },

@@ -11,7 +11,7 @@ import type { NextRequest } from 'next/server'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 
 // ✅ Actualizar un ítem
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params  // ✅ CORREGIDO
 
@@ -62,7 +62,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar un ítem
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params  // ✅ CORREGIDO
 

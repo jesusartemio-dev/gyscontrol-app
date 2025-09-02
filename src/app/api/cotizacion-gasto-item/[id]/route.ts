@@ -9,9 +9,9 @@ import { prisma } from '@/lib/prisma'
 import { CotizacionGastoItemUpdatePayload } from '@/types/payloads'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
 
     const data = await prisma.cotizacionGastoItem.findUnique({
       where: { id },
@@ -29,7 +29,7 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(req: Request, context: { params: { id: string } }) {
+export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params // ✅ CORREGIDO: await context.params
 
@@ -59,9 +59,9 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
 }
 
 
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = context.params
+    const { id } = await context.params
 
     const existing = await prisma.cotizacionGastoItem.findUnique({
       where: { id },

@@ -13,11 +13,12 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   try {
-    const items = await prisma.listaRequerimientoItem.findMany({
+    const items = await prisma.listaEquipoItem.findMany({
       include: {
         lista: true,
         proyectoEquipoItem: true,
-        paquetes: true,
+        proveedor: true,
+        cotizaciones: true,
       },
     })
     return NextResponse.json(items)
@@ -29,7 +30,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const data = await req.json()
-    const nuevoItem = await prisma.listaRequerimientoItem.create({
+    const nuevoItem = await prisma.listaEquipoItem.create({
       data,
     })
     return NextResponse.json(nuevoItem)

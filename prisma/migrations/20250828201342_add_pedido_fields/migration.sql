@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "PedidoEquipo" ADD COLUMN     "costoRealTotal" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "esUrgente" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "presupuestoTotal" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "prioridad" TEXT DEFAULT 'media';

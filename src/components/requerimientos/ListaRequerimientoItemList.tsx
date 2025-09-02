@@ -69,10 +69,8 @@ export default function ListaRequerimientoItemList({
           </div>
           <div className="flex gap-3 items-center">
             <Badge variant="outline">{item.estado}</Badge>
-            <span className="text-sm">
-              {item.precioUnitario !== null
-                ? `S/ ${item.precioUnitario?.toFixed(2)}`
-                : 'Sin precio'}
+            <span className="text-sm font-medium">
+              Cant: {item.cantidad}
             </span>
             {editable && onUpdated && (
               <Button

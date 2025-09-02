@@ -1,15 +1,23 @@
 import type { Proyecto, ProyectoPayload } from '@/types'
+import { logger } from '@/lib/logger'
+import { buildApiUrl } from '@/lib/utils'
 
 // Obtener todos los proyectos
 export async function getProyectos(): Promise<Proyecto[]> {
-  const res = await fetch('/api/proyecto')
+  // ✅ Use absolute URL for server-side requests
+  const baseUrl = typeof window === 'undefined' 
+    ? process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    : ''
+  const url = `${baseUrl}/api/proyecto`
+  
+  const res = await fetch(url)
   if (!res.ok) throw new Error('Error al obtener proyectos')
   return res.json()
 }
 
 // Crear un nuevo proyecto manual
 export async function createProyecto(data: Record<string, any>): Promise<Proyecto> {
-  const res = await fetch('/api/proyecto', {
+  const res = await fetch(buildApiUrl('/api/proyecto'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -42,7 +50,7 @@ export async function crearProyectoDesdeCotizacion(
   cotizacionId: string,
   data: ProyectoPayload
 ): Promise<Proyecto> {
-  const res = await fetch('/api/proyecto/from-cotizacion', {
+  const res = await fetch(buildApiUrl('/api/proyecto/from-cotizacion'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cotizacionId, ...data }),
@@ -53,7 +61,13 @@ export async function crearProyectoDesdeCotizacion(
 
 // Obtener un proyecto por su ID
 export async function getProyectoById(id: string): Promise<Proyecto> {
-  const res = await fetch(`/api/proyecto/${id}`, { cache: 'no-store' })
+  // ✅ Use absolute URL for server-side requests
+  const baseUrl = typeof window === 'undefined' 
+    ? process.env.NEXTAUTH_URL || 'http://localhost:3001'
+    : ''
+  const url = `${baseUrl}/api/proyecto/${id}`
+  
+  const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) throw new Error('Error al obtener el proyecto por ID')
   return res.json()
 }

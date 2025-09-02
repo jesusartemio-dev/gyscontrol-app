@@ -8,11 +8,22 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   try {
+    // ✅ Obtener sesión del usuario
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { listaId, proyectoEquipoItemId } = await req.json()
 
     if (!listaId || !proyectoEquipoItemId) {
@@ -34,12 +45,13 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ 2. Crear el ListaEquipoItem incluyendo proyectoEquipoId
+    // ✅ 2. Crear el ListaEquipoItem incluyendo proyectoEquipoId y responsableId
     const nuevo = await prisma.listaEquipoItem.create({
       data: {
         listaId,
         proyectoEquipoItemId,
         proyectoEquipoId: item.proyectoEquipoId ?? null,
+        responsableId: session.user.id,
         codigo: item.codigo,
         descripcion: item.descripcion || '',
         unidad: item.unidad || '',

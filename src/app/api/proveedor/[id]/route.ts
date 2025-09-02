@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { ProveedorUpdatePayload } from '@/types'
 
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await prisma.proveedor.findUnique({ where: { id } })
@@ -18,10 +18,10 @@ export async function GET(context: { params: { id: string } }) {
   }
 }
 
-export async function PUT(context: { params: { id: string }; request: Request }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    const body: ProveedorUpdatePayload = await context.request.json()
+    const body: ProveedorUpdatePayload = await request.json()
     const data = await prisma.proveedor.update({ where: { id }, data: body })
     return NextResponse.json(data)
   } catch (error) {
@@ -29,7 +29,7 @@ export async function PUT(context: { params: { id: string }; request: Request })
   }
 }
 
-export async function DELETE(context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     await prisma.proveedor.delete({ where: { id } })

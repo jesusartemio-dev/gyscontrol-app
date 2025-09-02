@@ -12,7 +12,7 @@ import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 import type { CotizacionServicioItemUpdatePayload } from '@/types'
 
 // ✅ Actualizar ítem de servicio en cotización
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params // ✅ Corrección para evitar error de Next.js
 
@@ -70,7 +70,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar ítem de servicio de cotización
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params // ✅ Corrección
 

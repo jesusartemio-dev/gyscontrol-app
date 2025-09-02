@@ -9,8 +9,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // 🔍 GET
-export async function GET(_req: NextRequest, context: { params: { id: string } }) {
-  const id = context.params.id
+export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
 
   try {
     const data = await prisma.categoriaServicio.findUnique({
@@ -25,8 +25,8 @@ export async function GET(_req: NextRequest, context: { params: { id: string } }
 }
 
 // ✏️ PUT
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
-  const id = context.params.id
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
 
   try {
     const body = await req.json()
@@ -43,8 +43,8 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 
 // 🗑️ DELETE
 // ✅ Forma correcta
-export async function DELETE(request: Request, context: { params: { id: string } }) {
-  const { id } = context.params
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
   try {
     const existente = await prisma.categoriaServicio.findUnique({ where: { id } })
     if (!existente) {

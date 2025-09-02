@@ -19,7 +19,7 @@ interface Props {
 export default function ListaEquipoResumenTotales({ items }: Props) {
   const cantidadTotal = items.reduce((sum, item) => sum + (item.cantidad || 0), 0)
   const precioTotal = items.reduce(
-    (sum, item) => sum + ((item.precioReferencial || 0) * (item.cantidad || 0)),
+    (sum, item) => sum + ((item.precioElegido || 0) * (item.cantidad || 0)),
     0
   )
 
@@ -31,7 +31,7 @@ export default function ListaEquipoResumenTotales({ items }: Props) {
       </div>
       <div className="flex justify-between">
         <span className="font-medium">Costo total referencial (S/):</span>
-        <span>S/ {precioTotal.toFixed(2)}</span>
+        <span>$ {precioTotal.toFixed(2)}</span>
       </div>
     </div>
   )

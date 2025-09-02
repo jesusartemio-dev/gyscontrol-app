@@ -9,15 +9,12 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import {
-  PedidoEquipo,
   PedidoEquipoUpdatePayload,
   PedidoEquipoItemUpdatePayload,
 } from '@/types'
 import {
-  getPedidoEquipos,
   updatePedidoEquipo,
   deletePedidoEquipo,
 } from '@/lib/services/pedidoEquipo'
@@ -25,70 +22,52 @@ import {
   updatePedidoEquipoItem,
   deletePedidoEquipoItem,
 } from '@/lib/services/pedidoEquipoItem'
-import PedidoEquipoList from '@/components/equipos/PedidoEquipoList'
+import PedidoEquipoListWithFilters from '@/components/equipos/PedidoEquipoListWithFilters'
 
 export default function PedidosPage() {
-  const [pedidos, setPedidos] = useState<PedidoEquipo[]>([])
-
-  const cargarPedidos = async () => {
-    try {
-      const data = await getPedidoEquipos()
-      setPedidos(data || [])
-    } catch {
-      toast.error('Error al cargar pedidos')
-    }
-  }
-
-  useEffect(() => {
-    cargarPedidos()
-  }, [])
 
   const handleUpdate = async (id: string, payload: PedidoEquipoUpdatePayload) => {
     const actualizado = await updatePedidoEquipo(id, payload)
     if (actualizado) {
       toast.success('Pedido actualizado')
-      cargarPedidos()
     } else {
       toast.error('Error al actualizar pedido')
     }
   }
 
   const handleDelete = async (id: string) => {
-    const ok = await deletePedidoEquipo(id)
-    if (ok) {
+    const eliminado = await deletePedidoEquipo(id)
+    if (eliminado) {
       toast.success('Pedido eliminado')
-      cargarPedidos()
     } else {
       toast.error('Error al eliminar pedido')
     }
   }
 
-  const handleUpdateItem = async (id: string, payload: PedidoEquipoItemUpdatePayload) => {
+  const handleUpdateItem = async (
+    id: string,
+    payload: PedidoEquipoItemUpdatePayload
+  ) => {
     const actualizado = await updatePedidoEquipoItem(id, payload)
     if (actualizado) {
-      toast.success('Ítem actualizado')
-      cargarPedidos()
+      toast.success('Item actualizado')
     } else {
-      toast.error('Error al actualizar ítem')
+      toast.error('Error al actualizar item')
     }
   }
 
   const handleDeleteItem = async (id: string) => {
-    const ok = await deletePedidoEquipoItem(id)
-    if (ok) {
-      toast.success('Ítem eliminado')
-      cargarPedidos()
+    const eliminado = await deletePedidoEquipoItem(id)
+    if (eliminado) {
+      toast.success('Item eliminado')
     } else {
-      toast.error('Error al eliminar ítem')
+      toast.error('Error al eliminar item')
     }
   }
 
   return (
-    <div className="p-4 space-y-4">
-      <h1 className="text-2xl font-bold">📋 Pedidos de Equipos</h1>
-
-      <PedidoEquipoList
-        data={pedidos}
+    <div className="container mx-auto p-6">
+      <PedidoEquipoListWithFilters
         onUpdate={handleUpdate}
         onDelete={handleDelete}
         onUpdateItem={handleUpdateItem}

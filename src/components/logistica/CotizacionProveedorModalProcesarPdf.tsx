@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { buildApiUrl } from '@/lib/utils'
 
 interface Props {
   cotizacionId: string
@@ -41,7 +42,7 @@ export default function CotizacionProveedorModalProcesarPdf({ cotizacionId, onCl
       formData.append('file', file)
       formData.append('cotizacionId', cotizacionId)
 
-      const res = await fetch('/api/procesar-pdf', {
+      const res = await fetch(buildApiUrl('/api/procesar-pdf'), {
         method: 'POST',
         body: formData,
       })

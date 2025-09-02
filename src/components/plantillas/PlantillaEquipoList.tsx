@@ -77,7 +77,7 @@ export default function PlantillaEquipoList({ equipos, plantillaId, onDeleted, o
               >
                 {loadingId === eq.id ? 'Guardando...' : eq.nombre}
               </td>
-              <td className="border px-4 py-2">S/ {eq.subtotalCliente.toFixed(2)}</td>
+              <td className="border px-4 py-2">$ {eq.subtotalCliente.toFixed(2)}</td>
               <td className="border px-4 py-2 space-x-2">
                 <Link
                   href={`/comercial/plantillas/${plantillaId}/equipo/${eq.id}`}

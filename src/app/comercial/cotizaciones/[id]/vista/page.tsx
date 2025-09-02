@@ -8,7 +8,7 @@ import type { Cotizacion } from '@/types'
 
 // 📦 Cargar dinámicamente el visor y el PDF (evita errores de SSR)
 const PDFViewer = dynamic(
-  () => import('@react-pdf/renderer').then(mod => mod.PDFViewer),
+  () => import('@react-pdf/renderer').then(mod => ({ default: mod.PDFViewer })),
   { ssr: false }
 )
 

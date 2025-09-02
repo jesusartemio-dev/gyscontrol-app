@@ -1,0 +1,176 @@
+# 📊 Codecov Configuration - Sistema GYS
+# 
+# Configuración para análisis de cobertura de código
+# con thresholds específicos y reportes detallados.
+# 
+# @author TRAE - Agente Senior Fullstack
+# @version 1.0.0
+
+coverage:
+  # 🎯 Configuración de precisión
+  precision: 2
+  round: down
+  range: "70...100"
+  
+  # 📊 Configuración de status checks
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 1%
+        base: auto
+        flags:
+          - unittests
+        paths:
+          - "src/"
+    
+    patch:
+      default:
+        target: 80%
+        threshold: 1%
+        base: auto
+        flags:
+          - unittests
+    
+    changes:
+      default:
+        target: 80%
+        threshold: 1%
+        base: auto
+        flags:
+          - unittests
+
+# 🚩 Configuración de flags
+flags:
+  unittests:
+    paths:
+      - src/
+    carryforward: false
+  
+  integration:
+    paths:
+      - src/
+    carryforward: false
+  
+  e2e:
+    paths:
+      - e2e/
+    carryforward: false
+
+# 📋 Configuración de comentarios en PR
+comment:
+  layout: "reach,diff,flags,tree,reach"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: yes
+  branches:
+    - main
+    - develop
+
+# 🔍 Archivos a ignorar
+ignore:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/__tests__/**"
+  - "**/__mocks__/**"
+  - "**/e2e/**"
+  - "**/coverage/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/.next/**"
+  - "**/node_modules/**"
+  - "**/*.config.js"
+  - "**/*.config.ts"
+  - "**/tailwind.config.js"
+  - "**/next.config.js"
+  - "**/playwright.config.ts"
+  - "**/vitest.config.ts"
+  - "**/jest.config.js"
+  - "**/.eslintrc.js"
+  - "**/prettier.config.js"
+  - "**/postcss.config.js"
+  - "**/middleware.ts"
+  - "**/instrumentation.ts"
+  - "src/app/globals.css"
+  - "src/app/layout.tsx"
+  - "src/app/loading.tsx"
+  - "src/app/error.tsx"
+  - "src/app/not-found.tsx"
+  - "prisma/**"
+  - "public/**"
+  - "docs/**"
+  - "*.md"
+  - "*.mdx"
+
+# 📈 Configuración de parsers
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      macro: no
+
+# 🎨 Configuración de GitHub Checks
+github_checks:
+  annotations: true
+
+# 📊 Configuración de Slack (opcional)
+# slack:
+#   url: "secret:SLACK_WEBHOOK_URL"
+#   threshold: 1%
+#   message: |
+#     Coverage for {{ owner }}/{{ repo }} changed by {{ range }}% ({{ commit }})
+#     {{ author }} - {{ message }}
+
+# 🔧 Configuración avanzada
+validation:
+  # Validar que el archivo de cobertura existe
+  require_ci_to_pass: yes
+  
+  # Validar cambios mínimos
+  notify:
+    after_n_builds: 1
+    countdown: 1
+    delay: 0
+
+# 📋 Configuración de archivos de cobertura
+coverage_files:
+  - "coverage/lcov.info"
+  - "coverage/coverage-final.json"
+  - "coverage/clover.xml"
+
+# 🎯 Configuración de notificaciones
+notifications:
+  email:
+    layout: "condensed_header,condensed_files,condensed_footer"
+    require_ci_to_pass: yes
+    flags:
+      - unittests
+  
+  webhook:
+    # url: "secret:WEBHOOK_URL"
+    threshold: 1%
+
+# 📊 Configuración de profiling
+profiling:
+  critical_files_paths:
+    - "src/lib/services/**"
+    - "src/app/api/**"
+    - "src/components/**"
+  
+  precision: 2
+
+# 🔍 Configuración de archivos críticos
+critical_files:
+  paths:
+    - "src/lib/auth.ts"
+    - "src/lib/prisma.ts"
+    - "src/lib/services/**"
+    - "src/app/api/**"
+    - "src/middleware.ts"
+  
+  threshold: 90%

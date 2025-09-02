@@ -77,7 +77,7 @@ export default function CotizacionEquipoList({ equipos, cotizacionId, onDeleted,
               >
                 {loadingId === eq.id ? 'Guardando...' : eq.nombre}
               </td>
-              <td className="border px-4 py-2">S/ {eq.subtotalCliente.toFixed(2)}</td>
+              <td className="border px-4 py-2">$ {eq.subtotalCliente.toFixed(2)}</td>
               <td className="border px-4 py-2 space-x-2">
                 <Link
                   href={`/comercial/cotizaciones/${cotizacionId}/equipo/${eq.id}`}

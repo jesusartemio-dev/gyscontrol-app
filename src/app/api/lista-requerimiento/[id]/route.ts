@@ -12,10 +12,10 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
 // ✅ Obtener una ListaRequerimiento por ID (incluye items)
-export async function GET(context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    const data = await prisma.listaRequerimiento.findUnique({
+    const data = await prisma.listaEquipo.findUnique({
       where: { id },
       include: {
         items: true,
@@ -29,11 +29,11 @@ export async function GET(context: { params: { id: string } }) {
 }
 
 // ✅ Actualizar una ListaRequerimiento
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const payload = await request.json()
-    const data = await prisma.listaRequerimiento.update({
+    const data = await prisma.listaEquipo.update({
       where: { id },
       data: payload
     })
@@ -44,10 +44,10 @@ export async function PUT(request: Request, context: { params: { id: string } })
 }
 
 // ✅ Eliminar una ListaRequerimiento
-export async function DELETE(context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    await prisma.listaRequerimiento.delete({ where: { id } })
+    await prisma.listaEquipo.delete({ where: { id } })
     return NextResponse.json({ status: 'OK' })
   } catch (error) {
     return NextResponse.json({ error: 'Error al eliminar la lista' }, { status: 500 })

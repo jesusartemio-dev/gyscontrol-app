@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useState } from 'react'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Correo inválido' }),
@@ -14,6 +15,7 @@ const loginSchema = z.object({
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -44,14 +46,9 @@ export default function LoginPage() {
       return
     }
 
-    // ✅ Redirigir según el rol
-    const role = session?.user?.role
-    if (role === 'admin') router.push('/admin/usuarios')
-    else if (role === 'comercial') router.push('/comercial/plantillas')
-    else if (role === 'proyectos') router.push('/proyectos')
-    else if (role === 'logistica') router.push('/logistica')
-    else router.push('/')
-
+    // ✅ Login exitoso - redirigir a la página principal
+    // El middleware se encargará de redirigir según el rol
+    router.push('/')
     setLoading(false)
   }
 
@@ -79,14 +76,28 @@ export default function LoginPage() {
 
         <div className="mb-6">
           <label className="block text-sm font-semibold mb-1">Contraseña</label>
-          <input
-            type="password"
-            className="w-full border rounded px-3 py-2 outline-none focus:ring focus:ring-blue-300"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            autoComplete="current-password"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              className="w-full border rounded px-3 py-2 pr-10 outline-none focus:ring focus:ring-blue-300"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showPassword ? (
+                <EyeOff className="h-5 w-5" />
+              ) : (
+                <Eye className="h-5 w-5" />
+              )}
+            </button>
+          </div>
         </div>
 
         <button

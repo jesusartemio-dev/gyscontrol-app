@@ -1,11 +1,13 @@
 'use client'
 
-import { Pencil, Trash2, Plus, Rocket, Save, X } from 'lucide-react'
+import { Pencil, Trash2, Plus, Rocket, Save, X, Clock, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import ListaEstadoFlujo from './ListaEstadoFlujo'
 import ListaEquipoItemList from './ListaEquipoItemList'
 import { ListaEquipo, ListaEquipoItem, ListaEquipoPayload, ListaEquipoUpdatePayload } from '@/types'
+import { calcularDiasRestantes, getEstadoTiempo } from '@/lib/services/listaEquipo'
 import { useState } from 'react'
 
 interface Props {
@@ -42,7 +44,6 @@ export default function ListaEquipoCard({
     if (!editValues.nombre) return
     onUpdate(lista.id, {
       nombre: editValues.nombre || '',
-      descripcion: editValues.descripcion || '',
     })
     setIsEdit(false)
     setEditValues({})
@@ -53,6 +54,10 @@ export default function ListaEquipoCard({
   }
 
   const todosVerificados = items.length > 0 && items.every((item) => item.verificado)
+  
+  // 📅 Calcular estado de tiempo para fechaNecesaria
+  const diasRestantes = calcularDiasRestantes(lista.fechaNecesaria || null)
+  const estadoTiempo = getEstadoTiempo(diasRestantes)
 
   return (
     <div className="border rounded-xl p-4 shadow-md hover:shadow-lg transition space-y-2">
@@ -65,7 +70,28 @@ export default function ListaEquipoCard({
               placeholder="Nombre"
             />
           ) : (
-            <div className="font-semibold">{lista.nombre}</div>
+            <div className="space-y-2">
+              <div className="font-semibold">{lista.nombre}</div>
+              {/* 📅 Badge de estado de tiempo */}
+              {diasRestantes !== null && estadoTiempo && (
+                <Badge 
+                  variant={estadoTiempo === 'critico' ? 'destructive' : estadoTiempo === 'urgente' ? 'secondary' : 'default'}
+                  className="flex items-center gap-1 w-fit text-xs"
+                >
+                  {estadoTiempo === 'critico' ? (
+                    <AlertTriangle className="h-3 w-3" />
+                  ) : (
+                    <Clock className="h-3 w-3" />
+                  )}
+                  {diasRestantes < 0 
+                    ? `${Math.abs(diasRestantes)} días vencido` 
+                    : diasRestantes === 0
+                      ? 'Vence hoy'
+                      : `${diasRestantes} días restantes`
+                  }
+                </Badge>
+              )}
+            </div>
           )}
         </div>
         <div className="col-span-4">
@@ -81,7 +107,7 @@ export default function ListaEquipoCard({
           onCreated={onRefreshItems}
         />
         <div className="text-right text-sm text-gray-600 font-medium mt-2">
-          Total estimado: S/. {calcularTotal().toFixed(2)}
+          Total estimado: $ {calcularTotal().toFixed(2)}
         </div>
       </div>
 
@@ -100,7 +126,7 @@ export default function ListaEquipoCard({
             <Button
               onClick={() => {
                 setIsEdit(true)
-                setEditValues({ nombre: lista.nombre, descripcion: lista.descripcion || '' })
+                setEditValues({ nombre: lista.nombre })
               }}
               variant="outline"
             >

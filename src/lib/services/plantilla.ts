@@ -1,8 +1,9 @@
 import type { Plantilla } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
 
 export async function getPlantillaById(id: string): Promise<Plantilla> {
   try {
-    const res = await fetch(`/api/plantilla/${id}`)
+    const res = await fetch(buildApiUrl(`/api/plantilla/${id}`))
     if (!res.ok) throw new Error('Error al obtener plantilla por ID')
     return await res.json()
   } catch (error) {
@@ -13,7 +14,7 @@ export async function getPlantillaById(id: string): Promise<Plantilla> {
 
 export async function getPlantillas(): Promise<Plantilla[]> {
   try {
-    const res = await fetch('/api/plantilla')
+    const res = await fetch(buildApiUrl('/api/plantilla'))
     if (!res.ok) {
       const errorData = await res.json()
       console.error('❌ Error del API /api/plantilla:', errorData)
@@ -31,7 +32,7 @@ export async function createPlantilla(data: {
   descripcion?: string
 }): Promise<Plantilla> {
   try {
-    const res = await fetch('/api/plantilla', {
+    const res = await fetch(buildApiUrl('/api/plantilla'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -46,7 +47,7 @@ export async function createPlantilla(data: {
 
 export async function updatePlantilla(id: string, data: Partial<Plantilla>): Promise<Plantilla> {
   try {
-    const res = await fetch(`/api/plantilla/${id}`, {
+    const res = await fetch(buildApiUrl(`/api/plantilla/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -61,7 +62,7 @@ export async function updatePlantilla(id: string, data: Partial<Plantilla>): Pro
 
 export async function deletePlantilla(id: string): Promise<void> {
   try {
-    const res = await fetch(`/api/plantilla/${id}`, {
+    const res = await fetch(buildApiUrl(`/api/plantilla/${id}`), {
       method: 'DELETE',
     })
     if (!res.ok) throw new Error('Error al eliminar plantilla')
@@ -86,7 +87,7 @@ export async function updatePlantillaTotales(
   }
 ) {
   try {
-    const res = await fetch(`/api/plantilla/${id}`, {
+    const res = await fetch(buildApiUrl(`/api/plantilla/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -103,7 +104,7 @@ export async function updatePlantillaTotales(
 // ✅ Recalcula totales desde backend
 export async function recalcularPlantillaDesdeAPI(id: string) {
   try {
-    const res = await fetch(`/api/plantilla/${id}/recalcular`, { method: 'POST' })
+    const res = await fetch(buildApiUrl(`/api/plantilla/${id}/recalcular`), { method: 'POST' })
     if (!res.ok) throw new Error('Error al recalcular totales de plantilla desde API')
     return await res.json()
   } catch (error) {

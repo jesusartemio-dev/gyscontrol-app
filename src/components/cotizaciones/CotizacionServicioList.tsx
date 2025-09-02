@@ -92,7 +92,7 @@ export default function CotizacionServicioList({
               >
                 {loading === s.id ? 'Actualizando...' : s.categoria}
               </td>
-              <td className="border px-4 py-2">S/ {s.subtotalCliente.toFixed(2)}</td>
+              <td className="border px-4 py-2">$ {s.subtotalCliente.toFixed(2)}</td>
               <td className="border px-4 py-2 space-x-2">
                 <a
                   href={`/comercial/cotizaciones/${cotizacionId}/servicio/${s.id}`}

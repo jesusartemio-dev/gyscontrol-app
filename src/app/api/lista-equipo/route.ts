@@ -8,11 +8,15 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 const listaEquipoSchema = z.object({
   proyectoId: z.string().min(1, 'El proyectoId es obligatorio'),
   nombre: z.string().min(1, 'El nombre es obligatorio'),
+  fechaNecesaria: z.string().optional(), // ✅ fecha límite para completar la lista
 })
 
 export async function GET(req: NextRequest) {
@@ -26,12 +30,17 @@ export async function GET(req: NextRequest) {
       },
       include: {
         proyecto: true,
+        responsable: true,
         items: {
           include: {
             lista: true, // ✅ Relación agregada
             proveedor: true,
             cotizaciones: true,
-            pedidos: true,
+            pedidos: {
+              include: {
+                pedido: true
+              }
+            },
             proyectoEquipoItem: {
               include: {
                 proyectoEquipo: true,
@@ -45,7 +54,40 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json(data)
+    // ✅ Calculate montoEstimado and cantidadPedida for each lista
+    const dataWithMontos = data.map(lista => {
+      const montoEstimado = lista.items.reduce((total, item) => {
+        // Use the best available price: cotización > precioElegido > presupuesto
+        const mejorCotizacion = item.cotizaciones.length > 0 
+          ? Math.min(...item.cotizaciones.map(c => c.precioUnitario || 0))
+          : 0
+        const precioUnitario = mejorCotizacion > 0 
+          ? mejorCotizacion 
+          : (item.precioElegido || item.presupuesto || 0)
+        
+        return total + (precioUnitario * (item.cantidad || 0))
+      }, 0)
+
+      // 🔄 Calculate cantidadPedida for each item
+      const itemsWithCantidadPedida = lista.items.map(item => {
+        const cantidadPedida = item.pedidos.reduce((total, pedidoItem) => {
+          return total + (pedidoItem.cantidadPedida || 0)
+        }, 0)
+        
+        return {
+          ...item,
+          cantidadPedida
+        }
+      })
+
+      return {
+        ...lista,
+        montoEstimado,
+        items: itemsWithCantidadPedida
+      }
+    })
+
+    return NextResponse.json(dataWithMontos)
   } catch (error) {
     console.error('❌ Error en GET /lista-equipo:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
@@ -54,6 +96,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(request: Request) {
   try {
+    // Get user session
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
 
     const parsed = listaEquipoSchema.safeParse(body)
@@ -86,18 +137,25 @@ export async function POST(request: Request) {
     const nuevaLista = await prisma.listaEquipo.create({
       data: {
         proyectoId: parsed.data.proyectoId,
+        responsableId: session.user.id,
         codigo: codigoGenerado,
         numeroSecuencia: nuevoNumero,
         nombre: parsed.data.nombre,
-      },
+        fechaNecesaria: parsed.data.fechaNecesaria ? new Date(parsed.data.fechaNecesaria) : null, // ✅ fecha necesaria
+      } satisfies Prisma.ListaEquipoUncheckedCreateInput,
       include: {
         proyecto: true,
+        responsable: true,
         items: {
           include: {
             lista: true, // ✅ Relación agregada
             proveedor: true,
             cotizaciones: true,
-            pedidos: true,
+            pedidos: {
+              include: {
+                pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+              }
+            },
             proyectoEquipoItem: {
               include: {
                 proyectoEquipo: true,

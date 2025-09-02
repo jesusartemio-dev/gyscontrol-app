@@ -52,7 +52,7 @@ export default function LogisticaListaDetalleItemCard({ item, onUpdated }: Props
 
           {isFinite(minPrecio) && (
             <Badge variant="outline" className="bg-green-200 text-green-800">
-              Mín. Precio: S/. {minPrecio.toFixed(2)}
+              Mín. Precio: $ {minPrecio.toFixed(2)}
             </Badge>
           )}
 
@@ -62,9 +62,9 @@ export default function LogisticaListaDetalleItemCard({ item, onUpdated }: Props
             </Badge>
           )}
 
-          <Badge variant="outline">Presupuesto: S/. {(item.presupuesto ?? 0).toFixed(2)}</Badge>
-          <Badge variant="outline">Precio Elegido: S/. {(item.precioElegido ?? 0).toFixed(2)}</Badge>
-          <Badge variant="outline">Costo Elegido: S/. {(item.costoElegido ?? 0).toFixed(2)}</Badge>
+          <Badge variant="outline">Presupuesto: $ {(item.presupuesto ?? 0).toFixed(2)}</Badge>
+          <Badge variant="outline">Precio Elegido: $ {(item.precioElegido ?? 0).toFixed(2)}</Badge>
+          <Badge variant="outline">Costo Elegido: $ {(item.costoElegido ?? 0).toFixed(2)}</Badge>
           <Badge variant="outline">Cant. Pedida: {item.cantidadPedida}</Badge>
           <Badge variant="outline">Cant. Entregada: {item.cantidadEntregada}</Badge>
         </div>

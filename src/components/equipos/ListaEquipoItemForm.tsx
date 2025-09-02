@@ -18,7 +18,7 @@ export default function ListaEquipoItemForm({ listaId, onCreated }: Props) {
     descripcion: '',
     unidad: '',
     cantidad: 1,
-    precioReferencial: undefined,
+    precioElegido: undefined,
   })
 
   const handleChange = (field: keyof ListaEquipoItemPayload, value: string | number) => {
@@ -36,7 +36,7 @@ export default function ListaEquipoItemForm({ listaId, onCreated }: Props) {
     const payload: ListaEquipoItemPayload = {
       ...form,
       cantidad: form.cantidad || 1,
-      precioReferencial: form.precioReferencial ?? 0,
+      precioElegido: form.precioElegido ?? 0,
     }
 
     onCreated(payload)
@@ -47,7 +47,7 @@ export default function ListaEquipoItemForm({ listaId, onCreated }: Props) {
       descripcion: '',
       unidad: '',
       cantidad: 1,
-      precioReferencial: undefined,
+      precioElegido: undefined,
     })
 
     toast.success('✅ Ítem agregado a la lista')
@@ -80,10 +80,10 @@ export default function ListaEquipoItemForm({ listaId, onCreated }: Props) {
       />
       <Input
         type="number"
-        placeholder="Precio Referencial"
-        value={form.precioReferencial ?? ''}
+        placeholder="Precio Elegido"
+        value={form.precioElegido ?? ''}
         onChange={(e) =>
-          handleChange('precioReferencial', parseFloat(e.target.value) || 0)
+          handleChange('precioElegido', parseFloat(e.target.value) || 0)
         }
       />
       <div className="col-span-1 md:col-span-5 text-right">

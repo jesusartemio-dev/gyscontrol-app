@@ -75,6 +75,7 @@ export default function PedidoEquipoForm({
         responsableId,
         listaId,
         observacion,
+        fechaNecesaria: fechaNecesaria,
         fechaEntregaEstimada: fechaNecesaria,
       }
 
@@ -92,10 +93,10 @@ export default function PedidoEquipoForm({
 
         await createPedidoEquipoItem({
           pedidoId: pedidoCreado.id,
+          responsableId,
           listaId,
           listaEquipoItemId: item.id,
           cantidadPedida: cantidad,
-          fechaNecesaria: new Date(fechaNecesaria).toISOString(),
           precioUnitario: item.precioElegido ?? undefined,
           costoTotal: cantidad * (item.precioElegido ?? 0),
           codigo: item.codigo,
@@ -103,7 +104,6 @@ export default function PedidoEquipoForm({
           unidad: item.unidad,
           tiempoEntrega: item.tiempoEntrega ?? undefined,
           tiempoEntregaDias: item.tiempoEntregaDias ?? undefined,
-          fechaEntregaEsperada: fechaEsperada?.toISOString(),
         })
       }
 
@@ -220,8 +220,8 @@ export default function PedidoEquipoForm({
                         }
                       />
                     </td>
-                    <td>S/. {precio.toFixed(2)}</td>
-                    <td>S/. {calcularCostoTotal(item).toFixed(2)}</td>
+                    <td>$ {precio.toFixed(2)}</td>
+                <td>$ {calcularCostoTotal(item).toFixed(2)}</td>
                   </tr>
                 )
               })}

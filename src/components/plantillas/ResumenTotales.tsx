@@ -107,8 +107,8 @@ const CotizacionPDF = ({ cotizacion }: Props) => (
           <Text style={styles.bold}>{e.nombre}</Text>
           {e.items.map(i => (
             <View key={i.id} style={styles.fila}>
-              <Text>{i.nombre}</Text>
-              <Text>S/ {i.costoCliente.toFixed(2)}</Text>
+              <Text>{i.descripcion}</Text>
+              <Text>$ {i.costoCliente.toFixed(2)}</Text>
             </View>
           ))}
         </View>
@@ -121,8 +121,8 @@ const CotizacionPDF = ({ cotizacion }: Props) => (
           <Text style={styles.bold}>{s.categoria}</Text>
           {s.items.map(i => (
             <View key={i.id} style={styles.fila}>
-              <Text>{i.nombre} • {i.descripcion}</Text>
-              <Text>S/ {i.costoCliente.toFixed(2)}</Text>
+              <Text>{i.descripcion}</Text>
+              <Text>$ {i.costoCliente.toFixed(2)}</Text>
             </View>
           ))}
         </View>
@@ -130,7 +130,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => (
 
       {/* Total */}
       <Text style={styles.total}>
-        Total Cliente: S/ {cotizacion.totalCliente.toFixed(2)}
+        Total Cliente: $ {cotizacion.totalCliente.toFixed(2)}
       </Text>
 
       {/* Condiciones */}

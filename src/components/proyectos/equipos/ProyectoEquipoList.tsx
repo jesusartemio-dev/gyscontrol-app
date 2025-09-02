@@ -10,6 +10,7 @@
 
 'use client'
 
+import React, { memo, useMemo } from 'react'
 import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
 import ProyectoEquipoAccordion from './ProyectoEquipoAccordion'
 
@@ -21,7 +22,7 @@ interface Props {
   onChange: (equipoId: string, changes: Partial<ProyectoEquipo>) => void
 }
 
-export default function ProyectoEquipoList({
+const ProyectoEquipoList = memo(function ProyectoEquipoList({
   equipos,
   onItemChange,
   onUpdatedNombre,
@@ -56,4 +57,6 @@ export default function ProyectoEquipoList({
       })}
     </div>
   )
-}
+})
+
+export default ProyectoEquipoList

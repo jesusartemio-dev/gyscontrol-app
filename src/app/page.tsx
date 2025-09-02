@@ -13,7 +13,7 @@ export default async function HomePage() {
   if (session.user.role === 'admin') return redirect('/admin/usuarios')
   if (session.user.role === 'comercial') return redirect('/comercial/plantillas')
   if (session.user.role === 'proyectos') return redirect('/proyectos')
-  if (session.user.role === 'logistica') return redirect('/logistica')
+  if (session.user.role === 'logistico') return redirect('/logistica')
 
   return <p>Sin rol válido</p>
 }

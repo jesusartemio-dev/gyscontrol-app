@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server'
 export const dynamic = 'force-dynamic' // ✅ recomendado por Next.js para rutas dinámicas
 
 // ✅ Obtener una plantilla por ID
-export async function GET(_: NextRequest, context: { params: { id: string } }) {
+export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 
@@ -56,7 +56,7 @@ export async function GET(_: NextRequest, context: { params: { id: string } }) {
 }
 
 // ✅ Actualizar una plantilla
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
     const data = await req.json()
@@ -90,7 +90,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 }
 
 // ✅ Eliminar una plantilla
-export async function DELETE(_: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
 
