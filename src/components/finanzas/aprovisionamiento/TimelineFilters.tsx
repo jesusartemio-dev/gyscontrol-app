@@ -261,7 +261,7 @@ export const TimelineFilters: React.FC<TimelineFiltersProps> = ({
           ...filtros,
           fechaInicio: data.fechaInicio,
           fechaFin: data.fechaFin,
-          proyectoIds: data.proyectoIds,
+          proyectoIds: data.proyectoIds?.filter((id): id is string => id !== undefined),
           soloAlertas: data.soloAlertas ?? false,
           tipoVista: data.tipoVista ?? 'gantt',
           agrupacion: data.agrupacion ?? 'proyecto',

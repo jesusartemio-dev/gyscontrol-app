@@ -280,7 +280,7 @@ interface FilterContentProps {
   onQuickFilter: (filter: typeof QUICK_FILTERS[0]) => void;
   onClearFilters: () => void;
   expandedSections: { dates: boolean; view: boolean; advanced: boolean };
-  onToggleSection: (section: keyof typeof expandedSections) => void;
+  onToggleSection: (section: 'dates' | 'view' | 'advanced') => void;
   proyectos: Array<{ id: string; nombre: string; codigo: string }>;
   loading: boolean;
 }
@@ -368,15 +368,14 @@ const FilterContent: React.FC<FilterContentProps> = ({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2">
-          <DatePickerWithRange
-            value={{
-              from: filtros.fechaInicio ? new Date(filtros.fechaInicio) : undefined,
-              to: filtros.fechaFin ? new Date(filtros.fechaFin) : undefined,
-            }}
-            onChange={onDateRangeChange}
-            disabled={loading}
-            className="w-full"
-          />
+          <DatePickerWithRange 
+             date={{ 
+               from: filtros.fechaInicio ? new Date(filtros.fechaInicio) : undefined, 
+               to: filtros.fechaFin ? new Date(filtros.fechaFin) : undefined, 
+             }} 
+             onDateChange={onDateRangeChange} 
+             className="w-full" 
+           />
         </CollapsibleContent>
       </Collapsible>
 
