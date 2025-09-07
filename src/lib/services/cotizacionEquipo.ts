@@ -20,13 +20,11 @@ export async function getCotizacionEquipoById(id: string): Promise<CotizacionEqu
   }
 }
 
-// ✅ Crear nueva cotización de equipo
+// ✅ Crear nueva sección de cotización de equipo
 export async function createCotizacionEquipo(data: {
   cotizacionId: string
-  equipoId: string
-  cantidad: number
-  precioUnitario: number
-  observaciones?: string
+  nombre: string
+  descripcion?: string
 }): Promise<CotizacionEquipo> {
   try {
     const res = await fetch(buildApiUrl('/api/cotizacion-equipo'), {

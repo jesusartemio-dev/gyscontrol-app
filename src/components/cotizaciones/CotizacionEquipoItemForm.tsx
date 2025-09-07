@@ -87,7 +87,22 @@ export default function CotizacionEquipoItemForm({ cotizacionEquipoId, onCreated
         costoCliente
       }
 
-      const creado = await createCotizacionEquipoItem(payload)
+      // ✅ Validar que el equipo esté seleccionado
+      if (!equipo?.id) {
+        toast.error('❌ Debe seleccionar un equipo')
+        return
+      }
+
+      // ✅ Mapear payload al formato esperado por el servicio
+      const servicePayload = {
+        cotizacionEquipoId: payload.cotizacionEquipoId,
+        catalogoEquipoId: equipo.id,
+        cantidad: payload.cantidad,
+        precioUnitario: payload.precioCliente,
+        observaciones: `${payload.marca} - ${payload.descripcion}`
+      }
+
+      const creado = await createCotizacionEquipoItem(servicePayload)
       
       setSubmitState('success')
       toast.success('✅ Equipo agregado exitosamente')

@@ -146,10 +146,10 @@ export default function ComparacionEquiposPage() {
         setListaItems(items)
         
         // Calcular totales, diferencias y contadores
-        const totalPEI = proyectoData.equipos.reduce((acc, grupo) => {
+        const totalPEI = proyectoData?.equipos?.reduce((acc, grupo) => {
           return acc + grupo.items.reduce((suma, item) =>
             suma + (item.precioInterno || 0) * (item.cantidad || 0), 0)
-        }, 0)
+        }, 0) || 0
         const totalLEI = items.reduce((acc, item) =>
           acc + (item.precioElegido || 0) * (item.cantidad || 0), 0)
         const diff = totalLEI - totalPEI

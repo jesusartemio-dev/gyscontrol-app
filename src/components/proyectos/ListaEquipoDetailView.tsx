@@ -65,12 +65,17 @@ import {
   DollarSign,
   Calendar,
   User,
-  FileText
+  FileText,
+  ShoppingCart
 } from 'lucide-react';
 import ListaEquipoItemList from '@/components/equipos/ListaEquipoItemList';
 import ListaEquipoForm from '@/components/equipos/ListaEquipoForm';
 import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
+import ListaEstadoFlujo from '@/components/equipos/ListaEstadoFlujo';
+import ListaEstadoFlujoBanner from '@/components/equipos/ListaEstadoFlujoBanner';
+import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
 
 // ✅ Props interface
 interface ListaEquipoDetailViewProps {
@@ -164,14 +169,18 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
   });
   const [activeTab, setActiveTab] = useState('items');
   
-  // Update edit form when lista changes
+  // Update edit form when lista changes (with stability check)
   React.useEffect(() => {
-    if (lista) {
-      setEditForm({
-        nombre: lista.nombre
+    if (lista?.nombre) {
+      setEditForm(prev => {
+        // Only update if the value actually changed
+        if (prev.nombre !== lista.nombre) {
+          return { nombre: lista.nombre };
+        }
+        return prev;
       });
     }
-  }, [lista]);
+  }, [lista?.nombre]); // Only depend on lista.nombre
   
   // 🔁 Handle navigation back to master
   const handleBackToMaster = () => {
@@ -410,30 +419,70 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
         </Card>
       </motion.div>
       
-      {/* 📑 Tabbed Content */}
+      {/* 🎯 Status Flow Banner - Always Visible */}
+      {lista && (
+        <motion.div variants={staggerItemVariants}>
+          <ListaEstadoFlujoBanner
+            estado={lista.estado}
+            listaId={lista.id}
+            onUpdated={(nuevoEstado) => {
+              // Refresh the data to reflect the new state
+              handleRefreshItems()
+            }}
+          />
+        </motion.div>
+      )}
+
+      {/* 📑 Primary Content - Always Visible */}
       <motion.div variants={staggerItemVariants}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <div className="flex items-center justify-between">
-            <TabsList className="grid w-full max-w-2xl grid-cols-4">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
               <TabsTrigger value="items" className="flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 Items
               </TabsTrigger>
-              <TabsTrigger value="timeline" className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Timeline
-              </TabsTrigger>
-              <TabsTrigger value="history" className="flex items-center gap-2">
-                <History className="w-4 h-4" />
-                Historial
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                Configuración
+              <TabsTrigger value="estados" className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Estados
               </TabsTrigger>
             </TabsList>
             
             <div className="flex gap-2">
+              {lista && (
+                <PedidoDesdeListaModal
+                  lista={lista}
+                  proyectoId={proyectoId}
+                  responsableId={lista.responsableId || 'default-user'}
+                  onCreated={async (payload) => {
+                    try {
+                      const result = await createPedidoDesdeListaContextual(payload);
+                      if (result) {
+                        toast.success('Pedido creado exitosamente');
+                        // Refresh the lista data to update cantidadPedida
+                        await refreshItems();
+                        return result;
+                      }
+                      return null;
+                    } catch (error) {
+                      console.error('Error creating pedido:', error);
+                      toast.error('Error al crear el pedido');
+                      return null;
+                    }
+                  }}
+                  onRefresh={refreshItems}
+                  trigger={
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <ShoppingCart className="w-4 h-4 mr-1" />
+                      Crear Pedidos
+                    </Button>
+                  }
+                />
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -462,10 +511,53 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
             </Suspense>
           </TabsContent>
           
+          <TabsContent value="estados" className="space-y-4">
+            {lista && (
+              <ListaEstadoFlujo 
+                estado={lista.estado}
+                listaId={lista.id}
+                onUpdated={async (nuevoEstado) => {
+                  try {
+                    await updateLista({ estado: nuevoEstado });
+                    toast.success(`Estado actualizado a: ${nuevoEstado}`);
+                  } catch (error) {
+                    console.error('Error updating estado:', error);
+                    toast.error('Error al actualizar el estado');
+                  }
+                }}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
+      </motion.div>
+
+      {/* 📊 Additional Information - Secondary Tabs */}
+      <motion.div variants={staggerItemVariants} className="mt-8 pt-6 border-t border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          Información Adicional
+        </h3>
+        
+        <Tabs defaultValue="timeline" className="space-y-4">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
+            <TabsTrigger value="timeline" className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Timeline
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="w-4 h-4" />
+              Historial
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Configuración
+            </TabsTrigger>
+          </TabsList>
+
           <TabsContent value="timeline" className="space-y-4">
             {lista && (
               <ListaEquipoTimeline 
-                lista={lista} 
+                lista={lista}
                 className="w-full"
               />
             )}
@@ -506,6 +598,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
           </TabsContent>
         </Tabs>
       </motion.div>
+
+
     </motion.div>
   );
 };

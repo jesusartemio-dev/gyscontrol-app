@@ -116,7 +116,7 @@ describe('/api/pedido-equipo/desde-lista', () => {
         return await callback(mockTx as any)
       })
 
-      const request = new NextRequest('http://localhost:3001/api/pedido-equipo/desde-lista', {
+      const request = new NextRequest('http://localhost:3000/api/pedido-equipo/desde-lista', {
         method: 'POST',
         body: JSON.stringify(validPayload),
         headers: {
@@ -197,7 +197,7 @@ describe('/api/pedido-equipo/desde-lista', () => {
         return await callback(mockTx as any)
       })
 
-      const request = new NextRequest('http://localhost:3001/api/pedido-equipo/desde-lista', {
+      const request = new NextRequest('http://localhost:3000/api/pedido-equipo/desde-lista', {
         method: 'POST',
         body: JSON.stringify(validPayload),
         headers: {
@@ -220,7 +220,7 @@ describe('/api/pedido-equipo/desde-lista', () => {
       mockPrisma.listaEquipoItem.findMany.mockResolvedValue([])
       mockPrisma.proyecto.findUnique.mockResolvedValue(null) // Project not found
 
-      const request = new NextRequest('http://localhost:3001/api/pedido-equipo/desde-lista', {
+      const request = new NextRequest('http://localhost:3000/api/pedido-equipo/desde-lista', {
         method: 'POST',
         body: JSON.stringify(validPayload),
         headers: {
@@ -241,7 +241,7 @@ describe('/api/pedido-equipo/desde-lista', () => {
         itemsSeleccionados: []
       }
 
-      const request = new NextRequest('http://localhost:3001/api/pedido-equipo/desde-lista', {
+      const request = new NextRequest('http://localhost:3000/api/pedido-equipo/desde-lista', {
         method: 'POST',
         body: JSON.stringify(invalidPayload),
         headers: {

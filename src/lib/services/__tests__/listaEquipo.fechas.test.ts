@@ -151,7 +151,7 @@ describe('🧪 ListaEquipo - Funcionalidad de Fechas', () => {
 
     it('✅ debe incluir fechaNecesaria al final si existe', () => {
       const timeline = getTimelineFechas(mockListaEquipo as any)
-      const fechaNecesaria = timeline.find(item => item.tipo === 'fechaNecesaria')
+      const fechaNecesaria = timeline.find((item: any) => item.tipo === 'fechaNecesaria')
       
       expect(fechaNecesaria).toBeDefined()
       expect(fechaNecesaria?.esFutura).toBe(true)
@@ -160,7 +160,7 @@ describe('🧪 ListaEquipo - Funcionalidad de Fechas', () => {
     it('✅ debe marcar correctamente fechas futuras', () => {
       const timeline = getTimelineFechas(mockListaEquipo as any)
       
-      timeline.forEach(item => {
+      timeline.forEach((item: any) => {
         if (item.tipo === 'fechaNecesaria') {
           expect(item.esFutura).toBe(true)
         } else {

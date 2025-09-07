@@ -94,7 +94,7 @@ export const detailToMasterVariants: Variants = {
   }
 };
 
-// ✅ Card hover animation variants
+// ✅ Card hover and interaction variants
 export const cardHoverVariants: Variants = {
   initial: {
     scale: 1,
@@ -109,10 +109,23 @@ export const cardHoverVariants: Variants = {
       duration: 0.2,
       ease: [0.25, 0.46, 0.45, 0.94]
     }
+  }
+};
+
+// ✅ Card content clickeable area variants (without tap effect)
+export const cardContentVariants: Variants = {
+  initial: {
+    scale: 1
+  },
+  hover: {
+    scale: 1.005,
+    transition: {
+      duration: 0.2,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
   },
   tap: {
-    scale: 0.98,
-    y: 0,
+    scale: 0.995,
     transition: {
       duration: 0.1,
       ease: [0.25, 0.46, 0.45, 0.94]

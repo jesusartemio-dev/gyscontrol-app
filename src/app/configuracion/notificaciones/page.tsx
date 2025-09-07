@@ -95,7 +95,7 @@ export default async function NotificacionesPage() {
           <div className="space-y-2">
             <h3 className="font-medium text-foreground">¿Cómo funcionan las notificaciones?</h3>
             <p>
-              El sistema verifica automáticamente el estado de órdenes, recepciones y pagos 
+              El sistema verifica automáticamente el estado de cotizaciones, proyectos y pedidos 
               según el intervalo configurado. Las notificaciones se muestran como badges 
               numerados en el menú lateral.
             </p>
@@ -104,9 +104,9 @@ export default async function NotificacionesPage() {
           <div className="space-y-2">
             <h3 className="font-medium text-foreground">Tipos de alertas disponibles</h3>
             <ul className="list-disc list-inside space-y-1 ml-4">
-              <li><strong>Órdenes pendientes:</strong> Órdenes de compra que requieren aprobación</li>
-              <li><strong>Recepciones pendientes:</strong> Recepciones que necesitan validación</li>
-              <li><strong>Pagos vencidos:</strong> Pagos que han superado su fecha límite</li>
+              <li><strong>Cotizaciones pendientes:</strong> Cotizaciones que requieren seguimiento</li>
+              <li><strong>Proyectos en progreso:</strong> Proyectos que necesitan atención</li>
+              <li><strong>Pedidos de equipos:</strong> Pedidos pendientes de gestión</li>
             </ul>
           </div>
           

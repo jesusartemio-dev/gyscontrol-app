@@ -63,8 +63,8 @@ export function useLazyLoading<T>(
   })
 
   const retryCount = useRef(0)
-  const debounceTimer = useRef<NodeJS.Timeout>()
-  const abortController = useRef<AbortController>()
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null)
+  const abortController = useRef<AbortController | null>(null)
 
   // 🔄 Función para cargar datos
   const loadData = useCallback(async (page: number, isReset = false) => {
@@ -195,7 +195,7 @@ export function useInfiniteScroll(
 ) {
   const { threshold = 0.8, rootMargin = '100px', enabled = true } = options
   const targetRef = useRef<HTMLDivElement>(null)
-  const observerRef = useRef<IntersectionObserver>()
+  const observerRef = useRef<IntersectionObserver | null>(null)
 
   useEffect(() => {
     if (!enabled) return
@@ -280,7 +280,7 @@ export function useSmartMemo<T>(
     value: T
     timestamp: number
     deps: React.DependencyList
-  }>()
+  } | null>(null)
 
   const now = Date.now()
   
@@ -298,7 +298,7 @@ export function useSmartMemo<T>(
     }
   }
 
-  return cache.current.value
+  return cache.current!.value
 }
 
 // 🎯 Hook para debounce de valores
@@ -324,7 +324,7 @@ export function useThrottle<T extends (...args: any[]) => any>(
   delay: number
 ): T {
   const lastCall = useRef<number>(0)
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   return useCallback((...args: Parameters<T>) => {
     const now = Date.now()
@@ -348,7 +348,7 @@ export function useThrottle<T extends (...args: any[]) => any>(
 // 📊 Hook para métricas de rendimiento
 export function usePerformanceMetrics(componentName: string) {
   const renderCount = useRef(0)
-  const startTime = useRef<number>()
+  const startTime = useRef<number | null>(null)
 
   useEffect(() => {
     renderCount.current++

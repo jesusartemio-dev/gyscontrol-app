@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Proveedor API</title>
+</head>
+<body>
+    <h1>Test Crear Proveedor</h1>
+    <form id="proveedorForm">
+        <div>
+            <label>Nombre:</label>
+            <input type="text" id="nombre" value="Test Provider" required>
+        </div>
+        <div>
+            <label>RUC:</label>
+            <input type="text" id="ruc" value="20123456789">
+        </div>
+        <button type="submit">Crear Proveedor</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <script>
+        document.getElementById('proveedorForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const nombre = document.getElementById('nombre').value;
+            const ruc = document.getElementById('ruc').value;
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/proveedor', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ nombre, ruc }),
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('result').innerHTML = 
+                        `<p style="color: green;">✅ Proveedor creado: ${JSON.stringify(data, null, 2)}</p>`;
+                } else {
+                    document.getElementById('result').innerHTML = 
+                        `<p style="color: red;">❌ Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<p style="color: red;">❌ Error de red: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>

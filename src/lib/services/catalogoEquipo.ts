@@ -38,11 +38,15 @@ export async function getCatalogoEquipos(): Promise<CatalogoEquipo[]> {
 
 // ✅ Crear nuevo equipo en catálogo
 export async function createCatalogoEquipo(data: {
-  nombre: string
-  descripcion?: string
-  categoriaEquipoId: string
+  codigo: string
+  descripcion: string
+  marca: string
+  precioInterno: number
+  margen: number
+  precioVenta: number
+  categoriaId: string
   unidadId: string
-  precio?: number
+  estado: string
 }): Promise<CatalogoEquipo> {
   try {
     const res = await fetch(buildApiUrl('/api/catalogo-equipo'), {

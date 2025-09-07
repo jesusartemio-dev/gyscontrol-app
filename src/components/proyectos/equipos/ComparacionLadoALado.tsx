@@ -73,7 +73,7 @@ const getTypeIcon = (type: string) => {
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('es-PE', {
     style: 'currency',
-    currency: 'PEN',
+    currency: 'USD',
     minimumFractionDigits: 2
   }).format(amount)
 }

@@ -1,0 +1,24 @@
+// ===================================================
+// 📁 Archivo: babel.config.js
+// 📌 Descripción: Configuración de Babel para Jest
+// 📌 Características: Transpilación de TypeScript y JSX
+// ✍️ Autor: Sistema de IA
+// 📅 Actualizado: 2025-01-27
+// ===================================================
+
+module.exports = {
+  presets: [
+    ['@babel/preset-env', {
+      targets: {
+        node: 'current'
+      }
+    }],
+    ['@babel/preset-react', {
+      runtime: 'automatic'
+    }],
+    '@babel/preset-typescript'
+  ],
+  plugins: [
+    '@babel/plugin-transform-runtime'
+  ]
+};

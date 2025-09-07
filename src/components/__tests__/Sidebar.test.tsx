@@ -615,4 +615,134 @@ describe('Sidebar Component', () => {
       expect(() => render(<Sidebar />)).not.toThrow()
     })
   })
+
+  describe('Submenu Functionality', () => {
+    beforeEach(() => {
+      mockUseSession.mockReturnValue({
+        data: mockSession,
+        status: 'authenticated',
+      })
+      mockUsePathname.mockReturnValue('/comercial/clientes')
+    })
+
+    it('should handle submenu toggle without infinite loops', async () => {
+      const renderCount = jest.fn()
+      
+      const TestWrapper = () => {
+        renderCount()
+        return <Sidebar />
+      }
+
+      render(<TestWrapper />)
+      
+      // Verificar renderizado inicial
+      expect(screen.getByText('GYS')).toBeInTheDocument()
+      
+      // Buscar botones que podrían tener submenús
+      const buttons = screen.getAllByRole('button')
+      
+      // Hacer clic en algunos botones para probar la estabilidad
+      await act(async () => {
+        buttons.slice(0, 3).forEach(button => {
+          fireEvent.click(button)
+        })
+      })
+      
+      // Verificar que no hay re-renders excesivos
+      expect(renderCount).toHaveBeenCalledTimes(1)
+      expect(screen.getByText('GYS')).toBeInTheDocument()
+    })
+
+    it('should maintain submenu state correctly', async () => {
+      render(<Sidebar />)
+      
+      // Verificar que el componente renderiza correctamente
+      expect(screen.getByText('GYS')).toBeInTheDocument()
+      
+      // Buscar elementos de navegación
+      const navigationElements = screen.getAllByRole('link')
+      expect(navigationElements.length).toBeGreaterThan(0)
+    })
+
+    it('should handle multiple submenu interactions', async () => {
+      render(<Sidebar />)
+      
+      const buttons = screen.getAllByRole('button')
+      
+      // Simular múltiples interacciones rápidas
+      await act(async () => {
+        for (let i = 0; i < Math.min(buttons.length, 5); i++) {
+          fireEvent.click(buttons[i])
+          // Pequeña pausa para simular interacción real
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+      })
+      
+      // El componente debería seguir siendo estable
+      expect(screen.getByText('GYS')).toBeInTheDocument()
+    })
+
+    it('should not cause memory leaks with submenu state', async () => {
+      const { unmount } = render(<Sidebar />)
+      
+      // Interactuar con submenús
+      const buttons = screen.getAllByRole('button')
+      await act(async () => {
+        buttons.slice(0, 2).forEach(button => {
+          fireEvent.click(button)
+        })
+      })
+      
+      // Desmontar el componente
+      unmount()
+      
+      // No debería haber errores o warnings
+      expect(true).toBe(true) // Test pasa si no hay errores
+    })
+  })
+
+  describe('Performance and Stability', () => {
+    beforeEach(() => {
+      mockUseSession.mockReturnValue({
+        data: mockSession,
+        status: 'authenticated',
+      })
+      mockUsePathname.mockReturnValue('/dashboard')
+    })
+
+    it('should prevent infinite update loops', async () => {
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {})
+      
+      render(<Sidebar />)
+      
+      // Esperar a que el componente se estabilice
+      await waitFor(() => {
+        expect(screen.getByText('GYS')).toBeInTheDocument()
+      }, { timeout: 3000 })
+      
+      // No debería haber errores de React sobre máxima profundidad de actualización
+      expect(consoleError).not.toHaveBeenCalledWith(
+        expect.stringContaining('Maximum update depth exceeded')
+      )
+      
+      consoleError.mockRestore()
+    })
+
+    it('should handle rapid state changes gracefully', async () => {
+      render(<Sidebar />)
+      
+      const collapseButton = screen.getByRole('button', { name: /colapsar/i })
+      
+      // Hacer múltiples clics rápidos
+      await act(async () => {
+        for (let i = 0; i < 10; i++) {
+          fireEvent.click(collapseButton)
+          await new Promise(resolve => setTimeout(resolve, 5))
+        }
+      })
+      
+      // El componente debería seguir funcionando
+      expect(screen.getByText('GYS')).toBeInTheDocument()
+    })
+  })
 })

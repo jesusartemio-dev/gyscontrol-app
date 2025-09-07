@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { calcularCostoItem, calcularCostoTotal, formatCurrency } from '../costoCalculations'
-import type { ListaEquipoItem } from '@/types'
+import type { ListaEquipoItem, EstadoListaItem } from '@/types'
 
 // 🧪 Mock data
 const mockItemWithCostoElegido: ListaEquipoItem = {
@@ -18,18 +18,71 @@ const mockItemWithCostoElegido: ListaEquipoItem = {
   costoElegido: 500.00, // ✅ Priority field
   cotizacionSeleccionada: {
     id: 'cot1',
+    cotizacionId: 'cotizacion-1',
+    listaEquipoItemId: '1',
+    listaId: 'lista1',
+    lista: undefined,
+    codigo: 'EQ001',
+    descripcion: 'Equipo con costo elegido',
+    unidad: 'pza',
+    cantidadOriginal: 2,
+    presupuesto: undefined,
     precioUnitario: 200.00, // Should be ignored when costoElegido exists
-    moneda: 'USD',
-    proveedor: 'Proveedor A',
-    tiempoEntrega: '15 días'
+    cantidad: 2,
+    costoTotal: 400.00,
+    tiempoEntrega: '15 días',
+    tiempoEntregaDias: 15,
+    estado: 'cotizado' as any,
+    esSeleccionada: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    cotizacion: {
+      id: 'cotizacion-1',
+      proveedorId: 'prov-1',
+      proyectoId: 'proyecto-1',
+      codigo: 'COT-001',
+      numeroSecuencia: 1,
+      estado: 'cotizado' as any,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      proveedor: {
+        id: 'prov-1',
+        nombre: 'Proveedor A'
+      },
+      proyecto: {} as any,
+      items: []
+    },
+    listaEquipoItem: undefined
   },
-  estado: 'aprobado',
+  estado: 'aprobado' as EstadoListaItem,
   origen: 'cotizado',
   verificado: true,
   listaId: 'lista1',
   catalogoEquipoId: 'cat1',
-  createdAt: new Date(),
-  updatedAt: new Date()
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  cotizaciones: [],
+  pedidos: [],
+  lista: {} as any,
+  proveedor: undefined,
+  catalogoEquipo: undefined,
+  proyectoEquipoItem: undefined,
+  reemplazaProyectoEquipoItem: undefined,
+  proyectoEquipo: undefined,
+  proyectoEquipoItemId: undefined,
+  proyectoEquipoId: undefined,
+  reemplazaProyectoEquipoItemId: undefined,
+  proveedorId: undefined,
+  cotizacionSeleccionadaId: undefined,
+  comentarioRevision: undefined,
+  presupuesto: undefined,
+  precioElegido: undefined,
+  costoPedido: undefined,
+  costoReal: undefined,
+  cantidadPedida: undefined,
+  cantidadEntregada: undefined,
+  tiempoEntrega: undefined,
+  tiempoEntregaDias: undefined
 }
 
 const mockItemWithCotizacion: ListaEquipoItem = {
@@ -38,21 +91,74 @@ const mockItemWithCotizacion: ListaEquipoItem = {
   descripcion: 'Equipo con cotización',
   unidad: 'pza',
   cantidad: 3,
-  costoElegido: null, // ✅ No costo elegido
+  costoElegido: undefined, // ✅ No costo elegido
   cotizacionSeleccionada: {
     id: 'cot2',
+    cotizacionId: 'cotizacion-2',
+    listaEquipoItemId: '2',
+    listaId: 'lista1',
+    lista: undefined,
+    codigo: 'EQ002',
+    descripcion: 'Equipo con cotización',
+    unidad: 'pza',
+    cantidadOriginal: 3,
+    presupuesto: undefined,
     precioUnitario: 150.00,
-    moneda: 'USD',
-    proveedor: 'Proveedor B',
-    tiempoEntrega: '10 días'
+    cantidad: 3,
+    costoTotal: 450.00,
+    tiempoEntrega: undefined,
+    tiempoEntregaDias: undefined,
+    estado: 'cotizado' as any,
+    esSeleccionada: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    cotizacion: {
+      id: 'cotizacion-2',
+      proveedorId: 'prov-2',
+      proyectoId: 'proyecto-1',
+      codigo: 'COT-002',
+      numeroSecuencia: 2,
+      estado: 'cotizado' as any,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      proveedor: {
+        id: 'prov-2',
+        nombre: 'Proveedor B'
+      },
+      proyecto: {} as any,
+      items: []
+    },
+    listaEquipoItem: undefined
   },
-  estado: 'aprobado',
+  estado: 'borrador',
   origen: 'cotizado',
   verificado: true,
   listaId: 'lista1',
   catalogoEquipoId: 'cat2',
-  createdAt: new Date(),
-  updatedAt: new Date()
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  cotizaciones: [],
+  pedidos: [],
+  lista: {} as any,
+  proveedor: undefined,
+  catalogoEquipo: undefined,
+  proyectoEquipoItem: undefined,
+  reemplazaProyectoEquipoItem: undefined,
+  proyectoEquipo: undefined,
+  proyectoEquipoItemId: undefined,
+  proyectoEquipoId: undefined,
+  reemplazaProyectoEquipoItemId: undefined,
+  proveedorId: undefined,
+  cotizacionSeleccionadaId: undefined,
+  comentarioRevision: undefined,
+  presupuesto: undefined,
+  precioElegido: undefined,
+  costoPedido: undefined,
+  costoReal: undefined,
+  cantidadPedida: undefined,
+  cantidadEntregada: undefined,
+  tiempoEntrega: undefined,
+  tiempoEntregaDias: undefined
 }
 
 const mockItemWithoutCost: ListaEquipoItem = {
@@ -61,15 +167,37 @@ const mockItemWithoutCost: ListaEquipoItem = {
   descripcion: 'Equipo sin costo',
   unidad: 'pza',
   cantidad: 1,
-  costoElegido: null,
-  cotizacionSeleccionada: null,
-  estado: 'pendiente',
+  costoElegido: undefined,
+  cotizacionSeleccionada: undefined,
+  estado: 'borrador',
   origen: 'nuevo',
   verificado: false,
   listaId: 'lista1',
   catalogoEquipoId: 'cat3',
-  createdAt: new Date(),
-  updatedAt: new Date()
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  cotizaciones: [],
+  pedidos: [],
+  lista: {} as any,
+  proveedor: undefined,
+  catalogoEquipo: undefined,
+  proyectoEquipoItem: undefined,
+  reemplazaProyectoEquipoItem: undefined,
+  proyectoEquipo: undefined,
+  proyectoEquipoItemId: undefined,
+  proyectoEquipoId: undefined,
+  reemplazaProyectoEquipoItemId: undefined,
+  proveedorId: undefined,
+  cotizacionSeleccionadaId: undefined,
+  comentarioRevision: undefined,
+  presupuesto: undefined,
+  precioElegido: undefined,
+  costoPedido: undefined,
+  costoReal: undefined,
+  cantidadPedida: undefined,
+  cantidadEntregada: undefined,
+  tiempoEntrega: undefined,
+  tiempoEntregaDias: undefined
 }
 
 describe('costoCalculations', () => {
@@ -102,7 +230,7 @@ describe('costoCalculations', () => {
       const itemWithZeroCantidad = {
         ...mockItemWithCotizacion,
         cantidad: 0,
-        costoElegido: null
+        costoElegido: undefined
       }
       const result = calcularCostoItem(itemWithZeroCantidad)
       expect(result).toBe(0)
@@ -112,7 +240,7 @@ describe('costoCalculations', () => {
       const itemWithNullCantidad = {
         ...mockItemWithCotizacion,
         cantidad: null,
-        costoElegido: null
+        costoElegido: undefined
       }
       const result = calcularCostoItem(itemWithNullCantidad as any)
       expect(result).toBe(0)
@@ -188,7 +316,7 @@ describe('costoCalculations integration', () => {
       },
       {
         ...mockItemWithCotizacion,
-        costoElegido: null // Should use calculation
+        costoElegido: undefined // Should use calculation
       }
     ]
 

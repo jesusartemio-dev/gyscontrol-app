@@ -40,6 +40,12 @@ export default function GenerarPedidoDesdeCotizacion({ pedidoId, responsableId }
 
     try {
       for (const item of itemsSeleccionados) {
+        // ✅ Validar que el item tenga listaEquipoItemId
+        if (!item.listaEquipoItemId) {
+          console.warn(`Item ${item.codigo} no tiene listaEquipoItemId, se omite`)
+          continue
+        }
+
         const payload: PedidoEquipoItemPayload = {
           pedidoId,
           responsableId,
@@ -47,7 +53,6 @@ export default function GenerarPedidoDesdeCotizacion({ pedidoId, responsableId }
           cantidadPedida: item.cantidad || item.cantidadOriginal,
           precioUnitario: item.precioUnitario,
           costoTotal: item.costoTotal,
-          fechaOrdenCompraRecomendada: new Date().toISOString().slice(0, 10),
           estado: 'pendiente',
           // Required fields from the payload type
           codigo: item.codigo || 'N/A',

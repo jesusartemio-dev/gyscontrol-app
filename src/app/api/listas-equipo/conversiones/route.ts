@@ -27,8 +27,6 @@ interface ConversionItem {
     name: string
   }
   estado: string
-  prioridad: string
-  fechaLimite: Date | null
   presupuestoEstimado: number
   costoCalculado: number
   desviacion: number
@@ -48,7 +46,7 @@ interface ConversionItemDetail {
       nombre: string
     }
     precioVenta?: number
-  } | null
+  } | null | undefined
   cantidad: number
   cantidadPedida: number
   cantidadPendiente: number
@@ -137,15 +135,19 @@ export async function GET(request: NextRequest) {
         },
         items: {
           include: {
-            catalogoEquipo: {
-              select: {
-                id: true,
-                codigo: true,
-                descripcion: true,
-                precioVenta: true,
-                unidad: {
+            proyectoEquipoItem: {
+              include: {
+                catalogoEquipo: {
                   select: {
-                    nombre: true
+                    id: true,
+                    codigo: true,
+                    descripcion: true,
+                    precioVenta: true,
+                    unidad: {
+                      select: {
+                        nombre: true
+                      }
+                    }
                   }
                 }
               }
@@ -170,10 +172,8 @@ export async function GET(request: NextRequest) {
         }
       },
       orderBy: [
-        { prioridad: 'desc' },
-        { fechaLimite: 'asc' },
-        { createdAt: 'desc' }
-      ]
+          { createdAt: 'desc' }
+        ]
     })
 
     // 🧮 Process conversion data
@@ -184,9 +184,9 @@ export async function GET(request: NextRequest) {
           ...item,
           id: item.id,
           listaId: lista.id,
-          codigo: item.catalogoEquipo?.codigo || '',
-          descripcion: item.catalogoEquipo?.descripcion || '',
-          unidad: item.catalogoEquipo?.unidad?.nombre || '',
+          codigo: item.proyectoEquipoItem?.catalogoEquipo?.codigo || '',
+          descripcion: item.proyectoEquipoItem?.catalogoEquipo?.descripcion || '',
+          unidad: item.proyectoEquipoItem?.catalogoEquipo?.unidad?.nombre || '',
           cantidad: item.cantidad,
           estado: 'borrador' as const,
           origen: 'cotizado' as const,
@@ -196,8 +196,8 @@ export async function GET(request: NextRequest) {
           lista: {} as any,
           cotizaciones: [],
           pedidos: [],
-          catalogoEquipo: item.catalogoEquipo ? {
-            ...item.catalogoEquipo,
+          catalogoEquipo: item.proyectoEquipoItem?.catalogoEquipo ? {
+            ...item.proyectoEquipoItem.catalogoEquipo,
             categoriaId: '',
             unidadId: '', // No available in this query - only nombre is included
             categoria: {
@@ -253,7 +253,7 @@ export async function GET(request: NextRequest) {
           proyectoEquipoItemId: item.proyectoEquipoItemId || undefined,
           proyectoEquipoId: item.proyectoEquipoId || undefined,
           reemplazaProyectoEquipoItemId: item.reemplazaProyectoEquipoItemId || undefined,
-          catalogoEquipoId: item.catalogoEquipoId || undefined,
+          catalogoEquipoId: item.proyectoEquipoItem?.catalogoEquipoId || undefined,
           proveedorId: item.proveedorId || undefined,
           cotizacionSeleccionadaId: item.cotizacionSeleccionadaId || undefined,
           comentarioRevision: item.comentarioRevision || undefined,
@@ -271,11 +271,11 @@ export async function GET(request: NextRequest) {
         return sum + (
           compatibleItem.cotizacionSeleccionada?.precioUnitario 
             ? compatibleItem.cotizacionSeleccionada.precioUnitario * compatibleItem.cantidad
-            : (compatibleItem.catalogoEquipo?.precioVenta || 0) * compatibleItem.cantidad
+            : (compatibleItem.proyectoEquipoItem?.catalogoEquipo?.precioVenta || 0) * compatibleItem.cantidad
         )
       }, 0)
-      const presupuestoEstimado = lista.presupuestoEstimado || 0
-      const desviacion = presupuestoEstimado > 0 ? 
+      const presupuestoEstimado = 0 // Campo no disponible en el modelo actual
+      const desviacion = presupuestoEstimado > 0 ?
         ((costoCalculado - presupuestoEstimado) / presupuestoEstimado) * 100 : 0
       
       const itemsCount = lista.items.length
@@ -310,8 +310,6 @@ export async function GET(request: NextRequest) {
         proyecto: lista.proyecto,
         responsable: lista.responsable,
         estado: lista.estado,
-        prioridad: lista.prioridad,
-        fechaLimite: lista.fechaLimite,
         presupuestoEstimado,
         costoCalculado,
         desviacion,
@@ -366,15 +364,19 @@ async function getListaDetalle(listaId: string) {
         },
         items: {
           include: {
-            catalogoEquipo: {
-              select: {
-                id: true,
-                codigo: true,
-                descripcion: true,
-                precioVenta: true,
-                unidad: {
+            proyectoEquipoItem: {
+              include: {
+                catalogoEquipo: {
                   select: {
-                    nombre: true
+                    id: true,
+                    codigo: true,
+                    descripcion: true,
+                    precioVenta: true,
+                    unidad: {
+                      select: {
+                        nombre: true
+                      }
+                    }
                   }
                 }
               }
@@ -414,9 +416,9 @@ async function getListaDetalle(listaId: string) {
         ...item,
         id: item.id,
         listaId: lista.id,
-        codigo: item.catalogoEquipo?.codigo || '',
-        descripcion: item.catalogoEquipo?.descripcion || '',
-        unidad: item.catalogoEquipo?.unidad?.nombre || '',
+        codigo: item.proyectoEquipoItem?.catalogoEquipo?.codigo || '',
+        descripcion: item.proyectoEquipoItem?.catalogoEquipo?.descripcion || '',
+        unidad: item.proyectoEquipoItem?.catalogoEquipo?.unidad?.nombre || '',
         cantidad: item.cantidad,
         estado: 'borrador' as const,
         origen: 'cotizado' as const,
@@ -426,8 +428,8 @@ async function getListaDetalle(listaId: string) {
         lista: {} as any,
         cotizaciones: [],
         pedidos: [],
-        catalogoEquipo: item.catalogoEquipo ? {
-          ...item.catalogoEquipo,
+        catalogoEquipo: item.proyectoEquipoItem?.catalogoEquipo ? {
+          ...item.proyectoEquipoItem.catalogoEquipo,
           categoriaId: '',
           unidadId: '', // No available in this query - only nombre is included
           categoria: {
@@ -436,7 +438,7 @@ async function getListaDetalle(listaId: string) {
           },
           unidad: {
             id: '', // Required by CatalogoEquipo type but not available in query
-            nombre: item.catalogoEquipo.unidad?.nombre || ''
+            nombre: item.proyectoEquipoItem?.catalogoEquipo?.unidad?.nombre || ''
           },
           marca: '',
           precioInterno: 0,
@@ -450,7 +452,7 @@ async function getListaDetalle(listaId: string) {
         proyectoEquipoItemId: item.proyectoEquipoItemId || undefined,
         proyectoEquipoId: item.proyectoEquipoId || undefined,
         reemplazaProyectoEquipoItemId: item.reemplazaProyectoEquipoItemId || undefined,
-        catalogoEquipoId: item.catalogoEquipoId || undefined,
+        catalogoEquipoId: item.proyectoEquipoItem?.catalogoEquipoId || undefined,
         proveedorId: item.proveedorId || undefined,
         cotizacionSeleccionadaId: item.cotizacionSeleccionadaId || undefined,
         comentarioRevision: item.comentarioRevision || undefined,
@@ -466,13 +468,13 @@ async function getListaDetalle(listaId: string) {
       }
       const costoEstimado = compatibleItem.cotizacionSeleccionada?.precioUnitario 
         ? compatibleItem.cotizacionSeleccionada.precioUnitario * compatibleItem.cantidad
-        : (compatibleItem.catalogoEquipo?.precioVenta || 0) * compatibleItem.cantidad
+        : (compatibleItem.proyectoEquipoItem?.catalogoEquipo?.precioVenta || 0) * compatibleItem.cantidad
       const cantidadPedidaActual = item.cantidadPedida ?? 0 // ✅ Manejar null
       const cantidadPendiente = item.cantidad - cantidadPedidaActual
       
       return {
         id: item.id,
-        catalogoEquipo: item.catalogoEquipo,
+        catalogoEquipo: item.proyectoEquipoItem?.catalogoEquipo,
         cantidad: item.cantidad,
         cantidadPedida: cantidadPedidaActual,
         cantidadPendiente,
@@ -493,9 +495,7 @@ async function getListaDetalle(listaId: string) {
         proyecto: lista.proyecto,
         responsable: lista.responsable,
         estado: lista.estado,
-        prioridad: lista.prioridad,
-        fechaLimite: lista.fechaLimite,
-        presupuestoEstimado: lista.presupuestoEstimado || 0
+        presupuestoEstimado: 0 // Campo no disponible en el modelo actual
       },
       items: itemsDetalle
     })
@@ -545,11 +545,15 @@ export async function POST(request: NextRequest) {
         include: {
           items: {
             include: {
-              catalogoEquipo: {
+              proyectoEquipoItem: {
                 include: {
-                  unidad: {
-                    select: {
-                      nombre: true
+                  catalogoEquipo: {
+                    include: {
+                      unidad: {
+                        select: {
+                          nombre: true
+                        }
+                      }
                     }
                   }
                 }
@@ -616,7 +620,7 @@ export async function POST(request: NextRequest) {
 
       for (const itemConversion of items) {
         const listaItem = lista.items.find(item => item.id === itemConversion.itemId)
-        if (!listaItem || !listaItem.catalogoEquipo) continue
+        if (!listaItem || !listaItem.proyectoEquipoItem?.catalogoEquipo) continue
 
         const cantidadAConvertir = Math.min(
           itemConversion.cantidadAConvertir,
@@ -641,9 +645,9 @@ export async function POST(request: NextRequest) {
            listaId: lista.id, 
            listaEquipoItemId: listaItem.id, 
            responsableId: session.user.id,
-           codigo: listaItem.catalogoEquipo?.codigo || 'SIN-CODIGO', 
-           descripcion: listaItem.catalogoEquipo?.descripcion || 'Sin descripción', 
-           unidad: listaItem.catalogoEquipo?.unidad?.nombre || 'und', 
+           codigo: listaItem.proyectoEquipoItem?.catalogoEquipo?.codigo || 'SIN-CODIGO',
+        descripcion: listaItem.proyectoEquipoItem?.catalogoEquipo?.descripcion || 'Sin descripción',
+        unidad: listaItem.proyectoEquipoItem?.catalogoEquipo?.unidad?.nombre || 'und', 
            cantidadPedida: cantidadAConvertir, 
            precioUnitario: costoUnitario, 
            costoTotal, 

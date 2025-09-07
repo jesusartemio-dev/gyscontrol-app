@@ -36,6 +36,7 @@ import {
 } from '@/lib/responsive/breakpoints';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { deleteListaEquipo } from '@/lib/services/listaEquipo';
 import { ListaEquipoMaster } from '@/types/master-detail';
 import { calculateMasterListStats } from '@/lib/transformers/master-detail-transformers';
 import { useListaEquipoMaster } from '@/hooks/useListaEquipoMaster';
@@ -196,6 +197,22 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
   // 🎯 Navigation to detail view (use hook function)
   const handleViewDetail = navigateToDetail;
   
+  // 🗑️ Handle delete action
+  const handleDelete = async (listaId: string) => {
+    try {
+      const success = await deleteListaEquipo(listaId);
+      if (success) {
+        toast.success('Lista eliminada correctamente');
+        await refreshData(); // Refresh the data after deletion
+      } else {
+        toast.error('Error al eliminar la lista');
+      }
+    } catch (error) {
+      console.error('Error deleting lista:', error);
+      toast.error('Error al eliminar la lista');
+    }
+  };
+
   // 📱 Handle bulk actions
   const handleBulkAction = (action: string) => {
     if (selectedIds.length === 0) {
@@ -211,7 +228,7 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
         toast.success(`Duplicando ${selectedIds.length} listas...`);
         break;
       case 'delete':
-        toast.error('Funcionalidad de eliminación no implementada');
+        toast.error('Funcionalidad de eliminación masiva no implementada');
         break;
       default:
         toast.info(`Acción "${action}" no implementada`);
@@ -391,6 +408,7 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
             onItemSelect={handleViewDetail}
+            onDelete={handleDelete}
             showSelection={hasSelection}
             showActions={true}
             currentPage={currentPage}

@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
   cardHoverVariants,
+  cardContentVariants,
   buttonInteractionVariants,
   staggerItemVariants
 } from '@/lib/animations/masterDetailAnimations';
@@ -47,7 +48,8 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle2,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 import { ListaEquipoMaster } from '@/types/master-detail';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -58,6 +60,7 @@ interface ListaEquipoMasterCardProps {
   lista: ListaEquipoMaster;
   proyectoId: string;
   onSelect?: (listaId: string) => void;
+  onDelete?: (listaId: string) => void;
   isSelected?: boolean;
   viewMode?: 'grid' | 'list';
   showActions?: boolean;
@@ -118,6 +121,7 @@ const ListaEquipoMasterCard: React.FC<ListaEquipoMasterCardProps> = ({
   lista,
   proyectoId,
   onSelect,
+  onDelete,
   isSelected = false,
   viewMode = 'grid',
   showActions = true,
@@ -163,13 +167,10 @@ const ListaEquipoMasterCard: React.FC<ListaEquipoMasterCardProps> = ({
       variants={cardHoverVariants}
       initial="initial"
       whileHover="hover"
-      whileTap="tap"
       className={cn(
-        'cursor-pointer',
         viewMode === 'list' && 'w-full',
         className
       )}
-      onClick={handleCardClick}
     >
       <Card className={cn(
         'h-full transition-all duration-200',
@@ -177,27 +178,36 @@ const ListaEquipoMasterCard: React.FC<ListaEquipoMasterCardProps> = ({
         isSelected ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200',
         statusInfo.bgColor
       )}>
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-lg font-semibold text-gray-900 truncate">
-                {lista.nombre}
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                Código: {lista.codigo}
-              </p>
+        {/* Clickeable content area */}
+        <motion.div 
+          variants={cardContentVariants}
+          initial="initial"
+          whileHover="hover"
+          whileTap="tap"
+          className="cursor-pointer"
+          onClick={handleCardClick}
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-lg font-semibold text-gray-900 truncate">
+                  {lista.nombre}
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                  Código: {lista.codigo}
+                </p>
+              </div>
+              <Badge 
+                variant={statusInfo.variant as 'secondary' | 'outline' | 'default'}
+                className={cn('ml-2 flex items-center gap-1', statusInfo.color)}
+              >
+                <StatusIcon className="w-3 h-3" />
+                {lista.estado.replace('_', ' ')}
+              </Badge>
             </div>
-            <Badge 
-              variant={statusInfo.variant as 'secondary' | 'outline' | 'default'}
-              className={cn('ml-2 flex items-center gap-1', statusInfo.color)}
-            >
-              <StatusIcon className="w-3 h-3" />
-              {lista.estado.replace('_', ' ')}
-            </Badge>
-          </div>
-        </CardHeader>
-        
-        <CardContent className="space-y-4">
+          </CardHeader>
+          
+          <CardContent className="space-y-4 pb-2">
           {/* 📊 Progress Section */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
@@ -245,31 +255,55 @@ const ListaEquipoMasterCard: React.FC<ListaEquipoMasterCardProps> = ({
             </div>
           </div>
           
-          {/* 📅 Date Information */}
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Calendar className="w-3 h-3" />
-            <span>Actualizado: {formatDate(lista.updatedAt)}</span>
-          </div>
-          
-          {/* 🎯 Actions */}
-          {showActions && (
+            {/* 📅 Date Information */}
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Calendar className="w-3 h-3" />
+              <span>Actualizado: {formatDate(lista.updatedAt)}</span>
+            </div>
+           </CardContent>
+         </motion.div>
+        
+        {/* 🎯 Actions - Outside clickeable area */}
+        {showActions && (
+          <div className="px-6 pb-4">
             <div className="flex items-center justify-between pt-2 border-t border-gray-100">
               <div className="flex items-center gap-1 text-xs text-gray-500">
                 <span>ID: {lista.id.slice(-8)}</span>
               </div>
               
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleViewDetail}
-                className={`h-8 px-3 text-xs hover:bg-blue-50 hover:text-blue-600 ${touchButtonClasses}`}
-              >
-                <Eye className="w-3 h-3 mr-1" />
-                Ver detalle
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`);
+                  }}
+                  className={`h-8 px-3 text-xs hover:bg-blue-50 hover:text-blue-600 ${touchButtonClasses}`}
+                >
+                  <Eye className="w-3 h-3 mr-1" />
+                  Ver detalle
+                </Button>
+                
+                {onDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onDelete(lista.id);
+                    }}
+                    className={`h-8 w-8 p-0 text-xs hover:bg-red-50 hover:text-red-600 ${touchButtonClasses}`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
             </div>
-          )}
-        </CardContent>
+          </div>
+        )}
       </Card>
     </motion.div>
   );

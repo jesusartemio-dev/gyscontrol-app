@@ -26,32 +26,32 @@ const TEST_USERS = {
   admin: {
     email: 'admin@gys.com',
     password: 'Admin123!',
-    role: 'ADMIN',
+    role: 'admin',
     authFile: 'auth-admin.json'
   },
   gerente: {
     email: 'gerente@gys.com',
     password: 'Gerente123!',
-    role: 'GERENTE',
+    role: 'gerente',
     authFile: 'auth-gerente.json'
   },
   comercial: {
     email: 'comercial@gys.com',
     password: 'Comercial123!',
-    role: 'COMERCIAL',
+    role: 'comercial',
     authFile: 'auth-comercial.json'
   },
-  logistica: {
-    email: 'logistica@gys.com',
-    password: 'Logistica123!',
-    role: 'LOGISTICA',
-    authFile: 'auth-logistica.json'
+  logistico: {
+    email: 'logistico@gys.com',
+    password: 'Logistico123!',
+    role: 'logistico',
+    authFile: 'auth-logistico.json'
   },
-  finanzas: {
-    email: 'finanzas@gys.com',
-    password: 'Finanzas123!',
-    role: 'FINANZAS',
-    authFile: 'auth-finanzas.json'
+  gestor: {
+    email: 'gestor@gys.com',
+    password: 'Gestor123!',
+    role: 'gestor',
+    authFile: 'auth-gestor.json'
   }
 }
 
@@ -220,91 +220,7 @@ export async function createTestData() {
       }
     })
     
-    // 📦 Crear producto de prueba
-    const producto = await prisma.producto.upsert({
-      where: { id: 'producto-test-001' },
-      update: {},
-      create: {
-        id: 'producto-test-001',
-        codigo: 'PROD-TEST-001',
-        nombre: 'Producto Test E2E',
-        categoria: 'EQUIPOS',
-        unidadMedida: 'UNIDAD',
-        precioReferencia: 1500.00,
-        moneda: 'PEN'
-      }
-    })
-
-    // 🛒 Crear orden de compra aprobada
-    const orden = await prisma.ordenCompra.upsert({
-      where: { id: 'orden-test-001' },
-      update: {},
-      create: {
-        id: 'orden-test-001',
-        numero: 'OC-TEST-001',
-        proveedor: {
-          connect: { id: proveedor.id }
-        },
-        usuario: {
-          connect: { id: comercial.id }
-        },
-        fechaRequerida: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 días
-        estado: 'APROBADA',
-        montoTotal: 8850.00,
-        moneda: 'PEN',
-        items: {
-          create: {
-            productoId: producto.id,
-            cantidad: 5,
-            precioUnitario: 1500.00,
-            subtotal: 7500.00
-          }
-        }
-      }
-    })
-    
-    // 🛒 Crear orden en borrador (para tests de validación)
-    const ordenBorrador = await prisma.ordenCompra.upsert({
-      where: { id: 'orden-borrador-test' },
-      update: {},
-      create: {
-        id: 'orden-borrador-test',
-        numero: 'OC-BORRADOR-TEST',
-        proveedor: {
-          connect: { id: proveedor.id }
-        },
-        usuario: {
-          connect: { id: comercial.id }
-        },
-        fechaRequerida: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-        estado: 'BORRADOR',
-        montoTotal: 3540.00,
-        moneda: 'PEN',
-        observaciones: 'Orden borrador para tests'
-      }
-    })
-    
-    // 🛒 Crear orden sin recepción (para tests de validación)
-    const ordenSinRecepcion = await prisma.ordenCompra.upsert({
-      where: { id: 'orden-sin-recepcion-test' },
-      update: {},
-      create: {
-        id: 'orden-sin-recepcion-test',
-        numero: 'OC-SIN-REC-TEST',
-        proveedor: {
-          connect: { id: proveedor.id }
-        },
-        usuario: {
-          connect: { id: comercial.id }
-        },
-        fechaRequerida: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-        estado: 'APROBADA',
-        montoTotal: 2360.00,
-        moneda: 'PEN',
-        observaciones: 'Orden sin recepción para tests',
-        fechaAprobacion: new Date()
-      }
-    })
+    // ✅ Datos básicos creados - sistema simplificado sin aprovisionamiento
     
     console.log('✅ Datos de prueba creados exitosamente')
     
@@ -313,9 +229,9 @@ export async function createTestData() {
       equipo,
       proyecto,
       pedido,
-      orden,
-      ordenBorrador,
-      ordenSinRecepcion
+      cliente,
+      comercial,
+      gestor
     }
     
   } catch (error) {
@@ -356,16 +272,15 @@ export async function cleanupTestData(testData?: any) {
   console.log('🧹 Limpiando datos de prueba...')
   
   try {
-    // Orden de limpieza respetando FK constraints
+    // Orden de limpieza respetando FK constraints - sistema simplificado
     const cleanupOrder = [
-      { model: 'pago', condition: { id: { startsWith: 'pago-test-' } } },
-      { model: 'recepcion', condition: { id: { startsWith: 'recepcion-test-' } } },
-      { model: 'itemOrdenCompra', condition: { ordenCompraId: { startsWith: 'orden' } } },
-      { model: 'ordenCompra', condition: { id: { startsWith: 'orden' } } },
       { model: 'pedidoEquipo', condition: { id: { startsWith: 'pedido-test-' } } },
       { model: 'proyecto', condition: { id: { startsWith: 'proyecto-test-' } } },
       { model: 'catalogoEquipo', condition: { id: { startsWith: 'equipo-test-' } } },
-      { model: 'proveedor', condition: { id: { startsWith: 'prov-test-' } } }
+      { model: 'cliente', condition: { id: { startsWith: 'cliente-test-' } } },
+      { model: 'proveedor', condition: { id: { startsWith: 'prov-test-' } } },
+      { model: 'categoriaEquipo', condition: { id: { startsWith: 'cat-test-' } } },
+      { model: 'unidad', condition: { id: { startsWith: 'unidad-test-' } } }
     ]
     
     for (const { model, condition } of cleanupOrder) {

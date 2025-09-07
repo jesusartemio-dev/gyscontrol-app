@@ -133,17 +133,7 @@ export const mockUtils = {
     vi.clearAllMocks()
     
     // Reset servicios
-    Object.values(mockOrdenCompraService).forEach(mock => {
-      if (vi.isMockFunction(mock)) mock.mockClear()
-    })
-    
-    Object.values(mockRecepcionService).forEach(mock => {
-      if (vi.isMockFunction(mock)) mock.mockClear()
-    })
-    
-    Object.values(mockPagoService).forEach(mock => {
-      if (vi.isMockFunction(mock)) mock.mockClear()
-    })
+    // ✅ Referencias de aprovisionamiento eliminadas
     
     // Reset Prisma
     Object.values(mockPrisma).forEach(model => {

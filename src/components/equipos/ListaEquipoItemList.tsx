@@ -15,15 +15,21 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, Minimize2, RotateCcw, Recycle } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, Minimize2, RotateCcw, Recycle, Plus, ShoppingCart } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
 import { updateListaEquipoItem, deleteListaEquipoItem } from '@/lib/services/listaEquipoItem'
 import { toast } from 'sonner'
 import ModalReemplazarItemDesdeCatalogo from './ModalReemplazarItemDesdeCatalogo'
 import ModalReemplazarReemplazoDesdeCatalogo from './ModalReemplazarReemplazoDesdeCatalogo'
+import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
+import ModalAgregarItemDesdeEquipo from './ModalAgregarItemDesdeEquipo'
 import { calcularCostoItem, calcularCostoTotal, formatCurrency } from '@/lib/utils/costoCalculations'
 import { motion, AnimatePresence } from 'framer-motion'
+// import { DebugLogger, useRenderTracker } from '@/components/debug/DebugLogger'
+// import MotionRefDebugger from '@/components/debug/MotionRefDebugger'
+// import RenderLoopDetector, { useRenderLoopDetection } from '@/components/debug/RenderLoopDetector'
+// Debug imports removed to fix runtime errors
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -39,6 +45,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { useOptimizedRenderCounter, useOptimizedRenderTracker, useOptimizedAnimatePresenceDebug } from '@/components/debug/OptimizedDebugHooks'
+import { MotionDebugger } from '@/components/debug/MotionDebugger'
 import { CotizacionInfo, CotizacionCodigoSimple } from './CotizacionSelector'
 import { 
   calcularResumenPedidos, 
@@ -53,6 +61,12 @@ import {
   getCodigoPedidoRelevante,
   type EstadoPedidoItemResumen 
 } from '@/lib/utils/pedidoHelpers'
+import {
+  obtenerTodosLosPedidos,
+  calcularDisponibilidad,
+  generarResumenPedidos,
+  obtenerColorDisponibilidad
+} from '@/lib/utils/pedidoDisplayHelpers'
 
 interface Props {
   listaId: string
@@ -118,11 +132,35 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   const [itemReemplazoReemplazo, setItemReemplazoReemplazo] = useState<ListaEquipoItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
   const [isLoading, setIsLoading] = useState(false)
 
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('list') // ✅ Default to list view
   const [compactMode, setCompactMode] = useState(true) // ✅ Compact mode by default
+  const [showModalAgregarCatalogo, setShowModalAgregarCatalogo] = useState(false)
+  const [showModalAgregarEquipo, setShowModalAgregarEquipo] = useState(false)
+  
+  // 🔍 Debug: Optimized render tracking (prevents infinite loops)
+  const renderCount = useOptimizedRenderCounter('ListaEquipoItemList', [items?.length, searchTerm], {
+    logThreshold: 10,
+    throttleMs: 1000,
+    maxLogs: 5
+  })
+  
+  // 📊 Hook para trackear renders detallados (optimized version)
+  const detailedRenderCount = useOptimizedRenderTracker('ListaEquipoItemList', [items?.length, searchTerm, viewMode, compactMode], {
+    enableDetailedLogging: false, // Only enable when debugging
+    maxRenderWarning: 30,
+    throttleMs: 2000
+  })
+  
+  // 🎬 Hook para detectar problemas con AnimatePresence (optimized version)
+  const motionRenderCount = useOptimizedAnimatePresenceDebug('ListaEquipoItemList', items, {
+    logChanges: false, // Only enable when debugging
+    throttleMs: 1000
+  })
+  
+  // 🔍 Debug: Track re-renders
+  // useRenderTracker('ListaEquipoItemList', { itemsLength: items?.length, listaId, proyectoId, viewMode })
   const [visibleColumns, setVisibleColumns] = useState({
     codigoDescripcion: true, // ✅ Combined column
     unidad: false, // ✅ Oculta cuando está activa la unificada
@@ -140,29 +178,34 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     acciones: true
   })
 
-  // 📊 Calculate statistics
-  const stats = useMemo(() => {
-    const total = items.length
-    const verificados = items.filter(i => i.verificado).length
-    const sinPedidos = items.filter(i => {
-      const resumen = calcularResumenPedidos(i)
-      return resumen.estado === 'sin_pedidos'
-    }).length
-    const enPedido = items.filter(i => {
-      const resumen = calcularResumenPedidos(i)
-      return resumen.estado === 'pendiente' || resumen.estado === 'parcial'
-    }).length
-    const conCotizacion = items.filter(i => 
-      i.cotizacionSeleccionada && i.cotizacionSeleccionada.precioUnitario && i.cotizacionSeleccionada.precioUnitario > 0
-    ).length
-    const costoTotal = calcularCostoTotal(items)
-    
-    return { total, verificados, sinPedidos, enPedido, conCotizacion, costoTotal }
+  // 📊 Memoize pedido summaries to prevent infinite loops
+  const itemsWithResumen = useMemo(() => {
+    return items.map(item => ({
+      ...item,
+      resumen: calcularResumenPedidos(item)
+    }))
   }, [items])
 
-  // 🔍 Filter and search items
+  // 📊 Calculate statistics using memoized summaries
+  const stats = useMemo(() => {
+    const total = itemsWithResumen.length
+    const verificados = itemsWithResumen.filter(i => i.verificado).length
+    const sinPedidos = itemsWithResumen.filter(i => i.resumen.estado === 'sin_pedidos').length
+    const enPedido = itemsWithResumen.filter(i => 
+      i.resumen.estado === 'pendiente' || i.resumen.estado === 'parcial'
+    ).length
+    const conCotizacion = itemsWithResumen.filter(i => 
+      i.cotizacionSeleccionada && i.cotizacionSeleccionada.precioUnitario && i.cotizacionSeleccionada.precioUnitario > 0
+    ).length
+    // ✅ Use itemsWithResumen instead of items to avoid duplicate dependency
+    const costoTotal = calcularCostoTotal(itemsWithResumen)
+    
+    return { total, verificados, sinPedidos, enPedido, conCotizacion, costoTotal }
+  }, [itemsWithResumen])
+
+  // 🔍 Filter and search items using memoized summaries
   const filteredItems = useMemo(() => {
-    let filtered = [...items]
+    let filtered = [...itemsWithResumen]
     
     // Search filter
     if (searchTerm) {
@@ -172,35 +215,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       )
     }
     
-    // Unified filter logic
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(item => {
-        const resumen = calcularResumenPedidos(item)
-        const tieneCotizacion = item.cotizacionSeleccionada && item.cotizacionSeleccionada.precioUnitario && item.cotizacionSeleccionada.precioUnitario > 0
-        
-        switch (filterStatus) {
-          case 'sin_pedidos':
-            return resumen.estado === 'sin_pedidos'
-          case 'en_pedido':
-            return resumen.estado === 'pendiente' || resumen.estado === 'parcial'
-          case 'completos':
-            return resumen.estado === 'atendido' || resumen.estado === 'entregado'
-          case 'verificados':
-            return item.verificado === true
-          case 'no_verificados':
-            return item.verificado === false
-          case 'con_cotizacion':
-            return tieneCotizacion
-          case 'sin_cotizacion':
-            return !tieneCotizacion
-          default:
-            return true
-        }
-      })
-    }
-    
     return filtered.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-  }, [items, searchTerm, filterStatus])
+  }, [itemsWithResumen, searchTerm])
 
   const handleSaveCantidad = async (itemId: string) => {
     try {
@@ -294,8 +310,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   }
 
   // 🔗 Función para navegar al pedido
-  const handleNavigateToPedido = (item: ListaEquipoItem) => {
-    const resumenPedidos = calcularResumenPedidos(item)
+  const handleNavigateToPedido = (item: ListaEquipoItem, resumenPedidos: ReturnType<typeof calcularResumenPedidos>) => {
     const pedidoId = getIdPedidoRelevante(resumenPedidos)
     
     if (pedidoId) {
@@ -305,65 +320,13 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     }
   }
 
-  // 🎨 Render header with statistics
+  // 🎨 Render header with search and actions only
   const renderHeader = () => (
     <motion.div 
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mb-6 space-y-4"
+      className="mb-6"
     >
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center space-x-2">
-            <Package className="h-5 w-5 text-blue-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Ítems</p>
-              <p className="text-2xl font-bold">{stats.total}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center space-x-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Verificados</p>
-              <p className="text-2xl font-bold text-green-600">{stats.verificados}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center space-x-2">
-            <Clock className="h-5 w-5 text-orange-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Sin Pedidos</p>
-              <p className="text-2xl font-bold text-orange-600">{stats.sinPedidos}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center space-x-2">
-            <Package className="h-5 w-5 text-blue-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">En Pedido</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.enPedido}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center space-x-2">
-            <DollarSign className="h-5 w-5 text-emerald-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Con Cotización</p>
-              <p className="text-2xl font-bold text-emerald-600">{stats.conCotizacion}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
 
       {/* Search, Filter and View Toggle */}
        <div className="flex flex-col sm:flex-row gap-4">
@@ -377,58 +340,31 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
            />
          </div>
          
-         {/* 🎯 Filtros minimalistas unificados */}
-         <div className="flex flex-wrap gap-2">
-           <Button
-             variant={filterStatus === 'all' ? 'default' : 'outline'}
-             size="sm"
-             onClick={() => setFilterStatus('all')}
-           >
-             Todos
-           </Button>
-           <Button
-             variant={filterStatus === 'sin_pedidos' ? 'default' : 'outline'}
-             size="sm"
-             onClick={() => setFilterStatus('sin_pedidos')}
-           >
-             Sin Pedidos
-           </Button>
-           <Button
-             variant={filterStatus === 'en_pedido' ? 'default' : 'outline'}
-             size="sm"
-             onClick={() => setFilterStatus('en_pedido')}
-           >
-             En Pedido
-           </Button>
-           <Button
-             variant={filterStatus === 'completos' ? 'default' : 'outline'}
-             size="sm"
-             onClick={() => setFilterStatus('completos')}
-           >
-             Completos
-           </Button>
-           <Button
-             variant={filterStatus === 'verificados' ? 'default' : 'outline'}
-             size="sm"
-             onClick={() => setFilterStatus('verificados')}
-           >
-             Verificados
-           </Button>
-           <Button
-             variant={filterStatus === 'no_verificados' ? 'default' : 'outline'}
-             size="sm"
-             onClick={() => setFilterStatus('no_verificados')}
-           >
-             No Verificados
-           </Button>
-           <Button
-             variant={filterStatus === 'con_cotizacion' ? 'default' : 'outline'}
-             size="sm"
-             onClick={() => setFilterStatus('con_cotizacion')}
-           >
-             Con Cotización
-           </Button>
-         </div>
+
+         
+         {/* Add Items Buttons */}
+         {editable && (
+           <div className="flex gap-2">
+             <Button
+               variant="default"
+               size="sm"
+               onClick={() => setShowModalAgregarCatalogo(true)}
+               className="h-8 px-3"
+             >
+               <Plus className="h-4 w-4 mr-1" />
+               Desde Catálogo
+             </Button>
+             <Button
+               variant="outline"
+               size="sm"
+               onClick={() => setShowModalAgregarEquipo(true)}
+               className="h-8 px-3"
+             >
+               <ShoppingCart className="h-4 w-4 mr-1" />
+               Desde Equipo
+             </Button>
+           </div>
+         )}
          
          {/* View Mode Toggle */}
          <div className="flex gap-2">
@@ -546,19 +482,18 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
       <h3 className="text-lg font-semibold mb-2">No hay ítems técnicos</h3>
       <p className="text-muted-foreground mb-4">
-        {searchTerm || filterStatus !== 'all' 
-          ? 'No se encontraron ítems que coincidan con los filtros aplicados.'
+        {searchTerm 
+          ? 'No se encontraron ítems que coincidan con la búsqueda.'
           : 'Comienza agregando ítems técnicos a esta lista de equipos.'}
       </p>
-      {(searchTerm || filterStatus !== 'all') && (
+      {searchTerm && (
         <Button 
           variant="outline" 
           onClick={() => {
             setSearchTerm('')
-            setFilterStatus('all')
           }}
         >
-          Limpiar filtros
+          Limpiar búsqueda
         </Button>
       )}
     </motion.div>
@@ -683,21 +618,25 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
               </tr>
             </thead>
           <tbody>
-            <AnimatePresence>
-            {filteredItems.map((item) => {
+            <MotionDebugger componentName="ListaEquipoItemList-AnimatePresence">
+              <AnimatePresence>
+                {filteredItems.map((item) => {
               const isEditingCantidad = editCantidadItemId === item.id
               const isEditingComentario = editComentarioItemId === item.id
               const costoTotal = calcularCostoItem(item)
-              const resumenPedidos = calcularResumenPedidos(item)
+              const resumenPedidos = item.resumen
               const clasesFilaPorEstado = getClasesFilaPorEstado(resumenPedidos.estado)
+
+              // 🔍 Debug: Log each render of motion.tr
+                // console.log('🔍 ListaEquipoItemList - Rendering motion.tr for item:', item.id, { estado: item.estado, resumenPedidos })
 
               return (
                 <motion.tr
                    key={item.id}
-                   initial={{ opacity: 0, height: 0 }}
-                   animate={{ opacity: 1, height: 'auto' }}
-                   exit={{ opacity: 0, height: 0 }}
-                   transition={{ duration: 0.3 }}
+                   variants={itemVariants}
+                   initial="hidden"
+                   animate="visible"
+                   exit="exit"
                    className={`border-b hover:bg-gray-50 transition-colors ${
                      item.estado === 'rechazado' ? 'bg-red-50/50' : 
                      item.estado === 'aprobado' ? 'bg-green-50/50' : ''
@@ -826,22 +765,52 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                    )}
                    {visibleColumns.pedidos && (
                      <td className={`${cellPadding} ${columnWidths.pedidos}`}>
-                      <div className="flex justify-center">
-                        {resumenPedidos.totalPedidos > 0 ? (
-                          <Badge 
-                            variant="outline" 
-                            className="text-blue-700 border-blue-200 text-xs cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => handleNavigateToPedido(item)}
-                          >
-                            {getCodigoPedidoRelevante(resumenPedidos) || 'Sin código'}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-gray-500">
-                            Disponible
-                          </Badge>
-                        )}
+                      <div className="flex flex-col gap-1 min-w-0">
+                        {(() => {
+                          const pedidos = obtenerTodosLosPedidos(item)
+                          
+                          if (pedidos.length === 0) {
+                            return (
+                               <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                                 Disponible
+                               </Badge>
+                             )
+                          }
+                          
+                          // Mostrar todos los pedidos directamente
+                          return (
+                            <div className="flex flex-col gap-1">
+                              {pedidos.map((codigo, index) => (
+                                <Tooltip key={index}>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-auto p-1 text-xs hover:bg-blue-50 justify-start min-w-0"
+                                      onClick={() => {
+                                        // Navegar al pedido específico
+                                        const pedidoItem = item.pedidos?.find(p => p.pedido?.codigo === codigo)
+                                        if (pedidoItem?.pedido?.id) {
+                                          router.push(`/proyectos/${proyectoId}/pedidos-equipo/${pedidoItem.pedido.id}`)
+                                        }
+                                      }}
+                                    >
+                                      <Badge variant="default" className="text-[10px] truncate px-1.5 py-0.5">
+                                         {codigo}
+                                       </Badge>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Click para ver pedido {codigo}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ))}
+                            </div>
+                          )
+                        })()
+                        }
                       </div>
-                    </td>
+                     </td>
                    )}
                    {visibleColumns.verificado && (
                      <td className={`${cellPadding} ${columnWidths.verificado} text-center`}>
@@ -959,10 +928,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                       </div>
                      </td>
                    )}
-                 </motion.tr>
+                   </motion.tr>
               )
-            })}
-          </AnimatePresence>
+                })
+              }
+              </AnimatePresence>
+            </MotionDebugger>
           </tbody>
           </table>
         </div>
@@ -971,7 +942,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   }
 
   return (
-    <div className="space-y-6">
+        <div className="space-y-6">
       {renderHeader()}
       
       {isLoading ? (
@@ -979,26 +950,16 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       ) : filteredItems.length === 0 ? (
         renderEmptyState()
       ) : viewMode === 'cards' ? (
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-        >
-          <AnimatePresence>
-            {filteredItems.map((item) => {
+        <MotionDebugger componentName="ListaEquipoItemList-CardsView">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredItems.map((item) => {
               const isEditingCantidad = editCantidadItemId === item.id
               const isEditingComentario = editComentarioItemId === item.id
               const costoTotal = calcularCostoItem(item)
 
               return (
-                <motion.div
+                <div
                   key={item.id}
-                  variants={itemVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  layout
                   className="h-full"
                 >
                   <Card className={`h-full transition-all duration-200 hover:shadow-md ${
@@ -1204,12 +1165,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                       </div>
                     </CardContent>
                   </Card>
-                </motion.div>
-
-            )
+                </div>
+              )
             })}
-          </AnimatePresence>
-        </motion.div>
+          </div>
+        </MotionDebugger>
       ) : (
         renderListView()
       )}
@@ -1250,6 +1210,29 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
           proyectoId={proyectoId}
         />
       )}
+
+      {/* Modales de Agregar Items */}
+      <ModalAgregarItemDesdeCatalogo
+        isOpen={showModalAgregarCatalogo}
+        onClose={() => setShowModalAgregarCatalogo(false)}
+        listaId={listaId}
+        proyectoId={proyectoId}
+        onSuccess={() => {
+          setShowModalAgregarCatalogo(false)
+          onCreated?.()
+        }}
+      />
+
+      <ModalAgregarItemDesdeEquipo
+        isOpen={showModalAgregarEquipo}
+        onClose={() => setShowModalAgregarEquipo(false)}
+        listaId={listaId}
+        proyectoId={proyectoId}
+        onSuccess={() => {
+          setShowModalAgregarEquipo(false)
+          onCreated?.()
+        }}
+      />
     </div>
   )
 }

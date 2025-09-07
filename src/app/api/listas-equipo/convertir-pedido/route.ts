@@ -80,12 +80,16 @@ export async function POST(request: NextRequest) {
         include: {
           items: {
             include: {
-              catalogoEquipo: {
-                select: {
-                  id: true,
-                  codigo: true,
-                  descripcion: true, // ✅ Corregido: usar 'descripcion' en lugar de 'nombre'
-                  precioVenta: true
+              proyectoEquipoItem: {
+                include: {
+                  catalogoEquipo: {
+                    select: {
+                      id: true,
+                      codigo: true,
+                      descripcion: true, // ✅ Corregido: usar 'descripcion' en lugar de 'nombre'
+                      precioVenta: true
+                    }
+                  }
                 }
               },
               cotizacionSeleccionada: {
@@ -151,28 +155,28 @@ export async function POST(request: NextRequest) {
         const cantidadDisponible = listaItem.cantidad - (listaItem.cantidadPedida ?? 0) // ✅ Manejar cantidadPedida null como 0
         
         // ✅ Verificar que catalogoEquipo no sea null
-        if (!listaItem.catalogoEquipo) {
+        if (!listaItem.proyectoEquipoItem?.catalogoEquipo) {
           erroresValidacion.push(`Item ${itemConversion.itemId}: No tiene catálogo de equipo asociado`)
           continue
         }
 
         if (cantidadDisponible <= 0) {
           erroresValidacion.push(
-            `Item ${listaItem.catalogoEquipo.codigo}: Ya fue completamente convertido`
+            `Item ${listaItem.proyectoEquipoItem?.catalogoEquipo?.codigo}: Ya fue completamente convertido`
           )
           continue
         }
 
         if (itemConversion.cantidadAConvertir <= 0) {
           erroresValidacion.push(
-            `Item ${listaItem.catalogoEquipo.codigo}: Cantidad a convertir debe ser mayor a 0`
+            `Item ${listaItem.proyectoEquipoItem?.catalogoEquipo?.codigo}: Cantidad a convertir debe ser mayor a 0`
           )
           continue
         }
 
         if (itemConversion.cantidadAConvertir > cantidadDisponible) {
           erroresValidacion.push(
-            `Item ${listaItem.catalogoEquipo.codigo}: Cantidad a convertir (${itemConversion.cantidadAConvertir}) excede la disponible (${cantidadDisponible})`
+            `Item ${listaItem.proyectoEquipoItem?.catalogoEquipo?.codigo}: Cantidad a convertir (${itemConversion.cantidadAConvertir}) excede la disponible (${cantidadDisponible})`
           )
           continue
         }
@@ -248,8 +252,8 @@ export async function POST(request: NextRequest) {
               listaId: lista.id,
               listaEquipoItemId: item.listaItem.id,
               responsableId: session.user.id, // ✅ Campo requerido agregado
-              codigo: item.listaItem.catalogoEquipo?.codigo || 'SIN-CODIGO', // ✅ Manejar catalogoEquipo null
-              descripcion: item.listaItem.catalogoEquipo?.descripcion || 'Sin descripción', // ✅ Manejar catalogoEquipo null
+              codigo: item.listaItem.proyectoEquipoItem?.catalogoEquipo?.codigo || 'SIN-CODIGO', // ✅ Manejar catalogoEquipo null
+          descripcion: item.listaItem.proyectoEquipoItem?.catalogoEquipo?.descripcion || 'Sin descripción', // ✅ Manejar catalogoEquipo null
               unidad: item.listaItem.unidad, // ✅ Corregido: usar 'unidad' del ListaEquipoItem
               cantidadPedida: item.cantidadAConvertir,
               cantidadAtendida: 0,

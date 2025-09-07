@@ -21,25 +21,42 @@ import { setupDefaultMocks, mockUtils } from './__mocks__/services'
 import { testConfig } from './__mocks__/fixtures'
 
 // 🌐 Configuración global de fetch
-Object.defineProperty(window, 'fetch', {
-  writable: true,
-  value: vi.fn()
-})
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'fetch', {
+    writable: true,
+    value: vi.fn()
+  })
+} else {
+  global.fetch = vi.fn()
+}
 
 // 📱 Mock de APIs del navegador
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation(query => ({
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  })
+} else {
+  global.matchMedia = vi.fn().mockImplementation(query => ({
     matches: false,
     media: query,
     onchange: null,
-    addListener: vi.fn(), // deprecated
-    removeListener: vi.fn(), // deprecated
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn()
   }))
-})
+}
 
 // 🖼️ Mock de IntersectionObserver
 Object.defineProperty(window, 'IntersectionObserver', {
@@ -235,8 +252,9 @@ Object.defineProperty(window, 'Notification', {
   }
 })
 
-// 🌍 Variables de entorno para testing
-process.env.NODE_ENV = 'test'
+// 🌐 Configuración de variables de entorno para testing
+// ✅ Configuración simplificada para evitar errores
+// NODE_ENV es establecido automáticamente por el test runner
 process.env.NEXTAUTH_SECRET = 'test-secret'
 process.env.NEXTAUTH_URL = 'http://localhost:3000'
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/gys_test'
@@ -308,10 +326,10 @@ afterEach(() => {
   
   // 🗑️ Limpiar console mocks si existen
   if (vi.isMockFunction(console.error)) {
-    console.error.mockRestore()
+    (console.error as any).mockRestore()
   }
   if (vi.isMockFunction(console.warn)) {
-    console.warn.mockRestore()
+    (console.warn as any).mockRestore()
   }
 })
 

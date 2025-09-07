@@ -86,8 +86,15 @@ export default function PedidoDesdeListaModal({
   // ✅ Update item selections when lista changes (after creating orders)
   useEffect(() => {
     const selections: Record<string, ItemSelection> = {}
-    lista.items?.forEach((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
+    // ✅ Validate lista and items exist before processing
+    if (!lista || !lista.items || !Array.isArray(lista.items)) {
+      setItemSelections({})
+      return
+    }
+    
+    lista.items.forEach((item) => {
+      // ✅ Opción 1: Considera tanto cantidadPedida como cantidadEntregada
+      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
       if (cantidadDisponible > 0) {
         // Preserve previous selection state if item was already selected
         const previousSelection = itemSelections[item.id]
@@ -102,6 +109,7 @@ export default function PedidoDesdeListaModal({
         }
       }
     })
+    
     setItemSelections(selections)
     
     // 🔍 Debug: Log current cantidadPedida values
@@ -110,16 +118,22 @@ export default function PedidoDesdeListaModal({
       codigo: item.codigo,
       cantidad: item.cantidad,
       cantidadPedida: item.cantidadPedida,
-      disponible: item.cantidad - (item.cantidadPedida || 0)
+      cantidadEntregada: item.cantidadEntregada || 0,
+      // ✅ Opción 1: Considera tanto cantidadPedida como cantidadEntregada
+      disponible: item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
     })))
   }, [lista.items, lista.id]) // Re-run when lista.items or lista.id changes
 
   // ✅ Calculate available items and totals
   const itemsDisponibles = useMemo(() => {
-    return lista.items?.filter((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
+    if (!lista || !lista.items || !Array.isArray(lista.items)) {
+      return []
+    }
+    return lista.items.filter((item) => {
+      // ✅ Opción 1: Considera tanto cantidadPedida como cantidadEntregada
+      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
       return cantidadDisponible > 0
-    }) || []
+    })
   }, [lista.items])
 
   const itemsSeleccionados = useMemo(() => {
@@ -128,7 +142,7 @@ export default function PedidoDesdeListaModal({
 
   const costoTotalEstimado = useMemo(() => {
     return itemsSeleccionados.reduce((total, selection) => {
-      const item = lista.items?.find((i) => i.id === selection.itemId)
+      const item = lista?.items?.find((i) => i.id === selection.itemId)
       const precio = item?.precioElegido || 0
       return total + (precio * selection.cantidadPedida)
     }, 0)
@@ -240,17 +254,20 @@ export default function PedidoDesdeListaModal({
     setEsUrgente(false)
     // Reset selections - recalculate available quantities
     const selections: Record<string, ItemSelection> = {}
-    lista.items?.forEach((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
-      if (cantidadDisponible > 0) {
-        selections[item.id] = {
-          itemId: item.id,
-          selected: false,
-          cantidadPedida: Math.min(cantidadDisponible, 1),
-          cantidadDisponible,
+    if (lista?.items && Array.isArray(lista.items)) {
+      lista.items.forEach((item) => {
+        // ✅ Opción 1: Considera tanto cantidadPedida como cantidadEntregada
+        const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
+        if (cantidadDisponible > 0) {
+          selections[item.id] = {
+            itemId: item.id,
+            selected: false,
+            cantidadPedida: Math.min(cantidadDisponible, 1),
+            cantidadDisponible,
+          }
         }
-      }
-    })
+      })
+    }
     setItemSelections(selections)
   }
 

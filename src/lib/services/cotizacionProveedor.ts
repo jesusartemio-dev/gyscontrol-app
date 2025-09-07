@@ -14,6 +14,7 @@ import {
   CotizacionProveedorUpdatePayload,
   CotizacionProveedorItemPayload,
 } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
 
 const BASE_URL = '/api/cotizacion-proveedor'
 
@@ -32,7 +33,8 @@ export async function getCotizacionesProveedor(): Promise<CotizacionProveedor[] 
 // ✅ Obtener una cotización por ID
 export async function getCotizacionProveedorById(id: string): Promise<CotizacionProveedor | null> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`)
+    const url = buildApiUrl(`${BASE_URL}/${id}`)
+    const res = await fetch(url)
     if (!res.ok) throw new Error('Error al obtener la cotización')
     return await res.json()
   } catch (error) {
@@ -64,7 +66,8 @@ export async function createCotizacionProveedorItem(
   payload: CotizacionProveedorItemPayload
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/item`, {
+    const url = buildApiUrl(`${BASE_URL}/item`)
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -82,7 +85,8 @@ export async function updateCotizacionProveedor(
   payload: CotizacionProveedorUpdatePayload
 ): Promise<CotizacionProveedor | null> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`, {
+    const url = buildApiUrl(`${BASE_URL}/${id}`)
+    const res = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -98,7 +102,8 @@ export async function updateCotizacionProveedor(
 // ✅ Eliminar cotización
 export async function deleteCotizacionProveedor(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`, {
+    const url = buildApiUrl(`${BASE_URL}/${id}`)
+    const res = await fetch(url, {
       method: 'DELETE',
     })
     return res.ok

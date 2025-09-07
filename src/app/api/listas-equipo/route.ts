@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { EstadoListaEquipo } from '@prisma/client'
 
 // Mock data for demonstration
 const mockListasEquipo = [
@@ -192,35 +194,37 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const proyectoId = searchParams.get('proyectoId')
-    const estado = searchParams.get('estado')
+    const estadoParam = searchParams.get('estado')
 
-    let listas = mockListasEquipo
+    // ✅ Validar que el estado sea un valor válido del enum
+    const estadosValidos = Object.values(EstadoListaEquipo)
+    const estado = estadoParam && estadosValidos.includes(estadoParam as EstadoListaEquipo) ? estadoParam as EstadoListaEquipo : undefined
 
-    // Filtrar por proyecto si se especifica
-    if (proyectoId) {
-      listas = listas.filter(lista => lista.proyectoId === proyectoId)
-    }
-
-    // Filtrar por estado si se especifica
-    if (estado && estado !== 'todos') {
-      listas = listas.filter(lista => lista.estado === estado)
-    }
-
-    // En una implementación real, aquí harías la consulta a la base de datos
-    // const listas = await prisma.listaEquipo.findMany({
-    //   where: {
-    //     ...(proyectoId && { proyectoId }),
-    //     ...(estado && estado !== 'todos' && { estado })
-    //   },
-    //   include: {
-    //     proyecto: true,
-    //     responsable: true,
-    //     items: true
-    //   },
-    //   orderBy: {
-    //     createdAt: 'desc'
-    //   }
-    // })
+    // ✅ Consultar listas desde la base de datos con Prisma
+    const listas = await prisma.listaEquipo.findMany({
+      where: {
+        ...(proyectoId && { proyectoId }),
+        ...(estado && estadoParam !== 'todos' && { estado })
+      },
+      include: {
+        proyecto: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true
+          }
+        },
+        items: true,
+        _count: {
+          select: {
+            items: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
 
     return NextResponse.json(listas)
   } catch (error) {
@@ -254,17 +258,56 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // En una implementación real, aquí crearías la lista en la base de datos
-    const nuevaLista = {
-      id: Date.now().toString(),
-      codigo: `LEQ-${String(Date.now()).slice(-3)}`,
-      estado: 'borrador',
-      numeroSecuencia: 1,
-      items: [],
-      ...body,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+    // ✅ Obtener información del proyecto y calcular siguiente número de secuencia
+    const proyecto = await prisma.proyecto.findUnique({
+      where: { id: body.proyectoId },
+      select: { codigo: true }
+    })
+
+    if (!proyecto) {
+      return NextResponse.json(
+        { error: 'Proyecto no encontrado' },
+        { status: 404 }
+      )
     }
+
+    // ✅ Obtener el siguiente número de secuencia
+    const ultimaLista = await prisma.listaEquipo.findFirst({
+      where: { proyectoId: body.proyectoId },
+      orderBy: { numeroSecuencia: 'desc' },
+      select: { numeroSecuencia: true }
+    })
+
+    const siguienteNumero = (ultimaLista?.numeroSecuencia || 0) + 1
+    const codigoLista = `${proyecto.codigo}-LST-${String(siguienteNumero).padStart(3, '0')}`
+
+    // ✅ Crear lista en la base de datos con Prisma
+    const nuevaLista = await prisma.listaEquipo.create({
+      data: {
+        proyectoId: body.proyectoId,
+        nombre: body.nombre,
+        codigo: codigoLista,
+        estado: 'borrador',
+        numeroSecuencia: siguienteNumero,
+        responsableId: body.responsableId || session.user.id, // ✅ Campo requerido
+        ...(body.fechaNecesaria && { fechaNecesaria: new Date(body.fechaNecesaria) })
+      },
+      include: {
+        proyecto: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true
+          }
+        },
+        items: true,
+        _count: {
+          select: {
+            items: true
+          }
+        }
+      }
+    })
 
     return NextResponse.json(nuevaLista, { status: 201 })
   } catch (error) {

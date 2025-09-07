@@ -21,10 +21,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { ListaEquipoPayload } from '@/types'
 import { Plus, Loader2, FileText } from 'lucide-react'
+import { createListaEquipo } from '@/lib/services/listas-equipo'
 
 interface Props {
   proyectoId: string
-  onCreated: (payload: ListaEquipoPayload) => void
+  onCreated: (lista: any) => void // ✅ Changed to receive the created lista object
 }
 
 export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
@@ -68,20 +69,42 @@ export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
     try {
       setLoading(true)
 
-      onCreated({
+      // ✅ Preparar payload para API (solo campos requeridos)
+      const payload = {
         proyectoId,
         nombre: nombre.trim(),
-        fechaNecesaria: fechaNecesaria || undefined, // ✅ incluir fecha necesaria
-        codigo: undefined,          // generado en backend
-        numeroSecuencia: undefined, // generado en backend
+        ...(fechaNecesaria && { fechaNecesaria })
+      }
+
+      // 📡 Llamada al API
+      const response = await fetch('/api/lista-equipo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload)
       })
 
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al crear la lista')
+      }
+
+      const nuevaLista = await response.json()
+      
+      // ✅ Call parent callback with the created lista
+      onCreated(nuevaLista)
+
+      // 🔄 Reset form
       setNombre('')
       setFechaNecesaria('')
       setErrors({})
-      toast.success('Lista creada correctamente')
-    } catch {
-      toast.error('Error al crear lista')
+      
+      toast.success('Lista técnica creada exitosamente')
+    } catch (error) {
+      console.error('Error al crear lista:', error)
+      toast.error('Error al crear la lista técnica. Intente nuevamente.')
     } finally {
       setLoading(false)
     }

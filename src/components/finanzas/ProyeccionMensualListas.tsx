@@ -544,13 +544,7 @@ export default function ProyeccionMensualListas({
     return proyecciones
   }
   
-  // 🧮 Función memoizada para uso externo
-  const calcularProyeccionesMensuales = useCallback((
-    listasData: ListaEquipo[],
-    itemsData: ListaEquipoItem[]
-  ): ProyeccionMensualDetalle[] => {
-    return calcularProyeccionesMensualesInterno(listasData, itemsData, periodoSeleccionado)
-  }, [periodoSeleccionado])
+  // ✅ Función eliminada para evitar dependencia circular
   
   // 🔄 Función para cargar datos reales
   const cargarDatosReales = useCallback(async (periodo?: string) => {
@@ -681,7 +675,7 @@ export default function ProyeccionMensualListas({
     } finally {
       setActualizando(false)
     }
-  }, [calcularProyeccionesMensuales])
+  }, [listas, items, periodoSeleccionado])
   
   // ✅ useEffect duplicado eliminado para evitar bucle infinito
   
@@ -1036,7 +1030,7 @@ export default function ProyeccionMensualListas({
                     <SelectValue placeholder="Todos los proyectos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los proyectos</SelectItem>
+                    <SelectItem value="all">Todos los proyectos</SelectItem>
                     {Array.from(new Set(proyeccionesMensuales.flatMap(p => p.proyectosInvolucrados))).map(proyecto => (
                       <SelectItem key={proyecto} value={proyecto}>
                         {proyecto}
@@ -1063,7 +1057,6 @@ export default function ProyeccionMensualListas({
                 
                 return (
                   <div
-                    key={proyeccion.mes}
                     onClick={() => {
                       setProyeccionSeleccionada(
                         proyeccionSeleccionada === proyeccion.mes ? null : proyeccion.mes

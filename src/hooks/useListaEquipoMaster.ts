@@ -126,7 +126,7 @@ interface UseListaEquipoMasterReturn {
 const defaultFilters: FilterState = {
   search: '',
   estado: [],
-  moneda: 'PEN',
+  moneda: 'USD',
   progreso: 'all'
 };
 

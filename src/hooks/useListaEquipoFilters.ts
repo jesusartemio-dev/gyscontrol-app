@@ -101,7 +101,7 @@ interface UseListaEquipoFiltersReturn {
 const defaultFilters: FilterState = {
   search: '',
   estado: [],
-  moneda: 'PEN',
+  moneda: 'USD',
   progreso: 'all'
 };
 

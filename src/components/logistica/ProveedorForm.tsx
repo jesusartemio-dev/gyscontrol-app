@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { ProveedorPayload } from '@/types'
+import { ProveedorPayload, Proveedor } from '@/types'
 
 // Validation schema with Zod
 const proveedorSchema = z.object({
@@ -41,10 +41,12 @@ const proveedorSchema = z.object({
 type FormData = z.infer<typeof proveedorSchema>
 
 interface Props {
-  onCreated?: (payload: ProveedorPayload) => void
+  onSaved?: (proveedor: any) => void
+  initial?: any | null
+  onCancel?: () => void
 }
 
-export default function ProveedorForm({ onCreated }: Props) {
+export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
   const {
     register,
     handleSubmit,
@@ -54,8 +56,8 @@ export default function ProveedorForm({ onCreated }: Props) {
   } = useForm<FormData>({
     resolver: zodResolver(proveedorSchema),
     defaultValues: {
-      nombre: '',
-      ruc: ''
+      nombre: initial?.nombre || '',
+      ruc: initial?.ruc || ''
     },
     mode: 'onChange' // Real-time validation
   })
@@ -66,44 +68,51 @@ export default function ProveedorForm({ onCreated }: Props) {
 
   const onSubmit = async (data: FormData) => {
     try {
-      const payload: ProveedorPayload = {
+      const payload = {
+        ...data,
         nombre: data.nombre.trim(),
         ruc: data.ruc?.trim() || undefined
       }
       
-      await onCreated?.(payload)
-      reset() // Clear form after successful submission
-      toast.success('Proveedor creado exitosamente', {
-        description: `${payload.nombre} ha sido agregado al sistema`
-      })
+      let result: Proveedor
+      
+      if (initial) {
+        // Update existing provider (not implemented yet)
+        result = {
+          id: initial.id,
+          ...payload
+        }
+      } else {
+        // Create new provider
+        const response = await fetch('/api/proveedor', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Error al crear proveedor')
+        }
+        
+        result = await response.json()
+        reset() // Clear form only when creating new
+        toast.success('Proveedor creado exitosamente')
+      }
+      
+      onSaved?.(result)
     } catch (error) {
-      toast.error('Error al crear proveedor', {
-        description: 'Por favor, intenta nuevamente'
+      console.error('Error al procesar proveedor:', error)
+      toast.error('Error al procesar proveedor', {
+        description: error instanceof Error ? error.message : 'Por favor, intenta nuevamente'
       })
     }
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Card className="shadow-sm border-0 bg-white/80 backdrop-blur-sm hover:shadow-md transition-shadow">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-lg font-semibold">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Plus className="h-5 w-5 text-green-600" />
-            </div>
-            Nuevo Proveedor
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Registra un nuevo proveedor en el sistema
-          </p>
-        </CardHeader>
-        
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Nombre Field */}
               <div className="space-y-2">
@@ -185,29 +194,36 @@ export default function ProveedorForm({ onCreated }: Props) {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <div className="flex justify-end pt-4">
-              <Button
-                type="submit"
-                disabled={isSubmitting || !isValid || !isDirty}
-                className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creando...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Proveedor
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </motion.div>
+      {/* Submit Buttons */}
+      <div className="flex justify-end gap-2 pt-4">
+        {initial && onCancel && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
+        )}
+        <Button
+          type="submit"
+          disabled={isSubmitting || !isValid || !isDirty}
+          className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {initial ? 'Actualizando...' : 'Creando...'}
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4 mr-2" />
+              {initial ? 'Actualizar Proveedor' : 'Crear Proveedor'}
+            </>
+          )}
+        </Button>
+      </div>
+    </form>
   )
 }

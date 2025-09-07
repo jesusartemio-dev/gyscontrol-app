@@ -19,10 +19,11 @@ export async function getProyectoEquipoItems(
   soloDisponibles: boolean = false
 ): Promise<ProyectoEquipoItem[]> {
   try {
-    const url = soloDisponibles
+    const endpoint = soloDisponibles
       ? `/api/proyecto-equipo-item/from-proyecto/${proyectoId}?soloDisponibles=true`
       : `/api/proyecto-equipo-item/from-proyecto/${proyectoId}`
-
+    
+    const url = buildApiUrl(endpoint)
     const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error('Error al obtener ítems de equipos del proyecto')
     return await res.json()
@@ -40,7 +41,8 @@ export async function getProyectoEquipoItemsDisponibles(proyectoId: string): Pro
 // ✅ Obtener un ítem por ID
 export async function getProyectoEquipoItemById(id: string): Promise<ProyectoEquipoItem | null> {
   try {
-    const res = await fetch(`/api/proyecto-equipo-item/${id}`, { cache: 'no-store' })
+    const url = buildApiUrl(`/api/proyecto-equipo-item/${id}`)
+    const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error('Error al obtener ítem de equipo por ID')
     return await res.json()
   } catch (error) {

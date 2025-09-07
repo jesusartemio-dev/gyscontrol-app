@@ -34,7 +34,7 @@ import { getTimelineFechas, calcularDiasRestantes, getEstadoTiempo } from '@/lib
 import { formatDate, cn } from '@/lib/utils'
 
 interface Props {
-  lista: ListaEquipo
+  lista: ListaEquipo | null | undefined
   className?: string
 }
 
@@ -57,6 +57,25 @@ const estadoColorMap = {
 }
 
 export default function ListaEquipoTimeline({ lista, className }: Props) {
+  // ✅ Validación temprana si lista es null/undefined
+  if (!lista) {
+    return (
+      <Card className={cn('w-full', className)}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Timeline de Seguimiento
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-center py-8">
+            No hay información de timeline disponible
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+  
   const timeline = getTimelineFechas(lista)
   const diasRestantes = calcularDiasRestantes(lista.fechaNecesaria || null)
   const estadoTiempo = getEstadoTiempo(diasRestantes)

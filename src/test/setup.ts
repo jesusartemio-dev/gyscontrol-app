@@ -245,4 +245,4 @@ vi.mock('lucide-react', () => ({
 // Mock any CSS module imports - handled by vitest config
 
 // Mock environment variables
-process.env.NODE_ENV = 'test'
+// NODE_ENV is set by the test runner

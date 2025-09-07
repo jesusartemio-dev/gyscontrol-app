@@ -24,7 +24,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { User } from '@/types'
@@ -101,7 +100,6 @@ export default function PedidoEquipoFilters({
     filters.soloVencidas
 
   return (
-    <TooltipProvider>
       <div className="bg-white p-4 rounded-lg border shadow-sm space-y-4">
         {/* Header with Stats Dashboard */}
         <div className="flex items-center justify-between">
@@ -490,7 +488,6 @@ export default function PedidoEquipoFilters({
         </div>
       )}
       </div>
-    </TooltipProvider>
   )
 }
 

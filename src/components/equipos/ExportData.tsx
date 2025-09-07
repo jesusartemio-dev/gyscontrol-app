@@ -55,28 +55,35 @@ export default function ExportData({ data, filters, className }: ExportDataProps
         ]
 
         if (includeOCData) {
-          const itemsWithOC = pedido.items?.filter(item => item.fechaOrdenCompraRecomendada) || []
+          // ✅ Filtrar items que necesitan seguimiento de entrega
+          const itemsWithDelivery = pedido.items?.filter(item => item.tiempoEntregaDias && item.tiempoEntregaDias > 0) || []
           const today = new Date()
           today.setHours(0, 0, 0, 0)
           
-          const overdueOC = itemsWithOC.filter(item => {
-            const ocDate = new Date(item.fechaOrdenCompraRecomendada!)
-            ocDate.setHours(0, 0, 0, 0)
-            return ocDate < today
+          const overdueItems = itemsWithDelivery.filter(item => {
+            // Calcular fecha estimada basada en tiempo de entrega
+            const estimatedDate = new Date(pedido.fechaPedido)
+            estimatedDate.setDate(estimatedDate.getDate() + (item.tiempoEntregaDias || 0))
+            estimatedDate.setHours(0, 0, 0, 0)
+            return estimatedDate < today
           }).length
           
-          const currentOC = itemsWithOC.length - overdueOC
+          const currentItems = itemsWithDelivery.length - overdueItems
           
-          const nextOC = itemsWithOC
-            .map(item => new Date(item.fechaOrdenCompraRecomendada!))
+          const nextDelivery = itemsWithDelivery
+            .map(item => {
+              const estimatedDate = new Date(pedido.fechaPedido)
+              estimatedDate.setDate(estimatedDate.getDate() + (item.tiempoEntregaDias || 0))
+              return estimatedDate
+            })
             .filter(date => date >= today)
             .sort((a, b) => a.getTime() - b.getTime())[0]
 
           basicData.push(
-            itemsWithOC.length,
-            overdueOC,
-            currentOC,
-            nextOC ? nextOC.toLocaleDateString('es-ES') : 'N/A'
+              itemsWithDelivery.length,
+              overdueItems,
+              currentItems,
+              nextDelivery ? nextDelivery.toLocaleDateString('es-ES') : 'N/A'
           )
         }
 

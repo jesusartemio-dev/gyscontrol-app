@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Check, AlertTriangle, ChevronDown, Eye } from "lucide-react"
 import { CotizacionProveedorItem } from "@/types/modelos"
 import { cn } from "@/lib/utils"
@@ -343,7 +343,6 @@ export function CotizacionCodigoSimple({
 
   // ✅ Mostrar todas las cotizaciones en lista vertical
   return (
-    <TooltipProvider>
       <div className="flex flex-col gap-1">
         {cotizaciones.map((cotizacion) => {
           const codigo = cotizacion.cotizacion?.codigo || "Sin código"
@@ -384,7 +383,6 @@ export function CotizacionCodigoSimple({
           )
         })}
       </div>
-    </TooltipProvider>
   )
 }
 

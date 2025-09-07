@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import type { NotificationBadgeType } from '@/types/modelos'
 
@@ -29,22 +29,26 @@ interface UseNotificationsReturn {
   hasNotifications: () => boolean
 }
 
+// 🎯 Constantes para evitar re-renders
+const DEFAULT_COUNTS: NotificationCounts = {
+  'ordenes-pendientes': 0,
+}
+
+const DEFAULT_PREFERENCES: UserPreferences = {
+  enabled: true,
+  updateInterval: 30,
+  soundEnabled: false
+}
+
 export function useNotifications(): UseNotificationsReturn {
   const { data: session } = useSession()
   
-  // 📊 Estado del hook
-  const [counts, setCounts] = useState<NotificationCounts>({
-    'pending-orders': 0,
-    'pending-receptions': 0,
-    'overdue-payments': 0,
-  })
+  // 📊 Estado del hook - Solo notificaciones de órdenes pendientes
+  const [counts, setCounts] = useState<NotificationCounts>(DEFAULT_COUNTS)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const prevCounts = useRef<NotificationCounts>({
-    'pending-orders': 0,
-    'pending-receptions': 0,
-    'overdue-payments': 0,
-  })
+  const prevCounts = useRef<NotificationCounts>(DEFAULT_COUNTS)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // 💾 Gestión de preferencias de usuario
   const getStoredPreferences = (): UserPreferences => {
@@ -116,45 +120,19 @@ export function useNotifications(): UseNotificationsReturn {
       setLoading(true)
       setError(null)
 
-      const promises = []
-      const role = session.user.role
-
-      // 📡 Órdenes pendientes (solo para roles de logística)
-      if (['admin', 'gerente', 'logistico'].includes(role)) {
-        promises.push(
-          fetch('/api/ordenes-compra?status=pendiente&count=true')
-            .then(res => res.json())
-            .then(data => ({ type: 'pending-orders', count: data.count || 0 }))
-        )
-      }
-
-      // 📡 Recepciones pendientes (solo para roles de logística)
-      if (['admin', 'gerente', 'logistico'].includes(role)) {
-        promises.push(
-          fetch('/api/recepciones?status=pendiente&count=true')
-            .then(res => res.json())
-            .then(data => ({ type: 'pending-receptions', count: data.count || 0 }))
-        )
-      }
-
-      // 📡 Pagos vencidos (solo para roles de finanzas)
-      if (['admin', 'gerente', 'finanzas', 'contabilidad'].includes(role)) {
-        promises.push(
-          fetch('/api/pagos?status=vencido&count=true')
-            .then(res => res.json())
-            .then(data => ({ type: 'overdue-payments', count: data.count || 0 }))
-        )
-      }
-
-      const results = await Promise.all(promises)
+      // 🔄 Sistema de notificaciones actualizado post-eliminación de aprovisionamiento
+      // Solo mantenemos notificaciones de órdenes pendientes del sistema actual
+      // Las APIs de aprovisionamiento (órdenes de compra, recepciones, pagos) fueron eliminadas
       
-      // 🔁 Actualizar contadores
-      const newCounts = { ...counts }
-      results.forEach(result => {
-        if (result.type in newCounts) {
-          newCounts[result.type as keyof NotificationCounts] = result.count
-        }
-      })
+      // TODO: Implementar notificaciones para el sistema actual (cotizaciones, proyectos, etc.)
+      // Por ahora, mantenemos la estructura pero sin llamadas a APIs eliminadas
+      
+      const role = session?.user?.role
+      
+      // 🔁 Actualizar contadores - estructura simplificada
+      const newCounts: NotificationCounts = {
+        'ordenes-pendientes': 0, // Placeholder para futuras implementaciones
+      }
 
       setCounts(newCounts)
     } catch (err) {
@@ -163,23 +141,36 @@ export function useNotifications(): UseNotificationsReturn {
     } finally {
       setLoading(false)
     }
-  }, [session, preferences.enabled])
+  }, [session?.user?.id, session?.user?.role, preferences.enabled])
 
-  // 🔁 Efecto para carga inicial
+  // 🔁 Efecto para carga inicial - optimizado para evitar bucles infinitos
   useEffect(() => {
-    refreshCounts()
-  }, [refreshCounts])
+    if (session?.user && preferences.enabled) {
+      refreshCounts()
+    }
+  }, [session?.user?.id, preferences.enabled])
 
-  // 🔁 Efecto para actualización automática
+  // 🔁 Efecto para actualización automática optimizado
   useEffect(() => {
-    if (!preferences.enabled) return
+    // Limpiar intervalo anterior si existe
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
 
-    const interval = setInterval(() => {
+    if (!preferences.enabled || !session?.user) return
+
+    intervalRef.current = setInterval(() => {
       refreshCounts()
     }, preferences.updateInterval * 1000)
 
-    return () => clearInterval(interval)
-  }, [preferences.enabled, preferences.updateInterval, refreshCounts])
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [preferences.enabled, preferences.updateInterval, session?.user?.id])
 
   // 🔊 Efecto para detectar nuevas notificaciones y reproducir sonido
   useEffect(() => {
@@ -193,17 +184,18 @@ export function useNotifications(): UseNotificationsReturn {
     prevCounts.current = { ...counts }
   }, [counts, preferences.soundEnabled, playNotificationSound])
 
-  // ✅ Función para obtener el badge de un tipo específico
-  const getBadgeCount = (type: NotificationBadgeType): number => {
+  // ✅ Función memoizada para obtener el badge de un tipo específico
+  const getBadgeCount = useCallback((type: NotificationBadgeType): number => {
     return counts[type] || 0
-  }
+  }, [counts])
 
-  // ✅ Función para verificar si hay notificaciones
-  const hasNotifications = (): boolean => {
+  // ✅ Función memoizada para verificar si hay notificaciones
+  const hasNotifications = useCallback((): boolean => {
     return Object.values(counts).some(count => count > 0)
-  }
+  }, [counts])
 
-  return {
+  // 🎯 Valor de retorno memoizado para evitar re-renders
+  const returnValue = useMemo(() => ({
     counts,
     preferences,
     loading,
@@ -212,7 +204,9 @@ export function useNotifications(): UseNotificationsReturn {
     refreshCounts,
     getBadgeCount,
     hasNotifications,
-  }
+  }), [counts, preferences, loading, error, updatePreferences, refreshCounts, getBadgeCount, hasNotifications])
+
+  return returnValue
 }
 
 export default useNotifications

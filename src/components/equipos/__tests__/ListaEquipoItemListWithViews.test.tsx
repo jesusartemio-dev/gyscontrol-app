@@ -68,7 +68,7 @@ const mockItems: ListaEquipoItem[] = [
     cotizacionSeleccionada: {
       id: 'cot1',
       precioUnitario: 100.50,
-      moneda: 'PEN',
+      moneda: 'USD',
       proveedor: 'Proveedor A'
     },
     createdAt: '2024-01-01T00:00:00Z',

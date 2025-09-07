@@ -12,7 +12,7 @@ import { ListaEquipoMaster } from '@/types/master-detail';
 import { logger } from '@/lib/logger';
 
 // 🌐 Base URL para APIs
-const API_BASE = '/api/listas-equipo';
+const API_BASE = '/api/lista-equipo';
 
 /**
  * 📡 Obtener lista de equipo por ID
@@ -26,6 +26,7 @@ export async function getListaEquipo(id: string): Promise<ListaEquipoMaster | nu
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // ✅ Include session cookies
       cache: 'no-store', // Always get fresh data
     });
 
@@ -59,6 +60,7 @@ export async function getListasEquipoPorProyecto(proyectoId: string): Promise<Li
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // ✅ Include session cookies
       cache: 'no-store',
     });
 
@@ -88,6 +90,7 @@ export async function getListasEquipo(): Promise<ListaEquipoMaster[]> {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // ✅ Include session cookies
       cache: 'no-store',
     });
 
@@ -117,6 +120,7 @@ export async function createListaEquipo(lista: Omit<ListaEquipoMaster, 'id' | 'c
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // ✅ Include session cookies
       body: JSON.stringify(lista),
     });
 

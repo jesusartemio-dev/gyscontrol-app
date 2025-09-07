@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { DebugLogger, useRenderTracker } from '@/components/debug/DebugLogger'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -37,14 +38,19 @@ import {
 } from 'lucide-react'
 
 interface Props {
+  isOpen: boolean
   proyectoId: string
   listaId: string
   onClose: () => void
-  onCreated?: () => void
+  onSuccess?: () => void
+  onCreated?: () => Promise<void>
 }
 
-export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClose, onCreated }: Props) {
+export default function ModalAgregarItemDesdeEquipo({ isOpen, proyectoId, listaId, onClose, onSuccess, onCreated }: Props) {
   const [items, setItems] = useState<ProyectoEquipoItem[]>([])
+  
+  // 🐛 Debug logger to track re-renders
+  const renderCount = useRenderTracker('ModalAgregarItemDesdeEquipo', [proyectoId, listaId, items?.length])
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingItems, setLoadingItems] = useState(true)
@@ -166,7 +172,8 @@ export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClo
         description: 'Los equipos han sido añadidos a la lista técnica'
       })
       
-      onCreated?.()
+      onSuccess?.()
+      await onCreated?.()
       onClose()
     } catch (error) {
       console.error('Error adding items:', error)
@@ -184,9 +191,13 @@ export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClo
     new Set(items.map((item) => item.proyectoEquipo?.nombre).filter(Boolean))
   )
 
+  if (!isOpen) return null
+
   return (
-    <AnimatePresence>
-      <Dialog open onOpenChange={onClose}>
+    <>
+      <DebugLogger componentName="ModalAgregarItemDesdeEquipo" props={{ proyectoId, listaId, itemsLength: items?.length, seleccionadosLength: seleccionados?.length }} />
+      <AnimatePresence>
+        <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-[98vw] w-full h-[90vh] flex flex-col p-0">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -373,6 +384,9 @@ export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClo
                             const yaCompletado = faltan <= 0
                             const isSelected = seleccionados.includes(item.id)
                             
+                            // 🔍 Debug: Log each render of motion.tr
+                // console.log('🔍 ModalAgregarItemDesdeEquipo - Rendering motion.tr for item:', item.id, { yaCompletado, faltan, isSelected })
+                            
                             return (
                               <motion.tr
                                 key={item.id}
@@ -491,7 +505,8 @@ export default function ModalAgregarItemDesdeEquipo({ proyectoId, listaId, onClo
             </div>
           </motion.div>
         </DialogContent>
-      </Dialog>
-    </AnimatePresence>
+        </Dialog>
+      </AnimatePresence>
+    </>
   )
 }

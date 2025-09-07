@@ -107,7 +107,7 @@ export default function NotificationSettings({ className }: NotificationSettings
                   Notificaciones habilitadas
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Recibir alertas sobre órdenes, recepciones y pagos
+                  Recibir alertas sobre el sistema
                 </p>
               </div>
             </div>
@@ -198,16 +198,16 @@ export default function NotificationSettings({ className }: NotificationSettings
           </h4>
           <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
             <div className="flex items-center justify-between">
-              <span>• Órdenes de compra pendientes</span>
-              <Badge variant="secondary" size="sm">Logística</Badge>
+              <span>• Cotizaciones pendientes</span>
+              <Badge variant="secondary">Comercial</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span>• Recepciones pendientes de aprobación</span>
-              <Badge variant="secondary" size="sm">Logística</Badge>
+              <span>• Proyectos en progreso</span>
+              <Badge variant="secondary">Proyectos</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span>• Pagos vencidos o por vencer</span>
-              <Badge variant="secondary" size="sm">Finanzas</Badge>
+              <span>• Pedidos de equipos</span>
+              <Badge variant="secondary">Logística</Badge>
             </div>
           </div>
         </div>

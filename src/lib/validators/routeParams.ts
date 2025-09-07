@@ -10,24 +10,27 @@
 
 import { z } from 'zod';
 
-// ✅ Base UUID validation schema
+// ✅ Base CUID validation schema (Prisma uses cuid() by default)
+const cuidSchema = z.string().regex(/^c[a-z0-9]{24}$/, 'ID debe ser un CUID válido');
+
+// ✅ Legacy UUID validation schema (for backward compatibility)
 const uuidSchema = z.string().uuid('ID debe ser un UUID válido');
 
 // ✅ Proyecto route params validation
 export const proyectoParamsSchema = z.object({
-  id: uuidSchema
+  id: cuidSchema
 });
 
 // ✅ Lista Equipo Detail route params validation
 export const listaEquipoDetailParamsSchema = z.object({
-  id: uuidSchema, // proyectoId
-  listaId: uuidSchema
+  id: cuidSchema, // proyectoId
+  listaId: cuidSchema
 });
 
 // ✅ Generic route params validation
 export const genericDetailParamsSchema = z.object({
-  id: uuidSchema,
-  detailId: uuidSchema.optional()
+  id: cuidSchema,
+  detailId: cuidSchema.optional()
 });
 
 // ✅ Search params validation for lists
@@ -109,7 +112,15 @@ export class RouteParamsValidator {
   }
   
   /**
-   * Check if a string is a valid UUID
+   * Check if a string is a valid CUID
+   */
+  static isValidCUID(value: string): boolean {
+    const cuidRegex = /^c[a-z0-9]{24}$/;
+    return cuidRegex.test(value);
+  }
+
+  /**
+   * Check if a string is a valid UUID (legacy support)
    */
   static isValidUUID(value: string): boolean {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

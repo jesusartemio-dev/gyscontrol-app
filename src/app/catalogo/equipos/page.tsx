@@ -177,7 +177,22 @@ export default function CatalogoEquipoPage() {
       if (duplicados.length > 0) {
         setMostrarModal(true)
       } else if (nuevos.length > 0) {
-        const creados = await Promise.all(nuevos.map(eq => createCatalogoEquipo(recalcularCatalogoEquipo(eq))))
+        // ✅ Mapear CatalogoEquipoPayload al formato correcto para la API
+        const equiposParaCrear = nuevos.map(eq => {
+          const equipoRecalculado = recalcularCatalogoEquipo(eq)
+          return {
+            codigo: equipoRecalculado.codigo,
+            descripcion: equipoRecalculado.descripcion,
+            marca: equipoRecalculado.marca,
+            precioInterno: equipoRecalculado.precioInterno,
+            margen: equipoRecalculado.margen,
+            precioVenta: equipoRecalculado.precioVenta,
+            categoriaId: equipoRecalculado.categoriaId,
+            unidadId: equipoRecalculado.unidadId,
+            estado: equipoRecalculado.estado
+          }
+        })
+        const creados = await Promise.all(equiposParaCrear.map(eq => createCatalogoEquipo(eq)))
         setEquipos(prev => [...prev, ...creados])
         toast.success('Equipos importados exitosamente.')
       } else {
@@ -194,8 +209,23 @@ export default function CatalogoEquipoPage() {
 
   const sobrescribirDuplicados = async () => {
     try {
+      // ✅ Mapear equiposNuevos al formato correcto para la API
+      const equiposNuevosParaCrear = equiposNuevos.map(eq => {
+        const equipoRecalculado = recalcularCatalogoEquipo(eq)
+        return {
+          codigo: equipoRecalculado.codigo,
+          descripcion: equipoRecalculado.descripcion,
+          marca: equipoRecalculado.marca,
+          precioInterno: equipoRecalculado.precioInterno,
+          margen: equipoRecalculado.margen,
+          precioVenta: equipoRecalculado.precioVenta,
+          categoriaId: equipoRecalculado.categoriaId,
+          unidadId: equipoRecalculado.unidadId,
+          estado: equipoRecalculado.estado
+        }
+      })
       const nuevos = await Promise.all(
-        equiposNuevos.map(eq => createCatalogoEquipo(recalcularCatalogoEquipo(eq)))
+        equiposNuevosParaCrear.map(eq => createCatalogoEquipo(eq))
       )
       const actualizados = await Promise.all(
         equiposDuplicados.map(eq => {

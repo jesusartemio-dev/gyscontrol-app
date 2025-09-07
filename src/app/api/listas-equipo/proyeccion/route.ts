@@ -15,14 +15,12 @@ const FiltrosProyeccionSchema = z.object({
   proyectoId: z.string().optional(),
   fechaDesde: z.string().optional(),
   fechaHasta: z.string().optional(),
-  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobado', 'rechazado']).optional(),
-  prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional()
+  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobado', 'rechazado']).optional()
 });
 
 const CrearListaProyeccionSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
   proyectoId: z.string().min(1, 'El proyecto es requerido'),
-  prioridad: z.enum(['baja', 'media', 'alta', 'critica']).default('media'),
   fechaRequerida: z.string().optional(),
   items: z.array(z.object({
     nombre: z.string().min(1),
@@ -44,8 +42,7 @@ export async function GET(request: NextRequest) {
       fechaDesde: searchParams.get('fechaDesde'),
       fechaHasta: searchParams.get('fechaHasta'),
       estado: searchParams.get('estado'),
-      categoria: searchParams.get('categoria'),
-      prioridad: searchParams.get('prioridad')
+      categoria: searchParams.get('categoria')
     };
     
     // Remover valores null
@@ -67,9 +64,7 @@ export async function GET(request: NextRequest) {
       whereClause.estado = filtros.estado;
     }
     
-    if (filtros.prioridad) {
-      whereClause.prioridad = filtros.prioridad;
-    }
+
     
     if (filtros.fechaDesde || filtros.fechaHasta) {
       whereClause.createdAt = {};
@@ -100,7 +95,6 @@ export async function GET(request: NextRequest) {
             cantidad: true,
             unidad: true,
             presupuesto: true,
-            prioridad: true,
             estado: true
           }
         },
@@ -111,7 +105,6 @@ export async function GET(request: NextRequest) {
         }
       },
       orderBy: [
-        { prioridad: 'desc' },
         { createdAt: 'desc' }
       ]
     });
@@ -127,10 +120,6 @@ export async function GET(request: NextRequest) {
       ),
       distribucionEstados: listas.reduce((acc, lista) => {
         acc[lista.estado] = (acc[lista.estado] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      distribucionPrioridades: listas.reduce((acc, lista) => {
-        acc[lista.prioridad] = (acc[lista.prioridad] || 0) + 1;
         return acc;
       }, {} as Record<string, number>)
     };
@@ -212,8 +201,6 @@ export async function POST(request: NextRequest) {
           numeroSecuencia: numeroSecuencia,
           proyectoId: datosValidados.proyectoId,
           responsableId: 'temp-user-id', // TODO: Obtener del contexto de autenticación
-          prioridad: datosValidados.prioridad,
-          fechaLimite: datosValidados.fechaRequerida ? new Date(datosValidados.fechaRequerida) : null,
           estado: 'borrador'
         }
       });
@@ -306,22 +293,6 @@ export async function PUT(request: NextRequest) {
           where: { id: { in: listaIds } },
           data: { 
             estado: nuevoEstado
-          }
-        });
-        break;
-
-      case 'cambiar_prioridad':
-        if (!datos?.prioridad) {
-          return NextResponse.json(
-            { success: false, error: 'Nueva prioridad es requerida' },
-            { status: 400 }
-          );
-        }
-        
-        resultado = await prisma.listaEquipo.updateMany({
-          where: { id: { in: listaIds } },
-          data: { 
-            prioridad: datos.prioridad
           }
         });
         break;

@@ -273,13 +273,7 @@ export default function PedidoEquipoItemList({ items, onUpdate, onDelete }: Prop
                       </div>
                     </div>
 
-                    {/* Fecha recomendada OC */}
-                    {item.fechaOrdenCompraRecomendada && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-                        <Calendar className="h-3 w-3" />
-                        <span>Fecha OC recomendada: {formatDate(item.fechaOrdenCompraRecomendada)}</span>
-                      </div>
-                    )}
+
 
                     {/* Acciones */}
                     {(onUpdate || onDelete) && (

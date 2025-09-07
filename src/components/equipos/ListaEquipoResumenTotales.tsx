@@ -30,7 +30,7 @@ export default function ListaEquipoResumenTotales({ items }: Props) {
         <span>{cantidadTotal.toFixed(2)}</span>
       </div>
       <div className="flex justify-between">
-        <span className="font-medium">Costo total referencial (S/):</span>
+        <span className="font-medium">Costo total referencial (USD):</span>
         <span>$ {precioTotal.toFixed(2)}</span>
       </div>
     </div>

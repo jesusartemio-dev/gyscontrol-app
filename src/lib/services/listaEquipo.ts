@@ -45,6 +45,9 @@ export interface ListaEquipoMaster {
     id: string
     name: string
   }
+  
+  // 🎯 Coherencia calculada (porcentaje de consistencia)
+  coherencia?: number
 }
 
 export interface ListaEquipoMasterResponse {
@@ -71,7 +74,8 @@ export interface ListaEquipoFilters {
 // Use getListasEquipoMaster for better performance
 export async function getTodasLasListas(): Promise<ListaEquipo[]> {
   try {
-    const res = await fetch(`${BASE_URL}`, {
+    const url = buildApiUrl(BASE_URL)
+    const res = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -121,8 +125,28 @@ export async function getListaEquiposPorProyecto(proyectoId: string): Promise<Li
 // Use getListaEquipoDetail for complete data or getListaEquipoById for basic data
 export async function getListaEquipoById(id: string): Promise<ListaEquipo | null> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`)
-    if (!res.ok) throw new Error('Error al obtener lista de equipos')
+    const url = buildApiUrl(`${BASE_URL}/${id}`)
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      cache: 'no-store'
+    })
+    
+    if (!res.ok) {
+      if (res.status === 404) {
+        console.warn(`Lista de equipos no encontrada: ${id}`)
+        return null
+      }
+      if (res.status === 401) {
+        console.warn('No autorizado para obtener lista de equipos')
+        return null
+      }
+      console.error(`Error ${res.status}: ${res.statusText}`)
+      return null
+    }
+    
     return await res.json()
   } catch (error) {
     console.error('getListaEquipoById:', error)
@@ -234,7 +258,12 @@ export async function updateFechaNecesaria(id: string, fechaNecesaria: string): 
 }
 
 // ✅ Obtener timeline de fechas de seguimiento de una lista
-export function getTimelineFechas(lista: ListaEquipo) {
+export function getTimelineFechas(lista: ListaEquipo | null | undefined) {
+  // ✅ Validación defensiva para evitar errores si lista es null/undefined
+  if (!lista) {
+    return []
+  }
+  
   const timeline = []
   
   if (lista.createdAt) {
@@ -388,7 +417,12 @@ export async function getListasEquipoMaster(filters: ListaEquipoFilters = {}): P
 // ✅ Obtener lista específica con datos completos para vista Detail (OPTIMIZED)
 export async function getListaEquipoDetail(id: string): Promise<ListaEquipo | null> {
   try {
-    const url = buildApiUrl(`${DETAIL_URL}/${id}`)
+    // 🔧 Server-side: use absolute URL for internal API calls
+    const baseUrl = typeof window === 'undefined' 
+      ? process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      : ''
+    const url = `${baseUrl}${DETAIL_URL}/${id}`
+    
     const res = await fetch(url, {
       method: 'GET',
       headers: {

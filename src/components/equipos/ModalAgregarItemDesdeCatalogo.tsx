@@ -42,16 +42,20 @@ import type {
 } from '@/types'
 
 interface Props {
+  isOpen: boolean
   proyectoId: string
   listaId: string
   onClose: () => void
-  onCreated?: () => void
+  onSuccess?: () => void
+  onCreated?: () => Promise<void>
 }
 
 export default function ModalAgregarItemDesdeCatalogo({
+  isOpen,
   proyectoId,
   listaId,
   onClose,
+  onSuccess,
   onCreated,
 }: Props) {
   const { data: session } = useSession()
@@ -125,7 +129,8 @@ export default function ModalAgregarItemDesdeCatalogo({
       }
 
       toast.success('✅ Equipos agregados correctamente')
-      onCreated?.()
+      onSuccess?.()
+      await onCreated?.()
       onClose()
     } catch (error) {
       console.error('❌ Error al agregar los equipos:', error)
@@ -143,9 +148,11 @@ export default function ModalAgregarItemDesdeCatalogo({
 
   const seleccionadosPreview = equipos.filter((e) => seleccionados.includes(e.id))
 
+  if (!isOpen) return null
+
   return (
     <AnimatePresence>
-      <Dialog open onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-[98vw] w-full h-[90vh] flex flex-col p-0">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}

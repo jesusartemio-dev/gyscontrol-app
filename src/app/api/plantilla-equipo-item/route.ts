@@ -15,8 +15,12 @@ import { recalcularTotalesPlantilla } from '@/lib/utils/recalculoPlantilla'
 export async function POST(req: NextRequest) {
   try {
     const data: PlantillaEquipoItemPayload = await req.json()
+    
+    // 🔍 Debug: Log de los datos recibidos
+    console.log('📥 Datos recibidos en API:', JSON.stringify(data, null, 2))
 
     if (!data || typeof data !== 'object') {
+      console.log('❌ Datos inválidos o no es objeto')
       return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
     }
 
@@ -34,13 +38,25 @@ export async function POST(req: NextRequest) {
       'costoCliente'
     ]
 
+    // 🔍 Debug: Verificar cada campo
+    const missingFields: string[] = []
     for (const field of requiredFields) {
       if (data[field] === undefined || data[field] === null) {
-        return NextResponse.json(
-          { error: `Campo faltante o inválido: ${field}` },
-          { status: 400 }
-        )
+        missingFields.push(field)
       }
+    }
+    
+    if (missingFields.length > 0) {
+      console.log('❌ Campos faltantes:', missingFields)
+      console.log('📊 Campos presentes:', Object.keys(data))
+      return NextResponse.json(
+        { 
+          error: `Campos faltantes o inválidos: ${missingFields.join(', ')}`,
+          received: Object.keys(data),
+          missing: missingFields
+        },
+        { status: 400 }
+      )
     }
 
     const nuevo = await prisma.plantillaEquipoItem.create({

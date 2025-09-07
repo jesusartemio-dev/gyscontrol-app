@@ -67,7 +67,11 @@ export async function GET(request: NextRequest) {
           include: {
             listaEquipoItem: {
               include: {
-                catalogoEquipo: true
+                proyectoEquipoItem: {
+                  include: {
+                    catalogoEquipo: true
+                  }
+                }
               }
             }
           }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'

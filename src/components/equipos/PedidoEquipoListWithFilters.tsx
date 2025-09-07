@@ -130,12 +130,13 @@ export default function PedidoEquipoListWithFilters({
     
     pedidos.forEach(pedido => {
       pedido.items?.forEach(item => {
-        if (item.fechaOrdenCompraRecomendada) {
+        if (item.tiempoEntregaDias && item.tiempoEntregaDias > 0) {
           totalOC++
-          const ocDate = new Date(item.fechaOrdenCompraRecomendada)
-          ocDate.setHours(0, 0, 0, 0)
+          const estimatedDate = new Date(pedido.fechaPedido)
+          estimatedDate.setDate(estimatedDate.getDate() + item.tiempoEntregaDias)
+          estimatedDate.setHours(0, 0, 0, 0)
           
-          if (ocDate < today) {
+          if (estimatedDate < today) {
             overdueOC++
           } else {
             currentOC++

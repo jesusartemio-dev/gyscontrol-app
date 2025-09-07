@@ -11,7 +11,7 @@
 
 // 📋 Importaciones de tipos desde Prisma Client
 import type { 
-   Producto as PrismaProducto
+   // ❌ Eliminado: Producto as PrismaProducto - no forma parte del sistema GYS
  } from '@prisma/client';
 
 // Tipos generales
@@ -31,7 +31,7 @@ export type RolUsuario =
 // ✅ Tipos para el sistema de notificaciones del sidebar
 export type NotificationBadgeType = 
   | 'ordenes-pendientes'
-  // recepciones-pendientes y pagos-vencidos removidos
+  
 
 // ✅ Tipo para enlaces del sidebar con notificaciones
 export interface SidebarLink {
@@ -39,6 +39,7 @@ export interface SidebarLink {
   label: string
   icon: any // Lucide icon component
   badge?: NotificationBadgeType
+  submenu?: SidebarLink[] // ✅ Submenú opcional para enlaces anidados
 }
 
 // ✅ Tipo para secciones del sidebar
@@ -66,6 +67,9 @@ export type EstadoEquipo =
   | 'en_lista'
   | 'reemplazado'
   | 'descartado'
+  | 'disponible'
+  | 'en_uso'
+  | 'mantenimiento'
 
 export type EstadoListaItem =
   | 'borrador'
@@ -810,6 +814,7 @@ export interface ProyectoGastoItem {
 export interface ListaEquipo {
   id: string
   proyectoId: string
+  responsableId: string            // ✅ ID del usuario responsable de la lista
   codigo: string                   // ✅ antes era 'nombre', ahora es el código único (ej. CJM27-LST-001)
   nombre: string
   numeroSecuencia: number          // ✅ número crudo, usado para construir el código
@@ -826,6 +831,14 @@ export interface ListaEquipo {
   fechaInicioCotizacion?: string
   fechaFinCotizacion?: string
   fechaAprobacionFinal?: string
+  
+  // ✅ Coherencia financiera
+  coherencia?: number              // Porcentaje de coherencia (0-100)
+  
+  // ✅ Prisma count aggregation (opcional, disponible cuando se incluye en queries)
+  _count?: {
+    items: number
+  }
   
   items: ListaEquipoItem[]
   proyecto?: Proyecto | null       // ✅ incluye info del proyecto si se hace include en la API
@@ -958,6 +971,9 @@ export interface PedidoEquipo {
   fechaEntregaReal?: string            // Fecha real de entrega
   observacion?: string
 
+  // ✅ Coherencia financiera
+  coherencia?: number                  // Porcentaje de coherencia (0-100)
+
   responsable?: User
   lista?: ListaEquipo
   items: PedidoEquipoItem[]
@@ -982,7 +998,7 @@ export interface PedidoEquipoItem {
 
   tiempoEntrega?: string              // Ej: "stock", "7 días", etc.
   tiempoEntregaDias?: number         // Ej: 0, 7, 14
-  // fechaOrdenCompraRecomendada removido
+
 
   createdAt?: string
   updatedAt?: string
@@ -1139,20 +1155,12 @@ export interface PaqueteCompraItemPayload {
 
 // ===== TIPOS BASE (ALIASES PARA MEJOR LEGIBILIDAD) =====
 
-/**
- * 📦 Producto - Catálogo de productos para órdenes de compra
- * @description Entidad que representa los productos disponibles en el sistema
- */
-export type Producto = PrismaProducto;
+// ❌ Eliminado: Producto - no forma parte del sistema GYS
 
 /**
  * 🛒 Orden de Compra - Documento que formaliza la solicitud de productos/servicios a un proveedor
  */
-// Tipos de aprovisionamiento eliminados
-
 // ===== ENUMS RE-EXPORTADOS PARA CONSISTENCIA =====
-
-// Enums de aprovisionamiento eliminados
 
 
 
@@ -1163,19 +1171,6 @@ export type Producto = PrismaProducto;
 
 // ===== TIPOS COMPUESTOS CON RELACIONES =====
 
-// Tipos compuestos de aprovisionamiento eliminados
-
-// OrdenCompraConTodo type removido
-
-// RecepcionConItems type removido
-
-// RecepcionConTodo type removido
-
-// PagoConItems type removido
-
-// PagoConTodo type removido
-
 // ===== TIPOS PARA DASHBOARDS Y REPORTES =====
 
 // ✅ Reportes
-// Tipos de reportes de aprovisionamiento eliminados

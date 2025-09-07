@@ -327,6 +327,7 @@ export default function ListaEquipoIntegradaPage() {
         {/* Modal for adding equipment */}
         {modalListaId && (
           <ModalAgregarItemDesdeEquipo
+            isOpen={!!modalListaId}
             proyectoId={id}
             listaId={modalListaId}
             onClose={() => setModalListaId(null)}

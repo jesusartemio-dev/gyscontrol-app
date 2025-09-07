@@ -14,7 +14,7 @@ import { defineConfig, devices } from '@playwright/test'
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './src/__tests__/e2e',
   
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -53,7 +53,16 @@ export default defineConfig({
     actionTimeout: 10000,
     
     /* Timeout for navigation */
-    navigationTimeout: 30000
+    navigationTimeout: 30000,
+    
+    /* Ignore HTTPS errors */
+    ignoreHTTPSErrors: true,
+    
+    /* Viewport size */
+    viewport: { width: 1280, height: 720 },
+    
+    /* User agent */
+    userAgent: 'GYS-App-E2E-Tests'
   },
 
   /* Configure projects for major browsers */
@@ -92,6 +101,45 @@ export default defineConfig({
       name: 'Google Chrome',
       use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     },
+    
+    // ✅ Accessibility testing with specific configuration
+    {
+      name: 'accessibility',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Enable accessibility tree in DevTools
+        launchOptions: {
+          args: [
+            '--enable-accessibility-logging',
+            '--enable-logging=stderr',
+            '--vmodule=accessibility*=1'
+          ]
+        }
+      },
+      testMatch: '**/*.accessibility.e2e.test.ts'
+    },
+    
+    // 📊 Performance testing
+    {
+      name: 'performance',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Enable performance metrics
+        launchOptions: {
+          args: [
+            '--enable-precise-memory-info',
+            '--enable-memory-info'
+          ]
+        }
+      },
+      testMatch: '**/*.performance.e2e.test.ts'
+    },
+    
+    // 📱 Tablet testing
+    {
+      name: 'Tablet',
+      use: { ...devices['iPad Pro'] },
+    },
   ],
 
   /* Run your local dev server before starting the tests */
@@ -100,6 +148,9 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes
+    env: {
+      NEXT_PRIVATE_SKIP_TURBO: '1'
+    }
   },
   
   /* Global setup and teardown */

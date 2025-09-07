@@ -11,6 +11,35 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// ✅ GET - Obtener equipo por ID
+export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
+
+  if (!id) {
+    return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 })
+  }
+
+  try {
+    const equipo = await prisma.catalogoEquipo.findUnique({
+      where: { id },
+      include: {
+        categoria: true,
+        unidad: true,
+      },
+    })
+
+    if (!equipo) {
+      return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
+    }
+
+    return NextResponse.json(equipo)
+  } catch (error) {
+    console.error('❌ Error al obtener equipo:', error)
+    return NextResponse.json({ error: 'Error interno al obtener equipo' }, { status: 500 })
+  }
+}
+
+// ✅ PUT - Actualizar equipo
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
 
@@ -42,6 +71,10 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     const actualizado = await prisma.catalogoEquipo.update({
       where: { id },
       data: payload,
+      include: {
+        categoria: true,
+        unidad: true,
+      },
     })
 
     return NextResponse.json(actualizado)

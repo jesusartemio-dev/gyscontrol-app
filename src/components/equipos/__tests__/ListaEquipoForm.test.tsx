@@ -16,26 +16,41 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListaEquipoForm from '../ListaEquipoForm'
 import { toast } from 'sonner'
+import { createListaEquipo } from '@/lib/services/listas-equipo'
 
 // Mock dependencies
-jest.mock('sonner')
-jest.mock('framer-motion', () => ({
+vi.mock('sonner')
+vi.mock('@/lib/services/listas-equipo')
+vi.mock('framer-motion', () => ({
   motion: {
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
     p: ({ children, ...props }: any) => <p {...props}>{children}</p>,
   },
 }))
 
-const mockToast = toast as jest.Mocked<typeof toast>
+const mockToast = vi.mocked(toast)
+const mockCreateListaEquipo = vi.mocked(createListaEquipo)
 
 const defaultProps = {
   proyectoId: 'proyecto-1',
-  onCreated: jest.fn(),
+  onCreated: vi.fn(),
+}
+
+const mockListaCreada = {
+  id: 'nueva-lista-id',
+  nombre: 'Lista Test',
+  codigo: 'LEQ-001',
+  proyectoId: 'proyecto-1',
+  numeroSecuencia: 1,
+  items: [],
+  _count: { items: 0 },
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
 }
 
 describe('ListaEquipoForm', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('Rendering', () => {
@@ -312,12 +327,99 @@ describe('ListaEquipoForm', () => {
     })
   })
 
-  describe('Responsive Design', () => {
-    it('should have responsive grid classes', () => {
+  describe('API Integration', () => {
+    it('should call createListaEquipo service and handle success', async () => {
+      const user = userEvent.setup()
+      mockCreateListaEquipo.mockResolvedValue(mockListaCreada)
+      
       render(<ListaEquipoForm {...defaultProps} />)
-
-      const gridContainer = screen.getByLabelText('Nombre de la Lista Técnica').closest('.grid')
-      expect(gridContainer).toHaveClass('grid-cols-1', 'md:grid-cols-4')
+      
+      const nameInput = screen.getByLabelText('Nombre de la Lista Técnica')
+      const dateInput = screen.getByLabelText('Fecha Necesaria (Opcional)')
+      const submitButton = screen.getByRole('button', { name: /crear lista técnica/i })
+      
+      // Fill form with valid data
+      await user.type(nameInput, 'Lista de Equipos Test')
+      await user.type(dateInput, '2025-12-31')
+      await user.click(submitButton)
+      
+      // Verify loading state
+      expect(screen.getByText(/creando.../i)).toBeInTheDocument()
+      
+      await waitFor(() => {
+        expect(mockCreateListaEquipo).toHaveBeenCalledWith({
+          proyectoId: 'proyecto-1',
+          nombre: 'Lista de Equipos Test',
+          fechaNecesaria: '2025-12-31',
+          codigo: '',
+          numeroSecuencia: 0,
+          items: [],
+          _count: { items: 0 }
+        })
+      })
+      
+      await waitFor(() => {
+        expect(defaultProps.onCreated).toHaveBeenCalledWith(mockListaCreada)
+        expect(mockToast.success).toHaveBeenCalledWith('Lista técnica creada exitosamente')
+      })
+      
+      // Verify form is reset
+      expect(nameInput).toHaveValue('')
+      expect(dateInput).toHaveValue('')
     })
-  })
-})
+
+    it('should handle API errors gracefully', async () => {
+      const user = userEvent.setup()
+      const errorMessage = 'Error de red'
+      mockCreateListaEquipo.mockRejectedValue(new Error(errorMessage))
+      
+      render(<ListaEquipoForm {...defaultProps} />)
+      
+      const nameInput = screen.getByLabelText('Nombre de la Lista Técnica')
+      const submitButton = screen.getByRole('button', { name: /crear lista técnica/i })
+      
+      await user.type(nameInput, 'Lista Test')
+      await user.click(submitButton)
+      
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith('Error al crear la lista técnica. Intente nuevamente.')
+      })
+      
+      expect(defaultProps.onCreated).not.toHaveBeenCalled()
+    })
+
+    it('should create lista without optional date', async () => {
+      const user = userEvent.setup()
+      mockCreateListaEquipo.mockResolvedValue(mockListaCreada)
+      
+      render(<ListaEquipoForm {...defaultProps} />)
+      
+      const nameInput = screen.getByLabelText('Nombre de la Lista Técnica')
+      const submitButton = screen.getByRole('button', { name: /crear lista técnica/i })
+      
+      await user.type(nameInput, 'Lista Sin Fecha')
+      await user.click(submitButton)
+      
+      await waitFor(() => {
+        expect(mockCreateListaEquipo).toHaveBeenCalledWith({
+          proyectoId: 'proyecto-1',
+          nombre: 'Lista Sin Fecha',
+          fechaNecesaria: undefined,
+          codigo: '',
+          numeroSecuencia: 0,
+          items: [],
+          _count: { items: 0 }
+        })
+      })
+    })
+   })
+
+   describe('Responsive Design', () => {
+     it('should have responsive grid classes', () => {
+       render(<ListaEquipoForm {...defaultProps} />)
+
+       const gridContainer = screen.getByLabelText('Nombre de la Lista Técnica').closest('.grid')
+       expect(gridContainer).toHaveClass('grid-cols-1', 'md:grid-cols-4')
+     })
+   })
+ })

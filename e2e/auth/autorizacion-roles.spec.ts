@@ -189,10 +189,10 @@ test.describe('Autorización por Roles', () => {
     })
   })
   
-  // 🚛 LOGISTICA - Gestión de recepciones y entregas
-  test.describe('Rol LOGISTICA', () => {
+  // 🚛 LOGISTICO - Gestión de recepciones y entregas
+  test.describe('Rol LOGISTICO', () => {
     test('Debe tener acceso a recepciones y logística', async ({ page }) => {
-      await loginAs(page, 'logistica')
+      await loginAs(page, 'logistico')
       
       // ✅ Secciones permitidas
       const seccionesPermitidas = [
@@ -211,7 +211,7 @@ test.describe('Autorización por Roles', () => {
     })
     
     test('Debe tener acceso de solo lectura a órdenes de compra', async ({ page }) => {
-      await loginAs(page, 'logistica')
+      await loginAs(page, 'logistico')
       await navigateAndWait(page, '/aprovisionamiento/ordenes-compra')
       
       // ✅ Puede ver órdenes
@@ -223,7 +223,7 @@ test.describe('Autorización por Roles', () => {
     })
     
     test('NO debe tener acceso a finanzas ni administración', async ({ page }) => {
-      await loginAs(page, 'logistica')
+      await loginAs(page, 'logistico')
       
       // ❌ Secciones restringidas
       const seccionesRestringidas = [
@@ -242,7 +242,7 @@ test.describe('Autorización por Roles', () => {
     })
     
     test('Debe poder gestionar recepciones completamente', async ({ page }) => {
-      await loginAs(page, 'logistica')
+      await loginAs(page, 'logistico')
       await navigateAndWait(page, '/aprovisionamiento/recepciones')
       
       // ✅ Verificar acciones de recepción
@@ -252,10 +252,10 @@ test.describe('Autorización por Roles', () => {
     })
   })
   
-  // 💰 FINANZAS - Gestión de pagos y finanzas
-  test.describe('Rol FINANZAS', () => {
+  // 💰 GESTOR - Gestión de pagos y finanzas
+  test.describe('Rol GESTOR', () => {
     test('Debe tener acceso a pagos y finanzas', async ({ page }) => {
-      await loginAs(page, 'finanzas')
+      await loginAs(page, 'gestor')
       
       // ✅ Secciones permitidas
       const seccionesPermitidas = [
@@ -273,7 +273,7 @@ test.describe('Autorización por Roles', () => {
     })
     
     test('Debe tener acceso de solo lectura a órdenes y recepciones', async ({ page }) => {
-      await loginAs(page, 'finanzas')
+      await loginAs(page, 'gestor')
       
       // ✅ Solo lectura a órdenes
       await navigateAndWait(page, '/aprovisionamiento/ordenes-compra')
@@ -287,7 +287,7 @@ test.describe('Autorización por Roles', () => {
     })
     
     test('NO debe tener acceso a proyectos ni administración', async ({ page }) => {
-      await loginAs(page, 'finanzas')
+      await loginAs(page, 'gestor')
       
       // ❌ Secciones restringidas
       const seccionesRestringidas = [
@@ -306,7 +306,7 @@ test.describe('Autorización por Roles', () => {
     })
     
     test('Debe poder gestionar pagos completamente', async ({ page }) => {
-      await loginAs(page, 'finanzas')
+      await loginAs(page, 'gestor')
       await navigateAndWait(page, '/aprovisionamiento/pagos')
       
       // ✅ Verificar acciones de pago
@@ -324,14 +324,14 @@ test.describe('Autorización por Roles', () => {
       await navigateAndWait(page, '/aprovisionamiento/pagos')
       await expect(page.locator('[data-testid="error-unauthorized"]')).toBeVisible()
       
-      // 🔄 Cambiar a finanzas
-      await loginAs(page, 'finanzas')
+      // 🔄 Cambiar a gestor
+      await loginAs(page, 'gestor')
       await navigateAndWait(page, '/aprovisionamiento/pagos')
       await expect(page.locator('h1')).toContainText('Pagos')
       await expect(page.locator('[data-testid="error-unauthorized"]')).not.toBeVisible()
       
-      // 🔄 Cambiar a logística
-      await loginAs(page, 'logistica')
+      // 🔄 Cambiar a logístico
+      await loginAs(page, 'logistico')
       await navigateAndWait(page, '/aprovisionamiento/pagos')
       await expect(page.locator('[data-testid="error-unauthorized"]')).toBeVisible()
     })
@@ -363,9 +363,9 @@ test.describe('Autorización por Roles', () => {
     })
     
     test('Navegación directa a URLs debe ser bloqueada', async ({ page }) => {
-      await loginAs(page, 'logistica')
+      await loginAs(page, 'logistico')
       
-      // 🚫 URLs que logística no debe poder acceder
+      // 🚫 URLs que logístico no debe poder acceder
       const urlsRestringidas = [
         '/admin/usuarios',
         '/proyectos/nuevo',

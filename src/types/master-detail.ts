@@ -35,6 +35,16 @@ export interface ListaEquipoMaster {
   createdAt: string
   updatedAt: string
   
+  // 📅 Fechas de seguimiento
+  fechaAprobacion?: string
+  fechaAprobacionFinal?: string
+  fechaAprobacionRevision?: string
+  fechaNecesaria?: string
+  fechaModificacion?: string
+  
+  // 👤 Información de modificación
+  modificadoPor?: string
+  
   // 📊 Estadísticas calculadas para la vista Master
   stats: {
     totalItems: number
@@ -57,6 +67,9 @@ export interface ListaEquipoMaster {
     id: string
     name: string
   }
+  
+  // 🎯 Coherencia calculada (porcentaje de consistencia)
+  coherencia?: number
 }
 
 /**
@@ -92,7 +105,7 @@ export interface ListaEquipoMasterCardProps {
  */
 export interface ListaEquipoDetail extends ListaEquipo {
   // 📊 Estadísticas extendidas calculadas
-  stats: {
+  stats?: {
     totalItems: number
     itemsVerificados: number
     itemsAprobados: number
@@ -113,6 +126,14 @@ export interface ListaEquipoDetail extends ListaEquipo {
     // 📋 Estadísticas de pedidos
     itemsConPedido: number
     itemsSinPedido: number
+  }
+  
+  // 📊 Estadísticas de aprovisionamiento (desde API)
+  estadisticas?: {
+    totalItems: number
+    totalPedidos: number
+    montoTotal: number
+    porcentajeEjecutado: number
   }
   
   // 🏗️ Información completa del proyecto

@@ -157,8 +157,7 @@ export async function GET(request: NextRequest) {
             precioUnitario: true,
             costoTotal: true,
             estado: true,
-            tiempoEntrega: true,
-            proveedorSeleccionado: true
+            tiempoEntrega: true
           }
         }
       },

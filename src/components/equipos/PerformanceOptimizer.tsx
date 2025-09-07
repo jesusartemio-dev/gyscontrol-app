@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Zap, Database, Clock, TrendingUp, Info } from 'lucide-react'
@@ -128,7 +127,6 @@ export default function PerformanceOptimizer({
   const status = getPerformanceStatus(performanceScore)
 
   return (
-    <TooltipProvider>
       <div className={`flex items-center gap-3 ${className}`}>
         {/* Performance Score Badge */}
         <Tooltip>
@@ -210,6 +208,5 @@ export default function PerformanceOptimizer({
           </Tooltip>
         )}
       </div>
-    </TooltipProvider>
   )
 }

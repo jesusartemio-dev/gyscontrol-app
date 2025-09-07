@@ -102,25 +102,25 @@ export default function PlantillaEquipoItemForm({ plantillaEquipoId, onCreated }
       return
     }
 
+    // ✅ Validar que el equipo tenga ID
+    if (!equipo?.id) {
+      setError('El equipo seleccionado no tiene ID válido.')
+      return
+    }
+
     try {
       setLoading(true)
 
-      const payload: PlantillaEquipoItemPayload = {
+      // 🔄 Enviar datos mínimos al servicio (el servicio construye el payload completo)
+      const servicePayload = {
         plantillaEquipoId,
-        catalogoEquipoId: equipo!.id,
-        codigo: equipo!.codigo,
-        descripcion: equipo!.descripcion,
-        categoria: equipo!.categoria.nombre,
-        unidad: equipo!.unidad.nombre,
-        marca: equipo!.marca,
-        precioInterno: equipo!.precioInterno,
-        precioCliente: equipo!.precioVenta,
+        catalogoEquipoId: equipo.id,
         cantidad,
-        costoInterno: cantidad * equipo!.precioInterno,
-        costoCliente: cantidad * equipo!.precioVenta
+        observaciones: `${equipo.marca} - ${equipo.descripcion}`
       }
 
-      const creado = await createPlantillaEquipoItem(payload)
+      console.log('🔍 Enviando desde componente:', servicePayload)
+      const creado = await createPlantillaEquipoItem(servicePayload)
       onCreated(creado)
       
       // Reset form
@@ -128,9 +128,10 @@ export default function PlantillaEquipoItemForm({ plantillaEquipoId, onCreated }
       setEquipo(null)
       setErrors({})
       setSuccess(true)
-    } catch (err) {
-      console.error(err)
-      setError('Error al crear ítem. Por favor, inténtelo nuevamente.')
+    } catch (err: any) {
+      console.error('❌ Error completo:', err)
+      const errorMessage = err?.message || 'Error al crear ítem. Por favor, inténtelo nuevamente.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }

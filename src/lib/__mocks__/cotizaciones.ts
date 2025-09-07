@@ -32,8 +32,8 @@ export const mockCotizacionEquipo: CotizacionEquipo = {
   subtotal: 3000.00,
   costoTotal: 2000.00,
   rentabilidad: 33.33,
-  createdAt: new Date('2024-01-15T10:00:00Z'),
-  updatedAt: new Date('2024-01-15T10:00:00Z')
+  createdAt: '2024-01-15T10:00:00Z',
+  updatedAt: '2024-01-15T10:00:00Z'
 }
 
 // Mock de servicio de cotización
@@ -62,8 +62,8 @@ export const mockCotizacionServicio: CotizacionServicio = {
   subtotal: 2000.00,
   costoTotal: 1200.00,
   rentabilidad: 40.00,
-  createdAt: new Date('2024-01-15T10:00:00Z'),
-  updatedAt: new Date('2024-01-15T10:00:00Z')
+  createdAt: '2024-01-15T10:00:00Z',
+  updatedAt: '2024-01-15T10:00:00Z'
 }
 
 // Mock de gasto de cotización
@@ -91,8 +91,8 @@ export const mockCotizacionGasto: CotizacionGasto = {
   subtotal: 500.00,
   costoTotal: 500.00,
   rentabilidad: 0.00,
-  createdAt: new Date('2024-01-15T10:00:00Z'),
-  updatedAt: new Date('2024-01-15T10:00:00Z')
+  createdAt: '2024-01-15T10:00:00Z',
+  updatedAt: '2024-01-15T10:00:00Z'
 }
 
 // Mock de cotización completa
@@ -111,8 +111,8 @@ export const mockCotizacion: Cotizacion = {
     ruc: '20123456789',
     contactoPrincipal: 'Juan Pérez',
     estado: 'ACTIVO',
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-01T00:00:00Z')
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z'
   },
   comercialId: 'comercial-1',
   comercial: {
@@ -122,8 +122,8 @@ export const mockCotizacion: Cotizacion = {
     telefono: '+51 999 777 666',
     rol: 'COMERCIAL',
     estado: 'ACTIVO',
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-01T00:00:00Z')
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z'
   },
   equipos: [mockCotizacionEquipo],
   servicios: [mockCotizacionServicio],
@@ -141,9 +141,8 @@ export const mockCotizacion: Cotizacion = {
   observaciones: 'Cotización de prueba para validar UX/UI',
   version: 1,
   createdAt: '2024-01-15T10:00:00Z',
-  fechaActualizacion: new Date('2024-01-15T10:00:00Z'),
-  createdAt: new Date('2024-01-15T10:00:00Z'),
-  updatedAt: new Date('2024-01-15T10:00:00Z')
+  fechaActualizacion: '2024-01-15T10:00:00Z',
+  updatedAt: '2024-01-15T10:00:00Z'
 }
 
 // Mock de cotización vacía (para probar estados vacíos)
@@ -235,7 +234,7 @@ export const mockApiResponses = {
   },
   updateCotizacion: {
     success: {
-      data: { ...mockCotizacion, updatedAt: new Date() },
+      data: { ...mockCotizacion, updatedAt: new Date().toISOString() },
       message: 'Cotización actualizada exitosamente'
     },
     error: {

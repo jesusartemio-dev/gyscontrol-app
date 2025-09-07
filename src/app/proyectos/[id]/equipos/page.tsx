@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import type { Proyecto, ProyectoEquipo } from '@/types';
+import { useDebugPanel, DebugPanel } from '@/components/debug/DebugPanel';
 
 // ✅ Page props interface
 interface PageProps {
@@ -97,6 +98,9 @@ function EquipmentPageSkeleton() {
           ))}
         </CardContent>
       </Card>
+      
+      {/* 🐛 Debug Panel for monitoring re-renders */}
+      <DebugPanel position="top-right" />
     </div>
   );
 }
@@ -107,6 +111,9 @@ export default function ProjectEquipmentPage({ params }: PageProps) {
   const [equipos, setEquipos] = useState<ProyectoEquipo[]>([]);
   const [loading, setLoading] = useState(true);
   const [proyectoId, setProyectoId] = useState<string>('');
+  
+  // 🐛 Debug panel for monitoring re-renders
+  const { DebugPanel } = useDebugPanel();
 
   useEffect(() => {
     const fetchParams = async () => {

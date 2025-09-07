@@ -12,6 +12,7 @@ import {
   ListaEquipoItemPayload,
   ListaEquipoItemUpdatePayload,
 } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
 
 const BASE_URL = '/api/lista-equipo-item'
 
@@ -51,7 +52,8 @@ export async function getListaEquipoItems(params?: { proyectoId?: string }): Pro
 // ✅ Obtener ítem por ID
 export async function getListaEquipoItemById(id: string): Promise<ListaEquipoItem | null> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`, { cache: 'no-store' })
+    const url = buildApiUrl(`${BASE_URL}/${id}`)
+    const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error('Error al obtener ítem de lista de equipos')
     return await res.json()
   } catch (error) {
@@ -63,7 +65,8 @@ export async function getListaEquipoItemById(id: string): Promise<ListaEquipoIte
 // ✅ Crear ítem manual
 export async function createListaEquipoItem(payload: ListaEquipoItemPayload): Promise<ListaEquipoItem | null> {
   try {
-    const res = await fetch(BASE_URL, {
+    const url = buildApiUrl(BASE_URL)
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -82,7 +85,8 @@ export async function updateListaEquipoItem(
   payload: ListaEquipoItemUpdatePayload
 ): Promise<ListaEquipoItem | null> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`, {
+    const url = buildApiUrl(`${BASE_URL}/${id}`)
+    const res = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -98,7 +102,8 @@ export async function updateListaEquipoItem(
 // ✅ Eliminar ítem
 export async function deleteListaEquipoItem(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`, { method: 'DELETE' })
+    const url = buildApiUrl(`${BASE_URL}/${id}`)
+    const res = await fetch(url, { method: 'DELETE' })
     return res.ok
   } catch (error) {
     console.error('❌ deleteListaEquipoItem:', error)
@@ -147,8 +152,28 @@ export async function getListaEquipoItemsByProyecto(proyectoId: string): Promise
 // ✅ Obtener ítems por lista específica
 export async function getListaEquipoItemsByLista(listaId: string): Promise<ListaEquipoItem[]> {
   try {
-    const res = await fetch(`${BASE_URL}/by-lista/${listaId}`, { cache: 'no-store' })
-    if (!res.ok) throw new Error('Error al obtener ítems de la lista')
+    const url = buildApiUrl(`${BASE_URL}/by-lista/${listaId}`)
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      cache: 'no-store'
+    })
+    
+    if (!res.ok) {
+      if (res.status === 404) {
+        console.warn(`Ítems de lista no encontrados: ${listaId}`)
+        return []
+      }
+      if (res.status === 401) {
+        console.warn('No autorizado para obtener ítems de la lista')
+        return []
+      }
+      console.error(`Error ${res.status}: ${res.statusText}`)
+      return []
+    }
+    
     return await res.json()
   } catch (error) {
     console.error('❌ getListaEquipoItemsByLista:', error)

@@ -18,6 +18,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DebugLogger, useRenderTracker } from '@/components/debug/DebugLogger';
 import { 
   useIsMobile,
   useIsTouchDevice,
@@ -56,7 +57,8 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Trash2
 } from 'lucide-react';
 import ListaEquipoMasterCard from './ListaEquipoMasterCard';
 import { ListaEquipoMaster } from '@/types/master-detail';
@@ -72,6 +74,7 @@ interface ListaEquipoMasterListProps {
   selectedIds?: string[];
   onSelectionChange?: (ids: string[]) => void;
   onItemSelect?: (listaId: string) => void;
+  onDelete?: (listaId: string) => void;
   showSelection?: boolean;
   showActions?: boolean;
   emptyMessage?: string;
@@ -107,6 +110,7 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
     selectedIds = [],
     onSelectionChange,
     onItemSelect,
+    onDelete,
     showSelection = false,
     showActions = true,
     emptyMessage = 'No hay listas de equipos',
@@ -117,6 +121,9 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
     onPageChange,
     itemsPerPage = 12
   }) => {
+    // 🐛 Debug logger to track re-renders
+    const renderCount = useRenderTracker('ListaEquipoMasterList', [listas?.length, proyectoId, viewMode, selectedIds?.length]);
+    
     // 📱 Responsive hooks
     const isMobile = useIsMobile();
     const isTouchDevice = useIsTouchDevice();
@@ -185,6 +192,7 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
             lista={lista}
             proyectoId={proyectoId}
             onSelect={onItemSelect}
+            onDelete={onDelete}
             isSelected={selectedIds.includes(lista.id)}
             viewMode="grid"
             showActions={showActions}
@@ -296,14 +304,29 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
                   
                   {showActions && (
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={`${touchButtonClasses} h-8 w-8 p-0`}
-                        onClick={() => onItemSelect?.(lista.id)}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`${touchButtonClasses} h-8 w-8 p-0`}
+                          onClick={() => onItemSelect?.(lista.id)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        {onDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete(lista.id);
+                            }}
+                            className={`${touchButtonClasses} h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </motion.tr>
@@ -348,7 +371,9 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
   
   // 🎯 Main render
   return (
-    <div className={cn('space-y-6', className)}>
+    <>
+      <DebugLogger componentName="ListaEquipoMasterList" props={{ listasLength: listas?.length, proyectoId, viewMode, selectedIdsLength: selectedIds?.length }} />
+      <div className={cn('space-y-6', className)}>
       {/* View Mode Toggle */}
       {onViewModeChange && (
         <div className="flex items-center gap-2">
@@ -387,6 +412,7 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
         </>
       )}
     </div>
+    </>
   );
 };
 

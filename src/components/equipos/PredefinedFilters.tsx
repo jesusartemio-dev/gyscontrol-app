@@ -22,7 +22,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
@@ -177,7 +176,6 @@ export default function PredefinedFilters({ onApplyFilter, currentFilters, class
   }
 
   return (
-    <TooltipProvider>
       <div className={cn("flex flex-wrap items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200", className)}>
         <div className="flex items-center gap-1 text-sm font-medium text-gray-700">
           <Star className="w-4 h-4 text-yellow-500" />
@@ -267,6 +265,5 @@ export default function PredefinedFilters({ onApplyFilter, currentFilters, class
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </TooltipProvider>
   )
 }

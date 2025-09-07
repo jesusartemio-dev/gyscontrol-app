@@ -66,6 +66,34 @@ async function main() {
     role: logisticoUser.role
   })
 
+  // Crear proveedores de ejemplo
+  const proveedor1 = await prisma.proveedor.create({
+    data: {
+      nombre: 'Ferretería Industrial SAC',
+      ruc: '20123456789'
+    }
+  })
+
+  const proveedor2 = await prisma.proveedor.create({
+    data: {
+      nombre: 'Equipos y Maquinarias EIRL',
+      ruc: '20987654321'
+    }
+  })
+
+  const proveedor3 = await prisma.proveedor.create({
+    data: {
+      nombre: 'Suministros Técnicos SA',
+      ruc: '20555666777'
+    }
+  })
+
+  console.log('✅ Proveedores creados:', {
+    proveedor1: { id: proveedor1.id, nombre: proveedor1.nombre },
+    proveedor2: { id: proveedor2.id, nombre: proveedor2.nombre },
+    proveedor3: { id: proveedor3.id, nombre: proveedor3.nombre }
+  })
+
   console.log('🎉 Seed completado exitosamente!')
   console.log('\n📋 Credenciales de acceso:')
   console.log('Email: admin@gys.com | Contraseña: admin123 | Rol: admin')

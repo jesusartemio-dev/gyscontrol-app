@@ -19,29 +19,14 @@ import type {
   EstadoPedido, 
   EstadoPedidoItem, 
   EstadoCotizacionProveedor, 
-  OrigenListaItem,
-  // ✅ Producto
-  Producto
+  OrigenListaItem
+  // ❌ Eliminado: Producto - no forma parte del sistema GYS
 } from './modelos'
 
-// 🚚 Tipos de aprovisionamiento eliminados 
+ 
 
 
-// ✅ Producto
-export interface ProductoPayload {
-  codigo: string
-  nombre: string
-  descripcion?: string
-  categoria?: string
-  unidadMedida?: string
-  precioReferencia?: number
-  moneda?: string
-  especificaciones?: string
-  marca?: string
-  modelo?: string
-  activo?: boolean
-}
-export interface ProductoUpdatePayload extends Partial<ProductoPayload> {}
+// ❌ Eliminado: ProductoPayload y ProductoUpdatePayload - no forman parte del sistema GYS
 
 // ✅ Unidad
 export interface UnidadPayload {
@@ -569,7 +554,7 @@ export interface PedidoEquipoItemPayload {
   unidad: string
   tiempoEntrega?: string
   tiempoEntregaDias?: number
-  // fechaOrdenCompraRecomendada removido
+
 }
 
 
@@ -618,35 +603,11 @@ export interface RegistroHorasUpdatePayload extends Partial<RegistroHorasPayload
 
 
 
-// 🚚 Payloads de aprovisionamiento eliminados
-
-// 📥 Payloads de recepción eliminados
-
-// 💳 Payloads de pago eliminados
-
-
-
 // 🔍 Filtros Completos
 
-// 🔍 Filtros de aprovisionamiento eliminados
 
 
-
-// ✅ Producto Filters
-export interface ProductoFilters {
-  codigo?: string;
-  nombre?: string;
-  categoria?: string;
-  unidadMedida?: string;
-  marca?: string;
-  modelo?: string;
-  activo?: boolean;
-  precioMinimo?: number;
-  precioMaximo?: number;
-  moneda?: string;
-}
-
-// 📈 Reportes de aprovisionamiento eliminados
+// ❌ Eliminado: ProductoFilters - no forma parte del sistema GYS
 
 // 📄 Tipos de Respuesta API Estándar
 export interface ApiResponse<T = any> {
@@ -691,16 +652,5 @@ export interface SearchParams {
 }
 
 
-// Tipos de respuesta de aprovisionamiento eliminados
-
-// ✅ Producto Response Types
-export type ProductoResponse = ApiResponse<Producto>;
-export type ProductoListResponse = PaginatedResponse<Producto>;
-export type ProductoMetricsResponse = ApiResponse<{
-  totalProductos: number;
-  productosActivos: number;
-  categorias: number;
-  marcas: number;
-}>;
-export type ProductoCategoriasResponse = ApiResponse<string[]>;
+// ❌ Eliminado: ProductoResponse types - no forman parte del sistema GYS
 

@@ -96,7 +96,19 @@ export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProp
     }
 
     try {
-      const nuevo = await createCatalogoEquipo({ ...values, precioVenta, estado: 'pendiente' })
+      // ✅ Mapear al formato correcto para la API
+      const equipoData = {
+        codigo: values.codigo,
+        descripcion: values.descripcion,
+        marca: values.marca,
+        precioInterno: values.precioInterno,
+        margen: values.margen,
+        precioVenta: precioVenta,
+        categoriaId: values.categoriaId,
+        unidadId: values.unidadId,
+        estado: 'activo'
+      }
+      const nuevo = await createCatalogoEquipo(equipoData)
       onCreated(nuevo)
       reset()
       setPrecioVenta(0)
