@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { logger } from '@/lib/logger';
+import logger from '@/lib/logger';
 import { z } from 'zod';
 
 // 📋 Esquemas de validación

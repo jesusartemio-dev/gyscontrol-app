@@ -17,7 +17,7 @@ import performanceMonitor, {
   trackError,
   trackUserInteraction,
 } from '@/lib/monitoring/performance';
-import { logger } from '@/lib/logger';
+import logger from '@/lib/logger';
 
 // 🎯 Tipos para el hook
 interface UseMonitoringOptions {

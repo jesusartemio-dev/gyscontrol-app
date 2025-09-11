@@ -122,6 +122,7 @@ type ColumnKey =
   | 'lista'
   | 'descripcion'
   | 'fechaPedido'
+  | 'fechaNecesaria'
   | 'fechaEntregaEstimada'
   | 'fechaEntregaReal'
   | 'estado'
@@ -143,6 +144,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: 'codigo', label: 'Código', sortable: true, width: '120px' },
   { key: 'proyecto', label: 'Proyecto', sortable: true, width: '150px' },
   { key: 'fechaPedido', label: 'F. Pedido', sortable: true, width: '110px', align: 'center' },
+  { key: 'fechaNecesaria', label: 'F. Necesaria', sortable: true, width: '120px', align: 'center' }, // ✅ Critical for procurement planning
   { key: 'fechaEntregaEstimada', label: 'F. Entrega Est.', sortable: true, width: '130px', align: 'center' },
   { key: 'fechaEntregaReal', label: 'F. Entrega Real', sortable: true, width: '130px', align: 'center' },
   { key: 'estado', label: 'Estado', sortable: true, width: '120px', align: 'center' },
@@ -663,6 +665,32 @@ export const PedidoEquipoTable: React.FC<PedidoEquipoTableProps> = ({
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
+                      </TableCell>
+                    )}
+                    
+                    {/* ✅ Fecha Necesaria - Campo crítico para planificación de aprovisionamiento */}
+                    {visibleColumns.includes('fechaNecesaria') && (
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          {pedido.fechaNecesaria ? (
+                            <>
+                              <Calendar className="w-4 h-4 text-orange-500" />
+                              {allowEdit ? (
+                                <InlineEditCell
+                                  value={pedido.fechaNecesaria}
+                                  type="date"
+                                  onSave={(value) => handleInlineEdit(pedido.id, 'fechaNecesaria', value)}
+                                />
+                              ) : (
+                                <span className="font-medium text-orange-700">
+                                  {new Date(pedido.fechaNecesaria).toLocaleDateString()}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                     

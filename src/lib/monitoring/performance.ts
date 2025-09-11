@@ -8,7 +8,7 @@
  * @version 1.0.0
  */
 
-import { logger } from '@/lib/logger';
+import logger from '@/lib/logger';
 import { buildApiUrl } from '@/lib/utils';
 
 // 📊 Tipos para métricas

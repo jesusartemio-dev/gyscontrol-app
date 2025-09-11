@@ -76,8 +76,10 @@ export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
         ...(fechaNecesaria && { fechaNecesaria })
       }
 
+      console.log('🔍 Enviando payload:', payload)
+
       // 📡 Llamada al API
-      const response = await fetch('/api/lista-equipo', {
+      const response = await fetch('/api/listas-equipo', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -86,12 +88,39 @@ export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
         body: JSON.stringify(payload)
       })
 
+      console.log('📡 Response status:', response.status)
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()))
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al crear la lista')
+        let errorData: { error?: string } = {}
+        let errorMessage = 'Error al crear la lista'
+        
+        try {
+          const contentType = response.headers.get('content-type')
+          if (contentType && contentType.includes('application/json')) {
+            errorData = await response.json()
+            errorMessage = errorData.error || errorMessage
+          } else {
+            const textResponse = await response.text()
+            console.error('❌ Non-JSON error response:', textResponse)
+            errorMessage = textResponse || `Error ${response.status}: ${response.statusText}`
+          }
+        } catch (parseError) {
+          console.error('❌ Error parsing response:', parseError)
+          errorMessage = `Error ${response.status}: ${response.statusText}`
+        }
+        
+        console.error('❌ Error response:', errorData)
+        
+        if (response.status === 401) {
+          throw new Error('No tienes autorización. Por favor, inicia sesión nuevamente.')
+        }
+        
+        throw new Error(errorMessage)
       }
 
       const nuevaLista = await response.json()
+      console.log('✅ Lista creada:', nuevaLista)
       
       // ✅ Call parent callback with the created lista
       onCreated(nuevaLista)
@@ -104,7 +133,17 @@ export default function ListaEquipoForm({ proyectoId, onCreated }: Props) {
       toast.success('Lista técnica creada exitosamente')
     } catch (error) {
       console.error('Error al crear lista:', error)
-      toast.error('Error al crear la lista técnica. Intente nuevamente.')
+      
+      // Provide more specific error messages
+      let errorMessage = 'Error al crear la lista técnica. Intente nuevamente.'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+      
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }

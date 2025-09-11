@@ -117,7 +117,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
          tiempoEntregaDias: body.tiempoEntregaDias, 
          fechaOrdenCompraRecomendada: fechaOC, 
          estado: body.estado, 
-         comentarioLogistica: body.comentarioLogistica, 
+         comentarioLogistica: body.comentarioLogistica,
+         // 🚚 Campos de trazabilidad de entregas
+         fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : undefined,
+         fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : undefined,
+         estadoEntrega: body.estadoEntrega,
+         observacionesEntrega: body.observacionesEntrega,
        }, 
      })
 

@@ -12,7 +12,10 @@ import {
   DollarSign,
   Calendar,
   TrendingUp,
-  Loader2
+  Loader2,
+  Activity,
+  Package,
+  BarChart3
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -87,8 +90,14 @@ export default function CotizacionesPage() {
   // Calculate statistics
   const totalCotizaciones = cotizaciones.length
   const cotizacionesAprobadas = cotizaciones.filter(c => c.estado?.toLowerCase() === 'aprobada').length
+  const cotizacionesEnviadas = cotizaciones.filter(c => c.estado?.toLowerCase() === 'enviada').length
+  const cotizacionesBorrador = cotizaciones.filter(c => c.estado?.toLowerCase() === 'borrador').length
   const montoTotal = cotizaciones.reduce((sum, c) => sum + (c.grandTotal || 0), 0)
   const promedioMonto = totalCotizaciones > 0 ? montoTotal / totalCotizaciones : 0
+  
+  // 📊 Métricas de trazabilidad
+  const tasaAprobacion = totalCotizaciones > 0 ? (cotizacionesAprobadas / totalCotizaciones) * 100 : 0
+  const cotizacionesActivas = cotizacionesEnviadas + cotizacionesBorrador
 
   if (loading) {
     return (
@@ -161,6 +170,14 @@ export default function CotizacionesPage() {
           </div>
           
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => router.push('/gestion/reportes/cotizaciones')}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Ver Reportes
+            </Button>
             <Button variant="outline" size="sm">
               <Share2 className="h-4 w-4 mr-2" />
               Compartir
@@ -177,11 +194,13 @@ export default function CotizacionesPage() {
 
       {/* Statistics Cards */}
       <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+        className="space-y-4"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
       >
+        {/* Primera fila de métricas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -246,17 +265,97 @@ export default function CotizacionesPage() {
         >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Promedio</CardTitle>
-              <Calendar className="h-4 w-4 text-purple-600" />
+              <CardTitle className="text-sm font-medium">Tasa Aprobación</CardTitle>
+              <Activity className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{formatCurrency(promedioMonto)}</div>
+              <div className="text-2xl font-bold text-green-600">{tasaAprobacion.toFixed(1)}%</div>
               <p className="text-xs text-muted-foreground">
-                Monto promedio por cotización
+                Porcentaje de aprobación
               </p>
             </CardContent>
           </Card>
         </motion.div>
+        </div>
+        
+        {/* Segunda fila de métricas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.7 }}
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Enviadas</CardTitle>
+                <Package className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">{cotizacionesEnviadas}</div>
+                <p className="text-xs text-muted-foreground">
+                  Cotizaciones enviadas
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.8 }}
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">En Borrador</CardTitle>
+                <FileText className="h-4 w-4 text-orange-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{cotizacionesBorrador}</div>
+                <p className="text-xs text-muted-foreground">
+                  Cotizaciones en borrador
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.9 }}
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Promedio</CardTitle>
+                <Calendar className="h-4 w-4 text-purple-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600">{formatCurrency(promedioMonto)}</div>
+                <p className="text-xs text-muted-foreground">
+                  Monto promedio por cotización
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: 1.0 }}
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Activas</CardTitle>
+                <Activity className="h-4 w-4 text-indigo-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-indigo-600">{cotizacionesActivas}</div>
+                <p className="text-xs text-muted-foreground">
+                  Cotizaciones en proceso
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </motion.div>
 
       {/* Main Content */}

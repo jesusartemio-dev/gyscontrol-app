@@ -443,7 +443,7 @@ export const ProyectoAprovisionamientoStats: React.FC<ProyectoAprovisionamientoS
 
         <StatCard
           title="Presupuesto Total"
-          value={formatCurrency(montoTotalInterno, 'PEN')}
+          value={formatCurrency(montoTotalInterno, 'USD')}
           subtitle="Monto interno planificado"
           icon={<Wallet className="w-5 h-5" />}
           trend={(tendencias as any)?.presupuesto ? {
@@ -476,7 +476,7 @@ export const ProyectoAprovisionamientoStats: React.FC<ProyectoAprovisionamientoS
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard
             title="Total Listas"
-            value={formatCurrency(montoTotalListas, 'PEN')}
+            value={formatCurrency(montoTotalListas, 'USD')}
             subtitle="Equipos listados"
             icon={<FileText className="w-5 h-5" />}
             color="info"
@@ -484,7 +484,7 @@ export const ProyectoAprovisionamientoStats: React.FC<ProyectoAprovisionamientoS
 
           <StatCard
             title="Total Pedidos"
-            value={formatCurrency(montoTotalPedidos, 'PEN')}
+            value={formatCurrency(montoTotalPedidos, 'USD')}
             subtitle={`Cobertura: ${formatPercentage(coberturaPedidos)}`}
             icon={<DollarSign className="w-5 h-5" />}
             color={coberturaPedidos < 80 ? 'warning' : 'success'}
@@ -492,7 +492,7 @@ export const ProyectoAprovisionamientoStats: React.FC<ProyectoAprovisionamientoS
 
           <StatCard
             title="Diferencia L/P"
-            value={formatCurrency(montoTotalListas - montoTotalPedidos, 'PEN')}
+            value={formatCurrency(montoTotalListas - montoTotalPedidos, 'USD')}
             subtitle="Listas vs Pedidos"
             icon={<TrendingDown className="w-5 h-5" />}
             color={Math.abs(montoTotalListas - montoTotalPedidos) > montoTotalListas * 0.1 ? 'warning' : 'success'}

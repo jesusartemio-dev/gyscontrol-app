@@ -1,5 +1,5 @@
 import type { Proyecto, ProyectoPayload } from '@/types'
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 import { buildApiUrl } from '@/lib/utils'
 
 // Obtener todos los proyectos

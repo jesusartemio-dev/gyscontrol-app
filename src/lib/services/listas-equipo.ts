@@ -9,7 +9,7 @@
  */
 
 import { ListaEquipoMaster } from '@/types/master-detail';
-import { logger } from '@/lib/logger';
+import logger from '@/lib/logger';
 
 // 🌐 Base URL para APIs
 const API_BASE = '/api/lista-equipo';

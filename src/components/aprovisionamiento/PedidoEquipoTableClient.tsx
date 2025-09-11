@@ -113,6 +113,7 @@ interface PedidoEquipoTableClientProps {
     descripcion?: string
     estado: EstadoPedido
     fechaCreacion: Date
+    fechaNecesaria?: Date
     fechaEntregaEstimada?: Date
     fechaEntregaReal?: Date
     montoTotal?: number
@@ -509,7 +510,7 @@ export default function PedidoEquipoTableClient({
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 font-semibold"
-                  onClick={() => handleSort('fechaEntregaEstimada')}
+                  onClick={() => handleSort('fechaNecesaria')}
                 >
                   F. Entrega
                   <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -549,7 +550,7 @@ export default function PedidoEquipoTableClient({
               {data.map((pedido, index) => {
                 const estadoConfig = ESTADOS_CONFIG[pedido.estado]
                 const isSelected = selectedIds.includes(pedido.id)
-                const overdue = isOverdue(pedido.fechaEntregaEstimada, pedido.estado)
+                const overdue = isOverdue(pedido.fechaNecesaria, pedido.estado)
                 const totalItems = pedido.items?.reduce((sum, item) => sum + item.cantidad, 0) || 0
                 const totalRecibidos = pedido.items?.reduce((sum, item) => sum + (item.cantidadRecibida || 0), 0) || 0
                 const progreso = getProgressPercentage(totalRecibidos, totalItems)
@@ -666,12 +667,17 @@ export default function PedidoEquipoTableClient({
                     
                     <TableCell>
                       <div className="space-y-1">
-                        {pedido.fechaEntregaEstimada && (
+                        {pedido.fechaNecesaria && (
                           <div className={cn(
-                            'text-sm',
-                            overdue ? 'text-red-600 font-medium' : 'text-muted-foreground'
+                            'text-sm font-medium',
+                            overdue ? 'text-red-600' : 'text-gray-900'
                           )}>
-                            {format(new Date(pedido.fechaEntregaEstimada), 'dd/MM/yyyy', { locale: es })}
+                            {format(new Date(pedido.fechaNecesaria), 'dd/MM/yyyy', { locale: es })}
+                          </div>
+                        )}
+                        {pedido.fechaEntregaEstimada && (
+                          <div className="text-xs text-blue-600">
+                            Estimada: {format(new Date(pedido.fechaEntregaEstimada), 'dd/MM/yyyy', { locale: es })}
                           </div>
                         )}
                         {pedido.fechaEntregaReal && (
@@ -679,7 +685,7 @@ export default function PedidoEquipoTableClient({
                             Entregado: {format(new Date(pedido.fechaEntregaReal), 'dd/MM/yyyy', { locale: es })}
                           </div>
                         )}
-                        {!pedido.fechaEntregaEstimada && (
+                        {!pedido.fechaNecesaria && (
                           <span className="text-xs text-muted-foreground">Sin fecha</span>
                         )}
                       </div>

@@ -713,9 +713,15 @@ export const utilidadesService = {
   /**
    * 💰 Formatear montos
    */
+<<<<<<< Updated upstream
   formatearMonto(monto: number, moneda: 'PEN' | 'USD' = 'PEN') {
     const simbolo = moneda === 'PEN' ? 'S/' : '$'
     return `${simbolo} ${monto.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
+=======
+  formatearMonto(monto: number, moneda: 'PEN' | 'USD' = 'USD') {
+    const simbolo = moneda === 'USD' ? '$' : 'S/'
+    return `${simbolo} ${monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+>>>>>>> Stashed changes
   },
 
   /**

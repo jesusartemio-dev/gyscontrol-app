@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useMonitoring } from '@/hooks/useMonitoring';
-import { logger } from '@/lib/logger';
+import logger from '@/lib/logger';
 import { buildApiUrl } from '@/lib/utils';
 
 // 🎯 Tipos para las métricas

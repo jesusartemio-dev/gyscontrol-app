@@ -9,7 +9,7 @@
  * @version 1.0.0
  */
 
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 
 // 🔧 Variable para controlar la inicialización
 let isInitialized = false

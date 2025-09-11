@@ -118,7 +118,7 @@ const FinancialIndicator: React.FC<{
   value: number;
   budget: number;
   currency?: 'PEN' | 'USD';
-}> = ({ label, value, budget, currency = 'PEN' }) => {
+}> = ({ label, value, budget, currency = 'USD' }) => {
   const percentage = budget > 0 ? (value / budget) * 100 : 0;
   const deviation = value - budget;
   const isPositive = deviation >= 0;
@@ -334,7 +334,7 @@ export const ProyectoAprovisionamientoTable: React.FC<ProyectoAprovisionamientoT
                       label="Ejecutado vs Presupuesto"
                       value={proyecto.totalReal || 0}
                       budget={proyecto.totalInterno || 0}
-                      currency="PEN"
+                      currency="USD"
                     />
                   </TableCell>
                   
@@ -345,7 +345,7 @@ export const ProyectoAprovisionamientoTable: React.FC<ProyectoAprovisionamientoT
                         <span className="text-sm">listas</span>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {formatCurrency(proyecto.montoTotalListas || 0, 'PEN')}
+                        {formatCurrency(proyecto.montoTotalListas || 0, 'USD')}
                       </div>
                       <Button
                         variant="ghost"
@@ -368,7 +368,7 @@ export const ProyectoAprovisionamientoTable: React.FC<ProyectoAprovisionamientoT
                         <span className="text-sm">pedidos</span>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {formatCurrency(proyecto.montoTotalPedidos || 0, 'PEN')}
+                        {formatCurrency(proyecto.montoTotalPedidos || 0, 'USD')}
                       </div>
                       <Button
                         variant="ghost"

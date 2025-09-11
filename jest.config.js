@@ -176,10 +176,39 @@ const customJestConfig = {
      {
        displayName: 'Unit Tests - API',
       testMatch: [
-        '<rootDir>/src/**/__tests__/api/**/*.test.{js,jsx,ts,tsx}'
+        '<rootDir>/src/__tests__/api/**/*.{test,spec}.{js,jsx,ts,tsx}'
       ],
       testEnvironment: 'node',
+<<<<<<< Updated upstream
       setupFilesAfterEnv: ['<rootDir>/jest.setup.services.js']
+=======
+      setupFilesAfterEnv: ['<rootDir>/config/jest.setup.services.js'],
+      moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/src/$1',
+        '^@/components/(.*)$': '<rootDir>/src/components/$1',
+        '^@/lib/(.*)$': '<rootDir>/src/lib/$1',
+        '^@/types/(.*)$': '<rootDir>/src/types/$1',
+        '^@/app/(.*)$': '<rootDir>/src/app/$1'
+      },
+      transform: {
+        '^.+\\.(js|jsx|ts|tsx)$': ['@swc/jest', {
+          jsc: {
+            parser: {
+              syntax: 'typescript',
+              tsx: true
+            },
+            transform: {
+              react: {
+                runtime: 'automatic'
+              }
+            }
+          },
+          module: {
+            type: 'commonjs'
+          }
+        }]
+      }
+>>>>>>> Stashed changes
     },
     {
       displayName: 'Integration Tests',

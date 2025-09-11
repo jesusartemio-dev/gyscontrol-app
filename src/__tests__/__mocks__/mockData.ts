@@ -13,29 +13,166 @@
  * @version 1.0.0
  */
 
-import { 
+import {
   ListaEquipo,
-  ListaEquipoMaster,
   ListaEquipoItem,
   Proyecto,
-  ListaEquipoStats,
-  ListaEquipoFilters
+  RolUsuario,
 } from '@/types/modelos';
+
+// ✅ Tipos locales para testing (no existen en modelos.ts)
+interface ListaEquipoMaster {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  estado: string;
+  progreso: number;
+  costoTotal: number;
+  totalItems: number;
+  itemsCompletados: number;
+  fechaCreacion: Date;
+  fechaActualizacion: Date;
+  proyectoId: string;
+  proyecto: {
+    nombre: string;
+    estado: string;
+  };
+}
+
+interface ListaEquipoStats {
+  totalListas: number;
+  totalCosto: number;
+  progresoPromedio: number;
+  statusDistribution: {
+    ACTIVA: number;
+    COMPLETADA: number;
+    PAUSADA: number;
+    CANCELADA: number;
+  };
+}
+
+interface ListaEquipoFilters {
+  search: string;
+  estado?: string;
+  progreso?: number;
+  fechaInicio?: Date;
+  fechaFin?: Date;
+  costoMin?: number;
+  costoMax?: number;
+}
 
 // ✅ Mock Proyecto
 export const mockProyecto: Proyecto = {
   id: 'proyecto-1',
-  nombre: 'Proyecto Test',
-  descripcion: 'Proyecto de prueba para testing',
-  estado: 'ACTIVO',
-  fechaInicio: new Date('2024-01-01'),
-  fechaFin: new Date('2024-12-31'),
-  presupuesto: 100000,
   clienteId: 'cliente-1',
-  responsableId: 'user-1',
-  createdAt: new Date('2024-01-01'),
-  updatedAt: new Date('2024-01-01')
-};
+  comercialId: 'comercial-1',
+  gestorId: 'gestor-1',
+  cotizacionId: 'cotizacion-1',
+  nombre: 'Proyecto Test',
+  totalEquiposInterno: 80000,
+  totalServiciosInterno: 15000,
+  totalGastosInterno: 5000,
+  totalInterno: 100000,
+  totalCliente: 120000,
+  descuento: 0,
+  grandTotal: 120000,
+  totalRealEquipos: 82000,
+  totalRealServicios: 16000,
+  totalRealGastos: 5500,
+  totalReal: 103500,
+  codigo: 'PRY-001',
+  estado: 'activo',
+  fechaInicio: '2024-01-01',
+  fechaFin: '2024-12-31',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+  cliente: {
+    id: 'cliente-1',
+    nombre: 'Cliente Test',
+    ruc: '12345678901',
+    direccion: 'Dirección Test',
+    telefono: '123456789',
+    correo: 'cliente@test.com',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z'
+  },
+  comercial: {
+    id: 'comercial-1',
+    name: 'Comercial Test',
+    email: 'comercial@test.com',
+    password: 'password',
+    role: 'comercial' as RolUsuario,
+    proyectosComercial: [],
+    proyectosGestor: [],
+    cotizaciones: [],
+    ProyectoEquipos: [],
+    ProyectoEquipoItems: [],
+    ProyectoServicios: [],
+    ProyectoServicioItems: []
+  },
+  gestor: {
+    id: 'gestor-1',
+    name: 'Gestor Test',
+    email: 'gestor@test.com',
+    password: 'password',
+    role: 'gestor' as RolUsuario,
+    proyectosComercial: [],
+    proyectosGestor: [],
+    cotizaciones: [],
+    ProyectoEquipos: [],
+    ProyectoEquipoItems: [],
+    ProyectoServicios: [],
+    ProyectoServicioItems: []
+  },
+  cotizacion: {
+    id: 'cotizacion-1',
+    nombre: 'Cotización Test',
+    estado: 'aprobado',
+    etapa: 'cerrada',
+    prioridad: 'alta',
+    probabilidad: 90,
+    fechaEnvio: '2023-12-01',
+    fechaCierreEstimada: '2024-01-01',
+    notas: 'Cotización de prueba',
+    totalEquiposInterno: 80000,
+    totalEquiposCliente: 96000,
+    totalServiciosInterno: 15000,
+    totalServiciosCliente: 18000,
+    totalGastosInterno: 5000,
+    totalGastosCliente: 6000,
+    totalInterno: 100000,
+    totalCliente: 120000,
+    descuento: 0,
+    grandTotal: 120000,
+    createdAt: '2023-12-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    cliente: {
+      id: 'cliente-1',
+      nombre: 'Cliente Test',
+      ruc: '12345678901',
+      direccion: 'Dirección Test',
+      correo: 'cliente@test.com'
+    },
+    comercial: {
+      id: 'comercial-1',
+      nombre: 'Comercial Test'
+    },
+    plantilla: {
+      id: 'plantilla-1',
+      nombre: 'Plantilla Test'
+    },
+    equipos: [],
+    servicios: [],
+    gastos: []
+  },
+  equipos: [],
+  servicios: [],
+  gastos: [],
+  ListaEquipo: [],
+  cotizaciones: [],
+  valorizaciones: [],
+  registrosHoras: []
+}
 
 // ✅ Mock Lista Equipo Master
 export const mockListaEquipoMaster: ListaEquipoMaster = {
@@ -56,83 +193,79 @@ export const mockListaEquipoMaster: ListaEquipoMaster = {
   }
 };
 
-// ✅ Mock Lista Equipo Detail
+// ✅ Mock ListaEquipo
 export const mockListaEquipo: ListaEquipo = {
   id: 'lista-1',
-  nombre: 'Lista de Equipos Test',
-  descripcion: 'Lista de equipos para testing',
-  estado: 'ACTIVA',
-  progreso: 75,
-  costoTotal: 15000,
-  totalItems: 5,
-  itemsCompletados: 3,
-  fechaCreacion: new Date('2024-01-15'),
-  fechaActualizacion: new Date('2024-01-20'),
   proyectoId: 'proyecto-1',
-  createdAt: new Date('2024-01-15'),
-  updatedAt: new Date('2024-01-20')
+  responsableId: 'user-1',
+  codigo: 'LST-001',
+  nombre: 'Lista de Equipos Test',
+  numeroSecuencia: 1,
+  estado: 'aprobado',
+  createdAt: '2024-01-15T00:00:00Z',
+  updatedAt: '2024-01-20T00:00:00Z',
+  fechaNecesaria: '2024-02-15T00:00:00Z',
+  coherencia: 85,
+  items: []
 };
 
 // ✅ Mock Lista Equipo Items
 export const mockListaEquipoItem: ListaEquipoItem = {
   id: 'item-1',
-  nombre: 'Excavadora CAT 320',
+  listaId: 'lista-1',
+  codigo: 'EXC-001',
   descripcion: 'Excavadora hidráulica para movimiento de tierras',
-  categoria: 'MAQUINARIA_PESADA',
-  subcategoria: 'EXCAVADORAS',
-  marca: 'Caterpillar',
-  modelo: '320',
-  especificaciones: {
-    potencia: '122 HP',
-    peso: '20 ton',
-    capacidad: '1.2 m³'
-  },
-  cantidad: 2,
   unidad: 'UNIDAD',
-  costoUnitario: 5000,
-  costoTotal: 10000,
-  progreso: 80,
-  estado: 'EN_PROCESO',
-  prioridad: 'ALTA',
-  fechaInicio: new Date('2024-01-16'),
-  fechaFin: new Date('2024-02-15'),
-  responsableId: 'user-2',
-  observaciones: 'Equipo en buen estado',
-  listaEquipoId: 'lista-1',
-  createdAt: new Date('2024-01-16'),
-  updatedAt: new Date('2024-01-18')
+  cantidad: 2,
+  verificado: true,
+  comentarioRevision: 'Equipo verificado',
+  presupuesto: 10000,
+  precioElegido: 5000,
+  costoElegido: 5000,
+  estado: 'aprobado',
+  origen: 'cotizado',
+  tiempoEntrega: '15 días',
+  tiempoEntregaDias: 15,
+  createdAt: '2024-01-16T00:00:00Z',
+  updatedAt: '2024-01-18T00:00:00Z',
+  lista: {
+    id: 'lista-1',
+    proyectoId: 'proyecto-1',
+    responsableId: 'user-1',
+    codigo: 'LST-001',
+    nombre: 'Lista de Equipos Test',
+    numeroSecuencia: 1,
+    estado: 'aprobado',
+    createdAt: '2024-01-15T00:00:00Z',
+    updatedAt: '2024-01-20T00:00:00Z',
+    items: []
+  },
+  cotizaciones: [],
+  pedidos: []
 };
 
-// ✅ Additional mock items for testing
+// ✅ Mock array de ListaEquipoItems
 export const mockListaEquipoItems: ListaEquipoItem[] = [
   mockListaEquipoItem,
   {
     ...mockListaEquipoItem,
     id: 'item-2',
-    nombre: 'Volquete Mercedes',
-    categoria: 'TRANSPORTE',
-    subcategoria: 'VOLQUETES',
-    marca: 'Mercedes-Benz',
-    modelo: 'Actros',
+    codigo: 'VOL-001',
+    descripcion: 'Volquete Mercedes para transporte',
     cantidad: 3,
-    costoUnitario: 2000,
-    costoTotal: 6000,
-    progreso: 100,
-    estado: 'COMPLETADO'
+    precioElegido: 2000,
+    costoElegido: 2000,
+    estado: 'aprobado'
   },
   {
     ...mockListaEquipoItem,
     id: 'item-3',
-    nombre: 'Grúa Torre',
-    categoria: 'MAQUINARIA_PESADA',
-    subcategoria: 'GRUAS',
-    marca: 'Liebherr',
-    modelo: 'EC-B 125',
+    codigo: 'GRU-001',
+    descripcion: 'Grúa Torre Liebherr',
     cantidad: 1,
-    costoUnitario: 8000,
-    costoTotal: 8000,
-    progreso: 50,
-    estado: 'PENDIENTE'
+    precioElegido: 8000,
+    costoElegido: 8000,
+    estado: 'por_revisar'
   }
 ];
 

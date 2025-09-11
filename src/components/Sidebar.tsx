@@ -33,7 +33,8 @@ import {
   PackageCheck,
   Receipt,
   AlertCircle,
-  Clock
+  Clock,
+  Activity
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -106,7 +107,16 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'logistico'],
       links: [
         { href: '/logistica/listas', label: 'Listas', icon: FileText },
-        { href: '/logistica/pedidos', label: 'Pedidos', icon: Package },
+        { 
+          href: '/logistica/pedidos', 
+          label: 'Pedidos', 
+          icon: Package,
+          submenu: [
+            { href: '/logistica/pedidos', label: 'Ver Pedidos', icon: Package },
+            { href: '/gestion/reportes/pedidos', label: 'Reportes Pedidos', icon: BarChart3 },
+            { href: '/gestion/reportes/trazabilidad', label: 'Trazabilidad', icon: Activity }
+          ]
+        },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones', icon: Calculator },
       ],
     },
@@ -147,7 +157,18 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'gestor'],
       links: [
         { href: '/gestion/valorizaciones', label: 'Valorizaciones', icon: Calculator },
-        { href: '/gestion/reportes', label: 'Reportes', icon: BarChart3 },
+        { 
+          href: '/gestion/reportes', 
+          label: 'Reportes', 
+          icon: BarChart3,
+          submenu: [
+            { href: '/gestion/reportes', label: 'Dashboard Reportes', icon: BarChart3 },
+            { href: '/gestion/reportes/pedidos', label: 'Reportes Pedidos', icon: Package },
+            { href: '/gestion/reportes/trazabilidad', label: 'Trazabilidad', icon: Activity },
+            { href: '/gestion/reportes/performance', label: 'Performance', icon: TrendingUp },
+            { href: '/gestion/reportes/financiero', label: 'Financiero', icon: DollarSign }
+          ]
+        },
         { href: '/gestion/indicadores', label: 'Indicadores', icon: BarChart3 },
       ],
     },

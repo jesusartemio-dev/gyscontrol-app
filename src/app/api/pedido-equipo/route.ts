@@ -74,15 +74,42 @@ export async function GET(request: Request) {
 
     const data = await prisma.pedidoEquipo.findMany({
       where: whereClause,
-      include: {
-        responsable: true,
-        proyecto: true,
+      select: {
+        id: true,
+        codigo: true,
+        numeroSecuencia: true,
+        estado: true,
+        observacion: true,
+        fechaPedido: true,
+        fechaNecesaria: true,
+        fechaEntregaEstimada: true,
+        fechaEntregaReal: true,
+        proyectoId: true,
+        responsableId: true,
+        listaId: true,
+        createdAt: true,
+        updatedAt: true,
+        responsable: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        proyecto: {
+          select: {
+            id: true,
+            codigo: true,
+            nombre: true,
+          },
+        },
         lista: {
-          include: {
+          select: {
+            id: true,
+            nombre: true,
             items: {
               select: {
                 id: true,
-                cantidad: true,
                 cantidadPedida: true,
                 codigo: true,
                 descripcion: true,
@@ -95,14 +122,38 @@ export async function GET(request: Request) {
           },
         },
         items: {
-          include: {
-            listaEquipoItem: {
-              include: {
-                proveedor: true,
-              },
-            },
-          },
-        },
+           select: {
+             id: true,
+             cantidadPedida: true,
+             cantidadAtendida: true,
+             precioUnitario: true,
+             costoTotal: true,
+             estado: true,
+             codigo: true,
+             descripcion: true,
+             unidad: true,
+             fechaEntregaEstimada: true,
+             fechaEntregaReal: true,
+             estadoEntrega: true,
+             observacionesEntrega: true,
+             listaEquipoItem: {
+               select: {
+                 id: true,
+                 codigo: true,
+                 descripcion: true,
+                 unidad: true,
+                 precioElegido: true,
+                 proveedor: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                    ruc: true,
+                  },
+                },
+               },
+             },
+           },
+         },
       },
       orderBy: { fechaPedido: 'desc' },
     })

@@ -67,9 +67,6 @@ export type EstadoEquipo =
   | 'en_lista'
   | 'reemplazado'
   | 'descartado'
-  | 'disponible'
-  | 'en_uso'
-  | 'mantenimiento'
 
 export type EstadoListaItem =
   | 'borrador'
@@ -107,6 +104,71 @@ export type EstadoPedidoItem =
   | 'atendido'
   | 'parcial'
   | 'entregado'
+
+export enum EstadoEntregaItem {
+  PENDIENTE = 'pendiente',
+  EN_PROCESO = 'en_proceso',
+  PARCIAL = 'parcial',
+  ENTREGADO = 'entregado',
+  RETRASADO = 'retrasado',
+  CANCELADO = 'cancelado'
+}
+
+// ============================
+// 📊 TIPOS DE TRAZABILIDAD
+// ============================
+
+/**
+ * Evento de trazabilidad para timeline
+ */
+export interface TrazabilidadEvent {
+  id: string;
+  fecha: Date;
+  tipo: 'creacion' | 'preparacion' | 'envio' | 'transito' | 'entrega' | 'incidencia' | 'devolucion' | 'cancelacion';
+  estado: EstadoEntregaItem;
+  titulo: string;
+  descripcion?: string;
+  responsable?: string;
+  ubicacion?: string;
+  observaciones?: string;
+  metadata?: Record<string, any>;
+  esHito?: boolean;
+  entidadId: string;
+  entidadTipo: 'PEDIDO' | 'PROYECTO' | 'ITEM';
+}
+
+/**
+ * Datos para métricas de entrega
+ */
+export interface MetricasEntregaData {
+  totalPedidos: number;
+  pedidosEntregados: number;
+  pedidosPendientes: number;
+  pedidosRetrasados: number;
+  tiempoPromedioEntrega: number;
+  porcentajeEntregaATiempo: number;
+  valorTotalEntregado: number;
+  tendenciaEntregas: 'subida' | 'bajada' | 'estable';
+  ultimaActualizacion: Date;
+}
+
+/**
+ * Datos para gráfico de progreso
+ */
+export interface GraficoProgresoData {
+  fecha: string;
+  completados: number;
+  pendientes: number;
+  retrasados: number;
+  cancelados: number;
+  meta?: number;
+  valorTotal?: number;
+}
+
+/**
+ * Evento de trazabilidad (alias para compatibilidad)
+ */
+export type EventoTrazabilidad = TrazabilidadEvent;
 
 export type EstadoCotizacionProveedor =
   | 'pendiente'

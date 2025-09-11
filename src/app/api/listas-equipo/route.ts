@@ -281,6 +281,23 @@ export async function POST(request: NextRequest) {
     const siguienteNumero = (ultimaLista?.numeroSecuencia || 0) + 1
     const codigoLista = `${proyecto.codigo}-LST-${String(siguienteNumero).padStart(3, '0')}`
 
+    // ✅ Verificar que el usuario responsable existe
+    const responsableId = body.responsableId || session.user.id
+    const responsable = await prisma.user.findUnique({
+      where: { id: responsableId },
+      select: { id: true, name: true }
+    })
+
+    if (!responsable) {
+      console.error('❌ Usuario responsable no encontrado:', responsableId)
+      return NextResponse.json(
+        { error: 'Usuario responsable no encontrado' },
+        { status: 400 }
+      )
+    }
+
+    // ✅ Usuario responsable validado
+
     // ✅ Crear lista en la base de datos con Prisma
     const nuevaLista = await prisma.listaEquipo.create({
       data: {
@@ -289,7 +306,7 @@ export async function POST(request: NextRequest) {
         codigo: codigoLista,
         estado: 'borrador',
         numeroSecuencia: siguienteNumero,
-        responsableId: body.responsableId || session.user.id, // ✅ Campo requerido
+        responsableId: responsableId, // ✅ Campo requerido y validado
         ...(body.fechaNecesaria && { fechaNecesaria: new Date(body.fechaNecesaria) })
       },
       include: {

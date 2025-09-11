@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 import { PedidoEquipoPayload } from '@/types'
 
 // ✅ POST - Crear pedido desde lista contextual

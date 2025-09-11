@@ -302,7 +302,11 @@ export const getOrigenItemBadgeVariant = (origen: OrigenListaItem) => {
 /**
  * Formatea un número como moneda
  */
+<<<<<<< Updated upstream
 export const formatCurrency = (amount: number, currency: string = 'PEN'): string => {
+=======
+export function formatCurrency(amount: number, currency: string = 'USD'): string {
+>>>>>>> Stashed changes
   return new Intl.NumberFormat('es-PE', {
     style: 'currency',
     currency: currency,

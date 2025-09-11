@@ -7,6 +7,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { rest } from 'msw'
 import { setupServer } from 'msw/node'
+import type { RestRequest, ResponseComposition, RestContext } from 'msw'
 import React from 'react'
 import { buildApiUrl } from '@/lib/utils'
 
@@ -39,7 +40,7 @@ jest.mock('@/components/ui/toast', () => ({
 // 📡 Configuración del servidor MSW
 const server = setupServer(
   // Endpoints para proyecto equipos
-  rest.get('/api/proyecto-equipos', (req, res, ctx) => {
+  rest.get('/api/proyecto-equipos', (req: RestRequest, res: ResponseComposition, ctx: RestContext) => {
     return res(
       ctx.json({
         success: true,
@@ -61,7 +62,7 @@ const server = setupServer(
     )
   }),
 
-  rest.post('/api/proyecto-equipos', (req, res, ctx) => {
+  rest.post('/api/proyecto-equipos', (req: RestRequest, res: ResponseComposition, ctx: RestContext) => {
     return res(
       ctx.json({
         success: true,
@@ -81,7 +82,7 @@ const server = setupServer(
     )
   }),
 
-  rest.put('/api/proyecto-equipos/:id', (req, res, ctx) => {
+  rest.put('/api/proyecto-equipos/:id', (req: RestRequest, res: ResponseComposition, ctx: RestContext) => {
     const { id } = req.params
     return res(
       ctx.json({
@@ -102,7 +103,7 @@ const server = setupServer(
     )
   }),
 
-  rest.delete('/api/proyecto-equipos/:id', (req, res, ctx) => {
+  rest.delete('/api/proyecto-equipos/:id', (req: RestRequest, res: ResponseComposition, ctx: RestContext) => {
     return res(
       ctx.json({
         success: true,
@@ -112,7 +113,7 @@ const server = setupServer(
   }),
 
   // Endpoints para lista equipos
-  rest.get('/api/lista-equipos', (req, res, ctx) => {
+  rest.get('/api/lista-equipos', (req: RestRequest, res: ResponseComposition, ctx: RestContext) => {
     return res(
       ctx.json({
         success: true,
@@ -134,7 +135,7 @@ const server = setupServer(
   }),
 
   // Endpoint de error para testing
-  rest.get('/api/proyecto-equipos/error', (req, res, ctx) => {
+  rest.get('/api/proyecto-equipos/error', (req: RestRequest, res: ResponseComposition, ctx: RestContext) => {
     return res(
       ctx.status(500),
       ctx.json({

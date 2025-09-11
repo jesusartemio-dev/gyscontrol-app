@@ -22,7 +22,7 @@ jest.mock('next-auth/react', () => ({
 }))
 
 // Mock Prisma
-jest.mock('@/lib/prisma', () => ({
+jest.mock('../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     proyecto: {

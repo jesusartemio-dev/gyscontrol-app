@@ -13,7 +13,7 @@ import {
   PedidoEquipoPayload,
   PedidoEquipoUpdatePayload,
 } from '@/types'
-import { logger } from '@/lib/logger'
+import logger from '@/lib/logger'
 
 const BASE_URL = '/api/pedido-equipo'
 

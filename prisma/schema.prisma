@@ -750,6 +750,13 @@ model PedidoEquipoItem {
   unidad                      String
   fechaOrdenCompraRecomendada DateTime?
   responsableId               String
+  
+  // 🆕 Campos para trazabilidad de entregas parciales
+  fechaEntregaEstimada        DateTime?         // Fecha estimada de entrega del item
+  fechaEntregaReal            DateTime?         // Fecha real de entrega del item
+  estadoEntrega              EstadoEntregaItem @default(pendiente) // Estado granular de entrega
+  observacionesEntrega       String?           // Comentarios sobre la entrega
+  
   listaEquipoItem             ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
   lista                       ListaEquipo?      @relation(fields: [listaId], references: [id])
   pedido                      PedidoEquipo      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
@@ -869,6 +876,16 @@ enum EstadoPedidoItem {
   atendido
   parcial
   entregado
+}
+
+// 🆕 Enum para trazabilidad de entregas a nivel de item
+enum EstadoEntregaItem {
+  pendiente
+  en_proceso
+  parcial
+  entregado
+  retrasado
+  cancelado
 }
 
 enum EstadoCotizacionProveedor {

@@ -9,7 +9,7 @@
  */
 
 import { Proyecto } from '@/types/modelos';
-import { logger } from '@/lib/logger';
+import logger from '@/lib/logger';
 import { buildApiUrl } from '@/lib/utils';
 
 // 🌐 Base URL para APIs

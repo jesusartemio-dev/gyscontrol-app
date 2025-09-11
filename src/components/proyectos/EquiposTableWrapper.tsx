@@ -337,22 +337,22 @@ export function EquiposTableWrapper({ data, pagination }: EquiposTableWrapperPro
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
-                          onClick={() => handleChangeStatus(equipo.id, 'disponible')}
-                          disabled={equipo.estado === 'disponible'}
+                          onClick={() => handleChangeStatus(equipo.id, 'en_lista')}
+                          disabled={equipo.estado === 'en_lista'}
                         >
-                          Marcar como Disponible
+                          Marcar como En Lista
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleChangeStatus(equipo.id, 'en_uso')}
-                          disabled={equipo.estado === 'en_uso'}
+                          onClick={() => handleChangeStatus(equipo.id, 'reemplazado')}
+                          disabled={equipo.estado === 'reemplazado'}
                         >
-                          Marcar como En Uso
+                          Marcar como Reemplazado
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleChangeStatus(equipo.id, 'mantenimiento')}
-                          disabled={equipo.estado === 'mantenimiento'}
+                          onClick={() => handleChangeStatus(equipo.id, 'descartado')}
+                          disabled={equipo.estado === 'descartado'}
                         >
-                          Marcar como Mantenimiento
+                          Marcar como Descartado
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 

@@ -57,6 +57,16 @@ import {
   Clock,
   DollarSign,
   RefreshCw,
+<<<<<<< Updated upstream
+=======
+  Plus,
+  Home,
+  FolderOpen,
+  ChevronRight,
+  BarChart3,
+  Activity,
+  Target
+>>>>>>> Stashed changes
 } from 'lucide-react'
 
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
@@ -299,10 +309,18 @@ export default function PedidosProyectoPage() {
   const totalPedidos = pedidos.length
   const pedidosPendientes = pedidos.filter(p => p.estado?.toLowerCase() === 'pendiente').length
   const pedidosCompletados = pedidos.filter(p => p.estado?.toLowerCase() === 'completado').length
+  const pedidosEnProgreso = pedidos.filter(p => ['en_proceso', 'parcial'].includes(p.estado?.toLowerCase() || '')).length
   const montoTotal = pedidos.reduce((total, pedido) => {
     const montoPedido = pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0
     return total + montoPedido
   }, 0)
+  
+  // 📊 Calcular progreso de trazabilidad
+  const progresoGeneral = totalPedidos > 0 ? Math.round((pedidosCompletados / totalPedidos) * 100) : 0
+  const itemsEntregados = pedidos.reduce((total, pedido) => {
+    return total + (pedido.items?.filter(item => item.estado === 'entregado').length || 0)
+  }, 0)
+  const totalItems = pedidos.reduce((total, pedido) => total + (pedido.items?.length || 0), 0)
 
   return (
     <motion.div
@@ -351,6 +369,14 @@ export default function PedidosProyectoPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={() => router.push('/gestion/reportes/pedidos')}
+            variant="default" 
+            size="sm"
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Ver Reportes
+          </Button>
           <Button onClick={cargarDatos} variant="outline" size="sm">
             <RefreshCw className="h-4 w-4 mr-2" />
             Actualizar
@@ -363,7 +389,7 @@ export default function PedidosProyectoPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6"
       >
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -376,11 +402,11 @@ export default function PedidosProyectoPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">En Progreso</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{pedidosPendientes}</div>
+            <div className="text-2xl font-bold text-blue-600">{pedidosEnProgreso}</div>
           </CardContent>
         </Card>
         <Card>
@@ -390,6 +416,18 @@ export default function PedidosProyectoPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{pedidosCompletados}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Progreso General</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{progresoGeneral}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {itemsEntregados}/{totalItems} items entregados
+            </p>
           </CardContent>
         </Card>
         <Card>

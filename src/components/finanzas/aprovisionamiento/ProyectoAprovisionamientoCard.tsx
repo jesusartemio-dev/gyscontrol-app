@@ -181,8 +181,8 @@ const FinancialMetrics: React.FC<{
           </div>
         </div>
         <div className="flex justify-between text-xs">
-          <span>Presupuesto: {formatCurrency(totalInterno, 'PEN')}</span>
-          <span>Ejecutado: {formatCurrency(totalReal, 'PEN')}</span>
+          <span>Presupuesto: {formatCurrency(totalInterno, 'USD')}</span>
+                <span>Ejecutado: {formatCurrency(totalReal, 'USD')}</span>
         </div>
         <Progress 
           value={Math.min(executionPercentage, 100)} 
@@ -220,7 +220,7 @@ const FinancialMetrics: React.FC<{
             <div className={`text-sm font-medium ${
               isOverBudget ? 'text-red-600' : 'text-green-600'
             }`}>
-              {isOverBudget ? '+' : ''}{formatCurrency(deviation, 'PEN')}
+              {isOverBudget ? '+' : ''}{formatCurrency(deviation, 'USD')}
             </div>
           </div>
           <div className="text-center">
@@ -335,7 +335,7 @@ export const ProyectoAprovisionamientoCard: React.FC<ProyectoAprovisionamientoCa
                   </div>
                   <div className="text-xs text-muted-foreground">Listas</div>
                   <div className="text-xs font-medium">
-                    {formatCurrency(proyecto.montoTotalListas || 0, 'PEN')}
+                    {formatCurrency(proyecto.montoTotalListas || 0, 'USD')}
                   </div>
                 </div>
                 <div className="text-center space-y-1">
@@ -345,7 +345,7 @@ export const ProyectoAprovisionamientoCard: React.FC<ProyectoAprovisionamientoCa
                   </div>
                   <div className="text-xs text-muted-foreground">Pedidos</div>
                   <div className="text-xs font-medium">
-                    {formatCurrency(proyecto.montoTotalPedidos || 0, 'PEN')}
+                    {formatCurrency(proyecto.montoTotalPedidos || 0, 'USD')}
                   </div>
                 </div>
               </div>

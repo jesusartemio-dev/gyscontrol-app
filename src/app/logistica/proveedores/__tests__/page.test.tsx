@@ -320,4 +320,57 @@ describe('ProveedoresPage', () => {
       expect(proveedorService.getProveedores).toHaveBeenCalledTimes(2)
     })
   })
+<<<<<<< Updated upstream
 })
+=======
+
+  it('should handle provider creation', async () => {
+    const user = userEvent.setup()
+    
+    render(<ProveedoresPage />)
+    
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.queryByText('Loading list...')).not.toBeInTheDocument()
+    })
+    
+    // Click new provider button
+    const newButton = screen.getByRole('button', { name: /Agregar Proveedor/i })
+    await user.click(newButton)
+    
+    // Modal should open
+    expect(screen.getByText('Nuevo Proveedor')).toBeInTheDocument()
+  })
+
+  it('should reset editing state when modal closes', async () => {
+    const user = userEvent.setup()
+    
+    render(<ProveedoresPage />)
+    
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.queryByText('Loading list...')).not.toBeInTheDocument()
+    })
+    
+    // Click new provider button to open modal
+    const newButton = screen.getByRole('button', { name: /Agregar Proveedor/i })
+    await user.click(newButton)
+    
+    // Modal should open
+    expect(screen.getByText('Nuevo Proveedor')).toBeInTheDocument()
+    
+    // Close modal
+    const closeButton = screen.getByText('Close')
+    await user.click(closeButton)
+    
+    // Wait for modal to close
+    await waitFor(() => {
+      expect(screen.queryByText('Nuevo Proveedor')).not.toBeInTheDocument()
+    })
+    
+    // Open modal again - should still work (not frozen)
+    await user.click(newButton)
+    expect(screen.getByText('Nuevo Proveedor')).toBeInTheDocument()
+  })
+})
+>>>>>>> Stashed changes

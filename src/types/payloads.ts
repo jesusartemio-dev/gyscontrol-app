@@ -19,6 +19,7 @@ import type {
   EstadoPedido, 
   EstadoPedidoItem, 
   EstadoCotizacionProveedor, 
+  EstadoEntregaItem,
   OrigenListaItem
   // ❌ Eliminado: Producto - no forma parte del sistema GYS
 } from './modelos'
@@ -554,7 +555,11 @@ export interface PedidoEquipoItemPayload {
   unidad: string
   tiempoEntrega?: string
   tiempoEntregaDias?: number
-
+  // 🚚 Campos de trazabilidad de entregas
+  fechaEntregaEstimada?: string
+  fechaEntregaReal?: string
+  estadoEntrega?: EstadoEntregaItem
+  observacionesEntrega?: string
 }
 
 
@@ -653,4 +658,140 @@ export interface SearchParams {
 
 
 // ❌ Eliminado: ProductoResponse types - no forman parte del sistema GYS
+
+// 📊 Tipos para reportes y analytics
+export interface ReportePayload {
+  tipo: 'pedidos' | 'metricas' | 'trazabilidad';
+  filtros: {
+    fechaInicio?: string;
+    fechaFin?: string;
+    proyectoId?: string;
+    proveedorId?: string;
+    estadoEntrega?: EstadoListaItem;
+  };
+  formato: 'pdf' | 'excel' | 'csv';
+  incluirDetalles?: boolean;
+}
+
+// 💰 Tipos para métricas financieras
+export interface FinancialMetrics {
+  ingresos: {
+    total: number;
+    proyectado: number;
+    realizado: number;
+    pendiente: number;
+  };
+  costos: {
+    total: number;
+    operativos: number;
+    materiales: number;
+    logistica: number;
+  };
+  rentabilidad: {
+    margenBruto: number;
+    margenNeto: number;
+    roi: number;
+    ebitda: number;
+  };
+  flujo: {
+    entradas: number;
+    salidas: number;
+    neto: number;
+    proyeccion: number;
+  };
+  metricas: Array<{
+    id: string;
+    nombre: string;
+    valor: number;
+    unidad: string;
+    tendencia: 'up' | 'down' | 'stable';
+    cambio: number;
+    categoria: 'ingresos' | 'costos' | 'rentabilidad' | 'flujo';
+  }>;
+  // Propiedades adicionales para compatibilidad con la UI
+  tendenciaCosto?: number;
+  porcentajePresupuesto?: number;
+  presupuestoUsado?: number;
+  presupuestoTotal?: number;
+  roiPromedio?: number;
+  tendenciaROI?: number;
+  tendenciaAhorro?: number;
+}
+
+export interface CostAnalysis {
+  categorias: Array<{
+    nombre: string;
+    presupuesto: number;
+    real: number;
+    variacion: number;
+    porcentaje: number;
+  }>;
+  centrosCosto: Array<{
+    id: string;
+    nombre: string;
+    presupuesto: number;
+    ejecutado: number;
+    disponible: number;
+    porcentajeUso: number;
+  }>;
+  tendencias: Array<{
+    mes: string;
+    presupuesto: number;
+    real: number;
+    diferencia: number;
+  }>;
+  alertas: Array<{
+    tipo: 'sobrecosto' | 'desviacion' | 'limite';
+    mensaje: string;
+    severidad: 'low' | 'medium' | 'high';
+    categoria?: string;
+  }>;
+}
+
+export interface BudgetTracking {
+  resumen: {
+    presupuestoTotal: number;
+    ejecutado: number;
+    disponible: number;
+    porcentajeEjecucion: number;
+  };
+  categorias: Array<{
+    nombre: string;
+    presupuesto: number;
+    ejecutado: number;
+    disponible: number;
+    porcentaje: number;
+    estado: 'normal' | 'alerta' | 'critico' | 'excedido';
+  }>;
+  proyecciones: {
+    finAno: number;
+    variacionEsperada: number;
+    riesgoSobrecosto: 'bajo' | 'medio' | 'alto';
+  };
+}
+
+export interface ROIData {
+  resumen: {
+    roiPromedio: number;
+    mejorProveedor: string;
+    peorProveedor: string;
+    tendenciaGeneral: 'up' | 'down' | 'stable';
+  };
+  proveedores: Array<{
+    id: string;
+    nombre: string;
+    roi: number;
+    inversion: number;
+    retorno: number;
+    proyectos: number;
+    calificacion: number;
+    tendencia: 'up' | 'down' | 'stable';
+  }>;
+  metricas: Array<{
+    nombre: string;
+    valor: number;
+    benchmark: number;
+    estado: 'excelente' | 'bueno' | 'regular' | 'malo';
+  }>;
+}
 

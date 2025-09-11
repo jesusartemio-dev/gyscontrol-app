@@ -41,7 +41,10 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    const data: ProyectoEquipoItemUpdatePayload = await req.json()
+    const body: ProyectoEquipoItemUpdatePayload = await req.json()
+    
+    // 🔧 Excluir campos de relación que no se pueden actualizar directamente
+    const { listaId, proyectoEquipoId, catalogoEquipoId, listaEquipoSeleccionadoId, ...data } = body
 
     const actualizado = await prisma.proyectoEquipoItem.update({
       where: { id },

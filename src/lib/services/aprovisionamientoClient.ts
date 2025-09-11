@@ -7,7 +7,7 @@ import type {
 } from '@/types/aprovisionamiento'
 import { buildApiUrl } from '@/lib/utils'
 
-const API_BASE = '/api/aprovisionamiento'
+const API_BASE = '/api/pedido-equipo'
 
 // 🔧 Utilidad para manejar respuestas de API en el cliente
 async function handleApiResponse<T>(response: Response): Promise<T> {
@@ -229,22 +229,37 @@ export async function getPedidosEquipoClient(filtros: {
   sortOrder?: 'asc' | 'desc'
 } = {}): Promise<ResponsePedidos> {
   try {
-    // 🔄 Mapear parámetros para compatibilidad con pedidosEquipoClientService
+    // 🔄 Usar el servicio getAllPedidoEquipos existente
+    const { getAllPedidoEquipos } = await import('./pedidoEquipo')
+    
+    // 🔧 Mapear filtros al formato esperado por getAllPedidoEquipos
     const filtrosMapeados = {
       proyectoId: filtros.proyectoId,
-      listaEquipoId: filtros.lista,
-      estado: filtros.estado ? [filtros.estado] : undefined, // ✅ Convertir string a array
-      proveedorId: filtros.proveedorId,
-      fechaDesde: filtros.fechaInicio, // ✅ Mapear 'fechaInicio' a 'fechaDesde'
-      fechaHasta: filtros.fechaFin, // ✅ Mapear 'fechaFin' a 'fechaHasta'
-      montoMinimo: filtros.montoMin, // ✅ Mapear 'montoMin' a 'montoMinimo'
-      montoMaximo: filtros.montoMax, // ✅ Mapear 'montoMax' a 'montoMaximo'
-      busqueda: filtros.busqueda,
-      page: filtros.page,
-      limit: filtros.limit
+      estado: filtros.estado,
+      responsableId: filtros.proveedorId,
+      fechaDesde: filtros.fechaInicio,
+      fechaHasta: filtros.fechaFin,
+      searchText: filtros.busqueda
     }
     
-    return await pedidosEquipoClientService.obtenerPedidos(filtrosMapeados)
+    const pedidos = await getAllPedidoEquipos(filtrosMapeados)
+    
+    // ✅ Transformar respuesta al formato esperado por ResponsePedidos
+    return {
+      success: true,
+      data: {
+        pedidos: pedidos || [],
+        pagination: {
+          page: filtros.page || 1,
+          limit: filtros.limit || 20,
+          total: pedidos?.length || 0,
+          pages: Math.ceil((pedidos?.length || 0) / (filtros.limit || 20)),
+          hasNext: false,
+          hasPrev: false
+        }
+      },
+      timestamp: new Date().toISOString()
+    }
   } catch (error) {
     console.error('Error al obtener pedidos de equipo (client wrapper):', error)
     return {
@@ -253,7 +268,7 @@ export async function getPedidosEquipoClient(filtros: {
         pedidos: [],
         pagination: {
           page: 1,
-          limit: 10,
+          limit: 20,
           total: 0,
           pages: 0,
           hasNext: false,

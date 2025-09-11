@@ -29,6 +29,7 @@ import type {
 import ListaEquipoMasterView from '@/components/proyectos/ListaEquipoMasterView'
 import ModalAgregarItemDesdeEquipo from '@/components/equipos/ModalAgregarItemDesdeEquipo'
 import ModalCrearListaEquipo from '@/components/equipos/ModalCrearListaEquipo'
+import SessionDebug from '@/components/debug/SessionDebug'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -315,9 +316,18 @@ export default function ListaEquipoIntegradaPage() {
                     </p>
                   </motion.div>
                 ) : (
-                  <ListaEquipoMasterView
-                    proyectoId={id}
-                  />
+                  <>
+                    {/* Debug de sesión - Solo en desarrollo */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="mb-6">
+                        <SessionDebug />
+                      </div>
+                    )}
+                    
+                    <ListaEquipoMasterView
+                      proyectoId={id}
+                    />
+                  </>
                 )}
               </CardContent>
             </Card>
