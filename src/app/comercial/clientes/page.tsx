@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { getClientes } from '@/lib/services/cliente'
 import ClienteForm from '@/components/clientes/ClienteForm'
 import ClienteList from '@/components/clientes/ClienteList'
+import ClienteImportExport from '@/components/clientes/ClienteImportExport'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -89,6 +90,24 @@ export default function ClientesPage() {
     setEditando(null)
   }
 
+  // ✅ Handle import success
+  const handleImported = async () => {
+    try {
+      const data = await getClientes()
+      setClientes(data)
+      toast.success('Clientes actualizados después de la importación')
+    } catch (err) {
+      console.error('Error reloading clients after import:', err)
+      toast.error('Error al actualizar la lista de clientes')
+    }
+  }
+
+  // ✅ Handle import errors
+  const handleImportErrors = (errores: string[]) => {
+    console.error('Import validation errors:', errores)
+    // You could show a detailed error modal here if needed
+  }
+
   // Calculate statistics
   const totalClientes = clientes.length
   const clientesConRuc = clientes.filter(c => c.ruc).length
@@ -138,19 +157,28 @@ export default function ClientesPage() {
             </div>
           </div>
           
-          {/* Quick Stats */}
-          <div className="flex gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{totalClientes}</div>
-              <div className="text-sm text-gray-500">Total Clientes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{clientesConRuc}</div>
-              <div className="text-sm text-gray-500">Con RUC</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{clientesConCorreo}</div>
-              <div className="text-sm text-gray-500">Con Email</div>
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+            {/* Import/Export Actions */}
+            <ClienteImportExport 
+              clientes={clientes}
+              onImported={handleImported}
+              onImportErrors={handleImportErrors}
+            />
+            
+            {/* Quick Stats */}
+            <div className="flex gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{totalClientes}</div>
+                <div className="text-sm text-gray-500">Total Clientes</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{clientesConRuc}</div>
+                <div className="text-sm text-gray-500">Con RUC</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{clientesConCorreo}</div>
+                <div className="text-sm text-gray-500">Con Email</div>
+              </div>
             </div>
           </div>
         </motion.div>

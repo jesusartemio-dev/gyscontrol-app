@@ -1,24 +1,12 @@
-/**
- * 📄 Página de Pedidos de Equipos - Sistema GYS
- * 
- * Funcionalidades:
- * - ✅ Listado paginado de pedidos de equipos
- * - ✅ Filtros avanzados (proyecto, proveedor, estado, fechas, montos)
- * - ✅ Búsqueda por texto y coherencia
- * - ✅ Ordenamiento por columnas
- * - ✅ Estadísticas en tiempo real
- * - ✅ Vista Gantt para timeline de ejecución
- * - ✅ Validaciones de coherencia lista vs pedidos
- * - ✅ Exportación a PDF/Excel
- * - ✅ Navegación breadcrumb
- * - ✅ Estados de carga y error
- * - ✅ Responsive design
- */
+// ===================================================
+// 📁 Archivo: page.tsx
+// 📌 Ubicación: src/app/finanzas/aprovisionamiento/pedidos/page.tsx
+// 🔧 Descripción: Página de gestión de pedidos de equipos con UX/UI mejorada
+// 🎨 Mejoras aplicadas: Framer Motion, Shadcn/UI, Estados de carga, Breadcrumb navigation
+// ✍️ Autor: Jesús Artemio + IA GYS
+// 📅 Última actualización: 2025-01-27
+// ===================================================
 
-<<<<<<< Updated upstream
-import { Suspense } from 'react'
-import PedidosEquipoPageContent from './PedidosEquipoPageContent'
-=======
 'use client'
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
@@ -52,259 +40,245 @@ import {
   Package
 } from 'lucide-react'
 
-// ✅ Components
+// ✅ Import components
 import PedidoEquipoFiltersClient from '@/components/aprovisionamiento/PedidoEquipoFiltersClient'
 import PedidoEquipoTableClient from '@/components/aprovisionamiento/PedidoEquipoTableClient'
 import PedidoEquipoGanttClient from '@/components/aprovisionamiento/PedidoEquipoGanttClient'
 import PedidoEquipoCoherenciaClient from '@/components/aprovisionamiento/PedidoEquipoCoherenciaClient'
 
-// 🔧 Services
-import { getPedidosEquipoClient } from '@/lib/services/aprovisionamientoClient'
->>>>>>> Stashed changes
+// ✅ Import React Query services
+import { usePedidosEquipo } from '@/lib/services/aprovisionamientoQuery'
 
-// 📝 Types
-import type { EstadoPedido } from '@/types/modelos'
+// ✅ Import types
+import type { EstadoPedido, PedidoEquipo } from '@/types/modelos'
 
-export const metadata = {
-  title: 'Pedidos de Equipos | Aprovisionamiento | GYS',
-  description: 'Gestión de pedidos de equipos para aprovisionamiento financiero con vista Gantt y validaciones de coherencia'
-}
-
-<<<<<<< Updated upstream
-export default function PedidosEquipoPage() {
-  return (
-    <Suspense fallback={<Loading />}>
-      <PedidosEquipoPageContent />
-    </Suspense>
-  )
-}
-=======
-// Componente que usa useSearchParams envuelto en Suspense
+// 🔧 Main component
 function PedidosEquipoContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { data: session, status } = useSession()
-  
-  // 🔁 State management
-  const [pedidosData, setPedidosData] = useState<{
-    items: PedidoEquipo[]
-    total: number
-    pagination: {
-      page: number
-      limit: number
-      total: number
-      pages: number
-      hasNext: boolean
-      hasPrev: boolean
-    }
-  }>({
-    items: [],
-    total: 0,
-    pagination: {
-      page: 1,
-      limit: 10,
-      total: 0,
-      pages: 0,
-      hasNext: false,
-      hasPrev: false
-    }
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'table' | 'gantt' | 'coherencia'>('table')
->>>>>>> Stashed changes
+  const { data: session } = useSession()
 
-function Loading() {
-  return (
-    <div className="container mx-auto p-6">
-      <div className="space-y-6">
-        {/* Breadcrumb skeleton */}
-        <div className="h-4 bg-gray-200 rounded w-64 animate-pulse" />
-        
-        {/* Header skeleton */}
-        <div className="space-y-2">
-          <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
-          <div className="h-4 bg-gray-200 rounded w-96 animate-pulse" />
-        </div>
-        
-<<<<<<< Updated upstream
-        {/* Stats cards skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-24 bg-gray-200 rounded animate-pulse" />
-          ))}
-        </div>
-        
-        {/* Filters skeleton */}
-        <div className="h-32 bg-gray-200 rounded animate-pulse" />
-        
-        {/* Table skeleton */}
-        <div className="space-y-4">
-          <div className="h-12 bg-gray-200 rounded animate-pulse" />
-          <div className="h-64 bg-gray-200 rounded animate-pulse" />
-        </div>
-      </div>
-=======
-        if (response.success && response.data) {
-          
-          setPedidosData({
-            items: response.data.pedidos || [],
-            total: response.data.pagination?.total || 0,
-            pagination: response.data.pagination || {
-              page: 1,
-              limit: 10,
-              total: 0,
-              pages: 0,
-              hasNext: false,
-              hasPrev: false
-            }
-          })
-        } else {
-          setError('Error al cargar pedidos')
-        }
-      } catch (err) {
-        setError('Error de conexión al cargar pedidos')
-      } finally {
-        setLoading(false)
+  // 📡 URL params
+  const proyecto = searchParams.get('proyecto') || ''
+  const proveedor = searchParams.get('proveedor') || ''
+  const estado = searchParams.get('estado') || ''
+  const fechaInicio = searchParams.get('fechaInicio') || ''
+  const fechaFin = searchParams.get('fechaFin') || ''
+  const montoMin = searchParams.get('montoMin') || ''
+  const montoMax = searchParams.get('montoMax') || ''
+  const coherencia = searchParams.get('coherencia') || ''
+  const lista = searchParams.get('lista') || ''
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '10')
+  const sortBy = searchParams.get('sortBy') || 'createdAt'
+  const sortOrder = searchParams.get('sortOrder') || 'desc'
+
+  // 🔁 State
+  const [viewMode, setViewMode] = useState<'table' | 'gantt' | 'coherencia'>('table')
+  
+  // 📡 React Query - Fetch pedidos with optimized cache
+  const {
+    data: pedidosResponse,
+    isLoading: loading,
+    error,
+    refetch
+  } = usePedidosEquipo({
+    proyectoId: proyecto || undefined,
+    proveedorId: proveedor || undefined,
+    estado: estado ? [estado as EstadoPedido] : undefined,
+    fechaDesde: fechaInicio || undefined,
+    fechaHasta: fechaFin || undefined,
+    montoMinimo: montoMin ? parseFloat(montoMin) : undefined,
+    montoMaximo: montoMax ? parseFloat(montoMax) : undefined,
+    busqueda: coherencia || undefined,
+    page,
+    limit
+  })
+  
+  // 🔄 Transform data for compatibility
+  const pedidosData = useMemo(() => {
+    if (!pedidosResponse?.data) {
+      return {
+        items: [],
+        total: 0,
+        pagination: { page: 1, limit: 10, total: 0, pages: 0, hasNext: false, hasPrev: false }
       }
     }
-
-    fetchPedidos()
-  }, [proyecto, proveedor, estado, fechaInicio, fechaFin, montoMin, montoMax, coherencia, lista, page, limit, sortBy, sortOrder])
-
-  // 🔁 Calculate stats with trazabilidad metrics
-  const stats = useMemo(() => {
-    const items = pedidosData.items
-    const totalItems = items.reduce((sum, pedido) => sum + (pedido.items?.length || 0), 0)
-    // TODO: Implementar estadoEntrega en PedidoEquipoItem
-    const itemsEntregados = items.reduce((sum, pedido) => {
-      // return sum + (pedido.items?.filter(item => item.estadoEntrega === 'ENTREGADO_COMPLETO').length || 0)
-      return sum + 0 // Temporal hasta implementar estadoEntrega
-    }, 0)
     
     return {
-      totalPedidos: pedidosData.total,
-      pedidosEnviados: items.filter(item => item.estado === 'enviado').length,
-      pedidosRecibidos: items.filter(item => item.estado === 'entregado').length,
-      pedidosRetrasados: items.filter(item => {
-        if (!item.fechaEntregaEstimada) return false
-        return new Date(item.fechaEntregaEstimada) < new Date() && item.estado !== 'entregado'
-      }).length,
-      montoTotal: items.reduce((sum, item) => sum + (item.presupuestoTotal || 0), 0),
-      proveedoresActivos: items.length,
-      coherenciaPromedio: items.length > 0 ? 
-        items.reduce((sum, item) => {
-          if (!item.coherencia) return sum
-          return sum + item.coherencia
-        }, 0) / items.length : 0,
-      // ✅ New trazabilidad metrics
-      progresoEntrega: totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0,
-      // TODO: Implementar estadoEntrega en PedidoEquipoItem
-      itemsEnProgreso: items.reduce((sum, pedido) => {
-        // return sum + (pedido.items?.filter(item => 
-        //   item.estadoEntrega === 'EN_TRANSITO' || item.estadoEntrega === 'ENTREGADO_PARCIAL'
-        // ).length || 0)
-        return sum + 0 // Temporal hasta implementar estadoEntrega
-      }, 0),
+      items: pedidosResponse.data || [],
+      total: pedidosResponse.meta?.total || 0,
+      pagination: pedidosResponse.meta || {
+        page: 1, limit: 10, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false
+      }
+    }
+  }, [pedidosResponse])
+
+  // ✅ Set dynamic page title
+  useEffect(() => {
+    document.title = 'Pedidos de Equipos | Aprovisionamiento | GYS'
+  }, [])
+
+  // 🔄 Handle error display
+  const errorMessage = error ? 'Error al cargar los pedidos' : null
+
+  // 📊 Stats calculation
+  const stats = useMemo(() => {
+    const items = pedidosData.items || []
+    const totalPedidos = items.length
+    const pedidosEnviados = items.filter(p => p.estado === 'enviado').length
+    const pedidosRecibidos = items.filter(p => p.estado === 'entregado').length
+    const pedidosRetrasados = items.filter(p => {
+      if (!p.fechaEntregaEstimada) return false
+      const fechaEstimada = new Date(p.fechaEntregaEstimada)
+      const hoy = new Date()
+      return fechaEstimada < hoy && p.estado !== 'entregado'
+    }).length
+    
+    const totalItems = items.reduce((sum, p) => sum + (p.items?.length || 0), 0)
+    const itemsEntregados = items.reduce((sum, p) => {
+      return sum + (p.items?.filter(item => (item.cantidadAtendida || 0) >= item.cantidadPedida).length || 0)
+    }, 0)
+    const itemsEnProgreso = totalItems - itemsEntregados
+    
+    const progresoEntrega = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0
+    
+    const montoTotal = items.reduce((sum, p) => {
+      // Calcular monto total basado en items del pedido
+      const montoPedido = p.items?.reduce((itemSum, item) => 
+        itemSum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0
+      ) || 0
+      return sum + montoPedido
+    }, 0)
+    
+    const coherenciaPromedio = items.length > 0 
+      ? items.reduce((sum, p) => sum + (p.coherencia || 0), 0) / items.length 
+      : 0
+
+    return {
+      totalPedidos,
+      pedidosEnviados,
+      pedidosRecibidos,
+      pedidosRetrasados,
       totalItems,
-      itemsEntregados
+      itemsEntregados,
+      itemsEnProgreso,
+      progresoEntrega,
+      montoTotal,
+      coherenciaPromedio
     }
   }, [pedidosData])
 
-  // 🔄 Transform PedidoEquipo data for Gantt component
+
+
+  // 📊 Gantt data transformation
   const ganttData = useMemo(() => {
-    if (!pedidosData?.items) return []
-    
     return pedidosData.items.map(pedido => {
-      // ✅ Calculate real amount from items (same logic as API)
-      const montoReal = pedido.items?.reduce((total, item) => {
-        return total + (item.cantidadPedida * (item.precioUnitario || 0))
-      }, 0) || 0
-      
+      // Calcular progreso basado en items entregados
+      const itemsEntregados = pedido.items?.filter(item => 
+        item.estado === 'entregado'
+      ).length || 0
+      const totalItems = pedido.items?.length || 0
+      const progreso = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0
+
+      // Calcular monto real basado en cantidades atendidas
+      const montoReal = pedido.items?.reduce((sum, item) => 
+        sum + ((item.cantidadAtendida || 0) * (item.precioUnitario || 0)), 0
+      ) || 0
+
       return {
         id: pedido.id,
-        codigo: pedido.codigo,
-        descripcion: pedido.observacion,
-        estado: pedido.estado,
-        fechaCreacion: new Date(pedido.createdAt),
-        fechaNecesaria: pedido.fechaNecesaria ? new Date(pedido.fechaNecesaria) : undefined, // ✅ Critical field for procurement planning
+        codigo: pedido.codigo || `PED-${String(pedido.numeroSecuencia).padStart(3, '0')}`,
+        nombre: pedido.codigo || `PED-${String(pedido.numeroSecuencia).padStart(3, '0')}`,
+        fechaCreacion: new Date(pedido.fechaPedido),
+        fechaInicio: pedido.fechaPedido,
+        fechaFin: pedido.fechaEntregaEstimada || pedido.fechaNecesaria,
         fechaEntregaEstimada: pedido.fechaEntregaEstimada ? new Date(pedido.fechaEntregaEstimada) : undefined,
         fechaEntregaReal: pedido.fechaEntregaReal ? new Date(pedido.fechaEntregaReal) : undefined,
-        montoTotal: montoReal, // ✅ Use calculated amount instead of presupuestoTotal
-        urgente: pedido.esUrgente,
-        coherencia: pedido.coherencia,
-        progreso: pedido.estado === 'entregado' ? 100 : 
-                  pedido.estado === 'atendido' ? 75 :
-                  pedido.estado === 'enviado' ? 50 : 25,
-        proyecto: pedido.proyecto ? {
-          id: pedido.proyecto.id,
-          nombre: pedido.proyecto.nombre,
-          codigo: pedido.proyecto.codigo
+        progreso,
+        estado: pedido.estado,
+        coherencia: pedido.coherencia || 0,
+        proveedor: pedido.items?.[0]?.listaEquipoItem?.proveedor ? {
+          id: pedido.items[0].listaEquipoItem.proveedor.id,
+          nombre: pedido.items[0].listaEquipoItem.proveedor.nombre
         } : undefined,
-        responsable: pedido.responsable ? {
-          id: pedido.responsable.id,
-          nombre: pedido.responsable.name || 'Sin nombre'
-        } : undefined
+        monto: pedido.items?.reduce((sum, item) => sum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0) || 0,
+        montoReal,
+        items: pedido.items?.map(item => ({
+          id: item.id,
+          cantidad: item.cantidadPedida,
+          cantidadRecibida: item.cantidadAtendida || 0,
+          precioUnitario: item.precioUnitario,
+          subtotal: item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))
+        })) || []
       }
     })
   }, [pedidosData])
 
-  // 🔄 Transform PedidoEquipo data for Table component
+  // 📊 Table data transformation
   const tableData = useMemo(() => {
-    if (!pedidosData?.items) return []
-    
     return pedidosData.items.map(pedido => {
-      // ✅ Calculate real amount from items (same logic as API)
-      const montoReal = pedido.items?.reduce((total, item) => {
-        return total + (item.cantidadPedida * (item.precioUnitario || 0))
-      }, 0) || 0
-      
+      // Calcular costo total basado en items
+      const costoTotal = pedido.items?.reduce((sum, item) => 
+        sum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0
+      ) || 0
+
+      // Calcular progreso
+      const itemsAtendidos = pedido.items?.filter(item => 
+        (item.cantidadAtendida || 0) >= item.cantidadPedida
+      ).length || 0
+      const totalItems = pedido.items?.length || 0
+      const progreso = totalItems > 0 ? Math.round((itemsAtendidos / totalItems) * 100) : 0
+
+      // Calcular coherencia
+      const coherenciaData = {
+        esCoherente: (pedido.coherencia || 0) >= 80,
+        itemsCoherentes: itemsAtendidos,
+        preciosCoherentes: totalItems,
+        totalItems,
+        alertas: {
+          cantidadesExcedidas: false,
+          preciosDesviados: false,
+          itemsFaltantes: itemsAtendidos < totalItems,
+          sinLista: !pedido.lista
+        }
+      }
+
       return {
         id: pedido.id,
-        codigo: pedido.codigo,
-        descripcion: pedido.observacion,
+        codigo: pedido.codigo || `PED-${String(pedido.numeroSecuencia).padStart(3, '0')}`,
+        descripcion: pedido.observacion || 'Pedido de equipos',
         estado: pedido.estado,
-        fechaCreacion: new Date(pedido.createdAt),
-        fechaNecesaria: pedido.fechaNecesaria ? new Date(pedido.fechaNecesaria) : undefined, // ✅ Critical field for procurement planning
+        fechaCreacion: new Date(pedido.fechaPedido),
+        fechaNecesaria: pedido.fechaNecesaria ? new Date(pedido.fechaNecesaria) : undefined,
         fechaEntregaEstimada: pedido.fechaEntregaEstimada ? new Date(pedido.fechaEntregaEstimada) : undefined,
         fechaEntregaReal: pedido.fechaEntregaReal ? new Date(pedido.fechaEntregaReal) : undefined,
-        montoTotal: montoReal, // ✅ Use calculated amount instead of presupuestoTotal
-      observaciones: pedido.observacion,
-      urgente: pedido.esUrgente,
-      coherencia: pedido.coherencia ? {
-        esCoherente: pedido.coherencia > 0.8, // ✅ Convert number to boolean based on threshold
-        itemsCoherentes: Math.round(pedido.coherencia * 100),
-        preciosCoherentes: Math.round(pedido.coherencia * 100),
-        totalItems: 100,
-        alertas: {
-          cantidadesExcedidas: pedido.coherencia < 0.6,
-          preciosDesviados: pedido.coherencia < 0.7,
-          itemsFaltantes: pedido.coherencia < 0.5,
-          sinLista: !pedido.listaId // ✅ Corrected: listaId instead of listaEquipoMasterId
-        }
-      } : undefined,
-      proyecto: pedido.proyecto ? {
-        id: pedido.proyecto.id,
-        nombre: pedido.proyecto.nombre,
-        codigo: pedido.proyecto.codigo
-      } : undefined,
-      proveedor: undefined, // ✅ PedidoEquipo doesn't have direct proveedor relation
-      lista: pedido.lista ? {
-        id: pedido.lista.id,
-        nombre: pedido.lista.nombre // ✅ Corrected: lista instead of listaEquipoMaster
-      } : undefined,
-      responsable: pedido.responsable ? {
-        id: pedido.responsable.id,
-        nombre: pedido.responsable.name || 'Sin nombre',
-        email: pedido.responsable.email || ''
-      } : undefined,
-      items: pedido.items?.map(item => ({
-        id: item.id,
-        cantidad: item.cantidadPedida, // ✅ Corrected: cantidadPedida instead of cantidad
-        cantidadRecibida: item.cantidadAtendida || 0, // ✅ Corrected: cantidadAtendida instead of cantidadRecibida
-        precioUnitario: item.precioUnitario,
-        subtotal: item.costoTotal // ✅ Corrected: costoTotal instead of subtotal
-      })) || []
+        montoTotal: costoTotal,
+        observaciones: pedido.observacion,
+        urgente: false, // TODO: Implementar lógica de urgencia
+        coherencia: coherenciaData,
+        proyecto: undefined, // TODO: Incluir datos del proyecto si es necesario
+        proveedor: pedido.items?.[0]?.listaEquipoItem?.proveedor ? {
+          id: pedido.items[0].listaEquipoItem.proveedor.id,
+          nombre: pedido.items[0].listaEquipoItem.proveedor.nombre,
+          ruc: pedido.items[0].listaEquipoItem.proveedor.ruc
+        } : undefined,
+        lista: pedido.lista ? {
+          id: pedido.lista.id,
+          nombre: pedido.lista.nombre
+        } : undefined,
+        responsable: pedido.responsable ? {
+          id: pedido.responsable.id,
+          nombre: pedido.responsable.name || 'Sin nombre',
+          email: pedido.responsable.email
+        } : undefined,
+        items: pedido.items?.map(item => ({
+          id: item.id,
+          cantidad: item.cantidadPedida,
+          cantidadRecibida: item.cantidadAtendida || 0,
+          precioUnitario: item.precioUnitario,
+          subtotal: item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))
+        })) || []
       }
     })
   }, [pedidosData])
@@ -331,7 +305,7 @@ function Loading() {
     )
   }
 
-  // ❌ Error state
+  // 🚨 Error state
   if (error) {
     return (
       <div className="container mx-auto p-6">
@@ -347,7 +321,7 @@ function Loading() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {error}
+              {error?.message || 'Error desconocido al cargar los pedidos'}
             </p>
             <div className="flex space-x-2">
               <Button onClick={() => window.location.reload()}>
@@ -367,7 +341,7 @@ function Loading() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* 🧭 Breadcrumb Navigation */}
+      {/* Breadcrumb */}
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -391,7 +365,7 @@ function Loading() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      {/* 🎨 Header Section */}
+      {/* Header */}
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -449,7 +423,7 @@ function Loading() {
           </div>
         </div>
 
-        {/* 📊 Stats Cards */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -518,70 +492,11 @@ function Loading() {
             </CardContent>
           </Card>
         </div>
-
-        {/* 📊 Secondary Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Enviados</CardTitle>
-              <Truck className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.pedidosEnviados}</div>
-              <p className="text-xs text-muted-foreground">
-                En tránsito
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Retrasados</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats.pedidosRetrasados}</div>
-              <p className="text-xs text-muted-foreground">
-                Requieren seguimiento
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Coherencia</CardTitle>
-              <Target className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">
-                {stats.coherenciaPromedio.toFixed(1)}%
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Coherencia promedio
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ver Reportes</CardTitle>
-              <BarChart3 className="h-4 w-4 text-indigo-600" />
-            </CardHeader>
-            <CardContent>
-              <Link href="/gestion/reportes/pedidos">
-                <Button variant="outline" size="sm" className="w-full">
-                  <Package className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       <Separator />
 
-      {/* 🎯 Filters Section */}
+      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -617,7 +532,7 @@ function Loading() {
         </CardContent>
       </Card>
 
-      {/* 📋 Content Section - Table or Gantt */}
+      {/* Main Content */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -659,7 +574,7 @@ function Loading() {
               }}
               sorting={{
                 sortBy,
-                sortOrder
+                sortOrder: sortOrder as 'asc' | 'desc'
               }}
             />
           )}
@@ -686,111 +601,11 @@ function Loading() {
           )}
         </CardContent>
       </Card>
-
-      {/* 🚨 Alertas Section */}
-      {stats.pedidosRetrasados > 0 && (
-        <Card className="border-red-200 bg-red-50">
-          <CardHeader>
-            <CardTitle className="text-red-800 flex items-center">
-              <AlertTriangle className="h-5 w-5 mr-2" />
-              Pedidos Retrasados ({stats.pedidosRetrasados})
-            </CardTitle>
-            <CardDescription className="text-red-700">
-              Pedidos que han superado su fecha de entrega estimada
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {pedidosData.items
-                .filter(pedido => {
-                  if (!pedido.fechaEntregaEstimada) return false
-                  return new Date(pedido.fechaEntregaEstimada) < new Date() && pedido.estado !== 'entregado'
-                })
-                .slice(0, 3)
-                .map((pedido) => {
-                  const diasRetraso = Math.floor(
-                    (new Date().getTime() - new Date(pedido.fechaEntregaEstimada!).getTime()) / (1000 * 60 * 60 * 24)
-                  )
-                  return (
-                    <div key={pedido.id} className="flex items-start justify-between p-3 bg-white border border-red-200 rounded-lg">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-red-900">{pedido.codigo}</p>
-                        <p className="text-xs text-red-700">
-                          Proyecto: {pedido.proyecto?.nombre || 'N/A'}
-                        </p>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="destructive" className="text-xs">
-                            {diasRetraso} días de retraso
-                          </Badge>
-                          <Badge variant="outline" className="text-xs text-red-800 border-red-300">
-                            ${pedido.presupuestoTotal?.toLocaleString('es-PE') || '0'}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex space-x-1">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/finanzas/aprovisionamiento/pedidos/${pedido.id}`}>
-                            Ver Detalle
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                })
-              }
-              {stats.pedidosRetrasados > 3 && (
-                <div className="text-center pt-2">
-                  <Button variant="outline" size="sm">
-                    Ver todos los pedidos retrasados ({stats.pedidosRetrasados})
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 📈 Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Acciones Rápidas</CardTitle>
-          <CardDescription>
-            Herramientas para gestión eficiente de pedidos y coherencia
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-              <Download className="h-6 w-6" />
-              <span className="text-sm">Exportar Reporte</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-              <Users className="h-6 w-6" />
-              <span className="text-sm">Gestionar Proveedores</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col items-center justify-center space-y-2"
-              onClick={() => setViewMode('coherencia')}
-            >
-              <Target className="h-6 w-6" />
-              <span className="text-sm">Validar Coherencia</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2" asChild>
-              <Link href="/finanzas/aprovisionamiento/timeline">
-                <Calendar className="h-6 w-6" />
-                <span className="text-sm">Ver Timeline</span>
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
->>>>>>> Stashed changes
     </div>
   )
 }
 
-// Componente principal con Suspense boundary
+// 🔧 Main page component with Suspense
 export default function PedidosEquipoPage() {
   return (
     <Suspense fallback={

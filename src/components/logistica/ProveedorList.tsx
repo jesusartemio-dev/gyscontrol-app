@@ -15,12 +15,16 @@ import { deleteProveedor } from '@/lib/services/proveedor'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import { 
   Building2, 
   Hash, 
   Edit, 
   Trash2, 
-  Users
+  Users,
+  MapPin,
+  Phone,
+  Mail
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Proveedor } from '@/types'
@@ -33,22 +37,43 @@ interface Props {
 }
 
 export default function ProveedorList({ proveedores, onDeleted, onEdit, loading = false }: Props) {
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  // ✅ State for enhanced confirmation dialog
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean
+    proveedor: Proveedor | null
+    isDeleting: boolean
+  }>({ open: false, proveedor: null, isDeleting: false })
 
-  const handleDelete = async (proveedor: Proveedor) => {
-    if (!confirm(`¿Estás seguro de eliminar a ${proveedor.nombre}?`)) {
-      return
-    }
+  // 🔁 Enhanced delete handler with confirmation dialog
+  const handleDeleteClick = (proveedor: Proveedor) => {
+    setDeleteDialog({ open: true, proveedor, isDeleting: false })
+  }
 
-    setDeletingId(proveedor.id)
+  const handleConfirmDelete = async () => {
+    if (!deleteDialog.proveedor) return
+
+    setDeleteDialog(prev => ({ ...prev, isDeleting: true }))
+    
     try {
-      await deleteProveedor(proveedor.id)
-      onDeleted(proveedor.id)
-      toast.success(`Proveedor ${proveedor.nombre} eliminado correctamente`)
+      const success = await deleteProveedor(deleteDialog.proveedor.id)
+      
+      if (success) {
+        toast.success(`Proveedor "${deleteDialog.proveedor.nombre}" eliminado correctamente`, {
+          description: 'El proveedor ha sido removido de la base de datos'
+        })
+        onDeleted(deleteDialog.proveedor.id)
+      } else {
+        toast.error('No se pudo eliminar el proveedor', {
+          description: 'Inténtalo nuevamente o contacta al administrador'
+        })
+      }
     } catch (error) {
-      toast.error('Error al eliminar el proveedor')
+      console.error('Error deleting proveedor:', error)
+      toast.error('Error inesperado al eliminar', {
+        description: 'Ocurrió un problema durante la eliminación'
+      })
     } finally {
-      setDeletingId(null)
+      setDeleteDialog({ open: false, proveedor: null, isDeleting: false })
     }
   }
 
@@ -143,6 +168,40 @@ export default function ProveedorList({ proveedores, onDeleted, onEdit, loading 
                   </div>
                 )}
 
+                {/* Dirección */}
+                {proveedor.direccion && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
+                    <div>
+                      <span className="text-gray-600">Dirección:</span>
+                      <p className="text-gray-800 mt-1">{proveedor.direccion}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Teléfono */}
+                {proveedor.telefono && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">Teléfono:</span>
+                    <span className="text-gray-800 font-medium">{proveedor.telefono}</span>
+                  </div>
+                )}
+
+                {/* Correo */}
+                {proveedor.correo && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">Correo:</span>
+                    <a 
+                      href={`mailto:${proveedor.correo}`}
+                      className="text-blue-600 hover:text-blue-800 underline"
+                    >
+                      {proveedor.correo}
+                    </a>
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex justify-end gap-2 pt-2">
                   <Button
@@ -157,12 +216,12 @@ export default function ProveedorList({ proveedores, onDeleted, onEdit, loading 
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => handleDelete(proveedor)}
-                    disabled={deletingId === proveedor.id}
+                    onClick={() => handleDeleteClick(proveedor)}
+                    disabled={deleteDialog.isDeleting && deleteDialog.proveedor?.id === proveedor.id}
                     className="flex items-center gap-1"
                   >
                     <Trash2 className="h-3 w-3" />
-                    {deletingId === proveedor.id ? 'Eliminando...' : 'Eliminar'}
+                    {deleteDialog.isDeleting && deleteDialog.proveedor?.id === proveedor.id ? 'Eliminando...' : 'Eliminar'}
                   </Button>
                 </div>
               </CardContent>
@@ -170,6 +229,51 @@ export default function ProveedorList({ proveedores, onDeleted, onEdit, loading 
           </motion.div>
         ))}
       </AnimatePresence>
+      
+      {/* 📡 Enhanced Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => !deleteDialog.isDeleting && setDeleteDialog(prev => ({ ...prev, open }))}
+        title="Confirmar eliminación de proveedor"
+        description={
+          deleteDialog.proveedor ? (
+            <div className="space-y-3">
+              <div className="text-sm text-gray-600">
+                ¿Estás seguro de que deseas eliminar este proveedor? Esta acción no se puede deshacer.
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-gray-900">{deleteDialog.proveedor.nombre}</span>
+                </div>
+                {deleteDialog.proveedor.ruc && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Hash className="h-3 w-3" />
+                    <span className="font-mono">{deleteDialog.proveedor.ruc}</span>
+                  </div>
+                )}
+                {deleteDialog.proveedor.telefono && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Phone className="h-3 w-3" />
+                    <span>{deleteDialog.proveedor.telefono}</span>
+                  </div>
+                )}
+                {deleteDialog.proveedor.correo && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Mail className="h-3 w-3" />
+                    <span className="break-all">{deleteDialog.proveedor.correo}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : ''
+        }
+        onConfirm={handleConfirmDelete}
+        confirmText={deleteDialog.isDeleting ? 'Eliminando...' : 'Eliminar proveedor'}
+        cancelText="Cancelar"
+        variant="destructive"
+        disabled={deleteDialog.isDeleting}
+      />
     </motion.div>
   )
 }

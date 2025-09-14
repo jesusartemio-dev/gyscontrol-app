@@ -1,8 +1,15 @@
 /**
- * 📋 ListaEquipoTable Component
+ * 📋 ListaEquipoTable Component - OPTIMIZED with React.memo
  * 
  * Tabla avanzada para gestión de listas de equipos con funcionalidades
  * de filtrado, ordenamiento, edición inline y acciones masivas.
+ * 
+ * 🚀 FASE 2 Optimizations:
+ * - React.memo en componentes principales
+ * - useMemo para cálculos pesados
+ * - useCallback para funciones estables
+ * - Memoización de componentes de fila
+ * - Separación de estado UI vs datos
  * 
  * Features:
  * - Tabla responsive con ordenamiento
@@ -13,12 +20,12 @@
  * - Exportación y configuración de columnas
  * 
  * @author GYS Team
- * @version 1.0.0
+ * @version 2.0.0 - Performance Optimized
  */
 
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
   Table,
   TableBody,
@@ -75,7 +82,6 @@ import {
   TrendingUp,
   X,
 } from 'lucide-react';
-// Removed framer-motion imports as they were causing ref conflicts
 import { toast } from 'sonner';
 
 // Types
@@ -121,6 +127,7 @@ interface ColumnConfig {
   visible?: boolean;
 }
 
+// 🎯 Memoized constants - evita recreación en cada render
 const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: 'codigo', label: 'Código', sortable: true, width: '120px' },
   { key: 'proyecto', label: 'Proyecto', sortable: true, width: '200px' },
@@ -134,29 +141,42 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: 'acciones', label: 'Acciones', sortable: false, width: '100px', align: 'center' },
 ];
 
-// ✅ Status badge component
-const StatusBadge: React.FC<{ estado: EstadoListaEquipo }> = ({ estado }) => {
-  const variants = {
-    borrador: { variant: 'secondary' as const, label: 'Borrador' },
-    por_revisar: { variant: 'outline' as const, label: 'Por Revisar' },
-    por_cotizar: { variant: 'outline' as const, label: 'Por Cotizar' },
-    por_validar: { variant: 'outline' as const, label: 'Por Validar' },
-    por_aprobar: { variant: 'outline' as const, label: 'Por Aprobar' },
-    aprobado: { variant: 'default' as const, label: 'Aprobado' },
-    rechazado: { variant: 'destructive' as const, label: 'Rechazado' },
-  };
+// 🎯 Memoized status variants - evita recreación
+const STATUS_VARIANTS = {
+  borrador: { variant: 'secondary' as const, label: 'Borrador' },
+  por_revisar: { variant: 'outline' as const, label: 'Por Revisar' },
+  por_cotizar: { variant: 'outline' as const, label: 'Por Cotizar' },
+  por_validar: { variant: 'outline' as const, label: 'Por Validar' },
+  por_aprobar: { variant: 'outline' as const, label: 'Por Aprobar' },
+  aprobado: { variant: 'default' as const, label: 'Aprobado' },
+  rechazado: { variant: 'destructive' as const, label: 'Rechazado' },
+} as const;
 
-  const config = variants[estado] || variants.borrador;
+// 🚀 OPTIMIZED: Status badge component with React.memo
+const StatusBadge = memo<{ estado: EstadoListaEquipo }>(({ estado }) => {
+  const config = STATUS_VARIANTS[estado] || STATUS_VARIANTS.borrador;
   
   return (
     <Badge variant={config.variant}>
       {config.label}
     </Badge>
   );
-};
+});
+StatusBadge.displayName = 'StatusBadge';
 
-// ✅ Coherence indicator
-const CoherenceIndicator: React.FC<{ coherencia?: number }> = ({ coherencia }) => {
+// 🚀 OPTIMIZED: Coherence indicator with React.memo
+const CoherenceIndicator = memo<{ coherencia?: number }>(({ coherencia }) => {
+  // 🎯 Memoized color calculation
+  const colorConfig = useMemo(() => {
+    if (coherencia === undefined) {
+      return { color: 'bg-gray-300', label: 'Sin validar' };
+    }
+    
+    if (coherencia >= 80) return { color: 'bg-green-500', label: 'Buena coherencia' };
+    if (coherencia >= 60) return { color: 'bg-yellow-500', label: 'Coherencia regular' };
+    return { color: 'bg-red-500', label: 'Baja coherencia' };
+  }, [coherencia]);
+
   if (coherencia === undefined) {
     return (
       <Tooltip>
@@ -170,35 +190,24 @@ const CoherenceIndicator: React.FC<{ coherencia?: number }> = ({ coherencia }) =
     );
   }
 
-  const getColor = (value: number) => {
-    if (value >= 80) return 'bg-green-500';
-    if (value >= 60) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
-
-  const getLabel = (value: number) => {
-    if (value >= 80) return 'Buena coherencia';
-    if (value >= 60) return 'Coherencia regular';
-    return 'Baja coherencia';
-  };
-
   return (
     <Tooltip>
       <TooltipTrigger>
         <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${getColor(coherencia)}`} />
+          <div className={`w-3 h-3 rounded-full ${colorConfig.color}`} />
           <span className="text-xs">{coherencia}%</span>
         </div>
       </TooltipTrigger>
       <TooltipContent>
-        <p>{getLabel(coherencia)}</p>
+        <p>{colorConfig.label}</p>
       </TooltipContent>
     </Tooltip>
   );
-};
+});
+CoherenceIndicator.displayName = 'CoherenceIndicator';
 
-// ✅ Alerts indicator
-const AlertsIndicator: React.FC<{ alertas?: number }> = ({ alertas = 0 }) => {
+// 🚀 OPTIMIZED: Alerts indicator with React.memo
+const AlertsIndicator = memo<{ alertas?: number }>(({ alertas = 0 }) => {
   if (alertas === 0) {
     return (
       <Tooltip>
@@ -225,36 +234,57 @@ const AlertsIndicator: React.FC<{ alertas?: number }> = ({ alertas = 0 }) => {
       </TooltipContent>
     </Tooltip>
   );
-};
+});
+AlertsIndicator.displayName = 'AlertsIndicator';
 
-// ✅ Inline edit cell
-const InlineEditCell: React.FC<{
+// 🚀 OPTIMIZED: Inline edit cell with React.memo
+interface InlineEditCellProps {
   value: string | number;
   type?: 'text' | 'number' | 'date';
   onSave: (newValue: string | number) => void;
   disabled?: boolean;
-}> = ({ value, type = 'text', onSave, disabled = false }) => {
+}
+
+const InlineEditCell = memo<InlineEditCellProps>(({ value, type = 'text', onSave, disabled = false }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(String(value));
 
-  const handleSave = () => {
+  // 🎯 Memoized handlers
+  const handleSave = useCallback(() => {
     const finalValue = type === 'number' ? Number(editValue) : editValue;
     onSave(finalValue);
     setIsEditing(false);
-  };
+  }, [editValue, type, onSave]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setEditValue(String(value));
     setIsEditing(false);
-  };
+  }, [value]);
+
+  const handleClick = useCallback(() => {
+    if (!disabled) setIsEditing(true);
+  }, [disabled]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave();
+    if (e.key === 'Escape') handleCancel();
+  }, [handleSave, handleCancel]);
+
+  // 🎯 Memoized display value
+  const displayValue = useMemo(() => {
+    if (type === 'date' && value) {
+      return new Date(String(value)).toLocaleDateString();
+    }
+    return String(value);
+  }, [value, type]);
 
   if (disabled || !isEditing) {
     return (
       <div
         className={`cursor-pointer hover:bg-gray-50 p-1 rounded ${disabled ? 'opacity-50' : ''}`}
-        onClick={() => !disabled && setIsEditing(true)}
+        onClick={handleClick}
       >
-        {type === 'date' && value ? new Date(String(value)).toLocaleDateString() : String(value)}
+        {displayValue}
       </div>
     );
   }
@@ -267,10 +297,7 @@ const InlineEditCell: React.FC<{
         onChange={(e) => setEditValue(e.target.value)}
         className="h-8 text-xs"
         autoFocus
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSave();
-          if (e.key === 'Escape') handleCancel();
-        }}
+        onKeyDown={handleKeyDown}
       />
       <Button size="sm" variant="ghost" onClick={handleSave}>
         <CheckCircle className="w-3 h-3" />
@@ -280,10 +307,217 @@ const InlineEditCell: React.FC<{
       </Button>
     </div>
   );
-};
+});
+InlineEditCell.displayName = 'InlineEditCell';
 
-// ✅ Main component
-export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
+// 🚀 OPTIMIZED: Table row component with React.memo
+interface TableRowProps {
+  lista: ListaEquipoDetail;
+  index: number;
+  visibleColumns: ColumnKey[];
+  allowEdit: boolean;
+  allowBulkActions: boolean;
+  showCoherenceIndicators: boolean;
+  isSelected: boolean;
+  onListaClick?: (lista: ListaEquipoDetail) => void;
+  onListaEdit?: (lista: ListaEquipoDetail) => void;
+  onSelectItem: (id: string, checked: boolean) => void;
+  onInlineEdit: (id: string, field: keyof ListaEquipoDetail, value: string | number) => void;
+}
+
+const ListaEquipoTableRow = memo<TableRowProps>(({ 
+  lista, 
+  index, 
+  visibleColumns, 
+  allowEdit, 
+  allowBulkActions, 
+  showCoherenceIndicators, 
+  isSelected,
+  onListaClick, 
+  onListaEdit, 
+  onSelectItem, 
+  onInlineEdit 
+}) => {
+  // 🎯 Memoized handlers
+  const handleRowClick = useCallback(() => {
+    onListaClick?.(lista);
+  }, [onListaClick, lista]);
+
+  const handleSelectChange = useCallback((checked: boolean) => {
+    onSelectItem(lista.id, checked);
+  }, [onSelectItem, lista.id]);
+
+  const handleEditClick = useCallback(() => {
+    onListaEdit?.(lista);
+  }, [onListaEdit, lista]);
+
+  // 🎯 Memoized inline edit handlers
+  const handleCodigoEdit = useCallback((value: string | number) => {
+    onInlineEdit(lista.id, 'codigo', value);
+  }, [onInlineEdit, lista.id]);
+
+  const handleFechaEdit = useCallback((value: string | number) => {
+    onInlineEdit(lista.id, 'fechaNecesaria', value);
+  }, [onInlineEdit, lista.id]);
+
+  // 🎯 Memoized computed values
+  const montoDisplay = useMemo(() => {
+    // Calculate total from items if available
+    const montoTotal = lista.items?.reduce((total, item) => {
+      const precio = item.precioElegido || item.presupuesto || 0;
+      const cantidad = item.cantidad || 0;
+      return total + (precio * cantidad);
+    }, 0) || lista.stats?.costoTotal || 0;
+    
+    return montoTotal > 0
+      ? `USD ${montoTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : '-';
+  }, [lista.items, lista.stats?.costoTotal]);
+
+  const fechaNecesariaDisplay = useMemo(() => {
+    return lista.fechaNecesaria 
+      ? new Date(lista.fechaNecesaria).toLocaleDateString() 
+      : '-';
+  }, [lista.fechaNecesaria]);
+
+  const fechaAprobacionDisplay = useMemo(() => {
+    return lista.fechaAprobacionFinal 
+      ? new Date(lista.fechaAprobacionFinal).toLocaleDateString() 
+      : '-';
+  }, [lista.fechaAprobacionFinal]);
+
+  return (
+    <TableRow
+      className="hover:bg-gray-50 cursor-pointer"
+      onClick={handleRowClick}
+    >
+      {allowBulkActions && (
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={handleSelectChange}
+          />
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('codigo') && (
+        <TableCell className="font-mono text-sm">
+          {allowEdit ? (
+            <InlineEditCell
+              value={lista.codigo}
+              onSave={handleCodigoEdit}
+            />
+          ) : (
+            lista.codigo
+          )}
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('proyecto') && (
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="font-medium">{lista.proyecto?.nombre}</span>
+          </div>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('descripcion') && (
+        <TableCell>
+          <div className="max-w-xs truncate" title={lista.nombre}>
+            {lista.nombre}
+          </div>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('fechaNecesaria') && (
+        <TableCell className="text-center">
+          {allowEdit ? (
+            <InlineEditCell
+              value={lista.fechaNecesaria || ''}
+              type="date"
+              onSave={handleFechaEdit}
+            />
+          ) : (
+            fechaNecesariaDisplay
+          )}
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('fechaAprobacionFinal') && (
+        <TableCell className="text-center">
+          <span className={!lista.fechaAprobacionFinal ? 'text-muted-foreground' : ''}>
+            {fechaAprobacionDisplay}
+          </span>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('estado') && (
+        <TableCell className="text-center">
+          <StatusBadge estado={lista.estado} />
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('montoTotal') && (
+        <TableCell className="text-right font-mono">
+          <span className={montoDisplay === '-' ? 'text-muted-foreground' : ''}>
+            {montoDisplay}
+          </span>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('coherencia') && showCoherenceIndicators && (
+        <TableCell className="text-center">
+          <CoherenceIndicator coherencia={lista.coherencia} />
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('alertas') && (
+        <TableCell className="text-center">
+          <AlertsIndicator alertas={lista.stats?.itemsRechazados || 0} />
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('acciones') && (
+        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleRowClick}>
+                <Eye className="w-4 h-4 mr-2" />
+                Ver detalles
+              </DropdownMenuItem>
+              {allowEdit && (
+                <DropdownMenuItem onClick={handleEditClick}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem>
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Ver pedidos
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <FileText className="w-4 h-4 mr-2" />
+                Generar PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      )}
+    </TableRow>
+  );
+});
+ListaEquipoTableRow.displayName = 'ListaEquipoTableRow';
+
+// 🚀 OPTIMIZED: Main component with React.memo
+export const ListaEquipoTable = memo<ListaEquipoTableProps>(({ 
   listas,
   loading = false,
   filtros,
@@ -297,7 +531,7 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
   onExport,
   className = '',
 }) => {
-  // State
+  // 🎯 UI State (separado de datos según FASE 2)
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{
     key: ColumnKey;
@@ -307,7 +541,7 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
     DEFAULT_COLUMNS.filter(col => col.visible !== false).map(col => col.key)
   );
 
-  // 🔁 Sort data
+  // 🚀 OPTIMIZED: Memoized sorted data
   const sortedListas = useMemo(() => {
     if (!sortConfig) return listas;
 
@@ -348,7 +582,14 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
     });
   }, [listas, sortConfig]);
 
-  // 🔁 Handle sort
+  // 🚀 OPTIMIZED: Memoized selection state
+  const selectionState = useMemo(() => {
+    const isAllSelected = listas.length > 0 && selectedIds.length === listas.length;
+    const isPartiallySelected = selectedIds.length > 0 && selectedIds.length < listas.length;
+    return { isAllSelected, isPartiallySelected };
+  }, [listas.length, selectedIds.length]);
+
+  // 🚀 OPTIMIZED: Stable callbacks
   const handleSort = useCallback((key: ColumnKey) => {
     setSortConfig(current => {
       if (current?.key === key) {
@@ -361,7 +602,6 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
     });
   }, []);
 
-  // 🔁 Handle selection
   const handleSelectAll = useCallback((checked: boolean) => {
     setSelectedIds(checked ? listas.map(lista => lista.id) : []);
   }, [listas]);
@@ -374,7 +614,6 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
     );
   }, []);
 
-  // 🔁 Handle inline edit
   const handleInlineEdit = useCallback(async (id: string, field: keyof ListaEquipoDetail, value: string | number) => {
     try {
       await onListaUpdate?.(id, { [field]: value });
@@ -385,7 +624,6 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
     }
   }, [onListaUpdate]);
 
-  // 🔁 Handle bulk actions
   const handleBulkAction = useCallback(async (action: string) => {
     if (selectedIds.length === 0) {
       toast.error('Selecciona al menos una lista');
@@ -402,11 +640,12 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
     }
   }, [selectedIds, onBulkAction]);
 
-  // 🔁 Get column config
+  // 🚀 OPTIMIZED: Memoized column config getter
   const getColumnConfig = useCallback((key: ColumnKey) => {
     return DEFAULT_COLUMNS.find(col => col.key === key);
   }, []);
 
+  // 🎯 Loading state
   if (loading) {
     return (
       <Card className={className}>
@@ -421,6 +660,7 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
     );
   }
 
+  // 🎯 Empty state
   if (listas.length === 0) {
     return (
       <Card className={className}>
@@ -436,224 +676,119 @@ export const ListaEquipoTable: React.FC<ListaEquipoTableProps> = ({
   }
 
   return (
-    <Card className={className}>
-      {/* Header with bulk actions */}
-      {allowBulkActions && selectedIds.length > 0 && (
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">
-                {selectedIds.length} lista{selectedIds.length > 1 ? 's' : ''} seleccionada{selectedIds.length > 1 ? 's' : ''}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkAction('aprobar')}
-              >
-                Aprobar
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkAction('rechazar')}
-              >
-                Rechazar
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkAction('exportar')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Exportar
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-      )}
-
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {allowBulkActions && (
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectedIds.length === listas.length}
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </TableHead>
-                )}
-                {visibleColumns.map(columnKey => {
-                  const config = getColumnConfig(columnKey);
-                  if (!config) return null;
-
-                  return (
-                    <TableHead
-                      key={columnKey}
-                      className={`${config.align === 'center' ? 'text-center' : config.align === 'right' ? 'text-right' : ''}`}
-                      style={{ width: config.width }}
-                    >
-                      {config.sortable ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 p-0 font-medium"
-                          onClick={() => handleSort(columnKey)}
-                        >
-                          {config.label}
-                          <ArrowUpDown className="w-3 h-3 ml-1" />
-                        </Button>
-                      ) : (
-                        config.label
-                      )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedListas.map((lista, index) => (
-                <TableRow
-                  key={lista.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => onListaClick?.(lista)}
+    <TooltipProvider>
+      <Card className={className}>
+        {/* Header with bulk actions */}
+        {allowBulkActions && selectedIds.length > 0 && (
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">
+                  {selectedIds.length} lista{selectedIds.length > 1 ? 's' : ''} seleccionada{selectedIds.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAction('aprobar')}
                 >
-                    {allowBulkActions && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.includes(lista.id)}
-                          onCheckedChange={(checked) => handleSelectItem(lista.id, !!checked)}
-                        />
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('codigo') && (
-                      <TableCell className="font-mono text-sm">
-                        {allowEdit ? (
-                          <InlineEditCell
-                            value={lista.codigo}
-                            onSave={(value) => handleInlineEdit(lista.id, 'codigo', value)}
-                          />
+                  Aprobar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAction('rechazar')}
+                >
+                  Rechazar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAction('exportar')}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+        )}
+
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {allowBulkActions && (
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectionState.isAllSelected}
+                        ref={undefined}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
+                  )}
+                  {visibleColumns.map(columnKey => {
+                    const config = getColumnConfig(columnKey);
+                    if (!config) return null;
+
+                    return (
+                      <TableHead
+                        key={columnKey}
+                        className={`${
+                          config.align === 'center' 
+                            ? 'text-center' 
+                            : config.align === 'right' 
+                            ? 'text-right' 
+                            : ''
+                        }`}
+                        style={{ width: config.width }}
+                      >
+                        {config.sortable ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 p-0 font-medium"
+                            onClick={() => handleSort(columnKey)}
+                          >
+                            {config.label}
+                            <ArrowUpDown className="w-3 h-3 ml-1" />
+                          </Button>
                         ) : (
-                          lista.codigo
+                          config.label
                         )}
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('proyecto') && (
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500" />
-                          <span className="font-medium">{lista.proyecto?.nombre}</span>
-                        </div>
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('descripcion') && (
-                      <TableCell>
-                        <div className="max-w-xs truncate" title={lista.nombre}>
-                          {lista.nombre}
-                        </div>
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('fechaNecesaria') && (
-                      <TableCell className="text-center">
-                        {allowEdit ? (
-                          <InlineEditCell
-                            value={lista.fechaNecesaria || ''}
-                            type="date"
-                            onSave={(value) => handleInlineEdit(lista.id, 'fechaNecesaria', value)}
-                          />
-                        ) : (
-                          lista.fechaNecesaria ? new Date(lista.fechaNecesaria).toLocaleDateString() : '-'
-                        )}
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('fechaAprobacionFinal') && (
-                      <TableCell className="text-center">
-                        {lista.fechaAprobacionFinal ? (
-                          new Date(lista.fechaAprobacionFinal).toLocaleDateString()
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('estado') && (
-                      <TableCell className="text-center">
-                        <StatusBadge estado={lista.estado} />
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('montoTotal') && (
-                      <TableCell className="text-right font-mono">
-                        {lista.estadisticas?.montoTotal ? (
-                          `PEN ${lista.estadisticas.montoTotal.toLocaleString()}`
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('coherencia') && showCoherenceIndicators && (
-                      <TableCell className="text-center">
-                        <CoherenceIndicator coherencia={lista.coherencia} />
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('alertas') && (
-                      <TableCell className="text-center">
-                        <AlertsIndicator alertas={lista.stats?.itemsRechazados || 0} />
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('acciones') && (
-                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => onListaClick?.(lista)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              Ver detalles
-                            </DropdownMenuItem>
-                            {allowEdit && (
-                              <DropdownMenuItem onClick={() => onListaEdit?.(lista)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem>
-                              <ShoppingCart className="w-4 h-4 mr-2" />
-                              Ver pedidos
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <FileText className="w-4 h-4 mr-2" />
-                              Generar PDF
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    )}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+              </TableHeader>
+              <TableBody>
+                {sortedListas.map((lista, index) => (
+                  <ListaEquipoTableRow
+                    key={lista.id}
+                    lista={lista}
+                    index={index}
+                    visibleColumns={visibleColumns}
+                    allowEdit={allowEdit}
+                    allowBulkActions={allowBulkActions}
+                    showCoherenceIndicators={showCoherenceIndicators}
+                    isSelected={selectedIds.includes(lista.id)}
+                    onListaClick={onListaClick}
+                    onListaEdit={onListaEdit}
+                    onSelectItem={handleSelectItem}
+                    onInlineEdit={handleInlineEdit}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
-};
+});
+
+ListaEquipoTable.displayName = 'ListaEquipoTable';
 
 export default ListaEquipoTable;

@@ -28,7 +28,55 @@ export async function PUT(req: Request) {
 
 // ✅ DELETE: Eliminar cliente
 export async function DELETE(req: Request) {
-  const { id } = await req.json()
-  await prisma.cliente.delete({ where: { id } })
-  return NextResponse.json({ ok: true })
+  try {
+    const { id } = await req.json()
+    
+    // 🔍 Verificar si el cliente tiene dependencias
+    const clienteConDependencias = await prisma.cliente.findUnique({
+      where: { id },
+      include: {
+        cotizaciones: { select: { id: true } },
+        proyectos: { select: { id: true } }
+      }
+    })
+    
+    if (!clienteConDependencias) {
+      return NextResponse.json(
+        { error: 'Cliente no encontrado' },
+        { status: 404 }
+      )
+    }
+    
+    // 🚫 Verificar si tiene proyectos activos (no se pueden eliminar)
+    if (clienteConDependencias.proyectos.length > 0) {
+      return NextResponse.json(
+        { 
+          error: 'No se puede eliminar el cliente porque tiene proyectos asociados',
+          details: `El cliente tiene ${clienteConDependencias.proyectos.length} proyecto(s) asociado(s)`
+        },
+        { status: 400 }
+      )
+    }
+    
+    // 🗑️ Eliminar cotizaciones en cascada y luego el cliente
+    await prisma.$transaction(async (tx) => {
+      // Eliminar cotizaciones relacionadas (esto eliminará automáticamente sus items por onDelete: Cascade)
+      if (clienteConDependencias.cotizaciones.length > 0) {
+        await tx.cotizacion.deleteMany({
+          where: { clienteId: id }
+        })
+      }
+      
+      // Eliminar el cliente
+      await tx.cliente.delete({ where: { id } })
+    })
+    
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('❌ Error al eliminar cliente:', error)
+    return NextResponse.json(
+      { error: 'Error interno del servidor al eliminar cliente' },
+      { status: 500 }
+    )
+  }
 }

@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import PlantillaForm from '@/components/plantillas/PlantillaForm'
+import PlantillaModal from '@/components/plantillas/PlantillaModal'
 import PlantillaList from '@/components/plantillas/PlantillaList'
 import { getPlantillas } from '@/lib/services/plantilla'
 import type { Plantilla } from '@/types'
@@ -279,36 +279,25 @@ export default function PlantillasPage() {
       {/* Main Content */}
       <motion.div 
         variants={itemVariants}
-        className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        className="space-y-6"
       >
-        {/* Form Section */}
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5 text-blue-600" />
-              Nueva Plantilla
-            </CardTitle>
-            <CardDescription>
-              Crea una nueva plantilla comercial para el sistema
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <PlantillaForm onCreated={handleCreated} />
-          </CardContent>
-        </Card>
+        {/* Header with Create Button */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <FileText className="h-6 w-6 text-green-600" />
+              Plantillas Comerciales
+            </h2>
+            <p className="text-gray-600 mt-1">
+              Administra y edita las plantillas comerciales disponibles
+            </p>
+          </div>
+          <PlantillaModal onCreated={handleCreated} />
+        </div>
 
         {/* List Section */}
-        <Card className="lg:col-span-2 hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-green-600" />
-              Plantillas Existentes
-            </CardTitle>
-            <CardDescription>
-              Administra y edita las plantillas comerciales disponibles
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="pt-6">
             {plantillas.length === 0 ? (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -318,10 +307,15 @@ export default function PlantillasPage() {
                 <p className="text-gray-500 mb-4">
                   Comienza creando tu primera plantilla comercial
                 </p>
-                <Button variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Primera Plantilla
-                </Button>
+                <PlantillaModal 
+                  onCreated={handleCreated}
+                  trigger={
+                    <Button variant="outline">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Primera Plantilla
+                    </Button>
+                  }
+                />
               </div>
             ) : (
               <PlantillaList

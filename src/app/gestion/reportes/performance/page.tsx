@@ -99,8 +99,8 @@ import GraficoProgreso from '@/components/equipos/GraficoProgreso'
 import MetricasEntrega from '@/components/equipos/MetricasEntrega'
 
 // 🔧 Utility functions
-const formatCurrency = (amount: number, currency: string = 'PEN'): string => {
-  return new Intl.NumberFormat('es-PE', {
+const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency
   }).format(amount)

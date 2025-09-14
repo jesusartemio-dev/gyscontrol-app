@@ -5,9 +5,10 @@ import { motion } from 'framer-motion'
 import { getProveedores } from '@/lib/services/proveedor'
 import ProveedorForm from '@/components/logistica/ProveedorForm'
 import ProveedorList from '@/components/logistica/ProveedorList'
+import ProveedorImportExport from '@/components/logistica/ProveedorImportExport'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { 
   Users, 
@@ -16,7 +17,8 @@ import {
   Building2, 
   UserPlus,
   TrendingUp,
-  Activity
+  Activity,
+  AlertCircle
 } from 'lucide-react'
 import type { Proveedor } from '@/types'
 
@@ -42,7 +44,8 @@ const itemVariants = {
 }
 
 export default function ProveedoresPage() {
-  const [proveedores, setProveedores] = useState<Proveedor[]>([])
+  const [proveedores, setProveedores] = useState<Proveedor[]>([])  
+  const [errores, setErrores] = useState<string[]>([])
   const [editando, setEditando] = useState<Proveedor | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -88,6 +91,21 @@ export default function ProveedoresPage() {
 
   const handleCancelEdit = () => {
     setEditando(null)
+  }
+
+  const handleImported = async () => {
+    // 🔁 Recargar lista de proveedores después de importación
+    try {
+      setLoading(true)
+      setErrores([]) // Clear import errors on successful import
+      const data = await getProveedores()
+      setProveedores(data)
+      toast.success('Lista de proveedores actualizada')
+    } catch (err) {
+      toast.error('Error al actualizar la lista de proveedores')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 📊 Estadísticas rápidas
@@ -138,20 +156,29 @@ export default function ProveedoresPage() {
             </div>
           </div>
           
-          {/* Quick Stats */}
-          <div className="flex gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{totalProveedores}</div>
-              <div className="text-sm text-gray-500">Total Proveedores</div>
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+            {/* Quick Stats */}
+            <div className="flex gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{totalProveedores}</div>
+                <div className="text-sm text-gray-500">Total Proveedores</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{proveedoresConRuc}</div>
+                <div className="text-sm text-gray-500">Con RUC</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{totalProveedores - proveedoresConRuc}</div>
+                <div className="text-sm text-gray-500">Sin RUC</div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{proveedoresConRuc}</div>
-              <div className="text-sm text-gray-500">Con RUC</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{totalProveedores - proveedoresConRuc}</div>
-              <div className="text-sm text-gray-500">Sin RUC</div>
-            </div>
+            
+            {/* Import/Export Actions */}
+            <ProveedorImportExport 
+              proveedores={proveedores} 
+              onImported={handleImported}
+              onErrores={setErrores}
+            />
           </div>
         </motion.div>
 
@@ -160,6 +187,25 @@ export default function ProveedoresPage() {
           <motion.div variants={itemVariants}>
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+
+        {/* Import Errors */}
+        {errores.length > 0 && (
+          <motion.div variants={itemVariants}>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Errores de importación</AlertTitle>
+              <AlertDescription>
+                <div className="mt-2 space-y-1">
+                  {errores.map((error, index) => (
+                    <div key={index} className="text-sm">
+                      {error}
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
             </Alert>
           </motion.div>
         )}

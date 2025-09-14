@@ -326,6 +326,7 @@ export async function getTimelineData(filtros: {
       label: item.nombre,
       titulo: item.nombre,
       descripcion: `${item.codigo} - ${item.proyecto.nombre}`,
+      codigo: item.codigo, // ✅ Mapear código para mostrar en formato "codigo - titulo"
       tipo: item.tipo,
       start: item.fechaInicio,
       end: item.fechaFin,
@@ -421,7 +422,7 @@ export const listasEquipoService = {
   } = {}): Promise<ResponseListas> {
     try {
       const queryParams = buildQueryParams(filtros)
-      const url = buildApiUrl(`${API_BASE}/listas${queryParams ? `?${queryParams}` : ''}`)
+      const url = buildApiUrl(`${API_BASE}${queryParams ? `?${queryParams}` : ''}`)
       
       // 📡 Obtener cookies de la petición para Server Components
       const cookie = await getServerCookies()
@@ -713,15 +714,9 @@ export const utilidadesService = {
   /**
    * 💰 Formatear montos
    */
-<<<<<<< Updated upstream
-  formatearMonto(monto: number, moneda: 'PEN' | 'USD' = 'PEN') {
-    const simbolo = moneda === 'PEN' ? 'S/' : '$'
-    return `${simbolo} ${monto.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
-=======
   formatearMonto(monto: number, moneda: 'PEN' | 'USD' = 'USD') {
     const simbolo = moneda === 'USD' ? '$' : 'S/'
     return `${simbolo} ${monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
->>>>>>> Stashed changes
   },
 
   /**
@@ -781,7 +776,7 @@ export const validacionCoherenciaService = {
    */
   async validarCoherenciaListaPedidos(listaEquipoId: string) {
     try {
-      const response = await fetch(`${API_BASE}/listas/${listaEquipoId}`, {
+      const response = await fetch(`${API_BASE}/${listaEquipoId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -842,7 +837,7 @@ export const validacionCoherenciaService = {
       
       for (const lista of listas.data.listas) {
         // 📊 Obtener pedidos asociados a esta lista
-        const pedidosLista = pedidos.data.pedidos.filter(p => p.listaEquipoId === lista.id);
+        const pedidosLista = pedidos.data.pedidos.filter(p => p.listaId === lista.id);
         
         // 💰 Calcular montos
         const montoLista = lista.items?.reduce(
@@ -872,7 +867,7 @@ export const validacionCoherenciaService = {
             id: p.id,
             codigo: p.codigo,
             fechaNecesaria: p.fechaNecesaria ? new Date(p.fechaNecesaria) : new Date(),
-            listaEquipoId: p.listaEquipoId,
+            listaEquipoId: p.listaId!,
             items: (p.items || []).map((item: PedidoEquipoItem) => ({
                tiempoEntregaDias: item.tiempoEntregaDias || 30,
                cantidadPedida: item.cantidadPedida || 0,
@@ -933,7 +928,7 @@ export const validacionCoherenciaService = {
    */
   async validarCantidadesPorItem(listaEquipoId: string) {
     try {
-      const response = await fetch(`${API_BASE}/listas/${listaEquipoId}`, {
+      const response = await fetch(`${API_BASE}/${listaEquipoId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'

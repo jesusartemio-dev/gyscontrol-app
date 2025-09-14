@@ -27,11 +27,45 @@ export async function updateCliente(data: Cliente): Promise<Cliente> {
   return res.json()
 }
 
-export async function deleteCliente(id: string): Promise<void> {
-  const res = await fetch(buildApiUrl('/api/clientes'), {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id }),
-  })
-  if (!res.ok) throw new Error('Error al eliminar cliente')
+export async function deleteCliente(id: string): Promise<{ success: boolean; error?: string; details?: string }> {
+  try {
+    const res = await fetch(buildApiUrl('/api/clientes'), {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }))
+      
+      // 🚫 Retornar error específico sin lanzar excepción
+      if (res.status === 400 && errorData.error?.includes('proyectos asociados')) {
+        return {
+          success: false,
+          error: errorData.error,
+          details: errorData.details || 'Para eliminar este cliente, primero debe finalizar o reasignar sus proyectos.'
+        }
+      }
+      
+      if (res.status === 404) {
+        return {
+          success: false,
+          error: 'Cliente no encontrado'
+        }
+      }
+      
+      return {
+        success: false,
+        error: errorData.error || 'Error al eliminar cliente'
+      }
+    }
+    
+    return { success: true }
+  } catch (error) {
+    console.error('❌ Error en deleteCliente:', error)
+    return {
+      success: false,
+      error: 'Error de conexión al eliminar cliente'
+    }
+  }
 }

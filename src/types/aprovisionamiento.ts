@@ -1,7 +1,7 @@
 // ✅ Types y interfaces para el sistema de Aprovisionamiento Financiero
 // 📋 Basado en PROCEDIMIENTO_APROVISIONAMIENTO_FINANCIERO_V2.md
 
-import type { EstadoListaEquipo, EstadoPedido, EstadoPedidoItem } from './modelos'
+import type { EstadoListaEquipo, EstadoPedido, EstadoPedidoItem, PedidoEquipo } from './modelos'
 
 // 📊 Interfaces para Timeline y Gantt
 export interface ItemGantt {
@@ -104,6 +104,7 @@ export interface GanttItem {
   label: string
   titulo: string
   descripcion?: string
+  codigo?: string // ✅ Código de la lista/pedido para mostrar en formato "codigo - titulo"
   tipo: 'lista' | 'pedido'
   start: Date
   end: Date
@@ -483,7 +484,7 @@ export interface ResponseListas {
 export interface ResponsePedidos {
   success: boolean
   data: {
-    pedidos: any[]
+    pedidos: PedidoEquipo[]
     pagination: {
       page: number
       limit: number

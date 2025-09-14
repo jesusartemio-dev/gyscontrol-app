@@ -473,9 +473,9 @@ export function formatearNumero(
       case 'porcentaje':
         return new Intl.NumberFormat('es-PE', { style: 'percent', minimumFractionDigits: 1 }).format(numero / 100);
       case 'moneda':
-        return new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(numero);
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(numero);
       case 'monedaUSD':
-        return new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD' }).format(numero);
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(numero);
       case 'compacto':
         return new Intl.NumberFormat('es-PE', { notation: 'compact', compactDisplay: 'short' }).format(numero);
       default:

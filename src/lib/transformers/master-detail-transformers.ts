@@ -34,7 +34,7 @@ import type {
 /**
  * Calcula estadísticas básicas para la vista Master
  */
-export const calculateMasterStats: StatsCalculator = (items: ListaEquipoItem[]) => {
+export const calculateMasterStats = (items: ListaEquipoItem[]): ListaEquipoMaster['stats'] => {
   const stats = {
     totalItems: items.length,
     itemsVerificados: 0,
@@ -280,8 +280,8 @@ export const masterListUtils = {
   /**
    * Formatea moneda
    */
-  formatCurrency: (amount: number, currency: string = 'PEN'): string => {
-    const formatter = new Intl.NumberFormat('es-PE', {
+  formatCurrency: (amount: number, currency: string = 'USD'): string => {
+    const formatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 2

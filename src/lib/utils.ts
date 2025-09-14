@@ -17,8 +17,8 @@ export const formatDate = (date: Date | string): string => {
 }
 
 // 💰 Currency formatting utilities
-export const formatCurrency = (amount: number, currency: string = 'PEN'): string => {
-  return new Intl.NumberFormat('es-PE', {
+export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2

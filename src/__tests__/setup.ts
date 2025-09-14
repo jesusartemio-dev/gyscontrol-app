@@ -277,7 +277,7 @@ beforeAll(async () => {
       'gys-language': 'es',
       'gys-user-preferences': JSON.stringify({
         itemsPerPage: 10,
-        defaultCurrency: 'PEN'
+        defaultCurrency: 'USD'
       })
     }
     return mockData[key] || null

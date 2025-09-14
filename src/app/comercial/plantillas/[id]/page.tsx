@@ -19,10 +19,10 @@ import { deletePlantillaServicio } from '@/lib/services/plantillaServicio'
 import { deletePlantillaEquipo } from '@/lib/services/plantillaEquipo'
 import { deletePlantillaGasto } from '@/lib/services/plantillaGasto'
 import { deletePlantillaGastoItem } from '@/lib/services/plantillaGastoItem'
-import PlantillaEquipoForm from '@/components/plantillas/PlantillaEquipoForm'
+import PlantillaEquipoModal from '@/components/plantillas/PlantillaEquipoModal'
 import PlantillaServicioForm from '@/components/plantillas/PlantillaServicioForm'
 import PlantillaGastoForm from '@/components/plantillas/PlantillaGastoForm'
-import PlantillaEquipoAccordion from '@/components/plantillas/PlantillaEquipoAccordion'
+import PlantillaEquipoAccordion from '@/components/plantillas/equipos/PlantillaEquipoAccordion'
 import PlantillaServicioAccordion from '@/components/plantillas/PlantillaServicioAccordion'
 import PlantillaGastoAccordion from '@/components/plantillas/PlantillaGastoAccordion'
 import ResumenTotalesPlantilla from '@/components/plantillas/ResumenTotalesPlantilla'
@@ -34,6 +34,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 
 // Icons
 import { 
@@ -124,7 +125,7 @@ export default function PlantillaDetallePage() {
   const [plantilla, setPlantilla] = useState<Plantilla | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
-  const [showForm, setShowForm] = useState({ equipo: false, servicio: false, gasto: false })
+  const [showForm, setShowForm] = useState({ servicio: false, gasto: false })
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string | undefined>()
 
   useEffect(() => {
@@ -408,29 +409,14 @@ export default function PlantillaDetallePage() {
                     Gestiona los grupos de equipos de la plantilla ({plantilla.equipos.length} secciones)
                   </CardDescription>
                 </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowForm(prev => ({ ...prev, equipo: !prev.equipo }))}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> 
-                  Nuevo Equipo
-                </Button>
+                <PlantillaEquipoModal 
+                  plantillaId={plantilla.id}
+                  onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
+                />
               </div>
             </CardHeader>
             <CardContent>
-              {showForm.equipo && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-4"
-                >
-                  <PlantillaEquipoForm 
-                    plantillaId={plantilla.id} 
-                    onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)} 
-                  />
-                </motion.div>
-              )}
+
               
               {plantilla.equipos.length === 0 ? (
                 <div className="text-center py-12">
@@ -441,13 +427,16 @@ export default function PlantillaDetallePage() {
                   <p className="text-gray-500 mb-4">
                     Comienza agregando tu primera sección de equipos
                   </p>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowForm(prev => ({ ...prev, equipo: true }))}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Primera Sección
-                  </Button>
+                  <PlantillaEquipoModal 
+                    plantillaId={plantilla.id}
+                    onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
+                    trigger={
+                      <Button variant="outline">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Crear Primera Sección
+                      </Button>
+                    }
+                  />
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -460,11 +449,10 @@ export default function PlantillaDetallePage() {
                       <PlantillaEquipoAccordion 
                         key={e.id} 
                         equipo={e} 
-                        onCreated={i => actualizarEquipo(e.id, items => [...items, i])} 
-                        onDeleted={id => actualizarEquipo(e.id, items => items.filter(i => i.id !== id))} 
-                        onUpdated={item => actualizarEquipo(e.id, items => items.map(i => i.id === item.id ? item : i))} 
-                        onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)} 
+                        onItemChange={(items) => actualizarEquipo(e.id, () => items)} 
                         onUpdatedNombre={nuevo => setPlantilla(p => p ? { ...p, equipos: p.equipos.map(eq => eq.id === e.id ? { ...eq, nombre: nuevo } : eq) } : p)} 
+                        onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)} 
+                        onChange={(changes) => setPlantilla(p => p ? { ...p, equipos: p.equipos.map(eq => eq.id === e.id ? { ...eq, ...changes } : eq) } : p)} 
                       />
                     </motion.div>
                   ))}

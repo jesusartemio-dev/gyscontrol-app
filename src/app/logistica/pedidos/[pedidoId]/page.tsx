@@ -375,11 +375,11 @@ export default function PedidoLogisticaDetailPage() {
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />
-                {formatDate(pedido.createdAt)}
+                {formatDate(pedido.fechaPedido)}
               </span>
               <span className="flex items-center gap-1">
                 <User className="h-4 w-4" />
-                {pedido.proyecto?.comercial?.name || 'N/A'}
+                {pedido.responsable?.name || 'N/A'}
               </span>
               <Badge variant={getStatusVariant(pedido.estado)}>
                 {pedido.estado}
@@ -568,7 +568,7 @@ export default function PedidoLogisticaDetailPage() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Fecha Creación</label>
-                      <p className="font-semibold">{formatDate(pedido.createdAt)}</p>
+                      <p className="font-semibold">{formatDate(pedido.fechaPedido)}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Fecha Requerida</label>
@@ -596,24 +596,20 @@ export default function PedidoLogisticaDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {pedido.proyecto ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Nombre</label>
-                        <p className="font-semibold">{pedido.proyecto.nombre}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Cliente</label>
-                        <p className="font-semibold">{pedido.proyecto.cliente.nombre}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Comercial</label>
-                        <p className="font-semibold">{pedido.proyecto.comercial.name}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">No hay información del proyecto disponible</p>
-                  )}
+                  {pedido.responsable ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Responsable</label>
+                    <p className="font-semibold">{pedido.responsable.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Email</label>
+                    <p className="font-semibold">{pedido.responsable.email || 'No especificado'}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No hay información del responsable disponible</p>
+              )}
                 </CardContent>
               </Card>
             </div>

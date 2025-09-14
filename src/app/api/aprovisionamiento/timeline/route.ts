@@ -24,8 +24,10 @@ import type {
   ResumenTimeline,
   AlertaTimeline 
 } from '@/types/aprovisionamiento'
+import type { TimelinePaginationParams } from '@/types/payloads'
+import { parsePaginationParams, PAGINATION_CONFIGS } from '@/lib/utils/pagination'
 
-// 📋 Schema de validación para filtros de timeline
+// 📋 Schema de validación para filtros de timeline con paginación
 const timelineFiltersSchema = z.object({
   proyectoId: z.string().optional(),
   fechaInicio: z.string().optional().transform((val) => {
@@ -52,7 +54,10 @@ const timelineFiltersSchema = z.object({
   montoMaximo: z.number().optional(),
   responsableId: z.string().optional(),
   soloConAlertas: z.boolean().default(false),
-  zoom: z.enum(['dia', 'semana', 'mes', 'trimestre']).default('mes')
+  zoom: z.enum(['dia', 'semana', 'mes', 'trimestre']).default('mes'),
+  // 📄 Parámetros de paginación
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(50)
 })
 
 // 📋 Schema para validación de coherencia POST
@@ -172,7 +177,7 @@ export async function GET(request: NextRequest) {
       console.log('🔐 Session status:', session ? 'authenticated' : 'not authenticated')
     }
 
-    // ✅ Validar parámetros de consulta
+    // ✅ Validar parámetros de consulta con paginación
     const { searchParams } = new URL(request.url)
     const filtros = timelineFiltersSchema.parse({
       proyectoId: searchParams.get('proyectoId') || undefined,
@@ -190,7 +195,9 @@ export async function GET(request: NextRequest) {
       montoMaximo: searchParams.get('montoMaximo') ? parseFloat(searchParams.get('montoMaximo')!) : undefined,
       responsableId: searchParams.get('responsableId') || undefined,
       soloConAlertas: searchParams.get('soloConAlertas') === 'true',
-      zoom: searchParams.get('zoom') as any || 'mes'
+      zoom: searchParams.get('zoom') as any || 'mes',
+      page: parseInt(searchParams.get('page') || '1'),
+      limit: parseInt(searchParams.get('limit') || '50')
     })
 
     const itemsGantt: ItemGantt[] = []
@@ -526,8 +533,18 @@ export async function GET(request: NextRequest) {
         itemsFiltrados.reduce((sum, item) => sum + (item.progreso || 0), 0) / itemsFiltrados.length : 100
     }
 
+    // 📄 Aplicar paginación a los items finales
+    const totalItems = itemsFiltrados.length
+    const skip = (filtros.page - 1) * filtros.limit
+    const itemsPaginados = itemsFiltrados.slice(skip, skip + filtros.limit)
+    
+    // 📊 Calcular metadata de paginación
+    const totalPages = Math.ceil(totalItems / filtros.limit)
+    const hasNext = filtros.page < totalPages
+    const hasPrev = filtros.page > 1
+
     return NextResponse.json({
-      items: itemsFiltrados,
+      items: itemsPaginados,
       resumen,
       configuracion: {
         zoom: filtros.zoom,
@@ -539,6 +556,14 @@ export async function GET(request: NextRequest) {
           itemsFiltrados.length > 0 ? 
             new Date(Math.max(...itemsFiltrados.map(item => item.fechaFin.getTime()))) : 
             new Date()
+      },
+      pagination: {
+        page: filtros.page,
+        limit: filtros.limit,
+        total: totalItems,
+        totalPages,
+        hasNext,
+        hasPrev
       }
     })
 

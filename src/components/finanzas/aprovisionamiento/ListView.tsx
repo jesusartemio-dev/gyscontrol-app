@@ -119,9 +119,9 @@ const getTypeIcon = (tipo: string) => {
 
 // ✅ Format currency
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-PE', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'PEN',
+    currency: 'USD',
     minimumFractionDigits: 2,
   }).format(amount);
 };

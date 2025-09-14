@@ -42,43 +42,19 @@ import {
 import ListaEquipoFiltersClient from '@/components/aprovisionamiento/ListaEquipoFiltersClient'
 import ListaEquipoTableClient from '@/components/aprovisionamiento/ListaEquipoTableClient'
 
-// 🔧 Services
-import { getListasEquipoClient } from '@/lib/services/aprovisionamientoClient'
+// ✅ React Query Services
+import { useListasEquipo } from '@/lib/services/aprovisionamientoQuery'
 
 // 📝 Types
 import type { EstadoListaEquipo } from '@/types/modelos'
+import type { ListasEquipoPaginationParams } from '@/types/payloads'
 
 export default function ListasEquipoPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { data: session, status } = useSession()
   
-  // 🔁 State management
-  const [listasData, setListasData] = useState<{
-    items: any[]
-    total: number
-    pagination: {
-      page: number
-      limit: number
-      total: number
-      pages: number
-      hasNext: boolean
-      hasPrev: boolean
-    }
-  }>({
-    items: [],
-    total: 0,
-    pagination: {
-      page: 1,
-      limit: 10,
-      total: 0,
-      pages: 0,
-      hasNext: false,
-      hasPrev: false
-    }
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // ✅ React Query - No more manual state management
 
   // 📋 Extract search params with memoization to prevent infinite loops
   const searchParamsObj = useMemo(() => {
@@ -102,74 +78,143 @@ export default function ListasEquipoPageContent() {
   const sortBy = searchParamsObj.sortBy
   const sortOrder = (searchParamsObj.sortOrder as 'asc' | 'desc') || 'desc'
 
-  // 📡 Fetch data effect
-  useEffect(() => {
-    const fetchListas = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        
-        const filtros = {
-          page,
-          limit,
-          ...(proyecto && { proyectoId: proyecto }),
-          ...(estado && { estado }),
-          ...(fechaInicio && { fechaInicio }),
-          ...(fechaFin && { fechaFin }),
-          ...(montoMin && { montoMin: parseFloat(montoMin) }),
-          ...(montoMax && { montoMax: parseFloat(montoMax) }),
-          ...(coherencia && { soloCoherencia: coherencia === 'true' }),
-          ...(busqueda && { busqueda }),
-          ...(sortBy && { sortBy }),
-          ...(sortOrder && { sortOrder })
+  // ✅ React Query params
+  const queryParams: ListasEquipoPaginationParams = useMemo(() => ({
+    page,
+    limit,
+    ...(proyecto && { proyectoId: proyecto }),
+    ...(estado && { estado }),
+    ...(fechaInicio && { fechaDesde: fechaInicio }),
+    ...(fechaFin && { fechaHasta: fechaFin }),
+    ...(montoMin && { montoMinimo: parseFloat(montoMin) }),
+    ...(montoMax && { montoMaximo: parseFloat(montoMax) }),
+    ...(busqueda && { busqueda }),
+    ...(sortBy && { sortBy }),
+    ...(sortOrder && { sortOrder })
+  }), [page, limit, proyecto, estado, fechaInicio, fechaFin, montoMin, montoMax, busqueda, sortBy, sortOrder])
+
+  // ✅ React Query hook
+  const { 
+    data: listasResponse, 
+    isLoading: loading, 
+    error: queryError,
+    isError 
+  } = useListasEquipo(queryParams, {
+    enabled: status !== 'loading' // Only fetch when session is ready
+  })
+
+  // ✅ Transform data for compatibility
+  const listasData = useMemo(() => {
+    if (!listasResponse) {
+      return {
+        items: [],
+        total: 0,
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 0,
+          pages: 0,
+          hasNext: false,
+          hasPrev: false
         }
-        
-        const response = await getListasEquipoClient(filtros)
-        
-        if (response.success) {
-          const listasArray = response.data?.listas || []
-          
-          setListasData({
-            items: listasArray,
-            total: response.data?.pagination?.total || 0,
-            pagination: response.data?.pagination || {
-              page: 1,
-              limit: 10,
-              total: 0,
-              pages: 0,
-              hasNext: false,
-              hasPrev: false
-            }
-          })
-        } else {
-          setError('Error al cargar las listas')
-        }
-      } catch (err) {
-        console.error('Error fetching listas:', err)
-        setError('Error de conexión al cargar las listas')
-      } finally {
-        setLoading(false)
       }
     }
 
-    if (status !== 'loading') {
-      fetchListas()
+    // 🔄 Transform ListaEquipo[] to ListaEquipoDetail[] with type assertion
+    const transformedItems = (listasResponse.data || []).map(lista => {
+      // ✅ Create a valid ListaEquipoDetail by ensuring proyecto is not null
+       const listaDetail = {
+         ...lista,
+         // ✅ Ensure proyecto is not null for ListaEquipoDetail compatibility
+         proyecto: lista.proyecto || {
+           id: lista.proyectoId,
+           clienteId: '',
+           comercialId: '',
+           gestorId: '',
+           nombre: 'Proyecto no encontrado',
+           totalEquiposInterno: 0,
+           totalServiciosInterno: 0,
+           totalGastosInterno: 0,
+           totalInterno: 0,
+           totalCliente: 0,
+           descuento: 0,
+           grandTotal: 0,
+           totalRealEquipos: 0,
+           totalRealServicios: 0,
+           totalRealGastos: 0,
+           totalReal: 0,
+           codigo: 'N/A',
+           estado: 'activo',
+           fechaInicio: '',
+           fechaFin: '',
+           createdAt: new Date().toISOString(),
+           updatedAt: new Date().toISOString(),
+           cliente: {} as any,
+           comercial: {} as any,
+           gestor: {} as any,
+           equipos: [],
+           servicios: [],
+           gastos: [],
+           ListaEquipo: [],
+           cotizaciones: [],
+           valorizaciones: [],
+           registrosHoras: []
+         },
+         // ✅ Transform items to ListaEquipoItemDetail[]
+         items: (lista.items || []).map(item => ({
+           ...item,
+           calculated: {
+             costoTotal: item.precioElegido || item.presupuesto || 0,
+             tienePedidos: false,
+             cantidadPedida: item.cantidadPedida || 0,
+             cantidadPendiente: item.cantidad - (item.cantidadPedida || 0),
+             estadoPedido: undefined
+           }
+         })),
+         // ✅ Calculate stats from items
+         stats: {
+           totalItems: lista._count?.items || 0,
+           itemsVerificados: 0,
+           itemsAprobados: 0,
+           itemsRechazados: 0,
+           itemsPendientes: lista._count?.items || 0,
+           costoTotal: (lista.items || []).reduce((total, item) => {
+             const precio = item.precioElegido || item.presupuesto || 0;
+             const cantidad = item.cantidad || 0;
+             return total + (precio * cantidad);
+           }, 0),
+           costoAprobado: 0,
+           costoRechazado: 0,
+           costoPendiente: 0,
+           itemsPorOrigen: {
+             cotizado: 0,
+             nuevo: 0,
+             reemplazo: 0
+           },
+           itemsConPedido: 0,
+           itemsSinPedido: 0
+         }
+       };
+      
+      return listaDetail;
+    });
+
+    return {
+      items: transformedItems,
+      total: listasResponse.meta?.total || 0,
+      pagination: listasResponse.meta || {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
+      }
     }
-  }, [
-    page, 
-    limit, 
-    proyecto, 
-    estado, 
-    fechaInicio, 
-    fechaFin, 
-    montoMin, 
-    montoMax, 
-    coherencia, 
-    busqueda, 
-    sortBy, 
-    sortOrder,
-    status
-  ])
+  }, [listasResponse])
+
+  // ✅ Error handling
+  const error = isError ? (queryError?.message || 'Error al cargar las listas') : null
 
   // 🔄 Handle filter changes
   const handleFilterChange = (newFilters: Record<string, any>) => {
@@ -193,7 +238,7 @@ export default function ListasEquipoPageContent() {
     const items = listasData.items || []
     
     return {
-      total: items.length,
+      total: listasData.pagination.total, // Use pagination total instead of filtered items
       pendientes: items.filter((item: any) => item.estado === 'pendiente').length,
       aprobadas: items.filter((item: any) => item.estado === 'aprobada').length,
       rechazadas: items.filter((item: any) => item.estado === 'rechazada').length,
@@ -366,7 +411,7 @@ export default function ListasEquipoPageContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              S/ {stats.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+              USD {stats.montoTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
               Valor estimado

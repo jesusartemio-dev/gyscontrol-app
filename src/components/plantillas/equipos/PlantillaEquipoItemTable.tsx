@@ -9,6 +9,8 @@
 
 import type { PlantillaEquipo, PlantillaEquipoItem } from '@/types'
 import PlantillaEquipoItemRow from './PlantillaEquipoItemRow'
+import PlantillaEquipoItemForm from '../PlantillaEquipoItemForm'
+import { Separator } from '@/components/ui/separator'
 
 interface Props {
   equipo: PlantillaEquipo
@@ -31,8 +33,23 @@ export default function PlantillaEquipoItemTable({
     onItemChange(nuevosItems)
   }
 
+  const handleItemCreated = (newItem: PlantillaEquipoItem) => {
+    const nuevosItems = [...equipo.items, newItem]
+    onItemChange(nuevosItems)
+  }
+
   return (
-    <div className="overflow-auto border rounded-md">
+    <div className="space-y-4">
+      {/* Formulario para agregar nuevos items */}
+      <PlantillaEquipoItemForm
+        plantillaEquipoId={equipo.id}
+        onCreated={handleItemCreated}
+      />
+      
+      <Separator />
+      
+      {/* Tabla de items existentes */}
+      <div className="overflow-auto border rounded-md">
       <table className="min-w-full text-sm">
         <thead className="bg-gray-100">
           <tr>
@@ -67,6 +84,7 @@ export default function PlantillaEquipoItemTable({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

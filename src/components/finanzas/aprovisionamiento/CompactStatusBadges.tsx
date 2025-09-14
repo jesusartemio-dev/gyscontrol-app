@@ -124,9 +124,9 @@ const formatValue = (value: string | number, format?: string): string => {
   
   switch (format) {
     case 'currency':
-      return new Intl.NumberFormat('es-PE', {
+      return new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: 'PEN',
+        currency: 'USD',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }).format(value);
@@ -134,7 +134,7 @@ const formatValue = (value: string | number, format?: string): string => {
       return `${Math.round(value)}%`;
     case 'number':
     default:
-      return new Intl.NumberFormat('es-PE').format(value);
+      return new Intl.NumberFormat('en-US').format(value);
   }
 };
 

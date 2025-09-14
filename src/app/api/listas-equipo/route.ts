@@ -11,6 +11,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { EstadoListaEquipo } from '@prisma/client'
+import type { PaginatedResponse, ListasEquipoPaginationParams } from '@/types/payloads'
+import { 
+  parsePaginationParams, 
+  paginateQuery, 
+  PAGINATION_CONFIGS 
+} from '@/lib/utils/pagination'
 
 // Mock data for demonstration
 const mockListasEquipo = [
@@ -180,7 +186,7 @@ const mockListasEquipo = [
   }
 ]
 
-// GET /api/listas-equipo - Obtener todas las listas de equipos
+// GET /api/listas-equipo - Obtener listas de equipos con paginación y búsqueda
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -193,40 +199,101 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    
+    // 🔧 Parsear parámetros usando utilidad optimizada
+    const paginationParams = parsePaginationParams(
+      searchParams, 
+      PAGINATION_CONFIGS.listasEquipo
+    )
+    
+    // 📡 Extraer filtros específicos de listas-equipo
     const proyectoId = searchParams.get('proyectoId')
     const estadoParam = searchParams.get('estado')
-
-    // ✅ Validar que el estado sea un valor válido del enum
+    const responsableId = searchParams.get('responsableId')
+    const fechaDesde = searchParams.get('fechaDesde')
+    const fechaHasta = searchParams.get('fechaHasta')
+    
+    // ✅ Validar estado del enum
     const estadosValidos = Object.values(EstadoListaEquipo)
-    const estado = estadoParam && estadosValidos.includes(estadoParam as EstadoListaEquipo) ? estadoParam as EstadoListaEquipo : undefined
-
-    // ✅ Consultar listas desde la base de datos con Prisma
-    const listas = await prisma.listaEquipo.findMany({
-      where: {
-        ...(proyectoId && { proyectoId }),
-        ...(estado && estadoParam !== 'todos' && { estado })
-      },
-      include: {
-        proyecto: {
-          select: {
-            id: true,
-            nombre: true,
-            codigo: true
+    const estado = estadoParam && estadosValidos.includes(estadoParam as EstadoListaEquipo) 
+      ? estadoParam as EstadoListaEquipo 
+      : undefined
+    
+    // 🔧 Construir filtros adicionales
+    const additionalWhere = {
+      ...(proyectoId && { proyectoId }),
+      ...(estado && estadoParam !== 'todos' && { estado }),
+      ...(responsableId && { responsableId }),
+      ...(fechaDesde && fechaHasta && {
+        fechaNecesaria: {
+          gte: new Date(fechaDesde),
+          lte: new Date(fechaHasta)
+        }
+      })
+    }
+    
+    // 📡 Función de consulta optimizada
+    const queryFn = async ({ skip, take, where, orderBy }: any) => {
+      return await prisma.listaEquipo.findMany({
+        where,
+        select: {
+          id: true,
+          nombre: true,
+          codigo: true,
+          estado: true,
+          numeroSecuencia: true,
+          fechaNecesaria: true,
+          fechaAprobacionFinal: true,
+          createdAt: true,
+          updatedAt: true,
+          proyecto: {
+            select: {
+              id: true,
+              nombre: true,
+              codigo: true
+            }
+          },
+          responsable: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          items: {
+            select: {
+              cantidad: true,
+              precioElegido: true,
+              presupuesto: true
+            }
+          },
+          _count: {
+            select: {
+              items: true
+            }
           }
         },
-        items: true,
-        _count: {
-          select: {
-            items: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-
-    return NextResponse.json(listas)
+        orderBy,
+        skip,
+        take
+      })
+    }
+    
+    // 📡 Función de conteo
+    const countFn = async (where: any) => {
+      return await prisma.listaEquipo.count({ where })
+    }
+    
+    // 🔁 Ejecutar paginación con utilidad optimizada
+    const result = await paginateQuery(
+      queryFn,
+      countFn,
+      paginationParams,
+      [...(PAGINATION_CONFIGS.listasEquipo.searchFields || ['codigo', 'nombre'])],
+      additionalWhere
+    )
+    
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error fetching listas-equipo:', error)
     return NextResponse.json(

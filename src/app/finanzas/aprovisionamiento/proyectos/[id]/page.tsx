@@ -106,7 +106,11 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
     totalPedidos: pedidosData.data.pagination.total,
     pedidosRecibidos: pedidosData.data.pedidos.filter(item => item.estado === 'entregado').length,
     montoTotalListas: listasData.data.listas.reduce((sum, item) => sum + (item.estadisticas?.montoTotal || 0), 0),
-    montoTotalPedidos: pedidosData.data.pedidos.reduce((sum, item) => sum + (item.montoTotal || 0), 0),
+    montoTotalPedidos: pedidosData.data.pedidos.reduce((sum, pedido) => {
+      const montoPedido = pedido.items?.reduce((itemSum, item) => 
+        itemSum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0) || 0
+      return sum + montoPedido
+    }, 0),
     progresoGeneral: proyecto.porcentajeEjecucion || 0,
     diasTranscurridos: proyecto.fechaInicio ? 
       Math.floor((new Date().getTime() - new Date(proyecto.fechaInicio).getTime()) / (1000 * 60 * 60 * 24)) : 0,

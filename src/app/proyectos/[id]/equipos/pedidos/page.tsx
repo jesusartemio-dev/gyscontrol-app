@@ -57,16 +57,12 @@ import {
   Clock,
   DollarSign,
   RefreshCw,
-<<<<<<< Updated upstream
-=======
   Plus,
   Home,
   FolderOpen,
-  ChevronRight,
   BarChart3,
   Activity,
   Target
->>>>>>> Stashed changes
 } from 'lucide-react'
 
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'

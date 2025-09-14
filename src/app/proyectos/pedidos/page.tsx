@@ -122,10 +122,14 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
   // 📊 Calculate statistics
   const stats = {
     totalPedidos: pedidosData.total,
-    pendientes: pedidosData.items.filter(p => p.estado === 'PENDIENTE').length,
-    aprobados: pedidosData.items.filter(p => p.estado === 'APROBADO').length,
-    rechazados: pedidosData.items.filter(p => p.estado === 'RECHAZADO').length,
-    montoTotal: pedidosData.items.reduce((sum, p) => sum + (p.montoTotal || 0), 0)
+    pendientes: pedidosData.items.filter(p => p.estado === EstadoPedido.borrador || p.estado === EstadoPedido.enviado).length,
+    aprobados: pedidosData.items.filter(p => p.estado === EstadoPedido.atendido || p.estado === EstadoPedido.entregado).length,
+    rechazados: pedidosData.items.filter(p => p.estado === EstadoPedido.cancelado).length,
+    montoTotal: pedidosData.items.reduce((sum, p) => {
+      const pedidoTotal = p.items?.reduce((itemSum, item) => 
+        itemSum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0) || 0
+      return sum + pedidoTotal
+    }, 0)
   }
 
   return (

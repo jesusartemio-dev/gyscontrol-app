@@ -52,11 +52,20 @@ interface PageProps {
     agrupacion?: 'proyecto' | 'estado' | 'proveedor' | 'fecha'
     coherencia?: string
     alertas?: string
+    minimal?: string
+    hideFilters?: string
+    fullscreen?: string
   }
 }
 
 export default async function TimelinePage({ searchParams: searchParamsPromise }: { searchParams: Promise<PageProps['searchParams']> }) {
   const searchParams = await searchParamsPromise
+  
+  // ✅ View mode flags - minimal is true by default
+  const isMinimal = searchParams.minimal !== 'false' // Default to true unless explicitly set to false
+  const hideFilters = searchParams.hideFilters === 'true'
+  const isFullscreen = searchParams.fullscreen === 'true'
+  
   // 📡 Fetch timeline data
   const timelineData = await getTimelineData({
     proyectoId: searchParams.proyecto,
@@ -79,186 +88,221 @@ export default async function TimelinePage({ searchParams: searchParamsPromise }
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* 🧭 Breadcrumb Navigation */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/" className="flex items-center gap-1">
-              <Home className="h-3 w-3" />
-              Inicio
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas/aprovisionamiento">Aprovisionamiento</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Timeline</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className={`${isFullscreen ? 'h-screen overflow-hidden' : 'container mx-auto'} ${isMinimal ? 'p-2' : 'p-6'} space-y-6`}>
+      {/* 🧭 Breadcrumb Navigation - Hidden in minimal mode */}
+      {!isMinimal && (
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/" className="flex items-center gap-1">
+                <Home className="h-3 w-3" />
+                Inicio
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/finanzas/aprovisionamiento">Aprovisionamiento</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Timeline</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      )}
 
-      {/* 🎨 Header Section */}
-      <div className="flex flex-col space-y-4">
+      {/* 🎨 Header Section - Simplified in minimal mode */}
+      <div className={`flex flex-col ${isMinimal ? 'space-y-2' : 'space-y-4'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/finanzas/aprovisionamiento">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
-              </Link>
-            </Button>
+            {!isMinimal && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/finanzas/aprovisionamiento">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Volver
+                </Link>
+              </Button>
+            )}
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Timeline de Aprovisionamiento</h1>
-              <p className="text-muted-foreground mt-2">
-                Vista Gantt interactiva con seguimiento temporal completo
-              </p>
+              <h1 className={`${isMinimal ? 'text-xl' : 'text-3xl'} font-bold tracking-tight`}>
+                {isMinimal ? 'Timeline Gantt' : 'Timeline de Aprovisionamiento'}
+              </h1>
+              {!isMinimal && (
+                <p className="text-muted-foreground mt-2">
+                  Vista Gantt interactiva con seguimiento temporal completo
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              Configurar Vista
+            {/* 🔄 View Toggle Buttons */}
+            <Button 
+              variant={isMinimal ? "default" : "outline"} 
+              size="sm" 
+              asChild
+            >
+              <Link href={`?${new URLSearchParams({...searchParams, minimal: isMinimal ? 'false' : 'true'}).toString()}`}>
+                {isMinimal ? 'Vista Completa' : 'Vista Minimal'}
+              </Link>
             </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
+            {!isMinimal && (
+              <>
+                <Button variant="outline" size="sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configurar Vista
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* 📊 Timeline Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalItems}</div>
-              <p className="text-xs text-muted-foreground">
-                Listas y pedidos
-              </p>
-            </CardContent>
-          </Card>
+        {/* 📊 Timeline Stats - Hidden in minimal mode */}
+        {!isMinimal && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalItems}</div>
+                <p className="text-xs text-muted-foreground">
+                  Listas y pedidos
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En Riesgo</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.itemsEnRiesgo}</div>
-              <p className="text-xs text-muted-foreground">
-                Requieren atención
-              </p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">En Riesgo</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{stats.itemsEnRiesgo}</div>
+                <p className="text-xs text-muted-foreground">
+                  Requieren atención
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Retrasados</CardTitle>
-              <Clock className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats.itemsRetrasados}</div>
-              <p className="text-xs text-muted-foreground">
-                Fuera de cronograma
-              </p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Retrasados</CardTitle>
+                <Clock className="h-4 w-4 text-destructive" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-destructive">{stats.itemsRetrasados}</div>
+                <p className="text-xs text-muted-foreground">
+                  Fuera de cronograma
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Alertas</CardTitle>
-              {stats.alertasActivas > 0 ? (
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-              ) : (
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              )}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Alertas</CardTitle>
                 {stats.alertasActivas > 0 ? (
-                  <Badge variant="destructive">{stats.alertasActivas}</Badge>
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
                 ) : (
-                  <Badge variant="default" className="bg-green-600">0</Badge>
+                  <CheckCircle className="h-4 w-4 text-green-600" />
                 )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Alertas activas
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {stats.alertasActivas > 0 ? (
+                    <Badge variant="destructive">{stats.alertasActivas}</Badge>
+                  ) : (
+                    <Badge variant="default" className="bg-green-600">0</Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Alertas activas
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
-      <Separator />
+      {!isMinimal && <Separator />}
 
       {/* 📅 Main Timeline View - Prioritized Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        {/* 🎯 Compact Filters Sidebar */}
-        <div className="xl:col-span-1">
-          <Card className="sticky top-6">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center space-x-2">
-                <Filter className="h-4 w-4" />
-                <span>Filtros</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Suspense fallback={<div className="h-48 bg-muted animate-pulse rounded" />}>
-                <TimelineFiltersWrapper 
-                  filtros={{
-                    fechaInicio: searchParams.fechaInicio ? new Date(searchParams.fechaInicio).toISOString() : undefined,
-                    fechaFin: searchParams.fechaFin ? new Date(searchParams.fechaFin).toISOString() : undefined,
-                    proyectoIds: searchParams.proyecto ? [searchParams.proyecto] : [],
-                    tipoVista: (searchParams.vista as 'gantt' | 'lista' | 'calendario') || 'gantt',
-                    agrupacion: (searchParams.agrupacion as 'proyecto' | 'estado' | 'proveedor' | 'fecha') || 'proyecto',
-                    validarCoherencia: searchParams.coherencia === 'true',
-                    soloAlertas: searchParams.alertas === 'true',
-                    incluirSugerencias: false,
-                    margenDias: 7,
-                    alertaAnticipacion: 15
-                  }}
-                  loading={false}
-                  compact={true}
-                />
-              </Suspense>
-            </CardContent>
-          </Card>
-        </div>
+      <div className={`grid grid-cols-1 ${(isMinimal || hideFilters) ? 'xl:grid-cols-1' : 'xl:grid-cols-5'} gap-6`}>
+        {/* 🎯 Compact Filters Sidebar - Collapsible */}
+        {!(isMinimal || hideFilters) && (
+          <div className="xl:col-span-1">
+            <Card className="sticky top-6">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Filter className="h-4 w-4" />
+                    <span>Filtros</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    asChild
+                    className="h-6 w-6 p-0"
+                  >
+                    <Link href={`?${new URLSearchParams({...searchParams, hideFilters: 'true'}).toString()}`}>
+                      ×
+                    </Link>
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Suspense fallback={<div className="h-48 bg-muted animate-pulse rounded" />}>
+                  <TimelineFiltersWrapper 
+                    filtros={{
+                      fechaInicio: searchParams.fechaInicio ? new Date(searchParams.fechaInicio).toISOString() : undefined,
+                      fechaFin: searchParams.fechaFin ? new Date(searchParams.fechaFin).toISOString() : undefined,
+                      proyectoIds: searchParams.proyecto ? [searchParams.proyecto] : [],
+                      tipoVista: (searchParams.vista as 'gantt' | 'lista' | 'calendario') || 'gantt',
+                      agrupacion: (searchParams.agrupacion as 'proyecto' | 'estado' | 'proveedor' | 'fecha') || 'proyecto',
+                      validarCoherencia: searchParams.coherencia === 'true',
+                      soloAlertas: searchParams.alertas === 'true',
+                      incluirSugerencias: false,
+                      margenDias: 7,
+                      alertaAnticipacion: 15
+                    }}
+                    loading={false}
+                    compact={true}
+                  />
+                </Suspense>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* 📊 Timeline Chart - Main Content */}
-        <div className="xl:col-span-4">
-          <Card className="min-h-[700px]">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">Timeline Gantt</CardTitle>
-                  <CardDescription className="text-sm">
-                    Cronograma interactivo de aprovisionamiento
-                  </CardDescription>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="outline" className="text-xs">
-                    {searchParams.vista || 'Gantt'}
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    {searchParams.agrupacion || 'Proyecto'}
-                  </Badge>
-                </div>
+        <div className={`${(isMinimal || hideFilters) ? 'xl:col-span-1' : 'xl:col-span-4'}`}>
+          <Card className={`${isFullscreen ? 'h-screen' : isMinimal ? 'min-h-[85vh]' : 'min-h-[700px]'}`}>
+            {/* 🔄 Floating Filters Toggle - Only show when hidden */}
+            {(isMinimal || hideFilters) && (
+              <div className="absolute top-4 right-4 z-10">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  asChild
+                >
+                  <Link href={`?${new URLSearchParams({...searchParams, hideFilters: 'false'}).toString()}`}>
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filtros
+                  </Link>
+                </Button>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
+            )}
+            <CardContent className={`${isMinimal ? 'p-2' : 'p-0'}`}>
               <Suspense fallback={
-                <div className="h-[600px] bg-muted animate-pulse rounded-b-lg flex items-center justify-center">
+                <div className={`${isFullscreen ? 'h-screen' : isMinimal ? 'h-[75vh]' : 'h-[600px]'} bg-muted animate-pulse rounded-b-lg flex items-center justify-center`}>
                   <div className="text-center">
                     <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-muted-foreground">Cargando timeline...</p>
@@ -270,7 +314,7 @@ export default async function TimelinePage({ searchParams: searchParamsPromise }
                   allowEdit={false}
                   showFilters={false}
                   showCoherencePanel={false}
-                  className="h-[600px]"
+                  className={`${isFullscreen ? 'h-screen' : isMinimal ? 'h-[75vh]' : 'h-[600px]'}`}
                   defaultFilters={{
                     fechaInicio: searchParams.fechaInicio ? new Date(searchParams.fechaInicio).toISOString() : undefined,
                     fechaFin: searchParams.fechaFin ? new Date(searchParams.fechaFin).toISOString() : undefined,
@@ -286,8 +330,8 @@ export default async function TimelinePage({ searchParams: searchParamsPromise }
         </div>
       </div>
 
-      {/* 🚨 Alertas Section (if any) */}
-      {stats.alertasActivas > 0 && (
+      {/* 🚨 Alertas Section (if any) - Hidden in minimal mode */}
+      {!isMinimal && stats.alertasActivas > 0 && (
         <Card className="border-orange-200 bg-orange-50">
           <CardHeader>
             <CardTitle className="text-orange-800 flex items-center">

@@ -176,12 +176,23 @@ export async function generarReportePedidos(
     if (filtros.proyectoId) queryParams.set('proyectoId', filtros.proyectoId);
     if (filtros.proveedorId) queryParams.set('proveedorId', filtros.proveedorId);
     if (filtros.estadoEntrega) queryParams.set('estadoEntrega', filtros.estadoEntrega);
-    if (filtros.fechaDesde) queryParams.set('fechaDesde', filtros.fechaDesde.toISOString());
-    if (filtros.fechaHasta) queryParams.set('fechaHasta', filtros.fechaHasta.toISOString());
+    if (filtros.fechaDesde) {
+      if (isNaN(filtros.fechaDesde.getTime())) {
+        throw new Error('Invalid time value');
+      }
+      queryParams.set('fechaDesde', filtros.fechaDesde.toISOString());
+    }
+    if (filtros.fechaHasta) {
+      if (isNaN(filtros.fechaHasta.getTime())) {
+        throw new Error('Invalid time value');
+      }
+      queryParams.set('fechaHasta', filtros.fechaHasta.toISOString());
+    }
     if (filtros.incluirDetalles) queryParams.set('incluirDetalles', 'true');
 
     // 📡 Obtener métricas generales
-    const metricsResponse = await fetch(`/api/reportes/pedidos?${queryParams}&tipoReporte=metricas`, {
+    queryParams.set('tipoReporte', 'metricas');
+    const metricsResponse = await fetch(`/api/reportes/pedidos?${queryParams}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -863,8 +874,8 @@ export async function obtenerMetricasFinancieras(
     logger.info('💰 Obteniendo métricas financieras', filtros);
 
     // 🔄 Simular datos financieros
-    const moneda = filtros.moneda || 'PEN';
-    const factorMoneda = moneda === 'USD' ? 0.27 : 1;
+    const moneda = filtros.moneda || 'USD';
+    const factorMoneda = moneda === 'USD' ? 1 : 3.7;
 
     const ingresos = {
       total: Math.random() * 500000 + 1000000,

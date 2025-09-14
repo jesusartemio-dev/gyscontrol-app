@@ -118,7 +118,7 @@ describe('ListaEquipoMasterCard', () => {
         />
       );
 
-      expect(screen.getByText('S/ 150,000.00')).toBeInTheDocument();
+      expect(screen.getByText('USD 150,000.00')).toBeInTheDocument();
     });
   });
 
@@ -359,7 +359,7 @@ describe('ListaEquipoMasterCard', () => {
         />
       );
 
-      expect(screen.getByText('S/ 0.00')).toBeInTheDocument();
+      expect(screen.getByText('USD 0.00')).toBeInTheDocument();
     });
 
     it('should handle very long names correctly', () => {

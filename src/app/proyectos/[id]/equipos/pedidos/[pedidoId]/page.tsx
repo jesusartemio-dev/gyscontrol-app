@@ -92,8 +92,8 @@ const getEstadoVariant = (estado: string) => {
   }
 }
 
-const formatCurrency = (amount: number, currency: string = 'PEN') => {
-  return new Intl.NumberFormat('es-PE', {
+const formatCurrency = (amount: number, currency: string = 'USD') => {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2

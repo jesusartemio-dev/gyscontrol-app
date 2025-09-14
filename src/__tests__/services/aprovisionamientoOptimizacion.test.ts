@@ -31,7 +31,7 @@ const mockProyectos: ProyectoAprovisionamiento[] = [
     clienteNombre: 'Cliente ABC',
     totalInterno: 150000,
     totalReal: 120000,
-    moneda: 'PEN',
+    moneda: 'USD',
     fechaCreacion: new Date('2024-01-01'),
     fechaActualizacion: new Date('2024-01-15')
   },
@@ -69,7 +69,7 @@ const mockProyectos: ProyectoAprovisionamiento[] = [
     clienteNombre: 'Cliente DEF',
     totalInterno: 300000,
     totalReal: 250000,
-    moneda: 'PEN',
+    moneda: 'USD',
     fechaCreacion: new Date('2024-02-15'),
     fechaActualizacion: new Date('2024-03-01')
   }

@@ -974,6 +974,11 @@ export interface Proveedor {
   id: string
   nombre: string
   ruc?: string
+  direccion?: string
+  telefono?: string
+  correo?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
 }
 
 export interface CotizacionProveedor {
@@ -1213,6 +1218,150 @@ export interface PaqueteCompraItemPayload {
   cantidad: number
   precioUnitario: number
   montoTotal?: number
+}
+
+// ============================
+// 📋 Sistema de Tareas y Subtareas
+// ============================
+
+// 🏷️ Enums para el sistema de tareas
+export type EstadoTarea = 'pendiente' | 'en_progreso' | 'completada' | 'cancelada' | 'pausada'
+export type PrioridadTarea = 'baja' | 'media' | 'alta' | 'critica'
+export type TipoDependencia = 'fin_a_inicio' | 'inicio_a_inicio' | 'fin_a_fin' | 'inicio_a_fin'
+export type TipoRecurso = 'humano' | 'material' | 'equipo'
+
+// 📋 Interfaz base de Tarea (sin relaciones)
+export interface TareaBase {
+  id: string
+  proyectoServicioId: string
+  nombre: string
+  descripcion?: string
+  estado: EstadoTarea
+  prioridad: PrioridadTarea
+  fechaInicio: string
+  fechaFin: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  porcentajeCompletado: number // 0-100
+  horasEstimadas: number
+  horasReales: number
+  responsableId: string
+  createdAt: string
+  updatedAt: string
+}
+
+// 📋 Interfaz completa de Tarea con relaciones
+export interface Tarea extends TareaBase {
+  // 🔗 Relaciones
+  proyectoServicio: ProyectoServicio
+  responsable: User
+  subtareas: Subtarea[]
+  dependenciasOrigen: DependenciaTarea[] // Tareas que dependen de esta
+  dependenciasDestino: DependenciaTarea[] // Tareas de las que depende esta
+  asignaciones: AsignacionRecurso[]
+  registrosProgreso: RegistroProgreso[]
+}
+
+// 📋 Tipo para respuestas de API con relaciones específicas
+export interface TareaConRelaciones extends TareaBase {
+  proyectoServicio: {
+    id: string
+    nombre: string
+    proyecto: {
+      id: string
+      nombre: string
+    }
+  }
+  responsable: {
+    id: string
+    name: string | null
+    email: string
+  }
+  _count: {
+    subtareas: number
+    dependenciasOrigen: number
+    dependenciasDestino: number
+    asignaciones: number
+    registrosProgreso: number
+  }
+}
+
+// 📝 Interfaz de Subtarea
+export interface Subtarea {
+  id: string
+  tareaId: string
+  nombre: string
+  descripcion?: string
+  estado: EstadoTarea
+  fechaInicio: string
+  fechaFin: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  porcentajeCompletado: number // 0-100
+  horasEstimadas: number
+  horasReales: number
+  asignadoId?: string
+  createdAt: string
+  updatedAt: string
+  
+  // 🔗 Relaciones
+  tarea: Tarea
+  asignado?: User
+  registrosProgreso: RegistroProgreso[]
+}
+
+// 🔗 Interfaz de Dependencia entre Tareas
+export interface DependenciaTarea {
+  id: string
+  tareaOrigenId: string
+  tareaDestinoId: string
+  tipo: TipoDependencia
+  retrasoMinimo: number // días de retraso mínimo
+  createdAt: string
+  updatedAt: string
+  
+  // 🔗 Relaciones
+  tareaOrigen: Tarea
+  tareaDestino: Tarea
+}
+
+// 👥 Interfaz de Asignación de Recursos
+export interface AsignacionRecurso {
+  id: string
+  tareaId: string
+  usuarioId: string
+  tipoRecurso: TipoRecurso
+  porcentajeAsignacion: number // 0-100
+  fechaAsignacion: string
+  fechaDesasignacion?: string
+  activo: boolean
+  createdAt: string
+  updatedAt: string
+  
+  // 🔗 Relaciones
+  tarea: Tarea
+  usuario: User
+}
+
+// 📊 Interfaz de Registro de Progreso
+export interface RegistroProgreso {
+  id: string
+  tareaId?: string
+  subtareaId?: string
+  usuarioId: string
+  fecha: string
+  horasTrabajadas: number
+  progresoAnterior: number
+  progresoNuevo: number
+  descripcion?: string
+  observaciones?: string
+  createdAt: string
+  updatedAt: string
+  
+  // 🔗 Relaciones
+  tarea?: Tarea
+  subtarea?: Subtarea
+  usuario: User
 }
 
 // ===== TIPOS BASE (ALIASES PARA MEJOR LEGIBILIDAD) =====

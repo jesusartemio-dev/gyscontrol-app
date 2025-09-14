@@ -119,7 +119,14 @@ export async function GET(request: NextRequest) {
     // 📊 Fetch listas convertibles
     const listas = await prisma.listaEquipo.findMany({
       where: whereClause,
-      include: {
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        estado: true,
+        fechaNecesaria: true,
+        fechaAprobacionFinal: true,
+        createdAt: true,
         proyecto: {
           select: {
             id: true,
@@ -134,9 +141,34 @@ export async function GET(request: NextRequest) {
           }
         },
         items: {
-          include: {
+          select: {
+            id: true,
+            listaId: true,
+            proyectoEquipoItemId: true,
+            proyectoEquipoId: true,
+            reemplazaProyectoEquipoItemId: true,
+            proveedorId: true,
+            cotizacionSeleccionadaId: true,
+            comentarioRevision: true,
+            codigo: true,
+            descripcion: true,
+            unidad: true,
+            cantidad: true,
+            cantidadPedida: true,
+            costoElegido: true,
+            precioElegido: true,
+            presupuesto: true,
+            costoPedido: true,
+            costoReal: true,
+            cantidadEntregada: true,
+            estado: true,
+            verificado: true,
+            tiempoEntrega: true,
+            tiempoEntregaDias: true,
             proyectoEquipoItem: {
-              include: {
+              select: {
+                id: true,
+                catalogoEquipoId: true,
                 catalogoEquipo: {
                   select: {
                     id: true,

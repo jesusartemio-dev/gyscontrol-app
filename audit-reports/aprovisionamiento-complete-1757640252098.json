@@ -1,0 +1,66 @@
+{
+  "timestamp": "2025-09-12T01:24:12.064Z",
+  "pages": {
+    "dashboard": {
+      "url": "http://localhost:3000/finanzas/aprovisionamiento",
+      "queryTime": 186.60649999999998,
+      "estimatedLoadTime": 386.6065,
+      "dataVolume": {
+        "records": 5,
+        "relations": 5
+      },
+      "bottlenecks": []
+    },
+    "proyectos": {
+      "url": "http://localhost:3000/finanzas/aprovisionamiento/proyectos",
+      "queryTime": 176.74739999999997,
+      "estimatedLoadTime": 426.74739999999997,
+      "dataVolume": {
+        "records": 2,
+        "relations": 5
+      },
+      "bottlenecks": []
+    },
+    "listas": {
+      "url": "http://localhost:3000/finanzas/aprovisionamiento/listas",
+      "queryTime": 199.51730000000003,
+      "estimatedLoadTime": 499.51730000000003,
+      "dataVolume": {
+        "records": 2,
+        "relations": 14
+      },
+      "bottlenecks": []
+    },
+    "pedidos": {
+      "url": "http://localhost:3000/finanzas/aprovisionamiento/pedidos",
+      "queryTime": 184.81160000000006,
+      "estimatedLoadTime": 464.81160000000006,
+      "dataVolume": {
+        "records": 3,
+        "relations": 5
+      },
+      "bottlenecks": []
+    },
+    "timeline": {
+      "url": "http://localhost:3000/finanzas/aprovisionamiento/timeline",
+      "queryTime": 179.47549999999995,
+      "estimatedLoadTime": 529.4755,
+      "dataVolume": {
+        "records": 7,
+        "relations": 7
+      },
+      "bottlenecks": []
+    }
+  },
+  "summary": {
+    "totalPages": 5,
+    "averageLoadTime": 461,
+    "slowestPage": "timeline",
+    "fastestPage": "dashboard",
+    "recommendations": [
+      "💡 Implementar React Query para cache entre páginas",
+      "💡 Considerar paginación en todas las listas",
+      "💡 Optimizar includes con select específicos"
+    ]
+  }
+}

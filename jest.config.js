@@ -179,10 +179,7 @@ const customJestConfig = {
         '<rootDir>/src/__tests__/api/**/*.{test,spec}.{js,jsx,ts,tsx}'
       ],
       testEnvironment: 'node',
-<<<<<<< Updated upstream
-      setupFilesAfterEnv: ['<rootDir>/jest.setup.services.js']
-=======
-      setupFilesAfterEnv: ['<rootDir>/config/jest.setup.services.js'],
+      setupFilesAfterEnv: ['<rootDir>/jest.setup.services.js'],
       moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
         '^@/components/(.*)$': '<rootDir>/src/components/$1',
@@ -191,7 +188,7 @@ const customJestConfig = {
         '^@/app/(.*)$': '<rootDir>/src/app/$1'
       },
       transform: {
-        '^.+\\.(js|jsx|ts|tsx)$': ['@swc/jest', {
+        '^.+\.(js|jsx|ts|tsx)$': ['@swc/jest', {
           jsc: {
             parser: {
               syntax: 'typescript',
@@ -208,7 +205,6 @@ const customJestConfig = {
           }
         }]
       }
->>>>>>> Stashed changes
     },
     {
       displayName: 'Integration Tests',

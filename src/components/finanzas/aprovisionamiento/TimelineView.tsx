@@ -37,11 +37,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   AlertCircle, 
   BarChart3, 
   Calendar, 
   CheckCircle, 
+  DollarSign, // 💰 Icon for cost toggle
   Filter, 
   Lightbulb, 
   Package,
@@ -49,7 +56,10 @@ import {
   Settings, 
   ShoppingCart,
   TrendingUp, 
-  Zap, 
+  Zap,
+  ChevronDown, // 📊 For dropdown selector
+  Percent, // 📊 For percentage display
+  Clock, // ⏰ For daily cost display
 } from 'lucide-react';
 // Removed framer-motion imports as they were causing ref conflicts with Radix UI
 import { toast } from 'sonner';
@@ -75,6 +85,16 @@ import type {
   SugerenciaOptimizacion,
 } from '@/types/aprovisionamiento';
 
+// ✅ Cost display options
+type CostDisplayMode = 'total' | 'daily' | 'percentage' | 'none';
+type CostPosition = 'right' | 'left' | 'top' | 'bottom';
+
+interface CostDisplayOptions {
+  mode: CostDisplayMode;
+  position: CostPosition;
+  compact: boolean;
+}
+
 // ✅ Props interface
 interface TimelineViewProps {
   proyectoId?: string;
@@ -84,6 +104,171 @@ interface TimelineViewProps {
   showCoherencePanel?: boolean;
   defaultFilters?: Partial<FiltrosTimeline>;
 }
+
+// ✅ Cost Display Selector Component
+const CostDisplaySelector: React.FC<{
+  options: CostDisplayOptions;
+  onOptionsChange: (options: CostDisplayOptions) => void;
+  disabled?: boolean;
+}> = ({ options, onOptionsChange, disabled = false }) => {
+  const getModeIcon = (mode: CostDisplayMode) => {
+    switch (mode) {
+      case 'total': return <DollarSign className="w-3 h-3" />;
+      case 'daily': return <Clock className="w-3 h-3" />;
+      case 'percentage': return <Percent className="w-3 h-3" />;
+      case 'none': return <DollarSign className="w-3 h-3 opacity-50" />;
+    }
+  };
+
+  const getModeLabel = (mode: CostDisplayMode) => {
+    switch (mode) {
+      case 'total': return 'Monto Total';
+      case 'daily': return 'Costo Diario';
+      case 'percentage': return '% Presupuesto';
+      case 'none': return 'Sin Costos';
+    }
+  };
+
+  const getPositionLabel = (position: CostPosition) => {
+    switch (position) {
+      case 'right': return 'Derecha';
+      case 'left': return 'Izquierda';
+      case 'top': return 'Arriba';
+      case 'bottom': return 'Abajo';
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      {/* Mode Selector */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant={options.mode !== 'none' ? "default" : "outline"}
+            size="sm"
+            disabled={disabled}
+            className="h-8 px-2"
+          >
+            {getModeIcon(options.mode)}
+            <span className="hidden sm:inline ml-1">
+              {getModeLabel(options.mode)}
+            </span>
+            <ChevronDown className="w-3 h-3 ml-1" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onClick={() => onOptionsChange({ ...options, mode: 'total' })}
+            className="flex items-center gap-2"
+          >
+            <DollarSign className="w-4 h-4" />
+            <div>
+              <div className="font-medium">Monto Total</div>
+              <div className="text-xs text-muted-foreground">Costo completo del item</div>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => onOptionsChange({ ...options, mode: 'daily' })}
+            className="flex items-center gap-2"
+          >
+            <Clock className="w-4 h-4" />
+            <div>
+              <div className="font-medium">Costo Diario</div>
+              <div className="text-xs text-muted-foreground">Costo promedio por día</div>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => onOptionsChange({ ...options, mode: 'percentage' })}
+            className="flex items-center gap-2"
+          >
+            <Percent className="w-4 h-4" />
+            <div>
+              <div className="font-medium">% Presupuesto</div>
+              <div className="text-xs text-muted-foreground">Porcentaje del total</div>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => onOptionsChange({ ...options, mode: 'none' })}
+            className="flex items-center gap-2"
+          >
+            <DollarSign className="w-4 h-4 opacity-50" />
+            <div>
+              <div className="font-medium">Sin Costos</div>
+              <div className="text-xs text-muted-foreground">Ocultar información de costos</div>
+            </div>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Position Selector - Only show when costs are enabled */}
+      {options.mode !== 'none' && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              className="h-8 px-2"
+              title="Posición del costo"
+            >
+              <Settings className="w-3 h-3" />
+              <span className="hidden lg:inline ml-1">
+                {getPositionLabel(options.position)}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuItem
+              onClick={() => onOptionsChange({ ...options, position: 'right' })}
+              className="flex items-center justify-between"
+            >
+              Derecha
+              {options.position === 'right' && <CheckCircle className="w-3 h-3" />}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onOptionsChange({ ...options, position: 'left' })}
+              className="flex items-center justify-between"
+            >
+              Izquierda
+              {options.position === 'left' && <CheckCircle className="w-3 h-3" />}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onOptionsChange({ ...options, position: 'top' })}
+              className="flex items-center justify-between"
+            >
+              Arriba
+              {options.position === 'top' && <CheckCircle className="w-3 h-3" />}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onOptionsChange({ ...options, position: 'bottom' })}
+              className="flex items-center justify-between"
+            >
+              Abajo
+              {options.position === 'bottom' && <CheckCircle className="w-3 h-3" />}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {/* Compact Toggle - Only show when costs are enabled */}
+      {options.mode !== 'none' && (
+        <Button
+          variant={options.compact ? "default" : "outline"}
+          size="sm"
+          disabled={disabled}
+          onClick={() => onOptionsChange({ ...options, compact: !options.compact })}
+          className="h-8 px-2"
+          title={options.compact ? "Formato completo" : "Formato compacto"}
+        >
+          <Package className="w-3 h-3" />
+          <span className="hidden xl:inline ml-1">
+            {options.compact ? "Compacto" : "Completo"}
+          </span>
+        </Button>
+      )}
+    </div>
+  );
+};
 
 // ✅ Alert summary component
 const AlertSummary: React.FC<{
@@ -287,6 +472,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [selectedItem, setSelectedItem] = useState<GanttItem | null>(null);
+  const [showCosts, setShowCosts] = useState(false); // 💰 Toggle for cost display
+  const [costOptions, setCostOptions] = useState<CostDisplayOptions>({
+    mode: 'total',
+    position: 'right',
+    compact: false
+  }); // 💰 Cost display configuration
 
   // 🔁 Load timeline data
   const loadTimelineData = useCallback(async () => {
@@ -465,6 +656,18 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 </Button>
               )}
               
+              {/* 💰 Cost display options */}
+              {filtros.tipoVista === 'gantt' && (
+                <CostDisplaySelector
+                  options={costOptions}
+                  onOptionsChange={(newOptions) => {
+                    setCostOptions(newOptions);
+                    setShowCosts(newOptions.mode !== 'none');
+                  }}
+                  disabled={loading}
+                />
+              )}
+              
               <Button
                 variant="outline"
                 size="sm"
@@ -537,6 +740,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               onExport={handleExport} 
               showLegend={true} 
               showMinimap={false} 
+              showCosts={showCosts} // 💰 Pass showCosts state
+              costOptions={costOptions} // 💰 Pass cost display options
             />
           )}
           

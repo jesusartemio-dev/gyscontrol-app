@@ -15,6 +15,7 @@ import { deleteCliente } from '@/lib/services/cliente'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import { 
   Building2, 
   FileText, 
@@ -26,7 +27,7 @@ import {
   Users,
   AlertTriangle
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from 'react-hot-toast'
 import type { Cliente } from '@/types'
 
 interface ClienteCardViewProps {
@@ -38,22 +39,68 @@ interface ClienteCardViewProps {
 
 export default function ClienteCardView({ clientes, onDeleted, onEdit, loading }: ClienteCardViewProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    cliente: Cliente | null
+  }>({ open: false, cliente: null })
 
-  const handleDelete = async (cliente: Cliente) => {
-    if (!confirm(`¿Estás seguro de eliminar a ${cliente.nombre}?`)) {
-      return
-    }
+  const handleDeleteClick = (cliente: Cliente) => {
+    setConfirmDialog({ open: true, cliente })
+  }
 
+  const handleConfirmDelete = async () => {
+    const cliente = confirmDialog.cliente
+    if (!cliente) return
+
+    setConfirmDialog({ open: false, cliente: null })
     setDeletingId(cliente.id)
-    try {
-      await deleteCliente(cliente.id)
+    
+    const result = await deleteCliente(cliente.id)
+    
+    if (result.success) {
       onDeleted(cliente.id)
-      toast.success(`Cliente ${cliente.nombre} eliminado correctamente`)
-    } catch (error) {
-      toast.error('Error al eliminar el cliente')
-    } finally {
-      setDeletingId(null)
+      toast.success(`Cliente ${cliente.nombre} eliminado correctamente`, {
+        duration: 4000,
+        icon: '✅'
+      })
+    } else {
+      // 🚫 Mostrar mensaje específico para clientes con proyectos
+      if (result.error?.includes('proyectos asociados')) {
+        toast.error(`${result.error}\n${result.details || 'Para eliminar este cliente, primero debe finalizar o reasignar sus proyectos.'}`, {
+          duration: 8000,
+          id: `delete-error-${cliente.id}`,
+          style: {
+            maxWidth: '450px',
+            whiteSpace: 'pre-line'
+          },
+          icon: '⚠️'
+        })
+      } else {
+        toast.error(result.error || 'Error al eliminar el cliente', {
+          icon: '❌'
+        })
+      }
     }
+    
+    setDeletingId(null)
+  }
+
+  const handleCancelDelete = () => {
+    setConfirmDialog({ open: false, cliente: null })
+  }
+
+  // ✅ Generate detailed confirmation message
+  const getConfirmationMessage = (cliente: Cliente) => {
+    const details = []
+    if (cliente.ruc) details.push(`RUC: ${cliente.ruc}`)
+    if (cliente.telefono) details.push(`Teléfono: ${cliente.telefono}`)
+    if (cliente.correo) details.push(`Email: ${cliente.correo}`)
+    
+    const baseMessage = `Se eliminará permanentemente el cliente "${cliente.nombre}"`
+    const detailsText = details.length > 0 ? `\n\nDetalles del cliente:\n• ${details.join('\n• ')}` : ''
+    const warningText = '\n\n⚠️ Esta acción no se puede deshacer. Si el cliente tiene proyectos asociados, la eliminación fallará.'
+    
+    return baseMessage + detailsText + warningText
   }
 
   const containerVariants = {
@@ -208,7 +255,7 @@ export default function ClienteCardView({ clientes, onDeleted, onEdit, loading }
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => handleDelete(cliente)}
+                    onClick={() => handleDeleteClick(cliente)}
                     disabled={deletingId === cliente.id}
                     className="flex-1"
                   >
@@ -230,6 +277,20 @@ export default function ClienteCardView({ clientes, onDeleted, onEdit, loading }
           </motion.div>
         ))}
       </AnimatePresence>
+
+      {/* ✅ Enhanced Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => {
+          if (!open) handleCancelDelete()
+        }}
+        title="Confirmar Eliminación"
+        description={confirmDialog.cliente ? getConfirmationMessage(confirmDialog.cliente) : ''}
+        onConfirm={handleConfirmDelete}
+        confirmText="Eliminar Cliente"
+        cancelText="Cancelar"
+        variant="destructive"
+      />
     </motion.div>
   )
 }

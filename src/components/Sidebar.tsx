@@ -34,7 +34,10 @@ import {
   Receipt,
   AlertCircle,
   Clock,
-  Activity
+  Activity,
+  CheckSquare,
+  GitBranch,
+  Calendar
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -96,6 +99,16 @@ export default function Sidebar() {
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart },
+        { 
+          href: '/proyectos/tareas', 
+          label: 'Gestión de Tareas', 
+          icon: CheckSquare,
+          submenu: [
+            { href: '/proyectos/tareas', label: 'Lista de Tareas', icon: CheckSquare },
+            { href: '/proyectos/tareas/gantt', label: 'Cronograma Gantt', icon: Calendar },
+            { href: '/proyectos/tareas/dependencias', label: 'Dependencias', icon: GitBranch }
+          ]
+        },
       ],
     },
     // 3. Logística - Listas, pedidos y cotizaciones
@@ -227,13 +240,16 @@ export default function Sidebar() {
               transition={{ duration: 0.2 }}
               className="flex items-center gap-3"
             >
-              <Image
-                src="/logo.png"
-                alt="Logo GyS"
-                width={140}
-                height={40}
-                className="object-contain"
-              />
+              <div className="relative w-[140px] h-10">
+                <Image
+                  src="/logo.png"
+                  alt="Logo GyS"
+                  fill
+                  priority
+                  sizes="140px"
+                  className="object-contain"
+                />
+              </div>
               <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-300 border-blue-400/30">
                 v2.0
               </Badge>

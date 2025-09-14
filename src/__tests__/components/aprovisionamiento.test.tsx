@@ -414,9 +414,9 @@ export const testUtils = {
   },
   
   expectCurrencyFormat: (element: HTMLElement, amount: number) => {
-    const formatted = new Intl.NumberFormat('es-PE', {
+    const formatted = new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'PEN'
+      currency: 'USD'
     }).format(amount);
     expect(element).toHaveTextContent(formatted);
   }

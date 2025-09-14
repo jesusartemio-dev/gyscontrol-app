@@ -46,7 +46,7 @@ import {
   Save, 
   X, 
   Calendar,
-  User,
+  User as UserIcon,
   FileText,
   Loader2
 } from 'lucide-react'
@@ -215,7 +215,7 @@ export const PedidoEquipoForm: React.FC<PedidoEquipoFormProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
+                      <UserIcon className="h-4 w-4" />
                       Responsable *
                     </FormLabel>
                     <FormControl>

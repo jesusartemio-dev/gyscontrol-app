@@ -10,9 +10,19 @@ interface Props {
   onExportar: () => void
   onImportar: (e: React.ChangeEvent<HTMLInputElement>) => void
   importando?: boolean
+  exportLabel?: string
+  importLabel?: string
+  acceptedFileTypes?: string
 }
 
-export function BotonesImportExport({ onExportar, onImportar, importando = false }: Props) {
+export function BotonesImportExport({ 
+  onExportar, 
+  onImportar, 
+  importando = false,
+  exportLabel = "Exportar Excel",
+  importLabel = "Importar Excel",
+  acceptedFileTypes = ".xlsx"
+}: Props) {
   return (
     <div className="flex gap-4 bg-gray-50 p-3 rounded-lg shadow-sm border w-fit">
       {/* Botón Exportar Excel */}
@@ -22,7 +32,7 @@ export function BotonesImportExport({ onExportar, onImportar, importando = false
         className="flex items-center gap-2 text-green-700 border-green-500 hover:bg-green-100"
       >
         <Download size={20} />
-        Exportar Excel
+        {exportLabel}
       </Button>
 
       {/* Botón Importar Excel */}
@@ -36,10 +46,10 @@ export function BotonesImportExport({ onExportar, onImportar, importando = false
         ) : (
           <Upload size={20} />
         )}
-        {importando ? 'Importando...' : 'Importar Excel'}
+        {importando ? 'Importando...' : importLabel}
         <input 
           type="file" 
-          accept=".xlsx" 
+          accept={acceptedFileTypes} 
           onChange={onImportar} 
           className="hidden" 
           disabled={importando}

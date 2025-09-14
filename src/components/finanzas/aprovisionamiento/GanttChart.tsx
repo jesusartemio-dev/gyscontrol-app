@@ -77,6 +77,16 @@ import type {
 // ✅ Union type para items del Gantt que pueden ser listas o pedidos
 type GanttItemUnion = GanttListaItem | GanttPedidoItem;
 
+// ✅ Cost display options (matching TimelineView)
+type CostDisplayMode = 'total' | 'daily' | 'percentage' | 'none';
+type CostPosition = 'right' | 'left' | 'top' | 'bottom';
+
+interface CostDisplayOptions {
+  mode: CostDisplayMode;
+  position: CostPosition;
+  compact: boolean;
+}
+
 interface GanttItemExtended extends GanttItem {
   x: number;
   width: number;
@@ -97,6 +107,8 @@ interface GanttChartProps {
   showLegend?: boolean;
   showMinimap?: boolean;
   allowEdit?: boolean;
+  showCosts?: boolean; // 💰 Show cost information next to bars
+  costOptions?: CostDisplayOptions; // 💰 Cost display configuration
   onItemClick?: (item: GanttItem) => void;
   onItemUpdate?: (item: GanttItem, newDates: { inicio: string; fin: string }) => void;
   onExport?: (format: 'png' | 'pdf') => void;
@@ -138,6 +150,19 @@ const formatDate = (date: string | Date, format: string = 'dd/MM/yyyy'): string 
   });
 };
 
+// 💰 Format currency for cost display
+const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+  try {
+    // 💰 Always display in USD as requested
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  } catch (error) {
+    return `$ ${amount.toFixed(2)}`;
+  }
+};
+
 const getItemColor = (item: GanttItem): string => {
   const colors = ITEM_COLORS[item.tipo as keyof typeof ITEM_COLORS];
   
@@ -173,7 +198,10 @@ const GanttItemComponent: React.FC<{
   scale: TimeScale;
   onItemClick?: (item: GanttItem) => void;
   allowEdit?: boolean;
-}> = ({ item, scale, onItemClick, allowEdit }) => {
+  showCosts?: boolean; // 💰 Show cost information
+  costOptions?: CostDisplayOptions; // 💰 Cost display configuration
+  totalBudget?: number; // 💰 Total budget for percentage calculation
+}> = ({ item, scale, onItemClick, allowEdit, showCosts, costOptions, totalBudget }) => {
   const [isDragging, setIsDragging] = useState(false);
   
   const handleClick = () => {
@@ -215,30 +243,104 @@ const GanttItemComponent: React.FC<{
     return null;
   };
 
+  // 💰 Cost calculation and formatting functions
+  const getCostValue = (): number => {
+    // Try different cost properties based on item type
+    const cost = (() => {
+      if ('montoProyectado' in item && typeof item.montoProyectado === 'number') return item.montoProyectado;
+      if ('montoEjecutado' in item && typeof item.montoEjecutado === 'number') return item.montoEjecutado;
+      if ('amount' in item && typeof item.amount === 'number') return item.amount;
+      if ('monto' in item && typeof item.monto === 'number') return item.monto;
+      return 0;
+    })();
+    return cost;
+  };
+
+  const formatCostDisplay = (): string => {
+    if (!costOptions || costOptions.mode === 'none') return '';
+    
+    const cost = getCostValue();
+    if (cost === 0) return costOptions.compact ? 'S/ 0' : 'S/ 0.00';
+
+    switch (costOptions.mode) {
+      case 'total':
+        return costOptions.compact ? formatCompactCurrency(cost) : formatCurrency(cost, 'USD');
+      
+      case 'daily': {
+        const startDate = new Date(item.fechaInicio);
+        const endDate = new Date(item.fechaFin);
+        const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const dailyCost = cost / days;
+        return costOptions.compact ? `${formatCompactCurrency(dailyCost)}/día` : `${formatCurrency(dailyCost, 'USD')} por día`;
+      }
+      
+      case 'percentage': {
+        if (!totalBudget || totalBudget === 0) return '0%';
+        const percentage = (cost / totalBudget) * 100;
+        return `${percentage.toFixed(1)}%`;
+      }
+      
+      default:
+        return '';
+    }
+  };
+
+  const formatCompactCurrency = (amount: number): string => {
+      if (amount >= 1000000) {
+        return `$ ${(amount / 1000000).toFixed(1)}M`;
+      } else if (amount >= 1000) {
+        return `$ ${(amount / 1000).toFixed(1)}K`;
+      } else {
+        return `$ ${amount.toFixed(0)}`;
+      }
+    };
+
+  const getCostPositionClasses = (): string => {
+    if (!costOptions || costOptions.mode === 'none') return 'hidden';
+    
+    const baseClasses = 'absolute text-xs font-medium bg-white/90 backdrop-blur-sm px-2 py-1 rounded shadow-sm border';
+    
+    switch (costOptions.position) {
+      case 'right':
+        return `${baseClasses} left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap`;
+      case 'left':
+        return `${baseClasses} right-full mr-2 top-1/2 -translate-y-1/2 whitespace-nowrap`;
+      case 'top':
+        return `${baseClasses} bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap`;
+      case 'bottom':
+        return `${baseClasses} top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap`;
+      default:
+        return `${baseClasses} left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap`;
+    }
+  };
+
+  const costDisplay = formatCostDisplay();
+
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-          <div
-            className={`
-              absolute rounded cursor-pointer border-2 border-opacity-50 transition-all duration-200
-              ${allowEdit ? 'hover:shadow-lg hover:scale-105' : ''}
-              ${isDragging ? 'shadow-xl z-10' : ''}
-            `}
-            style={{
-              left: item.x,
-              top: item.y,
-              width: item.width,
-              height: item.height,
-              backgroundColor: item.color,
-              borderColor: item.color,
-              color: item.textColor,
-            }}
-            onClick={handleClick}
-          >
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+            <div
+              className={`
+                absolute rounded cursor-pointer border-2 border-opacity-50 transition-all duration-200
+                ${allowEdit ? 'hover:shadow-lg hover:scale-105' : ''}
+                ${isDragging ? 'shadow-xl z-10' : ''}
+              `}
+              style={{
+                left: item.x,
+                top: item.y,
+                width: item.width,
+                height: item.height,
+                backgroundColor: item.color,
+                borderColor: item.color,
+                color: item.textColor,
+              }}
+              onClick={handleClick}
+            >
             <div className="flex items-center justify-between h-full px-2 text-xs font-medium">
               <div className="flex items-center gap-1 min-w-0">
                 {getIcon()}
-                <span className="truncate">{item.titulo}</span>
+                <span className="truncate">{item.codigo ? `${item.codigo} - ${item.titulo}` : item.titulo}</span>
               </div>
               <div className="flex items-center gap-1">
                 {item.coherencia !== undefined && item.coherencia < 100 && (
@@ -257,12 +359,21 @@ const GanttItemComponent: React.FC<{
                 style={{ width: `${item.progreso}%` }}
               />
             )}
+            
+            {/* 💰 Cost display */}
+            {costDisplay && (
+              <div className={getCostPositionClasses()}>
+                <span className="text-slate-700">{costDisplay}</span>
+              </div>
+            )}
           </div>
         </TooltipTrigger>
         
         <TooltipContent side="top" className="max-w-xs">
           <div className="space-y-2">
-            <div className="font-medium">{item.titulo}</div>
+            <div className="font-medium">
+              {item.codigo ? `${item.codigo} - ${item.titulo}` : item.titulo}
+            </div>
             <div className="text-sm text-muted-foreground">
               {formatDate(item.fechaInicio)} - {formatDate(item.fechaFin)}
             </div>
@@ -279,6 +390,19 @@ const GanttItemComponent: React.FC<{
                 Progreso: <span className="font-medium">{item.progreso}%</span>
               </div>
             )}
+            {(() => {
+              // Show cost in tooltip using different amount properties - always in USD
+              const ganttItem = item as any;
+              const amount = ganttItem.montoProyectado || ganttItem.montoEjecutado || ganttItem.amount || ganttItem.monto;
+              if (amount) {
+                return (
+                  <div className="text-sm">
+                    Costo: <span className="font-medium">{formatCurrency(amount, 'USD')}</span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             {item.alertas && item.alertas.length > 0 && (
               <div className="space-y-1">
                 <div className="text-sm font-medium">Alertas:</div>
@@ -298,6 +422,34 @@ const GanttItemComponent: React.FC<{
           </div>
         </TooltipContent>
       </Tooltip>
+      
+      {/* 💰 Cost display next to bar */}
+      {showCosts && (
+        <div
+          className="absolute text-xs font-medium text-gray-700 bg-white/90 px-2 py-1 rounded shadow-sm border whitespace-nowrap"
+          style={{
+            left: item.x + item.width + 8, // 8px spacing from bar
+            top: item.y + (item.height / 2) - 10, // Center vertically
+            zIndex: 10,
+          }}
+        >
+          {(() => {
+            // Use different amount properties based on item type
+            const ganttItem = item as any;
+            if (ganttItem.montoProyectado) {
+              return formatCurrency(ganttItem.montoProyectado);
+            } else if (ganttItem.montoEjecutado) {
+              return formatCurrency(ganttItem.montoEjecutado);
+            } else if (ganttItem.amount) {
+              return formatCurrency(ganttItem.amount);
+            } else if (ganttItem.monto) {
+              return formatCurrency(ganttItem.monto);
+            }
+            return 'S/ 0';
+          })()} 
+        </div>
+      )}
+    </>
   );
 };
 
@@ -381,6 +533,8 @@ export const GanttChart: React.FC<GanttChartProps> = ({
   showLegend = true,
   showMinimap = false,
   allowEdit = false,
+  showCosts = false, // 💰 Default to false
+  costOptions, // 💰 Cost display configuration
   onItemClick,
   onItemUpdate,
   onExport,
@@ -515,6 +669,23 @@ export const GanttChart: React.FC<GanttChartProps> = ({
 
   // 🔁 Chart height calculation
   const chartHeight = Math.max(height - 100, ganttItems.length * 45 + 100);
+
+  // 💰 Calculate total budget for percentage calculations
+  const totalBudget = useMemo(() => {
+    if (!data.items) return 0;
+    
+    return data.items.reduce((total, item) => {
+      // Try different cost properties based on item type
+      const cost = (() => {
+        if ('montoProyectado' in item && typeof item.montoProyectado === 'number') return item.montoProyectado;
+        if ('montoEjecutado' in item && typeof item.montoEjecutado === 'number') return item.montoEjecutado;
+        if ('amount' in item && typeof item.amount === 'number') return item.amount;
+        if ('monto' in item && typeof item.monto === 'number') return item.monto;
+        return 0;
+      })();
+      return total + cost;
+    }, 0);
+  }, [data.items]);
 
   // 🔁 Handle zoom with smooth transitions
   const handleZoom = (direction: 'in' | 'out') => {
@@ -767,6 +938,9 @@ export const GanttChart: React.FC<GanttChartProps> = ({
                 scale={scale}
                 onItemClick={onItemClick}
                 allowEdit={allowEdit}
+                showCosts={showCosts} // 💰 Pass showCosts prop
+                costOptions={costOptions} // 💰 Pass cost display options
+                totalBudget={totalBudget} // 💰 Pass total budget for percentage calculation
               />
             ))}
             

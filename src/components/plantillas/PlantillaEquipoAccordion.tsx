@@ -16,7 +16,8 @@ import PlantillaEquipoItemList from './PlantillaEquipoItemList'
 import { PlantillaEquipoAccordionSkeleton } from './PlantillaEquipoSkeleton'
 import type { PlantillaEquipo, PlantillaEquipoItem } from '@/types'
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2, Briefcase, DollarSign, TrendingUp, Package, Loader2 } from 'lucide-react'
+import { Pencil, Trash2, Briefcase, DollarSign, TrendingUp, Package, Loader2, Plus } from 'lucide-react'
+import PlantillaEquipoMultiAddModal from './PlantillaEquipoMultiAddModal'
 import { motion } from 'framer-motion'
 import { 
   formatCurrency, 
@@ -51,6 +52,7 @@ export default function PlantillaEquipoAccordion({
   const [nuevoNombre, setNuevoNombre] = useState(equipo.nombre)
   const [loading, setLoading] = useState(false)
   const [nameError, setNameError] = useState<string | null>(null)
+  const [showMultiAddModal, setShowMultiAddModal] = useState(false)
 
   // Show skeleton while loading
   if (isLoading) {
@@ -99,6 +101,12 @@ export default function PlantillaEquipoAccordion({
       setEditando(false)
       setNameError(null)
     }
+  }
+
+  // ✅ Handle multiple items creation
+  const handleMultipleItemsCreated = (items: PlantillaEquipoItem[]) => {
+    items.forEach(item => onCreated(item))
+    setShowMultiAddModal(false)
   }
 
   // Calculate totals using utilities
@@ -252,8 +260,29 @@ export default function PlantillaEquipoAccordion({
                 transition={{ delay: 0.1, duration: 0.3 }}
                 className="space-y-4"
               >
+                {/* ✅ Botón para agregar múltiples items */}
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-medium text-gray-700">Agregar Equipos</h3>
+                  <Button
+                    onClick={() => setShowMultiAddModal(true)}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Plus size={16} className="mr-2" />
+                    Agregar Items
+                  </Button>
+                </div>
+                
                 <PlantillaEquipoItemForm plantillaEquipoId={equipo.id} onCreated={onCreated} />
                 <PlantillaEquipoItemList items={equipo.items} onDeleted={onDeleted} onUpdated={onUpdated} />
+                
+                {/* ✅ Modal para agregar múltiples items */}
+                <PlantillaEquipoMultiAddModal
+                  isOpen={showMultiAddModal}
+                  onClose={() => setShowMultiAddModal(false)}
+                  plantillaEquipoId={equipo.id}
+                  onItemsCreated={handleMultipleItemsCreated}
+                />
               </motion.div>
             </AccordionContent>
           </AccordionItem>

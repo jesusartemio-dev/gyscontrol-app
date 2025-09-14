@@ -174,11 +174,12 @@ export default function ClienteModal({ isOpen, onClose, cliente, onSaved }: Clie
       
       if (isEditing && cliente) {
         // ✅ Update existing client
-        const updatePayload: ClienteUpdatePayload = {
+        const updatePayload: Cliente = {
+          ...cliente,
           ...payload
         };
         
-        await updateCliente(cliente.id, updatePayload);
+        await updateCliente(updatePayload);
         toast.success('Cliente actualizado exitosamente');
       } else {
         // ✅ Create new client

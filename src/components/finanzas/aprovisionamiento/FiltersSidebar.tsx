@@ -431,7 +431,7 @@ const FilterContent: React.FC<FilterContentProps> = ({
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" className="text-xs">Todos los proyectos</SelectItem>
+                  <SelectItem value="all" className="text-xs">Todos los proyectos</SelectItem>
                   {proyectos.map((proyecto) => (
                     <SelectItem key={proyecto.id} value={proyecto.id} className="text-xs">
                       {proyecto.codigo} - {proyecto.nombre}

@@ -1,4 +1,4 @@
-import { updateCliente, createCliente } from '@/lib/services/cliente';
+import { updateCliente, createCliente, deleteCliente } from '@/lib/services/cliente';
 import { buildApiUrl } from '@/lib/utils';
 import type { Cliente } from '@/types/modelos';
 
@@ -157,4 +157,90 @@ describe('Cliente Service', () => {
       await expect(createCliente(createData)).rejects.toThrow('Error al crear cliente');
     });
   });
+
+  describe('deleteCliente', () => {
+     it('✅ debe retornar success: true cuando la eliminación es exitosa', async () => {
+       // 🎭 Arrange
+       const mockResponse = {
+         ok: true,
+         json: jest.fn().mockResolvedValue({ message: 'Cliente eliminado' }),
+       };
+       
+       (fetch as jest.Mock).mockResolvedValue(mockResponse);
+ 
+       // 🎬 Act
+       const result = await deleteCliente('cliente-123');
+ 
+       // 🎯 Assert
+       expect(result).toEqual({ success: true });
+       expect(fetch).toHaveBeenCalledWith(
+         'http://localhost:3000/api/clientes',
+         {
+           method: 'DELETE',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ id: 'cliente-123' }),
+         }
+       );
+     });
+
+     it('🚫 debe retornar error específico para cliente con proyectos asociados', async () => {
+       // 🎭 Arrange
+       const errorResponse = {
+         error: 'No se puede eliminar el cliente porque tiene proyectos asociados',
+         details: 'El cliente tiene 2 proyecto(s) asociado(s)'
+       };
+       
+       const mockResponse = {
+         ok: false,
+         status: 400,
+         json: jest.fn().mockResolvedValue(errorResponse),
+       };
+       
+       (fetch as jest.Mock).mockResolvedValue(mockResponse);
+ 
+       // 🎬 Act
+       const result = await deleteCliente('cliente-con-proyectos');
+ 
+       // 🎯 Assert
+       expect(result).toEqual({
+         success: false,
+         error: 'No se puede eliminar el cliente porque tiene proyectos asociados',
+         details: 'El cliente tiene 2 proyecto(s) asociado(s)'
+       });
+     });
+
+     it('🔍 debe retornar error 404 para cliente no encontrado', async () => {
+       // 🎭 Arrange
+       const mockResponse = {
+         ok: false,
+         status: 404,
+         json: jest.fn().mockResolvedValue({ error: 'Cliente no encontrado' }),
+       };
+       
+       (fetch as jest.Mock).mockResolvedValue(mockResponse);
+ 
+       // 🎬 Act
+       const result = await deleteCliente('cliente-inexistente');
+ 
+       // 🎯 Assert
+       expect(result).toEqual({
+         success: false,
+         error: 'Cliente no encontrado'
+       });
+     });
+
+     it('⚠️ debe manejar errores de conexión', async () => {
+       // 🎭 Arrange
+       (fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+ 
+       // 🎬 Act
+       const result = await deleteCliente('cliente-123');
+ 
+       // 🎯 Assert
+       expect(result).toEqual({
+         success: false,
+         error: 'Error de conexión al eliminar cliente'
+       });
+     });
+   });
 });

@@ -15,7 +15,7 @@ import { DialogClose } from '@radix-ui/react-dialog'
 
 interface ConfirmDialogProps {
   title: string
-  description: string
+  description: string | React.ReactNode
   onConfirm: () => void
   // Props for external control
   open?: boolean
@@ -23,6 +23,7 @@ interface ConfirmDialogProps {
   confirmText?: string
   cancelText?: string
   variant?: 'default' | 'destructive'
+  disabled?: boolean
   // Props for trigger pattern
   trigger?: React.ReactNode
 }
@@ -36,6 +37,7 @@ export default function ConfirmDialog({
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
   variant = 'destructive',
+  disabled = false,
   trigger,
 }: ConfirmDialogProps) {
   // If trigger is provided, use internal state pattern
@@ -48,7 +50,11 @@ export default function ConfirmDialog({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
+            {typeof description === 'string' ? (
+              <DialogDescription>{description}</DialogDescription>
+            ) : (
+              <div className="text-sm text-muted-foreground">{description}</div>
+            )}
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild>
@@ -56,7 +62,7 @@ export default function ConfirmDialog({
                 {cancelText}
               </Button>
             </DialogClose>
-            <Button variant={variant} onClick={onConfirm}>
+            <Button variant={variant} onClick={onConfirm} disabled={disabled}>
               {confirmText}
             </Button>
           </DialogFooter>
@@ -71,7 +77,11 @@ export default function ConfirmDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {typeof description === 'string' ? (
+            <DialogDescription>{description}</DialogDescription>
+          ) : (
+            <div className="text-sm text-muted-foreground">{description}</div>
+          )}
         </DialogHeader>
         <DialogFooter>
           <Button 
@@ -87,6 +97,7 @@ export default function ConfirmDialog({
               onConfirm()
               onOpenChange?.(false)
             }}
+            disabled={disabled}
           >
             {confirmText}
           </Button>

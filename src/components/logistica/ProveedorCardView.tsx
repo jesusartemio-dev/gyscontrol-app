@@ -9,6 +9,7 @@
 
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Building2, Hash, MapPin, Phone, Mail, Edit, Trash2, MoreVertical } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -20,12 +21,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { toast } from 'sonner'
+import { deleteProveedor } from '@/lib/services/proveedor'
 import { Proveedor } from '@/types'
 
 interface ProveedorCardViewProps {
   proveedores: Proveedor[]
   onEdit?: (proveedor: Proveedor) => void
   onDelete?: (proveedor: Proveedor) => void
+  onDeleted?: (id: string) => void
   isLoading?: boolean
 }
 
@@ -33,8 +38,51 @@ export function ProveedorCardView({
   proveedores,
   onEdit,
   onDelete,
+  onDeleted,
   isLoading = false
 }: ProveedorCardViewProps) {
+  // ✅ State for enhanced confirmation dialog
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean
+    proveedor: Proveedor | null
+    isDeleting: boolean
+  }>({ open: false, proveedor: null, isDeleting: false })
+
+  // 🔁 Enhanced delete handler with confirmation dialog
+  const handleDeleteClick = (proveedor: Proveedor) => {
+    setDeleteDialog({ open: true, proveedor, isDeleting: false })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteDialog.proveedor) return
+
+    setDeleteDialog(prev => ({ ...prev, isDeleting: true }))
+    
+    try {
+      const success = await deleteProveedor(deleteDialog.proveedor.id)
+      
+      if (success) {
+        toast.success(`Proveedor "${deleteDialog.proveedor.nombre}" eliminado correctamente`, {
+          description: 'El proveedor ha sido removido de la base de datos'
+        })
+        
+        // Call both callbacks for compatibility
+        onDelete?.(deleteDialog.proveedor)
+        onDeleted?.(deleteDialog.proveedor.id)
+      } else {
+        toast.error('No se pudo eliminar el proveedor', {
+          description: 'Inténtalo nuevamente o contacta al administrador'
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting proveedor:', error)
+      toast.error('Error inesperado al eliminar', {
+        description: 'Ocurrió un problema durante la eliminación'
+      })
+    } finally {
+      setDeleteDialog({ open: false, proveedor: null, isDeleting: false })
+    }
+  }
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -115,9 +163,9 @@ export function ProveedorCardView({
                         Editar
                       </DropdownMenuItem>
                     )}
-                    {onDelete && (
+                    {(onDelete || onDeleted) && (
                       <DropdownMenuItem 
-                        onClick={() => onDelete(proveedor)}
+                        onClick={() => handleDeleteClick(proveedor)}
                         className="text-red-600 focus:text-red-600"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -189,6 +237,51 @@ export function ProveedorCardView({
           </Card>
         </motion.div>
       ))}
+      
+      {/* 📡 Enhanced Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => !deleteDialog.isDeleting && setDeleteDialog(prev => ({ ...prev, open }))}
+        title="Confirmar eliminación de proveedor"
+        description={
+          deleteDialog.proveedor ? (
+            <div className="space-y-3">
+              <div className="text-sm text-gray-600">
+                ¿Estás seguro de que deseas eliminar este proveedor? Esta acción no se puede deshacer.
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-gray-900">{deleteDialog.proveedor.nombre}</span>
+                </div>
+                {deleteDialog.proveedor.ruc && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Hash className="h-3 w-3" />
+                    <span className="font-mono">{deleteDialog.proveedor.ruc}</span>
+                  </div>
+                )}
+                {deleteDialog.proveedor.telefono && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Phone className="h-3 w-3" />
+                    <span>{deleteDialog.proveedor.telefono}</span>
+                  </div>
+                )}
+                {deleteDialog.proveedor.correo && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Mail className="h-3 w-3" />
+                    <span className="break-all">{deleteDialog.proveedor.correo}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : ''
+        }
+        onConfirm={handleConfirmDelete}
+        confirmText={deleteDialog.isDeleting ? 'Eliminando...' : 'Eliminar proveedor'}
+        cancelText="Cancelar"
+        variant="destructive"
+        disabled={deleteDialog.isDeleting}
+      />
     </div>
   )
 }

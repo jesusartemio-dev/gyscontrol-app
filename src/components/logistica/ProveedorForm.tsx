@@ -13,7 +13,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { Plus, Loader2, Building2, Hash, CheckCircle } from 'lucide-react'
+import { Plus, Loader2, Building2, Hash, CheckCircle, MapPin, Phone, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,6 +35,27 @@ const proveedorSchema = z.object({
     .refine(
       (val) => !val || val.length === 0 || /^\d{11}$/.test(val),
       'El RUC debe tener exactamente 11 dígitos'
+    ),
+  direccion: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || val.length === 0 || val.length >= 5,
+      'La dirección debe tener al menos 5 caracteres'
+    ),
+  telefono: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || val.length === 0 || /^[\d\s\-\+\(\)]{7,15}$/.test(val),
+      'El teléfono debe tener entre 7 y 15 dígitos'
+    ),
+  correo: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || val.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+      'El correo electrónico no es válido'
     )
 })
 
@@ -57,7 +78,10 @@ export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
     resolver: zodResolver(proveedorSchema),
     defaultValues: {
       nombre: initial?.nombre || '',
-      ruc: initial?.ruc || ''
+      ruc: initial?.ruc || '',
+      direccion: initial?.direccion || '',
+      telefono: initial?.telefono || '',
+      correo: initial?.correo || ''
     },
     mode: 'onChange' // Real-time validation
   })
@@ -65,13 +89,19 @@ export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
   // Watch form values for real-time feedback
   const watchedNombre = watch('nombre')
   const watchedRuc = watch('ruc')
+  const watchedDireccion = watch('direccion')
+  const watchedTelefono = watch('telefono')
+  const watchedCorreo = watch('correo')
 
   const onSubmit = async (data: FormData) => {
     try {
       const payload = {
         ...data,
         nombre: data.nombre.trim(),
-        ruc: data.ruc?.trim() || undefined
+        ruc: data.ruc?.trim() || undefined,
+        direccion: data.direccion?.trim() || undefined,
+        telefono: data.telefono?.trim() || undefined,
+        correo: data.correo?.trim() || undefined
       }
       
       let result: Proveedor
@@ -190,6 +220,124 @@ export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
                 )}
                 <p className="text-xs text-muted-foreground">
                   Registro Único de Contribuyentes (11 dígitos)
+                </p>
+              </div>
+
+              {/* Dirección Field */}
+              <div className="space-y-2">
+                <Label htmlFor="direccion" className="flex items-center gap-2 text-sm font-medium">
+                  <MapPin className="h-4 w-4 text-green-600" />
+                  Dirección
+                  <span className="text-xs text-muted-foreground">(Opcional)</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="direccion"
+                    {...register('direccion')}
+                    placeholder="Ej: Av. Argentina 1234, Lima"
+                    className={`transition-all duration-200 ${
+                      errors.direccion 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                        : watchedDireccion && watchedDireccion.length >= 5
+                        ? 'border-green-500 focus:border-green-500 focus:ring-green-500/20'
+                        : 'focus:border-blue-500 focus:ring-blue-500/20'
+                    }`}
+                    disabled={isSubmitting}
+                  />
+                  {watchedDireccion && watchedDireccion.length >= 5 && !errors.direccion && (
+                    <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-500" />
+                  )}
+                </div>
+                {errors.direccion && (
+                  <motion.p 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-sm text-red-600 flex items-center gap-1"
+                  >
+                    {errors.direccion.message}
+                  </motion.p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Dirección completa del proveedor
+                </p>
+              </div>
+
+              {/* Teléfono Field */}
+              <div className="space-y-2">
+                <Label htmlFor="telefono" className="flex items-center gap-2 text-sm font-medium">
+                  <Phone className="h-4 w-4 text-orange-600" />
+                  Teléfono
+                  <span className="text-xs text-muted-foreground">(Opcional)</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="telefono"
+                    {...register('telefono')}
+                    placeholder="Ej: +51 1 234-5678"
+                    className={`transition-all duration-200 ${
+                      errors.telefono 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                        : watchedTelefono && watchedTelefono.length >= 7
+                        ? 'border-green-500 focus:border-green-500 focus:ring-green-500/20'
+                        : 'focus:border-blue-500 focus:ring-blue-500/20'
+                    }`}
+                    disabled={isSubmitting}
+                  />
+                  {watchedTelefono && watchedTelefono.length >= 7 && !errors.telefono && (
+                    <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-500" />
+                  )}
+                </div>
+                {errors.telefono && (
+                  <motion.p 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-sm text-red-600 flex items-center gap-1"
+                  >
+                    {errors.telefono.message}
+                  </motion.p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Número de contacto del proveedor
+                </p>
+              </div>
+
+              {/* Correo Field */}
+              <div className="space-y-2">
+                <Label htmlFor="correo" className="flex items-center gap-2 text-sm font-medium">
+                  <Mail className="h-4 w-4 text-blue-600" />
+                  Correo Electrónico
+                  <span className="text-xs text-muted-foreground">(Opcional)</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="correo"
+                    {...register('correo')}
+                    placeholder="Ej: contacto@proveedor.com"
+                    type="email"
+                    className={`transition-all duration-200 ${
+                      errors.correo 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                        : watchedCorreo && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(watchedCorreo)
+                        ? 'border-green-500 focus:border-green-500 focus:ring-green-500/20'
+                        : 'focus:border-blue-500 focus:ring-blue-500/20'
+                    }`}
+                    disabled={isSubmitting}
+                  />
+                  {watchedCorreo && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(watchedCorreo) && !errors.correo && (
+                    <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-500" />
+                  )}
+                </div>
+                {errors.correo && (
+                  <motion.p 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-sm text-red-600 flex items-center gap-1"
+                  >
+                    {errors.correo.message}
+                  </motion.p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Email de contacto del proveedor
                 </p>
               </div>
             </div>

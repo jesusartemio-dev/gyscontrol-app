@@ -87,8 +87,8 @@ import {
 import GraficoProgreso from '@/components/equipos/GraficoProgreso'
 
 // 🔧 Utility functions
-const formatCurrency = (amount: number, currency: string = 'PEN'): string => {
-  return new Intl.NumberFormat('es-PE', {
+const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency
   }).format(amount)
@@ -136,7 +136,7 @@ function FinancieroContent() {
     periodo: '30d',
     proyecto: 'todos',
     categoria: 'todos',
-    moneda: 'PEN',
+    moneda: 'USD',
     fechaInicio: '',
     fechaFin: ''
   })
@@ -163,7 +163,7 @@ function FinancieroContent() {
       const [metricsData, costosData, presupuestoData, roiData] = await Promise.all([
         obtenerMetricasFinancieras({
           ...filtrosReporte,
-          moneda: filtros.moneda as 'PEN' | 'USD',
+          moneda: filtros.moneda as 'USD' | 'PEN',
           incluirProyecciones: true
         }),
         obtenerAnalisisCostos(filtrosReporte),
@@ -397,8 +397,8 @@ function FinancieroContent() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PEN">Soles (PEN)</SelectItem>
                     <SelectItem value="USD">Dólares (USD)</SelectItem>
+                    <SelectItem value="PEN">Soles (PEN)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -100,7 +100,7 @@ interface ListaEquipoMasterFiltersProps {
 const defaultFilters: FilterState = {
   search: '',
   estado: [],
-  moneda: 'PEN',
+  moneda: 'USD',
   progreso: 'all'
 };
 
@@ -569,8 +569,8 @@ const ListaEquipoMasterFilters: React.FC<ListaEquipoMasterFiltersProps> = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="PEN">PEN (Soles)</SelectItem>
                       <SelectItem value="USD">USD (Dólares)</SelectItem>
+                      <SelectItem value="PEN">PEN (Soles)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

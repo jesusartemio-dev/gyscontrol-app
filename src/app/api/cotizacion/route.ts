@@ -7,38 +7,114 @@
 // 📅 Última actualización: 2025-04-23
 // ===================================================
 
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import type { CotizacionesPaginationParams } from '@/types/payloads'
+import { 
+  parsePaginationParams, 
+  paginateQuery, 
+  PAGINATION_CONFIGS 
+} from '@/lib/utils/pagination'
 
-// ✅ Obtener todas las cotizaciones
-export async function GET() {
+// ✅ Obtener cotizaciones con paginación optimizada
+export async function GET(request: NextRequest) {
   try {
-    const cotizaciones = await prisma.cotizacion.findMany({
-      include: {
-        cliente: true,
-        comercial: true,
-        plantilla: true,
-        equipos: {
-          include: {
-            items: true
-          }
-        },
-        servicios: {
-          include: {
-            items: {
-              include: {
-                unidadServicio: true,
-                recurso: true,
-                catalogoServicio: true
-              }
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    
+    // 🔧 Parsear parámetros usando utilidad optimizada
+    const paginationParams = parsePaginationParams(
+      searchParams, 
+      PAGINATION_CONFIGS.cotizaciones
+    )
+    
+    // 📡 Extraer filtros específicos de cotizaciones
+    const clienteId = searchParams.get('clienteId')
+    const comercialId = searchParams.get('comercialId')
+    const estado = searchParams.get('estado')
+    const fechaDesde = searchParams.get('fechaDesde')
+    const fechaHasta = searchParams.get('fechaHasta')
+    
+    // 🔧 Construir filtros adicionales
+    const additionalWhere = {
+      ...(clienteId && { clienteId }),
+      ...(comercialId && { comercialId }),
+      ...(estado && estado !== 'todos' && { estado }),
+      ...(fechaDesde && fechaHasta && {
+        createdAt: {
+          gte: new Date(fechaDesde),
+          lte: new Date(fechaHasta)
+        }
+      })
+    }
+    
+    // 📡 Función de consulta optimizada
+    const queryFn = async ({ skip, take, where, orderBy }: any) => {
+      return await prisma.cotizacion.findMany({
+        where,
+        select: {
+          id: true,
+          nombre: true,
+          estado: true,
+          totalInterno: true,
+          totalCliente: true,
+          createdAt: true,
+          updatedAt: true,
+          cliente: {
+            select: {
+              id: true,
+              nombre: true,
+              correo: true
+            }
+          },
+          comercial: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          plantilla: {
+            select: {
+              id: true,
+              nombre: true,
+              estado: true
+            }
+          },
+          _count: {
+            select: {
+              equipos: true,
+              servicios: true
             }
           }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    return NextResponse.json(cotizaciones)
+        },
+        orderBy,
+        skip,
+        take
+      })
+    }
+    
+    // 📡 Función de conteo
+    const countFn = async (where: any) => {
+      return await prisma.cotizacion.count({ where })
+    }
+    
+    // 🔁 Ejecutar paginación con utilidad optimizada
+    const result = await paginateQuery(
+      queryFn,
+      countFn,
+      paginationParams,
+      [...(PAGINATION_CONFIGS.cotizaciones.searchFields || ['nombre'])],
+      additionalWhere
+    )
+    
+    return NextResponse.json(result)
   } catch (error) {
     console.error('❌ Error al obtener cotizaciones:', error)
     return NextResponse.json({ error: 'Error al obtener cotizaciones' }, { status: 500 })

@@ -3,6 +3,8 @@
 import React from 'react'
 import { SessionProvider } from 'next-auth/react'
 import { SWRConfig } from 'swr'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 // ✅ SWR configuration
 const swrConfig = {
@@ -31,12 +33,46 @@ const swrConfig = {
   }
 }
 
+// 🚀 React Query configuration - Optimized for GYS Performance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // 📊 Cache de 10 minutos para listas (según FASE 2)
+      staleTime: 10 * 60 * 1000, // 10 minutes
+      gcTime: 15 * 60 * 1000, // 15 minutes (formerly cacheTime)
+      // 🔄 Background refetch para datos actualizados
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      refetchOnMount: true,
+      // 🎯 Retry configuration optimizada
+      retry: (failureCount, error: any) => {
+        // No retry en errores 4xx (client errors)
+        if (error?.status >= 400 && error?.status < 500) return false
+        // Max 3 retries para otros errores
+        return failureCount < 3
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    },
+    mutations: {
+      // 🔄 Invalidación automática en mutaciones
+      retry: 1,
+      retryDelay: 1000,
+    },
+  },
+})
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <SWRConfig value={swrConfig}>
-        {children}
-      </SWRConfig>
+      <QueryClientProvider client={queryClient}>
+        <SWRConfig value={swrConfig}>
+          {children}
+        </SWRConfig>
+        {/* 🔧 React Query DevTools solo en desarrollo */}
+        {process.env.NODE_ENV === 'development' && (
+          <ReactQueryDevtools initialIsOpen={false} />
+        )}
+      </QueryClientProvider>
     </SessionProvider>
   )
 }

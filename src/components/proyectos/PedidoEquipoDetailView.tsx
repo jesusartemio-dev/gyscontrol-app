@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { 
   Calendar,
-  User,
+  User as UserIcon,
   FileText,
   Package,
   AlertCircle,
@@ -160,7 +160,7 @@ export default function PedidoEquipoDetailView({
                 Responsable
               </label>
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-400" />
+                <UserIcon className="h-4 w-4 text-gray-400" />
                 <span className="text-sm">
                   {pedido.responsable?.name || 'No asignado'}
                 </span>

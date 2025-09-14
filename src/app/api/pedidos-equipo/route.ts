@@ -12,8 +12,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { EstadoPedido } from '@prisma/client'
+import type { PaginatedResponse, PedidosPaginationParams } from '@/types/payloads'
+import { 
+  parsePaginationParams, 
+  paginateQuery, 
+  PAGINATION_CONFIGS 
+} from '@/lib/utils/pagination'
 
-// ✅ GET - Obtener todos los pedidos de equipos
+// ✅ GET - Obtener pedidos de equipos con paginación y búsqueda optimizada
 export async function GET(request: NextRequest) {
   try {
     // 🔐 Verificar autenticación
@@ -26,76 +32,93 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    
+    // 🔧 Parsear parámetros usando utilidad optimizada
+    const paginationParams = parsePaginationParams(
+      searchParams, 
+      PAGINATION_CONFIGS.pedidos
+    )
+    
+    // 📡 Extraer filtros específicos de pedidos
     const proyectoId = searchParams.get('proyectoId')
     const estadoParam = searchParams.get('estado')
     const responsableId = searchParams.get('responsableId')
-
+    const fechaDesde = searchParams.get('fechaDesde')
+    const fechaHasta = searchParams.get('fechaHasta')
+    const prioridad = searchParams.get('prioridad')
+    
     // ✅ Validar que el estado sea un valor válido del enum
     const estadosValidos = Object.values(EstadoPedido)
     const estado = estadoParam && estadosValidos.includes(estadoParam as EstadoPedido) ? estadoParam as EstadoPedido : undefined
+    
+    // 🔧 Construir filtros adicionales
+    const additionalWhere = {
+      ...(proyectoId && { proyectoId }),
+      ...(estado && { estado }),
+      ...(responsableId && { responsableId }),
+      ...(prioridad && { prioridad }),
+      ...(fechaDesde && fechaHasta && {
+        fechaPedido: {
+          gte: new Date(fechaDesde),
+          lte: new Date(fechaHasta)
+        }
+      })
+    }
 
-    // 📊 Obtener pedidos con relaciones completas
-    const pedidos = await prisma.pedidoEquipo.findMany({
-      where: {
-        ...(proyectoId ? { proyectoId } : {}),
-        ...(estado ? { estado } : {}),
-        ...(responsableId ? { responsableId } : {}),
-      },
-      include: {
-        proyecto: {
-          select: {
-            id: true,
-            nombre: true,
-            codigo: true
-          }
-        },
-        responsable: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        lista: {
-          select: {
-            id: true,
-            codigo: true,
-            nombre: true
-          }
-        },
-        items: {
-          include: {
-            listaEquipoItem: {
-              include: {
-                proyectoEquipoItem: {
-                  include: {
-                    catalogoEquipo: true
-                  }
-                }
-              }
+    // 📡 Función de consulta optimizada
+    const queryFn = async ({ skip, take, where, orderBy }: any) => {
+      const pedidos = await prisma.pedidoEquipo.findMany({
+        where,
+        select: {
+          id: true,
+          codigo: true,
+          numeroSecuencia: true,
+          estado: true,
+          prioridad: true,
+          fechaPedido: true,
+          fechaNecesaria: true,
+          fechaEntregaEstimada: true,
+          fechaEntregaReal: true,
+          observacion: true,
+          createdAt: true,
+          updatedAt: true,
+          proyecto: {
+            select: {
+              id: true,
+              nombre: true,
+              codigo: true
+            }
+          },
+          responsable: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          lista: {
+            select: {
+              id: true,
+              codigo: true,
+              nombre: true
+            }
+          },
+          _count: {
+            select: {
+              items: true
             }
           }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-
-    // 🔄 Transformar datos para la interfaz
-    const pedidosTransformados = pedidos.map(pedido => {
-      // ✅ Calculate montoTotal from items
-      const montoTotal = pedido.items.reduce((total, item) => {
-        const precioUnitario = item.precioUnitario || 
-          item.listaEquipoItem?.precioElegido || 
-          item.listaEquipoItem?.costoElegido || 
-          0
-        return total + (precioUnitario * (item.cantidadPedida || 0))
-      }, 0)
-
-      return {
+        },
+        orderBy,
+        skip,
+        take
+      })
+      
+      // 🔄 Transformar datos para la interfaz (optimizado)
+      return pedidos.map(pedido => ({
         id: pedido.id,
         codigo: pedido.codigo,
+        numeroSecuencia: pedido.numeroSecuencia,
         proyecto: {
           id: pedido.proyecto.id,
           nombre: pedido.proyecto.nombre,
@@ -103,7 +126,8 @@ export async function GET(request: NextRequest) {
         },
         responsable: {
           id: pedido.responsable?.id || '',
-          name: pedido.responsable?.name || 'Sin asignar'
+          name: pedido.responsable?.name || 'Sin asignar',
+          email: pedido.responsable?.email || ''
         },
         lista: pedido.lista ? {
           id: pedido.lista.id,
@@ -114,16 +138,30 @@ export async function GET(request: NextRequest) {
         prioridad: pedido.prioridad || 'media',
         fechaPedido: pedido.fechaPedido?.toISOString() || pedido.createdAt.toISOString(),
         fechaNecesaria: pedido.fechaNecesaria?.toISOString() || '',
-        fechaEntrega: pedido.fechaEntregaEstimada?.toISOString() || '',
-        montoTotal: montoTotal,
-        itemsCount: pedido.items.length,
+        fechaEntregaEstimada: pedido.fechaEntregaEstimada?.toISOString() || '',
+        fechaEntregaReal: pedido.fechaEntregaReal?.toISOString() || '',
+        itemsCount: pedido._count.items,
         observaciones: pedido.observacion || '',
         createdAt: pedido.createdAt.toISOString(),
         updatedAt: pedido.updatedAt.toISOString()
-      }
-    })
-
-    return NextResponse.json(pedidosTransformados)
+      }))
+    }
+    
+    // 📡 Función de conteo
+    const countFn = async (where: any) => {
+      return await prisma.pedidoEquipo.count({ where })
+    }
+    
+    // 🔁 Ejecutar paginación con utilidad optimizada
+    const result = await paginateQuery(
+      queryFn,
+      countFn,
+      paginationParams,
+      [...(PAGINATION_CONFIGS.pedidos.searchFields || ['codigo', 'observacion'])],
+      additionalWhere
+    )
+    
+    return NextResponse.json(result)
 
   } catch (error) {
     console.error('❌ Error al obtener pedidos:', error)

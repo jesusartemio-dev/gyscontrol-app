@@ -27,6 +27,13 @@ model User {
   ProyectoServicios             ProyectoServicio[]
   registrosHoras                RegistroHoras[]
   sessions                      Session[]
+  
+  // 📋 Relaciones con sistema de tareas
+  tareasResponsable             Tarea[]                       @relation("TareaResponsable")
+  subtareasAsignadas            Subtarea[]                    @relation("SubtareaAsignado")
+  asignacionesRecurso           AsignacionRecurso[]           @relation("AsignacionRecurso")
+  registrosProgreso             RegistroProgreso[]            @relation("RegistroProgreso")
+  
   // Relaciones Logística y Finanzas eliminadas
 }
 
@@ -470,6 +477,12 @@ model Proyecto {
   servicios             ProyectoServicio[]
   registrosHoras        RegistroHoras[]
   valorizaciones        Valorizacion[]
+
+  // ✅ Índices compuestos para optimizar queries frecuentes
+  @@index([estado, fechaInicio, createdAt(sort: Desc)], name: "idx_proyecto_estado_inicio_fecha")
+  @@index([comercialId, estado, fechaInicio], name: "idx_proyecto_comercial_estado_inicio")
+  @@index([gestorId, estado, fechaFin], name: "idx_proyecto_gestor_estado_fin")
+  @@index([clienteId, estado, createdAt(sort: Desc)], name: "idx_proyecto_cliente_estado_fecha")
 }
 
 model ProyectoEquipo {
@@ -536,6 +549,9 @@ model ProyectoServicio {
   responsable     User                   @relation(fields: [responsableId], references: [id])
   items           ProyectoServicioItem[]
   registrosHoras  RegistroHoras[]
+  
+  // 📋 Relación con sistema de tareas
+  tareas          Tarea[]
 }
 
 model ProyectoServicioItem {
@@ -615,6 +631,11 @@ model ListaEquipo {
   pedidoEquipos           PedidoEquipo[]
   pedidoEquipoItems       PedidoEquipoItem[]
   proyectoEquipoItems     ProyectoEquipoItem[]
+
+  // ✅ Índices compuestos para optimizar queries frecuentes
+  @@index([proyectoId, estado, createdAt(sort: Desc)], name: "idx_lista_proyecto_estado_fecha")
+  @@index([responsableId, estado, fechaAprobacionFinal], name: "idx_lista_responsable_estado_aprobacion")
+  @@index([estado, fechaNecesaria, createdAt(sort: Desc)], name: "idx_lista_estado_necesaria_fecha")
 }
 
 model ListaEquipoItem {
@@ -655,12 +676,20 @@ model ListaEquipoItem {
   responsable                   User                      @relation(fields: [responsableId], references: [id])
   pedidos                       PedidoEquipoItem[]
   listaSeleccionadaDe           ProyectoEquipoItem[]      @relation("ListaSeleccionada")
+
+  // ✅ Índices compuestos para optimizar queries frecuentes
+  @@index([listaId, estado, createdAt(sort: Desc)], name: "idx_lista_item_lista_estado_fecha")
+  @@index([responsableId, estado, verificado], name: "idx_lista_item_responsable_estado_verificado")
+  @@index([proveedorId, estado, precioElegido], name: "idx_lista_item_proveedor_estado_precio")
 }
 
 model Proveedor {
   id            String                @id @default(cuid())
   nombre        String
   ruc           String?
+  direccion     String?
+  telefono      String?
+  correo        String?
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   cotizaciones  CotizacionProveedor[]
@@ -728,6 +757,12 @@ model PedidoEquipo {
   proyecto             Proyecto           @relation(fields: [proyectoId], references: [id])
   responsable          User               @relation(fields: [responsableId], references: [id])
   items                PedidoEquipoItem[]
+
+  // ✅ Índices compuestos para optimizar queries frecuentes
+  @@index([proyectoId, estado, createdAt(sort: Desc)], name: "idx_pedido_proyecto_estado_fecha")
+  @@index([responsableId, estado, fechaNecesaria], name: "idx_pedido_responsable_estado_fecha")
+  @@index([estado, prioridad, createdAt(sort: Desc)], name: "idx_pedido_estado_prioridad_fecha")
+  @@index([proyectoId, responsableId, estado], name: "idx_pedido_proyecto_responsable_estado")
 }
 
 model PedidoEquipoItem {
@@ -906,6 +941,171 @@ enum Role {
   gestor
   gerente
   admin
+}
+
+// ✅ Enums para sistema de tareas y subtareas
+enum EstadoTarea {
+  pendiente
+  en_progreso
+  completada
+  pausada
+  cancelada
+}
+
+enum PrioridadTarea {
+  baja
+  media
+  alta
+  critica
+}
+
+enum TipoDependencia {
+  finish_to_start
+  start_to_start
+  finish_to_finish
+  start_to_finish
+}
+
+// 📋 Modelo principal de Tarea
+model Tarea {
+  id                String              @id @default(cuid())
+  nombre            String
+  descripcion       String?
+  fechaInicio       DateTime
+  fechaFin          DateTime
+  fechaInicioReal   DateTime?
+  fechaFinReal      DateTime?
+  estado            EstadoTarea         @default(pendiente)
+  prioridad         PrioridadTarea      @default(media)
+  porcentajeCompletado Int              @default(0)
+  horasEstimadas    Decimal?            @db.Decimal(10, 2)
+  horasReales       Decimal?            @db.Decimal(10, 2) @default(0)
+  
+  // 🔗 Relaciones
+  proyectoServicioId String
+  proyectoServicio   ProyectoServicio    @relation(fields: [proyectoServicioId], references: [id], onDelete: Cascade)
+  
+  responsableId     String?
+  responsable       User?               @relation("TareaResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  
+  // 📋 Subtareas
+  subtareas         Subtarea[]
+  
+  // 🔗 Dependencias
+  dependenciasOrigen     DependenciaTarea[] @relation("TareaOrigen")
+  dependenciasDependiente DependenciaTarea[] @relation("TareaDependiente")
+  
+  // 👥 Asignaciones de recursos
+  asignaciones      AsignacionRecurso[]
+  
+  // 📊 Registros de progreso
+  registrosProgreso RegistroProgreso[]
+  
+  // 📅 Timestamps
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  @@map("tareas")
+}
+
+// 📋 Modelo de Subtarea
+model Subtarea {
+  id                String              @id @default(cuid())
+  nombre            String
+  descripcion       String?
+  fechaInicio       DateTime
+  fechaFin          DateTime
+  fechaInicioReal   DateTime?
+  fechaFinReal      DateTime?
+  estado            EstadoTarea         @default(pendiente)
+  porcentajeCompletado Int              @default(0)
+  horasEstimadas    Decimal?            @db.Decimal(10, 2)
+  horasReales       Decimal?            @db.Decimal(10, 2) @default(0)
+  
+  // 🔗 Relación con tarea padre
+  tareaId           String
+  tarea             Tarea               @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  
+  // 👤 Usuario asignado
+  asignadoId        String?
+  asignado          User?               @relation("SubtareaAsignado", fields: [asignadoId], references: [id], onDelete: SetNull)
+  
+  // 📊 Registros de progreso
+  registrosProgreso RegistroProgreso[]
+  
+  // 📅 Timestamps
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  @@map("subtareas")
+}
+
+// 🔗 Modelo de Dependencias entre Tareas
+model DependenciaTarea {
+  id                String              @id @default(cuid())
+  tipo              TipoDependencia     @default(finish_to_start)
+  
+  // 🔗 Tarea origen (predecesora)
+  tareaOrigenId     String
+  tareaOrigen       Tarea               @relation("TareaOrigen", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
+  
+  // 🔗 Tarea dependiente (sucesora)
+  tareaDependienteId String
+  tareaDependiente  Tarea               @relation("TareaDependiente", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
+  
+  // 📅 Timestamps
+  createdAt         DateTime            @default(now())
+  
+  @@unique([tareaOrigenId, tareaDependienteId])
+  @@map("dependencias_tarea")
+}
+
+// 👥 Modelo de Asignación de Recursos
+model AsignacionRecurso {
+  id                String              @id @default(cuid())
+  rol               String              // Rol específico en la tarea
+  horasAsignadas    Decimal?            @db.Decimal(10, 2)
+  
+  // 🔗 Relación con tarea
+  tareaId           String
+  tarea             Tarea               @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  
+  // 👤 Usuario asignado
+  usuarioId         String
+  usuario           User                @relation("AsignacionRecurso", fields: [usuarioId], references: [id], onDelete: Cascade)
+  
+  // 📅 Timestamps
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  @@unique([tareaId, usuarioId])
+  @@map("asignaciones_recurso")
+}
+
+// 📊 Modelo de Registro de Progreso
+model RegistroProgreso {
+  id                String              @id @default(cuid())
+  fecha             DateTime            @default(now())
+  horasTrabajadas   Decimal             @db.Decimal(10, 2)
+  descripcion       String?
+  porcentajeCompletado Int?
+  
+  // 🔗 Relación con tarea (opcional)
+  tareaId           String?
+  tarea             Tarea?              @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  
+  // 🔗 Relación con subtarea (opcional)
+  subtareaId        String?
+  subtarea          Subtarea?           @relation(fields: [subtareaId], references: [id], onDelete: Cascade)
+  
+  // 👤 Usuario que registra
+  usuarioId         String
+  usuario           User                @relation("RegistroProgreso", fields: [usuarioId], references: [id], onDelete: Cascade)
+  
+  // 📅 Timestamps
+  createdAt         DateTime            @default(now())
+  
+  @@map("registros_progreso")
 }
 
 // Enums de aprovisionamiento eliminados

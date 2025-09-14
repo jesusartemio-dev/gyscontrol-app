@@ -24,8 +24,38 @@ import type {
   // ❌ Eliminado: Producto - no forma parte del sistema GYS
 } from './modelos'
 
- 
+// ===================================================
+// 🔄 INTERFACES DE PAGINACIÓN
+// ===================================================
 
+// ✅ Metadatos de paginación
+export interface PaginationMeta {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
+}
+
+// ✅ Respuesta paginada genérica
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: PaginationMeta
+}
+
+// ✅ Parámetros de paginación para requests
+export interface PaginationParams {
+  page?: number
+  limit?: number
+  search?: string
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}
+
+// ===================================================
+// 🔄 PAYLOADS DE ENTIDADES
+// ===================================================
 
 // ❌ Eliminado: ProductoPayload y ProductoUpdatePayload - no forman parte del sistema GYS
 
@@ -478,9 +508,22 @@ export interface ListaEquipoItemUpdatePayload extends Partial<ListaEquipoItemPay
 
 
 
+// ✅ Cliente
+export interface ClientePayload {
+  nombre: string
+  ruc?: string
+  direccion?: string
+  telefono?: string
+  correo?: string
+}
+export interface ClienteUpdatePayload extends Partial<ClientePayload> {}
+
 export interface ProveedorPayload {
   nombre: string
   ruc?: string
+  direccion?: string
+  telefono?: string
+  correo?: string
 }
 export interface ProveedorUpdatePayload extends Partial<ProveedorPayload> {}
 
@@ -630,30 +673,77 @@ export interface ApiError {
   field?: string;
 }
 
-export interface PaginatedResponse<T = any> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-}
+// ✅ Respuesta paginada estándar (eliminada - usar la definición con meta)
 
+// ✅ Parámetros de paginación mejorados
 export interface PaginationParams {
   page?: number;
   limit?: number;
+  search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
 
-// 🔍 Búsqueda y Filtros Avanzados
+// ✅ Parámetros de búsqueda con paginación
 export interface SearchParams {
   query?: string;
+  search?: string;
   filters?: Record<string, any>;
   pagination?: PaginationParams;
+}
+
+// ✅ Configuración de paginación por entidad
+export interface EntityPaginationConfig {
+  defaultLimit: number;
+  maxLimit: number;
+  defaultSortBy?: string;
+  defaultSortOrder?: 'asc' | 'desc';
+  searchFields?: string[];
+}
+
+// ✅ Parámetros específicos para APIs principales
+export interface ListasEquipoPaginationParams extends PaginationParams {
+  proyectoId?: string;
+  estado?: string;
+  responsableId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+}
+
+export interface CotizacionesPaginationParams extends PaginationParams {
+  clienteId?: string;
+  comercialId?: string;
+  estado?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+}
+
+export interface PedidosPaginationParams extends PaginationParams {
+  proyectoId?: string;
+  listaId?: string;
+  estado?: string;
+  prioridad?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+}
+
+// ✅ Parámetros específicos para pedidos de equipo (aprovisionamiento)
+export interface PedidosEquipoPaginationParams extends PaginationParams {
+  proyectoId?: string;
+  proveedorId?: string;
+  estado?: string[];
+  fechaDesde?: string;
+  fechaHasta?: string;
+  montoMinimo?: number;
+  montoMaximo?: number;
+  busqueda?: string;
+}
+
+export interface TimelinePaginationParams extends PaginationParams {
+  tipo?: string;
+  entidadId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
 }
 
 
@@ -793,5 +883,202 @@ export interface ROIData {
     benchmark: number;
     estado: 'excelente' | 'bueno' | 'regular' | 'malo';
   }>;
+}
+
+// ============================
+// 📋 Payloads Sistema de Tareas y Subtareas
+// ============================
+
+// 📋 Payload para crear/actualizar Tarea
+export interface TareaPayload {
+  proyectoServicioId: string
+  nombre: string
+  descripcion?: string
+  estado?: 'pendiente' | 'en_progreso' | 'completada' | 'cancelada' | 'pausada'
+  prioridad?: 'baja' | 'media' | 'alta' | 'critica'
+  fechaInicio: string
+  fechaFin: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  progreso?: number // 0-100
+  horasEstimadas: number
+  horasReales?: number
+  responsableId: string
+}
+
+export interface TareaUpdatePayload extends Partial<TareaPayload> {}
+
+// 📝 Payload para crear/actualizar Subtarea
+export interface SubtareaPayload {
+  tareaId: string
+  nombre: string
+  descripcion?: string
+  estado?: 'pendiente' | 'en_progreso' | 'completada' | 'cancelada' | 'pausada'
+  fechaInicio: string
+  fechaFin: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  progreso?: number // 0-100
+  horasEstimadas: number
+  horasReales?: number
+  asignadoId?: string
+}
+
+export interface SubtareaUpdatePayload extends Partial<SubtareaPayload> {}
+
+// 🔗 Payload para crear/actualizar Dependencia entre Tareas
+export interface DependenciaTareaPayload {
+  tareaOrigenId: string
+  tareaDestinoId: string
+  tipo: 'fin_a_inicio' | 'inicio_a_inicio' | 'fin_a_fin' | 'inicio_a_fin'
+  retrasoMinimo?: number // días de retraso mínimo
+}
+
+export interface DependenciaTareaUpdatePayload extends Partial<DependenciaTareaPayload> {}
+
+// 👥 Payload para crear/actualizar Asignación de Recursos
+export interface AsignacionRecursoPayload {
+  tareaId: string
+  usuarioId: string
+  tipoRecurso: 'humano' | 'material' | 'equipo'
+  porcentajeAsignacion: number // 0-100
+  fechaAsignacion: string
+  fechaDesasignacion?: string
+  activo?: boolean
+}
+
+export interface AsignacionRecursoUpdatePayload extends Partial<AsignacionRecursoPayload> {}
+
+// 📊 Payload para crear/actualizar Registro de Progreso
+export interface RegistroProgresoPayload {
+  tareaId?: string
+  subtareaId?: string
+  usuarioId: string
+  fecha: string
+  horasTrabajadas: number
+  progresoAnterior: number
+  progresoNuevo: number
+  descripcion?: string
+  observaciones?: string
+}
+
+export interface RegistroProgresoUpdatePayload extends Partial<RegistroProgresoPayload> {}
+
+// 📊 Parámetros de paginación específicos para Tareas
+export interface TareasPaginationParams extends PaginationParams {
+  proyectoServicioId?: string
+  responsableId?: string
+  estado?: string
+  prioridad?: string
+  fechaDesde?: string
+  fechaHasta?: string
+}
+
+// 📝 Parámetros de paginación específicos para Subtareas
+export interface SubtareasPaginationParams extends PaginationParams {
+  tareaId?: string
+  asignadoId?: string
+  estado?: string
+  fechaDesde?: string
+  fechaHasta?: string
+}
+
+// 📊 Parámetros de paginación específicos para Registros de Progreso
+export interface RegistrosProgresoPaginationParams extends PaginationParams {
+  tareaId?: string
+  subtareaId?: string
+  usuarioId?: string
+  fechaDesde?: string
+  fechaHasta?: string
+}
+
+// 📈 Payload para datos de Gantt Chart
+export interface GanttDataPayload {
+  proyectoServicioId: string
+  incluirSubtareas?: boolean
+  incluirDependencias?: boolean
+  fechaInicio?: string
+  fechaFin?: string
+}
+
+// 📊 Payload para métricas de tareas
+export interface MetricasTareasPayload {
+  proyectoServicioId?: string
+  responsableId?: string
+  fechaInicio?: string
+  fechaFin?: string
+  incluirSubtareas?: boolean
+}
+
+// 📊 Interfaces para Gantt Chart
+export interface GanttTaskPayload {
+  id: string
+  nombre: string
+  fechaInicio: string
+  fechaFin: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  progreso: number
+  estado: 'pendiente' | 'en_progreso' | 'completada' | 'cancelada' | 'pausada'
+  prioridad: 'baja' | 'media' | 'alta' | 'critica'
+  responsable: {
+    id: string
+    nombre: string
+    email: string
+  }
+  horasEstimadas: number
+  horasReales?: number
+  dependencias?: string[]
+  subtareas?: GanttTaskPayload[]
+  tipo: 'tarea' | 'subtarea'
+  nivel: number
+  rutaCritica?: boolean
+}
+
+export interface GanttMetricsPayload {
+  progresoGeneral: number
+  horasTotales: number
+  horasCompletadas: number
+  eficiencia: number
+  fechaInicioProyecto: string
+  fechaFinProyecto: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  diasRetraso?: number
+  tareasTotal: number
+  tareasCompletadas: number
+  tareasPendientes: number
+  tareasEnProgreso: number
+}
+
+// 📊 Interfaz para dependencias en Gantt
+export interface GanttDependency {
+  id: string
+  tareaOrigenId: string
+  tareaDestinoId: string
+  tipo: 'fin_a_inicio' | 'inicio_a_inicio' | 'fin_a_fin' | 'inicio_a_fin'
+  retrasoMinimo?: number
+}
+
+export interface GanttChartPayload {
+  tareas: GanttTaskPayload[]
+  dependencias?: GanttDependency[]
+  metricas: GanttMetricsPayload
+  rutaCritica?: string[]
+  timeline?: Array<{
+    fecha: string
+    eventos: Array<{
+      tipo: 'inicio' | 'fin' | 'hito'
+      tareaId: string
+      descripcion: string
+    }>
+  }>
+  cargaTrabajo?: Array<{
+    usuarioId: string
+    nombre: string
+    cargaPorcentaje: number
+    horasAsignadas: number
+    conflictos: boolean
+  }>
 }
 

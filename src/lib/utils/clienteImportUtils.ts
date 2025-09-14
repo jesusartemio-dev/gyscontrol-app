@@ -85,6 +85,28 @@ export function validarClientes(
 }
 
 /**
+ * Crea clientes en la base de datos a través de la API
+ * @param clientes - Array de clientes a crear
+ * @returns Promise con resultado de la importación
+ */
+export async function crearClientesEnBD(clientes: ClienteImportado[]): Promise<any> {
+  const response = await fetch('/api/cliente/import', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ clientes }),
+  })
+  
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || 'Error al importar clientes')
+  }
+  
+  return await response.json()
+}
+
+/**
  * Valida formato de email
  * @param email - Email a validar
  * @returns true si es válido, false si no

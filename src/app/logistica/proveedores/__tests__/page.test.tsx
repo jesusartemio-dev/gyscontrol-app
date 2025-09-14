@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -320,9 +321,6 @@ describe('ProveedoresPage', () => {
       expect(proveedorService.getProveedores).toHaveBeenCalledTimes(2)
     })
   })
-<<<<<<< Updated upstream
-})
-=======
 
   it('should handle provider creation', async () => {
     const user = userEvent.setup()
@@ -373,4 +371,3 @@ describe('ProveedoresPage', () => {
     expect(screen.getByText('Nuevo Proveedor')).toBeInTheDocument()
   })
 })
->>>>>>> Stashed changes

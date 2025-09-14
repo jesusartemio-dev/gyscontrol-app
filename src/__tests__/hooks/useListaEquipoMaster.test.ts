@@ -82,7 +82,7 @@ describe('useListaEquipoMaster Hook', () => {
     mockMasterListUtils.filterLists.mockImplementation((lists) => lists);
     mockMasterListUtils.sortLists.mockImplementation((lists) => lists);
     mockMasterListUtils.calculateProgress.mockReturnValue(50);
-    mockMasterListUtils.formatCurrency.mockReturnValue('S/ 10,000.00');
+    mockMasterListUtils.formatCurrency.mockReturnValue('USD 10,000.00');
     mockMasterListUtils.formatDate.mockReturnValue('01/01/2024');
   });
 

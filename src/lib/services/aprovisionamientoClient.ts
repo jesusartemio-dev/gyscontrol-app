@@ -1,13 +1,15 @@
 // 🚀 Servicios de Aprovisionamiento para Client Components
 // ✅ Versión optimizada para componentes del cliente que maneja automáticamente las cookies de NextAuth
+// 🔄 MIGRADO A REACT QUERY - Este archivo será deprecado gradualmente
 
 import type { 
   ResponseListas,
   ResponsePedidos 
 } from '@/types/aprovisionamiento'
 import { buildApiUrl } from '@/lib/utils'
+import logger from '@/lib/logger'
 
-const API_BASE = '/api/pedido-equipo'
+const API_BASE = '/api/listas-equipo'
 
 // 🔧 Utilidad para manejar respuestas de API en el cliente
 async function handleApiResponse<T>(response: Response): Promise<T> {
@@ -36,9 +38,11 @@ function buildQueryParams(params: Record<string, any>): string {
 }
 
 // 📊 Servicio de Listas de Equipo para Client Components
+// ⚠️ DEPRECADO: Usar aprovisionamientoQuery.ts con React Query
 export const listasEquipoClientService = {
   /**
    * 🔍 Obtener listas de equipo con filtros (Client Component)
+   * @deprecated Usar useListasEquipo hook de aprovisionamientoQuery.ts
    */
   async obtenerListas(filtros: {
     proyectoId?: string
@@ -52,8 +56,10 @@ export const listasEquipoClientService = {
     limit?: number
   } = {}): Promise<ResponseListas> {
     try {
+      logger.warn('🚨 Usando servicio deprecado listasEquipoClientService. Migrar a React Query.')
+      
       const queryParams = buildQueryParams(filtros)
-      const url = buildApiUrl(`${API_BASE}/listas${queryParams ? `?${queryParams}` : ''}`)
+      const url = buildApiUrl(`${API_BASE}${queryParams ? `?${queryParams}` : ''}`)
       
       // 📡 En Client Components, fetch automáticamente incluye las cookies de sesión
       const response = await fetch(url, {
@@ -66,12 +72,29 @@ export const listasEquipoClientService = {
       
       const apiResponse = await handleApiResponse<any>(response)
       
-      // ✅ Transformar respuesta de aprovisionamiento al formato esperado
-      // La API de aprovisionamiento devuelve: { success, data: [...], estadisticas: {...} }
-      // Necesitamos convertirlo al formato: { success, data: { listas: [...], pagination: {...} } }
+      // ✅ Validar que la respuesta de la API sea válida
+      if (!apiResponse || !Array.isArray(apiResponse)) {
+        logger.warn('API response is null or not an array:', apiResponse)
+        return {
+          success: false,
+          data: {
+            listas: [],
+            pagination: {
+              page: 1,
+              limit: 20,
+              total: 0,
+              pages: 0,
+              hasNext: false,
+              hasPrev: false
+            }
+          },
+          timestamp: new Date().toISOString()
+        }
+      }
       
-      // 🔧 Transformar las listas para extraer solo el porcentaje de coherencia
-      const listasTransformadas = (apiResponse.data || []).map((lista: any) => ({
+      // ✅ La API /api/listas-equipo devuelve directamente un array de listas
+      // Transformar las listas para extraer solo el porcentaje de coherencia
+      const listasTransformadas = apiResponse.map((lista: any) => ({
         ...lista,
         // ✅ Extraer solo el porcentaje de coherencia del objeto complejo
         coherencia: typeof lista.coherencia === 'object' && lista.coherencia?.porcentajeEjecutado 
@@ -82,16 +105,16 @@ export const listasEquipoClientService = {
       }))
       
       return {
-        success: apiResponse.success || true,
+        success: true,
         data: {
           listas: listasTransformadas,
           pagination: {
-            page: apiResponse.estadisticas?.pagina || 1,
-            limit: apiResponse.estadisticas?.limite || 20,
-            total: apiResponse.estadisticas?.total || 0,
-            pages: apiResponse.estadisticas?.totalPaginas || 0,
-            hasNext: (apiResponse.estadisticas?.pagina || 1) < (apiResponse.estadisticas?.totalPaginas || 0),
-            hasPrev: (apiResponse.estadisticas?.pagina || 1) > 1
+            page: filtros.page || 1,
+            limit: filtros.limit || 20,
+            total: listasTransformadas.length,
+            pages: Math.ceil(listasTransformadas.length / (filtros.limit || 20)),
+            hasNext: (filtros.page || 1) < Math.ceil(listasTransformadas.length / (filtros.limit || 20)),
+            hasPrev: (filtros.page || 1) > 1
           }
         },
         timestamp: new Date().toISOString()
@@ -135,6 +158,26 @@ export const pedidosEquipoClientService = {
       })
       
       const apiResponse = await handleApiResponse<any>(response)
+      
+      // ✅ Validar que la respuesta de la API sea válida
+      if (!apiResponse || typeof apiResponse !== 'object') {
+        console.warn('API response is null or invalid:', apiResponse)
+        return {
+          success: false,
+          data: {
+            pedidos: [],
+            pagination: {
+              page: 1,
+              limit: 20,
+              total: 0,
+              pages: 0,
+              hasNext: false,
+              hasPrev: false
+            }
+          },
+          timestamp: new Date().toISOString()
+        }
+      }
       
       // ✅ Transformar respuesta de aprovisionamiento al formato esperado
       // La API devuelve: { success: true, data: [...pedidos], estadisticas: {...} }

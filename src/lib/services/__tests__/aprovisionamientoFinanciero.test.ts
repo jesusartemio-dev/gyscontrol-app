@@ -166,7 +166,7 @@ describe('AprovisionamientoFinanciero Service', () => {
           pedidos: { total: 3, enviados: 2, pendientes: 1, montoTotal: 20000 },
           alertas: 1,
           progreso: 50,
-          moneda: 'PEN'
+          moneda: 'USD'
         }
       ]
 

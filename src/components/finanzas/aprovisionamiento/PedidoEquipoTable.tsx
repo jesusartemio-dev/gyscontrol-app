@@ -18,7 +18,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
   Table,
   TableBody,
@@ -128,6 +128,7 @@ type ColumnKey =
   | 'estado'
   | 'montoTotal'
   | 'coherencia'
+  | 'proveedor'
   | 'alertas'
   | 'acciones';
 
@@ -358,6 +359,261 @@ const InlineEditCell: React.FC<{
     </div>
   );
 };
+
+// 🚀 OPTIMIZED: Table row component with React.memo
+interface PedidoTableRowProps {
+  pedido: PedidoEquipo;
+  index: number;
+  visibleColumns: ColumnKey[];
+  allowEdit: boolean;
+  allowBulkActions: boolean;
+  showCoherenceIndicators: boolean;
+  isSelected: boolean;
+  onPedidoClick?: (pedido: PedidoEquipo) => void;
+  onPedidoEdit?: (pedido: PedidoEquipo) => void;
+  onSelectItem: (id: string, checked: boolean) => void;
+  onInlineEdit: (id: string, field: keyof PedidoEquipo, value: string | number) => void;
+  onViewTracking?: (pedido: PedidoEquipo) => void;
+  onContactSupplier?: (pedido: PedidoEquipo) => void;
+}
+
+const PedidoEquipoTableRow = memo<PedidoTableRowProps>(({ 
+  pedido, 
+  index, 
+  visibleColumns, 
+  allowEdit, 
+  allowBulkActions, 
+  showCoherenceIndicators, 
+  isSelected,
+  onPedidoClick, 
+  onPedidoEdit, 
+  onSelectItem, 
+  onInlineEdit,
+  onViewTracking,
+  onContactSupplier 
+}) => {
+  // 🎯 Memoized handlers
+  const handleRowClick = useCallback(() => {
+    onPedidoClick?.(pedido);
+  }, [onPedidoClick, pedido]);
+
+  const handleSelectChange = useCallback((checked: boolean) => {
+    onSelectItem(pedido.id, checked);
+  }, [onSelectItem, pedido.id]);
+
+  const handleEditClick = useCallback(() => {
+    onPedidoEdit?.(pedido);
+  }, [onPedidoEdit, pedido]);
+
+  // 🎯 Memoized inline edit handlers
+  const handleCodigoEdit = useCallback((value: string | number) => {
+    onInlineEdit(pedido.id, 'codigo', value);
+  }, [onInlineEdit, pedido.id]);
+
+  const handleFechaNecesariaEdit = useCallback((value: string | number) => {
+    onInlineEdit(pedido.id, 'fechaNecesaria', value);
+  }, [onInlineEdit, pedido.id]);
+
+  // 🎯 Memoized computed values
+  const montoTotal = useMemo(() => {
+    return pedido.items?.reduce((sum, item) => {
+      return sum + (item.costoTotal || 0);
+    }, 0) || 0;
+  }, [pedido.items]);
+
+  const montoDisplay = useMemo(() => {
+    return montoTotal > 0 
+      ? `PEN ${montoTotal.toLocaleString()}`
+      : '-';
+  }, [montoTotal]);
+
+  const fechaPedidoDisplay = useMemo(() => {
+    return pedido.fechaPedido 
+      ? new Date(pedido.fechaPedido).toLocaleDateString() 
+      : '-';
+  }, [pedido.fechaPedido]);
+
+  const fechaNecesariaDisplay = useMemo(() => {
+    return pedido.fechaNecesaria 
+      ? new Date(pedido.fechaNecesaria).toLocaleDateString() 
+      : '-';
+  }, [pedido.fechaNecesaria]);
+
+  const fechaEntregaDisplay = useMemo(() => {
+    return pedido.fechaEntregaEstimada 
+      ? new Date(pedido.fechaEntregaEstimada).toLocaleDateString() 
+      : '-';
+  }, [pedido.fechaEntregaEstimada]);
+
+  return (
+    <TableRow
+      className="hover:bg-gray-50 cursor-pointer"
+      onClick={handleRowClick}
+    >
+      {allowBulkActions && (
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={handleSelectChange}
+          />
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('codigo') && (
+        <TableCell className="font-mono text-sm">
+          {allowEdit ? (
+            <InlineEditCell
+              value={pedido.codigo}
+              onSave={handleCodigoEdit}
+            />
+          ) : (
+            pedido.codigo
+          )}
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('proyecto') && (
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-blue-500" />
+            <div className="flex flex-col">
+              <span className="font-medium text-sm">{(pedido as any).proyecto?.codigo || 'N/A'}</span>
+              <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={(pedido as any).proyecto?.nombre}>
+                {(pedido as any).proyecto?.nombre || 'Sin proyecto'}
+              </span>
+            </div>
+          </div>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('descripcion') && (
+        <TableCell>
+          <div className="max-w-xs truncate" title={pedido.observacion}>
+            {pedido.observacion || 'Sin descripción'}
+          </div>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('fechaPedido') && (
+        <TableCell className="text-center">
+          <span className={!pedido.fechaPedido ? 'text-muted-foreground' : ''}>
+            {fechaPedidoDisplay}
+          </span>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('fechaNecesaria') && (
+        <TableCell className="text-center">
+          <div className="flex items-center justify-center gap-2">
+            {pedido.fechaNecesaria ? (
+              <>
+                <Calendar className="w-4 h-4 text-orange-500" />
+                {allowEdit ? (
+                  <InlineEditCell
+                    value={pedido.fechaNecesaria}
+                    type="date"
+                    onSave={handleFechaNecesariaEdit}
+                  />
+                ) : (
+                  <span className="font-medium text-orange-700">
+                    {fechaNecesariaDisplay}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('fechaEntregaEstimada') && (
+        <TableCell className="text-center">
+          <div className="flex items-center justify-center gap-2">
+            {pedido.fechaEntregaEstimada ? (
+              <>
+                <Truck className="w-4 h-4 text-green-500" />
+                <span className="font-medium text-green-700">
+                  {fechaEntregaDisplay}
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('estado') && (
+        <TableCell className="text-center">
+          <StatusBadge estado={pedido.estado} />
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('montoTotal') && (
+        <TableCell className="text-right font-mono">
+          <span className={!montoTotal ? 'text-muted-foreground' : ''}>
+            {montoDisplay}
+          </span>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('proveedor') && (
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-purple-500" />
+            <span className="font-medium">
+              {(pedido as any).proveedor?.nombre || 'Sin asignar'}
+            </span>
+          </div>
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('coherencia') && showCoherenceIndicators && (
+        <TableCell className="text-center">
+          <CoherenceIndicator coherencia={(pedido as any).coherencia} />
+        </TableCell>
+      )}
+      
+      {visibleColumns.includes('acciones') && (
+        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleRowClick}>
+                <Eye className="w-4 h-4 mr-2" />
+                Ver detalles
+              </DropdownMenuItem>
+              {allowEdit && (
+                <DropdownMenuItem onClick={handleEditClick}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem>
+                <Package className="w-4 h-4 mr-2" />
+                Ver seguimiento
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <FileText className="w-4 h-4 mr-2" />
+                Generar reporte
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      )}
+    </TableRow>
+  );
+});
+
+// Set display name for debugging
+PedidoEquipoTableRow.displayName = 'PedidoEquipoTableRow';
 
 // ✅ Main component
 export const PedidoEquipoTable: React.FC<PedidoEquipoTableProps> = ({
@@ -607,209 +863,22 @@ export const PedidoEquipoTable: React.FC<PedidoEquipoTableProps> = ({
             </TableHeader>
             <TableBody>
               {sortedPedidos.map((pedido, index) => (
-                <TableRow
+                <PedidoEquipoTableRow
                   key={pedido.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => onPedidoClick?.(pedido)}
-                >
-                    {allowBulkActions && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.includes(pedido.id)}
-                          onCheckedChange={(checked) => handleSelectItem(pedido.id, !!checked)}
-                        />
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('codigo') && (
-                      <TableCell className="font-mono text-sm">
-                        {allowEdit ? (
-                          <InlineEditCell
-                            value={pedido.codigo}
-                            onSave={(value) => handleInlineEdit(pedido.id, 'codigo', value)}
-                          />
-                        ) : (
-                          pedido.codigo
-                        )}
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('proyecto') && (
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-500" />
-                          <div className="flex flex-col">
-                            <span className="font-medium text-sm">{(pedido as any).proyecto?.codigo || 'N/A'}</span>
-                            <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={(pedido as any).proyecto?.nombre}>
-                              {(pedido as any).proyecto?.nombre || 'Sin proyecto'}
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
-                    )}
-                    
-
-                    
-                    {visibleColumns.includes('descripcion') && (
-                      <TableCell>
-                        <div className="max-w-xs truncate" title={pedido.observacion}>
-                          {pedido.observacion || 'Sin descripción'}
-                        </div>
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('fechaPedido') && (
-                      <TableCell className="text-center">
-                        {pedido.fechaPedido ? (
-                          new Date(pedido.fechaPedido).toLocaleDateString()
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    )}
-                    
-                    {/* ✅ Fecha Necesaria - Campo crítico para planificación de aprovisionamiento */}
-                    {visibleColumns.includes('fechaNecesaria') && (
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {pedido.fechaNecesaria ? (
-                            <>
-                              <Calendar className="w-4 h-4 text-orange-500" />
-                              {allowEdit ? (
-                                <InlineEditCell
-                                  value={pedido.fechaNecesaria}
-                                  type="date"
-                                  onSave={(value) => handleInlineEdit(pedido.id, 'fechaNecesaria', value)}
-                                />
-                              ) : (
-                                <span className="font-medium text-orange-700">
-                                  {new Date(pedido.fechaNecesaria).toLocaleDateString()}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('fechaEntregaEstimada') && (
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {pedido.fechaEntregaEstimada ? (
-                            <>
-                              <DeliveryStatusIndicator
-                                fechaEntregaEstimada={pedido.fechaEntregaEstimada}
-                                fechaEntregaReal={pedido.fechaEntregaReal}
-                                estado={pedido.estado}
-                              />
-                              {allowEdit ? (
-                                <InlineEditCell
-                                  value={pedido.fechaEntregaEstimada}
-                                  type="date"
-                                  onSave={(value) => handleInlineEdit(pedido.id, 'fechaEntregaEstimada', value)}
-                                />
-                              ) : (
-                                new Date(pedido.fechaEntregaEstimada).toLocaleDateString()
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('fechaEntregaReal') && (
-                      <TableCell className="text-center">
-                        {pedido.fechaEntregaReal ? (
-                          allowEdit ? (
-                            <InlineEditCell
-                              value={pedido.fechaEntregaReal}
-                              type="date"
-                              onSave={(value) => handleInlineEdit(pedido.id, 'fechaEntregaReal', value)}
-                            />
-                          ) : (
-                            new Date(pedido.fechaEntregaReal).toLocaleDateString()
-                          )
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('estado') && (
-                      <TableCell className="text-center">
-                        <StatusBadge estado={pedido.estado} />
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('montoTotal') && (
-                      <TableCell className="text-right font-mono">
-                        {pedido.items && pedido.items.length > 0 ? (
-                          `PEN ${pedido.items.reduce((sum, item) => sum + (item.costoTotal || 0), 0).toLocaleString()}`
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('coherencia') && showCoherenceIndicators && (
-                      <TableCell className="text-center">
-                        <CoherenceIndicator coherencia={pedido.coherencia} />
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('alertas') && (
-                      <TableCell className="text-center">
-                        <AlertsIndicator 
-                          alertas={
-                            (pedido.coherencia && pedido.coherencia < 90 ? 1 : 0) + 
-                            (pedido.fechaEntregaReal && new Date(pedido.fechaEntregaReal) > new Date(pedido.fechaNecesaria) ? 1 : 0)
-                          } 
-                        />
-                      </TableCell>
-                    )}
-                    
-                    {visibleColumns.includes('acciones') && (
-                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => onPedidoClick?.(pedido)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              Ver detalles
-                            </DropdownMenuItem>
-                            {allowEdit && (
-                              <DropdownMenuItem onClick={() => onEdit?.(pedido)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => onViewTracking?.(pedido)}>
-                              <Truck className="w-4 h-4 mr-2" />
-                              Seguimiento
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onContactSupplier?.(pedido)}>
-                              <Building2 className="w-4 h-4 mr-2" />
-                              Contactar proveedor
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <FileText className="w-4 h-4 mr-2" />
-                              Generar PDF
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    )}
-                </TableRow>
+                  pedido={pedido}
+                  index={index}
+                  visibleColumns={visibleColumns}
+                  allowEdit={allowEdit}
+                  allowBulkActions={allowBulkActions}
+                  showCoherenceIndicators={showCoherenceIndicators}
+                  isSelected={selectedIds.includes(pedido.id)}
+                  onPedidoClick={onPedidoClick}
+                  onPedidoEdit={onEdit}
+                  onSelectItem={handleSelectItem}
+                  onInlineEdit={handleInlineEdit}
+                  onViewTracking={onViewTracking}
+                  onContactSupplier={onContactSupplier}
+                />
               ))}
             </TableBody>
           </Table>

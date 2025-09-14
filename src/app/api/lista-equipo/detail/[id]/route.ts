@@ -87,7 +87,16 @@ export async function GET(
             },
             // 💰 All cotizaciones with details
             cotizaciones: {
-              include: {
+              select: {
+                id: true,
+                precioUnitario: true,
+                cantidad: true,
+                cantidadOriginal: true,
+                tiempoEntrega: true,
+                tiempoEntregaDias: true,
+                estado: true,
+                esSeleccionada: true,
+                createdAt: true,
                 cotizacion: {
                   select: {
                     id: true,
@@ -109,7 +118,12 @@ export async function GET(
             },
             // 📦 All pedidos with complete information
             pedidos: {
-              include: {
+              select: {
+                id: true,
+                cantidadPedida: true,
+                precioUnitario: true,
+                estado: true,
+                createdAt: true,
                 pedido: {
                   select: {
                     id: true,

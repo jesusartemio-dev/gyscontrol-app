@@ -3,7 +3,6 @@
 // 🔧 Utilidades para importar proveedores desde Excel
 // ===============================
 import * as XLSX from 'xlsx'
-import { prisma } from '@/lib/prisma'
 
 /**
  * Interface para proveedor importado desde Excel
@@ -39,12 +38,12 @@ export async function leerProveedoresDesdeExcel(file: File): Promise<ProveedorIm
 /**
  * Valida los proveedores importados
  * @param proveedores - Array de proveedores a validar
- * @param existentes - Array de nombres de proveedores existentes
+ * @param existentes - Array de proveedores existentes
  * @returns Objeto con proveedores nuevos, errores y duplicados
  */
 export function validarProveedores(
   proveedores: ProveedorImportado[],
-  existentes: string[]
+  existentes: any[]
 ): {
   nuevos: ProveedorImportado[]
   errores: string[]
@@ -62,7 +61,10 @@ export function validarProveedores(
     }
     
     // ✅ Verificar duplicados
-    if (existentes.includes(p.nombre)) {
+    const existeNombre = existentes.some(e => e.nombre === p.nombre)
+    const existeRuc = p.ruc && existentes.some(e => e.ruc === p.ruc)
+    
+    if (existeNombre || existeRuc) {
       duplicados.push(p.nombre)
       continue
     }
@@ -113,27 +115,60 @@ function isValidPhone(phone: string): boolean {
 }
 
 /**
- * Crea proveedores en la base de datos
+ * Crea proveedores en la base de datos a través de la API
  * @param proveedores - Array de proveedores a crear
- * @returns Promise con array de proveedores creados
+ * @returns Promise con resultado de la importación
  */
-export async function crearProveedoresEnBD(proveedores: ProveedorImportado[]): Promise<any[]> {
-  const creados = []
+export async function crearProveedoresEnBD(proveedores: ProveedorImportado[]): Promise<any> {
+  const response = await fetch('/api/proveedor/import', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ proveedores }),
+  })
   
-  for (const p of proveedores) {
-    // 📡 Crear proveedor en la base de datos
-    const nuevoProveedor = await prisma.proveedor.create({
-      data: {
-        nombre: p.nombre,
-        ruc: p.ruc || null,
-        direccion: p.direccion || null,
-        telefono: p.telefono || null,
-        correo: p.correo || null
-      }
-    })
-    
-    creados.push(nuevoProveedor)
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || 'Error al importar proveedores')
   }
   
-  return creados
+  return await response.json()
+}
+
+/**
+ * Exporta proveedores a un archivo Excel
+ * @param proveedores - Array de proveedores a exportar
+ */
+export function exportarProveedoresAExcel(proveedores: any[]): void {
+  // ✅ Prepare data for Excel export
+  const data = proveedores.map(p => ({
+    'Nombre': p.nombre || '',
+    'RUC': p.ruc || '',
+    'Dirección': p.direccion || '',
+    'Teléfono': p.telefono || '',
+    'Correo': p.correo || ''
+  }))
+
+  // ✅ Create workbook and worksheet
+  const ws = XLSX.utils.json_to_sheet(data)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Proveedores')
+
+  // ✅ Set column widths for better readability
+  const colWidths = [
+    { wch: 30 }, // Nombre
+    { wch: 15 }, // RUC
+    { wch: 40 }, // Dirección
+    { wch: 15 }, // Teléfono
+    { wch: 25 }  // Correo
+  ]
+  ws['!cols'] = colWidths
+
+  // ✅ Generate filename with timestamp
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+  const filename = `proveedores_${timestamp}.xlsx`
+
+  // ✅ Download file
+  XLSX.writeFile(wb, filename)
 }

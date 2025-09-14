@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-09-12T23:46:43.132Z",
+  "database": {
+    "listasEquipo": {
+      "totalRecords": 0,
+      "queryTime": 69.83,
+      "avgQueryTime": null
+    },
+    "pedidosEquipo": {
+      "totalRecords": 0,
+      "queryTime": 2.46,
+      "avgQueryTime": null
+    },
+    "relacionesComplejas": {
+      "queryTime": 1.41,
+      "recordsWithRelations": 0
+    }
+  },
+  "estimatedPageLoad": {
+    "listasEquipoPage": 370,
+    "pedidosEquipoPage": 302,
+    "detailPage": 301
+  },
+  "recommendations": [
+    "💡 SUGERENCIA: Implementar React Query para cache inteligente",
+    "💡 SUGERENCIA: Agregar índices compuestos en Prisma",
+    "💡 SUGERENCIA: Usar React.memo en componentes de tabla"
+  ]
+}
