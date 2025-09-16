@@ -34,6 +34,9 @@ model User {
   asignacionesRecurso           AsignacionRecurso[]           @relation("AsignacionRecurso")
   registrosProgreso             RegistroProgreso[]            @relation("RegistroProgreso")
   
+  // Nueva relación con EDT
+  proyectoEdtsResponsable       ProyectoEdt[]                 @relation("EdtResponsable")
+  
   // Relaciones Logística y Finanzas eliminadas
 }
 
@@ -72,16 +75,18 @@ model VerificationToken {
 }
 
 model Cliente {
-  id           String       @id @default(cuid())
-  nombre       String
-  ruc          String?
-  direccion    String?
-  telefono     String?
-  correo       String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  cotizaciones Cotizacion[]
-  proyectos    Proyecto[]
+  id              String       @id @default(cuid())
+  codigo          String       @unique // ✅ Código del cliente (ej: CJM, ABC, etc.)
+  numeroSecuencia Int?         @default(1) // ✅ Número secuencial para códigos de proyecto
+  nombre          String
+  ruc             String?
+  direccion       String?
+  telefono        String?
+  correo          String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  cotizaciones    Cotizacion[]
+  proyectos       Proyecto[]
 }
 
 model Unidad {
@@ -116,6 +121,10 @@ model CategoriaServicio {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   servicios CatalogoServicio[]
+  
+  // Nuevas relaciones
+  proyectoEdts        ProyectoEdt[]
+  registrosHorasRef   RegistroHoras[] @relation("RegistroHorasCategoria")
 }
 
 model Recurso {
@@ -233,6 +242,7 @@ model PlantillaServicio {
   id              String                  @id @default(cuid())
   plantillaId     String
   nombre          String
+  categoria       String
   descripcion     String?
   subtotalInterno Float
   subtotalCliente Float
@@ -307,6 +317,8 @@ model Cotizacion {
   clienteId             String?
   comercialId           String?
   plantillaId           String?
+  codigo                String               @unique // ✅ Código automático formato GYS-XXXX-YY
+  numeroSecuencia       Int                  // ✅ Número correlativo para generación de código
   nombre                String
   totalEquiposInterno   Float                @default(0)
   totalEquiposCliente   Float                @default(0)
@@ -372,6 +384,7 @@ model CotizacionEquipoItem {
 model CotizacionServicio {
   id              String                   @id @default(cuid())
   cotizacionId    String
+  nombre          String
   categoria       String
   subtotalInterno Float
   subtotalCliente Float
@@ -456,7 +469,7 @@ model Proyecto {
   descuento             Float                 @default(0)
   grandTotal            Float                 @default(0)
   codigo                String
-  estado                String                @default("activo")
+  estado                ProyectoEstado        @default(en_ejecucion)
   fechaInicio           DateTime
   fechaFin              DateTime?
   totalRealEquipos      Float                 @default(0)
@@ -478,11 +491,57 @@ model Proyecto {
   registrosHoras        RegistroHoras[]
   valorizaciones        Valorizacion[]
 
+  // Nueva relación con EDT
+  proyectoEdts          ProyectoEdt[]
+
   // ✅ Índices compuestos para optimizar queries frecuentes
   @@index([estado, fechaInicio, createdAt(sort: Desc)], name: "idx_proyecto_estado_inicio_fecha")
   @@index([comercialId, estado, fechaInicio], name: "idx_proyecto_comercial_estado_inicio")
   @@index([gestorId, estado, fechaFin], name: "idx_proyecto_gestor_estado_fin")
   @@index([clienteId, estado, createdAt(sort: Desc)], name: "idx_proyecto_cliente_estado_fecha")
+}
+
+// ✅ Nuevo modelo ProyectoEdt para cronograma
+model ProyectoEdt {
+  id                  String   @id @default(cuid())
+  proyectoId          String
+  categoriaServicioId String
+  zona                String?        // ej. "Z1", "Planta"
+  
+  // Plan interno (ligero)
+  fechaInicioPlan     DateTime?
+  fechaFinPlan        DateTime?
+  horasPlan           Decimal?  @db.Decimal(10,2) @default(0)
+  
+  // Real (agregado desde HH)
+  fechaInicioReal     DateTime?
+  fechaFinReal        DateTime?
+  horasReales         Decimal   @db.Decimal(10,2) @default(0)
+  
+  // Estado operativo
+  estado              EstadoEdt @default(planificado)
+  
+  // Campos adicionales
+  responsableId       String?
+  porcentajeAvance    Int       @default(0) // 0-100
+  descripcion         String?
+  prioridad           PrioridadEdt @default(media)
+  
+  // Auditoría
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  // Relaciones
+  proyecto            Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  categoriaServicio   CategoriaServicio @relation(fields: [categoriaServicioId], references: [id])
+  responsable         User?             @relation("EdtResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  registrosHoras      RegistroHoras[]
+  
+  @@unique([proyectoId, categoriaServicioId, zona])
+  @@index([proyectoId, categoriaServicioId, zona])
+  @@index([estado, fechaFinPlan])
+  @@index([responsableId, estado])
+  @@map("proyecto_edt")
 }
 
 model ProyectoEquipo {
@@ -539,6 +598,7 @@ model ProyectoServicio {
   id              String                 @id @default(cuid())
   proyectoId      String
   responsableId   String
+  nombre          String
   categoria       String
   subtotalInterno Float
   subtotalCliente Float
@@ -826,12 +886,28 @@ model RegistroHoras {
   descripcion        String?
   observaciones      String?
   aprobado           Boolean          @default(false)
+  
+  // Nuevos campos
+  proyectoEdtId       String?
+  categoriaServicioId String?
+  origen              OrigenTrabajo?
+  ubicacion           String?
+  
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   proyecto           Proyecto         @relation(fields: [proyectoId], references: [id])
   proyectoServicio   ProyectoServicio @relation(fields: [proyectoServicioId], references: [id])
   recurso            Recurso          @relation(fields: [recursoId], references: [id])
   usuario            User             @relation(fields: [usuarioId], references: [id])
+  
+  // Nuevas relaciones
+  proyectoEdt         ProyectoEdt?      @relation(fields: [proyectoEdtId], references: [id], onDelete: SetNull)
+  categoriaServicioRef CategoriaServicio? @relation("RegistroHorasCategoria", fields: [categoriaServicioId], references: [id], onDelete: SetNull)
+  
+  // Nuevos índices
+  @@index([proyectoEdtId, fechaTrabajo])
+  @@index([categoriaServicioId, fechaTrabajo])
+  @@index([origen, fechaTrabajo])
 }
 
 // Modelo OrdenCompra eliminado
@@ -941,6 +1017,35 @@ enum Role {
   gestor
   gerente
   admin
+}
+
+// ✅ Nuevos enums para sistema de cronograma EDT
+enum ProyectoEstado {
+  en_planificacion
+  en_ejecucion
+  en_pausa
+  cerrado
+  cancelado
+}
+
+enum EstadoEdt {
+  planificado
+  en_progreso
+  detenido
+  completado
+  cancelado
+}
+
+enum PrioridadEdt {
+  baja
+  media
+  alta
+  critica
+}
+
+enum OrigenTrabajo {
+  oficina
+  campo
 }
 
 // ✅ Enums para sistema de tareas y subtareas

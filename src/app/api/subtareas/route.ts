@@ -28,7 +28,7 @@ const createSubtareaSchema = z.object({
   estado: z.enum(['pendiente', 'en_progreso', 'completada', 'cancelada']).default('pendiente'),
   fechaInicio: z.string().datetime('Fecha de inicio inválida').optional(),
   fechaFin: z.string().datetime('Fecha de fin inválida').optional(),
-  horasEstimadas: z.number().min(0, 'Horas estimadas debe ser positivo').default(0),
+  horasPlan: z.number().min(0, 'Horas estimadas debe ser positivo').default(0),
   horasReales: z.number().min(0).default(0),
   progreso: z.number().min(0).max(100).default(0),
   asignadoId: z.string().optional()
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
       fechaInicioReal: subtarea.fechaInicioReal?.toISOString() || undefined,
       fechaFinReal: subtarea.fechaFinReal?.toISOString() || undefined,
       porcentajeCompletado: Number(subtarea.porcentajeCompletado) || 0,
-      horasEstimadas: Number(subtarea.horasEstimadas) || 0,
+      horasPlan: Number(subtarea.horasEstimadas) || 0,
       horasReales: Number(subtarea.horasReales) || 0,
       asignadoId: subtarea.asignadoId || undefined,
       createdAt: subtarea.createdAt.toISOString(),

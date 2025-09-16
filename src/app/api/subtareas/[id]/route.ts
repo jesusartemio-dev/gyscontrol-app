@@ -27,7 +27,7 @@ const updateSubtareaSchema = z.object({
   estado: z.enum(['pendiente', 'en_progreso', 'completada', 'cancelada']).optional(),
   fechaInicio: z.string().datetime('Fecha de inicio inválida').nullable().optional(),
   fechaFin: z.string().datetime('Fecha de fin inválida').nullable().optional(),
-  horasEstimadas: z.number().min(0, 'Horas estimadas debe ser positivo').optional(),
+  horasPlan: z.number().min(0, 'Horas estimadas debe ser positivo').optional(),
   horasReales: z.number().min(0).optional(),
   progreso: z.number().min(0).max(100).optional(),
   asignadoId: z.string().nullable().optional()

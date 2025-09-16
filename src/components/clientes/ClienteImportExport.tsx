@@ -53,13 +53,13 @@ export default function ClienteImportExport({ clientes, onImported, onImportErro
       const datos = await leerClientesDesdeExcel(file)
       
       // 🔁 Validate data against existing clients
-      const nombresExistentes = clientes.map(c => c.nombre)
-      const { nuevos, errores, duplicados } = validarClientes(datos, nombresExistentes)
+      const codigosExistentes = clientes.map(c => c.codigo)
+      const { nuevos, errores, duplicados } = validarClientes(datos, codigosExistentes)
       
       // ✅ Show validation results
       if (errores.length > 0) {
         onImportErrors?.(errores)
-        toast.error(`Se encontraron ${errores.length} errores de validación`)
+        toast.error(`Se encontraron ${errores.length} errores de validación:\n${errores.slice(0, 3).join('\n')}${errores.length > 3 ? '\n...' : ''}`)
         return
       }
       
@@ -75,13 +75,26 @@ export default function ClienteImportExport({ clientes, onImported, onImportErro
       // 📡 Create clients in database
       const resultado = await crearClientesEnBD(nuevos)
       
-      // ✅ Success feedback
-      toast.success(`${resultado.creados} clientes importados exitosamente`)
-      onImported()
+      // ✅ Success feedback with error details if any
+      if (resultado.creados > 0) {
+        if (resultado.errores && resultado.errores.length > 0) {
+          toast.success(`${resultado.creados} clientes importados exitosamente`)
+          toast.error(`Se encontraron ${resultado.errores.length} errores:\n${resultado.errores.slice(0, 3).join('\n')}${resultado.errores.length > 3 ? '\n...' : ''}`)
+        } else {
+          toast.success(`${resultado.creados} clientes importados exitosamente`)
+        }
+        onImported()
+      } else {
+        if (resultado.errores && resultado.errores.length > 0) {
+          toast.error(`No se pudo importar ningún cliente:\n${resultado.errores.slice(0, 3).join('\n')}${resultado.errores.length > 3 ? '\n...' : ''}`)
+        } else {
+          toast.error('No se pudo importar ningún cliente')
+        }
+      }
       
     } catch (error) {
       console.error('Error importing clients:', error)
-      toast.error('Error al importar clientes')
+      toast.error('Error al procesar el archivo: ' + (error instanceof Error ? error.message : 'Error desconocido'))
     } finally {
       setImportando(false)
       // Reset file input

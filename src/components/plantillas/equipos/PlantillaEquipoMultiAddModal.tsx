@@ -38,30 +38,83 @@ export default function PlantillaEquipoMultiAddModal({
   plantillaEquipoId,
   onItemsCreated
 }: Props) {
-  const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])
-  const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
-  const [filteredEquipos, setFilteredEquipos] = useState<CatalogoEquipo[]>([])
-  const [selectedEquipos, setSelectedEquipos] = useState<SelectedEquipo[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
-  const [categoriaFiltro, setCategoriaFiltro] = useState('todas')
+  const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])  
+  const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])  
+  const [marcas, setMarcas] = useState<string[]>([])  
+  const [filteredEquipos, setFilteredEquipos] = useState<CatalogoEquipo[]>([])  
+  const [selectedEquipos, setSelectedEquipos] = useState<SelectedEquipo[]>([])  
+  const [searchTerm, setSearchTerm] = useState('')  
+  const [categoriaFiltro, setCategoriaFiltro] = useState('todas')  
+  const [marcaFiltro, setMarcaFiltro] = useState('todas')  
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // ✅ Get available brands based on selected category
+  const getAvailableBrands = () => {
+    if (categoriaFiltro === 'todas') {
+      return [...new Set(equipos.map(equipo => equipo.marca).filter(Boolean))]
+    }
+    return [...new Set(
+      equipos
+        .filter(equipo => equipo.categoriaId === categoriaFiltro)
+        .map(equipo => equipo.marca)
+        .filter(Boolean)
+    )]
+  }
+
+  // ✅ Get available categories based on selected brand
+  const getAvailableCategories = () => {
+    if (marcaFiltro === 'todas') {
+      return categorias
+    }
+    const availableCategoryIds = [...new Set(
+      equipos
+        .filter(equipo => equipo.marca === marcaFiltro)
+        .map(equipo => equipo.categoriaId)
+        .filter(Boolean)
+    )]
+    return categorias.filter(categoria => availableCategoryIds.includes(categoria.id!))
+  }
 
   // ✅ Load equipos and categorias when modal opens
   useEffect(() => {
     if (isOpen) {
-      loadEquipos()
-      loadCategorias()
+      loadData()
     }
   }, [isOpen])
 
-  // ✅ Filter equipos based on search term and category
+  // ✅ Reset brand filter when category changes and selected brand is not available
+  useEffect(() => {
+    if (categoriaFiltro !== 'todas' && marcaFiltro !== 'todas') {
+      const availableBrands = getAvailableBrands()
+      if (!availableBrands.includes(marcaFiltro)) {
+        setMarcaFiltro('todas')
+      }
+    }
+  }, [categoriaFiltro, equipos])
+
+  // ✅ Reset category filter when brand changes and selected category is not available
+  useEffect(() => {
+    if (marcaFiltro !== 'todas' && categoriaFiltro !== 'todas') {
+      const availableCategories = getAvailableCategories()
+      if (!availableCategories.some(cat => cat.id === categoriaFiltro)) {
+        setCategoriaFiltro('todas')
+      }
+    }
+  }, [marcaFiltro, equipos])
+
+  // ✅ Filter equipos based on search term, category and brand
   useEffect(() => {
     let filtered = equipos
     
     // Filter by category
     if (categoriaFiltro !== 'todas') {
       filtered = filtered.filter(equipo => equipo.categoriaId === categoriaFiltro)
+    }
+    
+    // Filter by brand
+    if (marcaFiltro !== 'todas') {
+      filtered = filtered.filter(equipo => equipo.marca === marcaFiltro)
     }
     
     // Filter by search term
@@ -74,29 +127,27 @@ export default function PlantillaEquipoMultiAddModal({
     }
     
     setFilteredEquipos(filtered)
-  }, [searchTerm, categoriaFiltro, equipos])
+  }, [searchTerm, categoriaFiltro, marcaFiltro, equipos])
 
-  const loadEquipos = async () => {
+  const loadData = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
-      const data = await getCatalogoEquipos()
-      setEquipos(data)
-      setFilteredEquipos(data)
+      const [equiposData, categoriasData] = await Promise.all([
+        getCatalogoEquipos(),
+        getCategoriasEquipo()
+      ])
+      setEquipos(equiposData)
+      setCategorias(categoriasData)
+      setFilteredEquipos(equiposData)
+      
+      // Extract unique brands
+      const uniqueMarcas = [...new Set(equiposData.map(equipo => equipo.marca).filter(Boolean))]
+      setMarcas(uniqueMarcas)
     } catch (error) {
-      console.error('Error loading equipos:', error)
-      toast.error('Error al cargar los equipos')
+      console.error('Error loading data:', error)
+      toast.error('Error al cargar los datos')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadCategorias = async () => {
-    try {
-      const data = await getCategoriasEquipo()
-      setCategorias(data)
-    } catch (error) {
-      console.error('Error loading categorias:', error)
-      toast.error('Error al cargar categorías')
     }
   }
 
@@ -195,56 +246,78 @@ export default function PlantillaEquipoMultiAddModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-7xl h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-600" />
             Agregar Múltiples Equipos
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 grid grid-cols-2 gap-6 min-h-0">
-          {/* ✅ Left Panel - Equipment Catalog */}
-          <div className="space-y-4">
-            <div className="space-y-4">
-              <Label>Buscar y Filtrar Equipos</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Buscar por nombre, código o descripción..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                
-                <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filtrar por categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas las categorías</SelectItem>
-                    {categorias.map(categoria => (
-                      <SelectItem key={categoria.id} value={categoria.id!}>
-                        {categoria.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+        {/* Búsqueda y Filtros */}
+        <div className="flex gap-3 mb-4">
+          <div className="flex-1">
+            <Input
+              placeholder="Buscar equipos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <div className="w-32">
+            <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Categorías" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Categorías</SelectItem>
+                {getAvailableCategories().map(categoria => (
+                  <SelectItem key={categoria.id} value={categoria.id!}>
+                    {categoria.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-32">
+            <Select value={marcaFiltro} onValueChange={setMarcaFiltro}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Marcas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Marcas</SelectItem>
+                {getAvailableBrands().map(marca => (
+                  <SelectItem key={marca} value={marca}>
+                    {marca}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-            <ScrollArea className="h-96">
+        {/* Layout de Dos Columnas Lado a Lado */}
+        <div className="grid grid-cols-2 gap-4 flex-1 overflow-hidden">
+          {/* Columna Izquierda - Equipos Disponibles */}
+          <div className="flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b">              
+              <h3 className="font-medium text-gray-900">Equipos Disponibles</h3>
+              <Badge variant="outline" className="text-xs">
+                {filteredEquipos.length}
+              </Badge>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
                   <span className="ml-2">Cargando equipos...</span>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <AnimatePresence>
-                    {filteredEquipos.map(equipo => (
+                <AnimatePresence>
+                  {filteredEquipos.map(equipo => {
+                    const isSelected = selectedEquipos.some(item => item.equipo.id === equipo.id)
+                    
+                    return (
                       <motion.div
                         key={equipo.id}
                         initial={{ opacity: 0, y: 20 }}
@@ -252,189 +325,144 @@ export default function PlantillaEquipoMultiAddModal({
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.2 }}
                       >
-                        <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" 
-                              onClick={() => handleAddEquipo(equipo)}>
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {equipo.codigo}
-                                </Badge>
-                                {equipo.categoria && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {equipo.categoria.nombre}
-                                  </Badge>
-                                )}
-                              </div>
-                              <h4 className="font-medium text-sm mb-1">{equipo.descripcion}</h4>
-                              {equipo.marca && (
-                                <p className="text-xs text-gray-600 mb-2">Marca: {equipo.marca}</p>
-                              )}
-                              <div className="flex items-center gap-4 text-xs">
-                                <span className="text-gray-600">
-                                  Interno: {formatCurrency(equipo.precioInterno || 0)}
-                                </span>
-                                <span className="font-medium text-green-600"> 
-                                   Cliente: {formatCurrency(equipo.precioVenta || 0)} 
-                                 </span>
-                              </div>
-                            </div>
-                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                  
-                  {filteredEquipos.length === 0 && !loading && (
-                    <div className="text-center py-8 text-gray-500">
-                      {searchTerm ? 'No se encontraron equipos' : 'No hay equipos disponibles'}
-                    </div>
-                  )}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
-
-          {/* ✅ Right Panel - Selected Items */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <Label>Equipos Seleccionados ({selectedEquipos.length})</Label>
-              <div className="text-sm text-gray-600">
-                Total: {formatCurrency(totalAmount)}
-              </div>
-            </div>
-
-            <ScrollArea className="h-96">
-              {selectedEquipos.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  Selecciona equipos del catálogo
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <AnimatePresence>
-                    {selectedEquipos.map(item => (
-                      <motion.div
-                        key={item.equipo.id}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <Card className="p-4">
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    {item.equipo.codigo}
-                                  </Badge>
-                                </div>
-                                <h4 className="font-medium text-sm">{item.equipo.descripcion}</h4>
-                              </div>
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                                onClick={() => handleRemoveEquipo(item.equipo.id!)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Label className="text-xs">Cantidad</Label>
-                                <div className="flex items-center gap-1 mt-1">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 w-8 p-0"
-                                    onClick={() => handleUpdateQuantity(item.equipo.id!, item.cantidad - 1)}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <Input
-                                    type="number"
-                                    value={item.cantidad}
-                                    onChange={(e) => handleUpdateQuantity(item.equipo.id!, parseInt(e.target.value) || 0)}
-                                    className="h-8 text-center text-sm"
-                                    min="1"
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 w-8 p-0"
-                                    onClick={() => handleUpdateQuantity(item.equipo.id!, item.cantidad + 1)}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                              
-                              <div>
-                                <Label className="text-xs">Precio Unitario</Label>
-                                <div className="relative mt-1">
-                                  <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                                  <Input
-                                    type="number"
-                                    value={item.precioUnitario}
-                                    onChange={(e) => handleUpdatePrice(item.equipo.id!, parseFloat(e.target.value) || 0)}
-                                    className="h-8 pl-7 text-sm"
-                                    step="0.01"
-                                    min="0"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="flex justify-between items-center text-sm">
-                              <span className="text-gray-600">Subtotal:</span>
-                              <span className="font-medium">
-                                {formatCurrency(item.cantidad * item.precioUnitario)}
+                        <div
+                          className={`p-2 border rounded-lg transition-all cursor-pointer ${
+                            isSelected 
+                              ? 'border-blue-500 bg-blue-50 opacity-50' 
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                          }`}
+                          onClick={() => !isSelected && handleAddEquipo(equipo)}
+                        >
+                          <div className="space-y-0.5">
+                            {/* Primera fila: Código */}
+                            <div className="flex items-center">
+                              <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                                {equipo.codigo}
                               </span>
                             </div>
+                            {/* Segunda fila: Descripción, Marca y Costo */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-sm truncate">{equipo.descripcion}</h4>
+                                <div className="flex items-center gap-3 text-xs text-gray-600 mt-0.5">
+                                  <span>{equipo.marca}</span>
+                                  <span className="font-medium text-green-600">
+                                    {formatCurrency(equipo.precioInterno || 0)}
+                                  </span>
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <div className="ml-3 shrink-0 text-blue-600">
+                                  <span className="h-4 w-4">✓</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </Card>
+                        </div>
                       </motion.div>
-                    ))}
-                  </AnimatePresence>
+                    )
+                  })}
+                </AnimatePresence>
+              )}
+              
+              {filteredEquipos.length === 0 && !loading && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Package className="mx-auto h-10 w-10 mb-3 opacity-50" />
+                  <p className="text-sm">No se encontraron equipos</p>
+                  <p className="text-xs text-gray-400">Ajusta los filtros de búsqueda</p>
                 </div>
               )}
-            </ScrollArea>
+            </div>
+          </div>
+
+          {/* Columna Derecha - Equipos Seleccionados */}
+          <div className="flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+              <h3 className="font-medium text-gray-900">Equipos Seleccionados</h3>
+              <Badge variant="secondary" className="text-blue-600 bg-blue-100">
+                {selectedEquipos.length}
+              </Badge>
+            </div>
+            
+            {selectedEquipos.length > 0 ? (
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                {selectedEquipos.map((item) => (
+                  <div key={item.equipo.id} className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        {/* Primera fila: Código */}
+                        <div className="flex items-center">
+                          <span className="font-mono text-xs bg-blue-100 px-1.5 py-0.5 rounded">
+                            {item.equipo.codigo}
+                          </span>
+                        </div>
+                        {/* Segunda fila: Descripción, Marca y Costo */}
+                        <div>
+                          <h4 className="font-medium text-sm truncate text-blue-900">{item.equipo.descripcion}</h4>
+                          <div className="flex items-center gap-3 text-xs text-blue-700 mt-0.5">
+                            <span>{item.equipo.marca}</span>
+                            <span className="font-medium text-green-600">
+                              {formatCurrency(item.cantidad * item.precioUnitario)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRemoveEquipo(item.equipo.id!)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0 ml-2 h-7 w-7 p-0"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-gray-500">
+                  <Package className="mx-auto h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm">Selecciona equipos de la lista</p>
+                  <p className="text-xs mt-1">Haz clic en cualquier equipo</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <DialogFooter className="border-t pt-4">
-          <div className="flex justify-between items-center w-full">
-            <div className="text-sm text-gray-600">
-              {selectedEquipos.length > 0 && (
-                <span>Total: <strong>{formatCurrency(totalAmount)}</strong></span>
+        <DialogFooter className="flex justify-between items-center w-full pt-3 border-t bg-white">
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-gray-500">
+              {selectedEquipos.length > 0 && `${selectedEquipos.length} equipo${selectedEquipos.length > 1 ? 's' : ''} seleccionado${selectedEquipos.length > 1 ? 's' : ''}`}
+            </div>
+            {selectedEquipos.length > 0 && (
+              <div className="text-sm font-bold text-blue-600">
+                Total: {formatCurrency(totalAmount)}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={handleClose} disabled={saving} className="h-9 px-4">
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSave} 
+              disabled={selectedEquipos.length === 0 || saving}
+              className="h-9 px-6 bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  Agregando...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-3 w-3" />
+                  Agregar ({selectedEquipos.length})
+                </>
               )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleClose} disabled={saving}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleSave} 
-                disabled={selectedEquipos.length === 0 || saving}
-                className="min-w-[140px]"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Guardando...
-                  </>
-                ) : (
-                  `Agregar ${selectedEquipos.length} Equipos`
-                )}
-              </Button>
-            </div>
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

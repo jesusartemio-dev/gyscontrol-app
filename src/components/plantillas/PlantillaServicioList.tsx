@@ -71,6 +71,7 @@ export default function PlantillaServicioList({
         <thead>
           <tr>
             <th className="border px-4 py-2">Nombre</th>
+            <th className="border px-4 py-2">Categoría</th>
             <th className="border px-4 py-2">Subtotal Cliente</th>
             <th className="border px-4 py-2">Acciones</th>
           </tr>
@@ -90,6 +91,19 @@ export default function PlantillaServicioList({
                 }}
               >
                 {loading === s.id ? 'Actualizando...' : s.nombre}
+              </td>
+              <td
+                className="border px-4 py-2"
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={(e) => {
+                  const value = e.currentTarget.textContent?.trim() || ''
+                  if (value !== s.categoria) {
+                    handleEdit(s.id, 'categoria', value)
+                  }
+                }}
+              >
+                {loading === s.id ? 'Actualizando...' : s.categoria}
               </td>
               <td className="border px-4 py-2">$ {s.subtotalCliente.toFixed(2)}</td>
               <td className="border px-4 py-2 space-x-2">

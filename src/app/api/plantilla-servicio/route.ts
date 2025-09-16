@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { plantillaServicioSchema } from '@/lib/validators/plantillaServicio'
 
 export async function GET() {
   const servicios = await prisma.plantillaServicio.findMany({
@@ -19,7 +20,32 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const data = await req.json()
-  const nuevo = await prisma.plantillaServicio.create({ data })
-  return NextResponse.json(nuevo)
+  try {
+    const body = await req.json()
+    
+    // 🔍 Validar datos con Zod
+    const validatedData = plantillaServicioSchema.parse(body)
+    
+    // 📡 Crear registro en base de datos
+    const nuevo = await prisma.plantillaServicio.create({ 
+      data: validatedData,
+      include: { items: true }
+    })
+    
+    return NextResponse.json(nuevo)
+  } catch (error) {
+    console.error('Error creating PlantillaServicio:', error)
+    
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
+    
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
+      { status: 500 }
+    )
+  }
 }

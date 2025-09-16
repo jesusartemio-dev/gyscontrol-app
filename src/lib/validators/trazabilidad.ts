@@ -22,7 +22,7 @@ import { EstadoEntregaItem } from '@/types/modelos';
  */
 export const EntregaItemSchema = z.object({
   pedidoEquipoItemId: z.string().uuid('ID de item inválido'),
-  estadoEntrega: z.nativeEnum(EstadoEntregaItem),
+  estadoEntrega: z.enum(['pendiente', 'en_proceso', 'parcial', 'entregado', 'retrasado', 'cancelado']),
   cantidadAtendida: z.number().positive('Cantidad debe ser positiva').optional(),
   fechaEntregaReal: z.date().optional(),
   observacionesEntrega: z.string().max(500, 'Observaciones muy largas').optional(),
@@ -33,7 +33,7 @@ export const EntregaItemSchema = z.object({
  * Schema para validar actualización de estado de entrega
  */
 export const ActualizacionEstadoSchema = z.object({
-  estadoNuevo: z.nativeEnum(EstadoEntregaItem),
+  estadoNuevo: z.enum(['pendiente', 'en_proceso', 'parcial', 'entregado', 'retrasado', 'cancelado']),
   observaciones: z.string().max(500, 'Observaciones muy largas').optional(),
   fechaEntregaEstimada: z.date().optional()
 });
@@ -43,7 +43,7 @@ export const ActualizacionEstadoSchema = z.object({
  */
 export const FiltrosTrazabilidadSchema = z.object({
   proyectoId: z.string().uuid('ID de proyecto inválido').optional(),
-  estadoEntrega: z.nativeEnum(EstadoEntregaItem).optional(),
+  estadoEntrega: z.enum(['pendiente', 'en_proceso', 'parcial', 'entregado', 'retrasado', 'cancelado']).optional(),
   fechaDesde: z.date().optional(),
   fechaHasta: z.date().optional(),
   proveedorId: z.string().uuid('ID de proveedor inválido').optional()
@@ -67,8 +67,8 @@ export const CrearEventoTrazabilidadSchema = z.object({
   entidadTipo: z.enum(['PEDIDO', 'PROYECTO', 'ITEM']),
   tipo: z.enum(['CREACION', 'ACTUALIZACION', 'ENTREGA', 'CANCELACION']),
   descripcion: z.string().min(1, 'Descripción requerida').max(1000, 'Descripción muy larga'),
-  estadoAnterior: z.nativeEnum(EstadoEntregaItem).optional(),
-  estadoNuevo: z.nativeEnum(EstadoEntregaItem),
+  estadoAnterior: z.enum(['pendiente', 'en_proceso', 'parcial', 'entregado', 'retrasado', 'cancelado']).optional(),
+  estadoNuevo: z.enum(['pendiente', 'en_proceso', 'parcial', 'entregado', 'retrasado', 'cancelado']),
   metadata: z.record(z.any()).optional(),
   fechaEvento: z.date().optional()
 });

@@ -51,7 +51,7 @@ async function measureDashboardPage(): Promise<PageMetrics> {
     // Proyectos activos
     prisma.proyecto.findMany({
       take: 10,
-      where: { estado: 'activo' },
+      where: { estado: 'en_ejecucion' },
       include: {
         cliente: true,
         listaEquipos: {
@@ -83,7 +83,7 @@ async function measureDashboardPage(): Promise<PageMetrics> {
     
     // Estadísticas generales
     Promise.all([
-      prisma.proyecto.count({ where: { estado: 'activo' } }),
+      prisma.proyecto.count({ where: { estado: 'en_ejecucion' } }),
       prisma.listaEquipo.count({ where: { estado: { not: 'rechazado' } } }),
       prisma.pedidoEquipo.count({ where: { estado: { not: 'cancelado' } } })
     ])

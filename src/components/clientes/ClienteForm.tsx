@@ -17,7 +17,8 @@ import {
   Save, 
   X, 
   Loader2,
-  FileText
+  FileText,
+  Hash
 } from 'lucide-react'
 import type { Cliente } from '@/types'
 import type { ClientePayload } from '@/types/payloads'
@@ -25,6 +26,7 @@ import { z } from 'zod'
 
 // Validation schema
 const clienteSchema = z.object({
+  codigo: z.string().min(2, 'El código debe tener al menos 2 caracteres').max(10, 'El código no puede exceder 10 caracteres'),
   nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
   ruc: z.string().optional().refine((val) => {
     if (!val) return true
@@ -136,6 +138,28 @@ export default function ClienteForm({ onSaved, initial, onCancel }: Props) {
         />
         {formErrors.nombre && (
           <p className="text-sm text-red-500">{formErrors.nombre}</p>
+        )}
+      </div>
+
+      {/* Código Field */}
+      <div className="space-y-2">
+        <Label htmlFor="codigo" className="flex items-center gap-2">
+          <Hash className="h-4 w-4" />
+          Código de Cliente *
+        </Label>
+        <Input
+          id="codigo"
+          placeholder="Ej: CJM, ABC, XYZ"
+          value={form.codigo || ''}
+          onChange={(e) => handleChange('codigo', e.target.value.toUpperCase())}
+          className={formErrors.codigo ? 'border-red-500' : ''}
+          maxLength={10}
+        />
+        {formErrors.codigo && (
+          <p className="text-sm text-red-500">{formErrors.codigo}</p>
+        )}
+        {!formErrors.codigo && (
+          <p className="text-sm text-gray-500">Código único para identificar al cliente (2-10 caracteres)</p>
         )}
       </div>
 

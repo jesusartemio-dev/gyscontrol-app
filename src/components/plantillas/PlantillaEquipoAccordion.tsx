@@ -17,7 +17,7 @@ import { PlantillaEquipoAccordionSkeleton } from './PlantillaEquipoSkeleton'
 import type { PlantillaEquipo, PlantillaEquipoItem } from '@/types'
 import { useState, useEffect } from 'react'
 import { Pencil, Trash2, Briefcase, DollarSign, TrendingUp, Package, Loader2, Plus } from 'lucide-react'
-import PlantillaEquipoMultiAddModal from './PlantillaEquipoMultiAddModal'
+import PlantillaEquipoMultiAddModal from './equipos/PlantillaEquipoMultiAddModal'
 import { motion } from 'framer-motion'
 import { 
   formatCurrency, 

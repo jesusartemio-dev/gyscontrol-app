@@ -1,193 +1,256 @@
-# 🏗️ Sistema GYS - Gestión y Servicios
+# 🏢 Sistema GYS - Gestión y Servicios
 
-Sistema integral de gestión empresarial construido con **Next.js 14+**, **Prisma ORM** y **TypeScript**. Implementa el **flujo Database-First Consistency** para garantizar la consistencia entre la base de datos, APIs y componentes.
+Sistema integral de gestión empresarial desarrollado con **Next.js 14+** y **TypeScript**, diseñado para optimizar procesos comerciales, de proyectos y logística.
 
-## 🚀 Inicio Rápido
+## 🚀 Características Principales
 
-### Instalación
-```bash
-# Instalar dependencias
-npm install
+### 📊 Módulos del Sistema
+- **Comercial**: Gestión de clientes, cotizaciones y oportunidades
+- **Proyectos**: Planificación, seguimiento y control de proyectos
+- **Logística**: Aprovisionamiento, pedidos y gestión de equipos
+- **Catálogo**: Gestión de productos, servicios y plantillas
+- **Finanzas**: Control financiero y reportes
 
-# Configurar base de datos
-npx prisma generate
-npx prisma db push
-
-# Configurar hooks de pre-commit
-npm run prepare
-```
-
-### Desarrollo
-```bash
-# Servidor de desarrollo
-npm run dev
-
-# Auditoría de consistencia
-npm run audit:consistency
-
-# Generar tipos desde Prisma
-npm run generate:types
-```
-
-Abre [http://localhost:3000](http://localhost:3000) para ver la aplicación.
-
-## 🔍 Database-First Consistency
-
-### ¿Qué es?
-Metodología que garantiza la **consistencia automática** entre:
-- 🗄️ **Modelos Prisma** (fuente de verdad)
-- 📡 **APIs y Endpoints**
-- 🧩 **Componentes React**
-- 🔍 **Validadores Zod**
-- 📝 **Tipos TypeScript**
-
-### Comandos de Auditoría
-```bash
-# Auditoría completa
-npm run audit:consistency
-
-# Reporte HTML detallado
-npm run audit:consistency:html
-
-# Auditoría + verificación de tipos
-npm run db:audit
-
-# Generar tipos automáticamente
-npm run generate:types
-```
-
-### Pre-commit Hooks
-Cada commit ejecuta automáticamente:
-- ✅ Auditoría de consistencia
-- ✅ Verificación de tipos TypeScript
-- ❌ **Bloquea commits** si hay inconsistencias
-
-### CI/CD Pipeline
-GitHub Actions verifica:
-- 🔍 Consistencia BD-API-Componentes
-- 🧪 Tests unitarios e integración
-- 📊 Reportes automáticos en PRs
+### 🎯 Funcionalidades Clave
+- ✅ **Gestión de Cotizaciones** con generación automática de códigos
+- ✅ **Sistema de Proyectos** con EDT y cronogramas
+- ✅ **Aprovisionamiento Inteligente** con comparación de proveedores
+- ✅ **Catálogo Unificado** de equipos y servicios
+- ✅ **Dashboard Analytics** con KPIs en tiempo real
+- ✅ **Sistema de Roles** y permisos granulares
+- ✅ **Generación de PDFs** profesionales
+- ✅ **Importación/Exportación** de datos Excel
 
 ## 🛠️ Stack Tecnológico
 
 ### Frontend
 - **Next.js 14+** con App Router
 - **React 18+** con Server Components
-- **TypeScript** para tipado estático
+- **TypeScript** estricto
 - **Tailwind CSS v4** + **shadcn/ui**
 - **Framer Motion** para animaciones
-- **React Hook Form** + **Zod** para formularios
+- **Lucide React** para iconografía
 
 ### Backend
-- **Next.js API Routes** (REST)
-- **Prisma ORM** con PostgreSQL
+- **Next.js API Routes**
+- **Prisma ORM** + **PostgreSQL**
 - **NextAuth.js** para autenticación
 - **Zod** para validación de datos
 
-### DevOps & Testing
-- **Vitest** + **Testing Library**
+### Testing & Quality
+- **Jest** + **React Testing Library**
 - **Playwright** para E2E
-- **Husky** para pre-commit hooks
-- **GitHub Actions** para CI/CD
 - **ESLint** + **Prettier**
+- **Husky** para pre-commit hooks
 
-## 📁 Arquitectura del Proyecto
+## 📦 Instalación
 
+### Prerrequisitos
+- Node.js 18+ 
+- PostgreSQL 14+
+- npm o yarn
+
+### Configuración Inicial
+
+1. **Clonar el repositorio**
+```bash
+git clone https://github.com/tu-usuario/gys-app-next.git
+cd gys-app-next
+```
+
+2. **Instalar dependencias**
+```bash
+npm install
+```
+
+3. **Configurar variables de entorno**
+```bash
+cp .env.example .env.local
+```
+
+Configurar las siguientes variables:
+```env
+# Base de datos
+DATABASE_URL="postgresql://usuario:password@localhost:5432/gys_db"
+
+# NextAuth
+NEXTAUTH_SECRET="tu-secret-key"
+NEXTAUTH_URL="http://localhost:3000"
+
+# Opcional: Códigos personalizados
+CLIENT_CODE="CLI"
+COTIZACION_CODE="GYS"
+```
+
+4. **Configurar base de datos**
+```bash
+# Generar cliente Prisma
+npx prisma generate
+
+# Ejecutar migraciones
+npx prisma migrate deploy
+
+# Poblar datos iniciales (opcional)
+npx prisma db seed
+```
+
+5. **Iniciar desarrollo**
+```bash
+npm run dev
+```
+
+La aplicación estará disponible en `http://localhost:3000`
+
+## 🧪 Testing
+
+### Ejecutar Tests
+```bash
+# Tests unitarios (cliente)
+npm run test:client
+
+# Tests de servicios (servidor)
+npm run test:server
+
+# Tests E2E
+npm run test:e2e
+
+# Cobertura completa
+npm run test:coverage
+```
+
+### Estándares de Testing
+- **Client Tests**: React Testing Library para componentes cliente
+- **Server Tests**: Jest puro para servicios y APIs
+- **E2E Tests**: Playwright para flujos completos
+- **Cobertura mínima**: 90% statements, 85% branches
+
+## 🏗️ Arquitectura
+
+### Estructura del Proyecto
 ```
 src/
-├── app/                    # App Router (Next.js 14+)
-│   ├── (admin)/           # Rutas de administración
-│   ├── (comercial)/       # Módulo comercial
-│   ├── (proyectos)/       # Gestión de proyectos
-│   ├── (logistica)/       # Módulo logístico
-│   └── api/               # Endpoints REST
-├── components/            # Componentes React
-│   ├── ui/               # Componentes base (shadcn/ui)
-│   ├── comercial/        # Componentes comerciales
-│   ├── proyectos/        # Componentes de proyectos
-│   └── logistica/        # Componentes logísticos
+├── app/                 # App Router (Next.js 14+)
+│   ├── (comercial)/     # Grupo de rutas comerciales
+│   ├── (proyectos)/     # Grupo de rutas de proyectos
+│   ├── (logistica)/     # Grupo de rutas logísticas
+│   └── api/             # API Routes
+├── components/          # Componentes React
+│   ├── ui/              # Componentes base (shadcn/ui)
+│   ├── comercial/       # Componentes comerciales
+│   ├── proyectos/       # Componentes de proyectos
+│   └── logistica/       # Componentes logísticos
 ├── lib/
-│   ├── services/         # Lógica de negocio
-│   ├── validators/       # Esquemas Zod
+│   ├── services/        # Lógica de negocio
+│   ├── validators/      # Esquemas Zod
 │   └── utils/           # Utilidades
-├── types/                # Tipos TypeScript
-└── scripts/             # Scripts de automatización
+└── types/               # Definiciones TypeScript
 ```
 
-## 🔧 Scripts Disponibles
+### Flujo de Desarrollo (FLUJO_GYS)
+1. **Modelo Prisma** → Definir entidad
+2. **Types** → Modelos y payloads TypeScript
+3. **API** → Rutas CRUD
+4. **Servicios** → Lógica de negocio
+5. **Componentes** → UI/UX
+6. **Páginas** → Integración final
+7. **Tests** → Cobertura completa
 
-### Desarrollo
+## 🎨 Guía de Estilo
+
+### Componentes UI
+- **Responsive Design** con Tailwind CSS
+- **Dark/Light Mode** automático
+- **Animaciones fluidas** con Framer Motion
+- **Accesibilidad** WCAG 2.1 AA
+- **Loading States** y **Error Boundaries**
+
+### Patrones de Código
+- **Server Components** por defecto
+- **Client Components** solo para interactividad
+- **Custom Hooks** para lógica reutilizable
+- **Compound Components** para UI compleja
+
+## 🔐 Seguridad
+
+### Autenticación y Autorización
+- **NextAuth.js** con múltiples proveedores
+- **Roles granulares**: Admin, Gerente, Comercial, Proyectos, Logística
+- **Middleware de autorización** en rutas protegidas
+- **Validación de datos** con Zod en cliente y servidor
+
+### Mejores Prácticas
+- ✅ Validación de entrada en todas las APIs
+- ✅ Sanitización de datos SQL injection-proof
+- ✅ Rate limiting en endpoints críticos
+- ✅ Logs de auditoría para acciones sensibles
+- ✅ Encriptación de datos sensibles
+
+## 📈 Performance
+
+### Optimizaciones Implementadas
+- **Server Components** para mejor SEO
+- **Lazy Loading** de componentes pesados
+- **Image Optimization** automática
+- **Bundle Splitting** inteligente
+- **Caching** estratégico con SWR
+
+### Métricas Objetivo
+- **First Contentful Paint**: < 1.5s
+- **Largest Contentful Paint**: < 2.5s
+- **Cumulative Layout Shift**: < 0.1
+- **Time to Interactive**: < 3s
+
+## 🚀 Deployment
+
+### Vercel (Recomendado)
 ```bash
-npm run dev              # Servidor de desarrollo
-npm run build            # Build de producción
-npm run start            # Servidor de producción
-npm run lint             # Linting con ESLint
+# Conectar con Vercel
+npx vercel
+
+# Configurar variables de entorno en Vercel Dashboard
+# Desplegar
+npx vercel --prod
 ```
 
-### Testing
+### Docker
 ```bash
-npm run test             # Tests unitarios
-npm run test:watch       # Tests en modo watch
-npm run test:coverage    # Cobertura de tests
-npm run test:e2e         # Tests E2E con Playwright
+# Construir imagen
+docker build -t gys-app .
+
+# Ejecutar contenedor
+docker run -p 3000:3000 gys-app
 ```
 
-### Base de Datos
-```bash
-npx prisma generate      # Generar cliente Prisma
-npx prisma db push       # Aplicar cambios a BD
-npx prisma studio        # Interfaz visual de BD
-npx prisma migrate dev   # Crear migración
-```
+## 📚 Documentación Adicional
 
-### Consistencia
-```bash
-npm run audit:consistency     # Auditoría completa
-npm run generate:types        # Generar tipos desde Prisma
-npm run db:audit             # Auditoría + type check
-```
+- [Arquitectura del Sistema](./docs/ARQUITECTURA_SISTEMA.md)
+- [Guía de Testing](./docs/GUIA_TESTING.md)
+- [API Documentation](./docs/API_DOCUMENTATION.md)
+- [Flujo de Trabajo GYS](./doc/FLUJO_TRABAJO_GYS.md)
 
-## 📚 Documentación
+## 🤝 Contribución
 
-- 📋 [**Mejoras de Consistencia**](./docs/MEJORAS_PLAN_MAESTRO_CONSISTENCIA.md) - Metodología Database-First
-- 🏗️ [**Estructura del Proyecto**](./doc/ESTRUCTURA_PROYECTO.md) - Arquitectura detallada
-- 🔄 [**Flujo de Trabajo**](./doc/FLUJO_TRABAJO_GYS.md) - Guía de desarrollo
-- 🧪 [**Testing**](./docs/TEST_README.md) - Estrategia de pruebas
-- 🧭 [**Navegación**](./docs/NAVEGACION_MASTER_DETAIL.md) - Guía de UI/UX
+### Proceso de Desarrollo
+1. Fork del repositorio
+2. Crear rama feature: `git checkout -b feature/nueva-funcionalidad`
+3. Commit cambios: `git commit -m 'feat: nueva funcionalidad'`
+4. Push a la rama: `git push origin feature/nueva-funcionalidad`
+5. Crear Pull Request
 
-## 🚨 Reglas de Oro
+### Convenciones
+- **Commits**: Conventional Commits (feat, fix, docs, etc.)
+- **Branches**: feature/, bugfix/, hotfix/
+- **Code Style**: ESLint + Prettier automático
+- **Tests**: Obligatorios para nuevas funcionalidades
 
-### Database-First Consistency
-1. **Prisma es la fuente de verdad** - Todos los cambios inician en `schema.prisma`
-2. **Auditoría antes de commit** - Los hooks bloquean commits inconsistentes
-3. **Generación automática** - Usa `npm run generate:types` después de cambios en Prisma
-4. **Validación en capas** - Zod en API, TypeScript en componentes
-5. **Testing obligatorio** - Cobertura mínima del 80%
+## 📄 Licencia
 
-### Flujo de Desarrollo
-1. 🗄️ **Modelo Prisma** → Definir entidad
-2. 📝 **Types** → Generar automáticamente
-3. 📡 **API** → Implementar CRUD
-4. 🔍 **Servicios** → Lógica de negocio
-5. 🧩 **Componentes** → UI/UX
-6. 🧪 **Tests** → Cobertura completa
+Este proyecto está bajo la Licencia MIT. Ver [LICENSE](./LICENSE) para más detalles.
 
-## 🤝 Contribuir
+## 👥 Equipo
 
-1. **Fork** el repositorio
-2. **Crea** una rama feature (`git checkout -b feature/nueva-funcionalidad`)
-3. **Ejecuta** auditoría (`npm run audit:consistency`)
-4. **Commit** tus cambios (`git commit -m 'feat: nueva funcionalidad'`)
-5. **Push** a la rama (`git push origin feature/nueva-funcionalidad`)
-6. **Abre** un Pull Request
-
-### Antes de hacer commit:
-- ✅ Ejecutar `npm run audit:consistency`
-- ✅ Verificar `npm run type-check`
-- ✅ Ejecutar tests `npm run test`
-- ✅ Revisar linting `npm run lint`
+Desarrollado con ❤️ por el equipo GYS
 
 ---
 
-**Desarrollado con ❤️ por el equipo GYS**  
-**Arquitectura Database-First Consistency** 🏗️
+**¿Necesitas ayuda?** Abre un [issue](https://github.com/tu-usuario/gys-app-next/issues) o contacta al equipo de desarrollo.

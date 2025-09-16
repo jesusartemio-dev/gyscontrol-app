@@ -72,15 +72,15 @@ export default function CotizacionServicioAccordion({
   onUpdatedNombre
 }: Props) {
   const [editando, setEditando] = useState(false)
-  const [nuevoNombre, setNuevoNombre] = useState(servicio.categoria)
+  const [nuevoNombre, setNuevoNombre] = useState(servicio.nombre || servicio.categoria)
   const [modalAbierto, setModalAbierto] = useState(false)
 
   useEffect(() => {
-    setNuevoNombre(servicio.categoria)
-  }, [servicio.categoria])
+    setNuevoNombre(servicio.nombre || servicio.categoria)
+  }, [servicio.nombre, servicio.categoria])
 
   const handleBlur = () => {
-    if (nuevoNombre.trim() && nuevoNombre !== servicio.categoria) {
+    if (nuevoNombre.trim() && nuevoNombre !== (servicio.nombre || servicio.categoria)) {
       onUpdatedNombre(nuevoNombre.trim())
     }
     setEditando(false)
@@ -91,7 +91,7 @@ export default function CotizacionServicioAccordion({
       handleBlur()
     }
     if (e.key === 'Escape') {
-      setNuevoNombre(servicio.categoria)
+      setNuevoNombre(servicio.nombre || servicio.categoria)
       setEditando(false)
     }
   }

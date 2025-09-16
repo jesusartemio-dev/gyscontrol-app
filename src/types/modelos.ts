@@ -232,6 +232,8 @@ export interface VerificationToken {
 // ============================
 export interface Cliente {
   id: string
+  codigo: string // ✅ Código automático formato CLI-XXXX-YY
+  numeroSecuencia: number // ✅ Número secuencial para generación de código
   nombre: string
   ruc?: string
   direccion?: string
@@ -417,6 +419,7 @@ export interface PlantillaServicio {
   id: string
   plantillaId: string
   nombre: string
+  categoria: string
   descripcion?: string
   subtotalInterno: number
   subtotalCliente: number
@@ -512,6 +515,8 @@ export interface PlantillaGastoItem {
 
 export interface Cotizacion {
   id: string
+  codigo: string // ✅ Código automático formato GYS-XXXX-YY
+  numeroSecuencia: number // ✅ Número secuencial para generación de código
   nombre: string
   estado: string
   etapa: string
@@ -598,6 +603,7 @@ export interface CotizacionEquipoItem {
 
 export interface CotizacionServicio {
   id: string
+  nombre: string
   categoria: string
   subtotalInterno: number
   subtotalCliente: number
@@ -792,7 +798,7 @@ export interface ProyectoServicio {
   id: string
   proyectoId: string
   responsableId: string
-
+  nombre: string
   categoria: string
   subtotalInterno: number
   subtotalCliente: number
@@ -1243,7 +1249,7 @@ export interface TareaBase {
   fechaInicioReal?: string
   fechaFinReal?: string
   porcentajeCompletado: number // 0-100
-  horasEstimadas: number
+  horasPlan: number
   horasReales: number
   responsableId: string
   createdAt: string
@@ -1298,7 +1304,7 @@ export interface Subtarea {
   fechaInicioReal?: string
   fechaFinReal?: string
   porcentajeCompletado: number // 0-100
-  horasEstimadas: number
+  horasPlan: number
   horasReales: number
   asignadoId?: string
   createdAt: string
@@ -1385,3 +1391,306 @@ export interface RegistroProgreso {
 // ===== TIPOS PARA DASHBOARDS Y REPORTES =====
 
 // ✅ Reportes
+
+// ===================================================
+// 📋 SISTEMA EDT (ESTRUCTURA DE DESGLOSE DE TRABAJO)
+// ===================================================
+
+// 🔧 Enums para el sistema EDT
+export type EstadoEdt = 'planificado' | 'en_progreso' | 'detenido' | 'completado' | 'cancelado'
+export type PrioridadEdt = 'baja' | 'media' | 'alta' | 'critica'
+export type OrigenTrabajo = 'planificado' | 'adicional' | 'correctivo' | 'emergencia'
+export type ProyectoEstado = 'en_planificacion' | 'en_ejecucion' | 'en_pausa' | 'cerrado' | 'cancelado'
+
+// 📋 Interface principal para ProyectoEdt
+export interface ProyectoEdt {
+  id: string
+  proyectoId: string
+  categoriaServicioId: string
+  zona?: string
+  fechaInicio?: string
+  fechaFin?: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  horasPlan: number
+  horasReales: number
+  estado: EstadoEdt
+  responsableId?: string
+  porcentajeAvance: number // 0-100
+  descripcion?: string
+  prioridad: PrioridadEdt
+  createdAt: string
+  updatedAt: string
+  
+  // 🔗 Relaciones
+  proyecto: {
+    id: string
+    nombre: string
+    codigo: string
+    estado: ProyectoEstado
+  }
+  categoriaServicio: {
+    id: string
+    nombre: string
+  }
+  responsable?: {
+    id: string
+    name: string | null
+    email: string
+  }
+  registrosHoras?: RegistroHoras[]
+}
+
+// 📊 Interface para métricas EDT
+export interface MetricasEdt {
+  totalEdts: number
+  edtsPendientes: number
+  edtsEnProgreso: number
+  edtsCompletados: number
+  edtsPausados: number
+  edtsCancelados: number
+  porcentajeAvancePromedio: number
+  horasPlanTotal: number
+  horasRealesTotal: number
+  eficienciaPromedio: number // horasReales / horasPlan * 100
+  ultimaActualizacion: Date
+}
+
+// 📈 Interface para datos de gráficos EDT
+export interface GraficoEdtData {
+  fecha: string
+  pendientes: number
+  enProgreso: number
+  completados: number
+  pausados: number
+  cancelados: number
+  horasPlan?: number
+  horasReales?: number
+  eficiencia?: number
+}
+
+// 🎯 Interface para resumen EDT por proyecto
+export interface ResumenEdtProyecto {
+  proyectoId: string
+  proyectoNombre: string
+  proyectoCodigo: string
+  totalEdts: number
+  edtsCompletados: number
+  porcentajeAvance: number
+  horasPlan: number
+  horasReales: number
+  eficiencia: number
+  estadoProyecto: ProyectoEstado
+  fechaInicio?: string
+  fechaFin?: string
+  responsables: {
+    id: string
+    name: string | null
+    totalEdts: number
+  }[]
+}
+
+// ===================================================
+// 📊 INTERFACES PARA SERVICIOS DE CRONOGRAMA - FASE 4
+// ===================================================
+
+// 📊 Interface para KPIs principales del cronograma
+export interface KpisCronograma {
+  totalEdts: number
+  edtsPlanificados: number
+  edtsEnProgreso: number
+  edtsCompletados: number
+  edtsRetrasados: number
+  horasPlanTotal: number
+  horasRealesTotal: number
+  promedioAvance: number
+  eficienciaGeneral: number // porcentaje de eficiencia
+  cumplimientoFechas: number // porcentaje de cumplimiento
+  desviacionPresupuestaria: number // porcentaje de desviación
+  fechaCalculo: Date
+}
+
+// 📈 Interface para tendencias mensuales
+export interface TendenciaMensual {
+  mes: Date
+  totalEdts: number
+  edtsCompletados: number
+  tasaCompletitud: number // porcentaje
+  horasPlan: number
+  horasReales: number
+  eficiencia: number // porcentaje
+  promedioAvance: number
+}
+
+// 🎯 Interface para análisis de rendimiento por categoría
+export interface AnalisisRendimiento {
+  categoriaServicioId: string
+  categoriaServicioNombre: string
+  totalEdts: number
+  horasPlan: number
+  horasReales: number
+  promedioAvance: number
+  eficiencia: number
+  desviacion: number // porcentaje de desviación
+  nivelRendimiento: 'excelente' | 'bueno' | 'regular' | 'deficiente'
+}
+
+// 🚨 Interface para alertas del cronograma
+export interface AlertaCronograma {
+  tipo: 'retraso' | 'vencimiento_proximo' | 'desviacion_horas' | 'sin_progreso'
+  severidad: 'alta' | 'media' | 'baja'
+  titulo: string
+  descripcion: string
+  proyectoId: string
+  edtId: string
+  responsableId?: string
+  fechaDeteccion: Date
+  datos: Record<string, any> // Datos específicos de la alerta
+}
+
+// 📊 Interface para métricas comparativas entre proyectos
+export interface MetricasComparativas {
+  proyectoId: string
+  proyectoNombre: string
+  proyectoCodigo: string
+  totalEdts: number
+  porcentajeCompletitud: number
+  eficienciaGeneral: number
+  cumplimientoFechas: number
+  desviacionPresupuestaria: number
+  horasPlanTotal: number
+  horasRealesTotal: number
+}
+
+// 📋 Interface para resumen de cronograma
+export interface ResumenCronograma {
+  proyectoId: string
+  proyectoNombre: string
+  totalEdts: number
+  edtsPlanificados: number
+  edtsEnProgreso: number
+  edtsCompletados: number
+  horasPlanTotal: number
+  horasRealesTotal: number
+  porcentajeAvanceGeneral: number
+}
+
+// 📊 Interface para comparativo plan vs real
+export interface ComparativoPlanReal {
+  categoriaServicioId: string
+  categoriaServicioNombre: string
+  zona?: string | null
+  horasPlan: number
+  horasReales: number
+  porcentajeAvance: number
+  estado: EstadoEdt
+  diasRetraso?: number
+}
+
+// 🔍 Interface para filtros de cronograma
+export interface FiltrosCronogramaData {
+  proyectoId?: string
+  categoriaServicioId?: string
+  responsableId?: string
+  estado?: EstadoEdt
+  prioridad?: PrioridadEdt
+  zona?: string
+  fechaDesde?: Date
+  fechaHasta?: Date
+  soloConRetrasos?: boolean
+  soloSinProgreso?: boolean
+}
+
+// 🏗️ Interface para datos de creación EDT
+export interface CreateProyectoEdtData {
+  proyectoId: string
+  categoriaServicioId: string
+  responsableId?: string
+  zona?: string | null
+  fechaInicioPlan?: Date | null
+  fechaFinPlan?: Date | null
+  horasPlan?: number | null
+  prioridad: PrioridadEdt
+  descripcion?: string | null
+}
+
+// 🔄 Interface para datos de actualización EDT
+export interface UpdateProyectoEdtData {
+  id?: string
+  responsableId?: string
+  zona?: string | null
+  fechaInicioPlan?: Date | null
+  fechaFinPlan?: Date | null
+  fechaInicioReal?: Date | null
+  fechaFinReal?: Date | null
+  horasPlan?: number | null
+  porcentajeAvance?: number
+  estado?: EstadoEdt
+  prioridad?: PrioridadEdt
+  descripcion?: string | null
+}
+
+// 🔗 Interface para EDT con relaciones completas
+export interface ProyectoEdtConRelaciones {
+  // Propiedades base de ProyectoEdt
+  id: string
+  proyectoId: string
+  categoriaServicioId: string
+  zona?: string
+  fechaInicio?: string
+  fechaFin?: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  horasPlan: number
+  horasReales: number
+  estado: EstadoEdt
+  responsableId?: string
+  porcentajeAvance: number
+  descripcion?: string
+  prioridad: PrioridadEdt
+  createdAt: string
+  updatedAt: string
+  
+  // Relaciones expandidas
+  proyecto: {
+    id: string
+    nombre: string
+    codigo: string
+    estado: ProyectoEstado
+  }
+  categoriaServicio: {
+    id: string
+    nombre: string
+  }
+  responsable?: {
+    id: string
+    name: string | null
+    email: string
+  }
+  registrosHoras: {
+    id: string
+    proyectoId: string
+    proyectoServicioId: string
+    categoria: string
+    nombreServicio: string
+    recursoId: string
+    recursoNombre: string
+    usuarioId: string
+    fechaTrabajo: string
+    horasTrabajadas: number
+    descripcion?: string
+    observaciones?: string
+    aprobado: boolean
+    proyectoEdtId: string
+    categoriaServicioId: string
+    origen: string
+    ubicacion: string
+    createdAt: string
+    updatedAt: string
+    usuario: {
+      id: string
+      name: string | null
+      email: string
+    }
+  }[]
+}

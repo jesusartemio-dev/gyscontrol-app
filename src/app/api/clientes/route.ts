@@ -1,18 +1,59 @@
 // src/app/api/clientes/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { generateNextClienteCode } from '@/lib/utils/clienteCodeGenerator'
 
 // ✅ GET: Listar todos los clientes
 export async function GET() {
-  const clientes = await prisma.cliente.findMany()
+  const clientes = await prisma.cliente.findMany({
+    orderBy: { createdAt: 'desc' } // ✅ Ordenar por fecha de creación
+  })
   return NextResponse.json(clientes)
 }
 
 // ✅ POST: Crear nuevo cliente
 export async function POST(req: Request) {
-  const data = await req.json()
-  const nuevo = await prisma.cliente.create({ data })
-  return NextResponse.json(nuevo)
+  try {
+    const data = await req.json()
+    
+    // ✅ Validate required fields
+    if (!data.codigo) {
+      return NextResponse.json(
+        { error: 'El código del cliente es obligatorio' },
+        { status: 400 }
+      )
+    }
+    
+    // ✅ Check if code already exists
+    const existingClient = await prisma.cliente.findUnique({
+      where: { codigo: data.codigo }
+    })
+    
+    if (existingClient) {
+      return NextResponse.json(
+        { error: 'Ya existe un cliente con este código' },
+        { status: 400 }
+      )
+    }
+    
+    console.log('🚀 Creating client with code:', data.codigo)
+    
+    const nuevo = await prisma.cliente.create({ 
+      data: {
+        ...data,
+        numeroSecuencia: 1 // ✅ Start with sequence 1
+      }
+    })
+    
+    console.log('✅ Client created successfully:', nuevo.codigo)
+    return NextResponse.json(nuevo)
+  } catch (error) {
+    console.error('❌ Error creating client:', error)
+    return NextResponse.json(
+      { error: 'Error al crear cliente' },
+      { status: 500 }
+    )
+  }
 }
 
 // ✅ PUT: Actualizar cliente

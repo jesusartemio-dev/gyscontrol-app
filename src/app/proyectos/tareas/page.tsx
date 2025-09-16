@@ -197,7 +197,7 @@ const TareasPage: React.FC = () => {
       ? Math.round(tareas.reduce((sum, t) => sum + t.porcentajeCompletado, 0) / totalTareas)
       : 0
     
-    const horasEstimadas = tareas.reduce((sum, t) => sum + t.horasEstimadas, 0)
+    const horasEstimadas = tareas.reduce((sum, t) => sum + t.horasPlan, 0)
     const horasReales = tareas.reduce((sum, t) => sum + t.horasReales, 0)
     
     setMetrics({

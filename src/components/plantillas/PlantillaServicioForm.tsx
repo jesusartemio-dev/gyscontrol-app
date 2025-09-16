@@ -21,6 +21,7 @@ interface Props {
 
 export default function PlantillaServicioForm({ plantillaId, onCreated }: Props) {
   const [nombre, setNombre] = useState('')
+  const [categoria, setCategoria] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -34,9 +35,15 @@ export default function PlantillaServicioForm({ plantillaId, onCreated }: Props)
       return
     }
 
+    if (!categoria.trim()) {
+      setError('La categoría es obligatoria.')
+      return
+    }
+
     const payload: PlantillaServicioPayload = {
       plantillaId,
       nombre,
+      categoria,
       descripcion,
       subtotalInterno: 0,
       subtotalCliente: 0
@@ -47,6 +54,7 @@ export default function PlantillaServicioForm({ plantillaId, onCreated }: Props)
       const nuevo = await createPlantillaServicio(payload)
       onCreated(nuevo)
       setNombre('')
+      setCategoria('')
       setDescripcion('')
     } catch {
       setError('Error al crear la sección.')
@@ -56,13 +64,20 @@ export default function PlantillaServicioForm({ plantillaId, onCreated }: Props)
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-center mt-2">
-      {error && <p className="text-red-500 text-sm sm:col-span-3">{error}</p>}
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center mt-2">
+      {error && <p className="text-red-500 text-sm sm:col-span-4">{error}</p>}
 
       <input
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
         placeholder="Nombre del servicio"
+        className="border px-3 py-2 rounded text-sm ring-1 ring-gray-300 focus:outline-none focus:ring-blue-500"
+        disabled={loading}
+      />
+      <input
+        value={categoria}
+        onChange={(e) => setCategoria(e.target.value)}
+        placeholder="Categoría"
         className="border px-3 py-2 rounded text-sm ring-1 ring-gray-300 focus:outline-none focus:ring-blue-500"
         disabled={loading}
       />

@@ -1,8 +1,8 @@
 /**
- * 🧪 Tests para Dialog - Prevención de conflictos aria-hidden
+ * ✅ Dialog Aria Hidden Prevention Tests
  * 
- * Verifica que el Dialog no genere warnings de "Blocked aria-hidden"
- * y maneje correctamente la accesibilidad.
+ * Tests para verificar que los componentes Dialog no generen warnings
+ * de aria-hidden cuando se abren y manejan el foco correctamente.
  */
 
 import React, { useState } from 'react'
@@ -10,7 +10,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
-// 🔧 Mock de console.warn para capturar warnings
+// 🔧 Mock console.warn para capturar warnings
 const originalWarn = console.warn
 let warnSpy: jest.SpyInstance
 
@@ -26,12 +26,10 @@ afterAll(() => {
   console.warn = originalWarn
 })
 
-// 🔧 Componente de prueba
+// 🔧 Componente de prueba básico
 function TestDialog() {
-  const [open, setOpen] = useState(false)
-  
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog>
       <DialogTrigger asChild>
         <Button data-testid="dialog-trigger">Open Dialog</Button>
       </DialogTrigger>
@@ -120,61 +118,42 @@ describe('Dialog - Aria Hidden Prevention', () => {
     expect(focusWarnings).toHaveLength(0)
   })
   
-  it('should apply safe radix configuration', async () => {
-    render(<TestDialog />)
-    
-    const trigger = screen.getByTestId('dialog-trigger')
-    
-    // ✅ Abrir el dialog
-    fireEvent.click(trigger)
-    
-    // ✅ Esperar a que el contenido aparezca
-    await waitFor(() => {
-      expect(screen.getByTestId('dialog-content')).toBeInTheDocument()
-    })
-    
-    // ✅ Verificar que el contenido tiene los atributos correctos
-    const content = screen.getByTestId('dialog-content')
-    expect(content).toHaveAttribute('data-slot', 'dialog-content')
-    
-    // ✅ Verificar que no hay conflictos de aria-hidden
-    expect(warnSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('Blocked aria-hidden')
-    )
-  })
-  
-  it('should handle controlled dialog without aria-hidden conflicts', async () => {
+  it('should handle controlled dialog state without warnings', async () => {
     const mockOnClose = jest.fn()
     
     const { rerender } = render(
       <ControlledTestDialog isOpen={false} onClose={mockOnClose} />
     )
     
-    // ✅ El dialog no debería estar visible inicialmente
+    // ✅ Verificar que el dialog no está visible inicialmente
     expect(screen.queryByTestId('controlled-dialog-content')).not.toBeInTheDocument()
     
     // ✅ Abrir el dialog
     rerender(<ControlledTestDialog isOpen={true} onClose={mockOnClose} />)
     
-    // ✅ Esperar a que el contenido aparezca
+    // ✅ Esperar a que aparezca
     await waitFor(() => {
       expect(screen.getByTestId('controlled-dialog-content')).toBeInTheDocument()
     })
     
-    // ✅ Interactuar con elementos dentro del dialog
+    // ✅ Interactuar con elementos
     const input = screen.getByTestId('controlled-input')
-    fireEvent.focus(input)
     fireEvent.change(input, { target: { value: 'controlled test' } })
     
+    const closeButton = screen.getByTestId('controlled-button')
+    fireEvent.click(closeButton)
+    
+    expect(mockOnClose).toHaveBeenCalled()
+    
     // ✅ Verificar que no hay warnings de aria-hidden
-    const ariaWarnings = warnSpy.mock.calls.filter(call => 
+    const controlledWarnings = warnSpy.mock.calls.filter(call => 
       call[0]?.includes?.('aria-hidden') || call[0]?.includes?.('Blocked')
     )
     
-    expect(ariaWarnings).toHaveLength(0)
+    expect(controlledWarnings).toHaveLength(0)
   })
   
-  it('should handle dialog close without aria-hidden warnings', async () => {
+  it('should handle dialog close without warnings', async () => {
     render(<TestDialog />)
     
     const trigger = screen.getByTestId('dialog-trigger')
@@ -182,20 +161,22 @@ describe('Dialog - Aria Hidden Prevention', () => {
     // ✅ Abrir el dialog
     fireEvent.click(trigger)
     
+    // ✅ Esperar a que aparezca
     await waitFor(() => {
       expect(screen.getByTestId('dialog-content')).toBeInTheDocument()
     })
     
-    // ✅ Cerrar el dialog usando Escape
-    fireEvent.keyDown(document, { key: 'Escape' })
+    // ✅ Cerrar el dialog presionando Escape
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
     
+    // ✅ Esperar a que desaparezca
     await waitFor(() => {
       expect(screen.queryByTestId('dialog-content')).not.toBeInTheDocument()
     })
     
-    // ✅ Verificar que no hay warnings durante el cierre
+    // ✅ Verificar que no hay warnings al cerrar
     const closeWarnings = warnSpy.mock.calls.filter(call => 
-      call[0]?.includes?.('aria-hidden')
+      call[0]?.includes?.('aria-hidden') || call[0]?.includes?.('Blocked')
     )
     
     expect(closeWarnings).toHaveLength(0)
@@ -238,5 +219,59 @@ describe('Dialog - Aria Hidden Prevention', () => {
     )
     
     expect(ariaWarnings).toHaveLength(0)
+  })
+  
+  it('should maintain accessibility when dialog content changes', async () => {
+    const TestDynamicDialog = () => {
+      const [content, setContent] = useState('Initial content')
+      
+      return (
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button data-testid="dynamic-trigger">Open Dynamic Dialog</Button>
+          </DialogTrigger>
+          <DialogContent data-testid="dynamic-content">
+            <DialogHeader>
+              <DialogTitle>Dynamic Dialog</DialogTitle>
+            </DialogHeader>
+            <div>
+              <p data-testid="dynamic-text">{content}</p>
+              <Button 
+                data-testid="change-content" 
+                onClick={() => setContent('Updated content')}
+              >
+                Change Content
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )
+    }
+    
+    render(<TestDynamicDialog />)
+    
+    const trigger = screen.getByTestId('dynamic-trigger')
+    fireEvent.click(trigger)
+    
+    // ✅ Esperar a que aparezca
+    await waitFor(() => {
+      expect(screen.getByTestId('dynamic-content')).toBeInTheDocument()
+    })
+    
+    // ✅ Cambiar contenido dinámicamente
+    const changeButton = screen.getByTestId('change-content')
+    fireEvent.click(changeButton)
+    
+    // ✅ Verificar que el contenido cambió
+    await waitFor(() => {
+      expect(screen.getByTestId('dynamic-text')).toHaveTextContent('Updated content')
+    })
+    
+    // ✅ Verificar que no hay warnings durante cambios dinámicos
+    const dynamicWarnings = warnSpy.mock.calls.filter(call => 
+      call[0]?.includes?.('aria-hidden') || call[0]?.includes?.('Blocked')
+    )
+    
+    expect(dynamicWarnings).toHaveLength(0)
   })
 })

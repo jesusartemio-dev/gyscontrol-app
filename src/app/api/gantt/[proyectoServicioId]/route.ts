@@ -276,7 +276,7 @@ export async function GET(
         progresoGeneral,
         horasTotales: totalHorasEstimadas,
         horasCompletadas: totalHorasReales,
-        eficiencia: totalHorasEstimadas > 0 
+        eficiencia: totalHorasEstimadas > 0
           ? Math.round((totalHorasEstimadas / totalHorasReales) * 100) 
           : 0,
         fechaInicioProyecto: proyectoServicio.proyecto.fechaInicio.toISOString(),

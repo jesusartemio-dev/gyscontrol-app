@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { generateNextCotizacionCode } from '@/lib/utils/cotizacionCodeGenerator'
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
@@ -126,11 +127,17 @@ export async function POST(req: Request) {
 
     // Preparar datos para creación
     console.log('🔍 DEBUG - Preparando datos para creación...')
+    
+    // 📡 Generar código automático con formato GYS-XXXX-YY
+    const { codigo, numeroSecuencia } = await generateNextCotizacionCode()
+    
     const baseData = {
       nombre: `Cotización de ${plantilla.nombre}`,
       clienteId,
       comercialId: session.user.id,
       plantillaId: plantilla.id,
+      codigo,
+      numeroSecuencia,
       totalInterno: plantilla.totalInterno,
       totalCliente: plantilla.totalCliente,
       totalEquiposInterno: plantilla.totalEquiposInterno,

@@ -186,7 +186,7 @@ const SubtareaAccordion: React.FC<SubtareaAccordionProps> = ({
       orden: 1, // Default order since Subtarea interface doesn't have orden property
       fechaInicio: subtarea.fechaInicio ? new Date(subtarea.fechaInicio).toISOString().slice(0, 16) : '',
       fechaFin: subtarea.fechaFin ? new Date(subtarea.fechaFin).toISOString().slice(0, 16) : '',
-      horasEstimadas: subtarea.horasEstimadas,
+      horasEstimadas: subtarea.horasPlan,
       horasReales: subtarea.horasReales,
       progreso: subtarea.porcentajeCompletado, // Use porcentajeCompletado instead of progreso
       asignadoId: subtarea.asignadoId || ''
@@ -434,10 +434,10 @@ const SubtareaAccordion: React.FC<SubtareaAccordionProps> = ({
                                             </div>
                                           )}
                                           
-                                          {subtarea.horasEstimadas > 0 && (
+                                          {subtarea.horasPlan > 0 && (
                                             <div className="flex items-center gap-1">
                                               <Clock className="h-3 w-3" />
-                                              {subtarea.horasEstimadas}h est.
+                                              {subtarea.horasPlan}h est.
                                             </div>
                                           )}
                                           

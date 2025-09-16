@@ -10,8 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import CotizacionEquipoItemForm from './CotizacionEquipoItemForm'
+// ❌ Eliminado: CotizacionEquipoItemForm - reemplazado por modal múltiple
 import CotizacionEquipoItemTable from './CotizacionEquipoItemTable'
+import CotizacionEquipoMultiAddModal from './CotizacionEquipoMultiAddModal'
 import type { CotizacionEquipo, CotizacionEquipoItem } from '@/types'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
@@ -22,7 +23,8 @@ import {
   TrendingUp, 
   DollarSign,
   Calculator,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from 'lucide-react'
 
 // Utility functions for formatting
@@ -49,6 +51,7 @@ const getRentabilityBadgeVariant = (percentage: number): "default" | "secondary"
 interface Props {
   equipo: CotizacionEquipo
   onCreated: (item: CotizacionEquipoItem) => void
+  onMultipleCreated?: (items: CotizacionEquipoItem[]) => void
   onDeleted: (itemId: string) => void
   onUpdated: (item: CotizacionEquipoItem) => void
   onDeletedGrupo: () => void
@@ -58,6 +61,7 @@ interface Props {
 export default function CotizacionEquipoAccordion({
   equipo,
   onCreated,
+  onMultipleCreated,
   onDeleted,
   onUpdated,
   onDeletedGrupo,
@@ -65,6 +69,7 @@ export default function CotizacionEquipoAccordion({
 }: Props) {
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(equipo.nombre)
+  const [showMultiAddModal, setShowMultiAddModal] = useState(false)
 
   useEffect(() => {
     setNuevoNombre(equipo.nombre)
@@ -90,6 +95,19 @@ export default function CotizacionEquipoAccordion({
   const renta = equipo.subtotalInterno > 0
     ? ((equipo.subtotalCliente - equipo.subtotalInterno) / equipo.subtotalInterno) * 100
     : 0
+
+  // ✅ Handle multiple items created - Fixed to add all items at once
+  const handleMultipleItemsCreated = (items: CotizacionEquipoItem[]) => {
+    if (items.length > 0) {
+      if (onMultipleCreated) {
+        onMultipleCreated(items)
+      } else {
+        // Fallback to individual creation if onMultipleCreated is not provided
+        items.forEach(item => onCreated(item))
+      }
+    }
+    setShowMultiAddModal(false)
+  }
 
   return (
     <motion.div
@@ -242,16 +260,25 @@ export default function CotizacionEquipoAccordion({
             <AccordionContent className="px-0 pb-0">
               <Separator />
               <div className="p-6 space-y-6 bg-muted/20">
+                {/* ✅ Botón para agregar múltiples items */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
+                  transition={{ delay: 0.05 }}
+                  className="flex justify-between items-center"
                 >
-                  <CotizacionEquipoItemForm 
-                    cotizacionEquipoId={equipo.id} 
-                    onCreated={onCreated} 
-                  />
+                  <h3 className="text-sm font-medium text-gray-700">Agregar Equipos</h3>
+                  <Button
+                    onClick={() => setShowMultiAddModal(true)}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Plus size={16} className="mr-2" />
+                    Agregar Items
+                  </Button>
                 </motion.div>
+                
+                {/* ❌ Eliminado: Formulario individual - ahora se usa el modal múltiple */}
                 
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -279,6 +306,14 @@ export default function CotizacionEquipoAccordion({
           </AccordionItem>
         </Accordion>
       </Card>
+      
+      {/* ✅ Modal para agregar múltiples items */}
+      <CotizacionEquipoMultiAddModal
+        isOpen={showMultiAddModal}
+        onClose={() => setShowMultiAddModal(false)}
+        cotizacionEquipoId={equipo.id}
+        onItemsCreated={handleMultipleItemsCreated}
+      />
     </motion.div>
   )
 }

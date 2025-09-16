@@ -62,6 +62,25 @@ export { formatDateRelative, formatearFecha } from './utils/fechas'
 // 💰 Alias para compatibilidad
 export const formatearMoneda = formatCurrency
 
+// ⏰ Time formatting utilities
+export const formatearHoras = (horas: number): string => {
+  if (horas < 1) {
+    return `${Math.round(horas * 60)}min`
+  }
+  const horasEnteras = Math.floor(horas)
+  const minutos = Math.round((horas - horasEnteras) * 60)
+  return minutos > 0 ? `${horasEnteras}h ${minutos}min` : `${horasEnteras}h`
+}
+
+// 📊 Percentage formatting with custom name
+export const formatearPorcentaje = (value: number): string => {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }).format(value / 100)
+}
+
 // 🔢 Code generation utilities
 export const generarCodigoFinanciero = (numero: number): string => {
   return `APR-${numero.toString().padStart(6, '0')}`

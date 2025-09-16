@@ -19,12 +19,45 @@ export async function createCotizacionEquipoItem(data: {
   observaciones?: string
 }): Promise<CotizacionEquipoItem> {
   try {
+    // 📡 Obtener datos del catálogo de equipos
+    const equipoRes = await fetch(buildApiUrl(`/api/catalogo-equipo/${data.catalogoEquipoId}`))
+    if (!equipoRes.ok) {
+      throw new Error('Error al obtener datos del equipo del catálogo')
+    }
+    const equipo = await equipoRes.json()
+
+    // 🔁 Transformar datos al formato requerido por la API
+    const itemPayload = {
+      cotizacionEquipoId: data.cotizacionEquipoId,
+      catalogoEquipoId: data.catalogoEquipoId,
+      codigo: equipo.codigo,
+      descripcion: equipo.descripcion,
+      categoria: equipo.categoria?.nombre || equipo.categoria || 'Sin categoría',
+      unidad: equipo.unidad?.nombre || equipo.unidad || 'Unidad',
+      marca: equipo.marca || 'Sin marca',
+      precioInterno: Number(equipo.precioInterno) || 0,
+      precioCliente: Number(data.precioUnitario) || 0,
+      cantidad: Number(data.cantidad) || 1,
+      costoInterno: Number(equipo.precioInterno || 0) * Number(data.cantidad || 1),
+      costoCliente: Number(data.precioUnitario || 0) * Number(data.cantidad || 1)
+    }
+
+    // 🐛 Debug: Log payload para debugging
+    console.log('📡 Payload enviado a API:', JSON.stringify(itemPayload, null, 2))
+    console.log('📡 Datos del equipo obtenidos:', JSON.stringify(equipo, null, 2))
+
+    // 📡 Crear el item en la API
     const res = await fetch(buildApiUrl('/api/cotizacion-equipo-item'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(itemPayload),
     })
-    if (!res.ok) throw new Error('Error al crear item de cotización de equipo')
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.error || 'Error al crear item de cotización de equipo')
+    }
+    
     return await res.json()
   } catch (error) {
     console.error('Error en createCotizacionEquipoItem:', error)

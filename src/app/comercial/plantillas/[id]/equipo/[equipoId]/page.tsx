@@ -8,7 +8,6 @@ import {
   deletePlantillaEquipoItem,
   updatePlantillaEquipoItem
 } from '@/lib/services/plantillaEquipoItem'
-import PlantillaEquipoItemForm from '@/components/plantillas/PlantillaEquipoItemForm'
 import PlantillaEquipoItemList from '@/components/plantillas/PlantillaEquipoItemList'
 import { PlantillaEquipo, PlantillaEquipoItem } from '@/types/modelos'
 
@@ -32,10 +31,7 @@ export default function PlantillaEquipoDetallePage() {
       })
   }, [equipoId])
 
-  const handleCreated = (nuevo: PlantillaEquipoItem) => {
-    if (!equipo) return
-    setEquipo({ ...equipo, items: [...equipo.items, nuevo] })
-  }
+
 
   const handleUpdated = (updated: PlantillaEquipoItem) => {
     if (!equipo) return
@@ -60,11 +56,6 @@ export default function PlantillaEquipoDetallePage() {
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-2xl font-bold">Sección: {equipo.nombre}</h1>
-
-      <PlantillaEquipoItemForm
-        plantillaEquipoId={equipo.id}
-        onCreated={handleCreated}
-      />
 
       <PlantillaEquipoItemList
         items={equipo.items}

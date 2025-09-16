@@ -39,7 +39,7 @@ const mockProyectos: ProyectoAprovisionamiento[] = [
     id: 'PROJ-002',
     nombre: 'Proyecto Beta',
     codigo: 'BETA-2024',
-    estado: 'planificacion',
+    estado: 'en_planificacion',
     fechaInicio: new Date('2024-02-01'),
     fechaFin: new Date('2024-07-01'),
     comercialId: 'COM-001',

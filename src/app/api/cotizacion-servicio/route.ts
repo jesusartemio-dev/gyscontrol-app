@@ -43,9 +43,9 @@ export async function POST(req: NextRequest) {
     const data: CotizacionServicioPayload = await req.json()
 
     // ✅ Validación básica de campos obligatorios
-    if (!data.cotizacionId || !data.categoria) {
+    if (!data.cotizacionId || !data.categoria || !data.nombre) {
       return NextResponse.json(
-        { error: 'Faltan campos obligatorios: cotizacionId y categoría' },
+        { error: 'Faltan campos obligatorios: cotizacionId, categoría y nombre' },
         { status: 400 }
       )
     }
@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     const nuevo = await prisma.cotizacionServicio.create({
       data: {
         cotizacionId: data.cotizacionId,
+        nombre: data.nombre,
         categoria: data.categoria,
         subtotalInterno: data.subtotalInterno ?? 0,
         subtotalCliente: data.subtotalCliente ?? 0

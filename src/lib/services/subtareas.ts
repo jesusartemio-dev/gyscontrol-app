@@ -364,7 +364,7 @@ export const duplicarSubtarea = async (id: string): Promise<Subtarea> => {
       estado: 'pendiente', // Siempre empezar como pendiente
       fechaInicio: subtareaOriginal.fechaInicio || new Date().toISOString(),
       fechaFin: subtareaOriginal.fechaFin || new Date().toISOString(),
-      horasEstimadas: subtareaOriginal.horasEstimadas || 0,
+      horasEstimadas: subtareaOriginal.horasPlan || 0,
       horasReales: 0, // Resetear horas reales
       progreso: 0, // Resetear progreso
       asignadoId: subtareaOriginal.asignadoId

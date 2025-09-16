@@ -131,8 +131,15 @@ export default function PlantillaEquipoAccordion({
             </div>
 
             <PlantillaEquipoItemTable
-              equipo={equipo}
-              onItemChange={onItemChange}
+              items={equipo.items}
+              onUpdated={(item) => {
+                const updatedItems = equipo.items.map(i => i.id === item.id ? item : i)
+                onItemChange(updatedItems)
+              }}
+              onDeleted={(id) => {
+                const updatedItems = equipo.items.filter(i => i.id !== id)
+                onItemChange(updatedItems)
+              }}
             />
           </AccordionContent>
         </AccordionItem>

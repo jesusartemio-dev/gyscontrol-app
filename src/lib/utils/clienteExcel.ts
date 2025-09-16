@@ -12,6 +12,7 @@ import { Cliente } from '@/types'
 export function exportarClientesAExcel(clientes: Cliente[]) {
   // ✅ Mapear datos para Excel con campos relevantes
   const data = clientes.map((c) => ({
+    Código: c.codigo || '',
     Nombre: c.nombre,
     RUC: c.ruc || '',
     Dirección: c.direccion || '',
@@ -24,6 +25,7 @@ export function exportarClientesAExcel(clientes: Cliente[]) {
   
   // ✅ Configurar ancho de columnas para mejor visualización
   const columnWidths = [
+    { wch: 15 }, // Código
     { wch: 30 }, // Nombre
     { wch: 15 }, // RUC
     { wch: 40 }, // Dirección

@@ -33,7 +33,12 @@ export async function createPlantillaServicio(payload: PlantillaServicioPayload)
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   })
-  if (!res.ok) throw new Error('Error al crear sección de servicios')
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }))
+    throw new Error(errorData.error || `Error ${res.status}: ${res.statusText}`)
+  }
+  
   return res.json()
 }
 

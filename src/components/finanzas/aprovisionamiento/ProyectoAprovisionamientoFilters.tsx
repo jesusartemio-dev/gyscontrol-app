@@ -329,7 +329,7 @@ export const ProyectoAprovisionamientoFilters: React.FC<ProyectoAprovisionamient
                       </FormControl>
                       <SelectContent>
                           <SelectItem value="all">Todos los estados</SelectItem>
-                          <SelectItem value="planificacion">Planificación</SelectItem>
+                          <SelectItem value="en_planificacion">En Planificación</SelectItem>
                           <SelectItem value="en_progreso">En Progreso</SelectItem>
                           <SelectItem value="completado">Completado</SelectItem>
                           <SelectItem value="pausado">Pausado</SelectItem>

@@ -17,6 +17,7 @@ import {
   paginateQuery, 
   PAGINATION_CONFIGS 
 } from '@/lib/utils/pagination'
+import { generateNextCotizacionCode } from '@/lib/utils/cotizacionCodeGenerator'
 
 // ✅ Obtener cotizaciones con paginación optimizada
 export async function GET(request: NextRequest) {
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
         where,
         select: {
           id: true,
+          codigo: true, // ✅ Incluir código de cotización
           nombre: true,
           estado: true,
           totalInterno: true,
@@ -131,11 +133,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
+    // 📡 Generar código automático con formato GYS-XXXX-YY
+    const { codigo, numeroSecuencia } = await generateNextCotizacionCode()
+
     const nueva = await prisma.cotizacion.create({
       data: {
         nombre,
         clienteId,
         comercialId,
+        codigo,
+        numeroSecuencia,
         estado: 'borrador',
         totalInterno: 0,
         totalCliente: 0

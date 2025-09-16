@@ -258,6 +258,14 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                           cotizacion.nombre
                         )}
                       </CardTitle>
+                      {/* 🏷️ Quote Code */}
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <FileText className="h-4 w-4" />
+                        <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                          {cotizacion.codigo || 'Sin código'}
+                        </span>
+                      </div>
+                      
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <User className="h-4 w-4" />
                         <span>{cotizacion.cliente?.nombre ?? 'Sin cliente asignado'}</span>

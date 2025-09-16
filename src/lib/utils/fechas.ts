@@ -50,18 +50,20 @@ export function getEstadoTiempo(diasRestantes: number): 'vencido' | 'proximo_ven
 
 /**
  * Formatea una fecha en formato legible
- * @param fecha - Fecha a formatear
+ * @param fecha - Fecha a formatear (Date o string)
  * @param formato - Formato deseado (por defecto: 'dd/mm/yyyy')
  * @returns Fecha formateada como string
  */
-export function formatearFecha(fecha: Date, formato: string = 'dd/mm/yyyy'): string {
-  if (!fecha || isNaN(fecha.getTime())) {
+export function formatearFecha(fecha: Date | string, formato: string = 'dd/mm/yyyy'): string {
+  const fechaObj = typeof fecha === 'string' ? new Date(fecha) : fecha
+  
+  if (!fechaObj || isNaN(fechaObj.getTime())) {
     return 'Fecha inválida'
   }
   
-  const dia = fecha.getDate().toString().padStart(2, '0')
-  const mes = (fecha.getMonth() + 1).toString().padStart(2, '0')
-  const año = fecha.getFullYear()
+  const dia = fechaObj.getDate().toString().padStart(2, '0')
+  const mes = (fechaObj.getMonth() + 1).toString().padStart(2, '0')
+  const año = fechaObj.getFullYear()
   
   switch (formato) {
     case 'yyyy-mm-dd':
@@ -74,15 +76,17 @@ export function formatearFecha(fecha: Date, formato: string = 'dd/mm/yyyy'): str
 
 /**
  * Formatea una fecha de manera relativa (ej: "Hace 2 días", "En 3 días")
- * @param fecha - Fecha a formatear
+ * @param fecha - Fecha a formatear (Date o string)
  * @returns Fecha formateada de manera relativa
  */
-export function formatearFechaRelativa(fecha: Date): string {
-  if (!fecha || isNaN(fecha.getTime())) {
+export function formatearFechaRelativa(fecha: Date | string): string {
+  const fechaObj = typeof fecha === 'string' ? new Date(fecha) : fecha
+  
+  if (!fechaObj || isNaN(fechaObj.getTime())) {
     return 'Fecha inválida'
   }
   
-  const diasRestantes = calcularDiasRestantes(fecha)
+  const diasRestantes = calcularDiasRestantes(fechaObj)
   
   if (diasRestantes === 0) {
     return 'Hoy'
@@ -105,7 +109,7 @@ export function formatearFechaRelativa(fecha: Date): string {
   }
   
   // Para fechas más lejanas, mostrar fecha completa
-  return formatearFecha(fecha)
+  return formatearFecha(fechaObj)
 }
 
 /**

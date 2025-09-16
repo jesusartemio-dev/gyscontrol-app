@@ -1,0 +1,4 @@
+Código,Nombre,RUC,Dirección,Teléfono,Correo
+CLI001,Empresa Test 1,20123456789,Av. Test 123,987654321,test1@empresa.com
+CLI002,Empresa Test 2,20987654321,Jr. Prueba 456,123456789,test2@empresa.com
+CLI003,Empresa Test 3,,Calle Demo 789,555666777,test3@empresa.com

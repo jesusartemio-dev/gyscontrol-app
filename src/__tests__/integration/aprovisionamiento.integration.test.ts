@@ -77,7 +77,7 @@ const mockProyectos = [
     descripcion: 'Otro proyecto de prueba',
     fechaInicio: new Date('2025-02-01'),
     fechaFin: new Date('2025-11-30'),
-    estado: 'PLANIFICACION',
+    estado: 'EN_PLANIFICACION',
     clienteId: '2',
     createdAt: new Date(),
     updatedAt: new Date()

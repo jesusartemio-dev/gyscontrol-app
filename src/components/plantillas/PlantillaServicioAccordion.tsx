@@ -8,10 +8,11 @@ import {
 } from '@/components/ui/accordion'
 import PlantillaServicioItemForm from './PlantillaServicioItemForm'
 import PlantillaServicioItemList from './PlantillaServicioItemList'
+import PlantillaServicioItemsModal from './PlantillaServicioItemsModal'
 import type { PlantillaServicio, PlantillaServicioItem } from '@/types'
 import { useState, useEffect } from 'react'
 import { Pencil, Trash2, Wrench, ChevronDown } from 'lucide-react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 
 interface Props {
   servicio: PlantillaServicio
@@ -32,8 +33,8 @@ export default function PlantillaServicioAccordion({
 }: Props) {
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(servicio.nombre)
+  const [showModal, setShowModal] = useState(false)
 
-  const router = useRouter()
   const params = useParams()
   const plantillaId = params.id as string
 
@@ -123,12 +124,10 @@ export default function PlantillaServicioAccordion({
         <AccordionContent className="px-6 pb-6 space-y-4">
           <div className="flex justify-end">
             <button
-              onClick={() =>
-                router.push(`/comercial/plantillas/${plantillaId}/servicio/select?grupo=${servicio.id}`)
-              }
+              onClick={() => setShowModal(true)}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm"
             >
-              ➕ Agregar Servicios desde Catálogo
+              ➕ Items desde Catálogo
             </button>
           </div>
 
@@ -136,6 +135,16 @@ export default function PlantillaServicioAccordion({
             items={servicio.items}
             onDeleted={onDeleted}
             onUpdated={onUpdated}
+          />
+
+          {/* Modal for adding items from catalog */}
+          <PlantillaServicioItemsModal
+            open={showModal}
+            onClose={() => setShowModal(false)}
+            plantillaId={plantillaId}
+            plantillaServicioId={servicio.id}
+            categoriaNombre={servicio.categoria} // This will show the category name
+            onCreated={onCreated}
           />
         </AccordionContent>
       </AccordionItem>

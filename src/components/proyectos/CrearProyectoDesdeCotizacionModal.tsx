@@ -7,40 +7,58 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { FolderPlus } from 'lucide-react'
 import { crearProyectoDesdeCotizacion } from '@/lib/services/proyecto'
 import type { Cotizacion } from '@/types'
 
 interface Props {
   cotizacion: Cotizacion
+  buttonVariant?: 'default' | 'outline' | 'ghost'
+  buttonSize?: 'sm' | 'default' | 'lg'
+  buttonClassName?: string
+  showIcon?: boolean
 }
 
-export default function CrearProyectoDesdeCotizacionModal({ cotizacion }: Props) {
+export default function CrearProyectoDesdeCotizacionModal({ 
+  cotizacion, 
+  buttonVariant = 'default',
+  buttonSize = 'default',
+  buttonClassName = '',
+  showIcon = true
+}: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [nombre, setNombre] = useState('')
-  const [codigo, setCodigo] = useState('')
   const [fechaInicio, setFechaInicio] = useState('')
   const [fechaFin, setFechaFin] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // ✅ Validación: nombre, código y fecha de inicio son obligatorios
-  const puedeCrear = nombre.trim() !== '' && codigo.trim() !== '' && fechaInicio.trim() !== ''
+  // ✅ Validación: nombre y fechaInicio son requeridos
+  const puedeCrear = nombre.trim() && fechaInicio && !loading
 
   const handleCrear = async () => {
     if (!puedeCrear) return
-    setLoading(true)
 
+    // ✅ Validate required fields before sending
+    if (!cotizacion.cliente?.id) {
+      toast.error('La cotización debe tener un cliente asignado')
+      return
+    }
+
+    if (!cotizacion.comercial?.id) {
+      toast.error('La cotización debe tener un comercial asignado')
+      return
+    }
+
+    setLoading(true)
     try {
+      // 📡 Call service to create project from cotización
       const proyecto = await crearProyectoDesdeCotizacion(cotizacion.id, {
-        clienteId: cotizacion.cliente?.id ?? '',
-        comercialId: cotizacion.comercial?.id ?? '',
-        gestorId: cotizacion.comercial?.id ?? '',
+        clienteId: cotizacion.cliente.id,
+        comercialId: cotizacion.comercial.id,
+        gestorId: cotizacion.comercial.id, // ✅ Use comercial as default gestor
         cotizacionId: cotizacion.id,
         nombre,
-        codigo,
-        estado: 'pendiente',
-        fechaInicio: new Date(fechaInicio).toISOString(),
-        fechaFin: fechaFin ? new Date(fechaFin).toISOString() : undefined,
         totalEquiposInterno: cotizacion.totalEquiposInterno,
         totalServiciosInterno: cotizacion.totalServiciosInterno,
         totalGastosInterno: cotizacion.totalGastosInterno,
@@ -48,14 +66,26 @@ export default function CrearProyectoDesdeCotizacionModal({ cotizacion }: Props)
         totalCliente: cotizacion.totalCliente,
         descuento: cotizacion.descuento,
         grandTotal: cotizacion.grandTotal,
+        estado: 'en_planificacion', // ✅ Use correct enum value
+        fechaInicio,
+        fechaFin: fechaFin || undefined
       })
 
-      toast.success('Proyecto creado correctamente')
-      router.push(`/proyectos/${proyecto.id}`)
+      toast.success('Proyecto creado exitosamente')
       setOpen(false)
-    } catch (err) {
-      console.error('❌ Error al crear proyecto:', err)
-      toast.error('Error al crear el proyecto')
+      
+      // Reset form
+      setNombre('')
+      setFechaInicio('')
+      setFechaFin('')
+      
+      // Navigate to the new project
+      router.push(`/proyectos/${proyecto.id}`)
+    } catch (error) {
+      console.error('Error al crear proyecto:', error)
+      // ✅ Show more specific error message
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al crear el proyecto'
+      toast.error(`Error al crear el proyecto: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -64,8 +94,14 @@ export default function CrearProyectoDesdeCotizacionModal({ cotizacion }: Props)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-          Crear Proyecto
+        <Button 
+          variant={buttonVariant}
+          size={buttonSize}
+          className={`${buttonVariant === 'default' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''} ${buttonClassName}`}
+        >
+          {showIcon && <FolderPlus className="h-4 w-4 mr-2" />}
+          <span className="hidden sm:inline">Crear Proyecto</span>
+          <span className="sm:hidden">Proyecto</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="space-y-4">
@@ -81,16 +117,6 @@ export default function CrearProyectoDesdeCotizacionModal({ cotizacion }: Props)
               placeholder="Ingrese el nombre del proyecto"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="codigo">Código del proyecto *</Label>
-            <Input
-              id="codigo"
-              placeholder="Ingrese el código del proyecto"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
             />
           </div>
           
@@ -114,7 +140,7 @@ export default function CrearProyectoDesdeCotizacionModal({ cotizacion }: Props)
                 value={fechaFin}
                 onChange={(e) => setFechaFin(e.target.value)}
                 className="w-full"
-                min={fechaInicio} // ✅ La fecha fin no puede ser anterior a la fecha inicio
+                min={fechaInicio}
               />
             </div>
           </div>

@@ -156,6 +156,7 @@ export async function createTestData() {
       update: {},
       create: {
         id: 'cliente-test-001',
+        codigo: 'CLI-TEST-001',
         nombre: 'Cliente Test E2E',
         ruc: '20123456789',
         direccion: 'Lima, Perú',
@@ -201,7 +202,7 @@ export async function createTestData() {
         nombre: 'Proyecto Test E2E',
         codigo: 'PROJ-TEST-001',
         fechaInicio: new Date(),
-        estado: 'activo'
+        estado: 'en_ejecucion'
       }
     })
     

@@ -20,7 +20,11 @@ import type {
   EstadoPedidoItem, 
   EstadoCotizacionProveedor, 
   EstadoEntregaItem,
-  OrigenListaItem
+  OrigenListaItem,
+  EstadoEdt,
+  PrioridadEdt,
+  OrigenTrabajo,
+  ProyectoEstado
   // ❌ Eliminado: Producto - no forma parte del sistema GYS
 } from './modelos'
 
@@ -191,6 +195,7 @@ export interface PlantillaEquipoItemUpdatePayload extends Partial<PlantillaEquip
 export interface PlantillaServicioPayload {
   plantillaId: string
   nombre: string
+  categoria: string
   descripcion?: string
   subtotalInterno: number
   subtotalCliente: number
@@ -236,6 +241,42 @@ export interface PlantillaGastoItemUpdatePayload extends Partial<PlantillaGastoI
 // 💲 Cotización
 // ============================
 
+// ✅ Payload para crear cotización
+export interface CotizacionPayload {
+  clienteId: string
+  comercialId?: string
+  plantillaId?: string
+  codigo?: string // ✅ Código automático - se genera si no se proporciona
+  numeroSecuencia?: number // ✅ Número secuencial - se genera automáticamente
+  nombre: string
+  totalEquiposInterno?: number
+  totalEquiposCliente?: number
+  totalServiciosInterno?: number
+  totalServiciosCliente?: number
+  totalGastosInterno?: number
+  totalGastosCliente?: number
+  totalInterno?: number
+  totalCliente?: number
+  descuento?: number
+  grandTotal?: number
+  etapa?: string
+  prioridad?: string
+  probabilidad?: number
+  fechaEnvio?: string
+  fechaCierreEstimada?: string
+  notas?: string
+  estado?: string
+}
+
+// ✅ Payload para actualizar cotización
+export interface CotizacionUpdatePayload extends Partial<CotizacionPayload> {}
+
+// ✅ Payload para crear cotización desde plantilla
+export interface CreateCotizacionFromPlantillaPayload {
+  plantillaId: string
+  clienteId: string
+}
+
 export interface CotizacionEquipoPayload {
   cotizacionId: string
   nombre: string
@@ -246,6 +287,7 @@ export interface CotizacionEquipoPayload {
 
 export interface CotizacionServicioPayload {
   cotizacionId: string
+  nombre: string
   categoria: string
   subtotalInterno: number
   subtotalCliente: number
@@ -341,7 +383,7 @@ export interface ProyectoPayload {
   descuento: number
   grandTotal: number
 
-  codigo: string
+  codigo?: string // ✅ Código automático - se genera basado en cliente.codigo + cliente.numeroSecuencia
   estado: string
   fechaInicio: string
   fechaFin?: string
@@ -396,6 +438,7 @@ export interface ProyectoEquipoItemUpdatePayload extends Partial<ProyectoEquipoI
 export interface ProyectoServicioPayload {
   proyectoId: string
   responsableId: string
+  nombre: string
   categoria: string
   subtotalInterno: number
   subtotalCliente: number
@@ -1080,5 +1123,226 @@ export interface GanttChartPayload {
     horasAsignadas: number
     conflictos: boolean
   }>
+}
+
+// ===================================================
+// 📋 PAYLOADS PARA SISTEMA EDT
+// ===================================================
+
+// 🔧 Payload para crear ProyectoEdt
+export interface ProyectoEdtPayload {
+  proyectoId: string
+  categoriaServicioId: string
+  zona?: string
+  fechaInicio?: string
+  fechaFin?: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  horasEstimadas: number
+  horasReales?: number
+  estado?: EstadoEdt
+  responsableId?: string
+  porcentajeAvance?: number // 0-100
+  descripcion?: string
+  prioridad?: PrioridadEdt
+}
+
+// 🔧 Payload para actualizar ProyectoEdt
+export interface ProyectoEdtUpdatePayload extends Partial<ProyectoEdtPayload> {
+  id?: string // Para identificar el EDT a actualizar
+}
+
+// 📊 Payload para filtros de búsqueda EDT
+export interface EdtPaginationParams extends PaginationParams {
+  proyectoId?: string
+  categoriaServicioId?: string
+  estado?: EstadoEdt
+  prioridad?: PrioridadEdt
+  responsableId?: string
+  zona?: string
+  fechaDesde?: string
+  fechaHasta?: string
+  porcentajeAvanceMin?: number
+  porcentajeAvanceMax?: number
+  horasEstimadasMin?: number
+  horasEstimadasMax?: number
+}
+
+// 📈 Payload para métricas EDT
+export interface MetricasEdtPayload {
+  proyectoId?: string
+  categoriaServicioId?: string
+  responsableId?: string
+  fechaInicio?: string
+  fechaFin?: string
+  incluirDetalles?: boolean
+}
+
+// 🎯 Payload para resumen EDT por proyecto
+export interface ResumenEdtProyectoPayload {
+  proyectoIds?: string[]
+  incluirResponsables?: boolean
+  incluirMetricas?: boolean
+  fechaCorte?: string
+}
+
+// 📋 Payload para actualización masiva de EDT
+export interface EdtBulkUpdatePayload {
+  edtIds: string[]
+  updates: {
+    estado?: EstadoEdt
+    prioridad?: PrioridadEdt
+    responsableId?: string
+    porcentajeAvance?: number
+    fechaInicio?: string
+    fechaFin?: string
+  }
+}
+
+// 🔄 Payload para transferir EDT entre responsables
+export interface EdtTransferPayload {
+  edtIds: string[]
+  nuevoResponsableId: string
+  motivo?: string
+  notificarResponsables?: boolean
+}
+
+// 📊 Payload para reportes EDT
+export interface ReporteEdtPayload {
+  tipo: 'resumen' | 'detallado' | 'metricas' | 'progreso'
+  filtros: {
+    proyectoId?: string
+    categoriaServicioId?: string
+    estado?: EstadoEdt[]
+    prioridad?: PrioridadEdt[]
+    responsableId?: string
+    fechaInicio?: string
+    fechaFin?: string
+    zona?: string
+  }
+  formato: 'pdf' | 'excel' | 'csv'
+  incluirGraficos?: boolean
+  incluirDetalleHoras?: boolean
+}
+
+// 🎨 Payload para configuración de vista EDT
+export interface EdtViewConfigPayload {
+  usuarioId: string
+  configuracion: {
+    columnas: string[]
+    filtrosPredeterminados?: EdtPaginationParams
+    ordenamiento?: {
+      campo: string
+      direccion: 'asc' | 'desc'
+    }
+    agrupamiento?: 'proyecto' | 'categoria' | 'responsable' | 'estado' | 'prioridad'
+    mostrarMetricas?: boolean
+  }
+}
+
+// 📊 PAYLOADS PARA CRONOGRAMA ANALYTICS - FASE 4
+// ===================================================
+
+// 🎯 Payload para obtener KPIs de cronograma
+export interface KpisCronogramaPayload {
+  proyectoId?: string
+  fechaInicio?: string
+  fechaFin?: string
+  incluirComparativo?: boolean
+  incluirTendencias?: boolean
+}
+
+// 📈 Payload para tendencias mensuales
+export interface TendenciasMensualesPayload {
+  proyectoId?: string
+  año: number
+  meses?: number[] // Array de meses (1-12)
+  metricas?: ('eficiencia' | 'cumplimiento' | 'horas' | 'costos')[]
+}
+
+// 🔍 Payload para análisis de rendimiento
+export interface AnalisisRendimientoPayload {
+  proyectoId?: string
+  responsableId?: string
+  categoriaServicioId?: string
+  fechaInicio?: string
+  fechaFin?: string
+  incluirRecomendaciones?: boolean
+}
+
+// 🚨 Payload para generar alertas
+export interface GenerarAlertasPayload {
+  proyectoId?: string
+  tiposAlerta?: ('retraso' | 'sobrecosto' | 'baja_eficiencia' | 'riesgo_calidad')[]
+  umbralRetraso?: number // días
+  umbralSobrecosto?: number // porcentaje
+  umbralEficiencia?: number // porcentaje
+  notificarPorEmail?: boolean
+}
+
+// 📊 Payload para métricas comparativas
+export interface MetricasComparativasPayload {
+  proyectoIds: string[]
+  metricas: ('duracion' | 'costo' | 'eficiencia' | 'calidad')[]
+  fechaInicio?: string
+  fechaFin?: string
+  agruparPor?: 'mes' | 'trimestre' | 'año'
+}
+
+// 🎛️ Payload para dashboard ejecutivo
+export interface DashboardEjecutivoPayload {
+  usuarioId: string
+  proyectoIds?: string[]
+  fechaInicio?: string
+  fechaFin?: string
+  incluirProyecciones?: boolean
+  incluirAlertas?: boolean
+  incluirKpis?: boolean
+}
+
+// ✅ Registro de Horas
+export interface CreateRegistroHorasPayload {
+  proyectoEdtId: string
+  usuarioId: string
+  fecha: string
+  horasTrabajadas: number
+  descripcion?: string
+  observaciones?: string
+}
+
+// ✅ Filtros para Cronograma
+export interface FiltrosCronogramaPayload {
+  proyectoId?: string
+  categoriaServicioId?: string
+  estado?: EstadoEdt
+  prioridad?: PrioridadEdt
+  responsableId?: string
+  zona?: string
+  fechaDesde?: string
+  fechaHasta?: string
+  porcentajeAvanceMin?: number
+  porcentajeAvanceMax?: number
+  horasEstimadasMin?: number
+  horasEstimadasMax?: number
+  page?: number
+  limit?: number
+  search?: string
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}
+
+// ✅ Payload para crear EDT desde cronograma
+export interface CreateProyectoEdtPayload {
+  proyectoId: string
+  categoriaServicioId: string
+  zona?: string
+  fechaInicio?: string
+  fechaFin?: string
+  horasEstimadas: number
+  estado?: EstadoEdt
+  responsableId?: string
+  porcentajeAvance?: number
+  descripcion?: string
+  prioridad?: PrioridadEdt
 }
 

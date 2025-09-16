@@ -39,6 +39,7 @@ import {
   PauseCircle
 } from 'lucide-react'
 import ProyectoEquipoAccordion from '@/components/proyectos/ProyectoEquipoAccordion'
+import ProyectoServicioAccordion from '@/components/proyectos/ProyectoServicioAccordion'
 
 export default function ProyectoDetallePage() {
   const { id } = useParams()
@@ -333,6 +334,38 @@ export default function ProyectoDetallePage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Services Section */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Settings className="h-5 w-5 text-slate-600" />
+                  Servicios del Proyecto
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {proyecto.servicios && proyecto.servicios.length > 0 ? (
+                  <div className="space-y-4">
+                    {proyecto.servicios.map((servicio) => (
+                      <ProyectoServicioAccordion
+                        key={servicio.id}
+                        servicio={servicio}
+                        onUpdatedItem={() => {
+                          // Refresh project data
+                          getProyectoById(id as string).then(setProyecto)
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-500">
+                    <Settings className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                    <p className="text-lg font-medium mb-2">No hay servicios registrados</p>
+                    <p className="text-sm">Los servicios aparecerán aquí una vez que sean agregados al proyecto.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </motion.div>
 
           {/* Right Column - Financial Summary */}
@@ -428,12 +461,20 @@ export default function ProyectoDetallePage() {
                     <div className="text-xs text-blue-700 font-medium">Equipos</div>
                   </div>
                   
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {proyecto.equipos?.reduce((acc, eq) => acc + (eq.items?.length || 0), 0) || 0}
+                  <div className="text-center p-3 bg-purple-50 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {proyecto.servicios?.length || 0}
                     </div>
-                    <div className="text-xs text-green-700 font-medium">Items</div>
+                    <div className="text-xs text-purple-700 font-medium">Servicios</div>
                   </div>
+                </div>
+                
+                <div className="text-center p-3 bg-green-50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">
+                    {(proyecto.equipos?.reduce((acc, eq) => acc + (eq.items?.length || 0), 0) || 0) + 
+                     (proyecto.servicios?.reduce((acc, sv) => acc + (sv.items?.length || 0), 0) || 0)}
+                  </div>
+                  <div className="text-xs text-green-700 font-medium">Total Items</div>
                 </div>
                 
                 <div className="text-center p-3 bg-slate-50 rounded-lg">

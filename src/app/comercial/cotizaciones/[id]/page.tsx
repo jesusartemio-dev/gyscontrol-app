@@ -53,12 +53,14 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 
-import CotizacionEquipoForm from '@/components/cotizaciones/CotizacionEquipoForm'
+
 import CotizacionServicioForm from '@/components/cotizaciones/CotizacionServicioForm'
 import CotizacionGastoForm from '@/components/cotizaciones/CotizacionGastoForm'
 import CotizacionEquipoAccordion from '@/components/cotizaciones/CotizacionEquipoAccordion'
 import CotizacionServicioAccordion from '@/components/cotizaciones/CotizacionServicioAccordion'
 import CotizacionGastoAccordion from '@/components/cotizaciones/CotizacionGastoAccordion'
+import CotizacionEquipoModal from '@/components/cotizaciones/CotizacionEquipoModal'
+
 import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
 import EstadoCotizacionToolbar from '@/components/cotizaciones/EstadoCotizacionToolbar'
@@ -106,7 +108,10 @@ export default function CotizacionDetallePage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [renderPDF, setRenderPDF] = useState(true)
-  const [showForm, setShowForm] = useState({ equipo: false, servicio: false, gasto: false })
+  const [showForm, setShowForm] = useState({ servicio: false, gasto: false })
+  const [showEquipoModal, setShowEquipoModal] = useState(false)
+
+  const [selectedEquipoId, setSelectedEquipoId] = useState<string | null>(null)
   const [creandoProyecto, setCreandoProyecto] = useState(false)
 
   useEffect(() => {
@@ -445,6 +450,15 @@ export default function CotizacionDetallePage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 leading-tight">{cotizacion.nombre}</h1>
+                  
+                  {/* 🏷️ Quote Code */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-mono text-sm bg-muted px-3 py-1 rounded-md border">
+                      {cotizacion.codigo || 'Sin código'}
+                    </span>
+                  </div>
+                  
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <Badge variant={getStatusVariant(cotizacion.estado)} className="text-sm font-medium w-fit">
                       {cotizacion.estado}
@@ -487,17 +501,38 @@ export default function CotizacionDetallePage() {
                 </div>
               </div>
               
-              <div className="flex flex-col sm:flex-row gap-2 xl:flex-col xl:w-auto">
-                <Button variant="outline" size="sm" className="bg-white hover:bg-gray-50 justify-start sm:justify-center xl:justify-start">
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-white hover:bg-gray-50 flex-shrink-0 h-8 min-w-[120px] justify-center"
+                >
                   <Share2 className="h-4 w-4 mr-2" />
-                  <span>Compartir</span>
+                  <span className="hidden sm:inline">Compartir</span>
+                  <span className="sm:hidden">Share</span>
                 </Button>
                 {renderPDF && puedeRenderizarPDF && (
-                  <DescargarPDFButton cotizacion={cotizacion} />
+                  <div className="flex-shrink-0">
+                    <DescargarPDFButton cotizacion={cotizacion} />
+                  </div>
                 )}
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 justify-start sm:justify-center xl:justify-start">
+                {cotizacion.estado === 'aprobada' && (
+                  <div className="flex-shrink-0">
+                    <CrearProyectoDesdeCotizacionModal 
+                      cotizacion={cotizacion} 
+                      buttonVariant="outline"
+                      buttonSize="sm"
+                      buttonClassName="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 h-8 min-w-[120px] justify-center"
+                    />
+                  </div>
+                )}
+                <Button 
+                  size="sm" 
+                  className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 h-8 min-w-[120px] justify-center"
+                >
                   <Edit className="h-4 w-4 mr-2" />
-                  <span>Editar</span>
+                  <span className="hidden sm:inline">Editar</span>
+                  <span className="sm:hidden">Edit</span>
                 </Button>
               </div>
             </div>
@@ -611,33 +646,20 @@ export default function CotizacionDetallePage() {
                 Secciones de Equipos
                 <Badge variant="secondary">{totalEquipos}</Badge>
               </CardTitle>
-              <Button
-                onClick={() => setShowForm(prev => ({ ...prev, equipo: !prev.equipo }))}
-                size="sm"
-                className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-center"
-              >
-                <Plus className="h-4 w-4" />
-                Agregar Equipo
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button
+                  onClick={() => setShowEquipoModal(true)}
+                  size="sm"
+                  className="flex items-center gap-2 justify-start sm:justify-center bg-blue-600 hover:bg-blue-700"
+                >
+                  <Package className="h-4 w-4" />
+                  Nuevo Equipo
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4">
-            {showForm.equipo && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <CotizacionEquipoForm
-                  cotizacionId={cotizacion.id}
-                  onCreated={(nuevo) =>
-                    setCotizacion(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)
-                  }
-                />
-                <Separator className="my-4" />
-              </motion.div>
-            )}
+
             
             {cotizacion.equipos.length === 0 ? (
               <motion.div 
@@ -663,18 +685,9 @@ export default function CotizacionDetallePage() {
                   Los equipos son el corazón de tu cotización. Agrega especificaciones técnicas, 
                   cantidades y precios para crear una propuesta profesional.
                 </p>
-                <div className="space-y-3">
-                  <Button
-                    onClick={() => setShowForm(prev => ({ ...prev, equipo: true }))}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar primer equipo
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    💡 Tip: Puedes agregar múltiples secciones de equipos para organizar mejor tu cotización
-                  </p>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  💡 Tip: Usa el botón "Nuevo Equipo" arriba para agregar tu primera sección de equipos
+                </p>
               </motion.div>
             ) : (
               <motion.div 
@@ -702,6 +715,7 @@ export default function CotizacionDetallePage() {
                     <CotizacionEquipoAccordion
                       equipo={e}
                       onCreated={i => actualizarEquipo(e.id, items => [...items, i])}
+                      onMultipleCreated={newItems => actualizarEquipo(e.id, items => [...items, ...newItems])}
                       onUpdated={item => actualizarEquipo(e.id, items => items.map(i => i.id === item.id ? item : i))}
                       onDeleted={id => actualizarEquipo(e.id, items => items.filter(i => i.id !== id))}
                       onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)}
@@ -952,28 +966,22 @@ export default function CotizacionDetallePage() {
         </motion.section>
       </div>
 
-      {/* Sección de Proyecto (solo para cotizaciones aprobadas y cerradas) */}
-      {cotizacion.estado === 'aprobada' && cotizacion.etapa === 'cerrado' && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 1.0, ease: [0.4, 0, 0.2, 1] }}
-          className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6"
-        >
-          <div className="flex items-center gap-3">
-            <CheckCircle className="h-6 w-6 text-green-600" />
-            <div>
-              <h3 className="text-lg font-semibold text-green-800">Cotización Aprobada y Cerrada</h3>
-              <p className="text-green-700 text-sm">
-                Esta cotización ha sido aprobada y cerrada. Puedes crear un proyecto desde esta cotización.
-              </p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <CrearProyectoDesdeCotizacionModal cotizacion={cotizacion} />
-          </div>
-        </motion.div>
-      )}
+
+
+      {/* Modal para crear nueva sección de equipo */}
+      <CotizacionEquipoModal
+        open={showEquipoModal}
+        onOpenChange={setShowEquipoModal}
+        cotizacionId={cotizacion.id}
+        onCreated={(nuevoEquipo) => {
+          setCotizacion(prev => prev ? {
+            ...prev,
+            equipos: [...prev.equipos, { ...nuevoEquipo, items: [] }]
+          } : prev)
+          setShowEquipoModal(false)
+        }}
+      />
+
 
 
       </motion.div>

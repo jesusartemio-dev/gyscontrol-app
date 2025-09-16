@@ -108,7 +108,7 @@ const TareaForm: React.FC<TareaFormProps> = ({
       orden: 1, // Default order since Tarea interface doesn't have orden property
       fechaInicio: tarea?.fechaInicio ? new Date(tarea.fechaInicio).toISOString().slice(0, 16) : '',
       fechaFin: tarea?.fechaFin ? new Date(tarea.fechaFin).toISOString().slice(0, 16) : '',
-      horasEstimadas: tarea?.horasEstimadas || 0,
+      horasEstimadas: tarea?.horasPlan || 0,
       horasReales: tarea?.horasReales || 0,
       progreso: tarea?.porcentajeCompletado || 0, // Use porcentajeCompletado instead of progreso
       asignadoId: tarea?.responsableId || '' // Use responsableId instead of asignadoId

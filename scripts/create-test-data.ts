@@ -22,6 +22,7 @@ async function createTestData() {
     if (!cliente) {
       cliente = await prisma.cliente.create({
         data: {
+          codigo: 'CLI-TEST-001',
           nombre: 'Empresa Test S.A.C.',
           correo: 'cliente.test@empresa.com',
           telefono: '+51 999 888 777',
@@ -54,7 +55,7 @@ async function createTestData() {
           clienteId: cliente.id,
           comercialId: adminUser.id,
           gestorId: adminUser.id,
-          estado: 'activo',
+          estado: 'en_ejecucion',
           fechaInicio: new Date('2025-01-01'),
           fechaFin: new Date('2025-12-31')
         }

@@ -9,7 +9,9 @@ export async function getCotizaciones(): Promise<Cotizacion[]> {
       credentials: 'include' // ✅ Incluir cookies de sesión
     })
     if (!res.ok) throw new Error('Error al obtener cotizaciones')
-    return await res.json()
+    const result = await res.json()
+    // ✅ La API devuelve un objeto paginado, extraemos solo los datos
+    return result.data || result
   } catch (error) {
     console.error('❌ getCotizaciones error:', error)
     throw error

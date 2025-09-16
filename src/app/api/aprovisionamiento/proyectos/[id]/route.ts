@@ -21,7 +21,7 @@ import { z } from 'zod'
 const actualizarProyectoSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').optional(),
   codigo: z.string().min(1, 'El código es requerido').optional(),
-  estado: z.enum(['planificacion', 'en_progreso', 'pausado', 'completado', 'cancelado']).optional(),
+  estado: z.enum(['en_planificacion', 'en_ejecucion', 'en_pausa', 'cerrado', 'cancelado']).optional(),
   fechaInicio: z.string().datetime().optional(),
   fechaFin: z.string().datetime().optional(),
   presupuesto: z.number().min(0, 'El presupuesto debe ser positivo').optional(),
@@ -264,7 +264,7 @@ export async function GET(
     const fechaFin = proyecto.fechaFin ? new Date(proyecto.fechaFin) : null
     
     const alertas = {
-      proyectoRetrasado: fechaFin ? fechaActual > fechaFin && proyecto.estado !== 'completado' : false,
+      proyectoRetrasado: fechaFin ? fechaActual > fechaFin && proyecto.estado !== 'cerrado' : false,
       sinAprovisionamiento: kpis.cantidadListas === 0,
       desviacionPresupuesto: Math.abs(kpis.porcentajeDesviacion) > 10,
       pedidosRetrasados: kpis.alertas.pedidosRetrasados > 0,

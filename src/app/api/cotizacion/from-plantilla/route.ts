@@ -7,6 +7,18 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { generateNextCotizacionCode } from '@/lib/utils/cotizacionCodeGenerator'
+
+// ✅ Type for PlantillaServicio with proper fields
+type PlantillaServicioWithItems = {
+  id: string
+  nombre: string
+  categoria: string
+  descripcion?: string | null
+  subtotalInterno: number
+  subtotalCliente: number
+  items: any[]
+}
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
@@ -80,7 +92,14 @@ export async function POST(req: Request) {
       }
     }
 
+    // ✅ Generar código automático de cotización
+    console.log('🔍 [DEBUG] Generando código automático de cotización...')
+    const { codigo, numeroSecuencia } = await generateNextCotizacionCode()
+    console.log('✅ [DEBUG] Código generado:', { codigo, numeroSecuencia })
+
     const baseData = {
+      codigo, // ✅ Código automático formato GYS-XXXX-YY
+      numeroSecuencia, // ✅ Número secuencial
       nombre: `Cotización de ${plantilla.nombre}`,
       clienteId,
       comercialId: session.user.id, // Se actualizará más adelante si es necesario
@@ -119,10 +138,11 @@ export async function POST(req: Request) {
         })),
       },
       servicios: {
-        create: plantilla.servicios.map(s => ({
-          categoria: s.nombre,
-          subtotalInterno: s.subtotalInterno,
-          subtotalCliente: s.subtotalCliente,
+        create: plantilla.servicios.map((s: PlantillaServicioWithItems) => ({
+          nombre: s.nombre,
+          categoria: s.categoria,
+          subtotalInterno: Number(s.subtotalInterno),
+          subtotalCliente: Number(s.subtotalCliente),
           items: {
             create: s.items.map(item => ({
               catalogoServicioId: item.catalogoServicioId,

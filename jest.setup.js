@@ -14,6 +14,57 @@ jest.mock('tailwindcss/tailwind.css', () => ({}), { virtual: true })
 // Extend Jest matchers
 expect.extend(require('@testing-library/jest-dom/matchers'))
 
+// ✅ Mock shadcn/ui components globally
+jest.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children, open, onOpenChange }) => 
+    open ? <div role="dialog" data-testid="modal">{children}</div> : <div>{children}</div>,
+  DialogContent: ({ children }) => <div>{children}</div>,
+  DialogHeader: ({ children }) => <div>{children}</div>,
+  DialogTitle: ({ children }) => <h2>{children}</h2>,
+  DialogTrigger: ({ children, asChild }) => asChild ? children : <div>{children}</div>,
+}))
+
+jest.mock('@/components/ui/button', () => ({
+  Button: ({ children, onClick, disabled, variant, size, className, ...props }) => (
+    <button 
+      onClick={onClick} 
+      disabled={disabled} 
+      className={className}
+      data-variant={variant}
+      data-size={size}
+      {...props}
+    >
+      {children}
+    </button>
+  ),
+}))
+
+jest.mock('@/components/ui/input', () => ({
+  Input: ({ id, type, value, onChange, placeholder, className, ...props }) => (
+    <input
+      id={id}
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={className}
+      {...props}
+    />
+  ),
+}))
+
+jest.mock('@/components/ui/label', () => ({
+  Label: ({ children, htmlFor }) => <label htmlFor={htmlFor}>{children}</label>,
+}))
+
+jest.mock('lucide-react', () => ({
+  FolderPlus: ({ className }) => <svg className={className} data-testid="folder-plus-icon" />,
+  // Add other icons as needed
+  ChevronDown: ({ className }) => <svg className={className} data-testid="chevron-down-icon" />,
+  Search: ({ className }) => <svg className={className} data-testid="search-icon" />,
+  Plus: ({ className }) => <svg className={className} data-testid="plus-icon" />,
+}))
+
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter() {

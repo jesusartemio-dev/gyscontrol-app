@@ -54,5 +54,40 @@ export function useToast() {
   return { toast }
 }
 
+// Export toast function directly for convenience
+export const toast = (() => {
+  const toastFn = ({
+    title,
+    description,
+    variant = 'default',
+    duration = 4000,
+  }: ToastProps) => {
+    const message = description || title || ''
+    
+    switch (variant) {
+      case 'destructive':
+        return sonnerToast.error(message, { duration })
+      case 'success':
+        return sonnerToast.success(message, { duration })
+      default:
+        return sonnerToast(message, { duration })
+    }
+  }
+
+  toastFn.success = (message: string, duration?: number) => {
+    return sonnerToast.success(message, { duration: duration || 4000 })
+  }
+
+  toastFn.error = (message: string, duration?: number) => {
+    return sonnerToast.error(message, { duration: duration || 4000 })
+  }
+
+  toastFn.info = (message: string, duration?: number) => {
+    return sonnerToast(message, { duration: duration || 4000 })
+  }
+
+  return toastFn
+})()
+
 // Export para compatibilidad
 export { useToast as default }

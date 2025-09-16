@@ -14,19 +14,18 @@ import {
   getPlantillaById,
   updatePlantillaTotales
 } from '@/lib/services/plantilla'
-import { createCotizacionFromPlantilla } from '@/lib/services/cotizacion'
 import { deletePlantillaServicio } from '@/lib/services/plantillaServicio'
 import { deletePlantillaEquipo } from '@/lib/services/plantillaEquipo'
 import { deletePlantillaGasto } from '@/lib/services/plantillaGasto'
 import { deletePlantillaGastoItem } from '@/lib/services/plantillaGastoItem'
 import PlantillaEquipoModal from '@/components/plantillas/PlantillaEquipoModal'
-import PlantillaServicioForm from '@/components/plantillas/PlantillaServicioForm'
+import PlantillaServicioModal from '@/components/plantillas/PlantillaServicioModal'
 import PlantillaGastoForm from '@/components/plantillas/PlantillaGastoForm'
 import PlantillaEquipoAccordion from '@/components/plantillas/equipos/PlantillaEquipoAccordion'
 import PlantillaServicioAccordion from '@/components/plantillas/PlantillaServicioAccordion'
 import PlantillaGastoAccordion from '@/components/plantillas/PlantillaGastoAccordion'
 import ResumenTotalesPlantilla from '@/components/plantillas/ResumenTotalesPlantilla'
-import ClienteSelector from '@/components/cotizaciones/ClienteSelector'
+import CrearCotizacionModal from '@/components/cotizaciones/CrearCotizacionModal'
 
 // UI Components
 import { Button } from '@/components/ui/button'
@@ -124,9 +123,7 @@ export default function PlantillaDetallePage() {
   const router = useRouter()
   const [plantilla, setPlantilla] = useState<Plantilla | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
   const [showForm, setShowForm] = useState({ servicio: false, gasto: false })
-  const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string | undefined>()
 
   useEffect(() => {
     if (typeof id === 'string') {
@@ -180,35 +177,21 @@ export default function PlantillaDetallePage() {
 
   const actualizarGasto = (gastoId: string, callback: (items: PlantillaGastoItem[]) => PlantillaGastoItem[]) => {
     if (!plantilla) return
-    const gastosActualizados = plantilla.gastos.map(g =>
+    const gastosActualizados = plantilla.gastos?.map(g =>
       g.id === gastoId ? { ...g, items: callback(g.items), ...calcularSubtotal(callback(g.items)) } : g
-    )
+    ) || []
     const nuevosTotales = actualizarTotalesParciales(plantilla.equipos, plantilla.servicios, gastosActualizados)
     setPlantilla({ ...plantilla, gastos: gastosActualizados, ...nuevosTotales })
     updatePlantillaTotales(plantilla.id, nuevosTotales)
   }
 
-  const handleCrearCotizacion = async () => {
-    if (!plantilla || !clienteIdSeleccionado) {
-      setError('Debe seleccionar un cliente para continuar.')
-      return
-    }
-    try {
-      setCreating(true)
-      const nueva = await createCotizacionFromPlantilla({ plantillaId: plantilla.id, clienteId: clienteIdSeleccionado })
-      router.push(`/comercial/cotizaciones/${nueva.id}`)
-    } catch {
-      setError('❌ No se pudo crear la cotización.')
-    } finally {
-      setCreating(false)
-    }
-  }
+
 
   const handleEliminarGrupoEquipo = async (id: string) => {
     if (!plantilla) return
     await deletePlantillaEquipo(id)
     const equipos = plantilla.equipos.filter(e => e.id !== id)
-    const nuevosTotales = actualizarTotalesParciales(equipos, plantilla.servicios, plantilla.gastos)
+    const nuevosTotales = actualizarTotalesParciales(equipos, plantilla.servicios, plantilla.gastos || [])
     setPlantilla({ ...plantilla, equipos, ...nuevosTotales })
     updatePlantillaTotales(plantilla.id, nuevosTotales)
   }
@@ -217,7 +200,7 @@ export default function PlantillaDetallePage() {
     if (!plantilla) return
     await deletePlantillaServicio(id)
     const servicios = plantilla.servicios.filter(s => s.id !== id)
-    const nuevosTotales = actualizarTotalesParciales(plantilla.equipos, servicios, plantilla.gastos)
+    const nuevosTotales = actualizarTotalesParciales(plantilla.equipos, servicios, plantilla.gastos || [])
     setPlantilla({ ...plantilla, servicios, ...nuevosTotales })
     updatePlantillaTotales(plantilla.id, nuevosTotales)
   }
@@ -225,7 +208,7 @@ export default function PlantillaDetallePage() {
   const handleEliminarGrupoGasto = async (id: string) => {
     if (!plantilla) return
     await deletePlantillaGasto(id)
-    const gastos = plantilla.gastos.filter(g => g.id !== id)
+    const gastos = (plantilla.gastos || []).filter(g => g.id !== id)
     const nuevosTotales = actualizarTotalesParciales(plantilla.equipos, plantilla.servicios, gastos)
     setPlantilla({ ...plantilla, gastos, ...nuevosTotales })
     updatePlantillaTotales(plantilla.id, nuevosTotales)
@@ -305,13 +288,13 @@ export default function PlantillaDetallePage() {
               Plantillas
             </Button>
             <ChevronRight className="h-4 w-4" />
-            <span className="font-medium text-foreground">{plantilla?.nombre}</span>
+            <span className="font-medium text-foreground">{plantilla?.nombre || 'Cargando...'}</span>
           </nav>
 
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-gray-900">{plantilla?.nombre}</h1>
+                <h1 className="text-3xl font-bold text-gray-900">{plantilla?.nombre || 'Cargando...'}</h1>
                 <Badge 
                   variant={getStatusVariant(plantilla?.estado || 'borrador').variant}
                   className={getStatusVariant(plantilla?.estado || 'borrador').className}
@@ -348,51 +331,21 @@ export default function PlantillaDetallePage() {
 
         {/* Financial Summary */}
         <motion.div variants={itemVariants}>
-          <ResumenTotalesPlantilla plantilla={plantilla!} />
+          {plantilla && <ResumenTotalesPlantilla plantilla={plantilla} />}
         </motion.div>
 
         <Separator />
 
-        {/* Client Selection and Quotation Creation */}
+        {/* Crear Cotización - Simple button at top */}
         <motion.div variants={itemVariants}>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-blue-600" />
-                Crear Cotización
-              </CardTitle>
-              <CardDescription>
-                Selecciona un cliente para generar una cotización basada en esta plantilla
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                <div className="flex-1 w-full lg:max-w-md">
-                  <ClienteSelector 
-                    selectedId={clienteIdSeleccionado} 
-                    onChange={setClienteIdSeleccionado} 
-                  />
-                </div>
-                <Button 
-                  onClick={handleCrearCotizacion} 
-                  disabled={!clienteIdSeleccionado || creating}
-                  className="w-full lg:w-auto"
-                >
-                  {creating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creando...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Crear Cotización
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex justify-end mb-6">
+            {plantilla && (
+              <CrearCotizacionModal 
+                plantillaId={plantilla.id}
+                onSuccess={(cotizacionId) => router.push(`/comercial/cotizaciones/${cotizacionId}`)}
+              />
+            )}
+          </div>
         </motion.div>
 
         {/* Equipos Section */}
@@ -406,19 +359,21 @@ export default function PlantillaDetallePage() {
                     Secciones de Equipos
                   </CardTitle>
                   <CardDescription>
-                    Gestiona los grupos de equipos de la plantilla ({plantilla.equipos.length} secciones)
+                    Gestiona los grupos de equipos de la plantilla ({plantilla?.equipos?.length || 0} secciones)
                   </CardDescription>
                 </div>
-                <PlantillaEquipoModal 
-                  plantillaId={plantilla.id}
-                  onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
-                />
+                {plantilla && (
+                  <PlantillaEquipoModal 
+                    plantillaId={plantilla.id}
+                    onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
+                  />
+                )}
               </div>
             </CardHeader>
             <CardContent>
 
               
-              {plantilla.equipos.length === 0 ? (
+              {(plantilla?.equipos?.length || 0) === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -427,20 +382,22 @@ export default function PlantillaDetallePage() {
                   <p className="text-gray-500 mb-4">
                     Comienza agregando tu primera sección de equipos
                   </p>
-                  <PlantillaEquipoModal 
-                    plantillaId={plantilla.id}
-                    onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
-                    trigger={
-                      <Button variant="outline">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Crear Primera Sección
-                      </Button>
-                    }
-                  />
+                  {plantilla && (
+                    <PlantillaEquipoModal 
+                      plantillaId={plantilla.id}
+                      onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
+                      trigger={
+                        <Button variant="outline">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Crear Primera Sección
+                        </Button>
+                      }
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {plantilla.equipos.map((e, index) => (
+                  {(plantilla?.equipos || []).map((e, index) => (
                     <motion.div
                       key={e.id}
                       variants={itemVariants}
@@ -473,7 +430,7 @@ export default function PlantillaDetallePage() {
                     Secciones de Servicios
                   </CardTitle>
                   <CardDescription>
-                    Gestiona los grupos de servicios de la plantilla ({plantilla.servicios.length} secciones)
+                    Gestiona los grupos de servicios de la plantilla ({plantilla?.servicios?.length || 0} secciones)
                   </CardDescription>
                 </div>
                 <Button 
@@ -486,21 +443,16 @@ export default function PlantillaDetallePage() {
               </div>
             </CardHeader>
             <CardContent>
-              {showForm.servicio && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-4"
-                >
-                  <PlantillaServicioForm 
-                    plantillaId={plantilla.id} 
-                    onCreated={nuevo => setPlantilla(p => p ? { ...p, servicios: [...p.servicios, { ...nuevo, items: [] }] } : p)} 
-                  />
-                </motion.div>
+              {plantilla && (
+                <PlantillaServicioModal
+                  plantillaId={plantilla.id}
+                  isOpen={showForm.servicio}
+                  onClose={() => setShowForm(prev => ({ ...prev, servicio: false }))}
+                  onCreated={nuevo => setPlantilla(p => p ? { ...p, servicios: [...p.servicios, { ...nuevo, items: [] }] } : p)}
+                />
               )}
               
-              {plantilla.servicios.length === 0 ? (
+              {(plantilla?.servicios?.length || 0) === 0 ? (
                 <div className="text-center py-12">
                   <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -519,7 +471,7 @@ export default function PlantillaDetallePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {plantilla.servicios.map((s, index) => (
+                  {(plantilla?.servicios || []).map((s, index) => (
                     <motion.div
                       key={s.id}
                       variants={itemVariants}
@@ -553,7 +505,7 @@ export default function PlantillaDetallePage() {
                     Secciones de Gastos
                   </CardTitle>
                   <CardDescription>
-                    Gestiona los grupos de gastos de la plantilla ({plantilla.gastos?.length || 0} secciones)
+                    Gestiona los grupos de gastos de la plantilla ({plantilla?.gastos?.length || 0} secciones)
                   </CardDescription>
                 </div>
                 <Button 
@@ -573,14 +525,16 @@ export default function PlantillaDetallePage() {
                   exit={{ opacity: 0, height: 0 }}
                   className="mb-4"
                 >
-                  <PlantillaGastoForm 
-                    plantillaId={plantilla.id} 
-                    onCreated={nuevo => setPlantilla(p => p ? { ...p, gastos: [...(p.gastos || []), { ...nuevo, items: [] }] } : p)} 
-                  />
+                  {plantilla && (
+                    <PlantillaGastoForm 
+                      plantillaId={plantilla.id} 
+                      onCreated={nuevo => setPlantilla(p => p ? { ...p, gastos: [...(p.gastos || []), { ...nuevo, items: [] }] } : p)} 
+                    />
+                  )}
                 </motion.div>
               )}
               
-              {(!plantilla.gastos || plantilla.gastos.length === 0) ? (
+              {(!plantilla?.gastos || (plantilla?.gastos?.length || 0) === 0) ? (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -599,7 +553,7 @@ export default function PlantillaDetallePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {plantilla.gastos.map((g, index) => (
+                  {(plantilla?.gastos || []).map((g, index) => (
                     <motion.div
                       key={g.id}
                       variants={itemVariants}
