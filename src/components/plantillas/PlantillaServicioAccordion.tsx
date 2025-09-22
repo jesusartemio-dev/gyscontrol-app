@@ -16,7 +16,7 @@ import { useParams } from 'next/navigation'
 
 interface Props {
   servicio: PlantillaServicio
-  onCreated: (item: PlantillaServicioItem) => void
+  onCreated: (items: PlantillaServicioItem[]) => void // ✅ Changed to accept array of items
   onDeleted: (itemId: string) => void
   onUpdated: (item: PlantillaServicioItem) => void
   onDeletedGrupo: () => void

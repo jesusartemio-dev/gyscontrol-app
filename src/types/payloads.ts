@@ -1132,6 +1132,7 @@ export interface GanttChartPayload {
 // 🔧 Payload para crear ProyectoEdt
 export interface ProyectoEdtPayload {
   proyectoId: string
+  nombre: string
   categoriaServicioId: string
   zona?: string
   fechaInicio?: string
@@ -1302,7 +1303,8 @@ export interface DashboardEjecutivoPayload {
 
 // ✅ Registro de Horas
 export interface CreateRegistroHorasPayload {
-  proyectoEdtId: string
+  proyectoEdtId?: string
+  proyectoTareaId?: string
   usuarioId: string
   fecha: string
   horasTrabajadas: number

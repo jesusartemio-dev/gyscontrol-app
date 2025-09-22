@@ -13,22 +13,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es" className="h-full">
       <head>
-        {/* ✅ Preload de fuentes críticas para mejor performance */}
-        <link
-          rel="preload"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-          as="style"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-        />
-        {/* 📡 DNS prefetch para recursos externos */}
-        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-        <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+        {/* ✅ Fuentes optimizadas para mejor performance */}
+        {/* Fuentes externas removidas para evitar conflictos con react-pdf */}
       </head>
-      <body className="h-full bg-gray-100 text-gray-800 overflow-hidden font-inter">
+      <body className="h-full bg-gray-100 text-gray-800 overflow-hidden">
         <Providers>
           <div className="flex h-full">
             <Sidebar key="sidebar-main" />

@@ -7,190 +7,241 @@ import {
   View,
   StyleSheet,
   PDFDownloadLink,
-  Image,
-  Font
+  Image
 } from '@react-pdf/renderer'
 import type { Cotizacion } from '@/types'
 
-// Register professional fonts
-Font.register({
-  family: 'Roboto',
-  fonts: [
-    {
-      src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-light-webfont.ttf',
-      fontWeight: 300
-    },
-    {
-      src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-regular-webfont.ttf',
-      fontWeight: 400
-    },
-    {
-      src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-medium-webfont.ttf',
-      fontWeight: 500
-    },
-    {
-      src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf',
-      fontWeight: 700
-    }
-  ]
-})
+// Use built-in Helvetica font for better compatibility
+// Font.register({
+//   family: 'Helvetica',
+//   fonts: [
+//     { src: 'Helvetica', fontWeight: 300 },
+//     { src: 'Helvetica', fontWeight: 400 },
+//     { src: 'Helvetica', fontWeight: 500 },
+//     { src: 'Helvetica', fontWeight: 600 },
+//     { src: 'Helvetica', fontWeight: 700 }
+//   ]
+// })
 
 interface Props {
   cotizacion: Cotizacion
 }
 
-// Professional color palette
+// Modern Gray Scale Sophistication - Single color palette
 const colors = {
-  primary: '#1e40af',      // Professional blue
-  secondary: '#64748b',    // Slate gray
-  accent: '#0ea5e9',       // Sky blue
-  success: '#10b981',      // Emerald
-  warning: '#f59e0b',      // Amber
-  danger: '#ef4444',       // Red
-  dark: '#1f2937',         // Dark gray
-  light: '#f8fafc',        // Light gray
+  primary: '#374151',      // Gray-700 - Main professional gray
+  secondary: '#6b7280',    // Gray-500 - Secondary text
+  accent: '#9ca3af',       // Gray-400 - Subtle accents
+  success: '#10b981',      // Keep for status indicators
+  warning: '#f59e0b',      // Keep for status indicators
+  danger: '#ef4444',       // Keep for status indicators
+  dark: '#111827',         // Gray-900 - Dark text
+  light: '#f9fafb',        // Gray-50 - Light backgrounds
   white: '#ffffff',
   black: '#000000',
-  border: '#e2e8f0'        // Light border
+  border: '#e5e7eb',       // Gray-200 - Modern borders
+  borderLight: '#f3f4f6',  // Gray-100 - Very light borders
+  shadow: '#d1d5db'        // Gray-300 - Subtle shadows
 }
 
 const styles = StyleSheet.create({
-  // Document and page styles
+  // Document and page styles - Modern Gray Scale
   page: {
-    padding: 40,
-    fontSize: 11,
-    fontFamily: 'Roboto',
+    padding: 45,
+    fontSize: 10.5,
     fontWeight: 400,
-    lineHeight: 1.4,
+    lineHeight: 1.5,
     color: colors.dark,
     backgroundColor: colors.white
   },
   
-  // Professional header with branding
+  // Modern header with clean lines and subtle gradients
   headerContainer: {
     flexDirection: 'row',
-    marginBottom: 30,
-    paddingBottom: 20,
-    borderBottom: `3px solid ${colors.primary}`,
-    alignItems: 'flex-start'
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    position: 'relative'
+  },
+  headerAccent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: colors.primary,
+    opacity: 0.8
   },
   logoSection: {
-    flex: 1,
-    marginRight: 30
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 35
+  },
+  logo: {
+    width: 80,
+    height: 40,
+    marginRight: 20
   },
   companyName: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: 700,
     color: colors.primary,
-    marginBottom: 8,
-    letterSpacing: 0.5
+    marginBottom: 4,
+    letterSpacing: -0.3
   },
   companyTagline: {
-    fontSize: 12,
-    fontWeight: 300,
+    fontSize: 9,
+    fontWeight: 400,
     color: colors.secondary,
-    marginBottom: 15
+    marginBottom: 6,
+    letterSpacing: 0.1
   },
   companyDetails: {
-    fontSize: 9,
+    fontSize: 7.5,
     color: colors.secondary,
-    lineHeight: 1.5
+    lineHeight: 1.4,
+    fontWeight: 400
   },
   
-  // Quote header section
+  // Compact header for interior pages
+  compactHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 10,
+    borderBottom: `2px solid ${colors.primary}`,
+    position: 'relative'
+  },
+  compactCompanyName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: colors.primary,
+    textAlign: 'center',
+    letterSpacing: 0.2
+  },
+  compactTagline: {
+    fontSize: 8,
+    fontWeight: 400,
+    color: colors.secondary,
+    textAlign: 'center',
+    marginTop: 3,
+    letterSpacing: 0.1
+  },
+  
+  // Modern quote header section
   quoteHeaderContainer: {
     backgroundColor: colors.light,
-    padding: 20,
-    marginBottom: 25,
-    borderRadius: 8,
-    border: `1px solid ${colors.border}`
+    padding: 22,
+    marginBottom: 28,
+    border: `1px solid ${colors.borderLight}`,
+    position: 'relative'
+  },
+  quoteHeaderAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: colors.primary
   },
   quoteTitle: {
-    fontSize: 20,
-    fontWeight: 700,
+    fontSize: 18,
+    fontWeight: 600,
     textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: 18,
     color: colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1
+    letterSpacing: 0.5
   },
   quoteMetadata: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    marginTop: 8
   },
   quoteNumber: {
-    fontSize: 16,
-    fontWeight: 600,
-    color: colors.dark
-  },
-  quoteDate: {
-    fontSize: 11,
-    color: colors.secondary,
-    fontWeight: 300
-  },
-  
-  // Professional client information table
-  clientSection: {
-    marginBottom: 30
-  },
-  sectionTitle: {
     fontSize: 14,
     fontWeight: 600,
+    color: colors.dark,
+    letterSpacing: 0.2
+  },
+  quoteDate: {
+    fontSize: 10,
+    color: colors.secondary,
+    fontWeight: 400,
+    letterSpacing: 0.1
+  },
+  
+  // Modern client information table
+  clientSection: {
+    marginBottom: 32
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: 600,
     color: colors.primary,
-    marginBottom: 15,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
+    marginBottom: 16,
+    letterSpacing: 0.3
   },
   clientTable: {
     border: `1px solid ${colors.border}`,
-    borderRadius: 6
+    overflow: 'hidden'
   },
   clientRow: {
     flexDirection: 'row',
-    borderBottom: `1px solid ${colors.border}`,
-    minHeight: 35,
+    borderBottom: `1px solid ${colors.borderLight}`,
+    minHeight: 38,
     alignItems: 'center'
   },
   clientRowLast: {
     borderBottom: 'none'
   },
   clientLabel: {
-    width: 120,
-    fontSize: 10,
+    width: 125,
+    fontSize: 9,
     fontWeight: 600,
-    paddingLeft: 15,
-    paddingRight: 15,
+    paddingLeft: 16,
+    paddingRight: 16,
     backgroundColor: colors.light,
-    borderRight: `1px solid ${colors.border}`,
-    color: colors.dark,
-    textTransform: 'uppercase'
+    borderRight: `1px solid ${colors.borderLight}`,
+    color: colors.primary,
+    letterSpacing: 0.2
   },
   clientValue: {
     flex: 1,
-    fontSize: 10,
-    paddingLeft: 15,
-    paddingRight: 15,
+    fontSize: 9,
+    paddingLeft: 16,
+    paddingRight: 16,
     color: colors.dark,
-    fontWeight: 400
+    fontWeight: 400,
+    lineHeight: 1.4
   },
   
-  // Enhanced summary section
+  // Modern summary section with gray scale sophistication
   summaryContainer: {
-    marginBottom: 30
+    marginBottom: 32
   },
   summaryHeader: {
     backgroundColor: colors.primary,
-    padding: 12,
-    marginBottom: 0
+    padding: 14,
+    marginBottom: 0,
+    position: 'relative'
+  },
+  summaryHeaderAccent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: colors.accent,
+    opacity: 0.3
   },
   summaryTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 600,
     color: colors.white,
     textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
+    letterSpacing: 0.3
   },
   summaryTable: {
     border: `1px solid ${colors.border}`,
@@ -199,37 +250,38 @@ const styles = StyleSheet.create({
   summaryTableHeader: {
     flexDirection: 'row',
     backgroundColor: colors.light,
-    borderBottom: `2px solid ${colors.primary}`
+    borderBottom: `1px solid ${colors.border}`
   },
   summaryHeaderCell: {
-    padding: 12,
-    fontSize: 11,
+    padding: 13,
+    fontSize: 9.5,
     fontWeight: 600,
     textAlign: 'center',
-    borderRight: `1px solid ${colors.border}`,
-    color: colors.dark,
-    textTransform: 'uppercase'
+    borderRight: `1px solid ${colors.borderLight}`,
+    color: colors.primary,
+    letterSpacing: 0.2
   },
   summaryRow: {
     flexDirection: 'row',
-    borderBottom: `1px solid ${colors.border}`,
-    minHeight: 40,
+    borderBottom: `1px solid ${colors.borderLight}`,
+    minHeight: 42,
     alignItems: 'center'
   },
   summaryRowAlt: {
-    backgroundColor: '#fafbfc'
+    backgroundColor: colors.white
   },
   summaryCell: {
-    padding: 12,
-    fontSize: 10,
-    borderRight: `1px solid ${colors.border}`,
+    padding: 13,
+    fontSize: 9,
+    borderRight: `1px solid ${colors.borderLight}`,
     textAlign: 'center',
     color: colors.dark
   },
   summaryDescCell: {
     flex: 3,
     textAlign: 'left',
-    fontWeight: 500
+    fontWeight: 500,
+    paddingLeft: 16
   },
   summaryQtyCell: {
     flex: 1,
@@ -239,7 +291,8 @@ const styles = StyleSheet.create({
     flex: 2,
     textAlign: 'right',
     fontWeight: 600,
-    color: colors.primary
+    color: colors.primary,
+    paddingRight: 16
   },
   
   // Professional totals section
@@ -272,8 +325,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.primary,
     padding: 15,
-    marginTop: 10,
-    borderRadius: 6
+    marginTop: 10
   },
   grandTotalLabel: {
     fontSize: 14,
@@ -400,33 +452,46 @@ const styles = StyleSheet.create({
     color: colors.primary
   },
   
-  // Professional footer
+  // Modern asymmetric footer
   footer: {
     position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    paddingTop: 15,
-    borderTop: `2px solid ${colors.primary}`,
+    bottom: 32,
+    left: 45,
+    right: 45,
+    paddingTop: 18,
+    borderTop: `1px solid ${colors.border}`,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'flex-end'
+  },
+  footerAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: colors.primary,
+    opacity: 0.4
   },
   footerLeft: {
-    flex: 1
+    flex: 1,
+    paddingTop: 8
   },
   footerCenter: {
     flex: 1,
-    textAlign: 'center'
+    textAlign: 'center',
+    paddingTop: 8
   },
   footerRight: {
     flex: 1,
-    textAlign: 'right'
+    textAlign: 'right',
+    paddingTop: 8
   },
   footerText: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: colors.secondary,
-    fontWeight: 300
+    fontWeight: 400,
+    lineHeight: 1.3
   },
   footerBold: {
     fontWeight: 600,
@@ -486,14 +551,27 @@ const formatNumber = (num: number): string => {
 }
 
 const CotizacionPDF = ({ cotizacion }: Props) => {
+  // Early return if cotizacion is not properly loaded
+  if (!cotizacion || !cotizacion.id) {
+    return null
+  }
+
   const currentDate = new Date()
   const validUntilDate = new Date()
   validUntilDate.setDate(currentDate.getDate() + 15)
-  
-  // Calculate totals
-  const equiposTotal = cotizacion.equipos?.reduce((sum, equipo) => sum + (equipo.subtotalCliente || 0), 0) || 0
-  const serviciosTotal = cotizacion.servicios?.reduce((sum, servicio) => sum + (servicio.subtotalCliente || 0), 0) || 0
-  const gastosTotal = cotizacion.gastos?.reduce((sum, gasto) => sum + (gasto.subtotalCliente || 0), 0) || 0
+
+  // Safe data access with defaults
+  const equipos = Array.isArray(cotizacion.equipos) ? cotizacion.equipos : []
+  const servicios = Array.isArray(cotizacion.servicios) ? cotizacion.servicios : []
+  const gastos = Array.isArray(cotizacion.gastos) ? cotizacion.gastos : []
+  const exclusiones = Array.isArray(cotizacion.exclusiones) ? cotizacion.exclusiones : []
+  const condiciones = Array.isArray(cotizacion.condiciones) ? cotizacion.condiciones : []
+  const cronograma = Array.isArray(cotizacion.cronograma) ? cotizacion.cronograma : []
+
+  // Calculate totals with safe access
+  const equiposTotal = equipos.reduce((sum, equipo) => sum + (equipo.subtotalCliente || 0), 0)
+  const serviciosTotal = servicios.reduce((sum, servicio) => sum + (servicio.subtotalCliente || 0), 0)
+  const gastosTotal = gastos.reduce((sum, gasto) => sum + (gasto.subtotalCliente || 0), 0)
   const subtotal = equiposTotal + serviciosTotal + gastosTotal
   const igv = subtotal * 0.18
   const total = subtotal + igv
@@ -509,25 +587,30 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
     >
       {/* PÁGINA 1: PORTADA Y INFORMACIÓN GENERAL */}
       <Page size="A4" style={styles.page}>
-        {/* Professional Header */}
+        {/* Modern Header */}
         <View style={styles.headerContainer}>
-          <View style={styles.logoSection}>
-            <Text style={styles.companyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-            <Text style={styles.companyTagline}>Soluciones Integrales en Automatización Industrial</Text>
-            <Text style={styles.companyDetails}>
-              📍 OF. Lima: Calle Los Geranios 486, Urb. San Eugenio Lince, Lima{"\n"}
-              📞 T. +51.1. 478 7587 | 📧 info@gyscontrol.com{"\n"}
-              📍 OF. Arequipa: Coop. Juan El Bueno E-26 Cercado, Arequipa{"\n"}
-              📞 T. +51 54. 277 584 | 🌐 www.gyscontrol.com
-            </Text>
+          <Image style={styles.logo} src="/logo.png" />
+          <View style={{ alignItems: 'center' }}>
+            <Text style={[styles.companyName, { textAlign: 'center', marginBottom: 4 }]}>GYS CONTROL SAC</Text>
+            <Text style={[styles.companyTagline, { textAlign: 'center' }]}>Soluciones Integrales en Automatización Industrial</Text>
           </View>
+          <View style={{ width: 80 }} />
         </View>
 
-        {/* Quote Header */}
+        {/* Contact Details */}
+        <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 5 }}>
+          <Text style={[styles.companyDetails, { textAlign: 'center' }]}>
+            Lima: Calle Los Geranios 486 - Tel: +51 1 478 7587 - Email: info@gyscontrol.com{"\n"}
+            Arequipa: Coop. Juan El Bueno E-26 - Tel: +51 54 277 584 - Web: www.gyscontrol.com
+          </Text>
+        </View>
+
+        {/* Modern Quote Header */}
         <View style={styles.quoteHeaderContainer}>
+          <View style={styles.quoteHeaderAccent} />
           <Text style={styles.quoteTitle}>Propuesta Económica</Text>
           <View style={styles.quoteMetadata}>
-            <Text style={styles.quoteNumber}>N° {safeText(cotizacion.nombre)}</Text>
+            <Text style={styles.quoteNumber}>N° {safeText(cotizacion.codigo)}</Text>
             <Text style={styles.quoteDate}>{formatDate(currentDate)}</Text>
           </View>
         </View>
@@ -597,8 +680,9 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
           </View>
         </View>
 
-        {/* Professional Footer */}
+        {/* Modern Footer */}
         <View style={styles.footer}>
+          <View style={styles.footerAccent} />
           <View style={styles.footerLeft}>
             <Text style={styles.footerText}>
               <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
@@ -612,7 +696,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
           </View>
           <View style={styles.footerRight}>
             <Text style={[styles.footerText, { textAlign: 'right' }]}>
-              Página 1 de 4
+              Página 1 de 6
             </Text>
           </View>
         </View>
@@ -620,17 +704,18 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
       {/* PÁGINA 2: RESUMEN EJECUTIVO */}
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.headerContainer}>
-          <View style={styles.logoSection}>
-            <Text style={styles.companyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-            <Text style={styles.companyTagline}>Soluciones Integrales en Automatización Industrial</Text>
+        {/* Compact Header for Interior Pages */}
+        <View style={styles.compactHeaderContainer}>
+          <View>
+            <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
+            <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
           </View>
         </View>
 
-        {/* Summary Table */}
+        {/* Modern Summary Table */}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryHeader}>
+            <View style={styles.summaryHeaderAccent} />
             <Text style={styles.summaryTitle}>Resumen Ejecutivo</Text>
           </View>
           <View style={styles.summaryTable}>
@@ -756,11 +841,11 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
       {/* PÁGINA 3: DETALLE DE EQUIPOS */}
       {cotizacion.equipos && cotizacion.equipos.length > 0 && (
         <Page size="A4" style={styles.page}>
-          {/* Header */}
-          <View style={styles.headerContainer}>
-            <View style={styles.logoSection}>
-              <Text style={styles.companyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-              <Text style={styles.companyTagline}>Soluciones Integrales en Automatización Industrial</Text>
+          {/* Compact Header for Interior Pages */}
+          <View style={styles.compactHeaderContainer}>
+            <View>
+              <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
+              <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
             </View>
           </View>
 
@@ -866,11 +951,11 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
       {/* PÁGINA 4: TÉRMINOS Y CONDICIONES */}
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.headerContainer}>
-          <View style={styles.logoSection}>
-            <Text style={styles.companyName}>GYS CONTROL INDUSTRIAL SAC</Text>
-            <Text style={styles.companyTagline}>Soluciones Integrales en Automatización Industrial</Text>
+        {/* Compact Header for Interior Pages */}
+        <View style={styles.compactHeaderContainer}>
+          <View>
+            <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
+            <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
           </View>
         </View>
 
@@ -959,7 +1044,172 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
           </View>
           <View style={styles.footerRight}>
             <Text style={[styles.footerText, { textAlign: 'right' }]}>
-              Página 4 de 4
+              Página 4 de 6
+            </Text>
+          </View>
+        </View>
+      </Page>
+
+      {/* PÁGINA 5: EXCLUSIONES Y CONDICIONES */}
+      <Page size="A4" style={styles.page}>
+        {/* Compact Header for Interior Pages */}
+        <View style={styles.compactHeaderContainer}>
+          <View>
+            <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
+            <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
+          </View>
+        </View>
+
+        {/* Exclusiones */}
+        <View style={styles.contentSection}>
+          <View style={styles.contentHeader}>
+            <Text style={styles.contentTitle}>Exclusiones de la Propuesta</Text>
+          </View>
+          <View style={styles.contentBody}>
+            {cotizacion.exclusiones && cotizacion.exclusiones.length > 0 ? (
+              <View style={styles.contentList}>
+                {cotizacion.exclusiones.map((exclusion, index) => (
+                  <Text key={exclusion.id || index} style={styles.contentListItem}>
+                    • {exclusion.descripcion}
+                  </Text>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.contentText}>
+                No se han definido exclusiones específicas para esta propuesta.
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Condiciones */}
+        <View style={styles.contentSection}>
+          <View style={styles.contentHeader}>
+            <Text style={styles.contentTitle}>Condiciones y Consideraciones</Text>
+          </View>
+          <View style={styles.contentBody}>
+            {cotizacion.condiciones && cotizacion.condiciones.length > 0 ? (
+              <View style={styles.contentList}>
+                {cotizacion.condiciones.map((condicion, index) => (
+                  <Text key={condicion.id || index} style={styles.contentListItem}>
+                    • {condicion.descripcion}
+                    {condicion.tipo && (
+                      <Text style={{ fontWeight: 600 }}> ({condicion.tipo})</Text>
+                    )}
+                  </Text>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.contentText}>
+                No se han definido condiciones específicas adicionales para esta propuesta.
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <View style={styles.footerLeft}>
+            <Text style={styles.footerText}>
+              <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
+              RUC: 20545610672
+            </Text>
+          </View>
+          <View style={styles.footerCenter}>
+            <Text style={[styles.footerText, { textAlign: 'center' }]}>
+              Documento Confidencial - Uso Exclusivo del Cliente
+            </Text>
+          </View>
+          <View style={styles.footerRight}>
+            <Text style={[styles.footerText, { textAlign: 'right' }]}>
+              Página 5 de 6
+            </Text>
+          </View>
+        </View>
+      </Page>
+
+      {/* PÁGINA 6: CRONOGRAMA COMERCIAL */}
+      <Page size="A4" style={styles.page}>
+        {/* Compact Header for Interior Pages */}
+        <View style={styles.compactHeaderContainer}>
+          <View>
+            <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
+            <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
+          </View>
+        </View>
+
+        {/* Cronograma Comercial */}
+        <View style={styles.contentSection}>
+          <View style={styles.contentHeader}>
+            <Text style={styles.contentTitle}>Cronograma de Ejecución</Text>
+          </View>
+          <View style={styles.contentBody}>
+            {cotizacion.cronograma && cotizacion.cronograma.length > 0 ? (
+              <View>
+                <Text style={styles.contentText}>
+                  A continuación se detalla el cronograma estimado de ejecución del proyecto:
+                </Text>
+                <View style={{ marginTop: 15 }}>
+                  {cotizacion.cronograma.map((edt, index) => (
+                    <View key={edt.id || index} style={{ marginBottom: 15 }}>
+                      <Text style={[styles.contentText, { fontWeight: 600, marginBottom: 8 }]}>
+                        {edt.categoriaServicio?.nombre || 'Sin categoría'} - {edt.zona || 'Sin zona'}
+                      </Text>
+                      <Text style={styles.contentText}>
+                        • Fecha Inicio: {edt.fechaInicioCom ? formatDate(edt.fechaInicioCom) : 'No definida'}
+                      </Text>
+                      <Text style={styles.contentText}>
+                        • Fecha Fin: {edt.fechaFinCom ? formatDate(edt.fechaFinCom) : 'No definida'}
+                      </Text>
+                      <Text style={styles.contentText}>
+                        • Horas Estimadas: {edt.horasCom || 0} horas
+                      </Text>
+                      {edt.descripcion && (
+                        <Text style={styles.contentText}>
+                          • Descripción: {edt.descripcion}
+                        </Text>
+                      )}
+                      {edt.tareas && edt.tareas.length > 0 && (
+                        <View style={{ marginLeft: 20, marginTop: 8 }}>
+                          <Text style={[styles.contentText, { fontWeight: 500 }]}>
+                            Tareas programadas:
+                          </Text>
+                          {edt.tareas.map((tarea, tareaIndex) => (
+                            <Text key={tarea.id || tareaIndex} style={[styles.contentText, { marginLeft: 10 }]}>
+                              - {tarea.nombre}: {tarea.fechaInicioCom ? formatDate(tarea.fechaInicioCom) : 'No definida'} - {tarea.fechaFinCom ? formatDate(tarea.fechaFinCom) : 'No definida'}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.contentText}>
+                No se ha definido un cronograma específico para esta propuesta.
+                Los tiempos de entrega se detallan en las secciones correspondientes.
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <View style={styles.footerLeft}>
+            <Text style={styles.footerText}>
+              <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
+              RUC: 20545610672
+            </Text>
+          </View>
+          <View style={styles.footerCenter}>
+            <Text style={[styles.footerText, { textAlign: 'center' }]}>
+              Documento Confidencial - Uso Exclusivo del Cliente
+            </Text>
+          </View>
+          <View style={styles.footerRight}>
+            <Text style={[styles.footerText, { textAlign: 'right' }]}>
+              Página 6 de 6
             </Text>
           </View>
         </View>

@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { registrarCreacion } from '@/lib/services/audit'
 
 const listaEquipoSchema = z.object({
   proyectoId: z.string().min(1, 'El proyectoId es obligatorio'),
@@ -165,6 +166,24 @@ export async function POST(request: Request) {
         },
       },
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      await registrarCreacion(
+        'LISTA_EQUIPO',
+        nuevaLista.id,
+        session.user.id,
+        nuevaLista.nombre,
+        {
+          proyecto: nuevaLista.proyecto.nombre,
+          codigo: nuevaLista.codigo,
+          fechaNecesaria: parsed.data.fechaNecesaria
+        }
+      )
+    } catch (auditError) {
+      console.error('Error al registrar auditoría:', auditError)
+      // No fallar la creación por error de auditoría
+    }
 
     return NextResponse.json(nuevaLista)
   } catch (error) {

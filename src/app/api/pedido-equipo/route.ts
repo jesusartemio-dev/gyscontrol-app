@@ -10,6 +10,9 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { PedidoEquipoPayload } from '@/types'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { registrarCreacion } from '@/lib/services/audit'
 
 // ✅ Obtener todos los pedidos con filtros avanzados
 export async function GET(request: Request) {
@@ -171,6 +174,15 @@ export async function GET(request: Request) {
 // ✅ Crear nuevo pedido
 export async function POST(request: Request) {
   try {
+    // Verificar autenticación
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const body: PedidoEquipoPayload = await request.json()
 
     // 🎯 Validaciones mínimas
@@ -231,6 +243,25 @@ export async function POST(request: Request) {
         fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : null,
       },
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      await registrarCreacion(
+        'PEDIDO_EQUIPO',
+        pedido.id,
+        session.user.id,
+        `Pedido ${pedido.codigo}`,
+        {
+          proyecto: proyecto.nombre,
+          codigo: pedido.codigo,
+          fechaNecesaria: body.fechaNecesaria,
+          estado: pedido.estado
+        }
+      )
+    } catch (auditError) {
+      console.error('Error al registrar auditoría:', auditError)
+      // No fallar la creación por error de auditoría
+    }
 
     console.log('✅ Pedido creado:', pedido)
     return NextResponse.json(pedido)

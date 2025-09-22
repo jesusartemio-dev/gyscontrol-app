@@ -20,8 +20,8 @@ async function migrateToEdt() {
     });
     
     await prisma.proyecto.updateMany({
-      where: { estado: 'cerrado' },
-      data: { estado: 'cerrado' }
+      where: { estado: 'completado' },
+      data: { estado: 'completado' }
     });
     
     // ✅ 2. Crear EDT básicos para proyectos existentes
@@ -45,6 +45,7 @@ async function migrateToEdt() {
         const edt = await prisma.proyectoEdt.create({
           data: {
             proyectoId: proyecto.id,
+            nombre: `EDT ${categoriaDefault.nombre}`,
             categoriaServicioId: categoriaDefault.id,
             zona: null,
             estado: 'en_progreso',
@@ -62,6 +63,7 @@ async function migrateToEdt() {
         const edt = await prisma.proyectoEdt.create({
           data: {
             proyectoId: proyecto.id,
+            nombre: `EDT ${primeraCategoria.nombre}`,
             categoriaServicioId: primeraCategoria.id,
             zona: null,
             estado: 'en_progreso',

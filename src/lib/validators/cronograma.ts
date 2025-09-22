@@ -11,6 +11,9 @@
 import { z } from 'zod'
 import type { EstadoEdt, PrioridadEdt, OrigenTrabajo, ProyectoEstado } from '@/types/modelos'
 
+// ✅ CUID validation schema (Prisma uses cuid() by default)
+const cuidSchema = z.string().regex(/^c[a-z0-9]{24}$/, 'ID debe ser un CUID válido')
+
 // ===================================================
 // 🔧 VALIDADORES BASE PARA EDT
 // ===================================================
@@ -41,8 +44,8 @@ const zonaSchema = z.string()
 
 // 🔧 Esquema para crear ProyectoEdt
 export const crearProyectoEdtSchema = z.object({
-  proyectoId: z.string().uuid('ID de proyecto inválido'),
-  categoriaServicioId: z.string().uuid('ID de categoría de servicio inválido'),
+  proyectoId: cuidSchema,
+  categoriaServicioId: cuidSchema,
   zona: zonaSchema,
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
@@ -51,7 +54,7 @@ export const crearProyectoEdtSchema = z.object({
   horasEstimadas: horasSchema,
   horasReales: horasSchema.optional(),
   estado: z.enum(['planificado', 'en_progreso', 'completado', 'detenido', 'cancelado']).optional().default('planificado'),
-  responsableId: z.string().uuid('ID de responsable inválido').optional(),
+  responsableId: cuidSchema.optional(),
   porcentajeAvance: porcentajeSchema.default(0),
   descripcion: z.string()
     .max(1000, 'La descripción no puede exceder 1000 caracteres')
@@ -91,8 +94,8 @@ export const crearProyectoEdtSchema = z.object({
 
 // 🔧 Esquema base para ProyectoEdt (sin refinements)
 const proyectoEdtBaseSchema = z.object({
-  proyectoId: z.string().uuid('ID de proyecto inválido'),
-  categoriaServicioId: z.string().uuid('ID de categoría de servicio inválido'),
+  proyectoId: cuidSchema,
+  categoriaServicioId: cuidSchema,
   zona: zonaSchema,
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
@@ -101,7 +104,7 @@ const proyectoEdtBaseSchema = z.object({
   horasEstimadas: horasSchema,
   horasReales: horasSchema.optional(),
   estado: z.enum(['planificado', 'en_progreso', 'completado', 'detenido', 'cancelado']).optional().default('planificado'),
-  responsableId: z.string().uuid('ID de responsable inválido').optional(),
+  responsableId: cuidSchema.optional(),
   porcentajeAvance: porcentajeSchema.default(0),
   descripcion: z.string()
     .max(1000, 'La descripción no puede exceder 1000 caracteres')
@@ -493,4 +496,388 @@ export function validarFechasEdt(fechaInicio?: string, fechaFin?: string): strin
 export function validarEstadoEdt(estado: string): boolean {
   const estadosValidos = ['pendiente', 'en_progreso', 'completado', 'pausado', 'cancelado'];
   return estadosValidos.includes(estado);
+}
+
+// ===================================================
+// 📋 VALIDADORES PARA CRONOGRAMA COMERCIAL
+// ===================================================
+
+// ✅ Esquema base para CotizacionEdt (sin refinaciones)
+const cotizacionEdtBaseSchema = z.object({
+  categoriaServicioId: cuidSchema,
+  zona: zonaSchema,
+  fechaInicioCom: fechaSchema,
+  fechaFinCom: fechaSchema,
+  horasCom: horasSchema,
+  responsableId: cuidSchema.optional(),
+  descripcion: z.string()
+    .max(1000, 'La descripción no puede exceder 1000 caracteres')
+    .optional(),
+  prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional().default('media')
+})
+
+// ✅ Esquema para crear CotizacionEdt
+export const crearCotizacionEdtSchema = z.object({
+  nombre: z.string().min(1, 'El nombre es requerido').max(255, 'El nombre no puede exceder 255 caracteres'),
+  categoriaServicioId: cuidSchema,
+  zona: zonaSchema,
+  fechaInicioCom: fechaSchema,
+  fechaFinCom: fechaSchema,
+  horasCom: horasSchema,
+  responsableId: cuidSchema.optional(),
+  descripcion: z.string()
+    .max(1000, 'La descripción no puede exceder 1000 caracteres')
+    .optional(),
+  prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional().default('media'),
+  cotizacionFaseId: cuidSchema.optional()
+})
+.refine((data) => {
+  // 🔁 Validación: fechaFin debe ser posterior a fechaInicio
+  if (data.fechaInicioCom && data.fechaFinCom) {
+    return new Date(data.fechaFinCom) >= new Date(data.fechaInicioCom)
+  }
+  return true
+}, {
+  message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
+  path: ['fechaFinCom']
+})
+
+// ✅ Esquema para actualizar CotizacionEdt
+export const actualizarCotizacionEdtSchema = cotizacionEdtBaseSchema.partial().extend({
+  id: cuidSchema.optional()
+})
+
+// ✅ Esquema base para CotizacionTarea (sin refinaciones)
+const cotizacionTareaBaseSchema = z.object({
+  nombre: z.string().min(1, 'El nombre es requerido').max(255, 'El nombre no puede exceder 255 caracteres'),
+  fechaInicioCom: fechaSchema,
+  fechaFinCom: fechaSchema,
+  horasCom: horasSchema,
+  dependenciaDeId: cuidSchema.optional(),
+  descripcion: z.string().max(500, 'La descripción no puede exceder 500 caracteres').optional(),
+  prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional().default('media'),
+  responsableId: cuidSchema.optional(),
+  cotizacionServicioItemId: cuidSchema.optional() // ✅ Nueva relación opcional
+})
+
+// ✅ Esquema para crear CotizacionTarea
+export const crearCotizacionTareaSchema = cotizacionTareaBaseSchema
+.refine((data) => {
+  // 🔁 Validación: fechaFin debe ser posterior a fechaInicio
+  if (data.fechaInicioCom && data.fechaFinCom) {
+    return new Date(data.fechaFinCom) >= new Date(data.fechaInicioCom)
+  }
+  return true
+}, {
+  message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
+  path: ['fechaFinCom']
+})
+
+// ✅ Esquema para actualizar CotizacionTarea
+export const actualizarCotizacionTareaSchema = cotizacionTareaBaseSchema.partial().extend({
+  id: cuidSchema.optional()
+})
+
+// ✅ Esquema para filtros de cronograma comercial
+export const filtrosCotizacionCronogramaSchema = z.object({
+  page: z.number().min(1).optional().default(1),
+  limit: z.number().min(1).max(100).optional().default(10),
+  search: z.string().optional(),
+  categoriaServicioId: cuidSchema.optional(),
+  responsableId: cuidSchema.optional(),
+  zona: z.string().optional(),
+  fechaDesde: fechaSchema,
+  fechaHasta: fechaSchema,
+  prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional(),
+  horasMin: z.number().min(0).optional(),
+  horasMax: z.number().min(0).optional()
+})
+.refine((data) => {
+  // 🔁 Validación: fechaHasta debe ser posterior a fechaDesde
+  if (data.fechaDesde && data.fechaHasta) {
+    return new Date(data.fechaHasta) >= new Date(data.fechaDesde)
+  }
+  return true
+}, {
+  message: 'La fecha hasta debe ser posterior o igual a la fecha desde',
+  path: ['fechaHasta']
+})
+.refine((data) => {
+  // 🔁 Validación: horasMax debe ser mayor a horasMin
+  if (data.horasMin !== undefined && data.horasMax !== undefined) {
+    return data.horasMax >= data.horasMin
+  }
+  return true
+}, {
+  message: 'Las horas máximas deben ser mayores o iguales a las mínimas',
+  path: ['horasMax']
+})
+
+// ===================================================
+// 📡 TIPOS INFERIDOS PARA CRONOGRAMA COMERCIAL
+// ===================================================
+
+// 🔧 Tipos inferidos de los esquemas
+export type CrearCotizacionEdtInput = z.infer<typeof crearCotizacionEdtSchema>
+export type ActualizarCotizacionEdtInput = z.infer<typeof actualizarCotizacionEdtSchema>
+export type CrearCotizacionTareaInput = z.infer<typeof crearCotizacionTareaSchema>
+export type ActualizarCotizacionTareaInput = z.infer<typeof actualizarCotizacionTareaSchema>
+export type FiltrosCotizacionCronogramaInput = z.infer<typeof filtrosCotizacionCronogramaSchema>
+
+// ===================================================
+// 🛡️ VALIDADORES DE REGLAS DE NEGOCIO PARA CRONOGRAMA COMERCIAL
+// ===================================================
+
+/**
+ * 🔍 Valida si un EDT comercial puede cambiar de estado
+ * @param estadoActual Estado actual del EDT comercial
+ * @param nuevoEstado Nuevo estado propuesto
+ * @returns boolean
+ */
+export function puedecambiarEstadoCotizacionEdt(estadoActual: EstadoEdt, nuevoEstado: EstadoEdt): boolean {
+  const transicionesPermitidas: Record<EstadoEdt, EstadoEdt[]> = {
+    'planificado': ['en_progreso', 'cancelado'],
+    'en_progreso': ['completado', 'detenido', 'cancelado'],
+    'detenido': ['en_progreso', 'cancelado'],
+    'completado': [], // No se puede cambiar desde completado
+    'cancelado': ['planificado'] // Solo se puede reactivar
+  }
+
+  return transicionesPermitidas[estadoActual]?.includes(nuevoEstado) ?? false
+}
+
+/**
+ * ⏰ Valida si las fechas comerciales son coherentes
+ * @param fechaInicioCom Fecha de inicio comercial
+ * @param fechaFinCom Fecha de fin comercial
+ * @returns boolean
+ */
+export function fechasComercialesCoherentes(fechaInicioCom?: string, fechaFinCom?: string): boolean {
+  if (!fechaInicioCom || !fechaFinCom) return true
+  return new Date(fechaFinCom) >= new Date(fechaInicioCom)
+}
+
+/**
+ * 📊 Calcula el porcentaje de avance basado en horas comerciales
+ * @param horasReales Horas reales trabajadas
+ * @param horasCom Horas comerciales estimadas
+ * @returns number Porcentaje de avance (0-100)
+ */
+export function calcularPorcentajeAvanceComercial(horasReales: number, horasCom: number): number {
+  if (horasCom <= 0) return 0
+
+  const porcentaje = Math.round((horasReales / horasCom) * 100)
+  return Math.min(porcentaje, 100) // No puede exceder 100%
+}
+
+/**
+ * 🚨 Determina si un EDT comercial está en riesgo de retraso
+ * @param fechaFinCom Fecha de fin comercial
+ * @param diasAnticipacion Días de anticipación para la alerta
+ * @returns boolean
+ */
+export function estaEnRiesgoDeRetrasoComercial(fechaFinCom: string, diasAnticipacion: number = 7): boolean {
+  const fechaFinDate = new Date(fechaFinCom)
+  const fechaActual = new Date()
+  const fechaAlerta = new Date(fechaFinDate.getTime() - (diasAnticipacion * 24 * 60 * 60 * 1000))
+
+  // Si ya pasó la fecha de fin
+  return fechaActual > fechaFinDate
+}
+
+/**
+ * ✅ Validador para registro de horas en EDT comercial
+ * @param data Datos del registro de horas
+ * @returns Promise<string[]> Array de errores de validación
+ */
+export async function validarRegistroHorasCotizacionEdt(data: {
+  cotizacionEdtId: string;
+  usuarioId: string;
+  fecha: string;
+  horasTrabajadas: number;
+}): Promise<string[]> {
+  const errores: string[] = []
+
+  // Validar que las horas no excedan las 24 horas del día
+  if (data.horasTrabajadas > 24) {
+    errores.push('Las horas trabajadas no pueden exceder 24 horas por día')
+  }
+
+  // Validar que las horas sean positivas
+  if (data.horasTrabajadas <= 0) {
+    errores.push('Las horas trabajadas deben ser mayor a 0')
+  }
+
+  // Validar formato de fecha
+  const fecha = new Date(data.fecha)
+  if (isNaN(fecha.getTime())) {
+    errores.push('Formato de fecha inválido')
+  }
+
+  // Validar que la fecha no sea futura
+  if (fecha > new Date()) {
+    errores.push('No se pueden registrar horas en fechas futuras')
+  }
+
+  return errores
+}
+
+// ✅ Validador para orden (número positivo)
+const ordenSchema = z.number()
+  .int('El orden debe ser un número entero')
+  .min(0, 'El orden no puede ser negativo')
+  .max(999999, 'El orden no puede exceder 999,999')
+
+// ✅ Esquema para validar dependencias de tareas
+export const dependenciaTareaSchema = z.object({
+  fromTaskIndex: z.number().int().min(0),
+  toTaskIndex: z.number().int().min(0),
+  type: z.enum(['finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'])
+})
+.refine((data) => data.fromTaskIndex !== data.toTaskIndex, {
+  message: 'Una tarea no puede depender de sí misma',
+  path: ['toTaskIndex']
+})
+
+// ✅ Esquema para batch import de tareas con validaciones avanzadas
+export const batchImportTareasSchema = z.object({
+  tasks: z.array(z.object({
+    servicioItemId: cuidSchema,
+    nombre: z.string().min(1, 'El nombre es requerido').max(255, 'El nombre no puede exceder 255 caracteres'),
+    descripcion: z.string().max(500, 'La descripción no puede exceder 500 caracteres').optional(),
+    fechaInicio: z.string().datetime('Formato de fecha de inicio inválido'),
+    fechaFin: z.string().datetime('Formato de fecha de fin inválido'),
+    horasEstimadas: horasSchema,
+    prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional().default('media'),
+    responsableId: cuidSchema.optional(),
+    orden: ordenSchema.optional()
+  })).min(1, 'Debe incluir al menos una tarea').max(50, 'No puede incluir más de 50 tareas'),
+  dependencies: z.array(dependenciaTareaSchema).optional().default([])
+})
+.refine((data) => {
+  // Validar que las fechas de cada tarea sean coherentes
+  for (const task of data.tasks) {
+    if (new Date(task.fechaInicio) >= new Date(task.fechaFin)) {
+      return false
+    }
+  }
+  return true
+}, {
+  message: 'La fecha de fin debe ser posterior a la fecha de inicio en todas las tareas',
+  path: ['tasks']
+})
+.refine((data) => {
+  // Validar que los índices de dependencias sean válidos
+  if (data.dependencies) {
+    for (const dep of data.dependencies) {
+      if (dep.fromTaskIndex >= data.tasks.length || dep.toTaskIndex >= data.tasks.length) {
+        return false
+      }
+    }
+  }
+  return true
+}, {
+  message: 'Los índices de dependencias deben corresponder a tareas existentes',
+  path: ['dependencies']
+})
+
+/**
+ * 🔄 Validador de ciclos en dependencias de tareas
+ * @param dependencies Array de dependencias
+ * @returns string[] Array de errores de validación
+ */
+export function validarCiclosDependencias(dependencies: Array<{
+  fromTaskIndex: number;
+  toTaskIndex: number;
+  type: string;
+}>): string[] {
+  const errores: string[] = []
+
+  // Construir grafo de dependencias
+  const graph: { [key: number]: number[] } = {}
+  dependencies.forEach(dep => {
+    if (!graph[dep.fromTaskIndex]) graph[dep.fromTaskIndex] = []
+    graph[dep.fromTaskIndex].push(dep.toTaskIndex)
+  })
+
+  // DFS para detectar ciclos
+  const visited = new Set<number>()
+  const recStack = new Set<number>()
+
+  const hasCycleDFS = (node: number): boolean => {
+    if (recStack.has(node)) return true
+    if (visited.has(node)) return false
+
+    visited.add(node)
+    recStack.add(node)
+
+    const neighbors = graph[node] || []
+    for (const neighbor of neighbors) {
+      if (hasCycleDFS(neighbor)) return true
+    }
+
+    recStack.delete(node)
+    return false
+  }
+
+  // Verificar ciclos desde todos los nodos
+  const allNodes = new Set([...Object.keys(graph).map(Number), ...dependencies.map(d => d.toTaskIndex)])
+  for (const node of allNodes) {
+    if (hasCycleDFS(node)) {
+      errores.push('Se detectó un ciclo en las dependencias de tareas. Revise las relaciones de dependencia.')
+      break
+    }
+  }
+
+  return errores
+}
+
+/**
+ * 📋 Validador completo para importación masiva de tareas
+ * @param data Datos de importación masiva
+ * @returns Promise<string[]> Array de errores de validación
+ */
+export async function validarBatchImportTareas(data: {
+  tasks: Array<{
+    servicioItemId: string;
+    nombre: string;
+    descripcion?: string;
+    fechaInicio: string;
+    fechaFin: string;
+    horasEstimadas: number;
+    prioridad?: string;
+    responsableId?: string;
+    orden?: number;
+  }>;
+  dependencies?: Array<{
+    fromTaskIndex: number;
+    toTaskIndex: number;
+    type: string;
+  }>;
+}): Promise<string[]> {
+  const errores: string[] = []
+
+  try {
+    // Validar esquema básico
+    batchImportTareasSchema.parse(data)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      errores.push(...error.errors.map(e => e.message))
+    }
+  }
+
+  // Validar ciclos en dependencias
+  if (data.dependencies) {
+    errores.push(...validarCiclosDependencias(data.dependencies))
+  }
+
+  // Validar unicidad de órdenes si se proporcionan
+  if (data.tasks.some(t => t.orden !== undefined)) {
+    const ordenes = data.tasks.map(t => t.orden).filter(o => o !== undefined)
+    if (ordenes.length !== new Set(ordenes).size) {
+      errores.push('Los valores de orden deben ser únicos')
+    }
+  }
+
+  return errores
 }

@@ -12,7 +12,7 @@ export function PedidoEquipoFiltersWrapper({ filtros }: PedidoEquipoFiltersWrapp
   const router = useRouter()
 
   const handleFiltrosChange = (newFiltros: FiltrosPedidoEquipo) => {
-    // 📡 Construir nueva URL con filtros para proyectos/equipos
+    // 📡 Construir nueva URL con filtros para la página actual de pedidos
     const params = new URLSearchParams()
     if (newFiltros.proyectoId) params.set('proyecto', newFiltros.proyectoId)
     if (newFiltros.proveedorId) params.set('proveedor', newFiltros.proveedorId)
@@ -21,10 +21,10 @@ export function PedidoEquipoFiltersWrapper({ filtros }: PedidoEquipoFiltersWrapp
     if (newFiltros.fechaCreacion?.to) params.set('fechaFin', newFiltros.fechaCreacion.to.toISOString().split('T')[0])
     if (newFiltros.montoMinimo) params.set('montoMin', newFiltros.montoMinimo.toString())
     if (newFiltros.montoMaximo) params.set('montoMax', newFiltros.montoMaximo.toString())
-    if (newFiltros.coherenciaMinima) params.set('coherencia', 'true')
-    
-    // 🔁 Navegar con nuevos parámetros a la página de proyectos/equipos
-    router.push(`/proyectos/equipos?${params.toString()}`)
+    if (newFiltros.coherenciaMinima) params.set('coherencia', newFiltros.coherenciaMinima.toString())
+
+    // 🔁 Navegar con nuevos parámetros a la página actual de pedidos
+    router.push(`/proyectos/pedidos?${params.toString()}`)
   }
 
   return (

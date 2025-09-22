@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const filtros = {
       proyectoId: searchParams.get('proyectoId') || undefined,
       proyectoEdtId: searchParams.get('proyectoEdtId') || undefined,
+      proyectoTareaId: searchParams.get('proyectoTareaId') || undefined,
       categoriaServicioId: searchParams.get('categoriaServicioId') || undefined,
       usuarioId: searchParams.get('usuarioId') || undefined,
       recursoId: searchParams.get('recursoId') || undefined,
@@ -33,9 +34,10 @@ export async function GET(request: NextRequest) {
 
     // 🔐 Filtro por rol
     const whereClause: any = {};
-    
+
     if (filtros.proyectoId) whereClause.proyectoId = filtros.proyectoId;
     if (filtros.proyectoEdtId) whereClause.proyectoEdtId = filtros.proyectoEdtId;
+    if (filtros.proyectoTareaId) whereClause.proyectoTareaId = filtros.proyectoTareaId;
     if (filtros.categoriaServicioId) whereClause.categoriaServicioId = filtros.categoriaServicioId;
     if (filtros.usuarioId) whereClause.usuarioId = filtros.usuarioId;
     if (filtros.recursoId) whereClause.recursoId = filtros.recursoId;
@@ -77,6 +79,14 @@ export async function GET(request: NextRequest) {
               zona: true,
               estado: true,
               porcentajeAvance: true
+            }
+          },
+          proyectoTarea: {
+            select: {
+              id: true,
+              nombre: true,
+              estado: true,
+              porcentajeCompletado: true
             }
           },
           categoriaServicioRef: {
@@ -184,42 +194,92 @@ export async function POST(request: NextRequest) {
       usuarioId: session.user.id // Siempre usar el usuario de la sesión
     };
 
-    // 🔍 Validaciones de negocio EDT
-    const erroresEdt = await validarRegistroHorasEdt({
-      proyectoEdtId: data.proyectoEdtId!,
-      usuarioId: session.user.id,
-      fecha: data.fecha,
-      horasTrabajadas: data.horasTrabajadas
-    });
+    // 🔍 Validaciones de negocio EDT/Tarea
+    if (data.proyectoEdtId) {
+      const erroresEdt = await validarRegistroHorasEdt({
+        proyectoEdtId: data.proyectoEdtId,
+        usuarioId: session.user.id,
+        fecha: data.fecha,
+        horasTrabajadas: data.horasTrabajadas
+      });
 
-    if (erroresEdt.length > 0) {
+      if (erroresEdt.length > 0) {
+        return NextResponse.json(
+          { error: 'Errores de validación EDT', detalles: erroresEdt },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validar que se proporcione EDT o Tarea
+    if (!data.proyectoEdtId && !data.proyectoTareaId) {
       return NextResponse.json(
-        { error: 'Errores de validación EDT', detalles: erroresEdt },
+        { error: 'Se requiere proyectoEdtId o proyectoTareaId' },
         { status: 400 }
       );
     }
 
-    // ✅ Obtener proyecto desde EDT
-    const edt = await prisma.proyectoEdt.findUnique({
-      where: { id: data.proyectoEdtId! },
-      include: { 
-        proyecto: true,
-        categoriaServicio: true
+    // ✅ Obtener proyecto desde EDT o Tarea
+    let proyecto, edt, tarea;
+
+    if (data.proyectoEdtId) {
+      edt = await prisma.proyectoEdt.findUnique({
+        where: { id: data.proyectoEdtId },
+        include: {
+          proyecto: true,
+          categoriaServicio: true
+        }
+      });
+
+      if (!edt) {
+        return NextResponse.json(
+          { error: 'EDT no encontrado' },
+          { status: 404 }
+        );
       }
-    });
-    
-    if (!edt) {
-      return NextResponse.json(
-        { error: 'EDT no encontrado' },
-        { status: 404 }
-      );
+
+      proyecto = edt.proyecto;
+    } else if (data.proyectoTareaId) {
+      tarea = await prisma.proyectoTarea.findUnique({
+        where: { id: data.proyectoTareaId },
+        include: {
+          proyectoEdt: {
+            include: {
+              proyecto: true,
+              categoriaServicio: true
+            }
+          }
+        }
+      });
+
+      if (!tarea) {
+        return NextResponse.json(
+          { error: 'Tarea no encontrada' },
+          { status: 404 }
+        );
+      }
+
+      if (!tarea.proyectoEdt) {
+        return NextResponse.json(
+          { error: 'La tarea no tiene un EDT asociado' },
+          { status: 400 }
+        );
+      }
+
+      proyecto = tarea.proyectoEdt.proyecto;
+      edt = tarea.proyectoEdt;
     }
-    
-    const proyecto = edt.proyecto;
 
     if (!proyecto) {
       return NextResponse.json(
         { error: 'Proyecto no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    if (!edt) {
+      return NextResponse.json(
+        { error: 'EDT no encontrado' },
         { status: 404 }
       );
     }
@@ -260,6 +320,7 @@ export async function POST(request: NextRequest) {
         proyectoId: proyecto.id,
         proyectoServicioId: 'default-service',
         proyectoEdtId: data.proyectoEdtId,
+        proyectoTareaId: data.proyectoTareaId,
         categoriaServicioId: edt.categoriaServicioId,
         categoria: edt.categoriaServicio?.nombre || 'General',
         nombreServicio: edt.categoriaServicio?.nombre || 'Servicio General',

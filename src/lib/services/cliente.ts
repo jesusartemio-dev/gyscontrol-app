@@ -1,71 +1,69 @@
-import { Cliente } from '@/types'
+// ===================================================
+// 📁 Archivo: cliente.ts
+// 📌 Ubicación: src/lib/services/cliente.ts
+// 🔧 Descripción: Servicios para gestión de clientes
+// ✅ Funciones para obtener clientes
+// ✍️ Autor: Sistema GYS - Asistente IA
+// 📅 Última actualización: 2025-09-19
+// ===================================================
+
 import { buildApiUrl } from '@/lib/utils'
 
+// Tipos para clientes
+export interface Cliente {
+  id: string
+  nombre: string
+  ruc?: string
+  sector?: string
+  correo?: string
+  telefono?: string
+  direccion?: string
+}
+
+// ✅ Obtener todos los clientes
 export async function getClientes(): Promise<Cliente[]> {
-  const res = await fetch(buildApiUrl('/api/clientes'), { cache: 'no-store' })
-  if (!res.ok) throw new Error('Error al obtener clientes')
-  return res.json()
-}
-
-export async function createCliente(data: Partial<Cliente>): Promise<Cliente> {
-  const res = await fetch(buildApiUrl('/api/clientes'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error('Error al crear cliente')
-  return res.json()
-}
-
-export async function updateCliente(data: Cliente): Promise<Cliente> {
-  const res = await fetch(buildApiUrl('/api/clientes'), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error('Error al actualizar cliente')
-  return res.json()
-}
-
-export async function deleteCliente(id: string): Promise<{ success: boolean; error?: string; details?: string }> {
   try {
-    const res = await fetch(buildApiUrl('/api/clientes'), {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
+    const response = await fetch(buildApiUrl('/api/clientes'), {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
     })
-    
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }))
-      
-      // 🚫 Retornar error específico sin lanzar excepción
-      if (res.status === 400 && errorData.error?.includes('proyectos asociados')) {
-        return {
-          success: false,
-          error: errorData.error,
-          details: errorData.details || 'Para eliminar este cliente, primero debe finalizar o reasignar sus proyectos.'
-        }
-      }
-      
-      if (res.status === 404) {
-        return {
-          success: false,
-          error: 'Cliente no encontrado'
-        }
-      }
-      
-      return {
-        success: false,
-        error: errorData.error || 'Error al eliminar cliente'
-      }
+
+    if (!response.ok) {
+      throw new Error(`Error al obtener clientes: ${response.statusText}`)
     }
-    
-    return { success: true }
+
+    return await response.json()
   } catch (error) {
-    console.error('❌ Error en deleteCliente:', error)
-    return {
-      success: false,
-      error: 'Error de conexión al eliminar cliente'
+    console.error('❌ Error en getClientes:', error)
+    throw error
+  }
+}
+
+// ✅ Obtener cliente por ID
+export async function getClienteById(id: string): Promise<Cliente> {
+  try {
+    // Usar la ruta correcta que ya existe
+    const response = await fetch(buildApiUrl(`/api/clientes/${id}`), {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Cliente no encontrado')
+      }
+      throw new Error(`Error al obtener cliente: ${response.statusText}`)
     }
+
+    return await response.json()
+  } catch (error) {
+    console.error('❌ Error en getClienteById:', error)
+    throw error
   }
 }

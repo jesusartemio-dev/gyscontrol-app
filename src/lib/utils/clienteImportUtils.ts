@@ -30,17 +30,17 @@ export async function leerClientesDesdeExcel(file: File): Promise<ClienteImporta
   return json.map((row, index) => {
     const codigo = row['Código'] ? (typeof row['Código'] === 'string' ? row['Código'].trim() : String(row['Código']).trim()) : ''
     const nombre = (typeof row['Nombre'] === 'string' ? row['Nombre'].trim() : String(row['Nombre'] || '').trim()) || ''
-    
-    // ✅ Validar que código y nombre sean requeridos
-    if (!codigo) {
-      throw new Error(`Fila ${index + 2}: El código es obligatorio`)
-    }
+
+    // ✅ Validar que nombre sea requerido
     if (!nombre) {
       throw new Error(`Fila ${index + 2}: El nombre es obligatorio`)
     }
+
+    // ✅ Si no hay código, generar uno automático o usar el nombre como base
+    const codigoFinal = codigo || `CLI-${String(index + 1).padStart(3, '0')}`
     
     return {
-      codigo,
+      codigo: codigoFinal,
       nombre,
       ruc: row['RUC'] ? (typeof row['RUC'] === 'string' ? row['RUC'].trim() : String(row['RUC']).trim()) || undefined : undefined,
       direccion: row['Dirección'] ? (typeof row['Dirección'] === 'string' ? row['Dirección'].trim() : String(row['Dirección']).trim()) || undefined : undefined,

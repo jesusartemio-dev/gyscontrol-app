@@ -22,7 +22,8 @@ import {
   Home,
   CheckCircle,
   Calculator,
-  Truck
+  Truck,
+  AlertTriangle
 } from 'lucide-react'
 import {
   getCotizacionById,
@@ -65,13 +66,24 @@ import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProye
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
 import EstadoCotizacionToolbar from '@/components/cotizaciones/EstadoCotizacionToolbar'
 import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
+import { Eye } from 'lucide-react'
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
+
+// ✅ Nuevo componente para cronograma comercial
+import { CronogramaComercialTab } from '@/components/comercial/cronograma/CronogramaComercialTab'
+
+// ✅ Nuevos componentes para las pestañas adicionales
+import { CabeceraTab } from '@/components/cotizaciones/tabs/CabeceraTab'
+import { ExclusionesTab } from '@/components/cotizaciones/tabs/ExclusionesTab'
+import { CondicionesTab } from '@/components/cotizaciones/tabs/CondicionesTab'
 
 import type {
   Cotizacion,
   CotizacionEquipoItem,
   CotizacionServicioItem,
-  CotizacionGastoItem
+  CotizacionGastoItem,
+  EstadoCotizacion,
+  EstadoOportunidad
 } from '@/types'
 
 // Utility functions
@@ -108,11 +120,23 @@ export default function CotizacionDetallePage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [renderPDF, setRenderPDF] = useState(true)
+  const [updatingData, setUpdatingData] = useState(false)
   const [showForm, setShowForm] = useState({ servicio: false, gasto: false })
   const [showEquipoModal, setShowEquipoModal] = useState(false)
 
   const [selectedEquipoId, setSelectedEquipoId] = useState<string | null>(null)
   const [creandoProyecto, setCreandoProyecto] = useState(false)
+
+  // ✅ Estado para controlar la vista activa (Equipos, Servicios, Gastos, Cronograma, Cabecera, Exclusiones, Condiciones)
+  const [activeSection, setActiveSection] = useState<'equipos' | 'servicios' | 'gastos' | 'cronograma' | 'cabecera' | 'exclusiones' | 'condiciones'>('equipos')
+
+  // Function to handle data updates with PDF protection
+  const handleDataUpdate = (updatedCotizacion: Cotizacion) => {
+    setUpdatingData(true)
+    setCotizacion(updatedCotizacion)
+    // Re-enable PDF rendering after a short delay
+    setTimeout(() => setUpdatingData(false), 500)
+  }
 
   useEffect(() => {
     if (typeof id === 'string') {
@@ -153,7 +177,7 @@ export default function CotizacionDetallePage() {
       e.id === equipoId ? { ...e, items: callback(e.items), ...calcularSubtotal(callback(e.items)) } : e
     )
     const nuevosTotales = actualizarTotalesParciales(equipos, cotizacion.servicios, cotizacion.gastos)
-    setCotizacion({ ...cotizacion, equipos, ...nuevosTotales })
+    handleDataUpdate({ ...cotizacion, equipos, ...nuevosTotales })
     void updateCotizacion(cotizacion.id, nuevosTotales)
     setTimeout(() => setRenderPDF(true), 100)
   }
@@ -165,7 +189,7 @@ export default function CotizacionDetallePage() {
       s.id === servicioId ? { ...s, items: callback(s.items), ...calcularSubtotal(callback(s.items)) } : s
     )
     const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, servicios, cotizacion.gastos)
-    setCotizacion({ ...cotizacion, servicios, ...nuevosTotales })
+    handleDataUpdate({ ...cotizacion, servicios, ...nuevosTotales })
     void updateCotizacion(cotizacion.id, nuevosTotales)
     setTimeout(() => setRenderPDF(true), 100)
   }
@@ -177,7 +201,7 @@ export default function CotizacionDetallePage() {
       g.id === gastoId ? { ...g, items: callback(g.items), ...calcularSubtotal(callback(g.items)) } : g
     )
     const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, cotizacion.servicios, gastos)
-    setCotizacion({ ...cotizacion, gastos, ...nuevosTotales })
+    handleDataUpdate({ ...cotizacion, gastos, ...nuevosTotales })
     void updateCotizacion(cotizacion.id, nuevosTotales)
     setTimeout(() => setRenderPDF(true), 100)
   }
@@ -188,7 +212,7 @@ export default function CotizacionDetallePage() {
     await deleteCotizacionEquipo(id)
     const equipos = cotizacion.equipos.filter(e => e.id !== id)
     const nuevosTotales = actualizarTotalesParciales(equipos, cotizacion.servicios, cotizacion.gastos)
-    setCotizacion({ ...cotizacion, equipos, ...nuevosTotales })
+    handleDataUpdate({ ...cotizacion, equipos, ...nuevosTotales })
     await updateCotizacion(cotizacion.id, nuevosTotales)
     setTimeout(() => setRenderPDF(true), 100)
   }
@@ -199,7 +223,7 @@ export default function CotizacionDetallePage() {
     await deleteCotizacionServicio(id)
     const servicios = cotizacion.servicios.filter(s => s.id !== id)
     const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, servicios, cotizacion.gastos)
-    setCotizacion({ ...cotizacion, servicios, ...nuevosTotales })
+    handleDataUpdate({ ...cotizacion, servicios, ...nuevosTotales })
     await updateCotizacion(cotizacion.id, nuevosTotales)
     setTimeout(() => setRenderPDF(true), 100)
   }
@@ -210,7 +234,7 @@ export default function CotizacionDetallePage() {
     await deleteCotizacionGasto(id)
     const gastos = cotizacion.gastos.filter(g => g.id !== id)
     const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, cotizacion.servicios, gastos)
-    setCotizacion({ ...cotizacion, gastos, ...nuevosTotales })
+    handleDataUpdate({ ...cotizacion, gastos, ...nuevosTotales })
     await updateCotizacion(cotizacion.id, nuevosTotales)
     setTimeout(() => setRenderPDF(true), 100)
   }
@@ -218,7 +242,7 @@ export default function CotizacionDetallePage() {
   const handleActualizarNombreEquipo = async (id: string, nuevo: string) => {
     if (!cotizacion) return
     await updateCotizacionEquipo(id, { nombre: nuevo })
-    setCotizacion({
+    handleDataUpdate({
       ...cotizacion,
       equipos: cotizacion.equipos.map(e => e.id === id ? { ...e, nombre: nuevo } : e)
     })
@@ -227,7 +251,7 @@ export default function CotizacionDetallePage() {
   const handleActualizarNombreServicio = async (id: string, nuevo: string) => {
     if (!cotizacion) return
     await updateCotizacionServicio(id, { categoria: nuevo })
-    setCotizacion({
+    handleDataUpdate({
       ...cotizacion,
       servicios: cotizacion.servicios.map(s => s.id === id ? { ...s, categoria: nuevo } : s)
     })
@@ -236,7 +260,7 @@ export default function CotizacionDetallePage() {
   const handleActualizarNombreGasto = async (id: string, nuevo: string) => {
     if (!cotizacion) return
     await updateCotizacionGasto(id, { nombre: nuevo })
-    setCotizacion({
+    handleDataUpdate({
       ...cotizacion,
       gastos: cotizacion.gastos.map(g => g.id === id ? { ...g, nombre: nuevo } : g)
     })
@@ -511,15 +535,25 @@ export default function CotizacionDetallePage() {
                   <span className="hidden sm:inline">Compartir</span>
                   <span className="sm:hidden">Share</span>
                 </Button>
-                {renderPDF && puedeRenderizarPDF && (
-                  <div className="flex-shrink-0">
+                {renderPDF && puedeRenderizarPDF && !updatingData && (
+                  <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/comercial/cotizaciones/${id}/preview`)}
+                      className="bg-white hover:bg-gray-50 flex-shrink-0 h-8 min-w-[120px] justify-center"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">Vista Previa</span>
+                      <span className="sm:hidden">Vista</span>
+                    </Button>
                     <DescargarPDFButton cotizacion={cotizacion} />
                   </div>
                 )}
-                {cotizacion.estado === 'aprobada' && (
+                {cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada') && (
                   <div className="flex-shrink-0">
-                    <CrearProyectoDesdeCotizacionModal 
-                      cotizacion={cotizacion} 
+                    <CrearProyectoDesdeCotizacionModal
+                      cotizacion={cotizacion}
                       buttonVariant="outline"
                       buttonSize="sm"
                       buttonClassName="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 h-8 min-w-[120px] justify-center"
@@ -568,8 +602,8 @@ export default function CotizacionDetallePage() {
               </div>
               <EstadoCotizacionToolbar
                 cotizacion={cotizacion}
-                onUpdated={(nuevoEstado, nuevaEtapa) =>
-                  setCotizacion(prev => prev ? { ...prev, estado: nuevoEstado, etapa: nuevaEtapa } : prev)
+                onUpdated={(nuevoEstado) =>
+                  handleDataUpdate(cotizacion ? { ...cotizacion, estado: nuevoEstado as EstadoCotizacion } : cotizacion)
                 }
               />
             </CardContent>
@@ -630,14 +664,93 @@ export default function CotizacionDetallePage() {
         </motion.div>
       </motion.div>
 
+      {/* Navegación por Tabs */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.5 }}
+        className="mb-8"
+      >
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={activeSection === 'equipos' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveSection('equipos')}
+                className="flex items-center gap-2"
+              >
+                <Package className="h-4 w-4" />
+                Equipos ({totalEquipos})
+              </Button>
+              <Button
+                variant={activeSection === 'servicios' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveSection('servicios')}
+                className="flex items-center gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Servicios ({totalServicios})
+              </Button>
+              <Button
+                variant={activeSection === 'gastos' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveSection('gastos')}
+                className="flex items-center gap-2"
+              >
+                <DollarSign className="h-4 w-4" />
+                Gastos ({totalGastos})
+              </Button>
+              <Button
+                variant={activeSection === 'cronograma' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveSection('cronograma')}
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                Cronograma
+              </Button>
+              <Button
+                variant={activeSection === 'cabecera' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveSection('cabecera')}
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Cabecera
+              </Button>
+              <Button
+                variant={activeSection === 'exclusiones' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveSection('exclusiones')}
+                className="flex items-center gap-2"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Exclusiones ({cotizacion.exclusiones?.length || 0})
+              </Button>
+              <Button
+                variant={activeSection === 'condiciones' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveSection('condiciones')}
+                className="flex items-center gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Condiciones ({cotizacion.condiciones?.length || 0})
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
       {/* Secciones de Contenido */}
       <div className="space-y-8">
         {/* Equipos */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-        >
+        {activeSection === 'equipos' && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+          >
         <Card>
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -728,8 +841,10 @@ export default function CotizacionDetallePage() {
           </CardContent>
         </Card>
       </motion.section>
+        )}
 
         {/* Servicios */}
+        {activeSection === 'servicios' && (
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -764,7 +879,7 @@ export default function CotizacionDetallePage() {
                 <CotizacionServicioForm
                   cotizacionId={cotizacion.id}
                   onCreated={(nuevo) =>
-                    setCotizacion(p => p ? { ...p, servicios: [...p.servicios, { ...nuevo, items: [] }] } : p)
+                    handleDataUpdate(cotizacion ? { ...cotizacion, servicios: [...cotizacion.servicios, { ...nuevo, items: [] }] } : cotizacion)
                   }
                 />
                 <Separator className="my-4" />
@@ -846,8 +961,10 @@ export default function CotizacionDetallePage() {
           </CardContent>
         </Card>
       </motion.section>
+        )}
 
         {/* Gastos */}
+        {activeSection === 'gastos' && (
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -882,7 +999,7 @@ export default function CotizacionDetallePage() {
                 <CotizacionGastoForm
                   cotizacionId={cotizacion.id}
                   onCreated={(nuevo) =>
-                    setCotizacion(p => p ? { ...p, gastos: [...p.gastos, { ...nuevo, items: [] }] } : p)
+                    handleDataUpdate(cotizacion ? { ...cotizacion, gastos: [...cotizacion.gastos, { ...nuevo, items: [] }] } : cotizacion)
                   }
                 />
                 <Separator className="my-4" />
@@ -964,6 +1081,63 @@ export default function CotizacionDetallePage() {
           </CardContent>
         </Card>
         </motion.section>
+        )}
+
+        {/* Cronograma Comercial */}
+        {activeSection === 'cronograma' && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.0 }}
+          >
+            <CronogramaComercialTab
+              cotizacionId={cotizacion.id}
+              cotizacionCodigo={cotizacion.codigo || 'Sin código'}
+            />
+          </motion.section>
+        )}
+
+        {/* Cabecera */}
+        {activeSection === 'cabecera' && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+          >
+            <CabeceraTab
+              cotizacion={cotizacion}
+              onUpdated={handleDataUpdate}
+            />
+          </motion.section>
+        )}
+
+        {/* Exclusiones */}
+        {activeSection === 'exclusiones' && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+          >
+            <ExclusionesTab
+              cotizacion={cotizacion}
+              onUpdated={handleDataUpdate}
+            />
+          </motion.section>
+        )}
+
+        {/* Condiciones */}
+        {activeSection === 'condiciones' && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.9 }}
+          >
+            <CondicionesTab
+              cotizacion={cotizacion}
+              onUpdated={handleDataUpdate}
+            />
+          </motion.section>
+        )}
       </div>
 
 
@@ -974,10 +1148,10 @@ export default function CotizacionDetallePage() {
         onOpenChange={setShowEquipoModal}
         cotizacionId={cotizacion.id}
         onCreated={(nuevoEquipo) => {
-          setCotizacion(prev => prev ? {
-            ...prev,
-            equipos: [...prev.equipos, { ...nuevoEquipo, items: [] }]
-          } : prev)
+          handleDataUpdate(cotizacion ? {
+            ...cotizacion,
+            equipos: [...cotizacion.equipos, { ...nuevoEquipo, items: [] }]
+          } : cotizacion)
           setShowEquipoModal(false)
         }}
       />

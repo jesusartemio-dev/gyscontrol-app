@@ -23,7 +23,7 @@ jest.mock('@/lib/prisma', () => ({
   prisma: mockPrismaClient
 }))
 
-const mockPrisma = mockPrismaClient as jest.Mocked<typeof mockPrismaClient>
+const mockPrisma = mockPrismaClient as any
 
 describe('POST /api/proyecto/from-cotizacion - Estado Fix', () => {
   beforeEach(() => {
@@ -87,11 +87,15 @@ describe('POST /api/proyecto/from-cotizacion - Estado Fix', () => {
     // ✅ Valores válidos del enum ProyectoEstado
     const estadosValidos = Object.values(ProyectoEstado)
     
+    expect(estadosValidos).toContain('creado')
     expect(estadosValidos).toContain('en_planificacion')
     expect(estadosValidos).toContain('en_ejecucion')
-    expect(estadosValidos).toContain('en_pausa')
-    expect(estadosValidos).toContain('cerrado')
+    expect(estadosValidos).toContain('pausado')
+    expect(estadosValidos).toContain('completado')
     expect(estadosValidos).toContain('cancelado')
+    expect(estadosValidos).toContain('listas_pendientes')
+    expect(estadosValidos).toContain('listas_aprobadas')
+    expect(estadosValidos).toContain('pedidos_creados')
     
     // ❌ Valor inválido que causaba el error
     expect(estadosValidos).not.toContain('pendiente')

@@ -28,6 +28,16 @@ export class ProyectoEdtService {
     filtros: FiltrosCronogramaData = {}
   ): Promise<ProyectoEdtConRelaciones[]> {
     try {
+      logger.info(`Obteniendo EDTs para proyecto: ${proyectoId}`, { filtros });
+
+      // First, try a simple query without relations to check if the basic query works
+      const basicEdts = await prisma.proyectoEdt.findMany({
+        where: { proyectoId },
+        select: { id: true, proyectoId: true, categoriaServicioId: true }
+      });
+
+      logger.info(`Basic query found ${basicEdts.length} EDTs`);
+
       const edts = await prisma.proyectoEdt.findMany({
         where: {
           proyectoId,
@@ -49,6 +59,7 @@ export class ProyectoEdtService {
         select: {
           id: true,
           proyectoId: true,
+          nombre: true,
           categoriaServicioId: true,
           responsableId: true,
           descripcion: true,
@@ -127,8 +138,10 @@ export class ProyectoEdtService {
         ]
       });
 
+
       return edts.map(edt => ({
         ...edt,
+        nombre: edt.nombre,
         zona: edt.zona || undefined,
         fechaInicio: edt.fechaInicioPlan?.toISOString() || undefined,
         fechaFin: edt.fechaFinPlan?.toISOString() || undefined,
@@ -161,11 +174,21 @@ export class ProyectoEdtService {
         descripcion: edt.descripcion || undefined,
         createdAt: edt.createdAt.toISOString(),
         updatedAt: edt.updatedAt.toISOString(),
-        responsable: edt.responsable || undefined
-      }));
+        responsable: edt.responsable || undefined,
+        proyecto: {
+          ...edt.proyecto,
+          estado: edt.proyecto.estado as any
+        },
+        categoriaServicio: edt.categoriaServicio
+      })) as ProyectoEdtConRelaciones[];
     } catch (error) {
-      logger.error('Error al obtener EDT por proyecto:', error);
-      throw new Error('Error al obtener EDT del proyecto');
+      logger.error('Error al obtener EDT por proyecto:', {
+        proyectoId,
+        filtros,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw new Error(`Error al obtener EDT del proyecto: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -236,6 +259,7 @@ export class ProyectoEdtService {
       
       return {
         ...edt,
+        nombre: edt.nombre,
         zona: edt.zona || undefined,
         fechaInicio: edt.fechaInicioPlan?.toISOString() || undefined,
         fechaFin: edt.fechaFinPlan?.toISOString() || undefined,
@@ -248,6 +272,10 @@ export class ProyectoEdtService {
         createdAt: edt.createdAt.toISOString(),
         updatedAt: edt.updatedAt.toISOString(),
         responsable: edt.responsable || undefined,
+        proyecto: {
+          ...edt.proyecto,
+          estado: edt.proyecto.estado as any
+        },
         registrosHoras: edt.registrosHoras.map(registro => ({
           ...registro,
           proyectoId: registro.proyectoId || '',
@@ -269,7 +297,7 @@ export class ProyectoEdtService {
           origen: registro.origen || '',
           ubicacion: registro.ubicacion || ''
         }))
-      };
+      } as ProyectoEdtConRelaciones;
     } catch (error) {
       logger.error('Error al obtener EDT por ID:', error);
       throw new Error('Error al obtener EDT');
@@ -305,7 +333,8 @@ export class ProyectoEdtService {
       const nuevoEdt = await prisma.proyectoEdt.create({
         data: {
           ...data,
-          zona: data.zona || null
+          zona: data.zona || null,
+          nombre: data.nombre
         },
         include: {
           proyecto: {
@@ -368,6 +397,7 @@ export class ProyectoEdtService {
       logger.info(`EDT creado: ${nuevoEdt.id}`);
       return {
         ...nuevoEdt,
+        nombre: nuevoEdt.nombre,
         zona: nuevoEdt.zona || undefined,
         responsableId: nuevoEdt.responsableId || undefined,
         descripcion: nuevoEdt.descripcion || undefined,
@@ -380,6 +410,10 @@ export class ProyectoEdtService {
         horasPlan: Number(nuevoEdt.horasPlan || 0),
         horasReales: Number(nuevoEdt.horasReales || 0),
         responsable: nuevoEdt.responsable || undefined,
+        proyecto: {
+          ...nuevoEdt.proyecto,
+          estado: nuevoEdt.proyecto.estado as any
+        },
         registrosHoras: nuevoEdt.registrosHoras.map(registro => ({
           ...registro,
           proyectoId: registro.proyectoId || '',
@@ -397,11 +431,11 @@ export class ProyectoEdtService {
           recursoId: registro.recursoId || '',
           recursoNombre: registro.recursoNombre || '',
           proyectoEdtId: registro.proyectoEdtId || '',
-            categoriaServicioId: registro.categoriaServicioId || '',
-            origen: registro.origen || '',
-            ubicacion: registro.ubicacion || ''
+          categoriaServicioId: registro.categoriaServicioId || '',
+          origen: registro.origen || '',
+          ubicacion: registro.ubicacion || ''
         }))
-      };
+      } as ProyectoEdtConRelaciones;
     } catch (error) {
       logger.error('Error al crear EDT:', error);
       throw error;
@@ -474,7 +508,10 @@ export class ProyectoEdtService {
       // 🔄 Actualizar EDT
       const edtActualizado = await prisma.proyectoEdt.update({
         where: { id: edtId },
-        data,
+        data: {
+          ...data,
+          nombre: data.nombre
+        },
         include: {
           proyecto: {
             select: {
@@ -536,6 +573,7 @@ export class ProyectoEdtService {
       logger.info(`EDT actualizado: ${edtId}`);
       return {
         ...edtActualizado,
+        nombre: edtActualizado.nombre,
         zona: edtActualizado.zona ?? undefined,
         responsableId: edtActualizado.responsableId ?? undefined,
         descripcion: edtActualizado.descripcion ?? undefined,
@@ -548,6 +586,10 @@ export class ProyectoEdtService {
         horasReales: Number(edtActualizado.horasReales),
         createdAt: edtActualizado.createdAt.toISOString(),
         updatedAt: edtActualizado.updatedAt.toISOString(),
+        proyecto: {
+          ...edtActualizado.proyecto,
+          estado: edtActualizado.proyecto.estado as any
+        },
         registrosHoras: edtActualizado.registrosHoras.map(registro => ({
           ...registro,
           proyectoId: registro.proyectoId || '',
@@ -569,7 +611,7 @@ export class ProyectoEdtService {
           origen: registro.origen || '',
           ubicacion: registro.ubicacion || ''
         }))
-      };
+      } as ProyectoEdtConRelaciones;
     } catch (error) {
       logger.error('Error al actualizar EDT:', error);
       throw error;
@@ -798,6 +840,114 @@ export class ProyectoEdtService {
     }
   }
 
+  // ✅ Obtener EDTs comerciales de un proyecto (desde su cotización)
+  static async obtenerEdtsComercialesDeProyecto(proyectoId: string): Promise<any[]> {
+    try {
+      // Obtener el proyecto con su cotización
+      const proyecto = await prisma.proyecto.findUnique({
+        where: { id: proyectoId },
+        select: {
+          id: true,
+          cotizacion: {
+            select: { id: true }
+          }
+        }
+      });
+
+      if (!proyecto?.cotizacion) {
+        return [];
+      }
+
+      // Obtener EDTs comerciales de la cotización
+      const comercialEdts = await prisma.cotizacionEdt.findMany({
+        where: { cotizacionId: proyecto.cotizacion.id },
+        include: {
+          cotizacionServicio: {
+            select: {
+              id: true,
+              nombre: true
+            }
+          },
+          categoriaServicio: {
+            select: {
+              id: true,
+              nombre: true
+            }
+          },
+          responsable: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          tareas: {
+            include: {
+              responsable: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
+            },
+            orderBy: { createdAt: 'asc' }
+          }
+        },
+        orderBy: { createdAt: 'asc' }
+      });
+
+      // Transformar datos para consistencia con ProyectoEdt
+      return comercialEdts.map(edt => ({
+        id: edt.id,
+        proyectoId: proyectoId, // Referencia al proyecto actual
+        nombre: edt.cotizacionServicio?.nombre || 'EDT sin nombre', // Copiar nombre del servicio
+        categoriaServicioId: edt.categoriaServicioId,
+        zona: edt.zona,
+        fechaInicio: edt.fechaInicioComercial?.toISOString(),
+        fechaFin: edt.fechaFinComercial?.toISOString(),
+        horasPlan: Number(edt.horasEstimadas || 0),
+        responsableId: edt.responsableId,
+        descripcion: edt.descripcion,
+        prioridad: edt.prioridad,
+        estado: edt.estado,
+        createdAt: edt.createdAt.toISOString(),
+        updatedAt: edt.updatedAt.toISOString(),
+        proyecto: {
+          id: proyectoId,
+          nombre: '', // Se llenará desde el contexto
+          codigo: '',
+          estado: 'en_ejecucion' as any // Estado por defecto para comerciales
+        },
+        categoriaServicio: edt.categoriaServicio,
+        responsable: edt.responsable,
+        tareas: edt.tareas.map(tarea => ({
+          id: tarea.id,
+          nombre: tarea.nombre,
+          descripcion: tarea.descripcion,
+          fechaInicio: tarea.fechaInicio.toISOString(),
+          fechaFin: tarea.fechaFin.toISOString(),
+          horasEstimadas: Number(tarea.horasEstimadas || 0),
+          estado: tarea.estado,
+          prioridad: tarea.prioridad,
+          responsableId: tarea.responsableId,
+          dependenciaId: tarea.dependenciaId,
+          responsable: tarea.responsable,
+          createdAt: tarea.createdAt.toISOString(),
+          updatedAt: tarea.updatedAt.toISOString()
+        })),
+        // Campos específicos de EDT comercial
+        tipo: 'comercial',
+        horasReales: 0, // No aplica para comerciales
+        porcentajeAvance: 0, // No aplica para comerciales
+        registrosHoras: [] // No aplica para comerciales
+      }));
+    } catch (error) {
+      logger.error('Error al obtener EDTs comerciales del proyecto:', error);
+      throw new Error('Error al obtener EDTs comerciales del proyecto');
+    }
+  }
+
   // ✅ Obtener EDT por responsable
   static async obtenerEdtsPorResponsable(
     responsableId: string,
@@ -875,6 +1025,7 @@ export class ProyectoEdtService {
 
       return edts.map(edt => ({
         ...edt,
+        nombre: edt.nombre,
         zona: edt.zona ?? undefined,
         responsableId: edt.responsableId ?? undefined,
         descripcion: edt.descripcion ?? undefined,
@@ -887,6 +1038,10 @@ export class ProyectoEdtService {
         horasReales: Number(edt.horasReales),
         createdAt: edt.createdAt.toISOString(),
         updatedAt: edt.updatedAt.toISOString(),
+        proyecto: {
+          ...edt.proyecto,
+          estado: edt.proyecto.estado as any
+        },
         registrosHoras: edt.registrosHoras.map(registro => ({
           ...registro,
           fechaTrabajo: registro.fechaTrabajo.toISOString(),
@@ -902,7 +1057,7 @@ export class ProyectoEdtService {
           origen: registro.origen || '',
           ubicacion: registro.ubicacion || ''
         }))
-      }));
+      })) as ProyectoEdtConRelaciones[];
     } catch (error) {
       logger.error('Error al obtener EDT por responsable:', error);
       throw error;

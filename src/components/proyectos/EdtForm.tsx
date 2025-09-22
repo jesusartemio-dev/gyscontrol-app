@@ -23,6 +23,7 @@ import type { ProyectoEdtPayload } from '@/types/payloads';
 
 // ✅ Schema de validación Zod
 const edtFormSchema = z.object({
+  nombre: z.string().min(1, 'El nombre del EDT es requerido'),
   categoriaServicioId: z.string().min(1, 'La categoría de servicio es requerida'),
   prioridad: z.enum(['baja', 'media', 'alta', 'critica'], {
     required_error: 'La prioridad es requerida'
@@ -90,6 +91,7 @@ export function EdtForm({
   const form = useForm<EdtFormData>({
     resolver: zodResolver(edtFormSchema),
     defaultValues: {
+      nombre: edt?.nombre || '',
       categoriaServicioId: edt?.categoriaServicioId || '',
       prioridad: edt?.prioridad || 'media',
       zona: edt?.zona || '',
@@ -108,6 +110,7 @@ export function EdtForm({
     try {
       const payload: ProyectoEdtPayload = {
         proyectoId,
+        nombre: data.nombre,
         categoriaServicioId: data.categoriaServicioId,
         prioridad: data.prioridad,
         zona: data.zona || undefined,
@@ -139,6 +142,8 @@ export function EdtForm({
 
   // ✅ Validar fechas en tiempo real
   const fechaInicio = form.watch('fechaInicioPlan');
+  const categoriaServicioId = form.watch('categoriaServicioId');
+
   useEffect(() => {
     const fechaFin = form.getValues('fechaFinPlan');
     if (fechaInicio && fechaFin && fechaFin <= fechaInicio) {
@@ -147,6 +152,19 @@ export function EdtForm({
       form.setValue('fechaFinPlan', nuevaFechaFin);
     }
   }, [fechaInicio, form]);
+
+  // ✅ Auto-fill nombre when categoriaServicio changes
+  useEffect(() => {
+    if (categoriaServicioId && !isEditing) {
+      const categoria = categoriasServicios.find(c => c.id === categoriaServicioId);
+      if (categoria) {
+        const currentNombre = form.getValues('nombre');
+        if (!currentNombre || currentNombre === '') {
+          form.setValue('nombre', categoria.nombre);
+        }
+      }
+    }
+  }, [categoriaServicioId, categoriasServicios, form, isEditing]);
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
@@ -160,6 +178,24 @@ export function EdtForm({
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            {/* ✅ Nombre del EDT */}
+            <FormField
+              control={form.control}
+              name="nombre"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre del EDT *</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Ej: Instalación eléctrica zona A, Montaje de equipos, etc."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* ✅ Fila 1: Categoría y Prioridad */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField

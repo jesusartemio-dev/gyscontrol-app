@@ -1,0 +1,158 @@
+{
+  "exclusiones": [
+    {
+      "id": "plantilla-exclusiones-general",
+      "nombre": "Exclusiones Generales",
+      "descripcion": "Exclusiones estándar para proyectos industriales",
+      "categoria": "general",
+      "activo": true,
+      "orden": 1,
+      "createdAt": "2025-09-18T15:51:37.702Z",
+      "updatedAt": "2025-09-18T15:52:08.462Z",
+      "items": [
+        {
+          "id": "item-1",
+          "descripcion": "Suministro de licencias para el correcto funcionamiento del sistema",
+          "orden": 1,
+          "activo": true,
+          "updatedAt": "2025-09-18T15:52:08.462Z"
+        },
+        {
+          "id": "item-2",
+          "descripcion": "Calibración de instrumentos",
+          "orden": 2,
+          "activo": true,
+          "updatedAt": "2025-09-18T15:52:08.462Z"
+        },
+        {
+          "id": "item-3",
+          "descripcion": "Planos o diagramas eléctricos/mecánicos completos del sistema",
+          "orden": 3,
+          "activo": true,
+          "updatedAt": "2025-09-18T15:52:08.462Z"
+        },
+        {
+          "id": "exc-item-1758210728462-3",
+          "descripcion": "Hospedaje",
+          "orden": 4,
+          "activo": true,
+          "updatedAt": "2025-09-18T15:52:08.462Z"
+        }
+      ],
+      "_count": {
+        "items": 4
+      }
+    },
+    {
+      "id": "plantilla-1758210800737",
+      "nombre": "Movilidad",
+      "descripcion": "no incluye movilidad",
+      "categoria": "",
+      "orden": 0,
+      "activo": true,
+      "createdAt": "2025-09-18T15:53:20.737Z",
+      "updatedAt": "2025-09-18T15:53:20.737Z",
+      "items": [
+        {
+          "id": "item-1758210800737-0",
+          "descripcion": "no camioneta",
+          "orden": 1,
+          "activo": true,
+          "createdAt": "2025-09-18T15:53:20.737Z",
+          "updatedAt": "2025-09-18T15:53:20.737Z"
+        },
+        {
+          "id": "item-1758210800737-1",
+          "descripcion": "No bus ni vuelos",
+          "orden": 2,
+          "activo": true,
+          "createdAt": "2025-09-18T15:53:20.737Z",
+          "updatedAt": "2025-09-18T15:53:20.737Z"
+        }
+      ],
+      "_count": {
+        "items": 2
+      }
+    }
+  ],
+  "condiciones": [
+    {
+      "id": "plantilla-condiciones-general",
+      "nombre": "Condiciones Generales",
+      "descripcion": "Condiciones estándar para proyectos industriales",
+      "categoria": "general",
+      "tipo": "comercial",
+      "activo": true,
+      "orden": 1,
+      "createdAt": "2025-09-18T15:51:37.702Z",
+      "updatedAt": "2025-09-18T15:55:03.182Z",
+      "items": [
+        {
+          "id": "cond-1",
+          "descripcion": "Los precios son válidos según el alcance técnico ofertado y plazos estipulados. Cualquier modificación requerida por el cliente será objeto de actualización de oferta.",
+          "tipo": "comercial",
+          "orden": 1,
+          "activo": true,
+          "updatedAt": "2025-09-18T15:55:03.182Z"
+        },
+        {
+          "id": "cond-2",
+          "descripcion": "El cliente debe enviar su orden de compra a ventas@gyscontrol.com. Si no recibe confirmación, debe comunicarse con GYS.",
+          "tipo": "comercial",
+          "orden": 2,
+          "activo": true,
+          "updatedAt": "2025-09-18T15:55:03.182Z"
+        },
+        {
+          "id": "cond-3",
+          "descripcion": "El plazo de entrega inicia una vez aclarado técnica-comercialmente el pedido.",
+          "tipo": "entrega",
+          "orden": 3,
+          "activo": true,
+          "updatedAt": "2025-09-18T15:55:03.182Z"
+        },
+        {
+          "id": "cond-item-1758210903182-3",
+          "descripcion": "no entrega en campo",
+          "tipo": "comercial",
+          "orden": 4,
+          "activo": true,
+          "updatedAt": "2025-09-18T15:55:03.182Z"
+        }
+      ],
+      "_count": {
+        "items": 4
+      }
+    },
+    {
+      "id": "plantilla-condiciones-precios",
+      "nombre": "Condiciones de Precios y Pagos",
+      "descripcion": "Condiciones específicas para precios y formas de pago",
+      "categoria": "precios",
+      "tipo": "comercial",
+      "activo": true,
+      "orden": 2,
+      "createdAt": "2025-09-18T15:51:37.702Z",
+      "updatedAt": "2025-09-18T15:51:37.702Z",
+      "items": [
+        {
+          "id": "precio-1",
+          "descripcion": "Los precios ofertados NO incluyen IGV.",
+          "tipo": "comercial",
+          "orden": 1,
+          "activo": true
+        },
+        {
+          "id": "precio-2",
+          "descripcion": "No se aceptará anulación total o parcial de órdenes de compra, salvo casos sustentados. Penalidades pueden alcanzar hasta el 100% del valor de la orden.",
+          "tipo": "comercial",
+          "orden": 2,
+          "activo": true
+        }
+      ],
+      "_count": {
+        "items": 2
+      }
+    }
+  ]
+}

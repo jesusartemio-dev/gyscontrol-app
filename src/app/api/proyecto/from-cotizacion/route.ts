@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createProyectoFromCotizacionSchema } from '@/lib/validators/proyecto'
 import { z } from 'zod'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 // ✅ Tipo explícito para cotización con includes
 type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
@@ -16,6 +16,17 @@ type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
     equipos: { include: { items: true } }
     servicios: { include: { items: true } }
     gastos: { include: { items: true } }
+    cronograma: {
+      include: {
+        categoriaServicio: true
+        responsable: true
+        tareas: {
+          include: {
+            responsable: true
+          }
+        }
+      }
+    }
   }
 }>
 
@@ -43,7 +54,7 @@ export async function POST(request: NextRequest) {
       fechaInicio, 
       fechaFin, 
       gestorId, 
-      estado = 'en_planificacion',
+      estado = 'creado',
       totalEquiposInterno,
       totalServiciosInterno,
       totalGastosInterno,
@@ -70,6 +81,17 @@ export async function POST(request: NextRequest) {
         equipos: { include: { items: true } },
         servicios: { include: { items: true } },
         gastos: { include: { items: true } },
+        cronograma: {
+          include: {
+            categoriaServicio: true,
+            responsable: true,
+            tareas: {
+              include: {
+                responsable: true
+              }
+            }
+          }
+        }
       },
     })
 
@@ -140,9 +162,7 @@ export async function POST(request: NextRequest) {
             responsableId: gestorId,
             items: {
               create: grupo.items.map((item) => ({
-                catalogoEquipo: item.catalogoEquipoId
-                  ? { connect: { id: item.catalogoEquipoId } }
-                  : undefined,
+                catalogoEquipoId: item.catalogoEquipoId,
                 codigo: item.codigo,
                 descripcion: item.descripcion,
                 categoria: item.categoria,
@@ -167,9 +187,7 @@ export async function POST(request: NextRequest) {
             responsableId: gestorId,
             items: {
               create: grupo.items.map((item) => ({
-                catalogoServicio: item.catalogoServicioId
-                  ? { connect: { id: item.catalogoServicioId } }
-                  : undefined,
+                catalogoServicioId: item.catalogoServicioId,
                 categoria: item.categoria,
                 costoHoraInterno: item.costoHora,
                 costoHoraCliente: item.costoHora * item.margen,
@@ -205,7 +223,73 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(proyecto)
+    // ✅ Convertir EDTs comerciales a EDTs de proyecto
+    if (cotizacion.cronograma && cotizacion.cronograma.length > 0) {
+      console.log(`📅 Convirtiendo ${cotizacion.cronograma.length} EDTs comerciales a proyecto ${proyecto.id}`)
+
+      for (const edtComercial of cotizacion.cronograma) {
+        // ✅ Validar que categoriaServicio existe antes de crear EDT
+        if (!edtComercial.categoriaServicio) {
+          console.warn(`⚠️ EDT comercial ${edtComercial.id} no tiene categoriaServicio, saltando...`)
+          continue
+        }
+
+        // Crear EDT de proyecto basado en el comercial
+        const edtProyecto = await prisma.proyectoEdt.create({
+          data: {
+            proyectoId: proyecto.id,
+            nombre: edtComercial.nombre || 'EDT sin nombre',
+            categoriaServicioId: edtComercial.categoriaServicioId || '',
+            zona: edtComercial.zona,
+            fechaInicioPlan: edtComercial.fechaInicioComercial,
+            fechaFinPlan: edtComercial.fechaFinComercial,
+            horasPlan: new Prisma.Decimal(edtComercial.horasEstimadas || 0),
+            responsableId: edtComercial.responsableId,
+            descripcion: edtComercial.descripcion,
+            prioridad: edtComercial.prioridad || 'media',
+            estado: 'planificado',
+            porcentajeAvance: 0
+          }
+        })
+
+        console.log(`✅ EDT proyecto creado: ${edtProyecto.id} desde comercial ${edtComercial.id}`)
+
+        // Convertir tareas comerciales a registros de horas (por ahora)
+        // Nota: Las tareas comerciales se convierten en registros de horas iniciales
+        if (edtComercial.tareas && edtComercial.tareas.length > 0) {
+          // Obtener el primer servicio de proyecto para asociar las horas
+          const primerServicioProyecto = await prisma.proyectoServicio.findFirst({
+            where: { proyectoId: proyecto.id }
+          })
+
+          for (const tareaComercial of edtComercial.tareas) {
+            if (tareaComercial.fechaInicio && tareaComercial.fechaFin && tareaComercial.horasEstimadas) {
+              await prisma.registroHoras.create({
+                data: {
+                  proyectoId: proyecto.id,
+                  proyectoServicioId: primerServicioProyecto?.id || '',
+                  categoria: edtComercial.categoriaServicio?.nombre || 'Sin categoría',
+                  nombreServicio: tareaComercial.nombre,
+                  recursoId: '', // TODO: Determinar recurso apropiado
+                  recursoNombre: 'Recurso por asignar',
+                  usuarioId: tareaComercial.responsableId || gestorId,
+                  fechaTrabajo: tareaComercial.fechaInicio,
+                  horasTrabajadas: Number(tareaComercial.horasEstimadas),
+                  descripcion: `Tarea comercial convertida: ${tareaComercial.nombre}`,
+                  proyectoEdtId: edtProyecto.id,
+                  categoriaServicioId: edtComercial.categoriaServicioId || ''
+                }
+              })
+            }
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({
+      ...proyecto,
+      cronogramaConvertido: cotizacion.cronograma?.length || 0
+    })
   } catch (error) {
     console.error('❌ Error al crear proyecto desde cotización:', error)
     return NextResponse.json({ error: 'Error interno al crear proyecto' }, { status: 500 })

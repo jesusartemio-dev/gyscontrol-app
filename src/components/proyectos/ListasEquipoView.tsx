@@ -30,15 +30,17 @@ async function fetchListasEquipo(proyectoId?: string, estado?: EstadoListaEquipo
     const params = new URLSearchParams()
     if (proyectoId && proyectoId !== 'todos') params.append('proyectoId', proyectoId)
     if (estado && estado !== 'todos' && estado !== 'all') params.append('estado', estado)
-    
+
     const url = `/api/listas-equipo${params.toString() ? `?${params.toString()}` : ''}`
     const response = await fetch(url, { cache: 'no-store' })
-    
+
     if (!response.ok) {
       throw new Error('Error al obtener listas de equipos')
     }
-    
-    return await response.json()
+
+    const result = await response.json()
+    // ✅ Handle paginated response - extract data array
+    return result.data || result || []
   } catch (error) {
     console.error('❌ Error fetching listas:', error)
     toast.error('Error al cargar las listas de equipos')

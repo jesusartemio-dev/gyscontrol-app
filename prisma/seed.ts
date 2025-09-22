@@ -94,6 +94,86 @@ async function main() {
     proveedor3: { id: proveedor3.id, nombre: proveedor3.nombre }
   })
 
+  // Crear categorías de servicio para el cronograma
+  const categoria1 = await prisma.categoriaServicio.upsert({
+    where: { nombre: 'Instalación Eléctrica' },
+    update: {},
+    create: {
+      nombre: 'Instalación Eléctrica'
+    }
+  })
+
+  const categoria2 = await prisma.categoriaServicio.upsert({
+    where: { nombre: 'Montaje Estructural' },
+    update: {},
+    create: {
+      nombre: 'Montaje Estructural'
+    }
+  })
+
+  const categoria3 = await prisma.categoriaServicio.upsert({
+    where: { nombre: 'Sistema de Control' },
+    update: {},
+    create: {
+      nombre: 'Sistema de Control'
+    }
+  })
+
+  const categoria4 = await prisma.categoriaServicio.upsert({
+    where: { nombre: 'Puesta en Marcha' },
+    update: {},
+    create: {
+      nombre: 'Puesta en Marcha'
+    }
+  })
+
+  console.log('✅ Categorías de servicio creadas:', {
+    categoria1: { id: categoria1.id, nombre: categoria1.nombre },
+    categoria2: { id: categoria2.id, nombre: categoria2.nombre },
+    categoria3: { id: categoria3.id, nombre: categoria3.nombre },
+    categoria4: { id: categoria4.id, nombre: categoria4.nombre }
+  })
+
+  // Crear fases por defecto para el sistema de cronograma
+  const fase1 = await (prisma as any).faseDefault.create({
+    data: {
+      nombre: 'Planificación',
+      descripcion: 'Fase de planificación detallada del proyecto',
+      orden: 1,
+      porcentajeDuracion: 20,
+      color: '#3b82f6',
+      activo: true
+    }
+  })
+
+  const fase2 = await (prisma as any).faseDefault.create({
+    data: {
+      nombre: 'Ejecución',
+      descripcion: 'Fase de ejecución y montaje del proyecto',
+      orden: 2,
+      porcentajeDuracion: 60,
+      color: '#10b981',
+      activo: true
+    }
+  })
+
+  const fase3 = await (prisma as any).faseDefault.create({
+    data: {
+      nombre: 'Cierre',
+      descripcion: 'Fase de pruebas, documentación y entrega final',
+      orden: 3,
+      porcentajeDuracion: 20,
+      color: '#f59e0b',
+      activo: true
+    }
+  })
+
+  console.log('✅ Fases por defecto creadas:', {
+    fase1: { id: fase1.id, nombre: fase1.nombre, porcentaje: fase1.porcentajeDuracion },
+    fase2: { id: fase2.id, nombre: fase2.nombre, porcentaje: fase2.porcentajeDuracion },
+    fase3: { id: fase3.id, nombre: fase3.nombre, porcentaje: fase3.porcentajeDuracion }
+  })
+
   console.log('🎉 Seed completado exitosamente!')
   console.log('\n📋 Credenciales de acceso:')
   console.log('Email: admin@gys.com | Contraseña: admin123 | Rol: admin')

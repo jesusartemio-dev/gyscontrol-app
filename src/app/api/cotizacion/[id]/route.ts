@@ -37,6 +37,13 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
           include: {
             items: true
           }
+        },
+        // ✅ Nuevas relaciones para exclusiones y condiciones
+        exclusiones: {
+          orderBy: { orden: 'asc' }
+        },
+        condiciones: {
+          orderBy: { orden: 'asc' }
         }
       }
     })

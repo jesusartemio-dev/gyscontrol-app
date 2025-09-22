@@ -1,9 +1,9 @@
 // ===================================================
-// 📁 Archivo: page.tsx (Detalles del Proyecto)
-// 📌 Descripción: Página mejorada de detalles del proyecto con diseño moderno
-// 📌 Características: Header mejorado, estadísticas visuales, navegación, timeline
-// ✍️ Autor: Sistema de IA
-// 📅 Actualizado: 2025-01-27
+// 📁 Archivo: page.tsx (Resumen del Proyecto)
+// 📌 Descripción: Dashboard de resumen del proyecto con navegación a secciones detalladas
+// 🎨 Vista simplificada con cards interactivos para mejor UX
+// ✍️ Autor: Sistema de IA Mejorado
+// 📅 Última actualización: 2025-09-20
 // ===================================================
 
 'use client'
@@ -16,30 +16,30 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import {
-  ArrowLeft,
-  Building,
-  User,
-  Calendar,
-  DollarSign,
   Package,
   Settings,
   Receipt,
+  DollarSign,
   TrendingUp,
-  Edit,
-  Share2,
-  Download,
   Eye,
+  AlertCircle,
+  ArrowRight,
+  BarChart3,
+  Target,
   Clock,
   CheckCircle,
-  AlertCircle,
-  PauseCircle
+  AlertTriangle,
+  PlayCircle,
+  XCircle,
+  PauseCircle,
+  Truck,
+  Calendar,
+  ArrowLeft
 } from 'lucide-react'
-import ProyectoEquipoAccordion from '@/components/proyectos/ProyectoEquipoAccordion'
-import ProyectoServicioAccordion from '@/components/proyectos/ProyectoServicioAccordion'
+import Link from 'next/link'
 
 export default function ProyectoDetallePage() {
   const { id } = useParams()
@@ -62,35 +62,85 @@ export default function ProyectoDetallePage() {
   }, [id])
 
   // Helper functions
-  const getStatusIcon = (estado: string) => {
-    switch (estado.toLowerCase()) {
-      case 'activo':
-        return <CheckCircle className="h-4 w-4" />
-      case 'completado':
-        return <CheckCircle className="h-4 w-4" />
-      case 'pausado':
-        return <PauseCircle className="h-4 w-4" />
-      case 'cancelado':
-        return <AlertCircle className="h-4 w-4" />
-      default:
-        return <Clock className="h-4 w-4" />
+  const getStatusInfo = (estado: string) => {
+    const statusMap: Record<string, any> = {
+      'creado': {
+        icon: <Clock className="h-4 w-4" />,
+        variant: 'outline' as const,
+        color: 'bg-blue-100 text-blue-800',
+        label: 'Creado',
+        description: 'Proyecto recién creado desde cotización'
+      },
+      'listas_pendientes': {
+        icon: <AlertTriangle className="h-4 w-4" />,
+        variant: 'outline' as const,
+        color: 'bg-yellow-100 text-yellow-800',
+        label: 'Listas Pendientes',
+        description: 'Esperando creación/aprobación de listas'
+      },
+      'listas_aprobadas': {
+        icon: <CheckCircle className="h-4 w-4" />,
+        variant: 'default' as const,
+        color: 'bg-green-100 text-green-800',
+        label: 'Listo para Pedidos',
+        description: 'Listas aprobadas, puede crear pedidos'
+      },
+      'pedidos_creados': {
+        icon: <Truck className="h-4 w-4" />,
+        variant: 'default' as const,
+        color: 'bg-purple-100 text-purple-800',
+        label: 'En Ejecución',
+        description: 'Pedidos parciales creados'
+      },
+      'en_ejecucion': {
+        icon: <PlayCircle className="h-4 w-4" />,
+        variant: 'default' as const,
+        color: 'bg-blue-100 text-blue-800',
+        label: 'En Ejecución',
+        description: 'Proyecto en ejecución activa'
+      },
+      'completado': {
+        icon: <CheckCircle className="h-4 w-4" />,
+        variant: 'default' as const,
+        color: 'bg-green-100 text-green-800',
+        label: 'Completado',
+        description: 'Proyecto terminado exitosamente'
+      },
+      'pausado': {
+        icon: <PauseCircle className="h-4 w-4" />,
+        variant: 'outline' as const,
+        color: 'bg-orange-100 text-orange-800',
+        label: 'Pausado',
+        description: 'Proyecto temporalmente pausado'
+      },
+      'cancelado': {
+        icon: <XCircle className="h-4 w-4" />,
+        variant: 'outline' as const,
+        color: 'bg-red-100 text-red-800',
+        label: 'Cancelado',
+        description: 'Proyecto cancelado'
+      }
     }
+    return statusMap[estado] || statusMap.creado
   }
 
-  const getStatusVariant = (estado: string): "default" | "outline" => {
-    switch (estado.toLowerCase()) {
-      case 'activo':
-        return 'default'
-      case 'completado':
-        return 'default'
-      case 'pausado':
-        return 'outline'
-      case 'cancelado':
-        return 'outline'
-      default:
-        return 'outline'
+  const getNextAction = (estado: string) => {
+    const actions: Record<string, any> = {
+      'creado': { text: 'Crear Listas', url: `/proyectos/${id}/listas`, icon: <Package className="h-4 w-4" /> },
+      'listas_pendientes': { text: 'Aprobar Listas', url: `/proyectos/${id}/listas`, icon: <CheckCircle className="h-4 w-4" /> },
+      'listas_aprobadas': { text: 'Crear Pedidos', url: `/proyectos/${id}/pedidos`, icon: <Truck className="h-4 w-4" /> },
+      'pedidos_creados': { text: 'Monitorear', url: `/proyectos/${id}/cronograma`, icon: <Target className="h-4 w-4" /> },
+      'en_ejecucion': { text: 'Ver Cronograma', url: `/proyectos/${id}/cronograma`, icon: <Calendar className="h-4 w-4" /> },
+      'completado': { text: 'Finalizado', url: null, icon: <CheckCircle className="h-4 w-4" /> },
+      'pausado': { text: 'Reanudar', url: null, icon: <PlayCircle className="h-4 w-4" /> },
+      'cancelado': { text: 'Cancelado', url: null, icon: <XCircle className="h-4 w-4" /> }
     }
+    return actions[estado] || actions.creado
   }
+
+  // Legacy functions for backward compatibility
+  const getStatusIcon = (estado: string) => getStatusInfo(estado).icon
+  const getStatusVariant = (estado: string) => getStatusInfo(estado).variant
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -144,350 +194,305 @@ export default function ProyectoDetallePage() {
     )
   }
 
+  // Calculate summary statistics
+  const getSummaryStats = (proyecto: Proyecto) => {
+    const equiposCount = proyecto.equipos?.length || 0
+    const serviciosCount = proyecto.servicios?.length || 0
+    const gastosCount = proyecto.gastos?.length || 0
+
+    const equiposItems = proyecto.equipos?.reduce((sum, eq) => sum + (eq.items?.length || 0), 0) || 0
+    const serviciosItems = proyecto.servicios?.reduce((sum, sv) => sum + (sv.items?.length || 0), 0) || 0
+    const gastosItems = proyecto.gastos?.reduce((sum, ga) => sum + (ga.items?.length || 0), 0) || 0
+
+    const totalItems = equiposItems + serviciosItems + gastosItems
+
+    return {
+      equipos: { count: equiposCount, items: equiposItems },
+      servicios: { count: serviciosCount, items: serviciosItems },
+      gastos: { count: gastosCount, items: gastosItems },
+      totalItems,
+      totalCost: proyecto.grandTotal || 0,
+      daysElapsed: Math.round(((new Date().getTime() - new Date(proyecto.fechaInicio).getTime()) / (1000 * 60 * 60 * 24)))
+    }
+  }
+
+  const stats = getSummaryStats(proyecto)
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {/* Header Section */}
+    <div className="space-y-8">
+      {/* Welcome Section */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center space-y-4"
+      >
+        <div className="flex items-center justify-center gap-3">
+          <Eye className="h-8 w-8 text-blue-600" />
+          <h1 className="text-3xl font-bold text-gray-900">Resumen del Proyecto</h1>
+        </div>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          Vista general del proyecto con acceso rápido a todas las secciones principales
+        </p>
+        <Badge className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium ${getStatusInfo(proyecto.estado).color}`}>
+          {getStatusInfo(proyecto.estado).icon}
+          {getStatusInfo(proyecto.estado).label}
+        </Badge>
+      </motion.div>
+
+      {/* Summary Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Equipos Card */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6"
+          transition={{ delay: 0.1 }}
         >
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            {/* Project Title & Info */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push('/proyectos')}
-                  className="text-slate-600 hover:text-slate-900"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  Proyectos
-                </Button>
-                <Separator orientation="vertical" className="h-6" />
-                <Badge variant={getStatusVariant(proyecto.estado)} className="flex items-center gap-1">
-                  {getStatusIcon(proyecto.estado)}
-                  {proyecto.estado.charAt(0).toUpperCase() + proyecto.estado.slice(1)}
-                </Badge>
-              </div>
-              
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{proyecto.nombre}</h1>
-                <p className="text-slate-600 flex items-center gap-2">
-                  <Eye className="h-4 w-4" />
-                  Código: <span className="font-mono font-medium">{proyecto.codigo}</span>
-                </p>
-              </div>
-
-              {/* Quick Info */}
-              <div className="flex flex-wrap gap-4 text-sm text-slate-600">
-                <div className="flex items-center gap-2">
-                  <Building className="h-4 w-4" />
-                  <span>{proyecto.cliente?.nombre || 'Sin cliente'}</span>
+          <Link href={`/proyectos/${id}/equipos`}>
+            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-blue-200 hover:border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-lg">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-6 w-6 text-blue-600" />
+                    Equipos
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-blue-600" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-blue-700 font-medium">Grupos</span>
+                  <span className="text-2xl font-bold text-blue-900">{stats.equipos.count}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span>{proyecto.comercial?.name || 'Sin comercial'}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-blue-700 font-medium">Items Totales</span>
+                  <span className="text-lg font-semibold text-blue-800">{stats.equipos.items}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  <span>{formatDate(proyecto.fechaInicio)}</span>
+                <div className="pt-2 border-t border-blue-200">
+                  <p className="text-xs text-blue-600">
+                    Gestiona equipos técnicos, listas y pedidos del proyecto
+                  </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm">
-                <Share2 className="h-4 w-4 mr-2" />
-                Compartir
-              </Button>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-              <Button size="sm">
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
-            </div>
-          </div>
+              </CardContent>
+            </Card>
+          </Link>
         </motion.div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Project Details */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="lg:col-span-2 space-y-6"
-          >
-            {/* Project Information */}
-            <Card className="border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Settings className="h-5 w-5 text-slate-600" />
-                  Información del Proyecto
+        {/* Servicios Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Link href={`/proyectos/${id}/servicios`}>
+            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-purple-200 hover:border-purple-300 bg-gradient-to-br from-purple-50 to-purple-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-lg">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-6 w-6 text-purple-600" />
+                    Servicios
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-purple-600" />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <Building className="h-4 w-4" />
-                        Cliente
-                      </span>
-                      <span className="text-sm text-slate-900 font-medium">
-                        {proyecto.cliente?.nombre || '—'}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <User className="h-4 w-4" />
-                        Comercial
-                      </span>
-                      <span className="text-sm text-slate-900 font-medium">
-                        {proyecto.comercial?.name || '—'}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <User className="h-4 w-4" />
-                        Gestor
-                      </span>
-                      <span className="text-sm text-slate-900 font-medium">
-                        {proyecto.gestor?.name || '—'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <Calendar className="h-4 w-4" />
-                        Fecha de Inicio
-                      </span>
-                      <span className="text-sm text-slate-900 font-medium">
-                        {formatDate(proyecto.fechaInicio)}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <TrendingUp className="h-4 w-4" />
-                        Estado
-                      </span>
-                      <Badge variant={getStatusVariant(proyecto.estado)} className="flex items-center gap-1">
-                        {getStatusIcon(proyecto.estado)}
-                        {proyecto.estado.charAt(0).toUpperCase() + proyecto.estado.slice(1)}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <Receipt className="h-4 w-4" />
-                        Descuento
-                      </span>
-                      <span className="text-sm text-slate-900 font-medium">
-                        {proyecto.descuento}%
-                      </span>
-                    </div>
-                  </div>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-purple-700 font-medium">Servicios</span>
+                  <span className="text-2xl font-bold text-purple-900">{stats.servicios.count}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-purple-700 font-medium">Items Totales</span>
+                  <span className="text-lg font-semibold text-purple-800">{stats.servicios.items}</span>
+                </div>
+                <div className="pt-2 border-t border-purple-200">
+                  <p className="text-xs text-purple-600">
+                    Gestiona servicios, requerimientos y entregas del proyecto
+                  </p>
                 </div>
               </CardContent>
             </Card>
+          </Link>
+        </motion.div>
 
-            {/* Equipment Section */}
-            <Card className="border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Package className="h-5 w-5 text-slate-600" />
-                  Equipos Técnicos del Proyecto
+        {/* Gastos Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Link href={`/proyectos/${id}/gastos`}>
+            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-orange-200 hover:border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-lg">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="h-6 w-6 text-orange-600" />
+                    Gastos
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-orange-600" />
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {proyecto.equipos && proyecto.equipos.length > 0 ? (
-                  <div className="space-y-4">
-                    {proyecto.equipos.map((equipo) => (
-                      <ProyectoEquipoAccordion
-                        key={equipo.id}
-                        equipo={equipo}
-                        onUpdatedItem={() => {
-                          // Refresh project data
-                          getProyectoById(id as string).then(setProyecto)
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-slate-500">
-                    <Package className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-                    <p className="text-lg font-medium mb-2">No hay equipos registrados</p>
-                    <p className="text-sm">Los equipos técnicos aparecerán aquí una vez que sean agregados al proyecto.</p>
-                  </div>
-                )}
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-orange-700 font-medium">Categorías</span>
+                  <span className="text-2xl font-bold text-orange-900">{stats.gastos.count}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-orange-700 font-medium">Items Totales</span>
+                  <span className="text-lg font-semibold text-orange-800">{stats.gastos.items}</span>
+                </div>
+                <div className="pt-2 border-t border-orange-200">
+                  <p className="text-xs text-orange-600">
+                    Gestiona gastos, presupuestos y control financiero del proyecto
+                  </p>
+                </div>
               </CardContent>
             </Card>
+          </Link>
+        </motion.div>
 
-            {/* Services Section */}
-            <Card className="border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Settings className="h-5 w-5 text-slate-600" />
-                  Servicios del Proyecto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {proyecto.servicios && proyecto.servicios.length > 0 ? (
-                  <div className="space-y-4">
-                    {proyecto.servicios.map((servicio) => (
-                      <ProyectoServicioAccordion
-                        key={servicio.id}
-                        servicio={servicio}
-                        onUpdatedItem={() => {
-                          // Refresh project data
-                          getProyectoById(id as string).then(setProyecto)
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-slate-500">
-                    <Settings className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-                    <p className="text-lg font-medium mb-2">No hay servicios registrados</p>
-                    <p className="text-sm">Los servicios aparecerán aquí una vez que sean agregados al proyecto.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Right Column - Financial Summary */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-6"
-          >
-            {/* Financial Overview */}
-            <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-white to-slate-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <DollarSign className="h-5 w-5 text-green-600" />
+        {/* Financial Summary Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-green-200 hover:border-green-300 bg-gradient-to-br from-green-50 to-green-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-lg">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-6 w-6 text-green-600" />
                   Resumen Financiero
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Cost Breakdown */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                    <span className="flex items-center gap-2 text-sm font-medium text-blue-700">
-                      <Package className="h-4 w-4" />
-                      Equipos
-                    </span>
-                    <span className="text-sm font-bold text-blue-900">
-                      {formatCurrency(proyecto.totalEquiposInterno)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-100">
-                    <span className="flex items-center gap-2 text-sm font-medium text-purple-700">
-                      <Settings className="h-4 w-4" />
-                      Servicios
-                    </span>
-                    <span className="text-sm font-bold text-purple-900">
-                      {formatCurrency(proyecto.totalServiciosInterno)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-100">
-                    <span className="flex items-center gap-2 text-sm font-medium text-orange-700">
-                      <Receipt className="h-4 w-4" />
-                      Gastos
-                    </span>
-                    <span className="text-sm font-bold text-orange-900">
-                      {formatCurrency(proyecto.totalGastosInterno)}
-                    </span>
-                  </div>
                 </div>
+                <ArrowRight className="h-5 w-5 text-green-600" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-green-700 font-medium">Total Items</span>
+                <span className="text-2xl font-bold text-green-900">{stats.totalItems}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-green-700 font-medium">Costo Total</span>
+                <span className="text-lg font-semibold text-green-800">{formatCurrency(stats.totalCost)}</span>
+              </div>
+              <div className="pt-2 border-t border-green-200">
+                <p className="text-xs text-green-600">
+                  Vista completa del presupuesto y costos del proyecto
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-                <Separator />
+        {/* Project Timeline Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-slate-200 hover:border-slate-300 bg-gradient-to-br from-slate-50 to-slate-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-lg">
+                <div className="flex items-center gap-2">
+                  <Target className="h-6 w-6 text-slate-600" />
+                  Cronograma
+                </div>
+                <ArrowRight className="h-5 w-5 text-slate-600" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-700 font-medium">Días Transcurridos</span>
+                <span className="text-2xl font-bold text-slate-900">{stats.daysElapsed}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-700 font-medium">Estado</span>
+                <span className="text-lg font-semibold text-slate-800">{getStatusInfo(proyecto.estado).label}</span>
+              </div>
+              <div className="pt-2 border-t border-slate-200">
+                <p className="text-xs text-slate-600">
+                  Monitorea el progreso y cronograma del proyecto
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-                {/* Totals */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                      <DollarSign className="h-4 w-4" />
-                      Total Cliente
-                    </span>
-                    <span className="text-sm font-bold text-slate-900">
-                      {formatCurrency(proyecto.totalCliente)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                    <span className="flex items-center gap-2 font-semibold text-green-700">
-                      <TrendingUp className="h-5 w-5" />
-                      Gran Total
-                    </span>
-                    <span className="text-lg font-bold text-green-800">
-                      {formatCurrency(proyecto.grandTotal)}
-                    </span>
-                  </div>
+        {/* Quick Actions Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-indigo-200 hover:border-indigo-300 bg-gradient-to-br from-indigo-50 to-indigo-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-lg">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-6 w-6 text-indigo-600" />
+                  Acciones Rápidas
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Stats */}
-            <Card className="border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className="h-5 w-5 text-slate-600" />
-                  Estadísticas Rápidas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {proyecto.equipos?.length || 0}
-                    </div>
-                    <div className="text-xs text-blue-700 font-medium">Equipos</div>
-                  </div>
-                  
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {proyecto.servicios?.length || 0}
-                    </div>
-                    <div className="text-xs text-purple-700 font-medium">Servicios</div>
-                  </div>
-                </div>
-                
-                <div className="text-center p-3 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {(proyecto.equipos?.reduce((acc, eq) => acc + (eq.items?.length || 0), 0) || 0) + 
-                     (proyecto.servicios?.reduce((acc, sv) => acc + (sv.items?.length || 0), 0) || 0)}
-                  </div>
-                  <div className="text-xs text-green-700 font-medium">Total Items</div>
-                </div>
-                
-                <div className="text-center p-3 bg-slate-50 rounded-lg">
-                  <div className="text-lg font-bold text-slate-600">
-                    {Math.round(((new Date().getTime() - new Date(proyecto.fechaInicio).getTime()) / (1000 * 60 * 60 * 24)))}
-                  </div>
-                  <div className="text-xs text-slate-700 font-medium">Días transcurridos</div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
+                <ArrowRight className="h-5 w-5 text-indigo-600" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start text-indigo-700 border-indigo-200 hover:bg-indigo-200"
+                  onClick={() => router.push(`/proyectos/${id}/equipos/listas`)}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Gestionar Listas Técnicas
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start text-indigo-700 border-indigo-200 hover:bg-indigo-200"
+                  onClick={() => router.push(`/proyectos/${id}/equipos/pedidos`)}
+                >
+                  <Truck className="h-4 w-4 mr-2" />
+                  Gestionar Pedidos
+                </Button>
+              </div>
+              <div className="pt-2 border-t border-indigo-200">
+                <p className="text-xs text-indigo-600">
+                  Accede rápidamente a las funciones más utilizadas
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
+
+      {/* Project Status Alert */}
+      {proyecto.estado === 'creado' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900 mb-1">¡Comienza tu proyecto!</h3>
+                  <p className="text-amber-700 text-sm mb-3">
+                    Es hora de crear las primeras listas técnicas para organizar los equipos del proyecto.
+                  </p>
+                  <Button
+                    onClick={() => router.push(`/proyectos/${id}/equipos`)}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Ir a Equipos
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
     </div>
   )
 }

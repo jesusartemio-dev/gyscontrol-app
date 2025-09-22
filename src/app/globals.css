@@ -43,14 +43,11 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* ✅ Optimización de fuentes con font-display: swap */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
+/* ✅ Fuentes optimizadas para mejor compatibilidad */
 body {
   /* 🎯 Fuente optimizada con fallback system */
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-display: swap; /* ✅ Evita FOIT (Flash of Invisible Text) */
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; /* 🎨 Mejores características tipográficas */
 }
 
 :root {

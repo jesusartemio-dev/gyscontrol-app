@@ -29,7 +29,7 @@ interface Props {
   plantillaId: string
   plantillaServicioId: string
   categoriaNombre: string
-  onCreated: (item: PlantillaServicioItem) => void
+  onCreated: (items: PlantillaServicioItem[]) => void // ✅ Changed to accept array of items
 }
 
 export default function PlantillaServicioItemsModal({
@@ -157,8 +157,8 @@ export default function PlantillaServicioItemsModal({
       // 📡 Recalculate template totals
       await recalcularPlantillaDesdeAPI(plantillaId)
       
-      // 🔁 Notify parent components
-      nuevosItems.forEach(item => onCreated(item))
+      // 🔁 Notify parent components - Pass all items at once for batch update
+      onCreated(nuevosItems)
       
       toast.success(`${nuevosItems.length} servicio${nuevosItems.length !== 1 ? 's' : ''} agregado${nuevosItems.length !== 1 ? 's' : ''} correctamente ✅`)
       onClose()

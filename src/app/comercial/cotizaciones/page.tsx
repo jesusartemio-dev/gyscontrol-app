@@ -24,7 +24,6 @@ import { Separator } from '@/components/ui/separator'
 import CotizacionForm from '@/components/cotizaciones/CotizacionForm'
 import CotizacionList from '@/components/cotizaciones/CotizacionList'
 import { getCotizaciones } from '@/lib/services/cotizacion'
-import { calcularTotal } from '@/lib/utils/costos'
 import type { Cotizacion } from '@/types'
 
 // Utility functions
@@ -63,18 +62,16 @@ export default function CotizacionesPage() {
   useEffect(() => {
     getCotizaciones()
       .then((data) => {
-        const actualizadas = data.map(c => ({
-          ...c,
-          ...calcularTotal(c)
-        }))
-        setCotizaciones(actualizadas)
+        // No recalculamos los totales aquí porque la API ya los devuelve correctos
+        // Solo usamos calcularTotal cuando tenemos los arrays completos de items
+        setCotizaciones(data)
       })
       .catch(() => setError('Error al cargar cotizaciones.'))
       .finally(() => setLoading(false))
   }, [])
 
   const handleCreated = (nueva: Cotizacion) => {
-    setCotizaciones(prev => [...prev, { ...nueva, ...calcularTotal(nueva) }])
+    setCotizaciones(prev => [...prev, nueva])
   }
 
   const handleDelete = (id: string) => {
@@ -83,7 +80,7 @@ export default function CotizacionesPage() {
 
   const handleUpdated = (actualizada: Cotizacion) => {
     setCotizaciones(prev =>
-      prev.map(c => c.id === actualizada.id ? { ...actualizada, ...calcularTotal(actualizada) } : c)
+      prev.map(c => c.id === actualizada.id ? actualizada : c)
     )
   }
 

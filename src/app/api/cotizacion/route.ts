@@ -12,12 +12,13 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import type { CotizacionesPaginationParams } from '@/types/payloads'
-import { 
-  parsePaginationParams, 
-  paginateQuery, 
-  PAGINATION_CONFIGS 
+import {
+  parsePaginationParams,
+  paginateQuery,
+  PAGINATION_CONFIGS
 } from '@/lib/utils/pagination'
 import { generateNextCotizacionCode } from '@/lib/utils/cotizacionCodeGenerator'
+import { registrarCreacion } from '@/lib/services/audit'
 
 // ✅ Obtener cotizaciones con paginación optimizada
 export async function GET(request: NextRequest) {
@@ -126,6 +127,15 @@ export async function GET(request: NextRequest) {
 // ✅ Crear nueva cotización manual
 export async function POST(req: NextRequest) {
   try {
+    // Verificar autenticación
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const data = await req.json()
     const { nombre, clienteId, comercialId } = data
 
@@ -146,8 +156,40 @@ export async function POST(req: NextRequest) {
         estado: 'borrador',
         totalInterno: 0,
         totalCliente: 0
+      },
+      include: {
+        cliente: {
+          select: {
+            id: true,
+            nombre: true
+          }
+        },
+        comercial: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       }
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      await registrarCreacion(
+        'COTIZACION',
+        nueva.id,
+        session.user.id,
+        nueva.nombre,
+        {
+          cliente: nueva.cliente?.nombre || 'Cliente desconocido',
+          codigo: nueva.codigo,
+          comercial: nueva.comercial?.name || 'Comercial desconocido'
+        }
+      )
+    } catch (auditError) {
+      console.error('Error al registrar auditoría:', auditError)
+      // No fallar la creación por error de auditoría
+    }
 
     return NextResponse.json(nueva, { status: 201 })
   } catch (error) {

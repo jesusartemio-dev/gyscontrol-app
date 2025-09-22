@@ -42,7 +42,20 @@ export async function deleteProyecto(id: string): Promise<void> {
   const res = await fetch(`/api/proyecto/${id}`, {
     method: 'DELETE',
   })
-  if (!res.ok) throw new Error('Error al eliminar proyecto')
+
+  if (!res.ok) {
+    // ✅ Intentar obtener el mensaje específico del error
+    try {
+      const errorData = await res.json()
+      if (errorData?.error) {
+        throw new Error(errorData.error)
+      }
+    } catch (parseError) {
+      // Si no se puede parsear el JSON, usar el mensaje genérico
+    }
+
+    throw new Error(`Error al eliminar proyecto: ${res.statusText}`)
+  }
 }
 
 // ✅ Crear proyecto desde cotización (nuevo flujo con payload completo)

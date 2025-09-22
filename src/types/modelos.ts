@@ -176,9 +176,75 @@ export type EstadoCotizacionProveedor =
   | 'cotizado'
   | 'rechazado'
   | 'seleccionado'
+
+// ✅ Nuevo tipo para estados de cotización
+export type EstadoCotizacion =
+  | 'borrador'
+  | 'enviada'
+  | 'aprobada'
+  | 'rechazada'
+
+// ✅ Nuevo tipo para estados de oportunidad CRM
+export type EstadoOportunidad =
+  | 'prospecto'
+  | 'contacto_inicial'
+  | 'propuesta_enviada'
+  | 'negociacion'
+  | 'cerrada_ganada'
+  | 'cerrada_perdida'
+
+// ===================================================
+// 🆕 MODELOS CRM PARA PROYECTOS INDUSTRIALES
+// ===================================================
+
+// 📋 Gestión de Oportunidades
+export interface CrmOportunidad {
+  id: string
+  clienteId: string
+  nombre: string
+  descripcion?: string
+  valorEstimado?: number
+  probabilidad: number // 0-100
+  fechaCierreEstimada?: string
+  fuente?: string // "licitación", "referido", "prospección"
+  estado: EstadoOportunidad // Estado del ciclo de vida de la oportunidad
+  prioridad: string
+  comercialId?: string
+  responsableId?: string
+  fechaUltimoContacto?: string
+  notas?: string
+  competencia?: string // Competidores identificados
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  cliente: Cliente
+  comercial?: User
+  responsable?: User
+  cotizacionId?: string
+  cotizacion?: Cotizacion
+  actividades: CrmActividad[]
+}
+
+// 📞 Seguimiento de Actividades
+export interface CrmActividad {
+  id: string
+  oportunidadId: string
+  tipo: string // "llamada", "email", "reunión", "propuesta", "seguimiento"
+  descripcion: string
+  fecha: string
+  resultado?: string // "positivo", "neutro", "negativo"
+  notas?: string
+  usuarioId: string
+  usuario: User
+  createdAt: string
+  updatedAt: string
+
+  oportunidad: CrmOportunidad
+}
   
 // ============================
-// 🛡️ Autenticación y Sesión
+// ️ Autenticación y Sesión
 // ============================
 export interface User {
   id: string
@@ -514,50 +580,68 @@ export interface PlantillaGastoItem {
 // ============================
 
 export interface Cotizacion {
-  id: string
-  codigo: string // ✅ Código automático formato GYS-XXXX-YY
-  numeroSecuencia: number // ✅ Número secuencial para generación de código
-  nombre: string
-  estado: string
-  etapa: string
-  prioridad?: string | null
-  probabilidad?: number | null
-  fechaEnvio?: string | null
-  fechaCierreEstimada?: string | null
-  notas?: string | null
+    id: string
+    codigo: string // ✅ Código automático formato GYS-XXXX-YY
+    numeroSecuencia: number // ✅ Número secuencial para generación de código
+    nombre: string
+    estado: EstadoCotizacion // ✅ Ahora usa enum
+    prioridad?: string | null
+    probabilidad?: number | null
+    fechaEnvio?: string | null
+    fechaCierreEstimada?: string | null
+    notas?: string | null
 
-  totalEquiposInterno: number
-  totalEquiposCliente: number
-  totalServiciosInterno: number
-  totalServiciosCliente: number
-  totalGastosInterno: number
-  totalGastosCliente: number
-  totalInterno: number
-  totalCliente: number
-  descuento: number
-  grandTotal: number
-  createdAt: string
-  updatedAt: string
-  cliente: {
-    id: string
-    nombre: string
-    ruc?: string
-    direccion?: string
-    correo?: string
-  } | null
-  comercial: {
-    id: string
-    nombre: string
-  } | null
-  plantilla: {
-    id: string
-    nombre: string
-  } | null
-  equipos: CotizacionEquipo[]
-  servicios: CotizacionServicio[]
-  gastos: CotizacionGasto[]
+   totalEquiposInterno: number
+   totalEquiposCliente: number
+   totalServiciosInterno: number
+   totalServiciosCliente: number
+   totalGastosInterno: number
+   totalGastosCliente: number
+   totalInterno: number
+   totalCliente: number
+   descuento: number
+   grandTotal: number
+   createdAt: string
+   updatedAt: string
+
+   // ✅ Nuevos campos para cabecera comercial
+   referencia?: string | null
+   formaPago?: string | null
+   validezOferta?: number | null
+   fechaValidezHasta?: string | null
+   moneda?: string | null
+   revision?: string | null
+   incluyeIGV?: boolean | null
+
+   cliente: {
+     id: string
+     nombre: string
+     ruc?: string
+     direccion?: string
+     correo?: string
+   } | null
+   comercial: {
+     id: string
+     nombre: string
+   } | null
+   plantilla: {
+     id: string
+     nombre: string
+   } | null
+   equipos: CotizacionEquipo[]
+   servicios: CotizacionServicio[]
+   gastos: CotizacionGasto[]
+
+   // ✅ Nueva relación con cronograma comercial
+   cronograma: CotizacionEdt[]
+
+   // ✅ Nuevas relaciones para exclusiones y condiciones
+   exclusiones: CotizacionExclusion[]
+   condiciones: CotizacionCondicion[]
+
+   // ✅ NUEVA RELACIÓN CON OPORTUNIDAD CRM
+   oportunidadCrm?: CrmOportunidad
 }
-
 
 
 export interface CotizacionEquipo {
@@ -682,6 +766,69 @@ export interface CotizacionGastoItem {
   costoCliente: number
   createdAt: string
   updatedAt: string
+}
+
+// ✅ Nuevos modelos para exclusiones y condiciones de cotización
+export interface CotizacionExclusion {
+  id: string
+  cotizacionId: string
+  descripcion: string
+  orden: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CotizacionCondicion {
+  id: string
+  cotizacionId: string
+  tipo?: string | null
+  descripcion: string
+  orden: number
+  createdAt: string
+  updatedAt: string
+}
+
+// ✅ Nuevo modelo CotizacionEdt para cronograma comercial
+export interface CotizacionEdt {
+  id: string
+  cotizacionId: string
+  categoriaServicioId: string
+  zona?: string | null
+  fechaInicioCom?: string | null
+  fechaFinCom?: string | null
+  horasCom?: number | null
+  prioridad: PrioridadEdt
+  responsableId?: string | null
+  descripcion?: string | null
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  categoriaServicio: CategoriaServicio
+  responsable?: User
+  tareas: CotizacionTarea[]
+}
+
+// ✅ Nuevo modelo CotizacionTarea para tareas del cronograma comercial
+export interface CotizacionTarea {
+  id: string
+  cotizacionEdtId: string
+  nombre: string
+  fechaInicioCom?: string | null
+  fechaFinCom?: string | null
+  horasCom?: number | null
+  prioridad: PrioridadTarea
+  dependenciaDeId?: string | null
+  orden: number
+  descripcion?: string | null
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  cotizacionEdt: CotizacionEdt
+  dependenciaDe?: CotizacionTarea
+  dependientes: CotizacionTarea[]
+  responsable?: User
 }
 
 
@@ -1400,12 +1547,13 @@ export interface RegistroProgreso {
 export type EstadoEdt = 'planificado' | 'en_progreso' | 'detenido' | 'completado' | 'cancelado'
 export type PrioridadEdt = 'baja' | 'media' | 'alta' | 'critica'
 export type OrigenTrabajo = 'planificado' | 'adicional' | 'correctivo' | 'emergencia'
-export type ProyectoEstado = 'en_planificacion' | 'en_ejecucion' | 'en_pausa' | 'cerrado' | 'cancelado'
+export type ProyectoEstado = 'creado' | 'en_planificacion' | 'en_ejecucion' | 'pausado' | 'completado' | 'cancelado' | 'listas_pendientes' | 'listas_aprobadas' | 'pedidos_creados'
 
 // 📋 Interface principal para ProyectoEdt
 export interface ProyectoEdt {
   id: string
   proyectoId: string
+  nombre: string // Nombre descriptivo del EDT
   categoriaServicioId: string
   zona?: string
   fechaInicio?: string
@@ -1604,6 +1752,7 @@ export interface FiltrosCronogramaData {
 // 🏗️ Interface para datos de creación EDT
 export interface CreateProyectoEdtData {
   proyectoId: string
+  nombre: string
   categoriaServicioId: string
   responsableId?: string
   zona?: string | null
@@ -1617,6 +1766,7 @@ export interface CreateProyectoEdtData {
 // 🔄 Interface para datos de actualización EDT
 export interface UpdateProyectoEdtData {
   id?: string
+  nombre?: string
   responsableId?: string
   zona?: string | null
   fechaInicioPlan?: Date | null
@@ -1635,6 +1785,7 @@ export interface ProyectoEdtConRelaciones {
   // Propiedades base de ProyectoEdt
   id: string
   proyectoId: string
+  nombre: string // Nombre descriptivo del EDT
   categoriaServicioId: string
   zona?: string
   fechaInicio?: string

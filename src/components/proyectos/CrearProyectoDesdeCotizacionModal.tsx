@@ -28,13 +28,12 @@ export default function CrearProyectoDesdeCotizacionModal({
 }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [nombre, setNombre] = useState('')
   const [fechaInicio, setFechaInicio] = useState('')
   const [fechaFin, setFechaFin] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // ✅ Validación: nombre y fechaInicio son requeridos
-  const puedeCrear = nombre.trim() && fechaInicio && !loading
+  // ✅ Validación: solo fechaInicio es requerida (nombre viene de la cotización)
+  const puedeCrear = fechaInicio && !loading
 
   const handleCrear = async () => {
     if (!puedeCrear) return
@@ -58,7 +57,7 @@ export default function CrearProyectoDesdeCotizacionModal({
         comercialId: cotizacion.comercial.id,
         gestorId: cotizacion.comercial.id, // ✅ Use comercial as default gestor
         cotizacionId: cotizacion.id,
-        nombre,
+        nombre: cotizacion.nombre, // ✅ Use cotización name automatically
         totalEquiposInterno: cotizacion.totalEquiposInterno,
         totalServiciosInterno: cotizacion.totalServiciosInterno,
         totalGastosInterno: cotizacion.totalGastosInterno,
@@ -66,16 +65,15 @@ export default function CrearProyectoDesdeCotizacionModal({
         totalCliente: cotizacion.totalCliente,
         descuento: cotizacion.descuento,
         grandTotal: cotizacion.grandTotal,
-        estado: 'en_planificacion', // ✅ Use correct enum value
+        estado: 'creado', // ✅ Use correct enum value
         fechaInicio,
         fechaFin: fechaFin || undefined
       })
 
       toast.success('Proyecto creado exitosamente')
       setOpen(false)
-      
+
       // Reset form
-      setNombre('')
       setFechaInicio('')
       setFechaFin('')
       
@@ -110,16 +108,22 @@ export default function CrearProyectoDesdeCotizacionModal({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre del proyecto *</Label>
-            <Input
-              id="nombre"
-              placeholder="Ingrese el nombre del proyecto"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
+          {/* Información del proyecto */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <FolderPlus className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-900">Nombre del Proyecto</p>
+                <p className="text-lg font-semibold text-blue-800">{cotizacion.nombre}</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Basado en la cotización: {cotizacion.codigo}
+                </p>
+              </div>
+            </div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="fechaInicio">Fecha de inicio *</Label>
@@ -131,7 +135,7 @@ export default function CrearProyectoDesdeCotizacionModal({
                 className="w-full"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="fechaFin">Fecha de fin (opcional)</Label>
               <Input

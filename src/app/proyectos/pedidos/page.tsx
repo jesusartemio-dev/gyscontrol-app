@@ -18,19 +18,14 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { 
-  Package, 
-  ArrowLeft, 
-  Plus, 
-  Download, 
-  Upload,
+import {
+  Package,
+  Plus,
+  Download,
   Filter,
   AlertTriangle,
-  CheckCircle,
   Clock,
   DollarSign,
-  Truck,
-  Users,
   Home,
   FolderOpen
 } from 'lucide-react'
@@ -119,22 +114,19 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
     busqueda: ''
   }
 
-  // 📊 Calculate statistics
+  // 📊 Calculate simplified statistics - only critical metrics
   const stats = {
     totalPedidos: pedidosData.total,
     pendientes: pedidosData.items.filter(p => p.estado === EstadoPedido.borrador || p.estado === EstadoPedido.enviado).length,
-    aprobados: pedidosData.items.filter(p => p.estado === EstadoPedido.atendido || p.estado === EstadoPedido.entregado).length,
-    rechazados: pedidosData.items.filter(p => p.estado === EstadoPedido.cancelado).length,
     montoTotal: pedidosData.items.reduce((sum, p) => {
-      const pedidoTotal = p.items?.reduce((itemSum, item) => 
+      const pedidoTotal = p.items?.reduce((itemSum, item) =>
         itemSum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0) || 0
       return sum + pedidoTotal
     }, 0)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="container mx-auto px-4 py-6 space-y-6">
         
         {/* 🧭 Breadcrumb Navigation */}
         <Breadcrumb>
@@ -160,42 +152,31 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* 📋 Header Section */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-blue-100 p-2">
-                <Package className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                  Pedidos de Equipos
-                </h1>
-                <p className="text-sm text-gray-600 md:text-base">
-                  Gestión de pedidos de equipos de todos los proyectos
-                </p>
-              </div>
-            </div>
+        {/* 📋 Simplified Header Section */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Pedidos de Equipos
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Gestión de pedidos de equipos de todos los proyectos
+            </p>
           </div>
-          
-          <div className="flex flex-wrap gap-2">
+
+          <div className="flex items-center gap-2">
             <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
+              <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
-            <Button variant="outline" size="sm">
-              <Upload className="mr-2 h-4 w-4" />
-              Importar
-            </Button>
             <Button size="sm">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4 mr-2" />
               Nuevo Pedido
             </Button>
           </div>
         </div>
 
-        {/* 📊 Statistics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {/* 📊 Simplified Statistics Cards - Only Critical Metrics */}
+        <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Pedidos</CardTitle>
@@ -208,7 +189,7 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
@@ -217,37 +198,11 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">{stats.pendientes}</div>
               <p className="text-xs text-muted-foreground">
-                Esperando aprobación
+                Requieren atención
               </p>
             </CardContent>
           </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Aprobados</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.aprobados}</div>
-              <p className="text-xs text-muted-foreground">
-                Listos para compra
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Rechazados</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats.rechazados}</div>
-              <p className="text-xs text-muted-foreground">
-                Requieren revisión
-              </p>
-            </CardContent>
-          </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Monto Total</CardTitle>
@@ -300,7 +255,6 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
             </Suspense>
           </CardContent>
         </Card>
-      </div>
     </div>
   )
 }

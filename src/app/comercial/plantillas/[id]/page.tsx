@@ -480,7 +480,7 @@ export default function PlantillaDetallePage() {
                       <PlantillaServicioAccordion 
                         key={s.id} 
                         servicio={s} 
-                        onCreated={i => actualizarServicio(s.id, items => [...items, i])} 
+                        onCreated={items => actualizarServicio(s.id, existingItems => [...existingItems, ...items])} 
                         onDeleted={id => actualizarServicio(s.id, items => items.filter(i => i.id !== id))} 
                         onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))} 
                         onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)} 

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -8,13 +8,14 @@ import clsx from 'clsx'
 import { useState } from 'react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Settings, 
-  Package, 
-  FolderOpen, 
-  Truck, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Minimize2,
+  Settings,
+  Package,
+  FolderOpen,
+  Truck,
   BarChart3,
   Users,
   Building2,
@@ -37,7 +38,9 @@ import {
   Activity,
   CheckSquare,
   GitBranch,
-  Calendar
+  Calendar,
+  FileCheck,
+  Target
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -54,13 +57,24 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({})
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    configuracion: true,
-    comercial: true,
-    proyectos: true,
-    logistica: true,
-    finanzas: true,
-    gestion: true,
+    configuracion: false,
+    comercial: false,
+    crm: false,
+    proyectos: false,
+    logistica: false,
+    finanzas: false,
+    gestion: false,
   })
+
+  // ✅ Nuevos estados para las mejoras del sidebar
+  const [sectionsCollapsed, setSectionsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar-sections-collapsed') === 'true'
+    }
+    return false
+  })
+  const [activeSection, setActiveSection] = useState<string | null>(null)
+  const activeSectionRef = React.useRef<string | null>(null)
 
   const toggleSection = (key: string) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -74,6 +88,36 @@ export default function Sidebar() {
 
   const toggleSidebar = () => setCollapsed((prev) => !prev)
 
+  // ✅ Nuevas funciones para las mejoras del sidebar
+  const collapseAllSections = () => {
+    setOpenSections(prev => {
+      const collapsed = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = false
+        return acc
+      }, {} as Record<string, boolean>)
+      return collapsed
+    })
+    setSectionsCollapsed(true)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar-sections-collapsed', 'true')
+    }
+  }
+
+  const expandActiveSection = (sectionKey: string) => {
+    setOpenSections(prev => {
+      const updated = Object.keys(prev).reduce((acc, key) => {
+        acc[key] = key === sectionKey
+        return acc
+      }, {} as Record<string, boolean>)
+      return updated
+    })
+    setActiveSection(sectionKey)
+    setSectionsCollapsed(false)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar-sections-collapsed', 'false')
+    }
+  }
+
   const allSections: SidebarSection[] = [
     // 1. Comercial - Inicio del flujo de negocio
     {
@@ -85,6 +129,20 @@ export default function Sidebar() {
       links: [
         { href: '/comercial/plantillas', label: 'Plantillas', icon: FileText },
         { href: '/comercial/cotizaciones', label: 'Cotizaciones', icon: Calculator },
+      ],
+    },
+    // 1.1. CRM - Gestión de Relaciones con Clientes
+    {
+      key: 'crm',
+      title: 'CRM',
+      icon: Users,
+      color: 'text-blue-400',
+      roles: ['admin', 'gerente', 'comercial'],
+      links: [
+        { href: '/crm', label: 'Oportunidades', icon: Target },
+        { href: '/crm/clientes', label: 'Gestión de Clientes', icon: Building2 },
+        { href: '/crm/actividades', label: 'Actividades', icon: Activity },
+        { href: '/crm/reportes', label: 'Reportes CRM', icon: BarChart3 },
       ],
     },
     // 2. Proyectos - Ejecución del negocio
@@ -194,6 +252,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'comercial', 'logistico', 'proyectos'],
       links: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+        { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },
         // 🏢 Entidades maestras del negocio
         { href: '/comercial/clientes', label: 'Clientes', icon: Building2 },
@@ -206,15 +265,53 @@ export default function Sidebar() {
         { href: '/catalogo/unidades', label: 'Unidades Equipos', icon: Calculator },
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },
         { href: '/catalogo/recursos', label: 'Recursos', icon: Wrench },
+        // 📋 Plantillas para cotizaciones
+        { href: '/catalogo/exclusiones', label: 'Exclusiones', icon: FileText },
+        { href: '/catalogo/condiciones', label: 'Condiciones', icon: FileCheck },
+        // 🏗️ Configuración de fases
+        { href: '/configuracion/fases', label: 'Fases por Defecto', icon: GitBranch },
       ],
     },
   ]
 
   const role = session?.user.role as RolUsuario | undefined
 
-  const visibleSections = allSections.filter((section) =>
-    role ? section.roles.includes(role) : false
+  const visibleSections = useMemo(() => allSections
+    .filter((section) =>
+      role ? section.roles.includes(role) : false
+    )
+    .map(section => ({
+      ...section,
+      links: section.links.filter(link => {
+        // Filtrar links específicos por rol
+        if (link.href === '/admin/actividad' && role !== 'admin') {
+          return false
+        }
+        return true
+      })
+    }))
+    .filter(section => section.links.length > 0), // Remover secciones sin links
+    [role]
   )
+
+  // ✅ Efecto para detectar la sección activa al cargar la página
+  React.useEffect(() => {
+    const currentSection = allSections.find(section =>
+      section.links.some(link =>
+        pathname === link.href ||
+        pathname.startsWith(link.href + '/')
+      )
+    )
+
+    if (currentSection && currentSection.key !== activeSectionRef.current) {
+      activeSectionRef.current = currentSection.key
+      setActiveSection(currentSection.key)
+      // Solo expandir automáticamente si no están colapsadas todas las secciones
+      if (!sectionsCollapsed) {
+        expandActiveSection(currentSection.key)
+      }
+    }
+  }, [pathname, sectionsCollapsed])
 
   return (
     <motion.aside 
@@ -257,19 +354,32 @@ export default function Sidebar() {
           )}
         </AnimatePresence>
         
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleSidebar}
-          className="text-gray-400 hover:text-white hover:bg-gray-700/50 p-2 rounded-lg transition-all duration-200"
-        >
-          <motion.div
-            animate={{ rotate: collapsed ? 0 : 180 }}
-            transition={{ duration: 0.2 }}
+        <div className="flex items-center gap-1">
+          {!collapsed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={collapseAllSections}
+              className="text-gray-400 hover:text-white hover:bg-gray-700/50 p-2 rounded-lg transition-all duration-200"
+              title="Contraer todas las secciones"
+            >
+              <Minimize2 size={16} />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSidebar}
+            className="text-gray-400 hover:text-white hover:bg-gray-700/50 p-2 rounded-lg transition-all duration-200"
           >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </motion.div>
-        </Button>
+            <motion.div
+              animate={{ rotate: collapsed ? 0 : 180 }}
+              transition={{ duration: 0.2 }}
+            >
+              {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            </motion.div>
+          </Button>
+        </div>
       </motion.div>
 
       {/* User Section */}
@@ -327,12 +437,16 @@ export default function Sidebar() {
                       className={clsx(
                         'w-full justify-between text-xs uppercase font-bold mb-2 px-3 py-2.5 rounded-lg transition-all duration-200',
                         'bg-gray-800/60 border border-gray-700/40 hover:bg-gray-700/60 text-gray-300 hover:text-white group',
-                        'shadow-sm hover:shadow-md'
+                        'shadow-sm hover:shadow-md',
+                        activeSection === section.key && 'bg-blue-600/20 border-blue-500/30 text-blue-300'
                       )}
                     >
                       <div className="flex items-center gap-2">
                         <SectionIcon size={16} className={clsx('transition-colors font-medium', section.color)} />
                         <span className="tracking-wide">{section.title}</span>
+                        {activeSection === section.key && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                        )}
                       </div>
                       <motion.div
                         animate={{ rotate: isOpen ? 180 : 0 }}
@@ -358,7 +472,13 @@ export default function Sidebar() {
                     >
                       {section.links.map((link, linkIndex) => {
                         const LinkIcon = link.icon
-                        const isActive = pathname.startsWith(link.href)
+                        // ✅ Fix: More precise route matching to prevent false positives
+                        // Check exact match or if pathname starts with href followed by '/' or query params
+                        const isActive = pathname === link.href || 
+                          (pathname.startsWith(link.href) && 
+                           (pathname.charAt(link.href.length) === '/' || 
+                            pathname.charAt(link.href.length) === '?' || 
+                            pathname.charAt(link.href.length) === '#'))
                         const badgeCount = link.badge ? getBadgeCount(link.badge) : 0
                         const hasSubmenu = link.submenu && link.submenu.length > 0
                         const submenuOpen = openSubmenus[link.href] || false

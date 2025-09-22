@@ -537,7 +537,109 @@ export const reactTestHelpers = {
   }
 }
 
+/**
+ * 🏗️ Crear datos de prueba básicos para tests unitarios
+ */
+export async function createTestData() {
+  const { PrismaClient } = require('@prisma/client')
+  const prisma = new PrismaClient()
+
+  try {
+    // Crear cliente básico
+    const cliente = await prisma.cliente.upsert({
+      where: { id: 'cliente-test-unit' },
+      update: {},
+      create: {
+        id: 'cliente-test-unit',
+        codigo: 'CLI-TEST-UNIT',
+        nombre: 'Cliente Test Unit',
+        ruc: '20123456789'
+      }
+    })
+
+    // Crear usuarios básicos
+    const comercial = await prisma.user.upsert({
+      where: { id: 'user-comercial-test-unit' },
+      update: {},
+      create: {
+        id: 'user-comercial-test-unit',
+        email: 'comercial-test-unit@gys.com',
+        name: 'Comercial Test Unit',
+        password: 'TestPassword123!',
+        role: 'comercial'
+      }
+    })
+
+    const gestor = await prisma.user.upsert({
+      where: { id: 'user-gestor-test-unit' },
+      update: {},
+      create: {
+        id: 'user-gestor-test-unit',
+        email: 'gestor-test-unit@gys.com',
+        name: 'Gestor Test Unit',
+        password: 'TestPassword123!',
+        role: 'gestor'
+      }
+    })
+
+    // Crear proyecto básico
+    const proyecto = await prisma.proyecto.upsert({
+      where: { id: 'proyecto-test-unit' },
+      update: {},
+      create: {
+        id: 'proyecto-test-unit',
+        clienteId: cliente.id,
+        comercialId: comercial.id,
+        gestorId: gestor.id,
+        nombre: 'Proyecto Test Unit',
+        codigo: 'PROJ-TEST-UNIT',
+        fechaInicio: new Date(),
+        estado: 'en_ejecucion'
+      }
+    })
+
+    // Crear categoría de servicio básica
+    const categoriaServicio = await prisma.categoriaServicio.upsert({
+      where: { id: 'cat-serv-test-unit' },
+      update: {},
+      create: {
+        id: 'cat-serv-test-unit',
+        nombre: 'Categoría Test Unit'
+      }
+    })
+
+    // Crear EDT básico
+    const edt = await prisma.proyectoEdt.upsert({
+      where: { id: 'edt-test-unit' },
+      update: {},
+      create: {
+        id: 'edt-test-unit',
+        proyectoId: proyecto.id,
+        nombre: 'EDT Test Unit',
+        categoriaServicioId: categoriaServicio.id,
+        estado: 'planificado'
+      }
+    })
+
+    return {
+      proyecto,
+      edt,
+      cliente,
+      comercial,
+      gestor,
+      categoriaServicio
+    }
+
+  } catch (error) {
+    console.error('Error creando datos de prueba:', error)
+    throw error
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
 export default {
   testConfigurations,
-  reactTestHelpers
+  reactTestHelpers,
+  createTestData
 }

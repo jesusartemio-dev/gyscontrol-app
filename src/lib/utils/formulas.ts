@@ -38,8 +38,8 @@ export function calcularHoras({
       return horaUnidad * cantidad
     case 'Escalonada':
       return cantidad <= 1
-        ? horaBase
-        : horaBase + (cantidad - 1) * horaRepetido
+        ? horaBase + horaFijo
+        : horaBase + (cantidad - 1) * horaRepetido + cantidad * horaUnidad + horaFijo
     default:
       return 0
   }

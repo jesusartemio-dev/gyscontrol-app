@@ -4,7 +4,7 @@ import { Metadata } from 'next';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { CronogramaContainer } from '@/components/proyectos/CronogramaContainer';
+import { ProyectoFasesView } from '@/components/proyectos/fases/ProyectoFasesView';
 import { getProyectoById } from '@/lib/services/proyecto';
 import { Calendar, Clock, BarChart3 } from 'lucide-react';
 import type { Proyecto } from '@/types/modelos';
@@ -116,11 +116,32 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
   try {
     proyecto = await getProyectoById(id);
     if (!proyecto) {
-      notFound();
+      // Redirect to 404 page instead of using notFound()
+      return (
+        <div className="container mx-auto px-4 py-6 space-y-6">
+          <div className="text-center py-12">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Proyecto no encontrado</h1>
+            <p className="text-gray-600 mb-6">El proyecto solicitado no existe o no tienes permisos para verlo.</p>
+            <a href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
+              Volver a la lista de proyectos
+            </a>
+          </div>
+        </div>
+      );
     }
   } catch (error) {
     console.error('Error al cargar proyecto:', error);
-    notFound();
+    return (
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Error al cargar el proyecto</h1>
+          <p className="text-gray-600 mb-6">Ha ocurrido un error al cargar la información del proyecto.</p>
+          <a href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
+            Volver a la lista de proyectos
+          </a>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -187,7 +208,7 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
 
       {/* ✅ Contenedor principal del cronograma */}
       <Suspense fallback={<CronogramaSkeleton />}>
-        <CronogramaContainer proyectoId={id} proyecto={proyecto} />
+        <ProyectoFasesView proyectoId={id} proyecto={proyecto} />
       </Suspense>
     </div>
   );

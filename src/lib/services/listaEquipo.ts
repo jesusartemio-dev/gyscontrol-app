@@ -211,6 +211,22 @@ export async function createListaDesdeEquiposCotizados(proyectoId: string): Prom
   }
 }
 
+// ✅ Crear lista técnica desde un ProyectoEquipo específico (conversión directa)
+export async function createListaDesdeProyectoEquipo(proyectoEquipoId: string, proyectoId: string): Promise<ListaEquipo | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/from-proyecto-equipo/${proyectoEquipoId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proyectoId }),
+    })
+    if (!res.ok) throw new Error('Error al crear lista desde proyecto equipo')
+    return await res.json()
+  } catch (error) {
+    console.error('createListaDesdeProyectoEquipo:', error)
+    return null
+  }
+}
+
 // ✅ Enviar lista a revisión técnica
 export async function enviarListaARevision(listaId: string): Promise<boolean> {
   try {
