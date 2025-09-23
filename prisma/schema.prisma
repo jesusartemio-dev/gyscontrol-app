@@ -730,6 +730,9 @@ model Proyecto {
   // ✅ Nueva relación con fases
   fases ProyectoFase[]
 
+  // ✅ Nueva relación con cronogramas
+  cronogramas ProyectoCronograma[]
+
   // ✅ NUEVA RELACIÓN PARA CRM
   historialProyectos CrmHistorialProyecto[]
 
@@ -742,11 +745,12 @@ model Proyecto {
 
 // ✅ Nuevo modelo ProyectoFase para jerarquía de 4 niveles
 model ProyectoFase {
-  id          String  @id @default(cuid())
-  proyectoId  String
-  nombre      String // "Planificación", "Ejecución", "Cierre", etc.
-  descripcion String?
-  orden       Int     @default(0) // Para ordenar fases
+  id                   String  @id @default(cuid())
+  proyectoId           String
+  proyectoCronogramaId String // ✅ Referencia al tipo de cronograma
+  nombre               String // "Planificación", "Ejecución", "Cierre", etc.
+  descripcion          String?
+  orden                Int     @default(0) // Para ordenar fases
 
   // Fechas de la fase
   fechaInicioPlan DateTime?
@@ -763,11 +767,12 @@ model ProyectoFase {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  proyecto Proyecto      @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  edts     ProyectoEdt[]
+  proyecto          Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyectoCronograma ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  edts              ProyectoEdt[]
 
-  @@unique([proyectoId, nombre])
-  @@index([proyectoId, orden])
+  @@unique([proyectoId, proyectoCronogramaId, nombre])
+  @@index([proyectoId, proyectoCronogramaId, orden])
   @@map("proyecto_fase")
 }
 
@@ -793,13 +798,43 @@ model FaseDefault {
   @@map("fase_default")
 }
 
+// ✅ Nuevo modelo ProyectoCronograma para controlar tipos de cronograma
+model ProyectoCronograma {
+  id          String  @id @default(cuid())
+  proyectoId  String
+  tipo        String // 'comercial', 'planificacion', 'ejecucion'
+  nombre      String // Nombre descriptivo del tipo de cronograma
+
+  // Para baseline comercial (copia de cotización)
+  copiadoDesdeCotizacionId String? @unique
+
+  // Control de versiones y estado
+  esBaseline  Boolean @default(false) // Si es inmutable (baseline)
+  version     Int     @default(1) // Para futuras versiones
+
+  // Auditoría
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  proyecto Proyecto      @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  fases    ProyectoFase[]
+  edts     ProyectoEdt[]
+  tareas   ProyectoTarea[]
+
+  @@unique([proyectoId, tipo])
+  @@index([proyectoId, tipo])
+  @@map("proyecto_cronograma")
+}
+
 // ✅ Nuevo modelo ProyectoEdt para cronograma
 model ProyectoEdt {
-  id                  String  @id @default(cuid())
-  proyectoId          String
-  nombre              String // Nombre descriptivo del EDT
-  categoriaServicioId String
-  zona                String? // ej. "Z1", "Planta"
+  id                   String  @id @default(cuid())
+  proyectoId           String
+  proyectoCronogramaId String // ✅ Referencia al tipo de cronograma
+  nombre               String // Nombre descriptivo del EDT
+  categoriaServicioId  String
+  zona                 String? // ej. "Z1", "Planta"
 
   // Nueva relación con fase
   proyectoFaseId String?
@@ -829,14 +864,15 @@ model ProyectoEdt {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  proyecto          Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  categoriaServicio CategoriaServicio @relation(fields: [categoriaServicioId], references: [id])
-  responsable       User?             @relation("EdtResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
-  registrosHoras    RegistroHoras[]
-  ProyectoTarea     ProyectoTarea[]
+  proyecto           Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyectoCronograma ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  categoriaServicio  CategoriaServicio @relation(fields: [categoriaServicioId], references: [id])
+  responsable        User?              @relation("EdtResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  registrosHoras     RegistroHoras[]
+  ProyectoTarea      ProyectoTarea[]
 
-  @@unique([proyectoId, categoriaServicioId, zona])
-  @@index([proyectoId, categoriaServicioId, zona])
+  @@unique([proyectoId, proyectoCronogramaId, categoriaServicioId, zona])
+  @@index([proyectoId, proyectoCronogramaId, categoriaServicioId, zona])
   @@index([estado, fechaFinPlan])
   @@index([responsableId, estado])
   @@map("proyecto_edt")
@@ -844,8 +880,9 @@ model ProyectoEdt {
 
 // ✅ NUEVO: Modelo para tareas de cronograma de proyecto (4 niveles)
 model ProyectoTarea {
-  id            String @id @default(cuid())
-  proyectoEdtId String
+  id                   String @id @default(cuid())
+  proyectoEdtId        String
+  proyectoCronogramaId String // ✅ Referencia al tipo de cronograma
 
   // Información básica
   nombre      String
@@ -888,9 +925,10 @@ model ProyectoTarea {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  proyectoEdt        ProyectoEdt     @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
-  dependencia        ProyectoTarea?  @relation("ProyectoTareaDependencia", fields: [dependenciaId], references: [id], onDelete: SetNull)
-  tareasDependientes ProyectoTarea[] @relation("ProyectoTareaDependencia")
+  proyectoEdt         ProyectoEdt      @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
+  proyectoCronograma  ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  dependencia         ProyectoTarea?   @relation("ProyectoTareaDependencia", fields: [dependenciaId], references: [id], onDelete: SetNull)
+  tareasDependientes  ProyectoTarea[]  @relation("ProyectoTareaDependencia")
 
   @@index([proyectoEdtId, estado])
   @@index([responsableId, fechaFin])

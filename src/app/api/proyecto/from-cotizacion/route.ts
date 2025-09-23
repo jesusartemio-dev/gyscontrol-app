@@ -223,12 +223,11 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // ✅ Convertir EDTs comerciales a EDTs de proyecto
+    // ✅ Convertir EDTs comerciales a EDTs de proyecto (versión simplificada)
     if (cotizacion.cronograma && cotizacion.cronograma.length > 0) {
       console.log(`📅 Convirtiendo ${cotizacion.cronograma.length} EDTs comerciales a proyecto ${proyecto.id}`)
 
       for (const edtComercial of cotizacion.cronograma) {
-        // ✅ Validar que categoriaServicio existe antes de crear EDT
         if (!edtComercial.categoriaServicio) {
           console.warn(`⚠️ EDT comercial ${edtComercial.id} no tiene categoriaServicio, saltando...`)
           continue

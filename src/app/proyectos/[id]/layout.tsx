@@ -10,7 +10,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter, usePathname } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
 import type { Proyecto } from '@/types'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,18 +19,13 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   ArrowLeft,
-  Package,
-  Settings,
-  Receipt,
   Calendar,
   Building,
   User,
   TrendingUp,
-  Eye,
   AlertCircle,
-  Target
+  Eye
 } from 'lucide-react'
-import Link from 'next/link'
 
 interface ProjectLayoutProps {
   children: React.ReactNode
@@ -39,7 +34,6 @@ interface ProjectLayoutProps {
 export default function ProjectLayout({ children }: ProjectLayoutProps) {
   const { id } = useParams()
   const router = useRouter()
-  const pathname = usePathname()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -59,43 +53,6 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
       .finally(() => setLoading(false))
   }, [id, router])
 
-  const navigationItems = [
-    {
-      id: 'overview',
-      label: 'Resumen',
-      href: `/proyectos/${id}`,
-      icon: Eye,
-      active: pathname === `/proyectos/${id}`
-    },
-    {
-      id: 'cronograma',
-      label: 'Cronograma',
-      href: `/proyectos/${id}/cronograma`,
-      icon: Target,
-      active: pathname.startsWith(`/proyectos/${id}/cronograma`)
-    },
-    {
-      id: 'equipos',
-      label: 'Equipos',
-      href: `/proyectos/${id}/equipos`,
-      icon: Package,
-      active: pathname.startsWith(`/proyectos/${id}/equipos`)
-    },
-    {
-      id: 'servicios',
-      label: 'Servicios',
-      href: `/proyectos/${id}/servicios`,
-      icon: Settings,
-      active: pathname.startsWith(`/proyectos/${id}/servicios`)
-    },
-    {
-      id: 'gastos',
-      label: 'Gastos',
-      href: `/proyectos/${id}/gastos`,
-      icon: Receipt,
-      active: pathname.startsWith(`/proyectos/${id}/gastos`)
-    }
-  ]
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -220,32 +177,6 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
           </CardContent>
         </Card>
 
-        {/* Navigation Tabs */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-4">
-            <nav className="flex flex-wrap gap-2">
-              {navigationItems.map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link key={item.id} href={item.href}>
-                    <Button
-                      variant={item.active ? "default" : "ghost"}
-                      size="sm"
-                      className={`flex items-center gap-2 ${
-                        item.active
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                )
-              })}
-            </nav>
-          </CardContent>
-        </Card>
 
         {/* Page Content */}
         <div className="space-y-6">

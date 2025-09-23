@@ -4,10 +4,10 @@ import { Metadata } from 'next';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { ProyectoFasesView } from '@/components/proyectos/fases/ProyectoFasesView';
+import { ProyectoCronogramaTab } from '@/components/proyectos/cronograma/ProyectoCronogramaTab';
 import { getProyectoById } from '@/lib/services/proyecto';
 import { Calendar, Clock, BarChart3 } from 'lucide-react';
-import type { Proyecto } from '@/types/modelos';
+import type { Proyecto, ProyectoCronograma } from '@/types/modelos';
 
 // ✅ Props de la página
 interface CronogramaPageProps {
@@ -208,7 +208,13 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
 
       {/* ✅ Contenedor principal del cronograma */}
       <Suspense fallback={<CronogramaSkeleton />}>
-        <ProyectoFasesView proyectoId={id} proyecto={proyecto} />
+        <ProyectoCronogramaTab
+          proyectoId={id}
+          proyectoNombre={proyecto.nombre}
+          onRefresh={() => {
+            // TODO: Implementar lógica de refresh si es necesario
+          }}
+        />
       </Suspense>
     </div>
   );

@@ -91,6 +91,13 @@ export type EstadoListaEquipo =
   | 'aprobado'
   | 'rechazado'
 
+export type EstadoFase =
+  | 'planificado'
+  | 'en_progreso'
+  | 'completado'
+  | 'pausado'
+  | 'cancelado'
+
 export type EstadoPedido =
   | 'borrador'
   | 'enviado'
@@ -876,6 +883,9 @@ export interface Proyecto {
   cotizaciones: CotizacionProveedor[]
   valorizaciones: Valorizacion[]
   registrosHoras: RegistroHoras[]
+
+  // ✅ Nueva relación con cronogramas
+  cronogramas: ProyectoCronograma[]
 }
 
 export interface ProyectoEquipo {
@@ -1636,6 +1646,119 @@ export interface ResumenEdtProyecto {
     name: string | null
     totalEdts: number
   }[]
+}
+
+// ===================================================
+// 📋 SISTEMA DE CRONOGRAMA DE PROYECTOS - FASE 4
+// ===================================================
+
+// 🎯 Interface para control de tipos de cronograma
+export interface ProyectoCronograma {
+  id: string
+  proyectoId: string
+  tipo: 'comercial' | 'planificacion' | 'ejecucion'
+  nombre: string
+  copiadoDesdeCotizacionId?: string
+  esBaseline: boolean
+  version: number
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  proyecto: Proyecto
+  fases: ProyectoFase[]
+  edts: ProyectoEdt[]
+  tareas: ProyectoTarea[]
+}
+
+// 📋 Interface para fases de proyecto
+export interface ProyectoFase {
+  id: string
+  proyectoId: string
+  proyectoCronogramaId: string
+  nombre: string
+  descripcion?: string
+  orden: number
+  fechaInicioPlan?: string
+  fechaFinPlan?: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  estado: EstadoFase
+  porcentajeAvance: number
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  proyecto: Proyecto
+  proyectoCronograma: ProyectoCronograma
+  edts: ProyectoEdt[]
+}
+
+// 📋 Interface para tareas de proyecto (4to nivel)
+export interface ProyectoTarea {
+  id: string
+  proyectoEdtId: string
+  proyectoCronogramaId: string
+  nombre: string
+  descripcion?: string
+  fechaInicio: string
+  fechaFin: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  horasEstimadas?: number
+  horasReales: number
+  estado: EstadoTarea
+  prioridad: PrioridadTarea
+  porcentajeCompletado: number
+  dependenciaId?: string
+  responsableId?: string
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  proyectoEdt: ProyectoEdt
+  proyectoCronograma: ProyectoCronograma
+  dependencia?: ProyectoTarea
+  tareasDependientes: ProyectoTarea[]
+  responsable?: User
+  registrosHoras: RegistroHoras[]
+  subtareas: ProyectoSubtarea[]
+}
+
+// 📋 Interface para subtareas de ProyectoTarea
+export interface ProyectoSubtarea {
+  id: string
+  proyectoTareaId: string
+  nombre: string
+  descripcion?: string
+  fechaInicio: string
+  fechaFin: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  estado: EstadoTarea
+  porcentajeCompletado: number
+  horasEstimadas?: number
+  horasReales?: number
+  asignadoId?: string
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  proyectoTarea: ProyectoTarea
+  asignado?: User
+}
+
+// 🔗 Interface para dependencias entre ProyectoTarea
+export interface ProyectoDependenciaTarea {
+  id: string
+  tipo: TipoDependencia
+  tareaOrigenId: string
+  tareaDependienteId: string
+  createdAt: string
+
+  // Relaciones
+  tareaOrigen: ProyectoTarea
+  tareaDependiente: ProyectoTarea
 }
 
 // ===================================================
