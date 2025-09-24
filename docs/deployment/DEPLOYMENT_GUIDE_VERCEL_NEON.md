@@ -97,7 +97,7 @@ SHOW ssl;
 ```bash
 # En Vercel Dashboard:
 1. Click "Add New..." > "Project"
-2. Buscar y seleccionar tu repositorio "gys-app-next-main"
+2. Buscar y seleccionar tu repositorio "gyscontrol-app"
 3. Click "Import"
 ```
 
@@ -268,7 +268,7 @@ git push origin main
 ### Opción 1: Subdominio Vercel (.vercel.app)
 ```bash
 # Automático - Vercel asigna automáticamente:
-# https://gys-app-next-main-[hash].vercel.app
+# https://gyscontrol-app-[hash].vercel.app
 
 # Para cambiar nombre:
 1. Ir a Project Settings > Domains

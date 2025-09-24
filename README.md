@@ -54,8 +54,8 @@ Sistema integral de gestión empresarial desarrollado con **Next.js 14+** y **Ty
 
 1. **Clonar el repositorio**
 ```bash
-git clone https://github.com/tu-usuario/gys-app-next.git
-cd gys-app-next
+git clone https://github.com/artemiogeek/gyscontrol-app.git
+cd gyscontrol-app
 ```
 
 2. **Instalar dependencias**
@@ -265,4 +265,4 @@ Desarrollado con ❤️ por el equipo GYS
 
 ---
 
-**¿Necesitas ayuda?** Abre un [issue](https://github.com/tu-usuario/gys-app-next/issues) o contacta al equipo de desarrollo.
+**¿Necesitas ayuda?** Abre un [issue](https://github.com/artemiogeek/gyscontrol-app/issues) o contacta al equipo de desarrollo.
