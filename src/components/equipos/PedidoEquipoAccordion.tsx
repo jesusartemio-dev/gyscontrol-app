@@ -48,6 +48,7 @@ import { Separator } from '@/components/ui/separator'
 
 import PedidoEquipoItemList from './PedidoEquipoItemList'
 import PedidoEquipoItemModalAgregar from './PedidoEquipoItemModalAgregar'
+import PedidoEquipoEditModal from './PedidoEquipoEditModal'
 
 interface Props {
   pedido: PedidoEquipo
@@ -72,6 +73,7 @@ export default function PedidoEquipoAccordion({
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [mostrarModal, setMostrarModal] = useState(false)
+  const [mostrarEditModal, setMostrarEditModal] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const lista = pedido.lista
@@ -103,6 +105,20 @@ export default function PedidoEquipoAccordion({
       console.error('Error creating item:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePedidoUpdated = (pedidoActualizado: PedidoEquipo) => {
+    // Call the parent update handler with the updated pedido data
+    if (onUpdate) {
+      // We need to create a payload from the updated pedido
+      const payload = {
+        observacion: pedidoActualizado.observacion,
+        fechaNecesaria: pedidoActualizado.fechaNecesaria,
+        fechaEntregaEstimada: pedidoActualizado.fechaEntregaEstimada,
+        estado: pedidoActualizado.estado
+      }
+      onUpdate(pedidoActualizado.id, payload)
     }
   }
 
@@ -199,7 +215,7 @@ export default function PedidoEquipoAccordion({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => onUpdate(pedido.id, {})}
+                  onClick={() => setMostrarEditModal(true)}
                   disabled={loading}
                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
                   title="Editar pedido"
@@ -371,6 +387,14 @@ export default function PedidoEquipoAccordion({
           onRefresh={onRefresh}
         />
       )}
+
+      {/* Modal de editar pedido */}
+      <PedidoEquipoEditModal
+        pedido={pedido}
+        open={mostrarEditModal}
+        onOpenChange={setMostrarEditModal}
+        onUpdated={handlePedidoUpdated}
+      />
     </motion.div>
   )
 }

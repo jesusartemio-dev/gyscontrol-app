@@ -76,9 +76,9 @@ export default function CrearProyectoDesdeCotizacionModal({
       // Reset form
       setFechaInicio('')
       setFechaFin('')
-      
+
       // Navigate to the new project
-      router.push(`/proyectos/${proyecto.id}`)
+      window.location.href = `/proyectos/${proyecto.id}`
     } catch (error) {
       console.error('Error al crear proyecto:', error)
       // ✅ Show more specific error message

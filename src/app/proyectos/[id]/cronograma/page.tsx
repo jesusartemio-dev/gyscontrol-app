@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { ProyectoCronogramaTab } from '@/components/proyectos/cronograma/ProyectoCronogramaTab';
-import { getProyectoById } from '@/lib/services/proyecto';
+import { prisma } from '@/lib/prisma';
 import { Calendar, Clock, BarChart3 } from 'lucide-react';
 import type { Proyecto, ProyectoCronograma } from '@/types/modelos';
 
@@ -20,7 +20,10 @@ interface CronogramaPageProps {
 export async function generateMetadata({ params }: CronogramaPageProps): Promise<Metadata> {
   const { id } = await params;
   try {
-    const proyecto = await getProyectoById(id);
+    const proyecto = await prisma.proyecto.findUnique({
+      where: { id },
+      select: { id: true, nombre: true, estado: true, fechaFin: true, totalReal: true, totalInterno: true }
+    }) as Proyecto | null;
     
     if (!proyecto) {
       return {
@@ -105,17 +108,28 @@ function CronogramaSkeleton() {
 
 // ✅ Componente principal de la página
 export default async function CronogramaPage({ params }: CronogramaPageProps) {
+  console.log('🔍 [CRONOGRAMA] Iniciando carga de página de cronograma');
+
   const { id } = await params;
+  console.log('🔍 [CRONOGRAMA] ID del proyecto:', id);
+
   // ✅ Validar que el ID sea válido
   if (!id || typeof id !== 'string') {
+    console.log('❌ [CRONOGRAMA] ID inválido, redirigiendo a 404');
     notFound();
   }
 
   // ✅ Obtener información básica del proyecto para el breadcrumb
   let proyecto: Proyecto | null = null;
   try {
-    proyecto = await getProyectoById(id);
+    console.log('🔍 [CRONOGRAMA] Obteniendo proyecto por ID...');
+    proyecto = await prisma.proyecto.findUnique({
+      where: { id },
+      select: { id: true, nombre: true, estado: true, fechaFin: true, totalReal: true, totalInterno: true }
+    }) as Proyecto | null;
+    console.log('✅ [CRONOGRAMA] Proyecto obtenido:', proyecto?.nombre);
     if (!proyecto) {
+      console.log('❌ [CRONOGRAMA] Proyecto no encontrado');
       // Redirect to 404 page instead of using notFound()
       return (
         <div className="container mx-auto px-4 py-6 space-y-6">
@@ -130,7 +144,7 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
       );
     }
   } catch (error) {
-    console.error('Error al cargar proyecto:', error);
+    console.error('❌ [CRONOGRAMA] Error al cargar proyecto:', error);
     return (
       <div className="container mx-auto px-4 py-6 space-y-6">
         <div className="text-center py-12">
@@ -143,6 +157,8 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
       </div>
     );
   }
+
+  console.log('✅ [CRONOGRAMA] Proyecto cargado exitosamente, renderizando componente');
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
@@ -165,45 +181,11 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
         </BreadcrumbList>
       </Breadcrumb>
 
-      {/* ✅ Header de la página */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Calendar className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Cronograma - {proyecto.nombre}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Gestión de EDT, planificación y seguimiento del progreso del proyecto
-            </p>
-          </div>
-        </div>
-
-        {/* ✅ Información rápida del proyecto */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Estado:</span>
-            <span className="font-medium capitalize">{proyecto.estado}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Progreso:</span>
-            <span className="font-medium">{Math.round((proyecto.totalReal / proyecto.totalInterno) * 100) || 0}%</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Fecha límite:</span>
-            <span className="font-medium">
-              {proyecto.fechaFin ?
-                new Date(proyecto.fechaFin).toLocaleDateString('es-ES') :
-                'No definida'
-              }
-            </span>
-          </div>
-        </div>
+      {/* ✅ Header compacto de la página */}
+      <div className="flex items-center justify-between py-2">
+        <h1 className="text-xl font-semibold text-gray-900">
+          Cronograma - {proyecto.nombre}
+        </h1>
       </div>
 
       {/* ✅ Contenedor principal del cronograma */}
@@ -211,9 +193,6 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
         <ProyectoCronogramaTab
           proyectoId={id}
           proyectoNombre={proyecto.nombre}
-          onRefresh={() => {
-            // TODO: Implementar lógica de refresh si es necesario
-          }}
         />
       </Suspense>
     </div>

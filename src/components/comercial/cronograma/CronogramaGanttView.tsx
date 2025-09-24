@@ -714,19 +714,24 @@ export function CronogramaGanttView({
                   {/* Today line indicator */}
                   {(() => {
                     const today = new Date()
-                    const timelineStart = timelineColumns[0]
-                    const timelineEnd = timelineColumns[timelineColumns.length - 1]
-                    const totalDays = (timelineEnd.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)
-                    const todayPosition = ((today.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)) / totalDays * 100
+                    today.setHours(12, 0, 0, 0) // Set to noon to avoid timezone issues
+                    const timelineStart = new Date(timelineColumns[0])
+                    timelineStart.setHours(0, 0, 0, 0) // Start of day
+                    const timelineEnd = new Date(timelineColumns[timelineColumns.length - 1])
+                    timelineEnd.setHours(23, 59, 59, 999) // End of day
+                    
+                    const totalMilliseconds = timelineEnd.getTime() - timelineStart.getTime()
+                    const todayMilliseconds = today.getTime() - timelineStart.getTime()
+                    const todayPosition = (todayMilliseconds / totalMilliseconds) * 100
 
                     if (todayPosition >= 0 && todayPosition <= 100) {
                       return (
                         <div
-                          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+                          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-[1] pointer-events-none"
                           style={{ left: `${todayPosition}%` }}
                           title={`Hoy: ${today.toLocaleDateString('es-ES')}`}
                         >
-                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-red-600 font-bold text-xs whitespace-nowrap">
+                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-red-600 font-bold text-xs whitespace-nowrap bg-white/90 px-1 rounded shadow-sm">
                             HOY
                           </div>
                         </div>

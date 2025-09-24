@@ -430,6 +430,7 @@ function CrearProyectoWrapper({ cotizacionId }: { cotizacionId: string }) {
 
 // ✅ Componente principal
 export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, onCreateCotizacion }: Props) {
+  const router = useRouter()
   const [oportunidades, setOportunidades] = useState<CrmOportunidad[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -848,7 +849,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation()
-                              window.open(`/comercial/cotizaciones/${oportunidad.cotizacion!.id}`, '_blank')
+                              router.push(`/comercial/cotizaciones/${oportunidad.cotizacion!.id}`)
                             }}
                             className="text-xs h-6 px-2"
                           >

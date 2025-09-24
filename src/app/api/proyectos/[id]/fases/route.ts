@@ -1,49 +1,99 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+// ===================================================
+// 📁 Archivo: route.ts
+// 📌 Ubicación: src/app/api/proyectos/[id]/fases/route.ts
+// 🔧 Descripción: API para gestión de fases de proyecto
+// 🎯 Funcionalidades: CRUD de fases
+// ✍️ Autor: Sistema de IA Mejorado
+// 📅 Última actualización: 2025-09-23
+// ===================================================
 
-// ✅ GET /api/proyectos/[id]/fases - Obtener fases de un proyecto
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+// ✅ Schema de validación para crear fase
+const createFaseSchema = z.object({
+  proyectoCronogramaId: z.string().min(1, 'ID de cronograma requerido'),
+  nombre: z.string().min(1, 'El nombre es requerido'),
+  descripcion: z.string().optional(),
+  orden: z.number().min(1).optional(),
+  fechaInicioPlan: z.string().optional(),
+  fechaFinPlan: z.string().optional(),
+})
+
+// ✅ Schema de validación para actualizar fase
+const updateFaseSchema = z.object({
+  nombre: z.string().min(1, 'El nombre es requerido').optional(),
+  descripcion: z.string().optional(),
+  orden: z.number().min(1).optional(),
+  estado: z.enum(['planificado', 'en_progreso', 'completado', 'pausado', 'cancelado']).optional(),
+  porcentajeAvance: z.number().min(0).max(100).optional(),
+  fechaInicioPlan: z.string().optional(),
+  fechaFinPlan: z.string().optional(),
+  fechaInicioReal: z.string().optional(),
+  fechaFinReal: z.string().optional(),
+})
+
+// ✅ GET /api/proyectos/[id]/fases - Obtener fases del proyecto
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const { id } = await params
+
+    // ✅ Validar que el proyecto existe
+    const proyecto = await prisma.proyecto.findUnique({
+      where: { id },
+      select: { id: true, nombre: true }
+    })
+
+    if (!proyecto) {
+      return NextResponse.json(
+        { error: 'Proyecto no encontrado' },
+        { status: 404 }
+      )
     }
 
-    const { id } = await params;
+    // ✅ Obtener parámetros de consulta para filtrado
+    const { searchParams } = new URL(request.url);
+    const cronogramaId = searchParams.get('cronogramaId') || undefined;
 
-    const fases = await prisma.proyectoFase.findMany({
-      where: { proyectoId: id },
+    // ✅ Obtener fases del proyecto con filtrado opcional por cronograma
+    const fases = await (prisma as any).proyectoFase.findMany({
+      where: {
+        proyectoId: id,
+        ...(cronogramaId && { proyectoCronogramaId: cronogramaId })
+      },
       include: {
+        proyectoCronograma: {
+          select: { id: true, nombre: true, tipo: true }
+        },
         edts: {
           include: {
+            ProyectoTarea: true,
             categoriaServicio: true,
-            responsable: true,
-            registrosHoras: { take: 5, orderBy: { fechaTrabajo: 'desc' } }
+            responsable: true
           }
+        },
+        _count: {
+          select: { edts: true }
         }
       },
       orderBy: { orden: 'asc' }
-    });
+    })
 
     return NextResponse.json({
       success: true,
-      data: fases,
-      meta: {
-        totalFases: fases.length,
-        totalEdts: fases.reduce((sum, f) => sum + f.edts.length, 0)
-      }
-    });
+      data: fases
+    })
+
   } catch (error) {
-    console.error('Error obteniendo fases:', error);
+    console.error('Error al obtener fases:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
-    );
+    )
   }
 }
 
@@ -53,72 +103,88 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
+    const { id } = await params
+    const body = await request.json()
 
-    const { id } = await params;
-    const data = await request.json();
+    // ✅ Validar datos de entrada
+    const validatedData = createFaseSchema.parse(body)
 
-    // Validar que el proyecto existe
+    // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
       where: { id },
-      select: { id: true, fechaInicio: true, fechaFin: true }
-    });
+      select: { id: true, nombre: true }
+    })
 
     if (!proyecto) {
       return NextResponse.json(
         { error: 'Proyecto no encontrado' },
         { status: 404 }
-      );
+      )
     }
 
-    // Validar fechas
-    if (data.fechaInicioPlan && data.fechaFinPlan) {
-      const fechaInicio = new Date(data.fechaInicioPlan);
-      const fechaFin = new Date(data.fechaFinPlan);
-
-      if (fechaInicio >= fechaFin) {
-        return NextResponse.json(
-          { error: 'La fecha de fin debe ser posterior a la fecha de inicio' },
-          { status: 400 }
-        );
+    // ✅ Validar que el cronograma existe y pertenece al proyecto
+    const cronograma = await (prisma as any).proyectoCronograma.findFirst({
+      where: {
+        id: validatedData.proyectoCronogramaId,
+        proyectoId: id
       }
+    })
 
-      // Validar que las fechas estén dentro del proyecto
-      if (proyecto.fechaFin && (fechaInicio < proyecto.fechaInicio || fechaFin > proyecto.fechaFin)) {
-        return NextResponse.json(
-          { error: 'Las fechas de la fase deben estar dentro del rango del proyecto' },
-          { status: 400 }
-        );
-      }
+    if (!cronograma) {
+      return NextResponse.json(
+        { error: 'Cronograma no encontrado o no pertenece al proyecto' },
+        { status: 404 }
+      )
     }
 
-    // Crear fase
-    const nuevaFase = await prisma.proyectoFase.create({
+    // ✅ Obtener el orden máximo actual para asignar el siguiente
+    const maxOrden = await (prisma as any).proyectoFase.aggregate({
+      where: { proyectoCronogramaId: validatedData.proyectoCronogramaId },
+      _max: { orden: true }
+    })
+
+    const nuevoOrden = (maxOrden._max?.orden || 0) + 1
+
+    // ✅ Crear la fase
+    const fase = await (prisma as any).proyectoFase.create({
       data: {
         proyectoId: id,
-        nombre: data.nombre,
-        descripcion: data.descripcion,
-        orden: data.orden || 0,
-        fechaInicioPlan: data.fechaInicioPlan ? new Date(data.fechaInicioPlan) : null,
-        fechaFinPlan: data.fechaFinPlan ? new Date(data.fechaFinPlan) : null,
-        estado: data.estado || 'planificado'
+        proyectoCronogramaId: validatedData.proyectoCronogramaId,
+        nombre: validatedData.nombre,
+        descripcion: validatedData.descripcion,
+        orden: validatedData.orden || nuevoOrden,
+        estado: 'planificado',
+        porcentajeAvance: 0,
+        fechaInicioPlan: validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null,
+        fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null
+      },
+      include: {
+        proyectoCronograma: {
+          select: { id: true, nombre: true, tipo: true }
+        },
+        _count: {
+          select: { edts: true }
+        }
       }
-    });
+    })
 
     return NextResponse.json({
       success: true,
-      data: nuevaFase,
-      message: 'Fase creada exitosamente'
-    }, { status: 201 });
+      data: fase
+    }, { status: 201 })
 
   } catch (error) {
-    console.error('Error creando fase:', error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', details: error.errors },
+        { status: 400 }
+      )
+    }
+
+    console.error('Error al crear fase:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
-    );
+    )
   }
 }

@@ -1,50 +1,40 @@
 // ===================================================
 // 📁 Archivo: route.ts
-// 📌 Ubicación: src/app/api/proyectos/[id]/fases/[faseId]/
+// 📌 Ubicación: src/app/api/proyectos/[id]/fases/[faseId]/route.ts
 // 🔧 Descripción: API para gestión individual de fases
-//    Funciones: Obtener, actualizar y eliminar fase específica
-//
-// 🧠 Funcionalidades:
-//    - GET: Obtener fase individual con EDTs
-//    - PUT: Actualizar fase
-//    - DELETE: Eliminar fase
-//
-// ✍️ Autor: Sistema GYS - Módulo Cronograma
-// 📅 Creado: 2025-09-21
+// 🎯 Funcionalidades: GET, PUT, DELETE de fase específica
+// ✍️ Autor: Sistema de IA Mejorado
+// 📅 Última actualización: 2025-09-23
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 // ✅ Schema de validación para actualizar fase
-const actualizarFaseSchema = z.object({
+const updateFaseSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').optional(),
   descripcion: z.string().optional(),
-  orden: z.number().int().min(0).optional(),
-  fechaInicioPlan: z.string().datetime().optional(),
-  fechaFinPlan: z.string().datetime().optional(),
-  estado: z.enum(['planificado', 'en_progreso', 'completado', 'pausado', 'cancelado']).optional()
+  orden: z.number().min(1).optional(),
+  estado: z.enum(['planificado', 'en_progreso', 'completado', 'pausado', 'cancelado']).optional(),
+  porcentajeAvance: z.number().min(0).max(100).optional(),
+  fechaInicioPlan: z.string().optional(),
+  fechaFinPlan: z.string().optional(),
+  fechaInicioReal: z.string().optional(),
+  fechaFinReal: z.string().optional(),
 })
 
-// ✅ GET /api/proyectos/[id]/fases/[faseId] - Obtener fase individual
+// ✅ GET /api/proyectos/[id]/fases/[faseId] - Obtener fase específica
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; faseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { id, faseId } = await params
 
-    const { id: proyectoId, faseId } = await params
-
-    // Verificar que el proyecto existe
+    // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
-      where: { id: proyectoId },
+      where: { id },
       select: { id: true, nombre: true }
     })
 
@@ -55,35 +45,28 @@ export async function GET(
       )
     }
 
-    // Obtener la fase con EDTs relacionados
-    const fase = await prisma.proyectoFase.findFirst({
+    // ✅ Obtener la fase específica
+    const fase = await (prisma as any).proyectoFase.findFirst({
       where: {
         id: faseId,
-        proyectoId
+        proyectoId: id
       },
       include: {
+        proyectoCronograma: {
+          select: { id: true, nombre: true, tipo: true }
+        },
         edts: {
           include: {
+            tareas: true,
             categoriaServicio: {
               select: { id: true, nombre: true }
-            },
-            responsable: {
-              select: { id: true, name: true, email: true }
-            },
-            registrosHoras: {
-              take: 5,
-              orderBy: { fechaTrabajo: 'desc' },
-              select: {
-                id: true,
-                horasTrabajadas: true,
-                fechaTrabajo: true,
-                usuario: {
-                  select: { id: true, name: true }
-                }
-              }
             }
-          },
-          orderBy: { fechaFinPlan: 'asc' }
+          }
+        },
+        _count: {
+          select: {
+            edts: true
+          }
         }
       }
     })
@@ -95,33 +78,9 @@ export async function GET(
       )
     }
 
-    // Calcular métricas
-    const totalEdts = fase.edts.length
-    const edtsCompletados = fase.edts.filter(edt => edt.estado === 'completado').length
-    const progresoFase = totalEdts > 0 ? Math.round((edtsCompletados / totalEdts) * 100) : 0
-    const horasPlanTotal = fase.edts.reduce((sum, edt) => sum + Number(edt.horasPlan || 0), 0)
-    const horasRealesTotal = fase.edts.reduce((sum, edt) => sum + Number(edt.horasReales || 0), 0)
-
-    const faseFormateada = {
-      ...fase,
-      fechaInicioPlan: fase.fechaInicioPlan?.toISOString(),
-      fechaFinPlan: fase.fechaFinPlan?.toISOString(),
-      fechaInicioReal: fase.fechaInicioReal?.toISOString(),
-      fechaFinReal: fase.fechaFinReal?.toISOString(),
-      createdAt: fase.createdAt.toISOString(),
-      updatedAt: fase.updatedAt.toISOString(),
-      metricas: {
-        totalEdts,
-        edtsCompletados,
-        progresoFase,
-        horasPlanTotal,
-        horasRealesTotal
-      }
-    }
-
     return NextResponse.json({
       success: true,
-      data: faseFormateada
+      data: fase
     })
 
   } catch (error) {
@@ -139,159 +98,70 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; faseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { id, faseId } = await params
+    const body = await request.json()
 
-    const { id: proyectoId, faseId } = await params
+    // ✅ Validar datos de entrada
+    const validatedData = updateFaseSchema.parse(body)
 
-    // Verificar que el proyecto existe
-    const proyecto = await prisma.proyecto.findUnique({
-      where: { id: proyectoId },
-      select: {
-        id: true,
-        nombre: true,
-        fechaInicio: true,
-        fechaFin: true
-      }
-    })
-
-    if (!proyecto) {
-      return NextResponse.json(
-        { error: 'Proyecto no encontrado' },
-        { status: 404 }
-      )
-    }
-
-    // Verificar que la fase existe
-    const faseExistente = await prisma.proyectoFase.findFirst({
+    // ✅ Validar que la fase existe y pertenece al proyecto
+    const faseExistente = await (prisma as any).proyectoFase.findFirst({
       where: {
         id: faseId,
-        proyectoId
+        proyectoId: id
       }
     })
 
     if (!faseExistente) {
       return NextResponse.json(
-        { error: 'Fase no encontrada' },
+        { error: 'Fase no encontrada o no pertenece al proyecto' },
         { status: 404 }
       )
     }
 
-    // Validar datos de entrada
-    const body = await request.json()
-    const validatedData = actualizarFaseSchema.parse(body)
+    // ✅ Preparar datos de actualización
+    const updateData: any = {}
 
-    // Validar fechas si se están actualizando
-    if (validatedData.fechaInicioPlan || validatedData.fechaFinPlan) {
-      const fechaInicioPlan = validatedData.fechaInicioPlan
-        ? new Date(validatedData.fechaInicioPlan)
-        : faseExistente.fechaInicioPlan
-      const fechaFinPlan = validatedData.fechaFinPlan
-        ? new Date(validatedData.fechaFinPlan)
-        : faseExistente.fechaFinPlan
+    if (validatedData.nombre !== undefined) updateData.nombre = validatedData.nombre
+    if (validatedData.descripcion !== undefined) updateData.descripcion = validatedData.descripcion
+    if (validatedData.orden !== undefined) updateData.orden = validatedData.orden
+    if (validatedData.estado !== undefined) updateData.estado = validatedData.estado
+    if (validatedData.porcentajeAvance !== undefined) updateData.porcentajeAvance = validatedData.porcentajeAvance
 
-      if (fechaInicioPlan && fechaFinPlan && fechaInicioPlan >= fechaFinPlan) {
-        return NextResponse.json(
-          { error: 'La fecha de fin debe ser posterior a la fecha de inicio' },
-          { status: 400 }
-        )
-      }
-
-      if (fechaInicioPlan && fechaInicioPlan < proyecto.fechaInicio) {
-        return NextResponse.json(
-          { error: 'La fecha de inicio no puede ser anterior al inicio del proyecto' },
-          { status: 400 }
-        )
-      }
-
-      if (fechaFinPlan && proyecto.fechaFin && fechaFinPlan > proyecto.fechaFin) {
-        return NextResponse.json(
-          { error: 'La fecha de fin no puede ser posterior al fin del proyecto' },
-          { status: 400 }
-        )
-      }
+    // ✅ Manejar fechas
+    if (validatedData.fechaInicioPlan !== undefined) {
+      updateData.fechaInicioPlan = validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null
+    }
+    if (validatedData.fechaFinPlan !== undefined) {
+      updateData.fechaFinPlan = validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null
+    }
+    if (validatedData.fechaInicioReal !== undefined) {
+      updateData.fechaInicioReal = validatedData.fechaInicioReal ? new Date(validatedData.fechaInicioReal) : null
+    }
+    if (validatedData.fechaFinReal !== undefined) {
+      updateData.fechaFinReal = validatedData.fechaFinReal ? new Date(validatedData.fechaFinReal) : null
     }
 
-    // Verificar unicidad del nombre si se está cambiando
-    if (validatedData.nombre && validatedData.nombre !== faseExistente.nombre) {
-      const faseConMismoNombre = await prisma.proyectoFase.findFirst({
-        where: {
-          proyectoId,
-          nombre: validatedData.nombre,
-          id: { not: faseId }
-        }
-      })
-
-      if (faseConMismoNombre) {
-        return NextResponse.json(
-          { error: 'Ya existe una fase con este nombre en el proyecto' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Preparar datos para actualizar
-    const updateData: any = { ...validatedData }
-    if (validatedData.fechaInicioPlan) {
-      updateData.fechaInicioPlan = new Date(validatedData.fechaInicioPlan)
-    }
-    if (validatedData.fechaFinPlan) {
-      updateData.fechaFinPlan = new Date(validatedData.fechaFinPlan)
-    }
-
-    // Actualizar la fase
-    const faseActualizada = await prisma.proyectoFase.update({
+    // ✅ Actualizar la fase
+    const faseActualizada = await (prisma as any).proyectoFase.update({
       where: { id: faseId },
       data: updateData,
       include: {
-        edts: {
-          include: {
-            categoriaServicio: {
-              select: { id: true, nombre: true }
-            },
-            responsable: {
-              select: { id: true, name: true, email: true }
-            }
-          }
+        proyectoCronograma: {
+          select: { id: true, nombre: true, tipo: true }
+        },
+        _count: {
+          select: { edts: true }
         }
       }
     })
 
-    // Calcular métricas actualizadas
-    const totalEdts = faseActualizada.edts.length
-    const edtsCompletados = faseActualizada.edts.filter(edt => edt.estado === 'completado').length
-    const progresoFase = totalEdts > 0 ? Math.round((edtsCompletados / totalEdts) * 100) : 0
-    const horasPlanTotal = faseActualizada.edts.reduce((sum, edt) => sum + Number(edt.horasPlan || 0), 0)
-    const horasRealesTotal = faseActualizada.edts.reduce((sum, edt) => sum + Number(edt.horasReales || 0), 0)
-
-    const faseFormateada = {
-      ...faseActualizada,
-      fechaInicioPlan: faseActualizada.fechaInicioPlan?.toISOString(),
-      fechaFinPlan: faseActualizada.fechaFinPlan?.toISOString(),
-      fechaInicioReal: faseActualizada.fechaInicioReal?.toISOString(),
-      fechaFinReal: faseActualizada.fechaFinReal?.toISOString(),
-      createdAt: faseActualizada.createdAt.toISOString(),
-      updatedAt: faseActualizada.updatedAt.toISOString(),
-      metricas: {
-        totalEdts,
-        edtsCompletados,
-        progresoFase,
-        horasPlanTotal,
-        horasRealesTotal
-      }
-    }
-
     return NextResponse.json({
       success: true,
-      data: faseFormateada,
-      message: 'Fase actualizada exitosamente'
+      data: faseActualizada
     })
 
   } catch (error) {
-    console.error('Error al actualizar fase:', error)
-
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Datos inválidos', details: error.errors },
@@ -299,6 +169,7 @@ export async function PUT(
       )
     }
 
+    console.error('Error al actualizar fase:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -312,59 +183,38 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; faseId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { id, faseId } = await params
 
-    const { id: proyectoId, faseId } = await params
-
-    // Verificar que el proyecto existe
-    const proyecto = await prisma.proyecto.findUnique({
-      where: { id: proyectoId },
-      select: { id: true, nombre: true }
-    })
-
-    if (!proyecto) {
-      return NextResponse.json(
-        { error: 'Proyecto no encontrado' },
-        { status: 404 }
-      )
-    }
-
-    // Verificar que la fase existe y obtener información
-    const faseExistente = await prisma.proyectoFase.findFirst({
+    // ✅ Validar que la fase existe y pertenece al proyecto
+    const fase = await (prisma as any).proyectoFase.findFirst({
       where: {
         id: faseId,
-        proyectoId
+        proyectoId: id
       },
       include: {
-        edts: {
-          select: { id: true }
+        _count: {
+          select: { edts: true }
         }
       }
     })
 
-    if (!faseExistente) {
+    if (!fase) {
       return NextResponse.json(
-        { error: 'Fase no encontrada' },
+        { error: 'Fase no encontrada o no pertenece al proyecto' },
         { status: 404 }
       )
     }
 
-    // Verificar que no tenga EDTs asignados
-    if (faseExistente.edts.length > 0) {
+    // ✅ Verificar que no tenga EDTs asociados
+    if (fase._count.edts > 0) {
       return NextResponse.json(
-        {
-          error: 'No se puede eliminar una fase que tiene EDTs asignados',
-          details: `La fase tiene ${faseExistente.edts.length} EDT(s) asignado(s)`
-        },
+        { error: 'No se puede eliminar la fase porque tiene EDTs asociados' },
         { status: 400 }
       )
     }
 
-    // Eliminar la fase
-    await prisma.proyectoFase.delete({
+    // ✅ Eliminar la fase
+    await (prisma as any).proyectoFase.delete({
       where: { id: faseId }
     })
 

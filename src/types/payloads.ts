@@ -1336,6 +1336,8 @@ export interface FiltrosCronogramaPayload {
 // ✅ Payload para crear EDT desde cronograma
 export interface CreateProyectoEdtPayload {
   proyectoId: string
+  proyectoCronogramaId: string
+  nombre: string
   categoriaServicioId: string
   zona?: string
   fechaInicio?: string

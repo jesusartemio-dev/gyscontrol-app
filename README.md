@@ -223,10 +223,22 @@ docker run -p 3000:3000 gys-app
 
 ## 📚 Documentación Adicional
 
-- [Arquitectura del Sistema](./docs/ARQUITECTURA_SISTEMA.md)
-- [Guía de Testing](./docs/GUIA_TESTING.md)
-- [API Documentation](./docs/API_DOCUMENTATION.md)
-- [Flujo de Trabajo GYS](./doc/FLUJO_TRABAJO_GYS.md)
+### 🏗️ Arquitectura
+- [Arquitectura del Sistema](./docs/architecture/ARQUITECTURA_GYS.md)
+- [Flujo de Trabajo GYS](./docs/architecture/FLUJO_TRABAJO_COMPLETO_GYS.md)
+- [Implementación Cronograma](./docs/architecture/Implementacion-Cronograma-Comercial-Opcion-A.md)
+
+### 🧪 Testing
+- [Guía de Testing](./docs/testing/TESTING.md)
+- [Reportes de Performance](./docs/testing/PERFORMANCE_REPORT.md)
+
+### 🚀 Deployment
+- [Guía de Deployment Vercel/Neon](./docs/deployment/DEPLOYMENT_GUIDE_VERCEL_NEON.md)
+- [Checklist de Producción](./docs/deployment/PRODUCTION_DEPLOYMENT_CHECKLIST.md)
+
+### 📋 Procedimientos
+- [Procedimiento Tareas/Subtareas](./docs/procedures/PROCEDIMIENTO_TAREAS_SUBTAREAS.md)
+- [Procedimiento Cronograma](./docs/procedures/PROCEDIMIENTO-IMPLEMENTACION-CRONOGRAMA-COMERCIAL.md)
 
 ## 🤝 Contribución
 

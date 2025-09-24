@@ -70,6 +70,7 @@ import {
 } from 'lucide-react';
 import ListaEquipoItemList from '@/components/equipos/ListaEquipoItemList';
 import ListaEquipoForm from '@/components/equipos/ListaEquipoForm';
+import ListaEquipoEditModal from '@/components/equipos/ListaEquipoEditModal';
 import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
 import ListaEstadoFlujo from '@/components/equipos/ListaEstadoFlujo';
 import ListaEstadoFlujoBanner from '@/components/equipos/ListaEstadoFlujoBanner';
@@ -163,47 +164,20 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
   });
   
   // 🔄 Local state management
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    nombre: lista?.nombre || ''
-  });
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('items');
   
-  // Update edit form when lista changes (with stability check)
-  React.useEffect(() => {
-    if (lista?.nombre) {
-      setEditForm(prev => {
-        // Only update if the value actually changed
-        if (prev.nombre !== lista.nombre) {
-          return { nombre: lista.nombre };
-        }
-        return prev;
-      });
-    }
-  }, [lista?.nombre]); // Only depend on lista.nombre
+  // Handle lista updated from modal
+  const handleListaUpdated = (updatedLista: ListaEquipo) => {
+    // The hook will refresh the data, but we can also update local state if needed
+    toast.success('Lista actualizada correctamente');
+  };
   
   // 🔁 Handle navigation back to master
   const handleBackToMaster = () => {
     router.push(`/proyectos/${proyectoId}/equipos/listas`);
   };
   
-  // 🔁 Handle lista update
-  const handleUpdateLista = async () => {
-    if (!lista) return;
-    
-    try {
-      const updatePayload: ListaEquipoUpdatePayload = {
-        nombre: editForm.nombre
-      };
-      
-      await updateLista(updatePayload);
-      setIsEditing(false);
-      toast.success('Lista actualizada correctamente');
-    } catch (error) {
-      console.error('Error updating lista:', error);
-      toast.error('Error al actualizar la lista');
-    }
-  };
   
   // 🔁 Handle items refresh
   const handleRefreshItems = useCallback(async () => {
@@ -269,29 +243,30 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
   const StatusIcon = statusInfo.icon;
   
   return (
-    <motion.div
-      variants={pageTransitionVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="space-y-6"
-    >
-      {/* 🧭 Enhanced Breadcrumb Navigation */}
-      <motion.div variants={staggerItemVariants}>
-        <DetailBreadcrumb
-          proyectoId={proyecto?.id || proyectoId}
-          proyectoNombre={proyecto?.nombre || 'Proyecto'}
-          masterPath={`/proyectos/${proyectoId}/equipos/listas`}
-          masterLabel="Listas de Equipos"
-          detailLabel={lista?.nombre || 'Lista de Equipos'}
-          detailId={lista?.id || listaId}
-          status={lista?.estado}
-          metadata={lista ? `${stats.totalItems} items • Actualizado ${formatDate(lista.updatedAt)}` : 'Cargando...'}
-          showBackButton={true}
-          showHomeLink={true}
-          onBackClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas`)}
-        />
-      </motion.div>
+    <>
+      <motion.div
+        variants={pageTransitionVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="space-y-6"
+      >
+        {/* 🧭 Enhanced Breadcrumb Navigation */}
+        <motion.div variants={staggerItemVariants}>
+          <DetailBreadcrumb
+            proyectoId={proyecto?.id || proyectoId}
+            proyectoNombre={proyecto?.nombre || 'Proyecto'}
+            masterPath={`/proyectos/${proyectoId}/equipos/listas`}
+            masterLabel="Listas de Equipos"
+            detailLabel={lista?.nombre || 'Lista de Equipos'}
+            detailId={lista?.id || listaId}
+            status={lista?.estado}
+            metadata={lista ? `${stats.totalItems} items • Actualizado ${formatDate(lista.updatedAt)}` : 'Cargando...'}
+            showBackButton={true}
+            showHomeLink={true}
+            onBackClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas`)}
+          />
+        </motion.div>
       
       {/* 📋 Header Section */}
       <motion.div variants={staggerItemVariants}>
@@ -310,26 +285,11 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                 </Button>
                 
                 <div className="space-y-2">
-                  {isEditing ? (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={editForm.nombre}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, nombre: e.target.value }))}
-                        className="text-2xl font-bold bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none"
-                      />
+                  <CardTitle className="text-2xl flex items-center gap-3">
+                    <Package className="w-6 h-6 text-blue-600" />
+                    {lista?.nombre || 'Lista de Equipos'}
+                  </CardTitle>
 
-                    </div>
-                  ) : (
-                    <div>
-                      <CardTitle className="text-2xl flex items-center gap-3">
-                        <Package className="w-6 h-6 text-blue-600" />
-                        {lista?.nombre || 'Lista de Equipos'}
-                      </CardTitle>
-
-                    </div>
-                  )}
-                  
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
@@ -345,37 +305,15 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                   <StatusIcon className="w-3 h-3" />
                   {statusInfo.label}
                 </Badge>
-                
-                {isEditing ? (
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleUpdateLista}>
-                      <Save className="w-4 h-4 mr-1" />
-                      Guardar
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => {
-                        setIsEditing(false);
-                        setEditForm({
-                          nombre: lista?.nombre || ''
-                        });
-                      }}
-                    >
-                      <X className="w-4 h-4 mr-1" />
-                      Cancelar
-                    </Button>
-                  </div>
-                ) : (
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <Edit className="w-4 h-4 mr-1" />
-                    Editar
-                  </Button>
-                )}
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditModalOpen(true)}
+                >
+                  <Edit className="w-4 h-4 mr-1" />
+                  Editar Lista
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -600,7 +538,15 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
       </motion.div>
 
 
-    </motion.div>
+      </motion.div>
+
+      <ListaEquipoEditModal
+        lista={lista}
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        onUpdated={handleListaUpdated}
+      />
+    </>
   );
 };
 

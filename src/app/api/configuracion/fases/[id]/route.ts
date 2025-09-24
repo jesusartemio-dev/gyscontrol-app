@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // ✅ Obtener fase por defecto específica
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -25,8 +25,9 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
     const faseDefault = await prisma.faseDefault.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!faseDefault) {
@@ -53,7 +54,7 @@ export async function GET(
 // ✅ Actualizar fase por defecto
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -61,6 +62,7 @@ export async function PUT(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
     const data = await request.json()
     const { nombre, descripcion, orden, porcentajeDuracion, color, activo } = data
 
@@ -74,7 +76,7 @@ export async function PUT(
 
     // ✅ Verificar que existe
     const faseExistente = await prisma.faseDefault.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!faseExistente) {
@@ -86,7 +88,7 @@ export async function PUT(
 
     // ✅ Actualizar fase por defecto
     const faseActualizada = await prisma.faseDefault.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
@@ -124,7 +126,7 @@ export async function PUT(
 // ✅ Desactivar fase por defecto (soft delete)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -132,9 +134,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
+
     // ✅ Verificar que existe
     const faseExistente = await (prisma as any).faseDefault.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!faseExistente) {
@@ -146,7 +150,7 @@ export async function DELETE(
 
     // ✅ Desactivar fase por defecto (no eliminar físicamente)
     const faseDesactivada = await prisma.faseDefault.update({
-      where: { id: params.id },
+      where: { id },
       data: { activo: false }
     })
 

@@ -72,6 +72,16 @@ export const updateProyectoSchema = z.object({
   grandTotal: z.number().optional()
 })
 
+// ✅ Función de validación para proyectos
+export function validateProyectoData(data: any) {
+  // Determinar qué schema usar basado en la presencia de cotizacionId
+  if (data.cotizacionId) {
+    return createProyectoFromCotizacionSchema.parse(data)
+  } else {
+    return createProyectoSchema.parse(data)
+  }
+}
+
 // ✅ Tipos inferidos
 export type CreateProyectoFromCotizacionInput = z.infer<typeof createProyectoFromCotizacionSchema>
 export type CreateProyectoInput = z.infer<typeof createProyectoSchema>

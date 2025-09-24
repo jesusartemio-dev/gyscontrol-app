@@ -49,6 +49,7 @@ import { CotizacionEdtForm } from './CotizacionEdtForm'
 
 interface CotizacionEdt {
   id: string
+  nombre: string
   zona?: string
   fechaInicioComercial?: string
   fechaFinComercial?: string
@@ -217,14 +218,15 @@ export function CotizacionEdtList({
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     {getEstadoIcon(edt.estado)}
-                    <CardTitle className="text-lg">
-                      {edt.categoriaServicio.nombre}
-                      {edt.zona && (
-                        <span className="text-muted-foreground font-normal">
-                          {' - '}{edt.zona}
-                        </span>
-                      )}
-                    </CardTitle>
+                    <div>
+                      <CardTitle className="text-lg">
+                        {edt.nombre}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {edt.categoriaServicio.nombre}
+                        {edt.zona && ` - ${edt.zona}`}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={getEstadoColor(edt.estado)}>
@@ -238,34 +240,39 @@ export function CotizacionEdtList({
                   </div>
                 </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setEditingEdt(edt)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar EDT
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setExpandedEdt(
-                        expandedEdt === edt.id ? null : edt.id
-                      )}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      {expandedEdt === edt.id ? 'Ocultar' : 'Ver'} Tareas
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setDeletingEdt(edt)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Eliminar EDT
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setExpandedEdt(
+                      expandedEdt === edt.id ? null : edt.id
+                    )}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {expandedEdt === edt.id ? 'Ocultar' : 'Ver'} Tareas
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setEditingEdt(edt)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar EDT
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setDeletingEdt(edt)}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Eliminar EDT
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </CardHeader>
 
@@ -355,7 +362,8 @@ export function CotizacionEdtList({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar EDT comercial?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará el EDT "{deletingEdt?.categoriaServicio.nombre}"
+              Esta acción eliminará el EDT "{deletingEdt?.nombre}"
+              {deletingEdt?.categoriaServicio.nombre && ` (${deletingEdt.categoriaServicio.nombre})`}
               {deletingEdt?.zona && ` - ${deletingEdt.zona}`} y todas sus tareas asociadas.
               Esta acción no se puede deshacer.
             </AlertDialogDescription>

@@ -21,7 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import CotizacionForm from '@/components/cotizaciones/CotizacionForm'
+import CotizacionModal from '@/components/cotizaciones/CotizacionModal'
 import CotizacionList from '@/components/cotizaciones/CotizacionList'
 import { getCotizaciones } from '@/lib/services/cotizacion'
 import type { Cotizacion } from '@/types'
@@ -356,90 +356,74 @@ export default function CotizacionesPage() {
       </motion.div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Form Section */}
-        <motion.div
-          className="lg:col-span-1"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Nueva Cotización
-              </CardTitle>
-              <CardDescription>
-                Completa el formulario para crear una nueva cotización
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CotizacionForm onCreated={handleCreated} />
-            </CardContent>
-          </Card>
-        </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="space-y-6"
+      >
+        {/* Header with Create Button */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <FileText className="h-6 w-6 text-blue-600" />
+              Cotizaciones
+            </h2>
+            <p className="text-gray-600 mt-1">
+              Gestiona y administra todas las cotizaciones del sistema
+            </p>
+          </div>
+          <CotizacionModal onCreated={handleCreated} />
+        </div>
 
         {/* List Section */}
-        <motion.div
-          className="lg:col-span-2"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>Lista de Cotizaciones</CardTitle>
-              <CardDescription>
-                Gestiona y revisa todas las cotizaciones existentes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {error ? (
-                <motion.div 
-                  className="text-center py-8"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="pt-6">
+            {error ? (
+              <motion.div
+                className="text-center py-8"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <FileText className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-red-600 mb-2">Error al cargar</h3>
+                <p className="text-muted-foreground mb-4">{error}</p>
+                <Button
+                  onClick={() => window.location.reload()}
+                  variant="outline"
                 >
-                  <FileText className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-red-600 mb-2">Error al cargar</h3>
-                  <p className="text-muted-foreground mb-4">{error}</p>
-                  <Button 
-                    onClick={() => window.location.reload()}
-                    variant="outline"
-                  >
-                    Reintentar
-                  </Button>
-                </motion.div>
-              ) : cotizaciones.length === 0 ? (
-                <motion.div 
-                  className="text-center py-12"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">No hay cotizaciones</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Comienza creando tu primera cotización usando el formulario de la izquierda.
-                  </p>
-                  <div className="flex justify-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      💡 Tip: Completa todos los campos requeridos
-                    </Badge>
-                  </div>
-                </motion.div>
-              ) : (
-                <CotizacionList
-                  cotizaciones={cotizaciones}
-                  onDelete={handleDelete}
-                  onUpdated={handleUpdated}
+                  Reintentar
+                </Button>
+              </motion.div>
+            ) : cotizaciones.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No hay cotizaciones disponibles
+                </h3>
+                <p className="text-gray-500 mb-4">
+                  Comienza creando tu primera cotización
+                </p>
+                <CotizacionModal
+                  onCreated={handleCreated}
+                  trigger={
+                    <Button variant="outline">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Primera Cotización
+                    </Button>
+                  }
                 />
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+              </div>
+            ) : (
+              <CotizacionList
+                cotizaciones={cotizaciones}
+                onDelete={handleDelete}
+                onUpdated={handleUpdated}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </motion.div>
   )
 }

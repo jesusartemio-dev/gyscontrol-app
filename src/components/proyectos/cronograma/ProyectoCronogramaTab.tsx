@@ -17,7 +17,14 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, Calendar, BarChart3, Filter, RefreshCw, FolderOpen, Settings } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import type { ProyectoCronograma } from '@/types/modelos'
+import { ProyectoFasesList } from '@/components/proyectos/fases/ProyectoFasesList'
+import { ProyectoEdtList } from '@/components/proyectos/cronograma/ProyectoEdtList'
+import { ProyectoCronogramaMetrics } from '@/components/proyectos/cronograma/ProyectoCronogramaMetrics'
+import { ProyectoCronogramaFilters, type FilterState } from '@/components/proyectos/cronograma/ProyectoCronogramaFilters'
+import { ProyectoCronogramaSelector } from '@/components/proyectos/cronograma/ProyectoCronogramaSelector'
+import { ProyectoGanttChart } from '@/components/proyectos/cronograma/ProyectoGanttChart'
+import { ProyectoCronogramaGanttView } from '@/components/proyectos/cronograma/ProyectoCronogramaGanttView'
+import type { ProyectoCronograma, ProyectoFase, ProyectoEdt } from '@/types/modelos'
 
 interface ProyectoCronogramaTabProps {
   proyectoId: string
@@ -32,11 +39,21 @@ export function ProyectoCronogramaTab({
   cronograma,
   onRefresh
 }: ProyectoCronogramaTabProps) {
-  const [activeTab, setActiveTab] = useState('lista')
+  console.log('🔍 [CRONOGRAMA TAB] Iniciando componente ProyectoCronogramaTab', { proyectoId, proyectoNombre })
+
+  const [activeTab, setActiveTab] = useState('selector')
   const [showEdtForm, setShowEdtForm] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedCronograma, setSelectedCronograma] = useState<ProyectoCronograma | undefined>(cronograma)
   const { toast } = useToast()
+
+  console.log('✅ [CRONOGRAMA TAB] Estado inicial configurado')
+
+  // Update selected cronograma when prop changes
+  useEffect(() => {
+    setSelectedCronograma(cronograma)
+  }, [cronograma])
 
   // Función para refrescar datos
   const handleRefresh = () => {
@@ -166,19 +183,12 @@ export function ProyectoCronogramaTab({
     }
   }
 
+  console.log('🎨 [CRONOGRAMA TAB] Renderizando componente')
+
   return (
     <div className="space-y-6">
       {/* Header del Tab */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            Cronograma de 4 Niveles
-          </h2>
-          <p className="text-muted-foreground">
-            Jerarquía completa: Proyecto → Fases → EDTs → Tareas para {proyectoNombre}
-          </p>
-        </div>
-
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -189,34 +199,16 @@ export function ProyectoCronogramaTab({
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Actualizar
           </Button>
-
-          <Button
-            variant="outline"
-            onClick={handleCreateDefaultFases}
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Crear Fases por Defecto
-          </Button>
-
-          <Button
-            onClick={handleCreateEdt}
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo EDT
-          </Button>
         </div>
       </div>
 
-      {/* Modal de creación de EDT */}
-      {showEdtForm && (
-        <div> {/* TODO: Implementar ProyectoEdtForm */} </div>
-      )}
-
       {/* Contenido principal con tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="selector" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Tipos
+          </TabsTrigger>
           <TabsTrigger value="fases" className="flex items-center gap-2">
             <FolderOpen className="h-4 w-4" />
             Fases
@@ -239,29 +231,107 @@ export function ProyectoCronogramaTab({
           </TabsTrigger>
         </TabsList>
 
+        {/* Tab de Selector de Cronogramas */}
+        <TabsContent value="selector" className="space-y-4">
+          <ProyectoCronogramaSelector
+            proyectoId={proyectoId}
+            selectedCronograma={selectedCronograma}
+            onCronogramaChange={(newCronograma) => {
+              console.log('🔄 [CRONOGRAMA TAB] Cambio de cronograma:', newCronograma)
+              setSelectedCronograma(newCronograma)
+              toast({
+                title: 'Cronograma cambiado',
+                description: `Ahora trabajando con: ${newCronograma.nombre}`,
+                variant: 'default'
+              })
+            }}
+            onCronogramaCreate={() => {
+              handleRefresh()
+            }}
+          />
+        </TabsContent>
+
         {/* Tab de Fases */}
         <TabsContent value="fases" className="space-y-4">
-          <div> {/* TODO: Implementar ProyectoFasesList */} </div>
+          <ProyectoFasesList
+            proyectoId={proyectoId}
+            cronogramaId={selectedCronograma?.id}
+            onFaseSelect={(fase) => {
+              console.log('Fase seleccionada:', fase)
+            }}
+            onFaseCreate={() => {
+              toast({
+                title: 'Funcionalidad pendiente',
+                description: 'La creación de fases estará disponible próximamente.',
+                variant: 'default'
+              })
+            }}
+            onFaseEdit={(fase: ProyectoFase) => {
+              toast({
+                title: 'Funcionalidad pendiente',
+                description: `Edición de fase "${fase.nombre}" estará disponible próximamente.`,
+                variant: 'default'
+              })
+            }}
+            onFaseDelete={(faseId: string) => {
+              handleRefresh()
+            }}
+          />
         </TabsContent>
 
         {/* Tab de Lista de EDTs */}
         <TabsContent value="lista" className="space-y-4">
-          <div> {/* TODO: Implementar ProyectoEdtList */} </div>
+          <ProyectoEdtList
+            proyectoId={proyectoId}
+            cronogramaId={selectedCronograma?.id}
+            onEdtCreate={() => {
+              toast({
+                title: 'Funcionalidad pendiente',
+                description: 'La creación de EDTs estará disponible próximamente.',
+                variant: 'default'
+              })
+            }}
+            onEdtEdit={(edt: ProyectoEdt) => {
+              toast({
+                title: 'Funcionalidad pendiente',
+                description: `Edición de EDT "${edt.nombre}" estará disponible próximamente.`,
+                variant: 'default'
+              })
+            }}
+            onEdtDelete={(edtId: string) => {
+              handleRefresh()
+            }}
+          />
         </TabsContent>
 
         {/* Tab de Vista Gantt */}
         <TabsContent value="gantt" className="space-y-4">
-          <div> {/* TODO: Implementar ProyectoCronogramaGanttView */} </div>
+          <ProyectoGanttChart
+            proyectoId={proyectoId}
+            cronogramaId={selectedCronograma?.id}
+            height={600}
+          />
         </TabsContent>
 
         {/* Tab de Métricas */}
         <TabsContent value="metricas" className="space-y-4">
-          <div> {/* TODO: Implementar ProyectoCronogramaMetrics */} </div>
+          <ProyectoCronogramaMetrics
+            proyectoId={proyectoId}
+          />
         </TabsContent>
 
         {/* Tab de Filtros */}
         <TabsContent value="filtros" className="space-y-4">
-          <div> {/* TODO: Implementar ProyectoCronogramaFilters */} </div>
+          <ProyectoCronogramaFilters
+            onFiltersChange={(filters: FilterState) => {
+              console.log('Filtros aplicados:', filters)
+              toast({
+                title: 'Filtros aplicados',
+                description: 'Los filtros se aplicarán en la próxima versión.',
+                variant: 'default'
+              })
+            }}
+          />
         </TabsContent>
       </Tabs>
 

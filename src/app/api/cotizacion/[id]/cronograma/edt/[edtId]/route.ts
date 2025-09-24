@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; edtId: string } }
+  { params }: { params: Promise<{ id: string; edtId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -22,12 +22,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id, edtId } = await params
     const data = await request.json()
     const { nombre, fechaInicioComercial, fechaFinComercial, estado, prioridad, descripcion } = data
 
     // ✅ Verificar que el EDT existe y pertenece a la cotización
     const edtExistente = await prisma.cotizacionEdt.findUnique({
-      where: { id: params.edtId },
+      where: { id: edtId },
       include: {
         cotizacion: true,
         cotizacionFase: true
@@ -41,7 +42,7 @@ export async function PATCH(
       )
     }
 
-    if (edtExistente.cotizacionId !== params.id) {
+    if (edtExistente.cotizacionId !== id) {
       return NextResponse.json(
         { error: 'El EDT no pertenece a esta cotización' },
         { status: 403 }
@@ -159,7 +160,7 @@ export async function PATCH(
 
     // ✅ Actualizar EDT
     const edtActualizado = await prisma.cotizacionEdt.update({
-      where: { id: params.edtId },
+      where: { id: edtId },
       data: updateData,
       include: {
         responsable: {

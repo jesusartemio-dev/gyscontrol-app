@@ -337,7 +337,7 @@ export default function Sidebar() {
               transition={{ duration: 0.2 }}
               className="flex items-center gap-3"
             >
-              <div className="relative w-[140px] h-10">
+              <Link href="/" className="relative w-[140px] h-10 cursor-pointer hover:opacity-80 transition-opacity">
                 <Image
                   src="/logo.png"
                   alt="Logo GyS"
@@ -346,7 +346,7 @@ export default function Sidebar() {
                   sizes="140px"
                   className="object-contain"
                 />
-              </div>
+              </Link>
               <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-300 border-blue-400/30">
                 v2.0
               </Badge>
@@ -472,13 +472,9 @@ export default function Sidebar() {
                     >
                       {section.links.map((link, linkIndex) => {
                         const LinkIcon = link.icon
-                        // ✅ Fix: More precise route matching to prevent false positives
-                        // Check exact match or if pathname starts with href followed by '/' or query params
-                        const isActive = pathname === link.href || 
-                          (pathname.startsWith(link.href) && 
-                           (pathname.charAt(link.href.length) === '/' || 
-                            pathname.charAt(link.href.length) === '?' || 
-                            pathname.charAt(link.href.length) === '#'))
+                        // ✅ Fix: More precise route matching to prevent multiple highlights
+                        // Only highlight exact matches - no parent/child path matching
+                        const isActive = pathname === link.href
                         const badgeCount = link.badge ? getBadgeCount(link.badge) : 0
                         const hasSubmenu = link.submenu && link.submenu.length > 0
                         const submenuOpen = openSubmenus[link.href] || false

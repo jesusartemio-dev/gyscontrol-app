@@ -63,7 +63,7 @@ import {
 } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 
-import GanttChart from '@/components/proyectos/GanttChart'
+import { ProyectoGanttChart } from '@/components/proyectos/cronograma/ProyectoGanttChart'
 
 import type { ProyectoServicio, User } from '@/types/modelos'
 import type { GanttChartPayload, GanttMetricsPayload } from '@/types/payloads'
@@ -541,8 +541,8 @@ const GanttPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             {selectedProyectoServicio ? (
-              <GanttChart
-                proyectoServicioId={selectedProyectoServicio}
+              <ProyectoGanttChart
+                proyectoId={selectedProyectoServicio}
                 height={600}
               />
             ) : (

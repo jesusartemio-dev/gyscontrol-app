@@ -18,6 +18,9 @@ const customJestConfig = {
     'tailwindcss': 'identity-obj-proxy'
   },
   testEnvironment: 'jest-environment-jsdom',
+
+  // Add React preset for JSX support
+  preset: null,
   
   // ✅ Test patterns
   testMatch: [

@@ -26,13 +26,19 @@ export async function GET(
       zona: searchParams.get('zona') || undefined
     };
 
+    // ✅ Add support for cronogramaId and faseId filtering
+    const cronogramaId = searchParams.get('cronogramaId') || undefined;
+    const faseId = searchParams.get('faseId') || undefined;
+
     const edts = await prisma.proyectoEdt.findMany({
       where: {
         proyectoId: id,
         ...(filtros.categoriaServicioId && { categoriaServicioId: filtros.categoriaServicioId }),
         ...(filtros.estado && { estado: filtros.estado }),
         ...(filtros.responsableId && { responsableId: filtros.responsableId }),
-        ...(filtros.zona && { zona: filtros.zona })
+        ...(filtros.zona && { zona: filtros.zona }),
+        ...(cronogramaId && { proyectoCronogramaId: cronogramaId }),
+        ...(faseId && { proyectoFaseId: faseId })
       },
       include: {
         proyecto: {
@@ -184,6 +190,8 @@ export async function POST(
     const nuevoEdt = await prisma.proyectoEdt.create({
       data: {
         proyectoId: id,
+        proyectoCronogramaId: data.proyectoCronogramaId,
+        nombre: data.nombre,
         categoriaServicioId: data.categoriaServicioId,
         zona: data.zona,
         fechaInicioPlan: data.fechaInicio ? new Date(data.fechaInicio) : undefined,

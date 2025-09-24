@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; taskId: string } }
+  { params }: { params: Promise<{ id: string; taskId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -22,12 +22,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id, taskId } = await params
     const data = await request.json()
     const { nombre, fechaInicio, fechaFin, estado, prioridad, descripcion } = data
 
     // ✅ Verificar que la tarea existe y pertenece a la cotización
     const tareaExistente = await prisma.cotizacionTarea.findUnique({
-      where: { id: params.taskId },
+      where: { id: taskId },
       include: {
         cotizacionEdt: {
           include: {
@@ -44,7 +45,7 @@ export async function PATCH(
       )
     }
 
-    if (tareaExistente.cotizacionEdt.cotizacionId !== params.id) {
+    if (tareaExistente.cotizacionEdt.cotizacionId !== id) {
       return NextResponse.json(
         { error: 'La tarea no pertenece a esta cotización' },
         { status: 403 }
@@ -160,7 +161,7 @@ export async function PATCH(
 
     // ✅ Actualizar tarea
     const tareaActualizada = await prisma.cotizacionTarea.update({
-      where: { id: params.taskId },
+      where: { id: taskId },
       data: updateData,
       include: {
         responsable: {

@@ -388,35 +388,39 @@ export default function ProyectoDetallePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
+          onClick={() => router.push(`/proyectos/${id}/cronograma`)}
+          className="cursor-pointer"
         >
-          <Link href={`/proyectos/${id}/cronograma`}>
-            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-slate-200 hover:border-slate-300 bg-gradient-to-br from-slate-50 to-slate-100">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-lg">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-6 w-6 text-slate-600" />
-                    Cronograma
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-slate-600" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-700 font-medium">Días Transcurridos</span>
-                  <span className="text-2xl font-bold text-slate-900">{stats.daysElapsed}</span>
+          <Card className="hover:shadow-lg transition-all duration-200 border-slate-200 hover:border-slate-300 bg-gradient-to-br from-slate-50 to-slate-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-lg">
+                <div className="flex items-center gap-2">
+                  <Target className="h-6 w-6 text-slate-600" />
+                  Cronograma
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-700 font-medium">Estado</span>
-                  <span className="text-lg font-semibold text-slate-800">{getStatusInfo(proyecto.estado).label}</span>
-                </div>
-                <div className="pt-2 border-t border-slate-200">
-                  <p className="text-xs text-slate-600">
-                    Monitorea el progreso y cronograma del proyecto
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+                <ArrowRight className="h-5 w-5 text-slate-600" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-700 font-medium">EDTs Activos</span>
+                <span className="text-2xl font-bold text-slate-900">
+                  {(proyecto as any).edts?.length || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-700 font-medium">Fases del Proyecto</span>
+                <span className="text-lg font-semibold text-slate-800">
+                  {(proyecto as any).fases?.length || 0}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-slate-200">
+                <p className="text-xs text-slate-600">
+                  Gestiona EDTs, fases y cronograma del proyecto
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Quick Actions Card */}

@@ -327,6 +327,8 @@ export function CotizacionEdtForm({
                   setFormData(prev => ({
                     ...prev,
                     categoriaServicioId: value,
+                    // ✅ Auto-fill nombre del EDT con el nombre del servicio
+                    nombre: servicioSeleccionado ? servicioSeleccionado.nombre : prev.nombre,
                     horasCom: horasTotales > 0 ? horasTotales.toString() : prev.horasCom,
                     // ✅ Auto-calcular fecha fin si hay fecha inicio
                     fechaFinCom: prev.fechaInicioCom && horasTotales > 0

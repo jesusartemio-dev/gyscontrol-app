@@ -62,6 +62,18 @@ export async function GET(request: NextRequest) {
     // 📝 Búsqueda por texto
     const search = searchParams.get('search')
 
+    // ✅ Filtros avanzados
+    const hasCotizacion = searchParams.get('hasCotizacion')
+    const hasProyecto = searchParams.get('hasProyecto')
+    const estadoCotizacion = searchParams.get('estadoCotizacion')
+    const estadoProyecto = searchParams.get('estadoProyecto')
+    const probabilidadMin = searchParams.get('probabilidadMin')
+    const probabilidadMax = searchParams.get('probabilidadMax')
+    const diasSinContacto = searchParams.get('diasSinContacto')
+    const soloUrgentes = searchParams.get('soloUrgentes')
+    const soloVencidas = searchParams.get('soloVencidas')
+    const soloActivas = searchParams.get('soloActivas')
+
     // 🔧 Construir filtros
     const where: any = {}
 
@@ -91,6 +103,57 @@ export async function GET(request: NextRequest) {
         { descripcion: { contains: search, mode: 'insensitive' } },
         { cliente: { nombre: { contains: search, mode: 'insensitive' } } }
       ]
+    }
+
+    // ✅ Filtros avanzados
+    if (hasCotizacion === 'true') {
+      where.cotizacionId = { not: null }
+    } else if (hasCotizacion === 'false') {
+      where.cotizacionId = null
+    }
+
+    if (hasProyecto === 'true') {
+      const proyectos = await prisma.proyecto.findMany({
+        select: { cotizacionId: true },
+        where: { cotizacionId: { not: null } }
+      })
+      const cotizacionIdsConProyecto = proyectos.map(p => p.cotizacionId).filter(Boolean) as string[]
+      where.cotizacionId = { in: cotizacionIdsConProyecto }
+    } else if (hasProyecto === 'false') {
+      const proyectos = await prisma.proyecto.findMany({
+        select: { cotizacionId: true },
+        where: { cotizacionId: { not: null } }
+      })
+      const cotizacionIdsConProyecto = proyectos.map(p => p.cotizacionId).filter(Boolean) as string[]
+      where.OR = [
+        { cotizacionId: null },
+        { cotizacionId: { notIn: cotizacionIdsConProyecto } }
+      ]
+    }
+
+    if (estadoCotizacion) {
+      where.cotizacion = { estado: estadoCotizacion }
+    }
+
+    if (probabilidadMin || probabilidadMax) {
+      where.probabilidad = {}
+      if (probabilidadMin) where.probabilidad.gte = parseInt(probabilidadMin)
+      if (probabilidadMax) where.probabilidad.lte = parseInt(probabilidadMax)
+    }
+
+    if (soloUrgentes === 'true') {
+      where.AND = [
+        { prioridad: { in: ['alta', 'critica'] } },
+        { fechaCierreEstimada: { lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) } } // Próximos 30 días
+      ]
+    }
+
+    if (soloVencidas === 'true') {
+      where.fechaCierreEstimada = { lt: new Date() }
+    }
+
+    if (soloActivas === 'true') {
+      where.estado = { notIn: ['cerrada_ganada', 'cerrada_perdida'] }
     }
 
     // 📊 Obtener oportunidades con relaciones
