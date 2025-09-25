@@ -78,6 +78,7 @@ export interface UnidadServicioUpdatePayload extends UnidadServicioPayload {}
 // ✅ CategoriaEquipo
 export interface CategoriaEquipoPayload {
   nombre: string
+  descripcion?: string | null
 }
 export interface CategoriaEquipoUpdatePayload extends CategoriaEquipoPayload {}
 
@@ -90,6 +91,7 @@ export interface NivelServicioUpdatePayload extends NivelServicioPayload {}
 // ✅ CategoriaServicio
 export interface CategoriaServicioPayload {
   nombre: string
+  descripcion?: string
 }
 export interface CategoriaServicioUpdatePayload extends CategoriaServicioPayload {}
 

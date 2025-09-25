@@ -1,88 +1,191 @@
 // ===================================================
 // 📁 Archivo: route.ts
 // 📌 Ubicación: /api/crm/clientes/[id]/historial
-// 🔧 Descripción: API para obtener historial de proyectos del cliente
-// ✅ GET: Obtener historial de proyectos
+// 🔧 Descripción: API para historial de proyectos de un cliente CRM
+// ✅ GET: Obtener historial completo de proyectos del cliente
 // ===================================================
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-// ✅ GET /api/crm/clientes/[id]/historial - Obtener historial de proyectos
+// ✅ Obtener historial de proyectos de un cliente
 export async function GET(
-  request: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const session = await getServerSession(authOptions)
+    const { searchParams } = new URL(req.url)
+    const tipo = searchParams.get('tipo') // 'todos', 'proyectos', 'cotizaciones'
 
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    // Verificar que el cliente existe
+    const cliente = await prisma.cliente.findUnique({
+      where: { id },
+      select: { id: true, nombre: true, codigo: true }
+    })
+
+    if (!cliente) {
+      return NextResponse.json(
+        { error: 'Cliente no encontrado' },
+        { status: 404 }
+      )
     }
 
     // Obtener proyectos asociados al cliente
     const proyectos = await prisma.proyecto.findMany({
       where: { clienteId: id },
-      include: {
+      select: {
+        id: true,
+        nombre: true,
+        codigo: true,
+        estado: true,
+        fechaInicio: true,
+        fechaFin: true,
+        totalCliente: true,
+        createdAt: true,
         comercial: {
-          select: { id: true, name: true, email: true }
-        },
-        gestor: {
-          select: { id: true, name: true, email: true }
+          select: { name: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    // Obtener cotizaciones asociadas al cliente
+    const cotizaciones = await prisma.cotizacion.findMany({
+      where: { clienteId: id },
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        estado: true,
+        totalCliente: true,
+        fechaEnvio: true,
+        createdAt: true,
+        comercial: {
+          select: { name: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    // Obtener historial de proyectos desde CrmHistorialProyecto
+    const historialProyectos = await prisma.crmHistorialProyecto.findMany({
+      where: { clienteId: id },
+      include: {
+        proyecto: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true,
+            estado: true
+          }
         },
         cotizacion: {
           select: {
             id: true,
             codigo: true,
             nombre: true,
-            totalCliente: true,
-            grandTotal: true
+            estado: true
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { fechaInicio: 'desc' }
     })
 
-    // Obtener cotizaciones sin proyecto asociado
-    const cotizacionesSinProyecto = await prisma.cotizacion.findMany({
-      where: {
-        clienteId: id,
-        // Filtrar cotizaciones que no están asociadas a ningún proyecto
-        proyectos: {
-          none: {} // No tiene ningún proyecto asociado
-        }
-      },
-      include: {
-        comercial: {
-          select: { id: true, name: true, email: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
+    // Combinar y formatear datos
+    const proyectosFormateados = proyectos.map(proyecto => ({
+      id: proyecto.id,
+      tipo: 'proyecto' as const,
+      titulo: proyecto.nombre,
+      codigo: proyecto.codigo,
+      estado: proyecto.estado,
+      fechaInicio: proyecto.fechaInicio,
+      fechaFin: proyecto.fechaFin,
+      valor: proyecto.totalCliente,
+      responsable: proyecto.comercial?.name,
+      createdAt: proyecto.createdAt
+    }))
 
-    // Calcular métricas del cliente
-    const metricas = {
-      totalProyectos: proyectos.length,
-      totalCotizaciones: cotizacionesSinProyecto.length,
-      valorTotalProyectos: proyectos.reduce((sum, p) => sum + (p.grandTotal || 0), 0),
-      valorTotalCotizaciones: cotizacionesSinProyecto.reduce((sum, c) => sum + (c.grandTotal || 0), 0),
-      ultimoProyecto: proyectos.length > 0 ? proyectos[0].fechaFin || proyectos[0].createdAt : null,
-      promedioValorProyecto: proyectos.length > 0 ?
-        proyectos.reduce((sum, p) => sum + (p.grandTotal || 0), 0) / proyectos.length : 0
+    const cotizacionesFormateadas = cotizaciones.map(cotizacion => ({
+      id: cotizacion.id,
+      tipo: 'cotizacion' as const,
+      titulo: cotizacion.nombre,
+      codigo: cotizacion.codigo,
+      estado: cotizacion.estado,
+      fechaInicio: cotizacion.fechaEnvio,
+      fechaFin: null,
+      valor: cotizacion.totalCliente,
+      responsable: cotizacion.comercial?.name,
+      createdAt: cotizacion.createdAt
+    }))
+
+    const historialFormateado = historialProyectos.map(historial => ({
+      id: historial.id,
+      tipo: 'historial' as const,
+      titulo: historial.nombreProyecto,
+      codigo: null,
+      estado: historial.proyecto?.estado || 'completado',
+      fechaInicio: historial.fechaInicio,
+      fechaFin: historial.fechaFin,
+      valor: historial.valorContrato,
+      responsable: null,
+      createdAt: historial.createdAt,
+      // Información adicional del historial
+      sector: historial.sector,
+      complejidad: historial.complejidad,
+      duracionDias: historial.duracionDias,
+      calificacionCliente: historial.calificacionCliente,
+      exitos: historial.exitos,
+      problemas: historial.problemas
+    }))
+
+    // Combinar todos los registros
+    let todosLosRegistros = [
+      ...proyectosFormateados,
+      ...cotizacionesFormateadas,
+      ...historialFormateado
+    ]
+
+    // Filtrar por tipo si se especifica
+    if (tipo && tipo !== 'todos') {
+      todosLosRegistros = todosLosRegistros.filter(registro => registro.tipo === tipo)
     }
 
-    return NextResponse.json({
-      proyectos,
-      cotizacionesSinProyecto,
-      metricas
-    })
+    // Ordenar por fecha de creación descendente
+    todosLosRegistros.sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+
+    // Calcular estadísticas
+    const estadisticas = {
+      totalProyectos: proyectos.length,
+      totalCotizaciones: cotizaciones.length,
+      totalRegistrosHistorial: historialProyectos.length,
+      valorTotalProyectos: proyectos.reduce((sum, p) => sum + p.totalCliente, 0),
+      valorTotalCotizaciones: cotizaciones.reduce((sum, c) => sum + c.totalCliente, 0),
+      proyectosActivos: proyectos.filter(p => ['creado', 'en_planificacion', 'en_ejecucion'].includes(p.estado)).length,
+      cotizacionesPendientes: cotizaciones.filter(c => ['borrador', 'enviada'].includes(c.estado)).length
+    }
+
+    const resultado = {
+      cliente,
+      estadisticas,
+      registros: todosLosRegistros,
+      filtros: {
+        tipo: tipo || 'todos',
+        totalRegistros: todosLosRegistros.length
+      }
+    }
+
+    return NextResponse.json(resultado)
   } catch (error) {
-    console.error('❌ Error al obtener historial:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    console.error('❌ Error al obtener historial del cliente:', error)
+    return NextResponse.json(
+      { error: 'Error al obtener historial del cliente' },
+      { status: 500 }
+    )
   }
 }

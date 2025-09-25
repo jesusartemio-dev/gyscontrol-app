@@ -23,7 +23,8 @@ import {
   CheckCircle,
   Calculator,
   Truck,
-  AlertTriangle
+  AlertTriangle,
+  Target
 } from 'lucide-react'
 import {
   getCotizacionById,
@@ -61,8 +62,11 @@ import CotizacionEquipoAccordion from '@/components/cotizaciones/CotizacionEquip
 import CotizacionServicioAccordion from '@/components/cotizaciones/CotizacionServicioAccordion'
 import CotizacionGastoAccordion from '@/components/cotizaciones/CotizacionGastoAccordion'
 import CotizacionEquipoModal from '@/components/cotizaciones/CotizacionEquipoModal'
+import ImportarPlantillaModal from '@/components/cotizaciones/ImportarPlantillaModal'
 
 import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
+import CrearOportunidadDesdeCotizacion from '@/components/crm/CrearOportunidadDesdeCotizacion'
+import CrmIntegrationNotification from '@/components/crm/CrmIntegrationNotification'
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
 import EstadoCotizacionToolbar from '@/components/cotizaciones/EstadoCotizacionToolbar'
 import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
@@ -123,6 +127,9 @@ export default function CotizacionDetallePage() {
   const [updatingData, setUpdatingData] = useState(false)
   const [showForm, setShowForm] = useState({ servicio: false, gasto: false })
   const [showEquipoModal, setShowEquipoModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState<{ tipo: 'equipos' | 'servicios' | 'gastos' | null }>({ tipo: null })
+  const [showCrearOportunidad, setShowCrearOportunidad] = useState(false)
+  const [showCrmNotification, setShowCrmNotification] = useState(false)
 
   const [selectedEquipoId, setSelectedEquipoId] = useState<string | null>(null)
   const [creandoProyecto, setCreandoProyecto] = useState(false)
@@ -147,6 +154,15 @@ export default function CotizacionDetallePage() {
         .finally(() => setLoading(false))
     }
   }, [id])
+
+  // Mostrar notificación CRM cuando la cotización está aprobada y no tiene oportunidad
+  useEffect(() => {
+    if (cotizacion && cotizacion.estado === 'aprobada' && !cotizacion.oportunidadCrm) {
+      // Pequeño delay para que aparezca después de cargar la página
+      const timer = setTimeout(() => setShowCrmNotification(true), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [cotizacion])
 
   const actualizarTotalesParciales = (equipos: any[], servicios: any[], gastos: any[]) => {
     const subtotalesEquipos = calcularTotal({ equipos, servicios: [], gastos: [] })
@@ -550,6 +566,18 @@ export default function CotizacionDetallePage() {
                     <DescargarPDFButton cotizacion={cotizacion} />
                   </div>
                 )}
+                {/* Botón para crear oportunidad CRM */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCrearOportunidad(true)}
+                  className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 flex-shrink-0 h-8 min-w-[120px] justify-center"
+                >
+                  <Target className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Crear Oportunidad</span>
+                  <span className="sm:hidden">CRM</span>
+                </Button>
+
                 {cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada') && (
                   <div className="flex-shrink-0">
                     <CrearProyectoDesdeCotizacionModal
@@ -768,6 +796,15 @@ export default function CotizacionDetallePage() {
                   <Package className="h-4 w-4" />
                   Nuevo Equipo
                 </Button>
+                <Button
+                  onClick={() => setShowImportModal({ tipo: 'equipos' })}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-2 justify-start sm:justify-center"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Importar Plantilla
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -858,14 +895,25 @@ export default function CotizacionDetallePage() {
                 Secciones de Servicios
                 <Badge variant="secondary">{totalServicios}</Badge>
               </CardTitle>
-              <Button
-                onClick={() => setShowForm(prev => ({ ...prev, servicio: !prev.servicio }))}
-                size="sm"
-                className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-center"
-              >
-                <Plus className="h-4 w-4" />
-                Agregar Servicio
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button
+                  onClick={() => setShowForm(prev => ({ ...prev, servicio: !prev.servicio }))}
+                  size="sm"
+                  className="flex items-center gap-2 justify-start sm:justify-center"
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar Servicio
+                </Button>
+                <Button
+                  onClick={() => setShowImportModal({ tipo: 'servicios' })}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-2 justify-start sm:justify-center"
+                >
+                  <Truck className="h-4 w-4" />
+                  Importar Plantilla
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4">
@@ -978,14 +1026,25 @@ export default function CotizacionDetallePage() {
                 Secciones de Gastos
                 <Badge variant="secondary">{totalGastos}</Badge>
               </CardTitle>
-              <Button
-                onClick={() => setShowForm(prev => ({ ...prev, gasto: !prev.gasto }))}
-                size="sm"
-                className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-center"
-              >
-                <Plus className="h-4 w-4" />
-                Agregar Gasto
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button
+                  onClick={() => setShowForm(prev => ({ ...prev, gasto: !prev.gasto }))}
+                  size="sm"
+                  className="flex items-center gap-2 justify-start sm:justify-center"
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar Gasto
+                </Button>
+                <Button
+                  onClick={() => setShowImportModal({ tipo: 'gastos' })}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-2 justify-start sm:justify-center"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  Importar Plantilla
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4">
@@ -1156,7 +1215,63 @@ export default function CotizacionDetallePage() {
         }}
       />
 
+      {/* Modal para importar plantillas */}
+      {showImportModal.tipo && (
+        <ImportarPlantillaModal
+          open={!!showImportModal.tipo}
+          onOpenChange={(open) => {
+            if (!open) setShowImportModal({ tipo: null })
+          }}
+          cotizacionId={cotizacion.id}
+          tipo={showImportModal.tipo}
+          onSuccess={async () => {
+            // Recargar la cotización completa para reflejar los cambios
+            if (typeof id === 'string') {
+              try {
+                const updatedCotizacion = await getCotizacionById(id)
+                setCotizacion(updatedCotizacion)
+              } catch (error) {
+                setError('Error al recargar cotización.')
+              }
+            }
+            setShowImportModal({ tipo: null })
+          }}
+        />
+      )}
 
+      {/* Modal para crear oportunidad desde cotización */}
+      <CrearOportunidadDesdeCotizacion
+        cotizacionId={cotizacion.id}
+        cotizacionNombre={cotizacion.nombre}
+        cotizacionCodigo={cotizacion.codigo || 'Sin código'}
+        clienteNombre={cotizacion.cliente?.nombre || 'Cliente no especificado'}
+        valorCotizacion={cotizacion.grandTotal || 0}
+        isOpen={showCrearOportunidad}
+        onClose={() => setShowCrearOportunidad(false)}
+        onSuccess={(oportunidad) => {
+          console.log('Oportunidad creada:', oportunidad)
+          // Aquí podríamos actualizar el estado de la cotización si es necesario
+        }}
+      />
+
+      {/* Notificación de integración CRM */}
+      {showCrmNotification && cotizacion && (
+        <CrmIntegrationNotification
+          entityType="cotizacion"
+          entityId={cotizacion.id}
+          entityNombre={cotizacion.nombre}
+          clienteNombre={cotizacion.cliente?.nombre || 'Cliente no especificado'}
+          valor={cotizacion.grandTotal || 0}
+          onCreateOportunidad={() => {
+            setShowCrmNotification(false)
+            // Recargar la cotización para reflejar la nueva oportunidad
+            if (typeof id === 'string') {
+              getCotizacionById(id).then(setCotizacion)
+            }
+          }}
+          onDismiss={() => setShowCrmNotification(false)}
+        />
+      )}
 
       </motion.div>
     )

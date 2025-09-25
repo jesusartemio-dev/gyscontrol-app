@@ -67,7 +67,12 @@ export default function CrearCotizacionDesdeOportunidadModal({
 
   const loadPlantillas = async () => {
     try {
-      const plantillasData = await getPlantillas()
+      // Solo cargar plantillas completas para creación inicial de cotizaciones
+      const response = await fetch('/api/plantilla?tipo=completa')
+      if (!response.ok) {
+        throw new Error('Error al cargar plantillas')
+      }
+      const plantillasData = await response.json()
       setPlantillas(plantillasData)
     } catch (error) {
       console.error('Error loading plantillas:', error)

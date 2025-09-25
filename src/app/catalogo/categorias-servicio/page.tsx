@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import CategoriaServicioForm from '@/components/catalogo/CategoriaServicioForm'
-import CategoriaServicioList from '@/components/catalogo/CategoriaServicioList'
+import CategoriaServicioModal from '@/components/catalogo/CategoriaServicioModal'
+import CategoriaServicioTableView from '@/components/catalogo/CategoriaServicioTableView'
+import CategoriaServicioCardView from '@/components/catalogo/CategoriaServicioCardView'
 import { getCategoriasServicio, createCategoriaServicio } from '@/lib/services/categoriaServicio'
 import { toast } from 'sonner'
 import { exportarCategoriasServicioAExcel } from '@/lib/utils/categoriaServicioExcel'
@@ -20,15 +21,18 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  ChevronRight, 
-  FolderOpen, 
-  Plus, 
-  BarChart3, 
-  FileText, 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  ChevronRight,
+  FolderOpen,
+  Plus,
+  BarChart3,
+  FileText,
   AlertCircle,
   Loader2,
-  Package
+  Package,
+  Grid3X3,
+  List
 } from 'lucide-react'
 
 export default function Page() {
@@ -37,6 +41,8 @@ export default function Page() {
   const [loading, setLoading] = useState(true)
   const [importando, setImportando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
   const cargarCategorias = async () => {
     try {
@@ -95,7 +101,10 @@ export default function Page() {
         return
       }
 
-      await Promise.all(nuevas.map(c => createCategoriaServicio({ nombre: c.nombre })))
+      await Promise.all(nuevas.map(c => createCategoriaServicio({
+        nombre: c.nombre,
+        descripcion: c.descripcion
+      })))
       toast.success(`${nuevas.length} categorías importadas correctamente`)
       cargarCategorias()
     } catch (err) {
@@ -232,6 +241,10 @@ export default function Page() {
         </div>
         <div className="flex items-center gap-2">
           <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
+          <Button onClick={() => setShowCreateModal(true)} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Categoría
+          </Button>
         </div>
       </motion.div>
 
@@ -316,23 +329,12 @@ export default function Page() {
         </motion.div>
       )}
 
-      {/* Create Form */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Nueva Categoría de Servicio
-            </CardTitle>
-            <CardDescription>
-              Crea una nueva categoría para organizar los servicios del catálogo
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CategoriaServicioForm onCreated={handleCreated} />
-          </CardContent>
-        </Card>
-      </motion.div>
+      {/* Create Modal */}
+      <CategoriaServicioModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={handleCreated}
+      />
 
       <Separator />
 
@@ -340,16 +342,32 @@ export default function Page() {
       <motion.div variants={itemVariants}>
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FolderOpen className="h-5 w-5" />
-              Categorías Existentes
-            </CardTitle>
-            <CardDescription>
-              {categorias.length === 0 
-                ? 'No hay categorías registradas aún'
-                : `${categorias.length} categoría${categorias.length !== 1 ? 's' : ''} registrada${categorias.length !== 1 ? 's' : ''}`
-              }
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5" />
+                  Categorías Existentes
+                </CardTitle>
+                <CardDescription>
+                  {categorias.length === 0
+                    ? 'No hay categorías registradas aún'
+                    : `${categorias.length} categoría${categorias.length !== 1 ? 's' : ''} registrada${categorias.length !== 1 ? 's' : ''}`
+                  }
+                </CardDescription>
+              </div>
+              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'cards')}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="table" className="flex items-center gap-2">
+                    <List className="h-4 w-4" />
+                    Tabla
+                  </TabsTrigger>
+                  <TabsTrigger value="cards" className="flex items-center gap-2">
+                    <Grid3X3 className="h-4 w-4" />
+                    Cards
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </CardHeader>
           <CardContent>
             {categorias.length === 0 ? (
@@ -363,16 +381,24 @@ export default function Page() {
                 <p className="text-gray-500 mb-4 max-w-sm mx-auto">
                   Comienza creando tu primera categoría de servicio para organizar el catálogo.
                 </p>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => setShowCreateModal(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Crear primera categoría
                 </Button>
               </div>
-            ) : (
-              <CategoriaServicioList
+            ) : viewMode === 'table' ? (
+              <CategoriaServicioTableView
                 data={categorias}
                 onUpdate={handleUpdated}
                 onDelete={handleDeleted}
+                loading={loading}
+              />
+            ) : (
+              <CategoriaServicioCardView
+                data={categorias}
+                onUpdate={handleUpdated}
+                onDelete={handleDeleted}
+                loading={loading}
               />
             )}
           </CardContent>

@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 
 export interface CategoriaEquipoImportada {
   nombre: string
+  descripcion?: string
 }
 
 export async function leerCategoriasEquipoDesdeExcel(file: File): Promise<CategoriaEquipoImportada[]> {
@@ -13,7 +14,31 @@ export async function leerCategoriasEquipoDesdeExcel(file: File): Promise<Catego
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const json: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
-  return json.map((row) => ({ nombre: row['Nombre']?.trim() || '' }))
+  return json.map((row) => {
+    // Get all column names
+    const columns = Object.keys(row)
+
+    // Find description column (case-insensitive, contains "descripcion" or "description")
+    const descColumn = columns.find(col =>
+      col.toLowerCase().includes('descripcion') ||
+      col.toLowerCase().includes('description') ||
+      col.toLowerCase().includes('descripción')
+    )
+
+    // Find name column (case-insensitive, contains "nombre" or "name")
+    const nameColumn = columns.find(col =>
+      col.toLowerCase().includes('nombre') ||
+      col.toLowerCase().includes('name')
+    )
+
+    const descripcion = descColumn ? row[descColumn]?.trim() || '' : ''
+    const nombre = nameColumn ? row[nameColumn]?.trim() || '' : ''
+
+    return {
+      nombre,
+      descripcion: descripcion || null
+    }
+  })
 }
 
 export function validarCategoriasEquipo(

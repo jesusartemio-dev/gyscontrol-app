@@ -139,6 +139,7 @@ export default function Sidebar() {
       color: 'text-blue-400',
       roles: ['admin', 'gerente', 'comercial'],
       links: [
+        { href: '/comercial/crm', label: 'Dashboard CRM', icon: Target },
         { href: '/crm', label: 'Oportunidades', icon: Target },
         { href: '/crm/clientes', label: 'Gestión de Clientes', icon: Building2 },
         { href: '/crm/actividades', label: 'Actividades', icon: Activity },

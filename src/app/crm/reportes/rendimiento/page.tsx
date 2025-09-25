@@ -12,17 +12,22 @@ import { getUsuarios, Usuario } from '@/lib/services/usuario'
 interface MetricasUsuario {
   usuarioId: string
   usuario: Usuario
-  cotizacionesGeneradas: number
-  cotizacionesAprobadas: number
-  proyectosCerrados: number
-  valorTotalVendido: number
-  margenTotalObtenido: number
-  tiempoPromedioCierre?: number
-  tasaConversion?: number
-  llamadasRealizadas: number
-  reunionesAgendadas: number
-  propuestasEnviadas: number
-  emailsEnviados: number
+  metaMensual: number | null
+  metaTrimestral: number | null
+  metricas: {
+    cotizacionesGeneradas: number
+    cotizacionesAprobadas: number
+    proyectosCerrados: number
+    valorTotalVendido: number
+    margenTotalObtenido: number
+    tiempoPromedioCierre?: number
+    tasaConversion?: number
+    valorPromedioProyecto?: number
+    llamadasRealizadas: number
+    reunionesAgendadas: number
+    propuestasEnviadas: number
+    emailsEnviados: number
+  }
 }
 
 export default function RendimientoReportPage() {
@@ -35,30 +40,23 @@ export default function RendimientoReportPage() {
       try {
         setLoading(true)
 
-        // Load users
-        const usuariosData = await getUsuarios()
-        setUsuarios(usuariosData)
+        // Load rendimiento data from API
+        const response = await fetch('/api/crm/reportes/rendimiento')
+        if (!response.ok) {
+          throw new Error('Error al cargar datos de rendimiento')
+        }
+        const data = await response.json()
 
-        // Mock metrics data (in real implementation, this would come from API)
-        const mockMetricas: MetricasUsuario[] = usuariosData
-          .filter(user => user.role === 'comercial')
-          .map(user => ({
-            usuarioId: user.id,
-            usuario: user,
-            cotizacionesGeneradas: Math.floor(Math.random() * 20) + 5,
-            cotizacionesAprobadas: Math.floor(Math.random() * 15) + 2,
-            proyectosCerrados: Math.floor(Math.random() * 8) + 1,
-            valorTotalVendido: Math.floor(Math.random() * 500000) + 50000,
-            margenTotalObtenido: Math.floor(Math.random() * 100000) + 10000,
-            tiempoPromedioCierre: Math.floor(Math.random() * 45) + 15,
-            tasaConversion: Math.floor(Math.random() * 40) + 10,
-            llamadasRealizadas: Math.floor(Math.random() * 200) + 50,
-            reunionesAgendadas: Math.floor(Math.random() * 30) + 5,
-            propuestasEnviadas: Math.floor(Math.random() * 25) + 3,
-            emailsEnviados: Math.floor(Math.random() * 150) + 30
-          }))
+        // Transform API data to match component interface
+        const metricasData: MetricasUsuario[] = data.comerciales.map((comercial: any) => ({
+          usuarioId: comercial.usuarioId,
+          usuario: comercial.usuario,
+          metaMensual: comercial.metaMensual,
+          metaTrimestral: comercial.metaTrimestral,
+          metricas: comercial.metricas
+        }))
 
-        setMetricas(mockMetricas)
+        setMetricas(metricasData)
       } catch (error) {
         console.error('Error loading rendimiento data:', error)
       } finally {
@@ -87,10 +85,10 @@ export default function RendimientoReportPage() {
     return 'text-red-600'
   }
 
-  const getTopPerformer = (metric: keyof MetricasUsuario) => {
+  const getTopPerformer = (metric: keyof typeof metricas[0]['metricas']) => {
     return metricas.reduce((prev, current) => {
-      const prevValue = typeof prev[metric] === 'number' ? prev[metric] as number : 0
-      const currentValue = typeof current[metric] === 'number' ? current[metric] as number : 0
+      const prevValue = typeof prev.metricas[metric] === 'number' ? prev.metricas[metric] as number : 0
+      const currentValue = typeof current.metricas[metric] === 'number' ? current.metricas[metric] as number : 0
       return currentValue > prevValue ? current : prev
     })
   }
@@ -108,11 +106,11 @@ export default function RendimientoReportPage() {
     )
   }
 
-  const totalCotizaciones = metricas.reduce((sum, m) => sum + m.cotizacionesGeneradas, 0)
-  const totalValorVendido = metricas.reduce((sum, m) => sum + m.valorTotalVendido, 0)
-  const totalProyectos = metricas.reduce((sum, m) => sum + m.proyectosCerrados, 0)
+  const totalCotizaciones = metricas.reduce((sum, m) => sum + m.metricas.cotizacionesGeneradas, 0)
+  const totalValorVendido = metricas.reduce((sum, m) => sum + m.metricas.valorTotalVendido, 0)
+  const totalProyectos = metricas.reduce((sum, m) => sum + m.metricas.proyectosCerrados, 0)
   const avgConversion = metricas.length > 0 ?
-    metricas.reduce((sum, m) => sum + (m.tasaConversion || 0), 0) / metricas.length : 0
+    metricas.reduce((sum, m) => sum + (m.metricas.tasaConversion || 0), 0) / metricas.length : 0
 
   return (
     <motion.div
@@ -203,7 +201,7 @@ export default function RendimientoReportPage() {
                   <div>
                     <p className="font-medium">{topSeller.usuario.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {formatCurrency(topSeller.valorTotalVendido)}
+                      {formatCurrency(topSeller.metricas.valorTotalVendido)}
                     </p>
                   </div>
                 </div>
@@ -232,7 +230,7 @@ export default function RendimientoReportPage() {
                   <div>
                     <p className="font-medium">{topGenerator.usuario.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {topGenerator.cotizacionesGeneradas} cotizaciones
+                      {topGenerator.metricas.cotizacionesGeneradas} cotizaciones
                     </p>
                   </div>
                 </div>
@@ -261,7 +259,7 @@ export default function RendimientoReportPage() {
                   <div>
                     <p className="font-medium">{mostActive.usuario.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {mostActive.llamadasRealizadas} llamadas
+                      {mostActive.metricas.llamadasRealizadas} llamadas
                     </p>
                   </div>
                 </div>
@@ -302,32 +300,32 @@ export default function RendimientoReportPage() {
                     </div>
                   </div>
                   <Badge variant="secondary">
-                    {metrica.tasaConversion?.toFixed(1)}% conversión
+                    {metrica.metricas.tasaConversion?.toFixed(1)}% conversión
                   </Badge>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div className="text-center">
-                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.cotizacionesGeneradas, { good: 15, medium: 8 })}`}>
-                      {metrica.cotizacionesGeneradas}
+                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.metricas.cotizacionesGeneradas, { good: 15, medium: 8 })}`}>
+                      {metrica.metricas.cotizacionesGeneradas}
                     </div>
                     <div className="text-xs text-muted-foreground">Cotizaciones</div>
                   </div>
                   <div className="text-center">
-                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.proyectosCerrados, { good: 5, medium: 2 })}`}>
-                      {metrica.proyectosCerrados}
+                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.metricas.proyectosCerrados, { good: 5, medium: 2 })}`}>
+                      {metrica.metricas.proyectosCerrados}
                     </div>
                     <div className="text-xs text-muted-foreground">Proyectos</div>
                   </div>
                   <div className="text-center">
-                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.valorTotalVendido / 1000, { good: 300, medium: 150 })}`}>
-                      {formatCurrency(metrica.valorTotalVendido).replace('$', '')}
+                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.metricas.valorTotalVendido / 1000, { good: 300, medium: 150 })}`}>
+                      {formatCurrency(metrica.metricas.valorTotalVendido).replace('$', '')}
                     </div>
                     <div className="text-xs text-muted-foreground">Valor Vendido</div>
                   </div>
                   <div className="text-center">
-                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.llamadasRealizadas, { good: 150, medium: 75 })}`}>
-                      {metrica.llamadasRealizadas}
+                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.metricas.llamadasRealizadas, { good: 150, medium: 75 })}`}>
+                      {metrica.metricas.llamadasRealizadas}
                     </div>
                     <div className="text-xs text-muted-foreground">Llamadas</div>
                   </div>
@@ -336,11 +334,11 @@ export default function RendimientoReportPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Progreso vs. Objetivo</span>
-                    <span>{((metrica.proyectosCerrados / 10) * 100).toFixed(0)}%</span>
+                    <span>{((metrica.metricas.proyectosCerrados / 10) * 100).toFixed(0)}%</span>
                   </div>
-                  <Progress value={(metrica.proyectosCerrados / 10) * 100} className="h-2" />
+                  <Progress value={(metrica.metricas.proyectosCerrados / 10) * 100} className="h-2" />
                   <div className="text-xs text-muted-foreground text-center">
-                    {metrica.proyectosCerrados} de 10 proyectos objetivo
+                    {metrica.metricas.proyectosCerrados} de 10 proyectos objetivo
                   </div>
                 </div>
               </motion.div>

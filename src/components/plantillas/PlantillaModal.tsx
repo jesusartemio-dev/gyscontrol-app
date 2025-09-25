@@ -34,7 +34,7 @@ export default function PlantillaModal({ onCreated, trigger }: Props) {
   // ✅ Form validation
   const validateForm = () => {
     const newErrors: { nombre?: string } = {}
-    
+
     if (!nombre.trim()) {
       newErrors.nombre = 'El nombre es obligatorio'
     } else if (nombre.trim().length < 3) {
@@ -42,7 +42,7 @@ export default function PlantillaModal({ onCreated, trigger }: Props) {
     } else if (nombre.trim().length > 100) {
       newErrors.nombre = 'El nombre no puede exceder 100 caracteres'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -59,7 +59,8 @@ export default function PlantillaModal({ onCreated, trigger }: Props) {
     setLoading(true)
     try {
       const nueva = await createPlantilla({
-        nombre: nombre.trim()
+        nombre: nombre.trim(),
+        tipo: 'completa'
       })
       
       if (nueva) {
@@ -155,6 +156,7 @@ export default function PlantillaModal({ onCreated, trigger }: Props) {
               </motion.p>
             )}
           </div>
+
 
           <DialogFooter>
             <Button

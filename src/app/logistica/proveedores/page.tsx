@@ -4,21 +4,26 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { getProveedores } from '@/lib/services/proveedor'
 import ProveedorForm from '@/components/logistica/ProveedorForm'
-import ProveedorList from '@/components/logistica/ProveedorList'
+import ProveedorTableView from '@/components/logistica/ProveedorTableView'
+import ProveedorCardView from '@/components/logistica/ProveedorCardView'
 import ProveedorImportExport from '@/components/logistica/ProveedorImportExport'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { 
-  Users, 
-  Home, 
-  ChevronRight, 
-  Building2, 
+import {
+  Users,
+  Home,
+  ChevronRight,
+  Building2,
   UserPlus,
   TrendingUp,
   Activity,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Table,
+  Grid3X3
 } from 'lucide-react'
 import type { Proveedor } from '@/types'
 
@@ -49,6 +54,9 @@ export default function ProveedoresPage() {
   const [editando, setEditando] = useState<Proveedor | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
   useEffect(() => {
     const loadProveedores = async () => {
@@ -75,6 +83,7 @@ export default function ProveedoresPage() {
       toast.success('Proveedor actualizado exitosamente')
     } else {
       setProveedores([...proveedores, proveedor])
+      setShowCreateModal(false)
       // No mostrar toast aquí porque ya se muestra en el formulario
     }
     setEditando(null)
@@ -87,10 +96,12 @@ export default function ProveedoresPage() {
 
   const handleEdit = (proveedor: Proveedor) => {
     setEditando(proveedor)
+    setShowEditModal(true)
   }
 
   const handleCancelEdit = () => {
     setEditando(null)
+    setShowEditModal(false)
   }
 
   const handleImported = async () => {
@@ -148,10 +159,10 @@ export default function ProveedoresPage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                {editando ? 'Editar Proveedor' : 'Gestión de Proveedores'}
+                Gestión de Proveedores
               </h1>
               <p className="text-gray-600 mt-1">
-                {editando ? 'Modifica la información del proveedor' : 'Administra la base de datos de proveedores'}
+                Administra la base de datos de proveedores
               </p>
             </div>
           </div>
@@ -173,9 +184,51 @@ export default function ProveedoresPage() {
               </div>
             </div>
             
+            {/* Create Provider Button */}
+            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Proveedor
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Crear Nuevo Proveedor</DialogTitle>
+                  <DialogDescription>
+                    Completa los datos para registrar un nuevo proveedor en el sistema
+                  </DialogDescription>
+                </DialogHeader>
+                <ProveedorForm
+                  onSaved={handleSaved}
+                  onCancel={() => setShowCreateModal(false)}
+                />
+              </DialogContent>
+            </Dialog>
+
+            {/* View Toggle */}
+            <div className="flex items-center gap-1 border rounded-lg p-1">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className="h-8 px-3"
+              >
+                <Table className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'card' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('card')}
+                className="h-8 px-3"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </Button>
+            </div>
+
             {/* Import/Export Actions */}
-            <ProveedorImportExport 
-              proveedores={proveedores} 
+            <ProveedorImportExport
+              proveedores={proveedores}
               onImported={handleImported}
               onErrores={setErrores}
             />
@@ -210,52 +263,54 @@ export default function ProveedoresPage() {
           </motion.div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Form Section */}
-          <motion.div className="lg:col-span-1" variants={itemVariants}>
-            <Card className="shadow-sm border-0 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5 text-blue-600" />
-                  {editando ? 'Editar Proveedor' : 'Nuevo Proveedor'}
-                </CardTitle>
-                <CardDescription>
-                  {editando ? 'Modifica los datos del proveedor seleccionado' : 'Completa los datos para registrar un nuevo proveedor'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ProveedorForm 
-                  onSaved={handleSaved} 
-                  initial={editando}
-                  onCancel={handleCancelEdit}
-                />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Providers List Section */}
-          <motion.div className="lg:col-span-2" variants={itemVariants}>
-            <Card className="shadow-sm border-0 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-blue-600" />
-                  Lista de Proveedores
-                </CardTitle>
-                <CardDescription>
-                  Gestiona todos los proveedores registrados en el sistema
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ProveedorList 
-                  proveedores={proveedores} 
-                  onDeleted={handleDelete} 
+        {/* Providers List Section */}
+        <motion.div variants={itemVariants}>
+          <Card className="shadow-sm border-0 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-blue-600" />
+                Lista de Proveedores
+              </CardTitle>
+              <CardDescription>
+                Gestiona todos los proveedores registrados en el sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {viewMode === 'table' ? (
+                <ProveedorTableView
+                  proveedores={proveedores}
+                  onDeleted={handleDelete}
                   onEdit={handleEdit}
                   loading={loading}
                 />
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
+              ) : (
+                <ProveedorCardView
+                  proveedores={proveedores}
+                  onDeleted={handleDelete}
+                  onEdit={handleEdit}
+                  loading={loading}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Edit Provider Modal */}
+        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Proveedor</DialogTitle>
+              <DialogDescription>
+                Modifica los datos del proveedor seleccionado
+              </DialogDescription>
+            </DialogHeader>
+            <ProveedorForm
+              onSaved={handleSaved}
+              initial={editando}
+              onCancel={handleCancelEdit}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </motion.div>
   )

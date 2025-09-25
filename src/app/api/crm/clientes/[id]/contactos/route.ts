@@ -1,85 +1,128 @@
 // ===================================================
 // 📁 Archivo: route.ts
 // 📌 Ubicación: /api/crm/clientes/[id]/contactos
-// 🔧 Descripción: API para gestionar contactos de clientes CRM
-// ✅ GET: Obtener contactos, POST: Crear contacto
+// 🔧 Descripción: API para gestión de contactos de clientes CRM
+// ✅ GET: Obtener contactos de un cliente
+// ✅ POST: Crear nuevo contacto para un cliente
 // ===================================================
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-// ✅ GET /api/crm/clientes/[id]/contactos - Obtener contactos del cliente
+// ✅ Obtener contactos de un cliente
 export async function GET(
-  request: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const session = await getServerSession(authOptions)
 
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    const contactos = await prisma.crmContactoCliente.findMany({
-      where: { clienteId: id },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    return NextResponse.json(contactos)
-  } catch (error) {
-    console.error('❌ Error al obtener contactos:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
-  }
-}
-
-// ✅ POST /api/crm/clientes/[id]/contactos - Crear nuevo contacto
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    const data = await request.json()
-    const { nombre, cargo, email, telefono, celular, esDecisionMaker, areasInfluencia, relacionComercial, notas } = data
-
-    // Validar cliente existe
+    // Verificar que el cliente existe
     const cliente = await prisma.cliente.findUnique({
       where: { id }
     })
 
     if (!cliente) {
-      return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Cliente no encontrado' },
+        { status: 404 }
+      )
     }
 
+    // Obtener contactos del cliente
+    const contactos = await prisma.crmContactoCliente.findMany({
+      where: { clienteId: id },
+      orderBy: [
+        { esDecisionMaker: 'desc' }, // Decision makers first
+        { updatedAt: 'desc' }
+      ]
+    })
+
+    return NextResponse.json(contactos)
+  } catch (error) {
+    console.error('❌ Error al obtener contactos del cliente:', error)
+    return NextResponse.json(
+      { error: 'Error al obtener contactos' },
+      { status: 500 }
+    )
+  }
+}
+
+// ✅ Crear nuevo contacto para un cliente
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const data = await req.json()
+
+    const {
+      nombre,
+      cargo,
+      email,
+      telefono,
+      celular,
+      esDecisionMaker,
+      areasInfluencia,
+      relacionComercial,
+      notas
+    } = data
+
+    // Validaciones básicas
+    if (!nombre || typeof nombre !== 'string' || nombre.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Nombre es requerido y debe tener al menos 2 caracteres' },
+        { status: 400 }
+      )
+    }
+
+    // Verificar que el cliente existe
+    const cliente = await prisma.cliente.findUnique({
+      where: { id }
+    })
+
+    if (!cliente) {
+      return NextResponse.json(
+        { error: 'Cliente no encontrado' },
+        { status: 404 }
+      )
+    }
+
+    // Crear el contacto
     const nuevoContacto = await prisma.crmContactoCliente.create({
       data: {
         clienteId: id,
-        nombre,
-        cargo,
-        email,
-        telefono,
-        celular,
+        nombre: nombre.trim(),
+        cargo: cargo?.trim(),
+        email: email?.trim(),
+        telefono: telefono?.trim(),
+        celular: celular?.trim(),
         esDecisionMaker: esDecisionMaker || false,
-        areasInfluencia,
-        relacionComercial,
-        notas
+        areasInfluencia: areasInfluencia?.trim(),
+        relacionComercial: relacionComercial?.trim(),
+        notas: notas?.trim()
       }
     })
 
     return NextResponse.json(nuevoContacto, { status: 201 })
   } catch (error) {
     console.error('❌ Error al crear contacto:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+
+    // Manejar errores de unicidad
+    if (error instanceof Error && error.message.includes('Unique constraint')) {
+      return NextResponse.json(
+        { error: 'Ya existe un contacto con estos datos' },
+        { status: 409 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Error al crear contacto' },
+      { status: 500 }
+    )
   }
 }

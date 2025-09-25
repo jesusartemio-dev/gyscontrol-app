@@ -3,24 +3,29 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { 
-  ChevronRight, 
-  Package, 
-  Plus, 
-  FileText, 
-  TrendingUp,
+import {
+  ChevronRight,
+  Package,
+  Plus,
+  FileText,
   AlertCircle,
   Loader2,
   Share2,
-  Download
+  Download,
+  Wrench,
+  Truck,
+  DollarSign
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import PlantillaModal from '@/components/plantillas/PlantillaModal'
+import PlantillaModalEquipos from '@/components/plantillas/PlantillaModalEquipos'
+import PlantillaModalServicios from '@/components/plantillas/PlantillaModalServicios'
+import PlantillaModalGastos from '@/components/plantillas/PlantillaModalGastos'
 import PlantillaList from '@/components/plantillas/PlantillaList'
-import { getPlantillas } from '@/lib/services/plantilla'
+import { getPlantillas, getPlantillasEquipos, getPlantillasServicios, getPlantillasGastos } from '@/lib/services/plantilla'
 import type { Plantilla } from '@/types'
 
 // Animation variants
@@ -48,45 +53,121 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
+type TemplateFilter = 'todas' | 'equipos' | 'servicios' | 'gastos'
+
 export default function PlantillasPage() {
   const router = useRouter()
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
+  const [plantillasEquipos, setPlantillasEquipos] = useState<any[]>([])
+  const [plantillasServicios, setPlantillasServicios] = useState<any[]>([])
+  const [plantillasGastos, setPlantillasGastos] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeFilter, setActiveFilter] = useState<TemplateFilter>('todas')
 
   useEffect(() => {
-    getPlantillas()
-      .then((data) => {
-        setPlantillas(data)
-      })
-      .catch(() => setError('Error al cargar plantillas.'))
-      .finally(() => setLoading(false))
+    const loadAllTemplates = async () => {
+      try {
+        setLoading(true)
+        const [general, equipos, servicios, gastos] = await Promise.all([
+          getPlantillas(),
+          getPlantillasEquipos(),
+          getPlantillasServicios(),
+          getPlantillasGastos()
+        ])
+        setPlantillas(general)
+        setPlantillasEquipos(equipos)
+        setPlantillasServicios(servicios)
+        setPlantillasGastos(gastos)
+      } catch (error) {
+        console.error('Error loading templates:', error)
+        setError('Error al cargar plantillas.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadAllTemplates()
   }, [])
 
-  const handleCreated = (nueva: Plantilla) => {
-    setPlantillas((prev) => [
-      ...prev,
-      nueva
-    ])
+  const handleCreated = (nueva: any) => {
+    // Add to the appropriate state based on template type
+    if (nueva.plantillaEquipoId !== undefined) {
+      // Equipment template
+      setPlantillasEquipos((prev) => [...prev, nueva])
+    } else if (nueva.plantillaServicioId !== undefined) {
+      // Service template
+      setPlantillasServicios((prev) => [...prev, nueva])
+    } else if (nueva.plantillaGastoId !== undefined) {
+      // Expense template
+      setPlantillasGastos((prev) => [...prev, nueva])
+    } else {
+      // Main template
+      setPlantillas((prev) => [...prev, nueva])
+    }
   }
 
   const handleDelete = (id: string) => {
+    // Remove from all states to ensure it's deleted regardless of current filter
     setPlantillas((prev) => prev.filter((p) => p.id !== id))
+    setPlantillasEquipos((prev) => prev.filter((p) => p.id !== id))
+    setPlantillasServicios((prev) => prev.filter((p) => p.id !== id))
+    setPlantillasGastos((prev) => prev.filter((p) => p.id !== id))
   }
 
-  const handleUpdated = (actualizada: Plantilla) => {
-    setPlantillas((prev) =>
-      prev.map((p) =>
-        p.id === actualizada.id ? actualizada : p
+  const handleUpdated = (actualizada: any) => {
+    // Update the appropriate state based on the template type
+    if (actualizada.plantillaEquipoId !== undefined) {
+      // Equipment template
+      setPlantillasEquipos((prev) =>
+        prev.map((p) =>
+          p.id === actualizada.id ? actualizada : p
+        )
       )
-    )
+    } else if (actualizada.plantillaServicioId !== undefined) {
+      // Service template
+      setPlantillasServicios((prev) =>
+        prev.map((p) =>
+          p.id === actualizada.id ? actualizada : p
+        )
+      )
+    } else if (actualizada.plantillaGastoId !== undefined) {
+      // Expense template
+      setPlantillasGastos((prev) =>
+        prev.map((p) =>
+          p.id === actualizada.id ? actualizada : p
+        )
+      )
+    } else {
+      // Main template
+      setPlantillas((prev) =>
+        prev.map((p) =>
+          p.id === actualizada.id ? actualizada : p
+        )
+      )
+    }
   }
 
-  // Calculate statistics
-  const totalPlantillas = plantillas.length
-  const totalValorCliente = plantillas.reduce((sum, p) => sum + (p.totalCliente || 0), 0)
-  const totalValorInterno = plantillas.reduce((sum, p) => sum + (p.totalInterno || 0), 0)
-  const plantillasActivas = plantillas.filter(p => (p.totalCliente || 0) > 0).length
+  // Get current templates based on filter
+  const getCurrentTemplates = () => {
+    switch (activeFilter) {
+      case 'equipos':
+        return plantillasEquipos
+      case 'servicios':
+        return plantillasServicios
+      case 'gastos':
+        return plantillasGastos
+      default:
+        return plantillas
+    }
+  }
+
+  // Calculate statistics based on current filter
+  const currentTemplates = getCurrentTemplates()
+  const totalPlantillas = currentTemplates.length
+  const totalValorCliente = currentTemplates.reduce((sum, p) => sum + (p.totalCliente || p.grandTotal || 0), 0)
+  const totalValorInterno = currentTemplates.reduce((sum, p) => sum + (p.totalInterno || 0), 0)
+  const plantillasActivas = currentTemplates.filter(p => (p.totalCliente || p.grandTotal || 0) > 0).length
 
   if (loading) {
     return (
@@ -185,82 +266,6 @@ export default function PlantillasPage() {
         </div>
       </motion.div>
 
-      {/* Statistics Cards */}
-      <motion.div 
-        variants={itemVariants}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-      >
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Plantillas
-            </CardTitle>
-            <FileText className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalPlantillas}</div>
-            <Badge variant="secondary" className="mt-1">
-              {plantillasActivas} activas
-            </Badge>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Valor Cliente
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(totalValorCliente)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Valor total para clientes
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Valor Interno
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(totalValorInterno)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Costo interno total
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Margen Promedio
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {totalValorInterno > 0 
-                ? `${(((totalValorCliente - totalValorInterno) / totalValorInterno) * 100).toFixed(1)}%`
-                : '0%'
-              }
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Rentabilidad promedio
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      <Separator />
 
       {/* Error State */}
       {error && (
@@ -276,12 +281,139 @@ export default function PlantillasPage() {
         </motion.div>
       )}
 
+      {/* Quick Create Section */}
+      <motion.div
+        variants={itemVariants}
+        className="space-y-4"
+      >
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Crear Nueva Plantilla</h2>
+          <p className="text-gray-600 text-sm">
+            Elige el tipo de plantilla que deseas crear según tus necesidades
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Plantilla Completa */}
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-blue-300">
+            <CardContent className="p-6 text-center">
+              <Package className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+              <h3 className="font-semibold mb-2">Plantilla Completa</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Equipos, servicios y gastos en una sola plantilla
+              </p>
+              <PlantillaModal
+                onCreated={handleCreated}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear
+                  </Button>
+                }
+              />
+            </CardContent>
+          </Card>
+
+          {/* Plantilla de Equipos */}
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-orange-300">
+            <CardContent className="p-6 text-center">
+              <Wrench className="h-12 w-12 text-orange-600 mx-auto mb-4" />
+              <h3 className="font-semibold mb-2">Plantilla de Equipos</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Solo equipos y maquinaria especializada
+              </p>
+              <PlantillaModalEquipos
+                onCreated={(nueva) => {
+                  handleCreated(nueva);
+                  // Redirect to equipment-specific page using Next.js router
+                  router.push(`/comercial/plantillas/equipos/${nueva.id}`);
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Plantilla de Servicios */}
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-green-300">
+            <CardContent className="p-6 text-center">
+              <Truck className="h-12 w-12 text-green-600 mx-auto mb-4" />
+              <h3 className="font-semibold mb-2">Plantilla de Servicios</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Solo servicios profesionales y técnicos
+              </p>
+              <PlantillaModalServicios
+                onCreated={(nueva) => {
+                  handleCreated(nueva);
+                  // Redirect to services-specific page using Next.js router
+                  router.push(`/comercial/plantillas/servicios/${nueva.id}`);
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Plantilla de Gastos */}
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-purple-300">
+            <CardContent className="p-6 text-center">
+              <DollarSign className="h-12 w-12 text-purple-600 mx-auto mb-4" />
+              <h3 className="font-semibold mb-2">Plantilla de Gastos</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Solo gastos adicionales y costos operativos
+              </p>
+              <PlantillaModalGastos />
+            </CardContent>
+          </Card>
+        </div>
+      </motion.div>
+
+      <Separator />
+
+      {/* Filter Tabs - Below creation cards */}
+      <motion.div variants={itemVariants} className="flex flex-wrap gap-2 mb-6">
+        <Button
+          variant={activeFilter === 'todas' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('todas')}
+          className="flex items-center gap-2"
+        >
+          <Package className="h-4 w-4" />
+          Todas ({plantillas.length})
+        </Button>
+        <Button
+          variant={activeFilter === 'equipos' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('equipos')}
+          className="flex items-center gap-2"
+        >
+          <Wrench className="h-4 w-4" />
+          Equipos ({plantillasEquipos.length})
+        </Button>
+        <Button
+          variant={activeFilter === 'servicios' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('servicios')}
+          className="flex items-center gap-2"
+        >
+          <Truck className="h-4 w-4" />
+          Servicios ({plantillasServicios.length})
+        </Button>
+        <Button
+          variant={activeFilter === 'gastos' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('gastos')}
+          className="flex items-center gap-2"
+        >
+          <DollarSign className="h-4 w-4" />
+          Gastos ({plantillasGastos.length})
+        </Button>
+      </motion.div>
+
+      <Separator />
+
       {/* Main Content */}
-      <motion.div 
+      <motion.div
         variants={itemVariants}
         className="space-y-6"
       >
-        {/* Header with Create Button */}
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -292,7 +424,6 @@ export default function PlantillasPage() {
               Administra y edita las plantillas comerciales disponibles
             </p>
           </div>
-          <PlantillaModal onCreated={handleCreated} />
         </div>
 
         {/* List Section */}
@@ -319,9 +450,10 @@ export default function PlantillasPage() {
               </div>
             ) : (
               <PlantillaList
-                plantillas={plantillas}
+                plantillas={currentTemplates}
                 onDelete={handleDelete}
                 onUpdated={handleUpdated}
+                filterType={activeFilter}
               />
             )}
           </CardContent>

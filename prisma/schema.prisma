@@ -9,13 +9,17 @@ datasource db {
 }
 
 model User {
-  id                 String             @id @default(cuid())
-  name               String?
-  email              String             @unique
-  emailVerified      DateTime?
-  password           String
-  role               Role               @default(colaborador)
-  image              String?
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String
+  role          Role      @default(colaborador)
+  image         String?
+
+  // ✅ NUEVOS CAMPOS PARA MÉTRICAS COMERCIALES
+  metaMensual        Float? // Meta mensual de ventas
+  metaTrimestral     Float? // Meta trimestral de ventas
   accounts           Account[]
   cotizaciones       Cotizacion[]
   listaEquipos       ListaEquipo[]
@@ -47,10 +51,11 @@ model User {
   proyectoSubtareasAsignadas ProyectoSubtarea[] @relation("ProyectoSubtareaAsignado")
 
   // ✅ NUEVAS RELACIONES PARA CRM
-  oportunidadesComercial   CrmOportunidad[]      @relation("CrmOportunidadComercial")
-  oportunidadesResponsable CrmOportunidad[]      @relation("CrmOportunidadResponsable")
-  actividadesCrm           CrmActividad[]
-  metricasComerciales      CrmMetricaComercial[]
+  oportunidadesComercial        CrmOportunidad[]      @relation("CrmOportunidadComercial")
+  oportunidadesResponsable      CrmOportunidad[]      @relation("CrmOportunidadResponsable")
+  actividadesCrm                CrmActividad[]
+  metricasComerciales           CrmMetricaComercial[]
+  metricasComercialesDetalladas MetricaComercial[]
 
   // ✅ NUEVA RELACIÓN PARA VERSIONES DE COTIZACIÓN
   versionesCotizacion CotizacionVersion[]
@@ -60,6 +65,9 @@ model User {
 
   // ✅ NUEVA RELACIÓN PARA AUDITORÍA
   auditLogs AuditLog[]
+
+  // ✅ NUEVA RELACIÓN PARA IMPORTACIONES DE PLANTILLAS
+  importacionesPlantillas CotizacionPlantillaImport[]
 
   // Relaciones Logística y Finanzas eliminadas
 }
@@ -121,6 +129,10 @@ model Cliente {
   estadoRelacion   String    @default("prospecto") // prospecto, cliente_activo, cliente_inactivo
   calificacion     Int?      @default(3) // 1-5
 
+  // ✅ NUEVOS CAMPOS PARA MÉTRICAS DE CLIENTES
+  frecuenciaCompraMeses    Int? // Frecuencia promedio entre proyectos (meses)
+  calificacionSatisfaccion Int? @default(3) // 1-5 escala de satisfacción
+
   // Relaciones existentes
   cotizaciones Cotizacion[]
   proyectos    Proyecto[]
@@ -140,26 +152,29 @@ model Unidad {
 }
 
 model UnidadServicio {
-  id                      String                   @id @default(cuid())
-  nombre                  String                   @unique
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  servicios               CatalogoServicio[]
-  cotizacionServicioItems CotizacionServicioItem[]
-  plantillaServicioItems  PlantillaServicioItem[]
+  id                                   String                               @id @default(cuid())
+  nombre                               String                               @unique
+  createdAt                            DateTime                             @default(now())
+  updatedAt                            DateTime                             @updatedAt
+  servicios                            CatalogoServicio[]
+  cotizacionServicioItems              CotizacionServicioItem[]
+  plantillaServicioItems               PlantillaServicioItem[]
+  plantillaServicioItemsIndependientes PlantillaServicioItemIndependiente[]
 }
 
 model CategoriaEquipo {
-  id        String           @id @default(cuid())
-  nombre    String           @unique
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  equipos   CatalogoEquipo[]
+  id          String           @id @default(cuid())
+  nombre      String           @unique
+  descripcion String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  equipos     CatalogoEquipo[]
 }
 
 model CategoriaServicio {
   id        String             @id @default(cuid())
   nombre    String             @unique
+  descripcion String?           // ✅ Campo descripción agregado
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   servicios CatalogoServicio[]
@@ -173,82 +188,87 @@ model CategoriaServicio {
 }
 
 model Recurso {
-  id                      String                   @id @default(cuid())
-  nombre                  String                   @unique
-  costoHora               Float
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  servicios               CatalogoServicio[]
-  cotizacionServicioItems CotizacionServicioItem[]
-  plantillaServicioItems  PlantillaServicioItem[]
-  registrosHoras          RegistroHoras[]
+  id                                   String                               @id @default(cuid())
+  nombre                               String                               @unique
+  costoHora                            Float
+  createdAt                            DateTime                             @default(now())
+  updatedAt                            DateTime                             @updatedAt
+  servicios                            CatalogoServicio[]
+  cotizacionServicioItems              CotizacionServicioItem[]
+  plantillaServicioItems               PlantillaServicioItem[]
+  registrosHoras                       RegistroHoras[]
+  plantillaServicioItemsIndependientes PlantillaServicioItemIndependiente[]
 }
 
 model CatalogoEquipo {
-  id                    String                 @id @default(cuid())
-  categoriaId           String
-  unidadId              String
-  codigo                String                 @unique
-  descripcion           String
-  marca                 String
-  precioInterno         Float
-  margen                Float
-  precioVenta           Float
-  estado                String
-  precioReal            Float?
-  fechaActualizacion    DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  categoria             CategoriaEquipo        @relation(fields: [categoriaId], references: [id])
-  unidad                Unidad                 @relation(fields: [unidadId], references: [id])
-  cotizacionEquipoItems CotizacionEquipoItem[]
-  plantillaEquipoItems  PlantillaEquipoItem[]
-  proyectoEquipoItems   ProyectoEquipoItem[]
+  id                                 String                             @id @default(cuid())
+  categoriaId                        String
+  unidadId                           String
+  codigo                             String                             @unique
+  descripcion                        String
+  marca                              String
+  precioInterno                      Float
+  margen                             Float
+  precioVenta                        Float
+  estado                             String
+  precioReal                         Float?
+  fechaActualizacion                 DateTime?
+  createdAt                          DateTime                           @default(now())
+  updatedAt                          DateTime                           @updatedAt
+  categoria                          CategoriaEquipo                    @relation(fields: [categoriaId], references: [id])
+  unidad                             Unidad                             @relation(fields: [unidadId], references: [id])
+  cotizacionEquipoItems              CotizacionEquipoItem[]
+  plantillaEquipoItems               PlantillaEquipoItem[]
+  proyectoEquipoItems                ProyectoEquipoItem[]
+  plantillaEquipoItemsIndependientes PlantillaEquipoItemIndependiente[]
 }
 
 model CatalogoServicio {
-  id                      String                   @id @default(cuid())
-  categoriaId             String
-  unidadServicioId        String
-  recursoId               String
-  nombre                  String
-  descripcion             String
-  formula                 String
-  horaBase                Float?
-  horaRepetido            Float?
-  horaUnidad              Float?
-  horaFijo                Float?
-  orden                   Int?                     @default(0)
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  categoria               CategoriaServicio        @relation(fields: [categoriaId], references: [id])
-  recurso                 Recurso                  @relation(fields: [recursoId], references: [id])
-  unidadServicio          UnidadServicio           @relation(fields: [unidadServicioId], references: [id])
-  cotizacionServicioItems CotizacionServicioItem[]
-  plantillaItems          PlantillaServicioItem[]
-  proyectoServicioItems   ProyectoServicioItem[]
+  id                                   String                               @id @default(cuid())
+  categoriaId                          String
+  unidadServicioId                     String
+  recursoId                            String
+  nombre                               String
+  descripcion                          String
+  formula                              String
+  horaBase                             Float?
+  horaRepetido                         Float?
+  horaUnidad                           Float?
+  horaFijo                             Float?
+  orden                                Int?                                 @default(0)
+  createdAt                            DateTime                             @default(now())
+  updatedAt                            DateTime                             @updatedAt
+  categoria                            CategoriaServicio                    @relation(fields: [categoriaId], references: [id])
+  recurso                              Recurso                              @relation(fields: [recursoId], references: [id])
+  unidadServicio                       UnidadServicio                       @relation(fields: [unidadServicioId], references: [id])
+  cotizacionServicioItems              CotizacionServicioItem[]
+  plantillaItems                       PlantillaServicioItem[]
+  proyectoServicioItems                ProyectoServicioItem[]
+  plantillaServicioItemsIndependientes PlantillaServicioItemIndependiente[]
 }
 
 model Plantilla {
-  id                    String              @id @default(cuid())
+  id                    String                      @id @default(cuid())
   nombre                String
-  estado                String              @default("borrador")
-  totalEquiposInterno   Float               @default(0)
-  totalEquiposCliente   Float               @default(0)
-  totalServiciosInterno Float               @default(0)
-  totalServiciosCliente Float               @default(0)
-  totalGastosInterno    Float               @default(0)
-  totalGastosCliente    Float               @default(0)
-  totalInterno          Float               @default(0)
-  totalCliente          Float               @default(0)
-  descuento             Float               @default(0)
-  grandTotal            Float               @default(0)
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  estado                String                      @default("borrador")
+  tipo                  PlantillaTipo               @default(completa) // ✅ Nuevo campo para tipo de plantilla
+  totalEquiposInterno   Float                       @default(0)
+  totalEquiposCliente   Float                       @default(0)
+  totalServiciosInterno Float                       @default(0)
+  totalServiciosCliente Float                       @default(0)
+  totalGastosInterno    Float                       @default(0)
+  totalGastosCliente    Float                       @default(0)
+  totalInterno          Float                       @default(0)
+  totalCliente          Float                       @default(0)
+  descuento             Float                       @default(0)
+  grandTotal            Float                       @default(0)
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
   cotizaciones          Cotizacion[]
   equipos               PlantillaEquipo[]
   gastos                PlantillaGasto[]
   servicios             PlantillaServicio[]
+  importaciones         CotizacionPlantillaImport[] // ✅ Nueva relación con historial de importaciones
 }
 
 model PlantillaEquipo {
@@ -358,6 +378,147 @@ model PlantillaGastoItem {
   gasto           PlantillaGasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
 }
 
+// ✅ NUEVO: Plantillas independientes de equipos
+model PlantillaEquipoIndependiente {
+  id           String   @id @default(cuid())
+  nombre       String
+  descripcion  String?
+  estado       String   @default("borrador")
+  totalInterno Float    @default(0)
+  totalCliente Float    @default(0)
+  descuento    Float    @default(0)
+  grandTotal   Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  items PlantillaEquipoItemIndependiente[]
+
+  @@map("plantilla_equipo_independiente")
+}
+
+// ✅ NUEVO: Items de plantillas de equipos independientes
+model PlantillaEquipoItemIndependiente {
+  id                String   @id @default(cuid())
+  plantillaEquipoId String
+  catalogoEquipoId  String?
+  codigo            String
+  descripcion       String
+  categoria         String
+  unidad            String
+  marca             String
+  precioInterno     Float
+  precioCliente     Float
+  cantidad          Float
+  costoInterno      Float
+  costoCliente      Float
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relaciones
+  catalogoEquipo  CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
+  plantillaEquipo PlantillaEquipoIndependiente @relation(fields: [plantillaEquipoId], references: [id], onDelete: Cascade)
+
+  @@map("plantilla_equipo_item_independiente")
+}
+
+// ✅ NUEVO: Plantillas independientes de servicios
+model PlantillaServicioIndependiente {
+  id           String   @id @default(cuid())
+  nombre       String
+  descripcion  String?
+  categoria    String
+  estado       String   @default("borrador")
+  totalInterno Float    @default(0)
+  totalCliente Float    @default(0)
+  descuento    Float    @default(0)
+  grandTotal   Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  items PlantillaServicioItemIndependiente[]
+
+  @@map("plantilla_servicio_independiente")
+}
+
+// ✅ NUEVO: Items de plantillas de servicios independientes
+model PlantillaServicioItemIndependiente {
+  id                   String   @id @default(cuid())
+  plantillaServicioId  String
+  catalogoServicioId   String?
+  unidadServicioId     String
+  recursoId            String
+  nombre               String
+  descripcion          String
+  categoria            String
+  unidadServicioNombre String
+  recursoNombre        String
+  formula              String
+  horaBase             Float?
+  horaRepetido         Float?
+  horaUnidad           Float?
+  horaFijo             Float?
+  costoHora            Float
+  cantidad             Int
+  horaTotal            Float
+  factorSeguridad      Float
+  margen               Float
+  costoInterno         Float
+  costoCliente         Float
+  orden                Int?     @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Relaciones
+  catalogoServicio  CatalogoServicio?              @relation(fields: [catalogoServicioId], references: [id])
+  plantillaServicio PlantillaServicioIndependiente @relation(fields: [plantillaServicioId], references: [id], onDelete: Cascade)
+  recurso           Recurso                        @relation(fields: [recursoId], references: [id])
+  unidadServicio    UnidadServicio                 @relation(fields: [unidadServicioId], references: [id])
+
+  @@map("plantilla_servicio_item_independiente")
+}
+
+// ✅ NUEVO: Plantillas independientes de gastos
+model PlantillaGastoIndependiente {
+  id           String   @id @default(cuid())
+  nombre       String
+  descripcion  String?
+  estado       String   @default("borrador")
+  totalInterno Float    @default(0)
+  totalCliente Float    @default(0)
+  descuento    Float    @default(0)
+  grandTotal   Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  items PlantillaGastoItemIndependiente[]
+
+  @@map("plantilla_gasto_independiente")
+}
+
+// ✅ NUEVO: Items de plantillas de gastos independientes
+model PlantillaGastoItemIndependiente {
+  id               String   @id @default(cuid())
+  plantillaGastoId String
+  nombre           String
+  descripcion      String?
+  cantidad         Float
+  precioUnitario   Float
+  factorSeguridad  Float    @default(1.0)
+  margen           Float    @default(1.0)
+  costoInterno     Float
+  costoCliente     Float
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relaciones
+  plantillaGasto PlantillaGastoIndependiente @relation(fields: [plantillaGastoId], references: [id], onDelete: Cascade)
+
+  @@map("plantilla_gasto_item_independiente")
+}
+
 model Cotizacion {
   id                    String           @id @default(cuid())
   clienteId             String?
@@ -430,6 +591,9 @@ model Cotizacion {
 
   // ✅ NUEVA RELACIÓN PARA VERSIONES
   versiones CotizacionVersion[]
+
+  // ✅ NUEVA RELACIÓN PARA IMPORTACIONES DE PLANTILLAS
+  importacionesPlantillas CotizacionPlantillaImport[]
 }
 
 model CotizacionEquipo {
@@ -735,6 +899,7 @@ model Proyecto {
 
   // ✅ NUEVA RELACIÓN PARA CRM
   historialProyectos CrmHistorialProyecto[]
+  oportunidadesCrm  CrmOportunidad[]
 
   // ✅ Índices compuestos para optimizar queries frecuentes
   @@index([estado, fechaInicio, createdAt(sort: Desc)], name: "idx_proyecto_estado_inicio_fecha")
@@ -767,9 +932,9 @@ model ProyectoFase {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  proyecto          Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyecto           Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   proyectoCronograma ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  edts              ProyectoEdt[]
+  edts               ProyectoEdt[]
 
   @@unique([proyectoId, proyectoCronogramaId, nombre])
   @@index([proyectoId, proyectoCronogramaId, orden])
@@ -800,24 +965,24 @@ model FaseDefault {
 
 // ✅ Nuevo modelo ProyectoCronograma para controlar tipos de cronograma
 model ProyectoCronograma {
-  id          String  @id @default(cuid())
-  proyectoId  String
-  tipo        String // 'comercial', 'planificacion', 'ejecucion'
-  nombre      String // Nombre descriptivo del tipo de cronograma
+  id         String @id @default(cuid())
+  proyectoId String
+  tipo       String // 'comercial', 'planificacion', 'ejecucion'
+  nombre     String // Nombre descriptivo del tipo de cronograma
 
   // Para baseline comercial (copia de cotización)
   copiadoDesdeCotizacionId String? @unique
 
   // Control de versiones y estado
-  esBaseline  Boolean @default(false) // Si es inmutable (baseline)
-  version     Int     @default(1) // Para futuras versiones
+  esBaseline Boolean @default(false) // Si es inmutable (baseline)
+  version    Int     @default(1) // Para futuras versiones
 
   // Auditoría
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  proyecto Proyecto      @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyecto Proyecto        @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   fases    ProyectoFase[]
   edts     ProyectoEdt[]
   tareas   ProyectoTarea[]
@@ -866,7 +1031,7 @@ model ProyectoEdt {
   // Relaciones
   proyecto           Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   proyectoCronograma ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  categoriaServicio  CategoriaServicio @relation(fields: [categoriaServicioId], references: [id])
+  categoriaServicio  CategoriaServicio  @relation(fields: [categoriaServicioId], references: [id])
   responsable        User?              @relation("EdtResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
   registrosHoras     RegistroHoras[]
   ProyectoTarea      ProyectoTarea[]
@@ -925,10 +1090,10 @@ model ProyectoTarea {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  proyectoEdt         ProyectoEdt      @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
-  proyectoCronograma  ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  dependencia         ProyectoTarea?   @relation("ProyectoTareaDependencia", fields: [dependenciaId], references: [id], onDelete: SetNull)
-  tareasDependientes  ProyectoTarea[]  @relation("ProyectoTareaDependencia")
+  proyectoEdt        ProyectoEdt        @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
+  proyectoCronograma ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  dependencia        ProyectoTarea?     @relation("ProyectoTareaDependencia", fields: [dependenciaId], references: [id], onDelete: SetNull)
+  tareasDependientes ProyectoTarea[]    @relation("ProyectoTareaDependencia")
 
   @@index([proyectoEdtId, estado])
   @@index([responsableId, fechaFin])
@@ -1814,6 +1979,8 @@ model CrmOportunidad {
   responsable  User?          @relation("CrmOportunidadResponsable", fields: [responsableId], references: [id])
   cotizacionId String?        @unique
   cotizacion   Cotizacion?    @relation(fields: [cotizacionId], references: [id])
+  proyectoId   String?
+  proyecto     Proyecto?      @relation(fields: [proyectoId], references: [id])
   actividades  CrmActividad[]
 
   @@index([clienteId, estado])
@@ -1948,6 +2115,39 @@ model CrmMetricaComercial {
   @@map("crm_metrica_comercial")
 }
 
+// 📊 Historial de Métricas Detalladas (para reportes avanzados)
+model MetricaComercial {
+  id                    String   @id @default(cuid())
+  usuarioId             String
+  periodo               String // "2024-09", "2024-Q3", "2024"
+  tipo                  String // "mensual", "trimestral", "anual"
+  cotizacionesGeneradas Int      @default(0)
+  cotizacionesAprobadas Int      @default(0)
+  proyectosCerrados     Int      @default(0)
+  valorTotalVendido     Float    @default(0)
+  margenTotalObtenido   Float    @default(0)
+  tiempoPromedioCierre  Float? // días
+  tasaConversion        Float? // porcentaje
+  valorPromedioProyecto Float?
+  llamadasRealizadas    Int      @default(0)
+  reunionesAgendadas    Int      @default(0)
+  propuestasEnviadas    Int      @default(0)
+  emailsEnviados        Int      @default(0)
+  oportunidadesCreadas  Int      @default(0)
+  oportunidadesGanadas  Int      @default(0)
+  oportunidadesPerdidas Int      @default(0)
+  actividadesRealizadas Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  usuario User @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, periodo, tipo])
+  @@index([periodo, tipo])
+  @@index([usuarioId, tipo])
+  @@map("metrica_comercial")
+}
+
 // ===================================================
 // 🆕 SISTEMA DE VERSIONES PARA COTIZACIONES
 // ===================================================
@@ -2060,6 +2260,36 @@ model AuditLog {
   @@index([usuarioId, createdAt(sort: Desc)])
   @@index([accion, createdAt(sort: Desc)])
   @@map("audit_log")
+}
+
+// ===================================================
+// 🆕 SISTEMA DE IMPORTACIÓN FLEXIBLE DE PLANTILLAS
+// ===================================================
+
+enum PlantillaTipo {
+  completa // Plantilla con equipos, servicios y gastos
+  equipos // Solo plantillas de equipos
+  servicios // Solo plantillas de servicios
+  gastos // Solo plantillas de gastos
+}
+
+model CotizacionPlantillaImport {
+  id               String   @id @default(cuid())
+  cotizacionId     String
+  plantillaId      String
+  tipoImportacion  String // 'equipos' | 'servicios' | 'gastos'
+  fechaImportacion DateTime @default(now())
+  usuarioId        String
+
+  // Relaciones
+  cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  plantilla  Plantilla  @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  usuario    User       @relation(fields: [usuarioId], references: [id])
+
+  // Índices para optimización
+  @@index([cotizacionId, fechaImportacion])
+  @@index([plantillaId, tipoImportacion])
+  @@map("cotizacion_plantilla_import")
 }
 
 // Enums de aprovisionamiento eliminados

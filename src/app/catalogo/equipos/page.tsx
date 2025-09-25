@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import CatalogoEquipoCrearAcordeon from '@/components/catalogo/CatalogoEquipoCrearAcordeon'
+import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
 import CatalogoEquipoList from '@/components/catalogo/CatalogoEquipoList'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { exportarEquiposAExcel, importarEquiposDesdeExcel } from '@/lib/utils/equiposExcel'
@@ -35,19 +36,21 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
 // Icons
-import { 
-  ChevronRight, 
-  Settings, 
-  TrendingUp, 
-  AlertCircle, 
-  Package, 
+import {
+  ChevronRight,
+  Settings,
+  TrendingUp,
+  AlertCircle,
+  Package,
   Upload,
   Download,
   Share2,
   Edit,
-  Loader2
+  Loader2,
+  Plus
 } from 'lucide-react'
 
 type CatalogoEquipoConId = CatalogoEquipoPayload & { id: string }
@@ -82,6 +85,7 @@ export default function CatalogoEquipoPage() {
   const [equiposNuevos, setEquiposNuevos] = useState<CatalogoEquipoPayload[]>([])
   const [equiposDuplicados, setEquiposDuplicados] = useState<CatalogoEquipoConId[]>([])
   const [mostrarModal, setMostrarModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   const cargarEquipos = async () => {
     try {
@@ -100,7 +104,10 @@ export default function CatalogoEquipoPage() {
     cargarEquipos()
   }, [])
 
-  const handleCreated = () => cargarEquipos()
+  const handleCreated = () => {
+    cargarEquipos()
+    setShowCreateModal(false)
+  }
   const handleUpdated = () => cargarEquipos()
   const handleDeleted = () => cargarEquipos()
 
@@ -177,24 +184,7 @@ export default function CatalogoEquipoPage() {
       if (duplicados.length > 0) {
         setMostrarModal(true)
       } else if (nuevos.length > 0) {
-        // ✅ Mapear CatalogoEquipoPayload al formato correcto para la API
-        const equiposParaCrear = nuevos.map(eq => {
-          const equipoRecalculado = recalcularCatalogoEquipo(eq)
-          return {
-            codigo: equipoRecalculado.codigo,
-            descripcion: equipoRecalculado.descripcion,
-            marca: equipoRecalculado.marca,
-            precioInterno: equipoRecalculado.precioInterno,
-            margen: equipoRecalculado.margen,
-            precioVenta: equipoRecalculado.precioVenta,
-            categoriaId: equipoRecalculado.categoriaId,
-            unidadId: equipoRecalculado.unidadId,
-            estado: equipoRecalculado.estado
-          }
-        })
-        const creados = await Promise.all(equiposParaCrear.map(eq => createCatalogoEquipo(eq)))
-        setEquipos(prev => [...prev, ...creados])
-        toast.success('Equipos importados exitosamente.')
+        await crearEquiposNuevos(nuevos)
       } else {
         toast('No se encontraron nuevos equipos para importar.')
       }
@@ -209,8 +199,41 @@ export default function CatalogoEquipoPage() {
 
   const sobrescribirDuplicados = async () => {
     try {
-      // ✅ Mapear equiposNuevos al formato correcto para la API
-      const equiposNuevosParaCrear = equiposNuevos.map(eq => {
+      // Create new equipment
+      if (equiposNuevos.length > 0) {
+        await crearEquiposNuevos(equiposNuevos)
+      }
+
+      // Update duplicate equipment
+      if (equiposDuplicados.length > 0) {
+        const actualizados = await Promise.all(
+          equiposDuplicados.map(eq => {
+            const { id, ...data } = eq
+            return updateCatalogoEquipo(id, recalcularCatalogoEquipo(data))
+          })
+        )
+
+        setEquipos(prev => {
+          const actualizadosIds = new Set(actualizados.map(e => e.id))
+          const equiposFiltrados = prev.filter(e => !actualizadosIds.has(e.id))
+          return [...equiposFiltrados, ...actualizados]
+        })
+      }
+
+      toast.success('Equipos procesados exitosamente.')
+      setMostrarModal(false)
+      setEquiposNuevos([])
+      setEquiposDuplicados([])
+    } catch (err) {
+      console.error('❌ Error al procesar equipos:', err)
+      toast.error('Error al procesar equipos.')
+    }
+  }
+
+  const crearEquiposNuevos = async (nuevos: CatalogoEquipoPayload[]) => {
+    try {
+      // ✅ Mapear CatalogoEquipoPayload al formato correcto para la API
+      const equiposParaCrear = nuevos.map(eq => {
         const equipoRecalculado = recalcularCatalogoEquipo(eq)
         return {
           codigo: equipoRecalculado.codigo,
@@ -224,27 +247,13 @@ export default function CatalogoEquipoPage() {
           estado: equipoRecalculado.estado
         }
       })
-      const nuevos = await Promise.all(
-        equiposNuevosParaCrear.map(eq => createCatalogoEquipo(eq))
-      )
-      const actualizados = await Promise.all(
-        equiposDuplicados.map(eq => {
-          const { id, ...data } = eq
-          return updateCatalogoEquipo(id, recalcularCatalogoEquipo(data))
-        })
-      )
-
-      setEquipos(prev => {
-        const actualizadosIds = new Set(actualizados.map(e => e.id))
-        const equiposFiltrados = prev.filter(e => !actualizadosIds.has(e.id))
-        return [...equiposFiltrados, ...actualizados, ...nuevos]
-      })
-
-      toast.success('Equipos sobrescritos exitosamente.')
-      setMostrarModal(false)
-    } catch (err) {
-      console.error('❌ Error al sobrescribir duplicados:', err)
-      toast.error('Error al sobrescribir duplicados.')
+      const creados = await Promise.all(equiposParaCrear.map(eq => createCatalogoEquipo(eq)))
+      setEquipos(prev => [...prev, ...creados])
+      toast.success(`${creados.length} equipos importados exitosamente.`)
+    } catch (error) {
+      console.error('❌ Error al crear equipos nuevos:', error)
+      toast.error('Error al crear equipos nuevos.')
+      throw error
     }
   }
 
@@ -344,6 +353,23 @@ export default function CatalogoEquipoPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Equipo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Equipo</DialogTitle>
+                <DialogDescription>
+                  Agrega un nuevo equipo al catálogo con toda su configuración
+                </DialogDescription>
+              </DialogHeader>
+              <CatalogoEquipoForm onCreated={handleCreated} />
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" size="sm">
             <Share2 className="h-4 w-4 mr-2" />
             Compartir
@@ -425,10 +451,6 @@ export default function CatalogoEquipoPage() {
 
       <Separator />
 
-      {/* Create Equipment Form */}
-      <motion.div variants={itemVariants}>
-        <CatalogoEquipoCrearAcordeon onCreated={handleCreated} />
-      </motion.div>
 
       {/* Equipment List */}
       <motion.div variants={itemVariants}>
@@ -493,53 +515,48 @@ export default function CatalogoEquipoPage() {
       )}
 
       {/* Duplicate Equipment Modal */}
-      {mostrarModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-background p-6 rounded-xl shadow-lg max-w-md w-full mx-4"
-          >
-            <div className="space-y-4">
-              <div className="text-center">
-                <div className="p-3 bg-orange-100 rounded-full w-fit mx-auto mb-4">
-                  <AlertCircle className="h-6 w-6 text-orange-600" />
-                </div>
-                <h2 className="text-xl font-bold">Equipos Duplicados</h2>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Se encontraron códigos ya existentes:
-                </p>
-              </div>
-              
-              <div className="bg-muted p-3 rounded-lg">
-                <ul className="space-y-1">
-                  {equiposDuplicados.map((eq, idx) => (
-                    <li key={idx} className="text-sm font-mono">
-                      <Badge variant="outline">{eq.codigo}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              
-              <div className="flex gap-3 pt-4">
-                <Button 
-                  onClick={sobrescribirDuplicados}
-                  className="flex-1"
-                >
-                  Sobreescribir
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={cancelarImportacion}
-                  className="flex-1"
-                >
-                  Cancelar
-                </Button>
-              </div>
+      <Dialog open={mostrarModal} onOpenChange={setMostrarModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+              Equipos Duplicados
+            </DialogTitle>
+            <DialogDescription>
+              Se encontraron códigos ya existentes. ¿Desea sobreescribir los equipos duplicados?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-muted p-3 rounded-lg max-h-40 overflow-y-auto">
+              <p className="text-sm font-medium mb-2">Equipos encontrados:</p>
+              <ul className="space-y-1">
+                {equiposDuplicados.map((eq, idx) => (
+                  <li key={idx} className="text-sm font-mono">
+                    <Badge variant="outline">{eq.codigo}</Badge>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </motion.div>
-        </div>
-      )}
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                onClick={sobrescribirDuplicados}
+                className="flex-1"
+              >
+                Sobreescribir
+              </Button>
+              <Button
+                variant="outline"
+                onClick={cancelarImportacion}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

@@ -24,12 +24,13 @@ interface Cliente {
 
 interface ClienteMetrics {
   cliente: Cliente
-  totalProyectos: number
-  valorTotal: number
-  ultimoProyecto: string
-  calificacionPromedio: number
-  frecuenciaProyectos: number
-  satisfaccion: number
+  metricas: {
+    totalProyectos: number
+    valorTotal: number
+    ultimoProyecto: string | null
+    frecuenciaPromedio: number
+    satisfaccion: number
+  }
 }
 
 export default function ClientesReportPage() {
@@ -41,21 +42,21 @@ export default function ClientesReportPage() {
     const loadData = async () => {
       try {
         setLoading(true)
-        const clientesData = await getClientes()
-        setClientes(clientesData)
 
-        // Mock metrics data (in real implementation, this would come from API)
-        const mockMetrics: ClienteMetrics[] = clientesData.map(cliente => ({
-          cliente,
-          totalProyectos: Math.floor(Math.random() * 8) + 1,
-          valorTotal: Math.floor(Math.random() * 500000) + 50000,
-          ultimoProyecto: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          calificacionPromedio: Math.floor(Math.random() * 3) + 3, // 3-5
-          frecuenciaProyectos: Math.floor(Math.random() * 12) + 1, // meses
-          satisfaccion: Math.floor(Math.random() * 40) + 60 // 60-100%
+        // Load client metrics from API
+        const response = await fetch('/api/crm/reportes/clientes')
+        if (!response.ok) {
+          throw new Error('Error al cargar datos de clientes')
+        }
+        const data = await response.json()
+
+        // Transform API data to match component interface
+        const metricsData: ClienteMetrics[] = data.clientes.map((clienteData: any) => ({
+          cliente: clienteData.cliente,
+          metricas: clienteData.metricas
         }))
 
-        setClienteMetrics(mockMetrics)
+        setClienteMetrics(metricsData)
       } catch (error) {
         console.error('Error loading client report data:', error)
       } finally {
@@ -106,9 +107,9 @@ export default function ClientesReportPage() {
     return 'text-red-600'
   }
 
-  const getTopClients = (metric: keyof ClienteMetrics) => {
+  const getTopClients = (metric: keyof typeof clienteMetrics[0]['metricas']) => {
     return clienteMetrics
-      .sort((a, b) => (b[metric] as number) - (a[metric] as number))
+      .sort((a, b) => (b.metricas[metric] as number) - (a.metricas[metric] as number))
       .slice(0, 5)
   }
 
@@ -127,9 +128,9 @@ export default function ClientesReportPage() {
 
   const totalClientes = clienteMetrics.length
   const clientesActivos = clienteMetrics.filter(c => c.cliente.estadoRelacion === 'cliente_activo').length
-  const valorTotalCartera = clienteMetrics.reduce((sum, c) => sum + c.valorTotal, 0)
+  const valorTotalCartera = clienteMetrics.reduce((sum, c) => sum + c.metricas.valorTotal, 0)
   const satisfaccionPromedio = clienteMetrics.length > 0 ?
-    clienteMetrics.reduce((sum, c) => sum + c.satisfaccion, 0) / clienteMetrics.length : 0
+    clienteMetrics.reduce((sum, c) => sum + c.metricas.satisfaccion, 0) / clienteMetrics.length : 0
 
   return (
     <motion.div
@@ -200,7 +201,7 @@ export default function ClientesReportPage() {
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
               {clienteMetrics.length > 0 ?
-                (clienteMetrics.reduce((sum, c) => sum + c.frecuenciaProyectos, 0) / clienteMetrics.length).toFixed(1) : 0} meses
+                (clienteMetrics.reduce((sum, c) => sum + c.metricas.frecuenciaPromedio, 0) / clienteMetrics.length).toFixed(1) : 0} meses
             </div>
             <p className="text-xs text-muted-foreground">
               Entre proyectos
@@ -234,7 +235,7 @@ export default function ClientesReportPage() {
                   <div className="flex-1">
                     <p className="text-sm font-medium">{metric.cliente.nombre}</p>
                     <p className="text-xs text-muted-foreground">
-                      {metric.totalProyectos} proyectos • {formatCurrency(metric.valorTotal)}
+                      {metric.metricas.totalProyectos} proyectos • {formatCurrency(metric.metricas.valorTotal)}
                     </p>
                   </div>
                 </div>
@@ -254,7 +255,7 @@ export default function ClientesReportPage() {
           <CardContent>
             <div className="space-y-4">
               {clienteMetrics
-                .sort((a, b) => b.satisfaccion - a.satisfaccion)
+                .sort((a, b) => b.metricas.satisfaccion - a.metricas.satisfaccion)
                 .slice(0, 5)
                 .map((metric, index) => (
                 <div key={metric.cliente.id} className="flex items-center gap-3">
@@ -269,7 +270,7 @@ export default function ClientesReportPage() {
                   <div className="flex-1">
                     <p className="text-sm font-medium">{metric.cliente.nombre}</p>
                     <p className="text-xs text-muted-foreground">
-                      Satisfacción: {metric.satisfaccion}% • {metric.calificacionPromedio}/5 ⭐
+                      Satisfacción: {metric.metricas.satisfaccion}% • {metric.metricas.satisfaccion}/5 ⭐
                     </p>
                   </div>
                 </div>
@@ -316,8 +317,8 @@ export default function ClientesReportPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={`text-2xl font-bold ${getSatisfaccionColor(metric.satisfaccion)}`}>
-                      {metric.satisfaccion}%
+                    <div className={`text-2xl font-bold ${getSatisfaccionColor(metric.metricas.satisfaccion)}`}>
+                      {metric.metricas.satisfaccion}%
                     </div>
                     <div className="text-xs text-muted-foreground">Satisfacción</div>
                   </div>
@@ -325,29 +326,29 @@ export default function ClientesReportPage() {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div className="text-center">
-                    <div className="text-xl font-bold text-blue-600">{metric.totalProyectos}</div>
+                    <div className="text-xl font-bold text-blue-600">{metric.metricas.totalProyectos}</div>
                     <div className="text-xs text-muted-foreground">Proyectos</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-xl font-bold text-green-600">{formatCurrency(metric.valorTotal)}</div>
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(metric.metricas.valorTotal)}</div>
                     <div className="text-xs text-muted-foreground">Valor Total</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-xl font-bold text-purple-600">{metric.frecuenciaProyectos} meses</div>
+                    <div className="text-xl font-bold text-purple-600">{metric.metricas.frecuenciaPromedio.toFixed(1)} meses</div>
                     <div className="text-xs text-muted-foreground">Frecuencia</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-xl font-bold text-yellow-600">{metric.calificacionPromedio}/5 ⭐</div>
+                    <div className="text-xl font-bold text-yellow-600">{metric.metricas.satisfaccion}/5 ⭐</div>
                     <div className="text-xs text-muted-foreground">Calificación</div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Último proyecto: {formatDate(metric.ultimoProyecto)}</span>
+                    <span>Último proyecto: {metric.metricas.ultimoProyecto ? formatDate(metric.metricas.ultimoProyecto) : 'N/A'}</span>
                     <span>Potencial: {metric.cliente.potencialAnual ? formatCurrency(metric.cliente.potencialAnual) : 'N/A'}</span>
                   </div>
-                  <Progress value={metric.satisfaccion} className="h-2" />
+                  <Progress value={metric.metricas.satisfaccion} className="h-2" />
                   <div className="text-xs text-muted-foreground text-center">
                     Nivel de satisfacción del cliente
                   </div>

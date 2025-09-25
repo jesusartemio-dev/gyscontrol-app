@@ -15,6 +15,10 @@ const protectedRoutes = withAuth(
       return NextResponse.redirect(new URL('/denied', req.url))
     }
 
+    if (path.startsWith('/crm') && !['admin', 'gerente', 'comercial', 'presupuestos'].includes(role || '')) {
+      return NextResponse.redirect(new URL('/denied', req.url))
+    }
+
     if (path.startsWith('/proyectos') && !['admin', 'gerente', 'proyectos', 'coordinador', 'gestor'].includes(role || '')) {
       return NextResponse.redirect(new URL('/denied', req.url))
     }

@@ -10,7 +10,7 @@ export async function getCategoriasEquipo() {
   return res.json()
 }
 
-export async function createCategoriaEquipo(data: any) {
+export async function createCategoriaEquipo(data: { nombre: string; descripcion?: string | null }) {
   const res = await fetch(buildApiUrl('/api/categoria-equipo'), {
     method: 'POST',
     headers: {
@@ -26,7 +26,7 @@ export async function createCategoriaEquipo(data: any) {
   return res.json()
 }
 
-export async function updateCategoriaEquipo(id: string, data: { nombre: string }) {
+export async function updateCategoriaEquipo(id: string, data: { nombre: string; descripcion?: string | null }) {
   const res = await fetch(`/api/categoria-equipo/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

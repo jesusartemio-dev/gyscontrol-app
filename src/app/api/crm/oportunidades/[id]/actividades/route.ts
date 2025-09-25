@@ -159,6 +159,19 @@ export async function POST(
       )
     }
 
+    // ✅ Verificar que el usuario existe
+    const usuario = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, name: true, email: true }
+    })
+
+    if (!usuario) {
+      return NextResponse.json(
+        { error: 'Usuario no encontrado' },
+        { status: 404 }
+      )
+    }
+
     // ✅ Crear actividad
     const nuevaActividad = await prisma.crmActividad.create({
       data: {

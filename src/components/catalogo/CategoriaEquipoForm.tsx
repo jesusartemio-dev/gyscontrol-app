@@ -10,6 +10,7 @@ import { CategoriaEquipo, CategoriaEquipoPayload } from '@/types'
 import { createCategoriaEquipo, updateCategoriaEquipo } from '@/lib/services/categoriaEquipo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'react-hot-toast'
 
 interface Props {
@@ -26,13 +27,14 @@ export default function CategoriaEquipoForm({
   isEditMode = false,
 }: Props) {
   const [nombre, setNombre] = useState(defaultValue?.nombre || '')
+  const [descripcion, setDescripcion] = useState(defaultValue?.descripcion || '')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    const payload: CategoriaEquipoPayload = { nombre }
+    const payload: CategoriaEquipoPayload = { nombre, descripcion: descripcion || null }
 
     try {
       let response
@@ -45,6 +47,7 @@ export default function CategoriaEquipoForm({
         toast.success('Categoría creada')
         onCreated?.(response)
         setNombre('')
+        setDescripcion('')
       }
     } catch (error) {
       toast.error('Error al guardar')
@@ -66,6 +69,14 @@ export default function CategoriaEquipoForm({
         placeholder="Nombre de la categoría"
         required
         disabled={loading}
+      />
+
+      <Textarea
+        value={descripcion}
+        onChange={(e) => setDescripcion(e.target.value)}
+        placeholder="Descripción de la categoría (opcional)"
+        disabled={loading}
+        rows={3}
       />
 
       <Button type="submit" disabled={loading}>

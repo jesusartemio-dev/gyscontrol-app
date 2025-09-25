@@ -36,17 +36,20 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 
 // Icons
-import { 
-  Plus, 
-  ChevronRight, 
-  Share2, 
-  Download, 
-  Edit, 
+import {
+  Plus,
+  ChevronRight,
+  Share2,
+  Download,
+  Edit,
   FileText,
   Package,
   Settings,
   AlertCircle,
-  Loader2
+  Loader2,
+  Wrench,
+  Truck,
+  DollarSign
 } from 'lucide-react'
 
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
@@ -98,7 +101,7 @@ const formatDate = (dateString: string): string => {
 
 const getStatusVariant = (status: string) => {
   switch (status.toLowerCase()) {
-    case 'activo': 
+    case 'activo':
     case 'active':
       return { variant: 'default' as const, className: 'bg-green-100 text-green-800 border-green-200' }
     case 'inactivo':
@@ -113,8 +116,44 @@ const getStatusVariant = (status: string) => {
     case 'archivado':
     case 'archived':
       return { variant: 'secondary' as const, className: 'bg-gray-100 text-gray-800 border-gray-200' }
-    default: 
+    default:
       return { variant: 'secondary' as const, className: 'bg-gray-100 text-gray-600 border-gray-200' }
+  }
+}
+
+// Obtener información del tipo de plantilla
+const getTipoInfo = (tipo: string) => {
+  switch (tipo) {
+    case 'completa':
+      return {
+        label: 'Completa',
+        icon: Package,
+        color: 'bg-blue-100 text-blue-800 border-blue-200'
+      }
+    case 'equipos':
+      return {
+        label: 'Equipos',
+        icon: Wrench,
+        color: 'bg-orange-100 text-orange-800 border-orange-200'
+      }
+    case 'servicios':
+      return {
+        label: 'Servicios',
+        icon: Truck,
+        color: 'bg-green-100 text-green-800 border-green-200'
+      }
+    case 'gastos':
+      return {
+        label: 'Gastos',
+        icon: DollarSign,
+        color: 'bg-purple-100 text-purple-800 border-purple-200'
+      }
+    default:
+      return {
+        label: tipo,
+        icon: FileText,
+        color: 'bg-gray-100 text-gray-800 border-gray-200'
+      }
   }
 }
 
@@ -295,12 +334,26 @@ export default function PlantillaDetallePage() {
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold text-gray-900">{plantilla?.nombre || 'Cargando...'}</h1>
-                <Badge 
+                <Badge
                   variant={getStatusVariant(plantilla?.estado || 'borrador').variant}
                   className={getStatusVariant(plantilla?.estado || 'borrador').className}
                 >
                   {plantilla?.estado || 'Borrador'}
                 </Badge>
+                {plantilla?.tipo && plantilla.tipo !== 'completa' && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    {(() => {
+                      const tipoInfo = getTipoInfo(plantilla.tipo)
+                      const IconComponent = tipoInfo.icon
+                      return (
+                        <>
+                          <IconComponent className="h-3 w-3" />
+                          Plantilla {tipoInfo.label}
+                        </>
+                      )
+                    })()}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
@@ -348,233 +401,239 @@ export default function PlantillaDetallePage() {
           </div>
         </motion.div>
 
-        {/* Equipos Section */}
-        <motion.div variants={itemVariants}>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-red-600" />
-                    Secciones de Equipos
-                  </CardTitle>
-                  <CardDescription>
-                    Gestiona los grupos de equipos de la plantilla ({plantilla?.equipos?.length || 0} secciones)
-                  </CardDescription>
-                </div>
-                {plantilla && (
-                  <PlantillaEquipoModal 
-                    plantillaId={plantilla.id}
-                    onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
-                  />
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-
-              
-              {(plantilla?.equipos?.length || 0) === 0 ? (
-                <div className="text-center py-12">
-                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    No hay secciones de equipos
-                  </h3>
-                  <p className="text-gray-500 mb-4">
-                    Comienza agregando tu primera sección de equipos
-                  </p>
+        {/* Equipos Section - Only show if template type allows it */}
+        {(plantilla?.tipo === 'completa' || plantilla?.tipo === 'equipos') && (
+          <motion.div variants={itemVariants}>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-red-600" />
+                      Secciones de Equipos
+                    </CardTitle>
+                    <CardDescription>
+                      Gestiona los grupos de equipos de la plantilla ({plantilla?.equipos?.length || 0} secciones)
+                    </CardDescription>
+                  </div>
                   {plantilla && (
-                    <PlantillaEquipoModal 
+                    <PlantillaEquipoModal
                       plantillaId={plantilla.id}
                       onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
-                      trigger={
-                        <Button variant="outline">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Crear Primera Sección
-                        </Button>
-                      }
                     />
                   )}
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {(plantilla?.equipos || []).map((e, index) => (
-                    <motion.div
-                      key={e.id}
-                      variants={itemVariants}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <PlantillaEquipoAccordion 
-                        key={e.id} 
-                        equipo={e} 
-                        onItemChange={(items) => actualizarEquipo(e.id, () => items)} 
-                        onUpdatedNombre={nuevo => setPlantilla(p => p ? { ...p, equipos: p.equipos.map(eq => eq.id === e.id ? { ...eq, nombre: nuevo } : eq) } : p)} 
-                        onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)} 
-                        onChange={(changes) => setPlantilla(p => p ? { ...p, equipos: p.equipos.map(eq => eq.id === e.id ? { ...eq, ...changes } : eq) } : p)} 
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardHeader>
+              <CardContent>
 
-        {/* Servicios Section */}
-        <motion.div variants={itemVariants}>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="h-5 w-5 text-blue-600" />
-                    Secciones de Servicios
-                  </CardTitle>
-                  <CardDescription>
-                    Gestiona los grupos de servicios de la plantilla ({plantilla?.servicios?.length || 0} secciones)
-                  </CardDescription>
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowForm(prev => ({ ...prev, servicio: !prev.servicio }))}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> 
-                  Nuevo Servicio
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {plantilla && (
-                <PlantillaServicioModal
-                  plantillaId={plantilla.id}
-                  isOpen={showForm.servicio}
-                  onClose={() => setShowForm(prev => ({ ...prev, servicio: false }))}
-                  onCreated={nuevo => setPlantilla(p => p ? { ...p, servicios: [...p.servicios, { ...nuevo, items: [] }] } : p)}
-                />
-              )}
-              
-              {(plantilla?.servicios?.length || 0) === 0 ? (
-                <div className="text-center py-12">
-                  <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    No hay secciones de servicios
-                  </h3>
-                  <p className="text-gray-500 mb-4">
-                    Comienza agregando tu primera sección de servicios
-                  </p>
-                  <Button 
+
+                {(plantilla?.equipos?.length || 0) === 0 ? (
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No hay secciones de equipos
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      Comienza agregando tu primera sección de equipos
+                    </p>
+                    {plantilla && (
+                      <PlantillaEquipoModal
+                        plantillaId={plantilla.id}
+                        onCreated={nuevo => setPlantilla(p => p ? { ...p, equipos: [...p.equipos, { ...nuevo, items: [] }] } : p)}
+                        trigger={
+                          <Button variant="outline">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Crear Primera Sección
+                          </Button>
+                        }
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {(plantilla?.equipos || []).map((e, index) => (
+                      <motion.div
+                        key={e.id}
+                        variants={itemVariants}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <PlantillaEquipoAccordion
+                          key={e.id}
+                          equipo={e}
+                          onItemChange={(items) => actualizarEquipo(e.id, () => items)}
+                          onUpdatedNombre={nuevo => setPlantilla(p => p ? { ...p, equipos: p.equipos.map(eq => eq.id === e.id ? { ...eq, nombre: nuevo } : eq) } : p)}
+                          onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)}
+                          onChange={(changes) => setPlantilla(p => p ? { ...p, equipos: p.equipos.map(eq => eq.id === e.id ? { ...eq, ...changes } : eq) } : p)}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Servicios Section - Only show if template type allows it */}
+        {(plantilla?.tipo === 'completa' || plantilla?.tipo === 'servicios') && (
+          <motion.div variants={itemVariants}>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings className="h-5 w-5 text-blue-600" />
+                      Secciones de Servicios
+                    </CardTitle>
+                    <CardDescription>
+                      Gestiona los grupos de servicios de la plantilla ({plantilla?.servicios?.length || 0} secciones)
+                    </CardDescription>
+                  </div>
+                  <Button
                     variant="outline"
-                    onClick={() => setShowForm(prev => ({ ...prev, servicio: true }))}
+                    onClick={() => setShowForm(prev => ({ ...prev, servicio: !prev.servicio }))}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Primera Sección
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nuevo Servicio
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {(plantilla?.servicios || []).map((s, index) => (
-                    <motion.div
-                      key={s.id}
-                      variants={itemVariants}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <PlantillaServicioAccordion 
-                        key={s.id} 
-                        servicio={s} 
-                        onCreated={items => actualizarServicio(s.id, existingItems => [...existingItems, ...items])} 
-                        onDeleted={id => actualizarServicio(s.id, items => items.filter(i => i.id !== id))} 
-                        onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))} 
-                        onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)} 
-                        onUpdatedNombre={nuevo => setPlantilla(p => p ? { ...p, servicios: p.servicios.map(se => se.id === s.id ? { ...se, nombre: nuevo } : se) } : p)} 
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardHeader>
+              <CardContent>
+                {plantilla && (
+                  <PlantillaServicioModal
+                    plantillaId={plantilla.id}
+                    isOpen={showForm.servicio}
+                    onClose={() => setShowForm(prev => ({ ...prev, servicio: false }))}
+                    onCreated={nuevo => setPlantilla(p => p ? { ...p, servicios: [...p.servicios, { ...nuevo, items: [] }] } : p)}
+                  />
+                )}
 
-        {/* Gastos Section */}
-        <motion.div variants={itemVariants}>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-green-600" />
-                    Secciones de Gastos
-                  </CardTitle>
-                  <CardDescription>
-                    Gestiona los grupos de gastos de la plantilla ({plantilla?.gastos?.length || 0} secciones)
-                  </CardDescription>
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowForm(prev => ({ ...prev, gasto: !prev.gasto }))}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> 
-                  Nuevo Gasto
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {showForm.gasto && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-4"
-                >
-                  {plantilla && (
-                    <PlantillaGastoForm 
-                      plantillaId={plantilla.id} 
-                      onCreated={nuevo => setPlantilla(p => p ? { ...p, gastos: [...(p.gastos || []), { ...nuevo, items: [] }] } : p)} 
-                    />
-                  )}
-                </motion.div>
-              )}
-              
-              {(!plantilla?.gastos || (plantilla?.gastos?.length || 0) === 0) ? (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    No hay secciones de gastos
-                  </h3>
-                  <p className="text-gray-500 mb-4">
-                    Comienza agregando tu primera sección de gastos
-                  </p>
-                  <Button 
+                {(plantilla?.servicios?.length || 0) === 0 ? (
+                  <div className="text-center py-12">
+                    <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No hay secciones de servicios
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      Comienza agregando tu primera sección de servicios
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowForm(prev => ({ ...prev, servicio: true }))}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Primera Sección
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {(plantilla?.servicios || []).map((s, index) => (
+                      <motion.div
+                        key={s.id}
+                        variants={itemVariants}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <PlantillaServicioAccordion
+                          key={s.id}
+                          servicio={s}
+                          onCreated={items => actualizarServicio(s.id, existingItems => [...existingItems, ...items])}
+                          onDeleted={id => actualizarServicio(s.id, items => items.filter(i => i.id !== id))}
+                          onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))}
+                          onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)}
+                          onUpdatedNombre={nuevo => setPlantilla(p => p ? { ...p, servicios: p.servicios.map(se => se.id === s.id ? { ...se, nombre: nuevo } : se) } : p)}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Gastos Section - Only show if template type allows it */}
+        {(plantilla?.tipo === 'completa' || plantilla?.tipo === 'gastos') && (
+          <motion.div variants={itemVariants}>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-green-600" />
+                      Secciones de Gastos
+                    </CardTitle>
+                    <CardDescription>
+                      Gestiona los grupos de gastos de la plantilla ({plantilla?.gastos?.length || 0} secciones)
+                    </CardDescription>
+                  </div>
+                  <Button
                     variant="outline"
-                    onClick={() => setShowForm(prev => ({ ...prev, gasto: true }))}
+                    onClick={() => setShowForm(prev => ({ ...prev, gasto: !prev.gasto }))}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Primera Sección
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nuevo Gasto
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {(plantilla?.gastos || []).map((g, index) => (
-                    <motion.div
-                      key={g.id}
-                      variants={itemVariants}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <PlantillaGastoAccordion 
-                        key={g.id} 
-                        gasto={g} 
-                        onCreated={i => actualizarGasto(g.id, items => [...items, i])} 
-                        onUpdated={(id, changes) => actualizarGasto(g.id, items => items.map(i => i.id === id ? { ...i, ...changes } : i))} 
-                        onDeleted={id => handleEliminarItemGasto(g.id, id)} 
-                        onDeletedGrupo={() => handleEliminarGrupoGasto(g.id)} 
-                        onUpdatedNombre={nuevo => setPlantilla(p => p ? { ...p, gastos: p.gastos.map(ga => ga.id === g.id ? { ...ga, nombre: nuevo } : ga) } : p)} 
+              </CardHeader>
+              <CardContent>
+                {showForm.gasto && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-4"
+                  >
+                    {plantilla && (
+                      <PlantillaGastoForm
+                        plantillaId={plantilla.id}
+                        onCreated={nuevo => setPlantilla(p => p ? { ...p, gastos: [...(p.gastos || []), { ...nuevo, items: [] }] } : p)}
                       />
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                    )}
+                  </motion.div>
+                )}
+
+                {(!plantilla?.gastos || (plantilla?.gastos?.length || 0) === 0) ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No hay secciones de gastos
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      Comienza agregando tu primera sección de gastos
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowForm(prev => ({ ...prev, gasto: true }))}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Primera Sección
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {(plantilla?.gastos || []).map((g, index) => (
+                      <motion.div
+                        key={g.id}
+                        variants={itemVariants}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <PlantillaGastoAccordion
+                          key={g.id}
+                          gasto={g}
+                          onCreated={i => actualizarGasto(g.id, items => [...items, i])}
+                          onUpdated={(id, changes) => actualizarGasto(g.id, items => items.map(i => i.id === id ? { ...i, ...changes } : i))}
+                          onDeleted={id => handleEliminarItemGasto(g.id, id)}
+                          onDeletedGrupo={() => handleEliminarGrupoGasto(g.id)}
+                          onUpdatedNombre={nuevo => setPlantilla(p => p ? { ...p, gastos: p.gastos.map(ga => ga.id === g.id ? { ...ga, nombre: nuevo } : ga) } : p)}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
        </div>
      </motion.div>
    )

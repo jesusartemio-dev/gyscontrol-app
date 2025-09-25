@@ -28,6 +28,7 @@ import {
 // Components
 import CatalogoServicioCrearAcordeon from '@/components/catalogo/CatalogoServicioCrearAcordeon'
 import CatalogoServicioTable from '@/components/catalogo/CatalogoServicioTable'
+import CatalogoServicioForm from '@/components/catalogo/CatalogoServicioForm'
 import ModalDuplicadosServicios from '@/components/catalogo/ModalDuplicadosServicios'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 
@@ -38,16 +39,18 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
 // Icons
-import { 
-  ChevronRight, 
-  Settings, 
-  TrendingUp, 
-  AlertCircle, 
-  FileText, 
+import {
+  ChevronRight,
+  Settings,
+  TrendingUp,
+  AlertCircle,
+  FileText,
   Upload,
-  Loader2
+  Loader2,
+  Plus
 } from 'lucide-react'
 
 // Animation
@@ -85,6 +88,7 @@ export default function CatalogoServicioPage() {
   const [mostrarModal, setMostrarModal] = useState(false)
   const [duplicados, setDuplicados] = useState<{ id: string; nombre: string }[]>([])
   const [serviciosDuplicados, setServiciosDuplicados] = useState<any[]>([])
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   const cargarServicios = async () => {
     try {
@@ -103,7 +107,10 @@ export default function CatalogoServicioPage() {
     cargarServicios()
   }, [])
 
-  const handleCreated = () => cargarServicios()
+  const handleCreated = () => {
+    cargarServicios()
+    setShowCreateModal(false)
+  }
 
   const actualizarServicio = async (servicio: CatalogoServicio) => {
     try {
@@ -309,6 +316,23 @@ export default function CatalogoServicioPage() {
         </div>
         
         <div className="flex items-center gap-2">
+          <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Servicio
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Servicio</DialogTitle>
+                <DialogDescription>
+                  Agrega un nuevo servicio al catálogo con toda su configuración
+                </DialogDescription>
+              </DialogHeader>
+              <CatalogoServicioForm onCreated={handleCreated} />
+            </DialogContent>
+          </Dialog>
           <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
         </div>
       </motion.div>
@@ -363,66 +387,6 @@ export default function CatalogoServicioPage() {
         </Card>
       </motion.div>
 
-      {/* Leyenda de Cálculo de Horas Hombre */}
-      <motion.div variants={itemVariants}>
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold text-blue-800 flex items-center gap-2">
-              📘 Cálculo de Horas Hombre
-            </CardTitle>
-            <CardDescription className="text-blue-600">
-              Fórmulas utilizadas para el cálculo de horas según el tipo de servicio
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg p-4 border border-blue-100">
-                <div className="font-semibold text-blue-700 mb-2 flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
-                    Proporcional
-                  </Badge>
-                </div>
-                <p className="text-sm text-gray-700">
-                  <strong className="text-blue-600">HH =</strong> cantidad × HH_unidad
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Las horas se multiplican por la cantidad
-                </p>
-              </div>
-              
-              <div className="bg-white rounded-lg p-4 border border-blue-100">
-                <div className="font-semibold text-blue-700 mb-2 flex items-center gap-2">
-                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
-                    Escalonada
-                  </Badge>
-                </div>
-                <p className="text-sm text-gray-700">
-                  <strong className="text-blue-600">HH =</strong> HH_base + (cantidad - 1) × HH_repetido
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Horas base más horas adicionales por repetición
-                </p>
-              </div>
-              
-              <div className="bg-white rounded-lg p-4 border border-blue-100">
-                <div className="font-semibold text-blue-700 mb-2 flex items-center gap-2">
-                  <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
-                    Fijo
-                  </Badge>
-                </div>
-                <p className="text-sm text-gray-700">
-                  <strong className="text-blue-600">HH =</strong> HH_fijo
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Horas fijas independiente de la cantidad
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      <Separator />
 
       {/* Import Status */}
       {importando && (
@@ -455,23 +419,6 @@ export default function CatalogoServicioPage() {
         </motion.div>
       )}
 
-      {/* Service Creation Form */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Crear Nuevo Servicio
-            </CardTitle>
-            <CardDescription>
-              Agrega un nuevo servicio al catálogo
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CatalogoServicioCrearAcordeon onCreated={handleCreated} />
-          </CardContent>
-        </Card>
-      </motion.div>
 
       {/* Services Table */}
       <motion.div variants={itemVariants}>

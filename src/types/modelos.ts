@@ -337,6 +337,7 @@ export interface UnidadServicio {
 export interface CategoriaEquipo {
   id: string
   nombre: string
+  descripcion?: string
   createdAt: string
   updatedAt: string
 }
@@ -351,6 +352,7 @@ export interface NivelServicio {
 export interface CategoriaServicio {
   id: string
   nombre: string
+  descripcion?: string
   createdAt: string
   updatedAt: string
   servicios?: CatalogoServicio[] // 🔁 Relación real completa
@@ -436,6 +438,7 @@ export interface Plantilla {
   id: string
   nombre: string
   estado: string
+  tipo: 'completa' | 'equipos' | 'servicios' | 'gastos' // ✅ Nuevo campo para tipo de plantilla
   // Totales por sección
   totalEquiposInterno: number
   totalEquiposCliente: number
@@ -1967,4 +1970,21 @@ export interface ProyectoEdtConRelaciones {
       email: string
     }
   }[]
+}
+
+// ✅ Interfaz para Contactos de Cliente CRM
+export interface CrmContactoCliente {
+  id?: string
+  nombre: string
+  cargo?: string
+  email?: string
+  telefono?: string
+  celular?: string
+  esDecisionMaker: boolean
+  areasInfluencia?: string
+  relacionComercial?: string
+  fechaUltimoContacto?: string
+  notas?: string
+  createdAt?: string
+  updatedAt?: string
 }

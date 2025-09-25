@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Building2, Users, Search, Filter, Eye, BarChart3, Loader2 } from 'lucide-react'
+import { Building2, Users, Search, Filter, Eye, BarChart3, Loader2, List, Grid3X3 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +34,7 @@ export default function CrmClientesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [sectorFilter, setSectorFilter] = useState('todos')
   const [estadoFilter, setEstadoFilter] = useState('todos')
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
   useEffect(() => {
     const loadClientes = async () => {
@@ -176,7 +177,7 @@ export default function CrmClientesPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Buscar</label>
@@ -188,6 +189,30 @@ export default function CrmClientesPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
+              </div>
+            </div>
+
+            {/* View Toggle Buttons - Hidden on mobile */}
+            <div className="hidden md:flex items-end">
+              <div className="flex items-center gap-1 border rounded-lg p-1">
+                <Button
+                  size="sm"
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  onClick={() => setViewMode('table')}
+                  className="h-8 px-3"
+                >
+                  <List className="h-4 w-4 mr-1" />
+                  Tabla
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === 'card' ? 'default' : 'ghost'}
+                  onClick={() => setViewMode('card')}
+                  className="h-8 px-3"
+                >
+                  <Grid3X3 className="h-4 w-4 mr-1" />
+                  Cards
+                </Button>
               </div>
             </div>
 
@@ -255,111 +280,220 @@ export default function CrmClientesPage() {
         </CardContent>
       </Card>
 
-      {/* Clients Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredClientes.map((cliente) => (
-          <motion.div
-            key={cliente.id}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
-                  onClick={() => router.push(`/crm/clientes/${cliente.id}`)}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
-                        {cliente.nombre.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                        {cliente.nombre}
-                      </h3>
-                      <p className="text-sm text-gray-500">{cliente.ruc || 'Sin RUC'}</p>
-                    </div>
-                  </div>
-                  <Badge variant={getEstadoBadgeVariant(cliente.estadoRelacion) as any} className="text-xs">
-                    {getEstadoLabel(cliente.estadoRelacion)}
-                  </Badge>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-3">
-                {/* CRM Information */}
-                <div className="space-y-2">
-                  {cliente.sector && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Building2 className="h-3 w-3 text-gray-400" />
-                      <span className="text-gray-600">{cliente.sector}</span>
-                    </div>
-                  )}
-
-                  {cliente.calificacion && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">Calificación:</span>
+      {/* Clients Display - Table or Card View */}
+      {viewMode === 'table' ? (
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sector</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Calificación</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Potencial</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredClientes.map((cliente, index) => (
+                  <motion.tr
+                    key={cliente.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{
+                      duration: 0.2,
+                      delay: index * 0.05,
+                      ease: [0.4, 0, 0.2, 1]
+                    }}
+                    className="hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <Avatar className="h-10 w-10">
+                            <AvatarFallback className="bg-blue-100 text-blue-600 text-sm">
+                              {cliente.nombre.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{cliente.nombre}</div>
+                          <div className="text-sm text-gray-500">{cliente.ruc || 'Sin RUC'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{cliente.sector || 'Sin sector'}</div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <Badge variant={getEstadoBadgeVariant(cliente.estadoRelacion) as any} className="text-xs">
+                        {getEstadoLabel(cliente.estadoRelacion)}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      {cliente.calificacion ? (
+                        <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1">
+                            {getCalificacionStars(cliente.calificacion)}
+                          </div>
+                          <span className="text-sm font-medium ml-1">{cliente.calificacion}/5</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-500">Sin calificar</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {cliente.potencialAnual ? formatCurrency(cliente.potencialAnual) : 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {cliente.correo ? (
+                          <div className="flex items-center gap-1">
+                            <span>📧</span>
+                            <span className="truncate max-w-32">{cliente.correo}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">Sin email</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-1">
-                        {getCalificacionStars(cliente.calificacion)}
-                        <span className="text-sm font-medium ml-1">{cliente.calificacion}/5</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/comercial/clientes/${cliente.id}`)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/crm/clientes/${cliente.id}`)}
+                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                        >
+                          <BarChart3 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredClientes.map((cliente) => (
+            <motion.div
+              key={cliente.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
+                    onClick={() => router.push(`/crm/clientes/${cliente.id}`)}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
+                          {cliente.nombre.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                          {cliente.nombre}
+                        </h3>
+                        <p className="text-sm text-gray-500">{cliente.ruc || 'Sin RUC'}</p>
                       </div>
                     </div>
-                  )}
+                    <Badge variant={getEstadoBadgeVariant(cliente.estadoRelacion) as any} className="text-xs">
+                      {getEstadoLabel(cliente.estadoRelacion)}
+                    </Badge>
+                  </div>
+                </CardHeader>
 
-                  {cliente.potencialAnual && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-600">Potencial:</span>
-                      <span className="font-medium text-green-600">
-                        {formatCurrency(cliente.potencialAnual)}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                <CardContent className="space-y-3">
+                  {/* CRM Information */}
+                  <div className="space-y-2">
+                    {cliente.sector && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Building2 className="h-3 w-3 text-gray-400" />
+                        <span className="text-gray-600">{cliente.sector}</span>
+                      </div>
+                    )}
 
-                {/* Contact Information */}
-                <div className="pt-2 border-t">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    {cliente.correo && (
-                      <div className="flex items-center gap-1">
-                        <span>📧</span>
-                        <span className="truncate">{cliente.correo}</span>
+                    {cliente.calificacion && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Calificación:</span>
+                        <div className="flex items-center gap-1">
+                          {getCalificacionStars(cliente.calificacion)}
+                          <span className="text-sm font-medium ml-1">{cliente.calificacion}/5</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {cliente.potencialAnual && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-600">Potencial:</span>
+                        <span className="font-medium text-green-600">
+                          {formatCurrency(cliente.potencialAnual)}
+                        </span>
                       </div>
                     )}
                   </div>
-                </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      router.push(`/comercial/clientes/${cliente.id}`)
-                    }}
-                  >
-                    <Eye className="h-3 w-3 mr-1" />
-                    Básico
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      router.push(`/crm/clientes/${cliente.id}`)
-                    }}
-                  >
-                    <BarChart3 className="h-3 w-3 mr-1" />
-                    CRM
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
+                  {/* Contact Information */}
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      {cliente.correo && (
+                        <div className="flex items-center gap-1">
+                          <span>📧</span>
+                          <span className="truncate">{cliente.correo}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        router.push(`/comercial/clientes/${cliente.id}`)
+                      }}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      Básico
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        router.push(`/crm/clientes/${cliente.id}`)
+                      }}
+                    >
+                      <BarChart3 className="h-3 w-3 mr-1" />
+                      CRM
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Empty State */}
       {filteredClientes.length === 0 && !loading && (

@@ -60,6 +60,8 @@
     "generate:entity": "tsx scripts/generate-entity.ts",
     "generate:types": "tsx scripts/generate-types.ts",
     "db:audit": "npm run audit:consistency && npm run type-check",
+    "db:backup": "tsx scripts/extract-current-data.ts",
+    "db:restore": "tsx scripts/restore-current-data.ts",
     "prepare": "husky install"
   },
   "dependencies": {

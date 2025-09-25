@@ -44,34 +44,14 @@ export default function MetricasReportPage() {
       try {
         setLoading(true)
 
-        // Mock comprehensive metrics data
-        const mockData: MetricasData = {
-          periodo: '2024-Q4',
-          totales: {
-            cotizacionesGeneradas: 45,
-            cotizacionesAprobadas: 32,
-            proyectosCerrados: 28,
-            valorTotalVendido: 1250000,
-            margenTotalObtenido: 312500,
-            llamadasRealizadas: 380,
-            reunionesAgendadas: 65,
-            propuestasEnviadas: 42,
-            emailsEnviados: 156
-          },
-          promedios: {
-            tiempoPromedioCierre: 24,
-            tasaConversion: 62.2,
-            valorPromedioProyecto: 44643
-          },
-          tendencias: [
-            { periodo: '2024-07', cotizaciones: 38, proyectos: 22, valor: 980000, conversion: 57.9 },
-            { periodo: '2024-08', cotizaciones: 42, proyectos: 25, valor: 1100000, conversion: 59.5 },
-            { periodo: '2024-09', cotizaciones: 48, proyectos: 28, valor: 1250000, conversion: 58.3 },
-            { periodo: '2024-10', cotizaciones: 45, proyectos: 28, valor: 1250000, conversion: 62.2 }
-          ]
+        // Load metrics data from API
+        const response = await fetch('/api/crm/reportes/metricas?periodo=2024-Q4')
+        if (!response.ok) {
+          throw new Error('Error al cargar datos de métricas')
         }
+        const data = await response.json()
 
-        setMetricasData(mockData)
+        setMetricasData(data)
       } catch (error) {
         console.error('Error loading metrics data:', error)
       } finally {

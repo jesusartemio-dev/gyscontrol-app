@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 // src/app/api/categoria-equipo/route.ts
 export async function GET() {
   const categorias = await prisma.categoriaEquipo.findMany({
-    select: { id: true, nombre: true },
+    select: { id: true, nombre: true, descripcion: true } as any,
     orderBy: { nombre: 'asc' },
   })
   return NextResponse.json(categorias)
@@ -20,7 +20,10 @@ export async function POST(req: Request) {
     }
 
     const nueva = await prisma.categoriaEquipo.create({
-      data: { nombre: body.nombre }
+      data: {
+        nombre: body.nombre,
+        descripcion: body.descripcion || null
+      } as any
     })
 
     return NextResponse.json(nueva, { status: 201 })

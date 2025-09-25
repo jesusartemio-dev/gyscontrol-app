@@ -33,7 +33,7 @@ export async function PUT(
     }
 
     const body = await req.json()
-    const { nombre } = body
+    const { nombre, descripcion } = body
 
     if (!nombre || typeof nombre !== 'string') {
       return NextResponse.json({ error: 'Nombre inválido' }, { status: 400 })
@@ -41,7 +41,10 @@ export async function PUT(
 
     const actualizada = await prisma.categoriaEquipo.update({
       where: { id },
-      data: { nombre },
+      data: {
+        nombre,
+        descripcion: descripcion || null
+      } as any,
     })
 
     return NextResponse.json(actualizada)

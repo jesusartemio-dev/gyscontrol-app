@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 
 export interface CategoriaServicioImportada {
   nombre: string
+  descripcion?: string
 }
 
 export async function leerCategoriasServicioDesdeExcel(file: File): Promise<CategoriaServicioImportada[]> {
@@ -13,7 +14,10 @@ export async function leerCategoriasServicioDesdeExcel(file: File): Promise<Cate
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const json: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
-  return json.map((row) => ({ nombre: row['Nombre']?.trim() || '' }))
+  return json.map((row) => ({
+    nombre: row['Nombre']?.trim() || '',
+    descripcion: row['Descripcion']?.trim() || undefined
+  }))
 }
 
 export function validarCategoriasServicio(

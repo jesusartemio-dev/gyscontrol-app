@@ -5,7 +5,10 @@ import * as XLSX from 'xlsx'
 import { CategoriaServicio } from '@/types'
 
 export function exportarCategoriasServicioAExcel(categorias: CategoriaServicio[]) {
-  const data = categorias.map((c) => ({ Nombre: c.nombre }))
+  const data = categorias.map((c) => ({
+    Nombre: c.nombre,
+    Descripcion: c.descripcion || ''
+  }))
   const worksheet = XLSX.utils.json_to_sheet(data)
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, worksheet, 'CategoriasServicio')

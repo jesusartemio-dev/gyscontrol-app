@@ -24,6 +24,8 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 // Icons
 import { 
@@ -45,6 +47,8 @@ export default function CategoriasEquipoPage() {
   const [importando, setImportando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
   const cargarCategorias = async () => {
     try {
@@ -65,6 +69,7 @@ export default function CategoriasEquipoPage() {
 
   const handleCreated = (nueva: CategoriaEquipo) => {
     setCategorias((prev) => [nueva, ...prev])
+    setModalOpen(false)
   }
 
   const handleUpdated = (actualizada: CategoriaEquipo) => {
@@ -103,7 +108,10 @@ export default function CategoriasEquipoPage() {
         return
       }
 
-      await Promise.all(nuevas.map(c => createCategoriaEquipo({ nombre: c.nombre })))
+      await Promise.all(nuevas.map(c => createCategoriaEquipo({
+        nombre: c.nombre,
+        descripcion: c.descripcion || null
+      })))
       toast.success(`${nuevas.length} categorías importadas correctamente`)
       cargarCategorias()
     } catch (err) {
@@ -243,6 +251,23 @@ export default function CategoriasEquipoPage() {
         </div>
         
         <div className="flex items-center gap-2">
+          <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Package className="h-4 w-4 mr-2" />
+                Nueva Categoría
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Crear Nueva Categoría</DialogTitle>
+                <DialogDescription>
+                  Agrega una nueva categoría de equipo al catálogo
+                </DialogDescription>
+              </DialogHeader>
+              <CategoriaEquipoForm onCreated={handleCreated} />
+            </DialogContent>
+          </Dialog>
           <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
         </div>
       </motion.div>
@@ -329,37 +354,29 @@ export default function CategoriasEquipoPage() {
       )}
 
       {/* Main Content */}
-      <motion.div 
-        className="grid grid-cols-1 lg:grid-cols-4 gap-6"
+      <motion.div
+        className="space-y-6"
         variants={itemVariants}
       >
-        {/* Form Section */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Nueva Categoría
-            </CardTitle>
-            <CardDescription>
-              Agrega una nueva categoría de equipo al catálogo
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CategoriaEquipoForm onCreated={handleCreated} />
-          </CardContent>
-        </Card>
-
         {/* List Section */}
-        <Card className="lg:col-span-3">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Lista de Categorías
               </span>
-              <Badge variant="secondary">
-                {categorias.length} {categorias.length === 1 ? 'categoría' : 'categorías'}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'card')}>
+                  <TabsList>
+                    <TabsTrigger value="table">Tabla</TabsTrigger>
+                    <TabsTrigger value="card">Cards</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <Badge variant="secondary">
+                  {categorias.length} {categorias.length === 1 ? 'categoría' : 'categorías'}
+                </Badge>
+              </div>
             </CardTitle>
             <CardDescription>
               Administra las categorías existentes de equipos
@@ -384,6 +401,7 @@ export default function CategoriasEquipoPage() {
                 onUpdate={handleUpdated}
                 onDelete={handleDeleted}
                 onRefresh={cargarCategorias}
+                viewMode={viewMode}
               />
             )}
           </CardContent>

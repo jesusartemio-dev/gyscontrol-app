@@ -31,7 +31,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Target, DollarSign, Settings, FileText, User } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Loader2, Target, DollarSign, Settings, FileText, User, Building2, Calendar, TrendingUp, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
@@ -46,11 +49,13 @@ import {
   CRM_FUENTES
 } from '@/lib/services/crm'
 
-// ✅ Esquema de validación
+// ✅ Esquema de validación mejorado
 const oportunidadSchema = z.object({
   nombre: z.string().min(1, 'El nombre es obligatorio'),
   descripcion: z.string().optional(),
   clienteId: z.string().min(1, 'Debe seleccionar un cliente'),
+  fuente: z.string().optional(),
+  prioridad: z.string().optional(),
   valorEstimado: z.number().min(0, 'El valor debe ser positivo').optional(),
   probabilidad: z.number().min(0).max(100, 'La probabilidad debe estar entre 0 y 100').optional(),
   fechaCierreEstimada: z.date().optional(),
@@ -82,13 +87,15 @@ export default function OportunidadForm({
   const { toast } = useToast()
   const isEditing = !!oportunidad
 
-  // ✅ Formulario con React Hook Form
+  // ✅ Formulario con React Hook Form mejorado
   const form = useForm<OportunidadFormData>({
     resolver: zodResolver(oportunidadSchema),
     defaultValues: {
       nombre: '',
       descripcion: '',
       clienteId: '',
+      fuente: '',
+      prioridad: 'media',
       valorEstimado: undefined,
       probabilidad: 0,
       fechaCierreEstimada: undefined,
@@ -103,6 +110,8 @@ export default function OportunidadForm({
         nombre: oportunidad.nombre,
         descripcion: oportunidad.descripcion || '',
         clienteId: oportunidad.cliente?.id || '',
+        fuente: oportunidad.fuente || '',
+        prioridad: oportunidad.prioridad || 'media',
         valorEstimado: oportunidad.valorEstimado || undefined,
         probabilidad: oportunidad.probabilidad,
         fechaCierreEstimada: oportunidad.fechaCierreEstimada ? new Date(oportunidad.fechaCierreEstimada) : undefined,
@@ -113,6 +122,8 @@ export default function OportunidadForm({
         nombre: '',
         descripcion: '',
         clienteId: '',
+        fuente: '',
+        prioridad: 'media',
         valorEstimado: undefined,
         probabilidad: 0,
         fechaCierreEstimada: undefined,
@@ -136,11 +147,13 @@ export default function OportunidadForm({
 
       console.log('📤 Enviando datos del formulario:', data)
 
-      // ✅ Preparar datos
+      // ✅ Preparar datos mejorados
       const formData = {
         clienteId: data.clienteId.trim(),
         nombre: data.nombre.trim(),
         descripcion: data.descripcion?.trim() || undefined,
+        fuente: data.fuente?.trim() || undefined,
+        prioridad: data.prioridad?.trim() || 'media',
         valorEstimado: data.valorEstimado || undefined,
         probabilidad: data.probabilidad || 0,
         fechaCierreEstimada: data.fechaCierreEstimada?.toISOString(),
@@ -203,14 +216,14 @@ export default function OportunidadForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader className="space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Target className="h-6 w-6 text-blue-600" />
+      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+              <Target className="h-8 w-8 text-white" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-semibold">
+            <div className="space-y-1">
+              <DialogTitle className="text-2xl font-bold text-gray-900">
                 {isEditing ? 'Editar Oportunidad' : 'Nueva Oportunidad'}
               </DialogTitle>
               <p className="text-sm text-muted-foreground">
@@ -221,216 +234,360 @@ export default function OportunidadForm({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             {/* Información Principal */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Target className="h-4 w-4" />
-                Información Principal
-              </div>
+            <Card className="border-l-4 border-l-blue-500">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Target className="h-5 w-5 text-blue-600" />
+                  Información Principal
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Nombre */}
+                <FormField
+                  control={form.control}
+                  name="nombre"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-gray-700">
+                        Nombre de la Oportunidad *
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ej: Proyecto Mina XYZ - Fase 1"
+                          className="h-9 text-sm"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs text-gray-500">
+                        Usa un nombre descriptivo que identifique claramente la oportunidad
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Nombre */}
-              <FormField
-                control={form.control}
-                name="nombre"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">Nombre de la Oportunidad *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Proyecto Mina XYZ" className="h-10" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                {/* Cliente con búsqueda mejorada */}
+                <FormField
+                  control={form.control}
+                  name="clienteId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-gray-700">
+                        Cliente *
+                      </FormLabel>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                            <Input
+                              placeholder="Buscar por nombre o RUC..."
+                              value={clienteSearch}
+                              onChange={(e) => setClienteSearch(e.target.value)}
+                              className="pl-10 h-9 text-sm"
+                            />
+                          </div>
+                          <Select onValueChange={(value) => {
+                            field.onChange(value)
+                            setClienteSearch('')
+                          }} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-9 w-48">
+                                <SelectValue placeholder="Seleccionar..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="max-h-[200px]">
+                              {clientes
+                                .filter(cliente =>
+                                  cliente.nombre.toLowerCase().includes(clienteSearch.toLowerCase()) ||
+                                  (cliente.ruc && cliente.ruc.includes(clienteSearch))
+                                )
+                                .map((cliente) => (
+                                  <SelectItem key={cliente.id} value={cliente.id}>
+                                    <div className="flex items-center gap-2">
+                                      <Building2 className="h-4 w-4 text-gray-500" />
+                                      <div>
+                                        <div className="font-medium text-sm">{cliente.nombre}</div>
+                                        {cliente.ruc && (
+                                          <div className="text-xs text-gray-500">RUC: {cliente.ruc}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <p className="text-xs text-gray-500">Busca por nombre de empresa o número de RUC</p>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Cliente */}
-              <FormField
-                control={form.control}
-                name="clienteId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">Cliente *</FormLabel>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Buscar..."
-                        value={clienteSearch}
-                        onChange={(e) => setClienteSearch(e.target.value)}
-                        className="h-10 flex-1 max-w-[150px]"
-                      />
-                      <Select onValueChange={(value) => {
-                        field.onChange(value)
-                        setClienteSearch('')
-                      }} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder="Seleccionar cliente..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="max-h-[200px]">
-                          {clientes
-                            .filter(cliente => cliente.nombre.toLowerCase().includes(clienteSearch.toLowerCase()))
-                            .map((cliente) => (
-                              <SelectItem key={cliente.id} value={cliente.id}>
-                                {cliente.nombre}
+                {/* Descripción */}
+                <FormField
+                  control={form.control}
+                  name="descripcion"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-gray-700">
+                        Descripción
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe brevemente la oportunidad, alcance del proyecto, etc."
+                          className="resize-none h-20 text-sm"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs text-gray-500">
+                        Incluye detalles relevantes como alcance, ubicación o requerimientos especiales
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Fuente y Prioridad */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="fuente"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-semibold text-gray-700">
+                          Fuente de la Oportunidad
+                        </FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Seleccionar fuente..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {Object.values(CRM_FUENTES).map((fuente) => (
+                              <SelectItem key={fuente} value={fuente}>
+                                {fuente}
                               </SelectItem>
                             ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                          </SelectContent>
+                        </Select>
+                        <FormDescription className="text-xs text-gray-500">
+                          ¿Cómo llegó esta oportunidad?
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              {/* Descripción */}
-              <FormField
-                control={form.control}
-                name="descripcion"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">Descripción</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Breve descripción de la oportunidad..."
-                        className="resize-none h-20"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-            </div>
+                  <FormField
+                    control={form.control}
+                    name="prioridad"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-semibold text-gray-700">
+                          Prioridad
+                        </FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Seleccionar prioridad..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {Object.values(CRM_PRIORIDADES).map((prioridad) => (
+                              <SelectItem key={prioridad} value={prioridad}>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant={
+                                      prioridad === 'critica' ? 'destructive' :
+                                      prioridad === 'alta' ? 'default' :
+                                      prioridad === 'media' ? 'secondary' : 'outline'
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {prioridad}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription className="text-xs text-gray-500">
+                          Nivel de urgencia para seguimiento
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Información Comercial */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <DollarSign className="h-4 w-4" />
-                Información Comercial
-              </div>
+            <Card className="border-l-4 border-l-green-500">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  Información Comercial
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="valorEstimado"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-semibold text-gray-700">
+                          Valor Estimado (USD)
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            className="h-9 text-sm"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs text-gray-500">
+                          Valor total esperado del proyecto
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="valorEstimado"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">Valor Estimado (USD)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          className="h-10"
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="probabilidad"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-semibold text-gray-700">
+                          Probabilidad (%)
+                        </FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              placeholder="0"
+                              className="h-9 text-sm pr-8"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
+                              value={field.value || ''}
+                            />
+                            <TrendingUp className="absolute right-3 top-2 h-3 w-3 text-gray-400" />
+                          </div>
+                        </FormControl>
+                        <FormDescription className="text-xs text-gray-500">
+                          Probabilidad de cerrar la venta
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="probabilidad"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">Probabilidad (%)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          placeholder="0"
-                          className="h-10"
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : 0)}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="fechaCierreEstimada"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium">Fecha Cierre Estimada</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          className="h-10"
-                          {...field}
-                          value={field.value ? field.value.toISOString().split('T')[0] : ''}
-                          onChange={(e) => {
-                            const value = e.target.value
-                            field.onChange(value ? new Date(value) : undefined)
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
+                  <FormField
+                    control={form.control}
+                    name="fechaCierreEstimada"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-semibold text-gray-700">
+                          Fecha Cierre Estimada
+                        </FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type="date"
+                              className="h-9 text-sm"
+                              {...field}
+                              value={field.value ? field.value.toISOString().split('T')[0] : ''}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                field.onChange(value ? new Date(value) : undefined)
+                              }}
+                            />
+                            <Calendar className="absolute right-3 top-2 h-3 w-3 text-gray-400" />
+                          </div>
+                        </FormControl>
+                        <FormDescription className="text-xs text-gray-500">
+                          Fecha probable de cierre
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Asignación */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Settings className="h-4 w-4" />
-                Asignación
-              </div>
+            <Card className="border-l-4 border-l-purple-500">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <User className="h-5 w-5 text-purple-600" />
+                  Asignación
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name="responsableId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-gray-700">
+                        Responsable de la Oportunidad
+                      </FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Seleccionar responsable..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {usuarios.map((usuario) => (
+                            <SelectItem key={usuario.id} value={usuario.id}>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-gray-500" />
+                                <span className="text-sm">{usuario.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription className="text-xs text-gray-500">
+                        Persona responsable del seguimiento de esta oportunidad
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
 
-              <FormField
-                control={form.control}
-                name="responsableId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">Responsable</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar responsable..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {usuarios.map((usuario) => (
-                          <SelectItem key={usuario.id} value={usuario.id}>
-                            {usuario.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-
-            {/* Botones de acción */}
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t">
+            {/* Botones de acción mejorados */}
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t bg-gray-50/50 -mx-6 px-6 py-4 rounded-b-lg">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={loading}
-                className="h-11"
+                className="h-10 px-4"
               >
+                <X className="h-4 w-4 mr-2" />
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 disabled={loading}
-                className="h-11 min-w-[120px]"
+                className="h-10 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg"
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isEditing ? 'Actualizar Oportunidad' : 'Crear Oportunidad'}

@@ -11,8 +11,9 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { getRecursos, createRecurso } from '@/lib/services/recurso'
 import { Recurso } from '@/types'
-import RecursoForm from '@/components/catalogo/RecursoForm'
-import RecursoList from '@/components/catalogo/RecursoList'
+import RecursoModal from '@/components/catalogo/RecursoModal'
+import RecursoTableView from '@/components/catalogo/RecursoTableView'
+import RecursoCardView from '@/components/catalogo/RecursoCardView'
 import { toast } from 'sonner'
 import { exportarRecursosAExcel } from '@/lib/utils/recursoExcel'
 import {
@@ -23,9 +24,20 @@ import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { AlertCircle, Calculator, TrendingUp, Package, Home, Settings, Loader2 } from 'lucide-react'
+import { AlertCircle, Calculator, TrendingUp, Package, Home, Settings, Loader2, Plus, Table, Grid, Search, Filter } from 'lucide-react'
+
+// Currency formatter
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
 
 // Variantes de animación para Framer Motion
 const containerVariants = {
@@ -55,6 +67,9 @@ export default function Page() {
   const [errores, setErrores] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table') // Vista tabla por defecto
+  const [searchTerm, setSearchTerm] = useState('')
 
   const cargarRecursos = async () => {
     try {
@@ -104,6 +119,11 @@ export default function Page() {
       toast.error('Error al exportar recursos')
     }
   }
+
+  // Filtrar recursos basado en el término de búsqueda
+  const filteredRecursos = recursos.filter(recurso =>
+    recurso.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -158,13 +178,8 @@ export default function Page() {
           </div>
           
           {/* Skeleton Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              <div className="h-64 bg-gray-200 rounded-lg animate-pulse" />
-            </div>
-            <div className="lg:col-span-2">
-              <div className="h-96 bg-gray-200 rounded-lg animate-pulse" />
-            </div>
+          <div className="grid grid-cols-1 gap-6">
+            <div className="h-96 bg-gray-200 rounded-lg animate-pulse" />
           </div>
         </div>
       </div>
@@ -208,7 +223,7 @@ export default function Page() {
         </motion.div>
 
         {/* Header Section */}
-        <motion.div 
+        <motion.div
           className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
           variants={itemVariants}
         >
@@ -221,11 +236,21 @@ export default function Page() {
               Administra los recursos humanos y sus costos por hora
             </p>
           </div>
-          <BotonesImportExport 
-            onExportar={handleExportar} 
-            onImportar={handleImportar}
-            importando={importando}
-          />
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              size="lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Recurso
+            </Button>
+            <BotonesImportExport
+              onExportar={handleExportar}
+              onImportar={handleImportar}
+              importando={importando}
+            />
+          </div>
         </motion.div>
 
         {/* Quick Stats */}
@@ -253,9 +278,9 @@ export default function Page() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${recursos.length > 0 
-                  ? (recursos.reduce((sum, r) => sum + r.costoHora, 0) / recursos.length).toFixed(2)
-                  : '0.00'
+                {recursos.length > 0
+                  ? formatCurrency(recursos.reduce((sum, r) => sum + r.costoHora, 0) / recursos.length)
+                  : formatCurrency(0)
                 }
               </div>
               <p className="text-xs text-muted-foreground">
@@ -271,9 +296,9 @@ export default function Page() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${recursos.length > 0 
-                  ? Math.max(...recursos.map(r => r.costoHora)).toFixed(2)
-                  : '0.00'
+                {recursos.length > 0
+                  ? formatCurrency(Math.max(...recursos.map(r => r.costoHora)))
+                  : formatCurrency(0)
                 }
               </div>
               <p className="text-xs text-muted-foreground">
@@ -338,59 +363,116 @@ export default function Page() {
         )}
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Form Section */}
-          <motion.div className="lg:col-span-1" variants={itemVariants}>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5" />
-                  Nuevo Recurso
-                </CardTitle>
-                <CardDescription>
-                  Agrega un nuevo recurso al catálogo
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RecursoForm onCreated={handleCreated} />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* List Section */}
-          <motion.div className="lg:col-span-2" variants={itemVariants}>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Lista de Recursos
-                </CardTitle>
-                <CardDescription>
-                  Gestiona los recursos existentes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {recursos.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Calculator className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No hay recursos registrados</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Comienza agregando tu primer recurso usando el formulario
-                    </p>
-                    <Badge variant="outline">Sistema listo para usar</Badge>
+        <motion.div variants={itemVariants} className="space-y-6">
+          {/* View Controls and Filter */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Vista:</span>
+                  <div className="flex rounded-md border">
+                    <Button
+                      variant={viewMode === 'table' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('table')}
+                      className="rounded-r-none"
+                    >
+                      <Table className="h-4 w-4 mr-1" />
+                      Tabla
+                    </Button>
+                    <Button
+                      variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('cards')}
+                      className="rounded-l-none"
+                    >
+                      <Grid className="h-4 w-4 mr-1" />
+                      Cards
+                    </Button>
                   </div>
-                ) : (
-                  <RecursoList
-                    data={recursos}
-                    onUpdate={handleUpdated}
-                    onDelete={handleDeleted}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Buscar recursos..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                  {searchTerm && (
+                    <Badge variant="secondary" className="text-xs">
+                      {filteredRecursos.length} resultado{filteredRecursos.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Content Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Recursos ({filteredRecursos.length})
+              </CardTitle>
+              <CardDescription>
+                {viewMode === 'table' ? 'Vista tabular de recursos' : 'Vista de tarjetas de recursos'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filteredRecursos.length === 0 && recursos.length > 0 ? (
+                <div className="text-center py-12">
+                  <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No se encontraron recursos</h3>
+                  <p className="text-muted-foreground mb-4">
+                    No hay recursos que coincidan con "{searchTerm}"
+                  </p>
+                  <Button variant="outline" onClick={() => setSearchTerm('')}>
+                    Limpiar búsqueda
+                  </Button>
+                </div>
+              ) : filteredRecursos.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calculator className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No hay recursos registrados</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Comienza agregando tu primer recurso usando el botón "Nuevo Recurso" en la parte superior
+                  </p>
+                  <Badge variant="outline">Sistema listo para usar</Badge>
+                </div>
+              ) : viewMode === 'table' ? (
+                <RecursoTableView
+                  data={filteredRecursos}
+                  onUpdate={handleUpdated}
+                  onDelete={handleDeleted}
+                  loading={loading}
+                  error={error}
+                />
+              ) : (
+                <RecursoCardView
+                  data={filteredRecursos}
+                  onUpdate={handleUpdated}
+                  onDelete={handleDeleted}
+                  loading={loading}
+                  error={error}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
+
+      {/* Modal para crear recursos */}
+      <RecursoModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={handleCreated}
+      />
     </motion.div>
   )
 }

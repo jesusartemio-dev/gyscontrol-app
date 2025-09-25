@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Eye, Trash2, Edit3, Loader2, AlertCircle, FileText } from 'lucide-react'
+import { Eye, Trash2, Edit3, Loader2, AlertCircle, FileText, Package, Wrench, Truck, DollarSign } from 'lucide-react'
 import { deletePlantilla, updatePlantilla } from '@/lib/services/plantilla'
 import { useState } from 'react'
 import type { Plantilla } from '@/types'
@@ -15,12 +15,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import ConfirmDialog from '@/components/ConfirmDialog'
 
 interface Props {
-  plantillas: Plantilla[]
+  plantillas: any[]
   onDelete: (id: string) => void
-  onUpdated: (actualizado: Plantilla) => void
+  onUpdated: (actualizado: any) => void
+  filterType?: 'todas' | 'equipos' | 'servicios' | 'gastos'
 }
 
-export default function PlantillaList({ plantillas, onDelete, onUpdated }: Props) {
+export default function PlantillaList({ plantillas, onDelete, onUpdated, filterType = 'todas' }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -34,7 +35,43 @@ export default function PlantillaList({ plantillas, onDelete, onUpdated }: Props
     currency: 'USD',
     minimumFractionDigits: 2
   }).format(amount)
-}
+  }
+
+  // Obtener información del tipo de plantilla
+  const getTipoInfo = (tipo: string) => {
+    switch (tipo) {
+      case 'completa':
+        return {
+          label: 'Completa',
+          icon: Package,
+          color: 'bg-blue-100 text-blue-800 border-blue-200'
+        }
+      case 'equipos':
+        return {
+          label: 'Equipos',
+          icon: Wrench,
+          color: 'bg-orange-100 text-orange-800 border-orange-200'
+        }
+      case 'servicios':
+        return {
+          label: 'Servicios',
+          icon: Truck,
+          color: 'bg-green-100 text-green-800 border-green-200'
+        }
+      case 'gastos':
+        return {
+          label: 'Gastos',
+          icon: DollarSign,
+          color: 'bg-purple-100 text-purple-800 border-purple-200'
+        }
+      default:
+        return {
+          label: tipo,
+          icon: FileText,
+          color: 'bg-gray-100 text-gray-800 border-gray-200'
+        }
+    }
+  }
 
   const startEdit = (id: string, currentValue: string) => {
     setEditingId(id)
@@ -51,11 +88,45 @@ export default function PlantillaList({ plantillas, onDelete, onUpdated }: Props
       setError('El nombre debe tener al menos 3 caracteres')
       return
     }
-    
+
     setError(null)
     setLoadingId(id)
     try {
-      const actualizado = await updatePlantilla(id, { nombre: editValue.trim() })
+      let actualizado
+
+      // Determine template type and call appropriate API based on filterType
+      if (filterType === 'equipos') {
+        // Equipment template
+        const res = await fetch(`/api/plantillas/equipos/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre: editValue.trim() }),
+        })
+        if (!res.ok) throw new Error('Error al actualizar plantilla')
+        actualizado = await res.json()
+      } else if (filterType === 'servicios') {
+        // Service template
+        const res = await fetch(`/api/plantillas/servicios/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre: editValue.trim() }),
+        })
+        if (!res.ok) throw new Error('Error al actualizar plantilla')
+        actualizado = await res.json()
+      } else if (filterType === 'gastos') {
+        // Expense template
+        const res = await fetch(`/api/plantillas/gastos/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre: editValue.trim() }),
+        })
+        if (!res.ok) throw new Error('Error al actualizar plantilla')
+        actualizado = await res.json()
+      } else {
+        // Main template (filterType === 'todas')
+        actualizado = await updatePlantilla(id, { nombre: editValue.trim() })
+      }
+
       onUpdated(actualizado)
       setEditingId(null)
       setEditValue('')
@@ -145,10 +216,13 @@ export default function PlantillaList({ plantillas, onDelete, onUpdated }: Props
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Plantillas ({plantillas.length})
+              Plantillas {filterType !== 'todas' ? `de ${filterType.charAt(0).toUpperCase() + filterType.slice(1)}` : ''} ({plantillas.length})
             </CardTitle>
             <CardDescription>
-              Gestiona tus plantillas de cotización comercial
+              {filterType === 'todas'
+                ? 'Gestiona tus plantillas de cotización comercial'
+                : `Gestiona tus plantillas de ${filterType}`
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -156,6 +230,7 @@ export default function PlantillaList({ plantillas, onDelete, onUpdated }: Props
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
+                  <TableHead className="text-center">Tipo</TableHead>
                   <TableHead className="text-right">Total Cliente</TableHead>
                   <TableHead className="text-right">Total Interno</TableHead>
                   <TableHead className="text-center">Estado</TableHead>
@@ -213,21 +288,65 @@ export default function PlantillaList({ plantillas, onDelete, onUpdated }: Props
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(p.totalCliente)}
+                    <TableCell className="text-center">
+                      {(() => {
+                        let tipo = 'completa'
+                        if (p.plantillaServicioId !== undefined) {
+                          tipo = 'servicios'
+                        } else if (p.plantillaGastoId !== undefined) {
+                          tipo = 'gastos'
+                        } else if (p.plantillaEquipoId !== undefined) {
+                          tipo = 'equipos'
+                        } else {
+                          tipo = p.tipo || 'completa'
+                        }
+                        const tipoInfo = getTipoInfo(tipo)
+                        const IconComponent = tipoInfo.icon
+                        return (
+                          <Badge variant="outline" className={`flex items-center gap-1 w-fit mx-auto ${tipoInfo.color}`}>
+                            <IconComponent className="h-3 w-3" />
+                            {tipoInfo.label}
+                          </Badge>
+                        )
+                      })()}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(p.totalInterno)}
+                      {formatCurrency(p.totalCliente || p.grandTotal || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(p.totalInterno || 0)}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant={p.totalCliente > 0 ? 'default' : 'secondary'}>
-                        {p.totalCliente > 0 ? 'Configurada' : 'Vacía'}
+                      <Badge variant={(p.totalCliente || p.grandTotal || 0) > 0 ? 'default' : 'secondary'}>
+                        {(p.totalCliente || p.grandTotal || 0) > 0 ? 'Configurada' : 'Vacía'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Button size="sm" variant="ghost" asChild>
-                          <Link href={`/comercial/plantillas/${p.id}`}>
+                          <Link href={(() => {
+                            // Check if it's an independent template by looking for specific fields
+                            if (p.plantillaServicioId !== undefined) {
+                              return `/comercial/plantillas/servicios/${p.id}`
+                            } else if (p.plantillaGastoId !== undefined) {
+                              return `/comercial/plantillas/gastos/${p.id}`
+                            } else if (p.plantillaEquipoId !== undefined) {
+                              return `/comercial/plantillas/equipos/${p.id}`
+                            } else {
+                              // General template
+                              const tipo = p.tipo || 'completa'
+                              switch (tipo) {
+                                case 'equipos':
+                                  return `/comercial/plantillas/equipos/${p.id}`
+                                case 'servicios':
+                                  return `/comercial/plantillas/servicios/${p.id}`
+                                case 'gastos':
+                                  return `/comercial/plantillas/gastos/${p.id}`
+                                default:
+                                  return `/comercial/plantillas/${p.id}`
+                              }
+                            }
+                          })()}>
                             <Eye className="h-4 w-4" />
                           </Link>
                         </Button>

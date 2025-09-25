@@ -30,6 +30,7 @@ export async function getPlantillas(): Promise<Plantilla[]> {
 export async function createPlantilla(data: {
   nombre: string
   descripcion?: string
+  tipo?: 'completa' | 'equipos' | 'servicios' | 'gastos'
 }): Promise<Plantilla> {
   try {
     const res = await fetch(buildApiUrl('/api/plantilla'), {
@@ -109,6 +110,54 @@ export async function recalcularPlantillaDesdeAPI(id: string) {
     return await res.json()
   } catch (error) {
     console.error('❌ Error en recalcularPlantillaDesdeAPI:', error)
+    throw error
+  }
+}
+
+// ✅ Obtener plantillas de equipos independientes
+export async function getPlantillasEquipos() {
+  try {
+    const res = await fetch(buildApiUrl('/api/plantillas/equipos'))
+    if (!res.ok) {
+      const errorData = await res.json()
+      console.error('❌ Error del API /api/plantillas/equipos:', errorData)
+      throw new Error('Error al obtener plantillas de equipos')
+    }
+    return await res.json()
+  } catch (error) {
+    console.error('❌ Error en getPlantillasEquipos:', error)
+    throw error
+  }
+}
+
+// ✅ Obtener plantillas de servicios independientes
+export async function getPlantillasServicios() {
+  try {
+    const res = await fetch(buildApiUrl('/api/plantillas/servicios'))
+    if (!res.ok) {
+      const errorData = await res.json()
+      console.error('❌ Error del API /api/plantillas/servicios:', errorData)
+      throw new Error('Error al obtener plantillas de servicios')
+    }
+    return await res.json()
+  } catch (error) {
+    console.error('❌ Error en getPlantillasServicios:', error)
+    throw error
+  }
+}
+
+// ✅ Obtener plantillas de gastos independientes
+export async function getPlantillasGastos() {
+  try {
+    const res = await fetch(buildApiUrl('/api/plantillas/gastos'))
+    if (!res.ok) {
+      const errorData = await res.json()
+      console.error('❌ Error del API /api/plantillas/gastos:', errorData)
+      throw new Error('Error al obtener plantillas de gastos')
+    }
+    return await res.json()
+  } catch (error) {
+    console.error('❌ Error en getPlantillasGastos:', error)
     throw error
   }
 }

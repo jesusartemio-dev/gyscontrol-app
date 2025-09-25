@@ -1,0 +1,364 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
+import PlantillaEquipoIndependienteMultiAddModal from '@/components/plantillas/equipos/PlantillaEquipoIndependienteMultiAddModal'
+
+import {
+  Plus,
+  ChevronRight,
+  Share2,
+  Download,
+  Package,
+  AlertCircle,
+  Loader2,
+  Wrench,
+  DollarSign,
+  Trash2
+} from 'lucide-react'
+
+// Types for independent equipment templates
+interface PlantillaEquipoIndependiente {
+  id: string
+  nombre: string
+  descripcion?: string
+  estado: string
+  totalInterno: number
+  totalCliente: number
+  descuento: number
+  grandTotal: number
+  createdAt: string
+  updatedAt: string
+  items: PlantillaEquipoItemIndependiente[]
+  _count?: { items: number }
+}
+
+interface PlantillaEquipoItemIndependiente {
+  id: string
+  plantillaEquipoId: string
+  catalogoEquipoId?: string
+  codigo: string
+  descripcion: string
+  categoria: string
+  unidad: string
+  marca: string
+  precioInterno: number
+  precioCliente: number
+  cantidad: number
+  costoInterno: number
+  costoCliente: number
+  createdAt: string
+  updatedAt: string
+  catalogoEquipo?: {
+    id: string
+    codigo: string
+    descripcion: string
+    marca: string
+    precioVenta: number
+  }
+}
+
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+}
+
+// Format currency helper
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
+
+export default function PlantillaEquiposIndependientePage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter()
+  const [plantilla, setPlantilla] = useState<PlantillaEquipoIndependiente | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [id, setId] = useState<string>('')
+  const [showMultiAddModal, setShowMultiAddModal] = useState(false)
+
+  useEffect(() => {
+    const unwrapParams = async () => {
+      const resolvedParams = await params
+      setId(resolvedParams.id)
+    }
+    unwrapParams()
+  }, [params])
+
+  useEffect(() => {
+    if (id) {
+      loadPlantilla()
+    }
+  }, [id])
+
+  const loadPlantilla = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/plantillas/equipos/${id}`)
+      if (!response.ok) throw new Error('Error al cargar plantilla')
+      const data = await response.json()
+      setPlantilla(data)
+    } catch (err) {
+      console.error('Error loading plantilla:', err)
+      setError('Error al cargar la plantilla')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este equipo?')) return
+
+    try {
+      const response = await fetch(`/api/plantillas/equipos/${id}/items/${itemId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) throw new Error('Error al eliminar item')
+
+      toast.success('Equipo eliminado exitosamente')
+      loadPlantilla()
+    } catch (err) {
+      console.error('Error deleting item:', err)
+      toast.error('Error al eliminar el equipo')
+    }
+  }
+
+  // ✅ Handle multiple items creation
+  const handleMultipleItemsCreated = (items: PlantillaEquipoItemIndependiente[]) => {
+    items.forEach(item => {
+      // Update the plantilla state to include new items
+      setPlantilla(prev => prev ? {
+        ...prev,
+        items: [...(prev.items || []), item],
+        totalInterno: (prev.totalInterno || 0) + (item.cantidad * item.precioInterno),
+        totalCliente: (prev.totalCliente || 0) + (item.cantidad * item.precioCliente),
+        grandTotal: (prev.grandTotal || 0) + (item.cantidad * item.precioCliente)
+      } : null)
+    })
+    setShowMultiAddModal(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="text-muted-foreground">Cargando plantilla...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !plantilla) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
+            <h3 className="text-lg font-semibold text-red-600">Error</h3>
+            <p className="text-muted-foreground">{error || 'Plantilla no encontrada'}</p>
+            <Button onClick={() => router.back()}>
+              Volver
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      className="p-6 space-y-6"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Header */}
+      <motion.div variants={itemVariants} className="space-y-4">
+        {/* Breadcrumb Navigation */}
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/comercial')}
+            className="p-0 h-auto font-normal"
+          >
+            Comercial
+          </Button>
+          <ChevronRight className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/comercial/plantillas')}
+            className="p-0 h-auto font-normal"
+          >
+            Plantillas
+          </Button>
+          <ChevronRight className="h-4 w-4" />
+          <span className="font-medium text-foreground">Equipos</span>
+        </nav>
+
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-6 w-6 text-orange-600" />
+              <h1 className="text-2xl font-bold tracking-tight">{plantilla.nombre}</h1>
+            </div>
+            <p className="text-muted-foreground">
+              Plantilla independiente especializada en equipos y maquinaria
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              <Share2 className="h-4 w-4 mr-2" />
+              Compartir
+            </Button>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+
+      <Separator />
+
+      {/* Financial Summary */}
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Resumen de Costos - Equipos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(plantilla.totalInterno)}
+                </div>
+                <div className="text-sm text-blue-600">Costo Interno</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {formatCurrency(plantilla.totalCliente)}
+                </div>
+                <div className="text-sm text-green-600">Precio Cliente</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {((plantilla.totalCliente - plantilla.totalInterno) > 0 ?
+                    `+${formatCurrency(plantilla.totalCliente - plantilla.totalInterno)}` :
+                    formatCurrency(plantilla.totalCliente - plantilla.totalInterno))}
+                </div>
+                <div className="text-sm text-purple-600">Margen</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Equipment Items Section */}
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-orange-600" />
+                  Equipos en la Plantilla
+                </CardTitle>
+                <CardDescription>
+                  Lista de equipos incluidos en esta plantilla independiente
+                </CardDescription>
+              </div>
+              <Button onClick={() => setShowMultiAddModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Equipos
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {plantilla.items && plantilla.items.length > 0 ? (
+              <div className="space-y-3">
+                {plantilla.items.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium">{item.descripcion}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {item.categoria} • {item.unidad} • {item.marca} • Código: {item.codigo}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="font-medium">{formatCurrency(item.costoCliente)}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Cant: {item.cantidad}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteItem(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">No hay equipos</h3>
+                <p className="text-sm mb-4">Comienza agregando equipos a esta plantilla independiente</p>
+                <Button onClick={() => setShowMultiAddModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Primer Equipo
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ✅ Multi-add modal */}
+      <PlantillaEquipoIndependienteMultiAddModal
+        isOpen={showMultiAddModal}
+        onClose={() => setShowMultiAddModal(false)}
+        plantillaId={id}
+        onItemsCreated={handleMultipleItemsCreated}
+      />
+    </motion.div>
+  )
+}

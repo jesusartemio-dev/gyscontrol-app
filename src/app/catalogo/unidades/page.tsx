@@ -8,8 +8,9 @@
 
 import { useEffect, useState } from 'react'
 // import { motion } from 'framer-motion'
-import UnidadForm from '@/components/catalogo/UnidadForm'
-import UnidadList from '@/components/catalogo/UnidadList'
+import UnidadModal from '@/components/catalogo/UnidadModal'
+import UnidadTableView from '@/components/catalogo/UnidadTableView'
+import UnidadCardView from '@/components/catalogo/UnidadCardView'
 import { Unidad } from '@/types'
 import { getUnidades, createUnidad } from '@/lib/services/unidad'
 import { toast } from 'sonner'
@@ -22,9 +23,11 @@ import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { AlertCircle, Calculator, TrendingUp, Package, Home, Settings, Loader2 } from 'lucide-react'
+import { AlertCircle, Calculator, TrendingUp, Package, Home, Settings, Loader2, Plus, Table, Grid, Search, Filter } from 'lucide-react'
 
 export default function Page() {
   const [unidades, setUnidades] = useState<Unidad[]>([])
@@ -32,6 +35,9 @@ export default function Page() {
   const [errores, setErrores] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table') // Vista tabla por defecto
+  const [searchTerm, setSearchTerm] = useState('')
 
   const cargarUnidades = async () => {
     try {
@@ -77,6 +83,11 @@ export default function Page() {
       toast.error('Error al exportar unidades')
     }
   }
+
+  // Filtrar unidades basado en el término de búsqueda
+  const filteredUnidades = unidades.filter(unidad =>
+    unidad.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -171,11 +182,21 @@ export default function Page() {
               Unidades
             </h1>
             <p className="text-gray-600 max-w-2xl">
-              Gestiona las unidades de medida para los equipos de tu catálogo. 
+              Gestiona las unidades de medida para los equipos de tu catálogo.
               Importa, exporta y administra de forma eficiente.
             </p>
           </div>
-          <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              size="lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Unidad
+            </Button>
+            <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -271,56 +292,114 @@ export default function Page() {
           </div>
         )}
 
-        {/* Form Section */}
-        <div>
-          <Card className="shadow-sm">
-            <CardHeader className="bg-gray-50/50">
-              <CardTitle className="flex items-center gap-2 text-gray-900">
-                <Calculator className="h-5 w-5 text-blue-600" />
-                Nueva Unidad
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
-                Completa el formulario para agregar una nueva unidad
-              </p>
-            </CardHeader>
-            <CardContent className="p-6">
-              <UnidadForm onCreated={handleCreated} />
-            </CardContent>
-          </Card>
-        </div>
-
-        <Separator />
-
-        {/* Units List Section */}
-        <div>
-          <Card className="shadow-sm">
-            <CardHeader className="bg-gray-50/50">
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-gray-900">
-                  <Package className="h-5 w-5 text-blue-600" />
-                  Lista de Unidades
+        {/* View Controls and Filter */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Vista:</span>
+                <div className="flex rounded-md border">
+                  <Button
+                    variant={viewMode === 'table' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('table')}
+                    className="rounded-r-none"
+                  >
+                    <Table className="h-4 w-4 mr-1" />
+                    Tabla
+                  </Button>
+                  <Button
+                    variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('cards')}
+                    className="rounded-l-none"
+                  >
+                    <Grid className="h-4 w-4 mr-1" />
+                    Cards
+                  </Button>
                 </div>
-                <Badge variant="outline">{unidades.length} unidades</Badge>
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
-                {unidades.length === 0 
-                  ? 'No hay unidades registradas' 
-                  : `${unidades.length} unidad${unidades.length !== 1 ? 'es' : ''} registrada${unidades.length !== 1 ? 's' : ''}`
-                }
-              </p>
-            </CardHeader>
-            <CardContent className="p-6">
-              <UnidadList
-                data={unidades}
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Buscar unidades..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                {searchTerm && (
+                  <Badge variant="secondary" className="text-xs">
+                    {filteredUnidades.length} resultado{filteredUnidades.length !== 1 ? 's' : ''}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Unidades ({filteredUnidades.length})
+            </CardTitle>
+            <CardDescription>
+              {viewMode === 'table' ? 'Vista tabular de unidades' : 'Vista de tarjetas de unidades'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {filteredUnidades.length === 0 && unidades.length > 0 ? (
+              <div className="text-center py-12">
+                <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No se encontraron unidades</h3>
+                <p className="text-muted-foreground mb-4">
+                  No hay unidades que coincidan con "{searchTerm}"
+                </p>
+                <Button variant="outline" onClick={() => setSearchTerm('')}>
+                  Limpiar búsqueda
+                </Button>
+              </div>
+            ) : filteredUnidades.length === 0 ? (
+              <div className="text-center py-12">
+                <Calculator className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No hay unidades registradas</h3>
+                <p className="text-muted-foreground mb-4">
+                  Comienza agregando tu primera unidad usando el botón "Nueva Unidad" en la parte superior
+                </p>
+                <Badge variant="outline">Sistema listo para usar</Badge>
+              </div>
+            ) : viewMode === 'table' ? (
+              <UnidadTableView
+                data={filteredUnidades}
                 onUpdate={handleUpdated}
                 onDelete={handleDeleted}
-                onRefresh={() => getUnidades().then(setUnidades)}
                 loading={loading}
+                error={error}
               />
-            </CardContent>
-          </Card>
-        </div>
+            ) : (
+              <UnidadCardView
+                data={filteredUnidades}
+                onUpdate={handleUpdated}
+                onDelete={handleDeleted}
+                loading={loading}
+                error={error}
+              />
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Modal para crear unidades */}
+      <UnidadModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={handleCreated}
+      />
     </div>
   )
 }
