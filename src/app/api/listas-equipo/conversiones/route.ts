@@ -322,7 +322,7 @@ export async function GET(request: NextRequest) {
       if (itemsPendientes === 0) {
         puedeConvertir = false
         motivoBloqueo = 'Todos los items ya fueron convertidos'
-      } else if (lista.estado !== 'aprobado' && lista.estado !== 'por_revisar') {
+      } else if (lista.estado !== EstadoListaEquipo.aprobada && lista.estado !== EstadoListaEquipo.por_revisar) {
         puedeConvertir = false
         motivoBloqueo = 'Lista debe estar aprobada para convertir'
       } else if (Math.abs(desviacion) > 25) {
@@ -735,7 +735,7 @@ export async function POST(request: NextRequest) {
       })
 
       // ✅ Usar valores válidos del enum EstadoListaEquipo
-      const nuevoEstadoLista: EstadoListaEquipo = itemsPendientes.length === 0 ? EstadoListaEquipo.aprobado : EstadoListaEquipo.por_revisar
+      const nuevoEstadoLista: EstadoListaEquipo = itemsPendientes.length === 0 ? EstadoListaEquipo.aprobada : EstadoListaEquipo.por_revisar
       
       await tx.listaEquipo.update({
         where: { id: lista.id },
