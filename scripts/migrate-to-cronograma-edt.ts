@@ -27,12 +27,12 @@ async function migrateToEdt() {
     // ✅ 2. Crear EDT básicos para proyectos existentes
     logger.info('🏗️ Creando EDT básicos...');
     const proyectos = await prisma.proyecto.findMany();
-    
+
     const edtCreados = new Map<string, string>();
-    
+
     // Obtener primera categoría disponible
     const primeraCategoria = await prisma.categoriaServicio.findFirst();
-    
+
     if (!primeraCategoria) {
       logger.info('⚠️ No hay categorías de servicio disponibles, creando una por defecto...');
       const categoriaDefault = await prisma.categoriaServicio.create({
@@ -40,11 +40,21 @@ async function migrateToEdt() {
           nombre: "General",
         }
       });
-      
+
       for (const proyecto of proyectos) {
+        // Crear ProyectoCronograma primero
+        const cronograma = await prisma.proyectoCronograma.create({
+          data: {
+            proyectoId: proyecto.id,
+            tipo: 'ejecucion',
+            nombre: 'Cronograma de Ejecución',
+          }
+        });
+
         const edt = await prisma.proyectoEdt.create({
           data: {
             proyectoId: proyecto.id,
+            proyectoCronogramaId: cronograma.id,
             nombre: `EDT ${categoriaDefault.nombre}`,
             categoriaServicioId: categoriaDefault.id,
             zona: null,
@@ -54,15 +64,25 @@ async function migrateToEdt() {
             prioridad: 'media'
           }
         });
-        
+
         edtCreados.set(`${proyecto.id}-${categoriaDefault.id}`, edt.id);
         logger.info(`✅ EDT creado: ${edt.id} para proyecto ${proyecto.nombre}`);
       }
     } else {
       for (const proyecto of proyectos) {
+        // Crear ProyectoCronograma primero
+        const cronograma = await prisma.proyectoCronograma.create({
+          data: {
+            proyectoId: proyecto.id,
+            tipo: 'ejecucion',
+            nombre: 'Cronograma de Ejecución',
+          }
+        });
+
         const edt = await prisma.proyectoEdt.create({
           data: {
             proyectoId: proyecto.id,
+            proyectoCronogramaId: cronograma.id,
             nombre: `EDT ${primeraCategoria.nombre}`,
             categoriaServicioId: primeraCategoria.id,
             zona: null,
@@ -72,7 +92,7 @@ async function migrateToEdt() {
             prioridad: 'media'
           }
         });
-        
+
         edtCreados.set(`${proyecto.id}-${primeraCategoria.id}`, edt.id);
         logger.info(`✅ EDT creado: ${edt.id} para proyecto ${proyecto.nombre}`);
       }
