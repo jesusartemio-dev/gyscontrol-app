@@ -2,9 +2,16 @@
 
 import type { Plantilla } from '@/types'
 
-function calcularRenta(pCliente: number, pInterno: number): string {
-  if (pInterno === 0) return '∞'
-  const renta = ((pCliente - pInterno) / pInterno) * 100
+function formatCurrency(amount: number | undefined | null): string {
+  const safeAmount = amount ?? 0
+  return `$${safeAmount.toFixed(2)}`
+}
+
+function calcularRenta(pCliente: number | undefined | null, pInterno: number | undefined | null): string {
+  const cliente = pCliente ?? 0
+  const interno = pInterno ?? 0
+  if (interno === 0) return '∞'
+  const renta = ((cliente - interno) / interno) * 100
   return `${renta.toFixed(1)}%`
 }
 
@@ -26,24 +33,24 @@ export default function ResumenTotalesPlantilla({ plantilla }: Props) {
       {/* Equipos */}
       <div className="grid grid-cols-[100px_1fr_1fr_1fr] text-sm items-center">
         <span className="text-red-600">🧰 Equipos:</span>
-        <span className="text-gray-700">${plantilla.totalEquiposInterno.toFixed(2)}</span>
-        <span className="text-blue-600 font-semibold">${plantilla.totalEquiposCliente.toFixed(2)}</span>
+        <span className="text-gray-700">{formatCurrency(plantilla.totalEquiposInterno)}</span>
+        <span className="text-blue-600 font-semibold">{formatCurrency(plantilla.totalEquiposCliente)}</span>
         <span className="text-blue-600">{calcularRenta(plantilla.totalEquiposCliente, plantilla.totalEquiposInterno)}</span>
       </div>
 
       {/* Servicios */}
       <div className="grid grid-cols-[100px_1fr_1fr_1fr] text-sm items-center">
         <span className="text-gray-700">🛠️ Servicios:</span>
-        <span className="text-gray-700">${plantilla.totalServiciosInterno.toFixed(2)}</span>
-        <span className="text-indigo-600 font-semibold">${plantilla.totalServiciosCliente.toFixed(2)}</span>
+        <span className="text-gray-700">{formatCurrency(plantilla.totalServiciosInterno)}</span>
+        <span className="text-indigo-600 font-semibold">{formatCurrency(plantilla.totalServiciosCliente)}</span>
         <span className="text-indigo-600">{calcularRenta(plantilla.totalServiciosCliente, plantilla.totalServiciosInterno)}</span>
       </div>
 
       {/* Gastos */}
       <div className="grid grid-cols-[100px_1fr_1fr_1fr] text-sm items-center">
         <span className="text-orange-600">💸 Gastos:</span>
-        <span className="text-gray-700">${plantilla.totalGastosInterno.toFixed(2)}</span>
-        <span className="text-orange-600 font-semibold">${plantilla.totalGastosCliente.toFixed(2)}</span>
+        <span className="text-gray-700">{formatCurrency(plantilla.totalGastosInterno)}</span>
+        <span className="text-orange-600 font-semibold">{formatCurrency(plantilla.totalGastosCliente)}</span>
         <span className="text-orange-600">{calcularRenta(plantilla.totalGastosCliente, plantilla.totalGastosInterno)}</span>
       </div>
 
@@ -53,19 +60,19 @@ export default function ResumenTotalesPlantilla({ plantilla }: Props) {
       <div className="space-y-2 text-sm">
         <div className="flex justify-between font-medium text-gray-700">
           <span>💼 Total Interno:</span>
-          <span>${plantilla.totalInterno.toFixed(2)}</span>
+          <span>{formatCurrency(plantilla.totalInterno)}</span>
         </div>
         <div className="flex justify-between font-medium text-gray-800">
           <span>💵 Total Cliente:</span>
-          <span>${plantilla.totalCliente.toFixed(2)}</span>
+          <span>{formatCurrency(plantilla.totalCliente)}</span>
         </div>
         <div className="flex justify-between font-medium text-yellow-600">
           <span>🔻 Descuento:</span>
-          <span>${plantilla.descuento.toFixed(2)}</span>
+          <span>{formatCurrency(plantilla.descuento)}</span>
         </div>
         <div className="flex justify-between font-bold text-green-700 text-base">
           <span>✅ Total Final:</span>
-          <span>${plantilla.grandTotal.toFixed(2)}</span>
+          <span>{formatCurrency(plantilla.grandTotal)}</span>
         </div>
       </div>
     </div>
