@@ -169,7 +169,8 @@ export default function PlantillasPage() {
       case 'gastos':
         return plantillasGastos
       default:
-        return plantillas
+        // Para 'todas', combinar todas las plantillas
+        return [...plantillas, ...plantillasEquipos, ...plantillasServicios, ...plantillasGastos]
     }
   }
 
@@ -386,7 +387,7 @@ export default function PlantillasPage() {
           className="flex items-center gap-2"
         >
           <Package className="h-4 w-4" />
-          Todas ({plantillas.length})
+          Todas ({plantillas.length + plantillasEquipos.length + plantillasServicios.length + plantillasGastos.length})
         </Button>
         <Button
           variant={activeFilter === 'equipos' ? 'default' : 'outline'}
@@ -440,7 +441,7 @@ export default function PlantillasPage() {
         {/* List Section */}
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-6">
-            {plantillas.length === 0 ? (
+            {(plantillas.length + plantillasEquipos.length + plantillasServicios.length + plantillasGastos.length) === 0 ? (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
