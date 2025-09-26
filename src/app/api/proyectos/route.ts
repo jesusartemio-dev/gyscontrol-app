@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
     // 🔍 Validar payload con Zod
     let validatedData: ProyectoPayload;
     try {
-      validatedData = validateProyectoData(body);
+      validatedData = validateProyectoData(body) as ProyectoPayload;
     } catch (error) {
       logger.error('❌ Error de validación en POST /api/proyectos:', error);
       return NextResponse.json(
