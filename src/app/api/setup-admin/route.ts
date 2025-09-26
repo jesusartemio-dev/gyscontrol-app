@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 
+export async function GET() {
+  return POST()
+}
+
 export async function POST() {
   try {
     console.log('🔐 Creando usuarios administradores...')
