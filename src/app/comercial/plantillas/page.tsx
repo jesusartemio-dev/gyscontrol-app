@@ -24,7 +24,7 @@ import PlantillaModal from '@/components/plantillas/PlantillaModal'
 import PlantillaModalEquipos from '@/components/plantillas/PlantillaModalEquipos'
 import PlantillaModalServicios from '@/components/plantillas/PlantillaModalServicios'
 import PlantillaModalGastos from '@/components/plantillas/PlantillaModalGastos'
-import PlantillaList from '@/components/plantillas/PlantillaList'
+import PlantillasView from '@/components/plantillas/PlantillasView'
 import { getPlantillas, getPlantillasEquipos, getPlantillasServicios, getPlantillasGastos } from '@/lib/services/plantilla'
 import type { Plantilla } from '@/types'
 
@@ -145,6 +145,17 @@ export default function PlantillasPage() {
           p.id === actualizada.id ? actualizada : p
         )
       )
+    }
+  }
+
+  const handleEdit = (id: string, currentName: string) => {
+    const newName = prompt('Editar nombre de plantilla:', currentName)
+    if (newName && newName.trim() && newName.trim() !== currentName) {
+      // Find the template and update it
+      const template = getCurrentTemplates().find(p => p.id === id)
+      if (template) {
+        handleUpdated({ ...template, nombre: newName.trim() })
+      }
     }
   }
 
@@ -449,11 +460,11 @@ export default function PlantillasPage() {
                 />
               </div>
             ) : (
-              <PlantillaList
+              <PlantillasView
                 plantillas={currentTemplates}
-                onDelete={handleDelete}
-                onUpdated={handleUpdated}
                 filterType={activeFilter}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
               />
             )}
           </CardContent>
