@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // ✅ Obtener fases de una cotización
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -24,8 +24,9 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
     const fases = await prisma.cotizacionFase.findMany({
-      where: { cotizacionId: params.id },
+      where: { cotizacionId: id },
       include: {
         edts: {
           include: {
@@ -68,7 +69,7 @@ export async function GET(
 // ✅ Crear nueva fase de cotización
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -76,6 +77,7 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
     const data = await request.json()
     const { nombre, descripcion, orden, fechaInicioPlan, fechaFinPlan } = data
 
@@ -89,7 +91,7 @@ export async function POST(
 
     // ✅ Verificar que la cotización existe
     const cotizacion = await prisma.cotizacion.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!cotizacion) {
@@ -102,7 +104,7 @@ export async function POST(
     // ✅ Crear fase
     const nuevaFase = await prisma.cotizacionFase.create({
       data: {
-        cotizacionId: params.id,
+        cotizacionId: id,
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
         orden: orden || 0,

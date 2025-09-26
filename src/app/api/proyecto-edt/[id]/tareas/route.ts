@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma'
 // ✅ GET /api/proyecto-edt/[id]/tareas - Obtener tareas de un EDT
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -24,9 +24,10 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
     const tareas = await prisma.proyectoTarea.findMany({
       where: {
-        proyectoEdtId: params.id
+        proyectoEdtId: id
       },
       include: {
         responsable: {
@@ -96,7 +97,7 @@ export async function GET(
 // ✅ POST /api/proyecto-edt/[id]/tareas - Crear nueva tarea en EDT
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -104,12 +105,13 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
     const data = await request.json()
 
     // Validar que el EDT existe y pertenece a un proyecto accesible
     const edt = await prisma.proyectoEdt.findFirst({
       where: {
-        id: params.id,
+        id,
         proyecto: {
           OR: [
             { comercialId: session.user.id },
@@ -150,7 +152,8 @@ export async function POST(
 
     const nuevaTarea = await prisma.proyectoTarea.create({
       data: {
-        proyectoEdtId: params.id,
+        proyectoEdtId: id,
+        proyectoCronogramaId: edt.proyectoCronogramaId,
         nombre: data.nombre,
         descripcion: data.descripcion,
         fechaInicio,

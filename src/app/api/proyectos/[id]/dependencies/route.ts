@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { searchParams } = new URL(request.url)
   const cronogramaId = searchParams.get('cronogramaId')
 
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     where: {
       tareaOrigen: {
         proyectoEdt: {
-          proyectoId: params.id,
+          proyectoId: id,
           ...(cronogramaId && { proyectoCronogramaId: cronogramaId })
         }
       }
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json(formattedDependencies)
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { fromTaskId, toTaskId, type = 'finish_to_start' } = await request.json()
 
   const dependency = await prisma.proyectoDependenciaTarea.create({
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   return NextResponse.json(dependency)
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { searchParams } = new URL(request.url)
   const dependencyId = searchParams.get('id')
 

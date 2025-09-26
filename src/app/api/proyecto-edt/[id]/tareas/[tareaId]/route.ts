@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma'
 // ✅ GET /api/proyecto-edt/[id]/tareas/[tareaId] - Obtener tarea individual
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; tareaId: string } }
+  { params }: { params: Promise<{ id: string; tareaId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -24,10 +24,11 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id, tareaId } = await params
     const tarea = await prisma.proyectoTarea.findFirst({
       where: {
-        id: params.tareaId,
-        proyectoEdtId: params.id,
+        id: tareaId,
+        proyectoEdtId: id,
         proyectoEdt: {
           proyecto: {
             OR: [
@@ -99,7 +100,7 @@ export async function GET(
 // ✅ PUT /api/proyecto-edt/[id]/tareas/[tareaId] - Actualizar tarea
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; tareaId: string } }
+  { params }: { params: Promise<{ id: string; tareaId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -107,13 +108,14 @@ export async function PUT(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id, tareaId } = await params
     const data = await request.json()
 
     // Verificar permisos y existencia
     const tareaExistente = await prisma.proyectoTarea.findFirst({
       where: {
-        id: params.tareaId,
-        proyectoEdtId: params.id,
+        id: tareaId,
+        proyectoEdtId: id,
         proyectoEdt: {
           proyecto: {
             OR: [
@@ -159,7 +161,7 @@ export async function PUT(
     }
 
     const tareaActualizada = await prisma.proyectoTarea.update({
-      where: { id: params.tareaId },
+      where: { id: tareaId },
       data: {
         nombre: data.nombre,
         descripcion: data.descripcion,
@@ -203,7 +205,7 @@ export async function PUT(
 // ✅ DELETE /api/proyecto-edt/[id]/tareas/[tareaId] - Eliminar tarea
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; tareaId: string } }
+  { params }: { params: Promise<{ id: string; tareaId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -211,11 +213,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id, tareaId } = await params
+
     // Verificar permisos y existencia
     const tarea = await prisma.proyectoTarea.findFirst({
       where: {
-        id: params.tareaId,
-        proyectoEdtId: params.id,
+        id: tareaId,
+        proyectoEdtId: id,
         proyectoEdt: {
           proyecto: {
             OR: [
@@ -238,8 +242,8 @@ export async function DELETE(
     const dependencias = await prisma.proyectoDependenciaTarea.count({
       where: {
         OR: [
-          { tareaOrigenId: params.tareaId },
-          { tareaDependienteId: params.tareaId }
+          { tareaOrigenId: tareaId },
+          { tareaDependienteId: tareaId }
         ]
       }
     })
@@ -252,7 +256,7 @@ export async function DELETE(
     }
 
     await prisma.proyectoTarea.delete({
-      where: { id: params.tareaId }
+      where: { id: tareaId }
     })
 
     return NextResponse.json({
