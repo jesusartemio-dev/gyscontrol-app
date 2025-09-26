@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { EstadoListaEquipo } from '@prisma/client'
 
 // ✅ Types
 interface ItemConversion {
@@ -311,7 +312,7 @@ export async function POST(request: NextRequest) {
 
       // ✅ Usar valores válidos del enum EstadoListaEquipo
       // Si todos los items fueron convertidos → aprobado, si quedan pendientes → por_revisar
-      const nuevoEstadoLista = itemsPendientes.length === 0 ? 'aprobado' : 'por_revisar'
+      const nuevoEstadoLista = itemsPendientes.length === 0 ? EstadoListaEquipo.aprobada : EstadoListaEquipo.por_revisar
       
       await tx.listaEquipo.update({
         where: { id: lista.id },
