@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         codigo: payload.codigo || `LST-${Date.now()}`, // generar código si no se proporciona
         nombre: payload.nombre,
         numeroSecuencia: payload.numeroSecuencia || 1,
-        estado: payload.estado || 'borrador'
+        estado: (payload.estado || 'borrador') as any
       }
     })
 
