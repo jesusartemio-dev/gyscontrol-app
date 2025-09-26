@@ -143,12 +143,13 @@ export default function PlantillasView({
     return types.sort()
   }, [plantillas])
 
-  const formatCurrency = (amount: number): string => {
+  const formatCurrency = (amount: number | undefined | null): string => {
+    const safeAmount = amount ?? 0
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2
-    }).format(amount)
+    }).format(safeAmount)
   }
 
   const getViewLink = (plantilla: Plantilla) => {
