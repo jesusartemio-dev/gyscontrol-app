@@ -13,7 +13,7 @@ import { z } from 'zod'
 const ActualizarListaSchema = z.object({
   nombre: z.string().min(1).optional(),
   fechaNecesaria: z.string().datetime().optional(),
-  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobado', 'rechazado']).optional()
+  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'rechazada']).optional()
 })
 
 // 🔁 Función para recalcular datos de Gantt
