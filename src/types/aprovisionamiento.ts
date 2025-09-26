@@ -18,7 +18,7 @@ export interface ItemGantt {
   fechaFin: Date
   fechaNecesaria: Date
   monto: number
-  estado: EstadoListaEquipo | EstadoPedido
+  estado: string
   progreso: number
   alertas: AlertaTimeline[]
   color: string
