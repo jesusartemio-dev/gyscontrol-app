@@ -90,11 +90,11 @@ export default function PlantillasView({
     }
 
     // Para el filtro 'todas', intentar detectar por campos
-    if (plantilla.plantillaServicioId !== undefined) {
+    if (plantilla.plantillaServicioId != null) {
       return 'servicios'
-    } else if (plantilla.plantillaGastoId !== undefined) {
+    } else if (plantilla.plantillaGastoId != null) {
       return 'gastos'
-    } else if (plantilla.plantillaEquipoId !== undefined) {
+    } else if (plantilla.plantillaEquipoId != null) {
       return 'equipos'
     } else {
       return plantilla.tipo || 'completa'
