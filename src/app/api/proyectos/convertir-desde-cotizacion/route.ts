@@ -88,13 +88,24 @@ async function convertirCotizacionAProyecto(cotizacionId: string, proyectoId: st
     }
   });
 
-  // 2. Crear fases estándar del proyecto
-  const fasesProyecto = await crearFasesEstandar(proyectoId);
+  // 2. Crear cronograma de ejecución para el proyecto
+  const cronogramaEjecucion = await prisma.proyectoCronograma.create({
+    data: {
+      proyectoId,
+      tipo: 'ejecucion',
+      nombre: 'Cronograma de Ejecución',
+      esBaseline: false,
+      version: 1
+    }
+  });
 
-  // 3. Distribuir EDTs en fases
+  // 3. Crear fases estándar del proyecto
+  const fasesProyecto = await crearFasesEstandar(proyectoId, cronogramaEjecucion.id);
+
+  // 4. Distribuir EDTs en fases
   const asignaciones = await distribuirEdtsEnFases(edtsComerciales, fasesProyecto);
 
-  // 4. Crear EDTs del proyecto
+  // 5. Crear EDTs del proyecto
   const edtsCreados = [];
   for (const asignacion of asignaciones) {
     const edtComercial = asignacion.edt;
@@ -102,6 +113,7 @@ async function convertirCotizacionAProyecto(cotizacionId: string, proyectoId: st
     const edtCreado = await prisma.proyectoEdt.create({
       data: {
         proyectoId,
+        proyectoCronogramaId: cronogramaEjecucion.id,
         nombre: edtComercial.nombre || `EDT ${edtComercial.categoriaServicio?.nombre}`,
         categoriaServicioId: edtComercial.categoriaServicioId,
         proyectoFaseId: asignacion.faseId,
@@ -132,7 +144,7 @@ async function convertirCotizacionAProyecto(cotizacionId: string, proyectoId: st
 }
 
 // Crear fases estándar
-async function crearFasesEstandar(proyectoId: string) {
+async function crearFasesEstandar(proyectoId: string, cronogramaId: string) {
   const proyecto = await prisma.proyecto.findUnique({
     where: { id: proyectoId },
     select: { fechaInicio: true, fechaFin: true }
@@ -177,6 +189,7 @@ async function crearFasesEstandar(proyectoId: string) {
     const faseCreada = await prisma.proyectoFase.create({
       data: {
         proyectoId,
+        proyectoCronogramaId: cronogramaId,
         nombre: fase.nombre,
         orden: fase.orden,
         fechaInicioPlan: fase.fechaInicio,
