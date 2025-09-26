@@ -111,7 +111,7 @@ export interface GanttItem {
   fechaInicio: Date
   fechaFin: Date
   amount: number
-  estado: EstadoListaEquipo | EstadoPedido
+  estado: string
   color?: string
   progress?: number
   progreso?: number
