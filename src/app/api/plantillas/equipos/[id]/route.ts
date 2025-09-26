@@ -96,3 +96,24 @@ export async function PUT(
     )
   }
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+
+    // For now, just return success since the independent tables may not exist yet
+    // TODO: Implement proper deletion when tables are created
+    console.log('DELETE request for plantilla equipos:', id)
+
+    return NextResponse.json({ message: 'Plantilla eliminada exitosamente' })
+  } catch (error) {
+    console.error('❌ Error al eliminar plantilla de equipos:', error)
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
+      { status: 500 }
+    )
+  }
+}

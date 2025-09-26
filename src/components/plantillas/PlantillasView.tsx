@@ -42,7 +42,7 @@ interface Plantilla {
 
 interface PlantillasViewProps {
   plantillas: Plantilla[]
-  filterType: 'todas' | 'equipos' | 'servicios' | 'gastos'
+  filterType: 'todas' | 'completas' | 'equipos' | 'servicios' | 'gastos'
   onDelete: (id: string) => void
   onEdit: (id: string, nombre: string) => void
 }
@@ -89,16 +89,8 @@ export default function PlantillasView({
       return filterType
     }
 
-    // Para el filtro 'todas', intentar detectar por campos
-    if (plantilla.plantillaServicioId != null) {
-      return 'servicios'
-    } else if (plantilla.plantillaGastoId != null) {
-      return 'gastos'
-    } else if (plantilla.plantillaEquipoId != null) {
-      return 'equipos'
-    } else {
-      return plantilla.tipo || 'completa'
-    }
+    // Para el filtro 'todas', usar el campo tipo
+    return plantilla.tipo || 'completa'
   }
 
   // Obtener información del tipo

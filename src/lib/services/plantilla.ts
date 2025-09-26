@@ -161,3 +161,60 @@ export async function getPlantillasGastos() {
     throw error
   }
 }
+
+// ✅ Crear plantilla de equipos independiente
+export async function createPlantillaEquipos(data: {
+  nombre: string
+  descripcion?: string
+}): Promise<any> {
+  try {
+    const res = await fetch(buildApiUrl('/api/plantillas/equipos'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error('Error al crear plantilla de equipos')
+    return await res.json()
+  } catch (error) {
+    console.error('❌ Error en createPlantillaEquipos:', error)
+    throw error
+  }
+}
+
+// ✅ Crear plantilla de servicios independiente
+export async function createPlantillaServicios(data: {
+  nombre: string
+  descripcion?: string
+}): Promise<any> {
+  try {
+    const res = await fetch(buildApiUrl('/api/plantillas/servicios'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error('Error al crear plantilla de servicios')
+    return await res.json()
+  } catch (error) {
+    console.error('❌ Error en createPlantillaServicios:', error)
+    throw error
+  }
+}
+
+// ✅ Crear plantilla de gastos independiente
+export async function createPlantillaGastos(data: {
+  nombre: string
+  descripcion?: string
+}): Promise<any> {
+  try {
+    const res = await fetch(buildApiUrl('/api/plantillas/gastos'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error('Error al crear plantilla de gastos')
+    return await res.json()
+  } catch (error) {
+    console.error('❌ Error en createPlantillaGastos:', error)
+    throw error
+  }
+}

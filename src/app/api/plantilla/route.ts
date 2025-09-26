@@ -190,55 +190,16 @@ export async function GET(request: NextRequest) {
           },
           orderBy: { createdAt: 'desc' },
         }),
-        // Plantillas de equipos independientes (solo si no hay filtro de tipo)
-        !tipo ? prisma.plantillaEquipoIndependiente.findMany({
-          include: {
-            items: {
-              include: {
-                catalogoEquipo: true
-              }
-            },
-            _count: {
-              select: { items: true }
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-        }) : Promise.resolve([]),
-        // Plantillas de servicios independientes (solo si no hay filtro de tipo)
-        !tipo ? prisma.plantillaServicioIndependiente.findMany({
-          include: {
-            items: {
-              include: {
-                catalogoServicio: true,
-                recurso: true,
-                unidadServicio: true
-              }
-            },
-            _count: {
-              select: { items: true }
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-        }) : Promise.resolve([]),
-        // Plantillas de gastos independientes (solo si no hay filtro de tipo)
-        !tipo ? prisma.plantillaGastoIndependiente.findMany({
-          include: {
-            items: true,
-            _count: {
-              select: { items: true }
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-        }) : Promise.resolve([])
+        // ❌ REMOVED: Plantillas independientes no deben estar en la API general
+        // Solo devolver plantillas completas
+        Promise.resolve([]),
+        Promise.resolve([]),
+        Promise.resolve([])
       ])
 
-      // Combinar todas las plantillas
-      const todasLasPlantillas = [
-        ...plantillasCompletas,
-        ...plantillasEquipos,
-        ...plantillasServicios,
-        ...plantillasGastos
-      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      // Solo devolver plantillas completas (plantillas independientes van por APIs específicas)
+      const todasLasPlantillas = [...plantillasCompletas]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
       return NextResponse.json(todasLasPlantillas)
     }

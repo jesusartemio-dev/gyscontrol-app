@@ -53,7 +53,7 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-type TemplateFilter = 'todas' | 'equipos' | 'servicios' | 'gastos'
+type TemplateFilter = 'todas' | 'completas' | 'equipos' | 'servicios' | 'gastos'
 
 export default function PlantillasPage() {
   const router = useRouter()
@@ -75,10 +75,18 @@ export default function PlantillasPage() {
           getPlantillasServicios(),
           getPlantillasGastos()
         ])
-        setPlantillas(general)
-        setPlantillasEquipos(equipos)
-        setPlantillasServicios(servicios)
-        setPlantillasGastos(gastos)
+
+        // Add tipo field to templates loaded from APIs
+        const generalWithTipo = general.map((p: any) => ({ ...p, tipo: p.tipo || 'completa' }))
+        const equiposWithTipo = equipos.map((p: any) => ({ ...p, tipo: 'equipos' }))
+        const serviciosWithTipo = servicios.map((p: any) => ({ ...p, tipo: 'servicios' }))
+        const gastosWithTipo = gastos.map((p: any) => ({ ...p, tipo: 'gastos' }))
+
+
+        setPlantillas(generalWithTipo)
+        setPlantillasEquipos(equiposWithTipo)
+        setPlantillasServicios(serviciosWithTipo)
+        setPlantillasGastos(gastosWithTipo)
       } catch (error) {
         console.error('Error loading templates:', error)
         setError('Error al cargar plantillas.')
@@ -90,62 +98,55 @@ export default function PlantillasPage() {
     loadAllTemplates()
   }, [])
 
-  const handleCreated = (nueva: any) => {
+  const handleCreated = (nueva: any, tipo?: 'equipos' | 'servicios' | 'gastos') => {
     // Add to the appropriate state based on template type
-    if (nueva.plantillaEquipoId !== undefined) {
-      // Equipment template
-      setPlantillasEquipos((prev) => [...prev, nueva])
-    } else if (nueva.plantillaServicioId !== undefined) {
-      // Service template
-      setPlantillasServicios((prev) => [...prev, nueva])
-    } else if (nueva.plantillaGastoId !== undefined) {
-      // Expense template
-      setPlantillasGastos((prev) => [...prev, nueva])
+    // If tipo is specified, it's a specific template type
+    if (tipo === 'equipos') {
+      setPlantillasEquipos((prev) => [...prev, { ...nueva, tipo: 'equipos' }])
+    } else if (tipo === 'servicios') {
+      setPlantillasServicios((prev) => [...prev, { ...nueva, tipo: 'servicios' }])
+    } else if (tipo === 'gastos') {
+      setPlantillasGastos((prev) => [...prev, { ...nueva, tipo: 'gastos' }])
     } else {
-      // Main template
+      // Main template - only add to completas
       setPlantillas((prev) => [...prev, nueva])
     }
   }
 
-  const handleDelete = (id: string) => {
-    // Remove from all states to ensure it's deleted regardless of current filter
-    setPlantillas((prev) => prev.filter((p) => p.id !== id))
-    setPlantillasEquipos((prev) => prev.filter((p) => p.id !== id))
-    setPlantillasServicios((prev) => prev.filter((p) => p.id !== id))
-    setPlantillasGastos((prev) => prev.filter((p) => p.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      // Use the unified API that handles all template types
+      const response = await fetch(`/api/plantilla/${id}`, { method: 'DELETE' })
+
+      if (!response.ok) {
+        throw new Error('Error al eliminar plantilla')
+      }
+
+      // Remove from all states to ensure it's deleted regardless of current filter
+      setPlantillas((prev) => prev.filter((p) => p.id !== id))
+      setPlantillasEquipos((prev) => prev.filter((p) => p.id !== id))
+      setPlantillasServicios((prev) => prev.filter((p) => p.id !== id))
+      setPlantillasGastos((prev) => prev.filter((p) => p.id !== id))
+    } catch (error) {
+      console.error('Error deleting template:', error)
+      // You might want to show a toast notification here
+    }
   }
 
   const handleUpdated = (actualizada: any) => {
-    // Update the appropriate state based on the template type
-    if (actualizada.plantillaEquipoId !== undefined) {
-      // Equipment template
-      setPlantillasEquipos((prev) =>
-        prev.map((p) =>
-          p.id === actualizada.id ? actualizada : p
-        )
-      )
-    } else if (actualizada.plantillaServicioId !== undefined) {
-      // Service template
-      setPlantillasServicios((prev) =>
-        prev.map((p) =>
-          p.id === actualizada.id ? actualizada : p
-        )
-      )
-    } else if (actualizada.plantillaGastoId !== undefined) {
-      // Expense template
-      setPlantillasGastos((prev) =>
-        prev.map((p) =>
-          p.id === actualizada.id ? actualizada : p
-        )
-      )
-    } else {
-      // Main template
-      setPlantillas((prev) =>
-        prev.map((p) =>
-          p.id === actualizada.id ? actualizada : p
-        )
-      )
-    }
+    // Update in all arrays to ensure the template is updated regardless of where it is
+    setPlantillas((prev) =>
+      prev.map((p) => p.id === actualizada.id ? actualizada : p)
+    )
+    setPlantillasEquipos((prev) =>
+      prev.map((p) => p.id === actualizada.id ? actualizada : p)
+    )
+    setPlantillasServicios((prev) =>
+      prev.map((p) => p.id === actualizada.id ? actualizada : p)
+    )
+    setPlantillasGastos((prev) =>
+      prev.map((p) => p.id === actualizada.id ? actualizada : p)
+    )
   }
 
   const handleEdit = (id: string, currentName: string) => {
@@ -162,21 +163,39 @@ export default function PlantillasPage() {
   // Get current templates based on filter
   const getCurrentTemplates = () => {
     switch (activeFilter) {
+      case 'completas':
+        // Solo plantillas completas (tipo undefined o 'completa')
+        return plantillas.filter(p => !p.tipo || p.tipo === 'completa')
       case 'equipos':
-        return plantillasEquipos
+        // Solo plantillas específicas de equipos
+        return plantillasEquipos.filter(p => p.tipo === 'equipos')
       case 'servicios':
-        return plantillasServicios
+        // Solo plantillas específicas de servicios
+        return plantillasServicios.filter(p => p.tipo === 'servicios')
       case 'gastos':
-        return plantillasGastos
+        // Solo plantillas específicas de gastos
+        return plantillasGastos.filter(p => p.tipo === 'gastos')
       default:
-        // Para 'todas', combinar todas las plantillas eliminando duplicados por ID
-        const allTemplates = [...plantillas, ...plantillasEquipos, ...plantillasServicios, ...plantillasGastos]
+        // Para 'todas', combinar todas sin duplicados
+        const completas = plantillas.filter(p => !p.tipo || p.tipo === 'completa')
+        const equiposEspecificos = plantillasEquipos.filter(p => p.tipo === 'equipos')
+        const serviciosEspecificos = plantillasServicios.filter(p => p.tipo === 'servicios')
+        const gastosEspecificos = plantillasGastos.filter(p => p.tipo === 'gastos')
+
+        const allTemplates = [...completas, ...equiposEspecificos, ...serviciosEspecificos, ...gastosEspecificos]
         const uniqueTemplates = allTemplates.filter((template, index, self) =>
           index === self.findIndex(t => t.id === template.id)
         )
         return uniqueTemplates
     }
   }
+
+  // Calculate filtered counts for each type
+  const completasCount = plantillas.filter(p => !p.tipo || p.tipo === 'completa').length
+  const equiposCount = plantillasEquipos.filter(p => p.tipo === 'equipos').length
+  const serviciosCount = plantillasServicios.filter(p => p.tipo === 'servicios').length
+  const gastosCount = plantillasGastos.filter(p => p.tipo === 'gastos').length
+  const todasCount = completasCount + equiposCount + serviciosCount + gastosCount
 
   // Calculate statistics based on current filter
   const currentTemplates = getCurrentTemplates()
@@ -319,7 +338,10 @@ export default function PlantillasPage() {
                 Equipos, servicios y gastos en una sola plantilla
               </p>
               <PlantillaModal
-                onCreated={handleCreated}
+                onCreated={(nueva) => {
+                  handleCreated(nueva);
+                  router.push(`/comercial/plantillas/${nueva.id}`);
+                }}
                 trigger={
                   <Button variant="outline" size="sm">
                     <Plus className="h-4 w-4 mr-2" />
@@ -340,7 +362,7 @@ export default function PlantillasPage() {
               </p>
               <PlantillaModalEquipos
                 onCreated={(nueva) => {
-                  handleCreated(nueva);
+                  handleCreated(nueva, 'equipos');
                   // Redirect to equipment-specific page using Next.js router
                   router.push(`/comercial/plantillas/equipos/${nueva.id}`);
                 }}
@@ -358,7 +380,7 @@ export default function PlantillasPage() {
               </p>
               <PlantillaModalServicios
                 onCreated={(nueva) => {
-                  handleCreated(nueva);
+                  handleCreated(nueva, 'servicios');
                   // Redirect to services-specific page using Next.js router
                   router.push(`/comercial/plantillas/servicios/${nueva.id}`);
                 }}
@@ -391,7 +413,16 @@ export default function PlantillasPage() {
           className="flex items-center gap-2"
         >
           <Package className="h-4 w-4" />
-          Todas ({plantillas.length + plantillasEquipos.length + plantillasServicios.length + plantillasGastos.length})
+          Todas ({todasCount})
+        </Button>
+        <Button
+          variant={activeFilter === 'completas' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('completas')}
+          className="flex items-center gap-2"
+        >
+          <Package className="h-4 w-4" />
+          Completas ({completasCount})
         </Button>
         <Button
           variant={activeFilter === 'equipos' ? 'default' : 'outline'}
@@ -400,7 +431,7 @@ export default function PlantillasPage() {
           className="flex items-center gap-2"
         >
           <Wrench className="h-4 w-4" />
-          Equipos ({plantillasEquipos.length})
+          Equipos ({equiposCount})
         </Button>
         <Button
           variant={activeFilter === 'servicios' ? 'default' : 'outline'}
@@ -409,7 +440,7 @@ export default function PlantillasPage() {
           className="flex items-center gap-2"
         >
           <Truck className="h-4 w-4" />
-          Servicios ({plantillasServicios.length})
+          Servicios ({serviciosCount})
         </Button>
         <Button
           variant={activeFilter === 'gastos' ? 'default' : 'outline'}
@@ -418,7 +449,7 @@ export default function PlantillasPage() {
           className="flex items-center gap-2"
         >
           <DollarSign className="h-4 w-4" />
-          Gastos ({plantillasGastos.length})
+          Gastos ({gastosCount})
         </Button>
       </motion.div>
 
@@ -445,7 +476,7 @@ export default function PlantillasPage() {
         {/* List Section */}
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="pt-6">
-            {(plantillas.length + plantillasEquipos.length + plantillasServicios.length + plantillasGastos.length) === 0 ? (
+            {todasCount === 0 ? (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -454,8 +485,11 @@ export default function PlantillasPage() {
                 <p className="text-gray-500 mb-4">
                   Comienza creando tu primera plantilla comercial
                 </p>
-                <PlantillaModal 
-                  onCreated={handleCreated}
+                <PlantillaModal
+                  onCreated={(nueva) => {
+                    handleCreated(nueva);
+                    router.push(`/comercial/plantillas/${nueva.id}`);
+                  }}
                   trigger={
                     <Button variant="outline">
                       <Plus className="h-4 w-4 mr-2" />

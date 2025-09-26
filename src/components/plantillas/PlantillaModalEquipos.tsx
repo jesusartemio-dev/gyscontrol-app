@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Loader2, AlertCircle, X, Wrench } from 'lucide-react'
-import { createPlantilla } from '@/lib/services/plantilla'
+import { createPlantillaEquipos } from '@/lib/services/plantilla'
 import type { Plantilla } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,9 +58,8 @@ export default function PlantillaModalEquipos({ onCreated, trigger }: Props) {
 
     setLoading(true)
     try {
-      const nueva = await createPlantilla({
-        nombre: nombre.trim(),
-        tipo: 'equipos'
+      const nueva = await createPlantillaEquipos({
+        nombre: nombre.trim()
       })
 
       if (nueva) {
