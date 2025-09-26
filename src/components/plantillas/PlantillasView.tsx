@@ -59,9 +59,9 @@ export default function PlantillasView({
   const [isMobile, setIsMobile] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [searchTerm, setSearchTerm] = useState('')
-  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<string>(filterType === 'todas' ? 'all' : filterType)
 
-  // Detectar móvil al montar
+  // Detectar móvil al montar y resetear filtros cuando cambia filterType
   useMemo(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768
@@ -77,8 +77,19 @@ export default function PlantillasView({
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Determinar el tipo correcto de plantilla
+  // Resetear filtros cuando cambia filterType
+  useMemo(() => {
+    setTypeFilter(filterType === 'todas' ? 'all' : filterType)
+  }, [filterType])
+
+  // Determinar el tipo correcto de plantilla basado en filterType
   const getPlantillaType = (plantilla: Plantilla): string => {
+    // Si tenemos un filterType específico, usarlo
+    if (filterType !== 'todas') {
+      return filterType
+    }
+
+    // Para el filtro 'todas', intentar detectar por campos
     if (plantilla.plantillaServicioId !== undefined) {
       return 'servicios'
     } else if (plantilla.plantillaGastoId !== undefined) {
@@ -139,9 +150,15 @@ export default function PlantillasView({
 
   // Opciones de tipo para filtro
   const typeOptions = useMemo(() => {
-    const types = [...new Set(plantillas.map(p => getPlantillaType(p)))]
-    return types.sort()
-  }, [plantillas])
+    if (filterType === 'todas') {
+      // Para 'todas', mostrar todos los tipos disponibles
+      const types = [...new Set(plantillas.map(p => getPlantillaType(p)))]
+      return types.sort()
+    } else {
+      // Para filtros específicos, solo mostrar ese tipo
+      return [filterType]
+    }
+  }, [plantillas, filterType])
 
   const formatCurrency = (amount: number | undefined | null): string => {
     const safeAmount = amount ?? 0
