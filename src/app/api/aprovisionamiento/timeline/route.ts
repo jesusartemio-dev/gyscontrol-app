@@ -270,7 +270,7 @@ export async function GET(request: NextRequest) {
         // 🧮 Calcular días de retraso para listas
         const hoy = new Date()
         let diasRetraso = 0
-        if (lista.fechaNecesaria && hoy > lista.fechaNecesaria && lista.estado !== 'aprobado') {
+        if (lista.fechaNecesaria && hoy > lista.fechaNecesaria && lista.estado !== 'aprobada') {
           diasRetraso = Math.ceil((hoy.getTime() - lista.fechaNecesaria.getTime()) / (1000 * 60 * 60 * 24))
         }
 
@@ -286,10 +286,10 @@ export async function GET(request: NextRequest) {
         switch (lista.estado) {
           case 'borrador': color = '#6b7280'; break
           case 'por_revisar': color = '#f59e0b'; break
-          case 'aprobado': color = '#10b981'; break
+          case 'aprobada': color = '#10b981'; break
           case 'por_cotizar': color = '#3b82f6'; break
           case 'por_validar': color = '#059669'; break
-          case 'rechazado': color = '#ef4444'; break
+          case 'rechazada': color = '#ef4444'; break
         }
 
         const itemGantt: ItemGantt = {
@@ -307,7 +307,7 @@ export async function GET(request: NextRequest) {
           fechaNecesaria: lista.fechaNecesaria,
           monto,
           estado: lista.estado,
-          progreso: lista.estado === 'aprobado' ? 100 : 
+          progreso: lista.estado === 'aprobada' ? 100 :
                    lista.estado === 'por_validar' ? 75 :
                    lista.estado === 'por_aprobar' ? 50 :
                    lista.estado === 'por_revisar' ? 25 : 0,
