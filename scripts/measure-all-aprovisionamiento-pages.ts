@@ -84,7 +84,7 @@ async function measureDashboardPage(): Promise<PageMetrics> {
     // Estadísticas generales
     Promise.all([
       prisma.proyecto.count({ where: { estado: 'en_ejecucion' } }),
-      prisma.listaEquipo.count({ where: { estado: { not: 'rechazado' } } }),
+      prisma.listaEquipo.count({ where: { estado: { not: 'rechazada' } } }),
       prisma.pedidoEquipo.count({ where: { estado: { not: 'cancelado' } } })
     ])
   ])
