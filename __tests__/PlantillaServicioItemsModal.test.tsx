@@ -32,8 +32,11 @@ const mockCatalogoServicios: CatalogoServicio[] = [
     id: 'servicio-1',
     nombre: 'Programación PLC',
     descripcion: 'Programación de lógica de control',
+    categoriaId: 'cat-1',
+    unidadServicioId: 'unidad-1',
+    recursoId: 'recurso-1',
     categoria: { id: 'cat-1', nombre: 'PLC' },
-    formula: 'escalada',
+    formula: 'Escalonada',
     horaBase: 5,
     horaRepetido: 0,
     horaUnidad: 8,
@@ -47,8 +50,11 @@ const mockCatalogoServicios: CatalogoServicio[] = [
     id: 'servicio-2',
     nombre: 'Configuración HMI',
     descripcion: 'Configuración de interfaz humano-máquina',
+    categoriaId: 'cat-1',
+    unidadServicioId: 'unidad-2',
+    recursoId: 'recurso-2',
     categoria: { id: 'cat-1', nombre: 'PLC' },
-    formula: 'fija',
+    formula: 'Fijo',
     horaBase: 0,
     horaRepetido: 0,
     horaUnidad: 0,
@@ -70,7 +76,7 @@ const mockCreatedItems: PlantillaServicioItem[] = [
     nombre: 'Programación PLC',
     descripcion: 'Programación de lógica de control',
     categoria: 'PLC',
-    formula: 'escalada',
+    formula: 'Escalonada',
     horaBase: 5,
     horaRepetido: 0,
     horaUnidad: 8,
@@ -84,6 +90,8 @@ const mockCreatedItems: PlantillaServicioItem[] = [
     costoInterno: 640.50,
     margen: 1.35,
     costoCliente: 864.68,
+    unidadServicio: { id: 'unidad-1', nombre: 'Motores' },
+    recurso: { id: 'recurso-1', nombre: 'Programador Senior', costoHora: 30.50 },
     createdAt: '2025-01-23T10:00:00Z',
     updatedAt: '2025-01-23T10:00:00Z'
   },
@@ -96,7 +104,7 @@ const mockCreatedItems: PlantillaServicioItem[] = [
     nombre: 'Configuración HMI',
     descripcion: 'Configuración de interfaz humano-máquina',
     categoria: 'PLC',
-    formula: 'fija',
+    formula: 'Fijo',
     horaBase: 0,
     horaRepetido: 0,
     horaUnidad: 0,
@@ -110,6 +118,8 @@ const mockCreatedItems: PlantillaServicioItem[] = [
     costoInterno: 100.00,
     margen: 1.35,
     costoCliente: 135.00,
+    unidadServicio: { id: 'unidad-2', nombre: 'Interfaces' },
+    recurso: { id: 'recurso-2', nombre: 'Técnico HMI', costoHora: 25.00 },
     createdAt: '2025-01-23T10:00:00Z',
     updatedAt: '2025-01-23T10:00:00Z'
   }
@@ -131,7 +141,7 @@ describe('PlantillaServicioItemsModal', () => {
     mockCreatePlantillaServicioItem.mockImplementation((payload) => 
       Promise.resolve(mockCreatedItems.find(item => item.catalogoServicioId === payload.catalogoServicioId)!)
     )
-    mockRecalcularPlantilla.mockResolvedValue()
+    mockRecalcularPlantilla.mockResolvedValue(undefined)
     mockToast.success = jest.fn()
     mockToast.error = jest.fn()
   })

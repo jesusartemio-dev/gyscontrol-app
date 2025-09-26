@@ -334,7 +334,8 @@ export class ProyectoEdtService {
         data: {
           ...data,
           zona: data.zona || null,
-          nombre: data.nombre
+          nombre: data.nombre,
+          proyectoCronogramaId: data.proyectoCronogramaId
         },
         include: {
           proyecto: {

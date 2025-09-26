@@ -92,15 +92,27 @@ export class CronogramaConversionService {
 
       const proyectoAsociado = cotizacion.proyectos[0];
 
-      // 2. Crear fases estándar del proyecto
-      const fasesProyecto = await this.crearFasesEstandar(proyectoId, proyectoAsociado);
+      // 2. Crear cronograma de ejecución para el proyecto
+      const cronogramaEjecucion = await prisma.proyectoCronograma.create({
+        data: {
+          proyectoId,
+          tipo: 'ejecucion',
+          nombre: 'Plan de Ejecución',
+          esBaseline: false,
+          version: 1
+        }
+      });
+
+      // 3. Crear fases estándar del proyecto
+      const fasesProyecto = await this.crearFasesEstandar(proyectoId, proyectoAsociado, cronogramaEjecucion.id);
       resultado.fasesCreadas = fasesProyecto.length;
 
-      // 3. Convertir EDTs comerciales a EDTs de proyecto
+      // 4. Convertir EDTs comerciales a EDTs de proyecto
       const asignaciones = await this.convertirEdtsComerciales(
         cotizacion.cronograma,
         fasesProyecto,
-        proyectoId
+        proyectoId,
+        cronogramaEjecucion.id
       );
       resultado.edtsConvertidos = asignaciones.length;
 
@@ -126,12 +138,13 @@ export class CronogramaConversionService {
   }
 
   /**
-   * ✅ Crear fases estándar para el proyecto
-   */
-  private static async crearFasesEstandar(
-    proyectoId: string,
-    proyecto: { fechaInicio: Date; fechaFin: Date | null }
-  ): Promise<any[]> {
+    * ✅ Crear fases estándar para el proyecto
+    */
+   private static async crearFasesEstandar(
+     proyectoId: string,
+     proyecto: { fechaInicio: Date; fechaFin: Date | null },
+     proyectoCronogramaId: string
+   ): Promise<any[]> {
     if (!proyecto.fechaFin) {
       throw new Error('El proyecto debe tener fecha de fin definida');
     }
@@ -173,6 +186,7 @@ export class CronogramaConversionService {
       const faseCreada = await prisma.proyectoFase.create({
         data: {
           proyectoId,
+          proyectoCronogramaId,
           nombre: fase.nombre,
           descripcion: fase.descripcion,
           orden: fase.orden,
@@ -188,13 +202,14 @@ export class CronogramaConversionService {
   }
 
   /**
-   * ✅ Convertir EDTs comerciales a EDTs de proyecto
-   */
-  private static async convertirEdtsComerciales(
-    edtsComerciales: any[],
-    fasesProyecto: any[],
-    proyectoId: string
-  ): Promise<any[]> {
+    * ✅ Convertir EDTs comerciales a EDTs de proyecto
+    */
+   private static async convertirEdtsComerciales(
+     edtsComerciales: any[],
+     fasesProyecto: any[],
+     proyectoId: string,
+     proyectoCronogramaId: string
+   ): Promise<any[]> {
     const asignaciones = [];
 
     for (const edtComercial of edtsComerciales) {
@@ -205,9 +220,10 @@ export class CronogramaConversionService {
       const edtProyecto = await prisma.proyectoEdt.create({
         data: {
           proyectoId,
+          proyectoCronogramaId,
           nombre: edtComercial.nombre || edtComercial.cotizacionServicio?.nombre || 'EDT sin nombre',
           categoriaServicioId: edtComercial.categoriaServicioId,
-          proyectoFaseId: faseAsignada.id,
+          zona: null,
           fechaInicioPlan: edtComercial.fechaInicioComercial,
           fechaFinPlan: edtComercial.fechaFinComercial,
           horasPlan: edtComercial.horasEstimadas || 0,
@@ -222,6 +238,7 @@ export class CronogramaConversionService {
       asignaciones.push({
         edtComercial: edtComercial.id,
         edtProyecto: edtProyecto.id,
+        proyectoCronogramaId,
         faseId: faseAsignada.id,
         faseNombre: faseAsignada.nombre,
         tareas: edtComercial.tareas || []
@@ -243,6 +260,7 @@ export class CronogramaConversionService {
         await prisma.proyectoTarea.create({
           data: {
             proyectoEdtId: asignacion.edtProyecto,
+            proyectoCronogramaId: asignacion.proyectoCronogramaId,
             nombre: tareaComercial.nombre,
             descripcion: tareaComercial.descripcion,
             fechaInicio: tareaComercial.fechaInicio,

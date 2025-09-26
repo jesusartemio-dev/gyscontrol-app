@@ -153,7 +153,7 @@ export async function triggerListaAprobada(proyectoId: string, listaId: string) 
     const listasPendientes = await prisma.listaEquipo.count({
       where: {
         proyectoId,
-        estado: { not: 'aprobado' }
+        estado: { not: 'aprobada' }
       }
     })
 

@@ -1878,6 +1878,7 @@ export interface FiltrosCronogramaData {
 // 🏗️ Interface para datos de creación EDT
 export interface CreateProyectoEdtData {
   proyectoId: string
+  proyectoCronogramaId: string
   nombre: string
   categoriaServicioId: string
   responsableId?: string

@@ -81,13 +81,15 @@ export const mockProyecto: Proyecto = {
   totalRealGastos: 5500,
   totalReal: 103500,
   codigo: 'PRY-001',
-  estado: 'activo',
+  estado: 'en_ejecucion',
   fechaInicio: '2024-01-01',
   fechaFin: '2024-12-31',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
   cliente: {
     id: 'cliente-1',
+    codigo: 'CLI-001',
+    numeroSecuencia: 1,
     nombre: 'Cliente Test',
     ruc: '12345678901',
     direccion: 'Dirección Test',
@@ -126,9 +128,10 @@ export const mockProyecto: Proyecto = {
   },
   cotizacion: {
     id: 'cotizacion-1',
+    codigo: 'GYS-001-24',
+    numeroSecuencia: 1,
     nombre: 'Cotización Test',
-    estado: 'aprobado',
-    etapa: 'cerrada',
+    estado: 'aprobada',
     prioridad: 'alta',
     probabilidad: 90,
     fechaEnvio: '2023-12-01',
@@ -163,7 +166,10 @@ export const mockProyecto: Proyecto = {
     },
     equipos: [],
     servicios: [],
-    gastos: []
+    gastos: [],
+    cronograma: [],
+    exclusiones: [],
+    condiciones: []
   },
   equipos: [],
   servicios: [],
@@ -171,7 +177,8 @@ export const mockProyecto: Proyecto = {
   ListaEquipo: [],
   cotizaciones: [],
   valorizaciones: [],
-  registrosHoras: []
+  registrosHoras: [],
+  cronogramas: []
 }
 
 // ✅ Mock Lista Equipo Master
