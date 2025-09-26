@@ -271,10 +271,10 @@ export async function GET(request: NextRequest) {
       }, 0)
       
       // 📊 Contar estados
-      const listasAprobadas = listas.filter(l => l.estado === 'aprobado').length
-      const listasPendientes = listas.filter(l => l.estado === 'borrador' || l.estado === 'por_revisar').length
+      const listasAprobadas = listas.filter((l: any) => l.estado === 'aprobado').length
+      const listasPendientes = listas.filter((l: any) => l.estado === 'borrador' || l.estado === 'por_revisar').length
 
-      const pedidosEnviados = pedidos.filter(p => p.estado === 'enviado').length
+      const pedidosEnviados = pedidos.filter((p: any) => p.estado === 'enviado').length
       const pedidosPendientes = pedidos.filter(p => p.estado === 'borrador').length
       
       const alertas = contarAlertas(proyecto, listas, pedidos)
