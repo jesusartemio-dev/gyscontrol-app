@@ -5,24 +5,20 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import PlantillaEquipoIndependienteMultiAddModal from '@/components/plantillas/equipos/PlantillaEquipoIndependienteMultiAddModal'
+import PlantillaEquiposView from '@/components/plantillas/equipos/PlantillaEquiposView'
 
 import {
   Plus,
   ChevronRight,
   Share2,
   Download,
-  Package,
   AlertCircle,
   Loader2,
   Wrench,
-  DollarSign,
-  Trash2
+  DollarSign
 } from 'lucide-react'
 
 // Types for independent equipment templates
@@ -92,6 +88,7 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
+
 export default function PlantillaEquiposIndependientePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const [plantilla, setPlantilla] = useState<PlantillaEquipoIndependiente | null>(null)
@@ -130,23 +127,6 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
   }
 
 
-  const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este equipo?')) return
-
-    try {
-      const response = await fetch(`/api/plantillas/equipos/${id}/items/${itemId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) throw new Error('Error al eliminar item')
-
-      toast.success('Equipo eliminado exitosamente')
-      loadPlantilla()
-    } catch (err) {
-      console.error('Error deleting item:', err)
-      toast.error('Error al eliminar el equipo')
-    }
-  }
 
   // ✅ Handle multiple items creation
   const handleMultipleItemsCreated = (items: PlantillaEquipoItemIndependiente[]) => {
@@ -295,7 +275,7 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-orange-600" />
+                  <Wrench className="h-5 w-5 text-orange-600" />
                   Equipos en la Plantilla
                 </CardTitle>
                 <CardDescription>
@@ -309,45 +289,17 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
             </div>
           </CardHeader>
           <CardContent>
-            {plantilla.items && plantilla.items.length > 0 ? (
-              <div className="space-y-3">
-                {plantilla.items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium">{item.descripcion}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {item.categoria} • {item.unidad} • {item.marca} • Código: {item.codigo}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <div className="font-medium">{formatCurrency(item.costoCliente)}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Cant: {item.cantidad}
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteItem(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-medium mb-2">No hay equipos</h3>
-                <p className="text-sm mb-4">Comienza agregando equipos a esta plantilla independiente</p>
-                <Button onClick={() => setShowMultiAddModal(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Primer Equipo
-                </Button>
-              </div>
-            )}
+            <PlantillaEquiposView
+              items={plantilla.items || []}
+              plantillaId={id}
+              onDeleteItem={(itemId) => {
+                setPlantilla(prev => prev ? {
+                  ...prev,
+                  items: prev.items?.filter(item => item.id !== itemId) || []
+                } : null)
+              }}
+              onRefresh={loadPlantilla}
+            />
           </CardContent>
         </Card>
       </motion.div>
