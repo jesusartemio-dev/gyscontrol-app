@@ -2,7 +2,7 @@
 
 import { signIn } from 'next-auth/react'
 import { useSession } from 'next-auth/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
@@ -20,7 +20,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const router = useRouter()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+
+  // Redirigir automáticamente si ya hay sesión activa
+  useEffect(() => {
+    if (status === 'authenticated' && session) {
+      router.push('/')
+    }
+  }, [session, status, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,7 +44,8 @@ export default function LoginPage() {
     const res = await signIn('credentials', {
       email,
       password,
-      redirect: false,
+      redirect: true,
+      callbackUrl: '/',
     })
 
     if (res?.error) {
@@ -46,9 +54,7 @@ export default function LoginPage() {
       return
     }
 
-    // ✅ Login exitoso - redirigir a la página principal
-    // El middleware se encargará de redirigir según el rol
-    router.push('/')
+    // NextAuth manejará la redirección automáticamente
     setLoading(false)
   }
 
