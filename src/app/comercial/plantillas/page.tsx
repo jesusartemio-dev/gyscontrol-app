@@ -169,8 +169,12 @@ export default function PlantillasPage() {
       case 'gastos':
         return plantillasGastos
       default:
-        // Para 'todas', combinar todas las plantillas
-        return [...plantillas, ...plantillasEquipos, ...plantillasServicios, ...plantillasGastos]
+        // Para 'todas', combinar todas las plantillas eliminando duplicados por ID
+        const allTemplates = [...plantillas, ...plantillasEquipos, ...plantillasServicios, ...plantillasGastos]
+        const uniqueTemplates = allTemplates.filter((template, index, self) =>
+          index === self.findIndex(t => t.id === template.id)
+        )
+        return uniqueTemplates
     }
   }
 
