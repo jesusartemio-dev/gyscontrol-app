@@ -101,8 +101,8 @@ export default function ClienteForm({ onSaved, initial, onCancel }: Props) {
 
     try {
       const cliente = form.id
-        ? await updateCliente(form as Cliente)
-        : await createCliente(form as ClientePayload)
+        ? await updateCliente(form.id, form)
+        : await createCliente(form as Omit<Cliente, 'id'>)
       onSaved(cliente)
       if (!form.id) {
         setForm({})

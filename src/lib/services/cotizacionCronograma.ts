@@ -30,6 +30,7 @@ export class CotizacionCronogramaService {
      cotizacionId: string
      cotizacionServicioId: string
      categoriaServicioId: string
+     nombre: string
      zona?: string
      fechaInicioCom?: Date
      fechaFinCom?: Date
@@ -52,6 +53,7 @@ export class CotizacionCronogramaService {
           cotizacionId: data.cotizacionId,
           cotizacionServicioId: data.cotizacionServicioId || '', // ✅ Add required field
           categoriaServicioId: data.categoriaServicioId,
+          nombre: data.nombre,
           zona: data.zona,
           fechaInicioComercial: data.fechaInicioCom,
           fechaFinComercial: data.fechaFinCom,
@@ -281,7 +283,8 @@ export class CotizacionCronogramaService {
    */
   static async convertirEdtsAProyecto(
     cotizacionId: string,
-    proyectoId: string
+    proyectoId: string,
+    proyectoCronogramaId: string
   ): Promise<any[]> {
     try {
       // Obtener todos los EDTs comerciales de la cotización
@@ -294,7 +297,9 @@ export class CotizacionCronogramaService {
         const edtProyecto = await prisma.proyectoEdt.create({
           data: {
             proyectoId,
+            proyectoCronogramaId,
             categoriaServicioId: edtComercial.categoriaServicioId || '',
+            nombre: edtComercial.nombre || `EDT ${edtComercial.categoriaServicio?.nombre || 'Sin nombre'}`,
             zona: edtComercial.zona,
             fechaInicioPlan: edtComercial.fechaInicioComercial,
             fechaFinPlan: edtComercial.fechaFinComercial,
@@ -320,7 +325,9 @@ export class CotizacionCronogramaService {
           horasPlan: Number(edtProyecto.horasPlan) || 0,
           horasReales: Number(edtProyecto.horasReales) || 0,
           createdAt: edtProyecto.createdAt.toISOString(),
-          updatedAt: edtProyecto.updatedAt.toISOString()
+          updatedAt: edtProyecto.updatedAt.toISOString(),
+          proyecto: edtProyecto.proyecto,
+          categoriaServicio: edtProyecto.categoriaServicio
         }
         edtsProyecto.push(edtCompatible)
 

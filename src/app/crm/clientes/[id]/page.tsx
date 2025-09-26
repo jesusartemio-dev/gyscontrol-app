@@ -170,18 +170,9 @@ export default function CrmClienteDetailPage() {
     ))
   }
 
-  const handleCreateContacto = async (data: CreateContactoData) => {
-    try {
-      setSavingContacto(true)
-      const nuevoContacto = await createContacto(clienteId, data)
-      setContactos(prev => [nuevoContacto, ...prev])
-      setShowContactoForm(false)
-    } catch (error) {
-      console.error('Error creating contacto:', error)
-      throw error
-    } finally {
-      setSavingContacto(false)
-    }
+  const handleCreateContacto = (contacto: CrmContactoCliente) => {
+    setContactos(prev => [contacto, ...prev])
+    setShowContactoForm(false)
   }
 
   const handleEditContacto = (contacto: CrmContactoCliente) => {
@@ -641,14 +632,13 @@ export default function CrmClienteDetailPage() {
       </div>
 
       {/* Contacto Form Modal */}
-      {showContactoForm && (
-        <ContactoForm
-          clienteId={clienteId}
-          onSave={handleCreateContacto}
-          onCancel={() => setShowContactoForm(false)}
-          loading={savingContacto}
-        />
-      )}
+      <ContactoForm
+        isOpen={showContactoForm}
+        onClose={() => setShowContactoForm(false)}
+        onSave={handleCreateContacto}
+        clienteId={clienteId}
+        mode="create"
+      />
     </motion.div>
   )
 }

@@ -158,7 +158,8 @@ export default function ListasEquipoPageContent() {
            ListaEquipo: [],
            cotizaciones: [],
            valorizaciones: [],
-           registrosHoras: []
+           registrosHoras: [],
+           cronogramas: []
          },
          // ✅ Transform items to ListaEquipoItemDetail[]
          items: (lista.items || []).map(item => ({

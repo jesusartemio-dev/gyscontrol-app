@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import ContactoList from '@/components/crm/contactos/ContactoList'
 import ContactoForm from '@/components/crm/contactos/ContactoForm'
-import type { CrmContactoCliente } from '@/types'
+import type { CrmContactoCliente } from '@/lib/services/crm'
 
 type Contacto = CrmContactoCliente
 

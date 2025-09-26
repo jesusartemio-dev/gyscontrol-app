@@ -18,7 +18,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import type { CrmContactoCliente } from '@/types'
+import type { CrmContactoCliente } from '@/lib/services/crm'
+
+interface ContactoFormData {
+  nombre: string
+  cargo?: string
+  email?: string
+  telefono?: string
+  celular?: string
+  esDecisionMaker: boolean
+  areasInfluencia?: string
+  relacionComercial?: string
+  notas?: string
+}
 
 interface ContactoFormProps {
    isOpen: boolean
@@ -56,7 +68,7 @@ export default function ContactoForm({
   clienteId,
   mode
 }: ContactoFormProps) {
-  const [formData, setFormData] = useState<CrmContactoCliente>({
+  const [formData, setFormData] = useState<ContactoFormData>({
     nombre: '',
     cargo: '',
     email: '',
@@ -76,8 +88,15 @@ export default function ContactoForm({
     if (isOpen) {
       if (mode === 'edit' && contacto) {
         setFormData({
-          ...contacto,
-          fechaUltimoContacto: contacto.fechaUltimoContacto || ''
+          nombre: contacto.nombre,
+          cargo: contacto.cargo,
+          email: contacto.email,
+          telefono: contacto.telefono,
+          celular: contacto.celular,
+          esDecisionMaker: contacto.esDecisionMaker,
+          areasInfluencia: contacto.areasInfluencia,
+          relacionComercial: contacto.relacionComercial,
+          notas: contacto.notas
         })
       } else {
         setFormData({
@@ -157,7 +176,7 @@ export default function ContactoForm({
     }
   }
 
-  const handleInputChange = (field: keyof CrmContactoCliente, value: string | boolean) => {
+  const handleInputChange = (field: keyof ContactoFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))

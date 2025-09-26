@@ -34,7 +34,7 @@ export default function EstadoCotizacionToolbar({ cotizacion, onUpdated }: Props
   const handleEstadoChange = async (nuevoEstado: string) => {
     try {
       setLoadingEstado(nuevoEstado)
-      await updateCotizacion(cotizacion.id, { estado: nuevoEstado })
+      await updateCotizacion(cotizacion.id, { estado: nuevoEstado as any })
       onUpdated(nuevoEstado)
       toast.success(`Estado actualizado a ${estadosConfig[nuevoEstado as keyof typeof estadosConfig]?.label || nuevoEstado}`)
     } catch {

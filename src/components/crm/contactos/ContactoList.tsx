@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import type { CrmContactoCliente } from '@/types'
+import type { CrmContactoCliente } from '@/lib/services/crm'
 
 interface ContactoListProps {
    contactos: CrmContactoCliente[]
