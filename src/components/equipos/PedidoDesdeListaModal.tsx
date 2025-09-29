@@ -54,6 +54,8 @@ interface Props {
   onCreated: (payload: PedidoEquipoPayload) => Promise<{ id: string } | null>
   onRefresh?: () => void
   trigger?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 interface ItemSelection {
@@ -70,8 +72,14 @@ export default function PedidoDesdeListaModal({
   onCreated,
   onRefresh,
   trigger,
+  open: externalOpen,
+  onOpenChange: externalOnOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  // Use external control if provided, otherwise use internal state
+  const open = externalOpen !== undefined ? externalOpen : internalOpen
+  const setOpen = externalOnOpenChange || setInternalOpen
   const [loading, setLoading] = useState(false)
   const [observacion, setObservacion] = useState('')
   const [fechaNecesaria, setFechaNecesaria] = useState(

@@ -1,608 +1,454 @@
 /**
- * 📄 Página de Detalle de Pedido de Equipos
- * 
- * Permite gestionar un pedido específico y sus items asociados.
- * Incluye funcionalidades para agregar, editar y eliminar items del pedido.
- * 
+ * 🎯 Project Pedido Detail Page
+ *
+ * Shows detailed view of a specific pedido with its items and audit history.
+ * Displays items in table or card view, defaulting to table.
+ *
+ * Features:
+ * - Pedido details and statistics
+ * - Items list with table/card toggle
+ * - Audit history timeline
+ * - Status management
+ * - Navigation back to pedidos list
+ *
  * @author GYS Team
  * @version 1.0.0
  */
 
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
-import { motion } from 'framer-motion'
-import { toast } from 'sonner'
-
-// 🎨 UI Components
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import { Suspense, useEffect, useState } from 'react';
+import { notFound } from 'next/navigation';
+import { getProyectoById } from '@/lib/services/proyecto';
+import { getPedidoEquipoById } from '@/lib/services/pedidoEquipo';
+import { useSession } from 'next-auth/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
-
-// 🎯 Icons
-import { 
-  ArrowLeft, 
-  Package, 
-  Calendar, 
-  User, 
-  MapPin,
-  Plus,
+  ArrowLeft,
+  Package,
+  DollarSign,
+  Calendar,
+  Grid3X3,
+  Table,
   Edit,
-  Trash2,
-  FileText,
-  Activity,
-  Target,
-  Clock,
-  CheckCircle,
-  BarChart3
-} from 'lucide-react'
+  Truck,
+  User,
+  Target
+} from 'lucide-react';
+import Link from 'next/link';
+import type { Proyecto, PedidoEquipo } from '@/types';
+import PedidoEquipoHistorial from '@/components/equipos/PedidoEquipoHistorial';
+import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner';
+import PedidoEquipoEditModal from '@/components/equipos/PedidoEquipoEditModal';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
-// 📡 Services & Types
-import { 
-  getPedidoEquipoById,
-  updatePedidoEquipo,
-  deletePedidoEquipo
-} from '@/lib/services/pedidoEquipo'
-import {
-  createPedidoEquipoItem,
-  updatePedidoEquipoItem,
-  deletePedidoEquipoItem
-} from '@/lib/services/pedidoEquipoItem'
-import { getListaEquiposPorProyecto } from '@/lib/services/listaEquipo'
-import { getProyecto } from '@/lib/services/proyectos'
-
-import type { 
-  PedidoEquipo, 
-  ListaEquipo,
-  Proyecto
-} from '@/types/modelos'
-import type {
-  PedidoEquipoUpdatePayload,
-  PedidoEquipoItemPayload,
-  PedidoEquipoItemUpdatePayload
-} from '@/types/payloads'
-
-// 🧩 Components
-import PedidoEquipoForm from '@/components/proyectos/PedidoEquipoForm'
-import PedidoEquipoItemForm from '@/components/proyectos/PedidoEquipoItemForm'
-import PedidoEquipoItemList from '@/components/proyectos/PedidoEquipoItemList'
-import TrazabilidadTimeline from '@/components/trazabilidad/TrazabilidadTimeline'
-import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-
-// 🎨 Helper functions
-const getEstadoVariant = (estado: string) => {
-  switch (estado) {
-    case 'pendiente': return 'secondary'
-    case 'aprobado': return 'default'
-    case 'rechazado': return 'destructive'
-    case 'completado': return 'outline'
-    default: return 'secondary'
-  }
+// ✅ Page props interface
+interface PageProps {
+  params: Promise<{
+    id: string;
+    pedidoId: string;
+  }>;
 }
 
-const formatCurrency = (amount: number, currency: string = 'USD') => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: 2
-  }).format(amount)
-}
-
-const formatDate = (date: string | Date | null | undefined) => {
-  if (!date) return 'No especificada'
-  
-  const dateObj = new Date(date)
-  if (isNaN(dateObj.getTime())) return 'Fecha inválida'
-  
-  return new Intl.DateTimeFormat('es-PE', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }).format(dateObj)
-}
-
-// 🎯 Main Component
-export default function PedidoEquipoDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const { data: session } = useSession()
-  
-  const proyectoId = params.id as string
-  const pedidoId = params.pedidoId as string
-
-  // 🎯 States
-  const [pedido, setPedido] = useState<PedidoEquipo | null>(null)
-  const [proyecto, setProyecto] = useState<Proyecto | null>(null)
-  const [listas, setListas] = useState<ListaEquipo[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showEditForm, setShowEditForm] = useState(false)
-  const [showItemForm, setShowItemForm] = useState(false)
-
-  // 📡 Data loading
-  useEffect(() => {
-    cargarDatos()
-  }, [pedidoId, proyectoId])
-
-  const cargarDatos = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const [pedidoData, proyectoData, listasData] = await Promise.all([
-        getPedidoEquipoById(pedidoId),
-        getProyecto(proyectoId),
-        getListaEquiposPorProyecto(proyectoId)
-      ])
-      
-      setPedido(pedidoData)
-      setProyecto(proyectoData)
-      setListas(listasData || [])
-    } catch (err) {
-      setError('Error al cargar los datos del pedido')
-      toast.error('Error al cargar los datos del pedido')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const cargarPedido = async () => {
-    try {
-      const data = await getPedidoEquipoById(pedidoId)
-      setPedido(data)
-    } catch {
-      toast.error('Error al cargar pedido')
-    }
-  }
-
-  // 🎯 Event handlers
-  const handleUpdatePedido = async (payload: PedidoEquipoUpdatePayload) => {
-    const actualizado = await updatePedidoEquipo(pedidoId, payload)
-    if (actualizado) {
-      toast.success('Pedido actualizado')
-      setShowEditForm(false)
-      await cargarPedido()
-    } else {
-      toast.error('Error al actualizar pedido')
-    }
-  }
-
-  const handleDeletePedido = async () => {
-    if (!confirm('¿Estás seguro de eliminar este pedido?')) return
-    
-    const ok = await deletePedidoEquipo(pedidoId)
-    if (ok) {
-      toast.success('Pedido eliminado')
-      router.push(`/proyectos/${proyectoId}/equipos/pedidos`)
-    } else {
-      toast.error('Error al eliminar pedido')
-    }
-  }
-
-  const handleCreateItem = async (payload: PedidoEquipoItemPayload) => {
-    const nuevo = await createPedidoEquipoItem(payload)
-    if (nuevo) {
-      toast.success('Ítem agregado al pedido')
-      setShowItemForm(false)
-      await cargarPedido()
-    } else {
-      toast.error('Error al agregar ítem')
-    }
-  }
-
-  const handleUpdateItem = async (id: string, payload: PedidoEquipoItemUpdatePayload) => {
-    const actualizado = await updatePedidoEquipoItem(id, payload)
-    if (actualizado) {
-      toast.success('Ítem actualizado')
-      await cargarPedido()
-    } else {
-      toast.error('Error al actualizar ítem')
-    }
-  }
-
-  const handleDeleteItem = async (id: string) => {
-    const ok = await deletePedidoEquipoItem(id)
-    if (ok) {
-      toast.success('Ítem eliminado')
-      await cargarPedido()
-    } else {
-      toast.error('Error al eliminar ítem')
-    }
-  }
-
-  // 🎯 Loading state
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
+// ✅ Loading skeleton component
+function PedidoDetailSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Header skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96" />
         </div>
+        <Skeleton className="h-10 w-32" />
       </div>
-    )
+
+      {/* Pedido details skeleton */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-6 w-16" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Items list skeleton */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="border rounded-lg p-4">
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ✅ Main page component
+export default function ProjectPedidoDetailPage({ params }: PageProps) {
+  const { data: session } = useSession();
+  const [proyecto, setProyecto] = useState<Proyecto | null>(null);
+  const [pedido, setPedido] = useState<PedidoEquipo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [proyectoId, setProyectoId] = useState<string>('');
+  const [pedidoId, setPedidoId] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => {
+    const fetchParams = async () => {
+      const resolvedParams = await params;
+      setProyectoId(resolvedParams.id);
+      setPedidoId(resolvedParams.pedidoId);
+    };
+    fetchParams();
+  }, [params]);
+
+  useEffect(() => {
+    if (!proyectoId || !pedidoId) return;
+
+    const fetchData = async () => {
+      try {
+        const [proyectoData, pedidoData] = await Promise.all([
+          getProyectoById(proyectoId),
+          getPedidoEquipoById(pedidoId)
+        ]);
+
+        if (!proyectoData || !pedidoData) {
+          notFound();
+          return;
+        }
+
+        setProyecto(proyectoData);
+        setPedido(pedidoData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [proyectoId, pedidoId]);
+
+  if (loading) {
+    return <PedidoDetailSkeleton />;
   }
 
-  // 🎯 Error state
-  if (error || !pedido || !proyecto) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-muted-foreground mb-2">
-              {error || 'Pedido no encontrado'}
-            </h3>
-            <Button onClick={() => router.back()} variant="outline">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  // ✅ Handle not found
+  if (!proyecto || !pedido) {
+    notFound();
   }
 
-  // 📊 Calculate stats
-  const totalItems = pedido.items?.length || 0
-  const itemsEntregados = pedido.items?.filter(item => item.estado === 'entregado').length || 0
-  const itemsPendientes = totalItems - itemsEntregados
-  const progresoEntrega = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0
-  const montoTotal = pedido.items?.reduce((sum, item) => {
-    return sum + ((item.precioUnitario || 0) * item.cantidadPedida)
-  }, 0) || 0
-  const montoEntregado = pedido.items?.filter(item => item.estado === 'entregado')
-    .reduce((sum, item) => sum + ((item.precioUnitario || 0) * item.cantidadPedida), 0) || 0
+  // ✅ Calculate pedido statistics
+  const stats = {
+    totalItems: pedido.items?.length || 0,
+    totalCost: pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0,
+    deliveredItems: pedido.items?.filter(item => item.estado === 'entregado').length || 0,
+    progressPercentage: pedido.items?.length ?
+      ((pedido.items.filter(item => item.estado === 'entregado').length / pedido.items.length) * 100) : 0
+  };
 
   return (
-    <motion.div 
-      className="container mx-auto p-6 space-y-6"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      {/* 🧭 Breadcrumb Navigation */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href={`/proyectos/${proyectoId}`}>
-              {proyecto.nombre}
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href={`/proyectos/${proyectoId}/equipos`}>
-              Equipos
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href={`/proyectos/${proyectoId}/equipos/pedidos`}>
-              Pedidos
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Pedido #{pedido.numeroSecuencia}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className="space-y-6">
+      {/* 📋 Breadcrumb Navigation */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Link href="/proyectos" className="hover:text-foreground transition-colors">
+          Proyectos
+        </Link>
+        <span>/</span>
+        <Link
+          href={`/proyectos/${proyectoId}`}
+          className="hover:text-foreground transition-colors"
+        >
+          {proyecto.nombre}
+        </Link>
+        <span>/</span>
+        <Link
+          href={`/proyectos/${proyectoId}/equipos/pedidos`}
+          className="hover:text-foreground transition-colors"
+        >
+          Pedidos
+        </Link>
+        <span>/</span>
+        <span className="text-foreground font-medium">{pedido.codigo}</span>
+      </div>
 
-      {/* 📋 Header */}
+      {/* 🎯 Page Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.back()}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
+        <div className="space-y-1">
+          <Button variant="ghost" size="sm" asChild className="mb-2">
+            <Link href={`/proyectos/${proyectoId}/equipos/pedidos`}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver a Pedidos
+            </Link>
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Pedido #{pedido.numeroSecuencia}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {proyecto.nombre}
-            </p>
+          <div className="flex items-center gap-3">
+            <Package className="h-8 w-8 text-blue-600" />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {pedido.codigo}
+              </h1>
+              <p className="text-gray-600">
+                Detalle del pedido - {proyecto.nombre}
+              </p>
+            </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <Badge variant={getEstadoVariant(pedido.estado)}>
-            {pedido.estado}
-          </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowEditForm(!showEditForm)}
-          >
+          <div className="flex items-center gap-1 border rounded-lg p-1">
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="h-8"
+            >
+              <Table className="h-4 w-4 mr-2" />
+              Tabla
+            </Button>
+            <Button
+              variant={viewMode === 'card' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('card')}
+              className="h-8"
+            >
+              <Grid3X3 className="h-4 w-4 mr-2" />
+              Cards
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)}>
             <Edit className="h-4 w-4 mr-2" />
             Editar
           </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleDeletePedido}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Eliminar
-          </Button>
         </div>
       </div>
 
-      {/* ✏️ Edit Form */}
-      {showEditForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Editar Pedido</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PedidoEquipoForm
-              proyectoId={proyectoId}
-              listas={listas}
-              pedido={pedido}
-              onSubmit={handleUpdatePedido}
-              onCancel={() => setShowEditForm(false)}
-            />
-          </CardContent>
-        </Card>
-      )}
+      {/* 📊 Estado del Pedido */}
+      <PedidoEstadoFlujoBanner
+        estado={pedido.estado || 'borrador'}
+        pedidoId={pedidoId}
+        pedidoNombre={pedido.codigo}
+        usuarioId={session?.user?.id}
+        onUpdated={(nuevoEstado: string) => {
+          setPedido(prev => prev ? { ...prev, estado: nuevoEstado as any } : null);
+        }}
+      />
 
-      {/* 📊 Pedido Info */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 📋 Main Info */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Información del Pedido
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Número</label>
-                  <p className="font-semibold">#{pedido.numeroSecuencia}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Estado</label>
-                  <div className="mt-1">
-                    <Badge variant={getEstadoVariant(pedido.estado)}>
-                      {pedido.estado}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Fecha de Pedido</label>
-                  <p className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    {formatDate(pedido.fechaPedido)}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Fecha Requerida</label>
-                  <p className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    {formatDate(pedido.fechaNecesaria)}
-                  </p>
-                </div>
-              </div>
-              
-              {pedido.observacion && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Observaciones</label>
-                  <p className="text-sm bg-gray-50 p-3 rounded-md mt-1">
-                    {pedido.observacion}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* 📊 Stats */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Progreso de Entrega
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-blue-600">{progresoEntrega}%</p>
-                <Progress value={progresoEntrega} className="mt-2" />
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="text-center">
-                  <p className="text-green-600 font-semibold">{itemsEntregados}</p>
-                  <p className="text-muted-foreground">Entregados</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-orange-600 font-semibold">{itemsPendientes}</p>
-                  <p className="text-muted-foreground">Pendientes</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-sm font-medium text-muted-foreground">Total Items</p>
-                <p className="text-2xl font-bold">{totalItems}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4 space-y-2">
-              <div className="text-center">
-                <p className="text-sm font-medium text-muted-foreground">Monto Total</p>
-                <p className="text-xl font-bold text-green-600">
-                  {formatCurrency(montoTotal)}
-                </p>
-              </div>
-              <div className="text-center pt-2 border-t">
-                <p className="text-xs text-muted-foreground">Entregado</p>
-                <p className="text-sm font-semibold text-blue-600">
-                  {formatCurrency(montoEntregado)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* 📊 Tabs Section */}
-      <Tabs defaultValue="items" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="items" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Items del Pedido
-          </TabsTrigger>
-          <TabsTrigger value="timeline" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Timeline
-          </TabsTrigger>
-          <TabsTrigger value="reportes" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Reportes
-          </TabsTrigger>
-        </TabsList>
-
-        {/* 📦 Items Tab */}
-        <TabsContent value="items" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Items del Pedido
-            </h2>
-            <Button
-              onClick={() => setShowItemForm(!showItemForm)}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Agregar Item
-            </Button>
+      {/* 📊 Pedido Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-blue-600" />
+            Resumen del Pedido
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-600">Items Totales</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalItems}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-600">Costo Total</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatCurrency(stats.totalCost)}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-600">Items Entregados</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.deliveredItems}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-600">Progreso</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.progressPercentage.toFixed(1)}%</p>
+            </div>
           </div>
 
-          {/* ➕ Add Item Form */}
-          {showItemForm && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Agregar Item al Pedido</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PedidoEquipoItemForm
-                  pedidoId={pedidoId}
-                  listas={listas}
-                  onSubmit={handleCreateItem}
-                  onCancel={() => setShowItemForm(false)}
-                />
-              </CardContent>
-            </Card>
+          {/* Información adicional */}
+          <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4 text-gray-500" />
+                <span className="font-medium">Responsable:</span>
+                <span>{pedido.responsable?.name || 'Sin asignar'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="font-medium">Fecha Pedido:</span>
+                <span>{formatDate(pedido.fechaPedido)}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Target className="h-4 w-4 text-gray-500" />
+                <span className="font-medium">Fecha Necesaria:</span>
+                <span>{pedido.fechaNecesaria ? formatDate(pedido.fechaNecesaria) : 'No especificada'}</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {pedido.fechaEntregaEstimada && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="font-medium">Entrega Estimada:</span>
+                  <span>{formatDate(pedido.fechaEntregaEstimada)}</span>
+                </div>
+              )}
+              {pedido.fechaEntregaReal && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Target className="h-4 w-4 text-gray-500" />
+                  <span className="font-medium">Entrega Real:</span>
+                  <span>{formatDate(pedido.fechaEntregaReal)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {pedido.observacion && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm text-gray-600">{pedido.observacion}</p>
+            </div>
           )}
+        </CardContent>
+      </Card>
 
-          {/* 📋 Items List */}
-          <PedidoEquipoItemList
-            items={pedido.items || []}
-            listas={listas}
-            onUpdate={handleUpdateItem}
-            onDelete={handleDeleteItem}
-          />
-        </TabsContent>
-
-        {/* 📈 Timeline Tab */}
-        <TabsContent value="timeline" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Timeline de Entregas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TrazabilidadTimeline
-                eventos={[]}
-                pedidoId={pedidoId}
-                mostrarDetalles={true}
-                animaciones={true}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 📊 Reportes Tab */}
-        <TabsContent value="reportes" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Análisis del Pedido
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium">Estado de Entregas</h4>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Completado</span>
-                      <span className="text-green-600">{progresoEntrega}%</span>
-                    </div>
-                    <Progress value={progresoEntrega} className="h-2" />
-                  </div>
+      {/* 🎯 Pedido Items */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-blue-600" />
+            Items del Pedido
+            <Badge variant="secondary" className="ml-auto">
+              {pedido.items?.length || 0} items
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Suspense fallback={<PedidoDetailSkeleton />}>
+            {pedido.items && pedido.items.length > 0 ? (
+              <div className="space-y-4">
+                {/* Table View */}
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-900">Código</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-900">Descripción</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-900">Unidad</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-900">Cantidad Pedida</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-900">Cantidad Atendida</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-900">Estado</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-900">Costo Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {pedido.items.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            {item.codigo}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {item.descripcion}
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600">
+                            {item.unidad}
+                          </td>
+                          <td className="px-4 py-3 text-center font-medium text-blue-600">
+                            {item.cantidadPedida}
+                          </td>
+                          <td className="px-4 py-3 text-center font-medium text-green-600">
+                            {item.cantidadAtendida || 0}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge
+                              variant={
+                                item.estado === 'entregado' ? 'default' :
+                                item.estado === 'parcial' ? 'secondary' :
+                                item.estado === 'atendido' ? 'outline' : 'destructive'
+                              }
+                            >
+                              {item.estado}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium text-emerald-600">
+                            {item.costoTotal ? formatCurrency(item.costoTotal) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="space-y-2">
-                  <h4 className="font-medium">Valor Entregado</h4>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Monto</span>
-                      <span className="text-blue-600">
-                        {formatCurrency(montoEntregado)} / {formatCurrency(montoTotal)}
-                      </span>
+
+                {/* Summary */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600">Total Items</p>
+                      <p className="text-xl font-bold text-gray-900">{pedido.items.length}</p>
                     </div>
-                    <Progress 
-                      value={montoTotal > 0 ? (montoEntregado / montoTotal) * 100 : 0} 
-                      className="h-2" 
-                    />
+                    <div>
+                      <p className="text-gray-600">Entregados</p>
+                      <p className="text-xl font-bold text-green-600">
+                        {pedido.items.filter(item => item.estado === 'entregado').length}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Parciales</p>
+                      <p className="text-xl font-bold text-yellow-600">
+                        {pedido.items.filter(item => item.estado === 'parcial').length}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Pendientes</p>
+                      <p className="text-xl font-bold text-red-600">
+                        {pedido.items.filter(item => item.estado === 'pendiente').length}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-              
-              <div className="pt-4 border-t">
-                <Button 
-                  onClick={() => router.push('/gestion/reportes/pedidos')}
-                  variant="outline" 
-                  className="w-full"
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Ver Dashboard Completo
-                </Button>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No hay items en este pedido</p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </motion.div>
-  )
+            )}
+          </Suspense>
+        </CardContent>
+      </Card>
+
+      {/* 📋 Historial de Auditoría */}
+      <PedidoEquipoHistorial
+        pedidoId={pedidoId}
+        className="w-full"
+      />
+
+      {/* ✏️ Modal de Edición */}
+      <PedidoEquipoEditModal
+        pedido={pedido}
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        onUpdated={(pedidoActualizado) => {
+          setPedido(pedidoActualizado);
+        }}
+        fields={['fechaNecesaria', 'observacion']}
+      />
+    </div>
+  );
 }

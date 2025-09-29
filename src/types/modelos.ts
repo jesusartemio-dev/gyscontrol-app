@@ -266,10 +266,10 @@ export interface User {
   proyectosComercial: Proyecto[]
   proyectosGestor: Proyecto[]
   cotizaciones: Cotizacion[]
-  ProyectoEquipos: ProyectoEquipo[]
-  ProyectoEquipoItems: ProyectoEquipoItem[]
-  ProyectoServicios: ProyectoServicio[]
-  ProyectoServicioItems: ProyectoServicioItem[]
+  ProyectoEquipos: ProyectoEquipoCotizado[]
+  ProyectoEquipoItems: ProyectoEquipoCotizadoItem[]
+  ProyectoServicios: ProyectoServicioCotizado[]
+  ProyectoServicioItems: ProyectoServicioCotizadoItem[]
 }
 
 export interface Account {
@@ -879,9 +879,9 @@ export interface Proyecto {
   gestor: User
   cotizacion?: Cotizacion
 
-  equipos: ProyectoEquipo[]
-  servicios: ProyectoServicio[]
-  gastos: ProyectoGasto[]
+  equipos: ProyectoEquipoCotizado[]
+  servicios: ProyectoServicioCotizado[]
+  gastos: ProyectoCotizadoGasto[]
   ListaEquipo: ListaEquipo[]
   cotizaciones: CotizacionProveedor[]
   valorizaciones: Valorizacion[]
@@ -891,7 +891,7 @@ export interface Proyecto {
   cronogramas: ProyectoCronograma[]
 }
 
-export interface ProyectoEquipo {
+export interface ProyectoEquipoCotizado {
   id: string
   proyectoId: string
   responsableId: string
@@ -905,10 +905,10 @@ export interface ProyectoEquipo {
 
   proyecto: Proyecto
   responsable: User
-  items: ProyectoEquipoItem[]
+  items: ProyectoEquipoCotizadoItem[]
 }
 
-export interface ProyectoEquipoItem {
+export interface ProyectoEquipoCotizadoItem {
   id: string
   proyectoEquipoId: string
   catalogoEquipoId?: string
@@ -941,7 +941,7 @@ export interface ProyectoEquipoItem {
   updatedAt: string
 
   // Relaciones
-  proyectoEquipo: ProyectoEquipo
+  proyectoEquipo: ProyectoEquipoCotizado
   catalogoEquipo?: CatalogoEquipo
   listaEquipos: ListaEquipoItem[]
   listaEquipoSeleccionado?: ListaEquipoItem // 🆕 El item vigente actual
@@ -954,7 +954,7 @@ export interface ProyectoEquipoItem {
 
 
 
-export interface ProyectoServicio {
+export interface ProyectoServicioCotizado {
   id: string
   proyectoId: string
   responsableId: string
@@ -969,10 +969,10 @@ export interface ProyectoServicio {
 
   proyecto: Proyecto
   responsable: User
-  items: ProyectoServicioItem[]
+  items: ProyectoServicioCotizadoItem[]
 }
 
-export interface ProyectoServicioItem {
+export interface ProyectoServicioCotizadoItem {
   id: string
   proyectoServicioId: string
   catalogoServicioId?: string
@@ -994,12 +994,12 @@ export interface ProyectoServicioItem {
   createdAt: string
   updatedAt: string
 
-  proyectoServicio: ProyectoServicio
+  proyectoServicio: ProyectoServicioCotizado
   responsable: User
   catalogoServicio?: CatalogoServicio
 }
 
-export interface ProyectoGasto {
+export interface ProyectoCotizadoGasto {
   id: string
   proyectoId: string
 
@@ -1013,9 +1013,9 @@ export interface ProyectoGasto {
   updatedAt: string
 
   proyecto: Proyecto
-  items: ProyectoGastoItem[]
+  items: ProyectoGastoCotizadoItem[]
 }
-export interface ProyectoGastoItem {
+export interface ProyectoGastoCotizadoItem {
   id: string
   gastoId: string
 
@@ -1032,7 +1032,7 @@ export interface ProyectoGastoItem {
   createdAt: string
   updatedAt: string
 
-  gasto: ProyectoGasto
+  gasto: ProyectoCotizadoGasto
 }
 
 // ============================
@@ -1283,7 +1283,7 @@ export interface RegistroHoras {
   updatedAt: string
 
   proyecto: Proyecto
-  proyectoServicio: ProyectoServicio
+  proyectoServicio: ProyectoServicioCotizado
   recurso: Recurso
   usuario: {
     id: string;
@@ -1419,7 +1419,7 @@ export interface TareaBase {
 // 📋 Interfaz completa de Tarea con relaciones
 export interface Tarea extends TareaBase {
   // 🔗 Relaciones
-  proyectoServicio: ProyectoServicio
+  proyectoServicio: ProyectoServicioCotizado
   responsable: User
   subtareas: Subtarea[]
   dependenciasOrigen: DependenciaTarea[] // Tareas que dependen de esta
@@ -1988,4 +1988,120 @@ export interface CrmContactoCliente {
   notas?: string
   createdAt?: string
   updatedAt?: string
+}
+
+// ===================================================
+// 📋 SISTEMA DE PERMISOS GRANULARES
+// ===================================================
+
+// ✅ Tipos de acciones de permisos
+export type PermissionAction = 'create' | 'read' | 'update' | 'delete' | 'manage' | 'view' | 'export' | 'import'
+
+// ✅ Recursos del sistema
+export type PermissionResource =
+  | 'users'
+  | 'roles'
+  | 'permissions'
+  | 'projects'
+  | 'cotizaciones'
+  | 'clientes'
+  | 'proveedores'
+  | 'equipos'
+  | 'servicios'
+  | 'gastos'
+  | 'listas'
+  | 'pedidos'
+  | 'valorizaciones'
+  | 'reportes'
+  | 'configuracion'
+  | 'auditoria'
+
+// ✅ Interfaz de Permiso
+export interface Permission {
+  id: string
+  name: string              // Ej: 'users.create', 'projects.read'
+  description: string
+  resource: PermissionResource
+  action: PermissionAction
+  isSystemPermission: boolean  // Los permisos base del sistema
+  createdAt: string
+  updatedAt: string
+}
+
+// ✅ Interfaz de Rol Personalizado (además de los system roles)
+export interface CustomRole {
+  id: string
+  name: string
+  description: string
+  permissions: Permission[]
+  isActive: boolean
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+// ✅ Interfaz extendida de Usuario con permisos
+export interface UserWithPermissions extends User {
+  customPermissions: UserPermission[]
+  effectivePermissions: Permission[]  // Permisos calculados (rol + overrides)
+}
+
+// ✅ Tipos de permisos de usuario (overrides)
+export type UserPermissionType = 'grant' | 'deny'
+
+export interface UserPermission {
+  id: string
+  userId: string
+  permissionId: string
+  type: UserPermissionType  // grant o deny
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  permission: Permission
+}
+
+// ✅ Interfaz para matriz de permisos
+export interface PermissionMatrix {
+  resource: PermissionResource
+  actions: {
+    [K in PermissionAction]?: {
+      permission: Permission
+      hasPermission: boolean
+      source: 'role' | 'user_grant' | 'user_deny'
+    }
+  }
+}
+
+// ✅ Interfaz para configuración de permisos por rol
+export interface RolePermissionConfig {
+  role: RolUsuario
+  permissions: {
+    [resource in PermissionResource]?: PermissionAction[]
+  }
+}
+
+// ===================================================
+//  SISTEMA DE AUDITORÍA E HISTORIAL
+// ===================================================
+
+// ✅ Interfaz para registros de auditoría
+export interface AuditLog {
+  id: string
+  entidadTipo: string // 'LISTA_EQUIPO', 'PEDIDO_EQUIPO', 'PROYECTO', 'COTIZACION', 'OPORTUNIDAD'
+  entidadId: string // ID de la entidad afectada
+  accion: string // 'CREAR', 'ACTUALIZAR', 'ELIMINAR', 'CAMBIAR_ESTADO', etc.
+  usuarioId: string // Usuario que realizó la acción
+  descripcion: string // Descripción legible de la acción
+  cambios?: string // JSON con { campo: { anterior: valor, nuevo: valor } }
+  metadata?: string // JSON con información adicional del contexto
+  createdAt: string
+
+  // Relación con usuario
+  usuario: {
+    id: string
+    name: string | null
+    email: string
+  }
 }

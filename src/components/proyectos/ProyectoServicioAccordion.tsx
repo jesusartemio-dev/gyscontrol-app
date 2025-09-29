@@ -12,10 +12,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
-import type { ProyectoServicio } from '@/types'
+import type { ProyectoServicioCotizado } from '@/types'
 
 interface Props {
-  servicio: ProyectoServicio
+  servicio: ProyectoServicioCotizado
   onUpdatedItem?: () => void
 }
 

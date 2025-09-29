@@ -53,6 +53,13 @@ export interface ListaEquipoMaster {
     itemsRechazados: number
     costoTotal: number
     costoAprobado: number
+    // 📦 Estadísticas de pedidos
+    itemsConPedido: number
+    itemsSinPedido: number
+    numeroPedidos: number
+    pedidosCompletos: number
+    pedidosParciales: number
+    pedidosPendientes: number
   }
   
   // 🏗️ Información mínima del proyecto

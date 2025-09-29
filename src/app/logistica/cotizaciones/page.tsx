@@ -3,16 +3,19 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import { 
-  Plus, 
-  Package, 
-  TrendingUp, 
-  Clock, 
-  CheckCircle, 
+import { useSession } from 'next-auth/react'
+import {
+  Plus,
+  Package,
+  TrendingUp,
+  Clock,
+  CheckCircle,
   AlertCircle,
   FileText,
   Users,
-  Loader2
+  Loader2,
+  Grid3X3,
+  Table
 } from 'lucide-react'
 
 import { CotizacionProveedor, Proyecto, Proveedor } from '@/types'
@@ -26,18 +29,22 @@ import { getProveedores } from '@/lib/services/proveedor'
 
 import CotizacionProveedorAccordion from '@/components/logistica/CotizacionProveedorAccordion'
 import ModalCrearCotizacionProveedor from '@/components/logistica/ModalCrearCotizacionProveedor'
+import CotizacionesProveedorTableView from '@/components/logistica/CotizacionesProveedorTableView'
+import CotizacionesProveedorCardView from '@/components/logistica/CotizacionesProveedorCardView'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 
 export default function CotizacionesPage() {
+  const { data: session } = useSession()
   const [cotizaciones, setCotizaciones] = useState<CotizacionProveedor[]>([])
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [openModal, setOpenModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingAction, setLoadingAction] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
   const cargarCotizaciones = async () => {
     try {
@@ -75,31 +82,53 @@ export default function CotizacionesPage() {
   // ✅ Nueva función para actualización local de estado sin refetch
   const handleEstadoUpdated = async (cotizacionId: string, nuevoEstado: CotizacionProveedor['estado']) => {
     try {
+      // Buscar la cotización para obtener el estado anterior
+      const cotizacion = cotizaciones.find(c => c.id === cotizacionId);
+      const estadoAnterior = cotizacion?.estado;
+
       // Actualizar estado local inmediatamente
-      setCotizaciones(prev => 
-        prev.map(cot => 
+      setCotizaciones(prev =>
+        prev.map(cot =>
           cot.id === cotizacionId ? { ...cot, estado: nuevoEstado } : cot
         )
-      )
-      
+      );
+
       // Llamar al servicio para persistir el cambio
-      await updateCotizacionProveedor(cotizacionId, { estado: nuevoEstado })
+      await updateCotizacionProveedor(cotizacionId, { estado: nuevoEstado });
+
+      // ✅ Registrar auditoría del cambio de estado
+      if (estadoAnterior && estadoAnterior !== nuevoEstado) {
+        try {
+          const { logStatusChange } = await import('@/lib/services/auditLogger');
+          await logStatusChange({
+            userId: (session?.user as any)?.id || '',
+            entityType: 'COTIZACION',
+            entityId: cotizacionId,
+            oldStatus: estadoAnterior,
+            newStatus: nuevoEstado,
+            description: cotizacion?.codigo || `Cotización ${cotizacionId}`
+          });
+        } catch (auditError) {
+          console.warn('Error al registrar auditoría:', auditError);
+          // No fallar la operación por error de auditoría
+        }
+      }
     } catch (error) {
-      console.error('Error al actualizar estado:', error)
+      console.error('Error al actualizar estado:', error);
       // Revertir cambio local en caso de error
-      setCotizaciones(prev => 
+      setCotizaciones(prev =>
         prev.map(cot => {
           if (cot.id === cotizacionId) {
             // Buscar el estado original
-            const originalCotizacion = cotizaciones.find(c => c.id === cotizacionId)
-            return originalCotizacion ? { ...cot, estado: originalCotizacion.estado } : cot
+            const originalCotizacion = cotizaciones.find(c => c.id === cotizacionId);
+            return originalCotizacion ? { ...cot, estado: originalCotizacion.estado } : cot;
           }
-          return cot
+          return cot;
         })
-      )
-      throw error // Re-throw para que el componente maneje el error
+      );
+      throw error; // Re-throw para que el componente maneje el error
     }
-  }
+  };
 
   const cargarDatosIniciales = async () => {
     try {
@@ -170,6 +199,16 @@ export default function CotizacionesPage() {
 
   const estadisticas = getEstadisticas()
 
+  // ✅ Wrapper functions for table/card views
+  const handleEditCotizacion = (cotizacion: CotizacionProveedor) => {
+    // For now, just show a placeholder - could open edit modal
+    console.log('Edit cotizacion:', cotizacion);
+  }
+
+  const handleDeleteCotizacion = async (cotizacion: CotizacionProveedor) => {
+    await handleDelete(cotizacion.id);
+  }
+
   if (loading) {
     return (
       <div className="p-6 space-y-6">
@@ -232,24 +271,47 @@ export default function CotizacionesPage() {
               Gestiona y supervisa todas las cotizaciones de proveedores
             </p>
           </div>
-          
-          <Button
-            onClick={() => setOpenModal(true)}
-            disabled={loadingAction}
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-          >
-            {loadingAction ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Procesando...
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Cotización
-              </>
-            )}
-          </Button>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 border rounded-lg p-1">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className="h-8"
+              >
+                <Table className="h-4 w-4 mr-2" />
+                Tabla
+              </Button>
+              <Button
+                variant={viewMode === 'card' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('card')}
+                className="h-8"
+              >
+                <Grid3X3 className="h-4 w-4 mr-2" />
+                Cards
+              </Button>
+            </div>
+
+            <Button
+              onClick={() => setOpenModal(true)}
+              disabled={loadingAction}
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              {loadingAction ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Cotización
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         <Separator />
@@ -312,45 +374,31 @@ export default function CotizacionesPage() {
       </motion.div>
 
       {/* Content Section */}
-      <motion.div 
+      <motion.div
         className="space-y-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.3 }}
       >
         {cotizaciones.length > 0 ? (
-          <motion.div 
-            className="space-y-4"
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden: { opacity: 0 },
-              visible: {
-                opacity: 1,
-                transition: {
-                  staggerChildren: 0.1
-                }
-              }
-            }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
           >
-            {cotizaciones.map((cot, index) => (
-              <motion.div
-                key={cot.id}
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: { opacity: 1, y: 0 }
-                }}
-                transition={{ duration: 0.3 }}
-              >
-                <CotizacionProveedorAccordion
-                  cotizacion={cot}
-                  onUpdate={handleUpdate}
-                  onDelete={handleDelete}
-                  onUpdatedItem={() => handleCotizacionUpdated(cot.id)}
-                  onEstadoUpdated={handleEstadoUpdated}
-                />
-              </motion.div>
-            ))}
+            {viewMode === 'table' ? (
+              <CotizacionesProveedorTableView
+                cotizaciones={cotizaciones}
+                onEdit={handleEditCotizacion}
+                onDelete={handleDeleteCotizacion}
+              />
+            ) : (
+              <CotizacionesProveedorCardView
+                cotizaciones={cotizaciones}
+                onEdit={handleEditCotizacion}
+                onDelete={handleDeleteCotizacion}
+              />
+            )}
           </motion.div>
         ) : (
           <motion.div

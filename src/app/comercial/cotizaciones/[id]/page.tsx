@@ -47,6 +47,7 @@ import {
   updateCotizacionGastoItem
 } from '@/lib/services/cotizacionGastoItem'
 import { deleteCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
+import { updateCotizacionEquipoItem } from '@/lib/services/cotizacionEquipoItem'
 
 // UI Components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -136,6 +137,9 @@ export default function CotizacionDetallePage() {
 
   // ✅ Estado para controlar la vista activa (Equipos, Servicios, Gastos, Cronograma, Cabecera, Exclusiones, Condiciones)
   const [activeSection, setActiveSection] = useState<'equipos' | 'servicios' | 'gastos' | 'cronograma' | 'cabecera' | 'exclusiones' | 'condiciones'>('equipos')
+
+  // ✅ Estado para forzar re-render después de importar plantillas
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Function to handle data updates with PDF protection
   const handleDataUpdate = (updatedCotizacion: Cotizacion) => {
@@ -775,6 +779,7 @@ export default function CotizacionDetallePage() {
         {/* Equipos */}
         {activeSection === 'equipos' && (
           <motion.section
+            key={`equipos-${refreshKey}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.7 }}
@@ -863,10 +868,20 @@ export default function CotizacionDetallePage() {
                     }}
                   >
                     <CotizacionEquipoAccordion
+                      key={`${e.id}-${e.items?.length || 0}`}
                       equipo={e}
                       onCreated={i => actualizarEquipo(e.id, items => [...items, i])}
                       onMultipleCreated={newItems => actualizarEquipo(e.id, items => [...items, ...newItems])}
-                      onUpdated={item => actualizarEquipo(e.id, items => items.map(i => i.id === item.id ? item : i))}
+                      onUpdated={async (item) => {
+                        // Update the item in the database
+                        await updateCotizacionEquipoItem(item.id, {
+                          cantidad: item.cantidad,
+                          costoInterno: item.costoInterno,
+                          costoCliente: item.costoCliente
+                        })
+                        // Update local state
+                        actualizarEquipo(e.id, items => items.map(i => i.id === item.id ? item : i))
+                      }}
                       onDeleted={id => actualizarEquipo(e.id, items => items.filter(i => i.id !== id))}
                       onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)}
                       onUpdatedNombre={nuevo => handleActualizarNombreEquipo(e.id, nuevo)}
@@ -1230,6 +1245,8 @@ export default function CotizacionDetallePage() {
               try {
                 const updatedCotizacion = await getCotizacionById(id)
                 setCotizacion(updatedCotizacion)
+                // Forzar re-render de la sección completa
+                setRefreshKey(prev => prev + 1)
               } catch (error) {
                 setError('Error al recargar cotización.')
               }

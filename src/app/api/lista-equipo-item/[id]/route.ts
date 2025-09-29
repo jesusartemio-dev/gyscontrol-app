@@ -216,7 +216,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
 
     // 🧹 Si el ítem proviene de ProyectoEquipoItem, hacer rollback completo
     if (item.proyectoEquipoItemId) {
-      await prisma.proyectoEquipoItem.update({
+      await prisma.proyectoEquipoCotizadoItem.update({
         where: { id: item.proyectoEquipoItemId },
         data: {
           listaEquipoSeleccionadoId: null,

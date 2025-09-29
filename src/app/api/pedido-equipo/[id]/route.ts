@@ -11,6 +11,8 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { PedidoEquipoUpdatePayload } from '@/types'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 // ✅ Obtener pedido por ID
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -64,8 +66,36 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 // ✅ Actualizar pedido
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
+    // Verificar autenticación
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await context.params
     const body: PedidoEquipoUpdatePayload = await req.json()
+
+    // Obtener el pedido actual antes de actualizar para comparar cambios
+    const pedidoActual = await prisma.pedidoEquipo.findUnique({
+      where: { id },
+      select: {
+        observacion: true,
+        fechaNecesaria: true,
+        fechaEntregaEstimada: true,
+        estado: true,
+        codigo: true,
+        proyecto: {
+          select: { nombre: true }
+        }
+      }
+    })
+
+    if (!pedidoActual) {
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
+    }
 
     const data = await prisma.pedidoEquipo.update({
       where: { id },
@@ -76,8 +106,8 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         estado: body.estado,
         observacion: body.observacion,
         fechaPedido: body.fechaPedido ? new Date(body.fechaPedido) : undefined,
-        fechaNecesaria: body.fechaNecesaria ? new Date(body.fechaNecesaria) : undefined,
-        fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : null,
+        fechaNecesaria: body.fechaNecesaria ? new Date(body.fechaNecesaria + 'T00:00:00') : undefined,
+        fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada + 'T00:00:00') : null,
         fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : null,
       },
       include: {
@@ -91,6 +121,48 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         },
       },
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      // Determinar qué campos cambiaron
+      const cambios: Record<string, { anterior: any; nuevo: any }> = {}
+
+      if (body.observacion !== undefined && body.observacion !== pedidoActual.observacion) {
+        cambios.observacion = { anterior: pedidoActual.observacion, nuevo: body.observacion }
+      }
+
+      if (body.fechaNecesaria !== undefined && body.fechaNecesaria !== pedidoActual.fechaNecesaria?.toISOString().split('T')[0]) {
+        cambios.fechaNecesaria = { anterior: pedidoActual.fechaNecesaria?.toISOString().split('T')[0], nuevo: body.fechaNecesaria }
+      }
+
+      if (body.fechaEntregaEstimada !== undefined && body.fechaEntregaEstimada !== pedidoActual.fechaEntregaEstimada?.toISOString().split('T')[0]) {
+        cambios.fechaEntregaEstimada = { anterior: pedidoActual.fechaEntregaEstimada?.toISOString().split('T')[0], nuevo: body.fechaEntregaEstimada }
+      }
+
+      if (body.estado !== undefined && body.estado !== pedidoActual.estado) {
+        cambios.estado = { anterior: pedidoActual.estado, nuevo: body.estado }
+      }
+
+      if (Object.keys(cambios).length > 0) {
+        await prisma.auditLog.create({
+          data: {
+            entidadTipo: 'PEDIDO_EQUIPO',
+            entidadId: id,
+            accion: 'ACTUALIZAR',
+            usuarioId: session.user.id,
+            descripcion: `Actualización del pedido ${pedidoActual.codigo}`,
+            cambios: JSON.stringify(cambios),
+            metadata: JSON.stringify({
+              proyecto: pedidoActual.proyecto.nombre,
+              codigo: pedidoActual.codigo
+            })
+          }
+        })
+      }
+    } catch (auditError) {
+      console.error('Error al registrar auditoría:', auditError)
+      // No fallar la actualización por error de auditoría
+    }
 
     return NextResponse.json(data)
   } catch (error) {

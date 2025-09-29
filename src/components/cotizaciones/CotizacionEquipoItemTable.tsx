@@ -123,19 +123,51 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
                   <td className="p-2 text-center space-x-1">
                     {isEdit ? (
                       <>
-                        <button onClick={() => guardarCambios(item)}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            guardarCambios(item)
+                          }}
+                          className="p-1 hover:bg-blue-50 rounded"
+                        >
                           <Save className="w-5 h-5 text-blue-600" />
                         </button>
-                        <button onClick={cancelarEdicion}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            cancelarEdicion()
+                          }}
+                          className="p-1 hover:bg-gray-50 rounded"
+                        >
                           <X className="w-5 h-5 text-gray-500" />
                         </button>
                       </>
                     ) : (
                       <>
-                        <button onClick={() => iniciarEdicion(item)}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            iniciarEdicion(item)
+                          }}
+                          className="p-1 hover:bg-yellow-50 rounded"
+                        >
                           <Pencil className="w-5 h-5 text-yellow-600" />
                         </button>
-                        <button onClick={() => onDeleted?.(item.id)}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onDeleted?.(item.id)
+                          }}
+                          className="p-1 hover:bg-red-50 rounded"
+                        >
                           <Trash2 className="w-5 h-5 text-red-500" />
                         </button>
                       </>

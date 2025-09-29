@@ -48,10 +48,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizadoItem } from '@/types'
 
 interface Props {
-  items: ProyectoEquipoItem[]
+  items: ProyectoEquipoCotizadoItem[]
   onUpdated?: () => void
 }
 

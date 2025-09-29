@@ -2,24 +2,57 @@
 "use client"
 
 import { Trash2 } from "lucide-react"
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 
 interface Props {
   onConfirm: () => void
+  title?: string
+  description?: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function DeleteAlertDialog({ onConfirm }: Props) {
-  const [open, setOpen] = useState(false)
+export function DeleteAlertDialog({
+  onConfirm,
+  title = "¿Eliminar ítem?",
+  description = "Esta acción no se puede deshacer.",
+  open,
+  onOpenChange
+}: Props) {
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  const isControlled = open !== undefined && onOpenChange !== undefined
+  const dialogOpen = isControlled ? open : internalOpen
+  const setDialogOpen = isControlled ? onOpenChange : setInternalOpen
 
   const handleDelete = () => {
     onConfirm()
-    setOpen(false)
+    setDialogOpen(false)
   }
 
+  // If controlled, don't render the trigger button
+  if (isControlled) {
+    return (
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // If uncontrolled, render with trigger
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon">
           <Trash2 className="w-4 h-4 text-red-500" />
@@ -27,11 +60,11 @@ export function DeleteAlertDialog({ onConfirm }: Props) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <h3 className="text-lg font-semibold">¿Eliminar ítem?</h3>
-          <p className="text-sm text-muted-foreground">Esta acción no se puede deshacer.</p>
+          <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
+          <p className="text-sm text-muted-foreground">{description}</p>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
           <Button variant="destructive" onClick={handleDelete}>Eliminar</Button>
         </DialogFooter>
       </DialogContent>

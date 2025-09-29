@@ -12,10 +12,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
-import type { ProyectoGasto } from '@/types'
+import type { ProyectoCotizadoGasto } from '@/types'
 
 interface Props {
-  gasto: ProyectoGasto
+  gasto: ProyectoCotizadoGasto
   onUpdatedItem?: () => void
 }
 

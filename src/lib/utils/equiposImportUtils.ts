@@ -35,6 +35,7 @@ export async function importarEquiposDesdeExcelValidado(
 }> {
   const errores: string[] = []
   const equiposValidos: EquipoImportadoTemporal[] = []
+  const codigosEnArchivo: Set<string> = new Set()
 
   for (let [index, row] of rows.entries()) {
     const categoria = categorias.find(c => c.nombre.toLowerCase() === row['Categoría']?.toLowerCase())
@@ -50,6 +51,17 @@ export async function importarEquiposDesdeExcelValidado(
     }
 
     const codigo = row['Código']
+    if (!codigo || codigo.trim() === '') {
+      errores.push(`Fila ${index + 2}: Código no puede estar vacío.`)
+      continue
+    }
+
+    // Check for duplicates within the file
+    if (codigosEnArchivo.has(codigo)) {
+      errores.push(`Fila ${index + 2}: Código "${codigo}" duplicado en el archivo.`)
+      continue
+    }
+
     const yaExiste = codigosExistentes.includes(codigo)
     const precioInterno = parseFloat(row['PrecioInterno']) || 0
     const margen = 0.25
@@ -67,6 +79,8 @@ export async function importarEquiposDesdeExcelValidado(
       estado: 'pendiente',
       duplicado: yaExiste,
     })
+
+    codigosEnArchivo.add(codigo)
   }
 
   return { equiposValidos, errores }

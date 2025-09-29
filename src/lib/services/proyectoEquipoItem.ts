@@ -7,9 +7,9 @@
 // ===================================================
 
 import type {
-  ProyectoEquipoItem,
-  ProyectoEquipoItemPayload,
-  ProyectoEquipoItemUpdatePayload,
+  ProyectoEquipoCotizadoItem,
+  ProyectoEquipoCotizadoItemPayload,
+  ProyectoEquipoCotizadoItemUpdatePayload,
 } from '@/types'
 import { buildApiUrl } from '@/lib/utils'
 
@@ -17,7 +17,7 @@ import { buildApiUrl } from '@/lib/utils'
 export async function getProyectoEquipoItems(
   proyectoId: string,
   soloDisponibles: boolean = false
-): Promise<ProyectoEquipoItem[]> {
+): Promise<ProyectoEquipoCotizadoItem[]> {
   try {
     const endpoint = soloDisponibles
       ? `/api/proyecto-equipo-item/from-proyecto/${proyectoId}?soloDisponibles=true`
@@ -34,12 +34,12 @@ export async function getProyectoEquipoItems(
 }
 
 // 🔁 Alias por compatibilidad: obtiene ítems sin lista técnica asignada
-export async function getProyectoEquipoItemsDisponibles(proyectoId: string): Promise<ProyectoEquipoItem[]> {
+export async function getProyectoEquipoItemsDisponibles(proyectoId: string): Promise<ProyectoEquipoCotizadoItem[]> {
   return getProyectoEquipoItems(proyectoId, true)
 }
 
 // ✅ Obtener un ítem por ID
-export async function getProyectoEquipoItemById(id: string): Promise<ProyectoEquipoItem | null> {
+export async function getProyectoEquipoItemById(id: string): Promise<ProyectoEquipoCotizadoItem | null> {
   try {
     const url = buildApiUrl(`/api/proyecto-equipo-item/${id}`)
     const res = await fetch(url, { cache: 'no-store' })
@@ -53,8 +53,8 @@ export async function getProyectoEquipoItemById(id: string): Promise<ProyectoEqu
 
 // ✅ Crear ítem (puede derivarse de un ítem anterior mediante listaEquipoSeleccionadoId)
 export async function createProyectoEquipoItem(
-  data: ProyectoEquipoItemPayload
-): Promise<ProyectoEquipoItem> {
+  data: ProyectoEquipoCotizadoItemPayload
+): Promise<ProyectoEquipoCotizadoItem> {
   try {
     const res = await fetch(buildApiUrl('/api/proyecto-equipo-item'), {
       method: 'POST',
@@ -72,8 +72,8 @@ export async function createProyectoEquipoItem(
 // ✅ Actualizar ítem (incluye campo listaEquipoSeleccionadoId para trazabilidad)
 export async function updateProyectoEquipoItem(
   id: string,
-  data: ProyectoEquipoItemUpdatePayload
-): Promise<ProyectoEquipoItem> {
+  data: ProyectoEquipoCotizadoItemUpdatePayload
+): Promise<ProyectoEquipoCotizadoItem> {
   try {
     const res = await fetch(`/api/proyecto-equipo-item/${id}`, {
       method: 'PUT',

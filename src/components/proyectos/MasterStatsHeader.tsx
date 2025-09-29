@@ -16,19 +16,14 @@
 
 import React from 'react';
 import { motion, type Variants } from 'framer-motion';
-import { 
-  List, 
-  Package, 
-  DollarSign, 
-  BarChart3, 
-  TrendingUp,
-  Clock,
-  CheckCircle2,
-  AlertCircle
+import {
+  List,
+  Package,
+  DollarSign,
+  BarChart3
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { formatCurrency } from '@/lib/utils';
 
 // 📊 Types
@@ -225,74 +220,6 @@ export function MasterStatsHeader({
         })}
       </div>
 
-      {/* 📈 Progress Section */}
-      {showProgress && stats.listasPorEstado && (
-        <motion.div
-          variants={itemVariants}
-          className="mt-6"
-        >
-          <Card className="overflow-hidden border-0 shadow-lg bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                    Distribución por Estado
-                  </h3>
-                  <Badge variant="outline" className="text-sm">
-                    {completionRate}% completado
-                  </Badge>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Progreso General</span>
-                    <span className="font-medium">{completionRate}%</span>
-                  </div>
-                  <Progress 
-                    value={completionRate} 
-                    className="h-2"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <div>
-                      <p className="text-sm font-medium">{stats.listasPorEstado.aprobado || 0}</p>
-                      <p className="text-xs text-muted-foreground">Aprobadas</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-yellow-600" />
-                    <div>
-                      <p className="text-sm font-medium">{stats.listasPorEstado.pendiente || 0}</p>
-                      <p className="text-xs text-muted-foreground">Pendientes</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-orange-600" />
-                    <div>
-                      <p className="text-sm font-medium">{stats.listasPorEstado.revision || 0}</p>
-                      <p className="text-xs text-muted-foreground">En Revisión</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <div>
-                      <p className="text-sm font-medium">{stats.listasPorEstado.rechazado || 0}</p>
-                      <p className="text-xs text-muted-foreground">Rechazadas</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
     </motion.div>
   );
 }

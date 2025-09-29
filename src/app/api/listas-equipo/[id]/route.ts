@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import logger from '@/lib/logger'
+import { registrarActualizacion } from '@/lib/services/audit'
 
 // ✅ GET - Obtener lista de equipos por ID
 export async function GET(
@@ -132,6 +133,24 @@ export async function PUT(
       listaId: id,
       changes: body
     })
+
+    // ✅ Registrar en auditoría
+    try {
+      await registrarActualizacion(
+        'LISTA_EQUIPO',
+        id,
+        session.user.id,
+        `Lista "${listaEquipoActualizada.nombre}" actualizada`,
+        body,
+        {
+          proyectoNombre: listaEquipoActualizada.proyecto.nombre,
+          responsableNombre: listaEquipoActualizada.responsable.name
+        }
+      )
+    } catch (auditError) {
+      logger.error('Error al registrar auditoría:', auditError)
+      // No fallar la actualización por error de auditoría
+    }
 
     return NextResponse.json(listaEquipoActualizada)
 

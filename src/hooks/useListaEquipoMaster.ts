@@ -24,11 +24,10 @@ import { toast } from 'sonner';
 import { ListaEquipo } from '@/types/modelos';
 import { ListaEquipoMaster } from '@/types/master-detail';
 import { ListaEquipoUpdatePayload } from '@/types/payloads';
-import { 
+import {
   getListasEquipoMaster,
   ListaEquipoMasterResponse,
-  ListaEquipoFilters,
-  ListaEquipoMaster as ServiceListaEquipoMaster
+  ListaEquipoFilters
 } from '@/lib/services/listaEquipo';
 import { useListaEquipoSync } from './useListaEquipoSync';
 import { 
@@ -237,14 +236,11 @@ export const useListaEquipoMaster = ({
     }
   }, [deleteListaWithSync]);
   
-  // 🔄 Extract data from optimized Master response and convert to master-detail type
+  // 🔄 Extract data from optimized Master response
   const listas = useMemo(() => {
     if (!masterResponse?.data) return [];
-    // Convert service type to master-detail type
-    return masterResponse.data.map((lista: ServiceListaEquipoMaster): ListaEquipoMaster => ({
-      ...lista,
-      estado: lista.estado as any // Type assertion since both use EstadoListaEquipo now
-    }));
+    // Data from API already matches the expected ListaEquipoMaster interface
+    return masterResponse.data as ListaEquipoMaster[];
   }, [masterResponse]);
   
   // 🔧 Helper function to parse SortOption
@@ -367,7 +363,7 @@ export const useListaEquipoMaster = ({
   
   // 🔄 Navigation
   const navigateToDetail = useCallback((listaId: string) => {
-    router.push(`/proyectos/${proyectoId}/equipos/${listaId}/detalle`);
+    router.push(`/proyectos/${proyectoId}/equipos/listas/${listaId}`);
   }, [router, proyectoId]);
   
   // 🔄 Load view mode preference on mount

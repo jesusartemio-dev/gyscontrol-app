@@ -23,15 +23,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import { PedidoEquipo, EstadoPedido } from '@/types/modelos'
 import { Loader2, FileText, Calendar, MessageSquare } from 'lucide-react'
+import { formatDateForInput } from '@/lib/utils/date'
 
 interface Props {
   pedido: PedidoEquipo | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdated: (pedido: PedidoEquipo) => void
+  fields?: ('fechaNecesaria' | 'fechaEntregaEstimada' | 'estado' | 'observacion')[]
 }
 
-export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUpdated }: Props) {
+export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUpdated, fields }: Props) {
   const [observacion, setObservacion] = useState('')
   const [fechaNecesaria, setFechaNecesaria] = useState('')
   const [fechaEntregaEstimada, setFechaEntregaEstimada] = useState('')
@@ -39,12 +41,18 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<{ fechaNecesaria?: string; fechaEntregaEstimada?: string }>({})
 
+  // Default fields to show if none specified
+  const defaultFields: ('fechaNecesaria' | 'fechaEntregaEstimada' | 'estado' | 'observacion')[] =
+    ['fechaNecesaria', 'fechaEntregaEstimada', 'estado', 'observacion']
+
+  const visibleFields = fields || defaultFields
+
   // Reset form when pedido changes
   useEffect(() => {
     if (pedido) {
       setObservacion(pedido.observacion || '')
-      setFechaNecesaria(pedido.fechaNecesaria || '')
-      setFechaEntregaEstimada(pedido.fechaEntregaEstimada || '')
+      setFechaNecesaria(pedido.fechaNecesaria ? formatDateForInput(pedido.fechaNecesaria) : '')
+      setFechaEntregaEstimada(pedido.fechaEntregaEstimada ? formatDateForInput(pedido.fechaEntregaEstimada) : '')
       setEstado(pedido.estado || 'borrador')
       setErrors({})
     }
@@ -89,7 +97,7 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
     try {
       setLoading(true)
 
-      // Preparar payload para API
+      // Preparar payload para API - ensure dates are sent as date-only strings
       const payload = {
         observacion: observacion.trim() || null,
         fechaNecesaria: fechaNecesaria || null,
@@ -223,10 +231,10 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {visibleFields.includes('fechaNecesaria') && (
             <div className="space-y-2">
               <Label htmlFor="fechaNecesaria" className="text-sm font-medium text-gray-700">
-                Fecha Necesaria (Opcional)
+                Fecha Necesaria
               </Label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -250,7 +258,9 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
                 </motion.p>
               )}
             </div>
+          )}
 
+          {visibleFields.includes('fechaEntregaEstimada') && (
             <div className="space-y-2">
               <Label htmlFor="fechaEntregaEstimada" className="text-sm font-medium text-gray-700">
                 Fecha Entrega Estimada (Opcional)
@@ -276,42 +286,46 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
                 </motion.p>
               )}
             </div>
-          </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="estado" className="text-sm font-medium text-gray-700">
-              Estado del Pedido
-            </Label>
-            <Select value={estado} onValueChange={handleEstadoChange} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un estado" />
-              </SelectTrigger>
-              <SelectContent>
-                {estadoOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="observacion" className="text-sm font-medium text-gray-700">
-              Observaciones (Opcional)
-            </Label>
-            <div className="relative">
-              <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Textarea
-                id="observacion"
-                value={observacion}
-                onChange={(e) => handleInputChange('observacion', e.target.value)}
-                placeholder="Agregue observaciones adicionales sobre el pedido..."
-                className="pl-10 min-h-[100px]"
-                disabled={loading}
-              />
+          {visibleFields.includes('estado') && (
+            <div className="space-y-2">
+              <Label htmlFor="estado" className="text-sm font-medium text-gray-700">
+                Estado del Pedido
+              </Label>
+              <Select value={estado} onValueChange={handleEstadoChange} disabled={loading}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {estadoOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
+          )}
+
+          {visibleFields.includes('observacion') && (
+            <div className="space-y-2">
+              <Label htmlFor="observacion" className="text-sm font-medium text-gray-700">
+                Observaciones (Opcional)
+              </Label>
+              <div className="relative">
+                <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Textarea
+                  id="observacion"
+                  value={observacion}
+                  onChange={(e) => handleInputChange('observacion', e.target.value)}
+                  placeholder="Agregue observaciones adicionales sobre el pedido..."
+                  className="pl-10 min-h-[100px]"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+          )}
 
           <DialogFooter>
             <Button

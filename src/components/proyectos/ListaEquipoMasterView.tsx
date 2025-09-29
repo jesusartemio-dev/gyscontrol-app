@@ -40,14 +40,19 @@ import { deleteListaEquipo } from '@/lib/services/listaEquipo';
 import { ListaEquipoMaster } from '@/types/master-detail';
 import { calculateMasterListStats } from '@/lib/transformers/master-detail-transformers';
 import { useListaEquipoMaster } from '@/hooks/useListaEquipoMaster';
-import { useListaEquipoFilters } from '@/hooks/useListaEquipoFilters';
 import ListaEquipoMasterList from './ListaEquipoMasterList';
-import ListaEquipoMasterFilters from './ListaEquipoMasterFilters';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { 
   MasterGridSkeleton,
   MasterTableSkeleton,
@@ -55,7 +60,7 @@ import {
   DetailViewSkeleton,
   MasterViewSkeleton
 } from '@/components/ui/skeletons/MasterViewSkeletons';
-import { 
+import {
   Search,
   Filter,
   Grid3X3,
@@ -70,7 +75,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  XCircle
+  XCircle,
+  X
 } from 'lucide-react';
 import ModalCrearListaEquipo from '@/components/equipos/ModalCrearListaEquipo';
 
@@ -101,7 +107,7 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
   const isTouchDevice = useIsTouchDevice();
   
   // 🔄 State management
-  const [viewMode, setViewMode] = useState<ViewMode>(isMobile ? 'table' : 'grid');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [showFilters, setShowFilters] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');
   
@@ -146,26 +152,6 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
     enableSelection: true
   });
   
-  const {
-    filters: advancedFilters,
-    updateFilter,
-    setFilters: setAdvancedFilters,
-    clearFilters: clearAdvancedFilters,
-    hasActiveFilters,
-    getFilterSummary,
-    quickFilters,
-    applyQuickFilter
-  } = useListaEquipoFilters({
-    proyectoId,
-    initialFilters: filters,
-    enableHistory: true,
-    enablePresets: true
-  });
-  
-  // 🔄 Wrapper function to handle filter changes
-  const handleFiltersChange = (newFilters: typeof advancedFilters) => {
-    setAdvancedFilters(newFilters);
-  };
   
   // 🔍 Apply quick search to filters
   const handleQuickSearch = (value: string) => {
@@ -248,150 +234,110 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
       <motion.div variants={staggerItemVariants} className="space-y-4">
         {/* Search and Actions Bar */}
         <Suspense fallback={<DetailViewSkeleton />}>
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar listas de equipos..."
-                  value={quickSearch}
-                  onChange={(e) => handleQuickSearch(e.target.value)}
-                  className="pl-10"
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="flex-1 max-w-md">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar listas de equipos..."
+                    value={quickSearch}
+                    onChange={(e) => handleQuickSearch(e.target.value)}
+                    className="pl-10"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  className={touchButtonClasses}
                   disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Actualizar
+                </Button>
+
+                <div className="flex border rounded-md">
+                  <Button
+                    variant={hookViewMode === 'grid' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setHookViewMode('grid')}
+                    className={`${touchButtonClasses} rounded-r-none`}
+                    disabled={loading}
+                  >
+                    <Grid3X3 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={hookViewMode === 'table' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setHookViewMode('table')}
+                    className={`${touchButtonClasses} rounded-l-none`}
+                    disabled={loading}
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <ModalCrearListaEquipo
+                  proyectoId={proyectoId}
+                  onCreated={() => {
+                    refreshData();
+                    toast.success('✅ Lista técnica creada exitosamente');
+                  }}
+                  triggerClassName={`${touchButtonClasses} ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
             </div>
-            
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className={`${touchButtonClasses} ${isFiltered ? 'border-blue-500 text-blue-600' : ''}`}
-                disabled={loading}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filtros
-                {isFiltered && (
-                  <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 text-xs">
-                    {Object.values(filters).filter(v => 
-                      v !== '' && v !== 'all' && 
-                      !(Array.isArray(v) && v.length === 0) &&
-                      v !== undefined
-                    ).length}
-                  </Badge>
-                )}
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                className={touchButtonClasses}
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Actualizar
-              </Button>
-              
-              <div className="flex border rounded-md">
-                <Button
-                  variant={hookViewMode === 'grid' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setHookViewMode('grid')}
-                  className={`${touchButtonClasses} rounded-r-none`}
-                  disabled={loading}
+
+            {/* Standard Filters Row */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm font-medium text-muted-foreground mr-2">Estado:</span>
+                <Select
+                  value={filters.estado.length === 1 ? filters.estado[0] : 'all'}
+                  onValueChange={(value) => {
+                    if (value === 'all') {
+                      setFilters({ ...filters, estado: [] });
+                    } else {
+                      setFilters({ ...filters, estado: [value] });
+                    }
+                  }}
                 >
-                  <Grid3X3 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={hookViewMode === 'table' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setHookViewMode('table')}
-                  className={`${touchButtonClasses} rounded-l-none`}
-                  disabled={loading}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Todos los estados" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="borrador">Borrador</SelectItem>
+                    <SelectItem value="por_revisar">Por Revisar</SelectItem>
+                    <SelectItem value="por_cotizar">Por Cotizar</SelectItem>
+                    <SelectItem value="por_validar">Por Validar</SelectItem>
+                    <SelectItem value="por_aprobar">Por Aprobar</SelectItem>
+                    <SelectItem value="aprobado">Aprobado</SelectItem>
+                    <SelectItem value="rechazado">Rechazado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              
-              <ModalCrearListaEquipo
-                proyectoId={proyectoId}
-                onCreated={() => {
-                  refreshData();
-                  toast.success('✅ Lista técnica creada exitosamente');
-                }}
-                triggerClassName={`${touchButtonClasses} ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              />
+
+              {isFiltered && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className={`${touchButtonClasses} text-blue-600 hover:text-blue-700`}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Limpiar filtros
+                </Button>
+              )}
             </div>
           </div>
         </Suspense>
-        
-        {/* Quick Filters */}
-        <Suspense fallback={
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            ))}
-          </div>
-        }>
-          <div className="flex flex-wrap gap-2">
-            {quickFilters.slice(0, 5).map((quickFilter) => (
-              <Button
-                key={quickFilter.id}
-                variant="outline"
-                size="sm"
-                onClick={() => applyQuickFilter(quickFilter.id)}
-                className={`${touchButtonClasses} text-xs`}
-                disabled={loading}
-              >
-                {quickFilter.icon && <span className="mr-1">{quickFilter.icon}</span>}
-                {quickFilter.name}
-              </Button>
-            ))}
-          </div>
-        </Suspense>
-        
-        {/* Active Filters Summary */}
-        {isFiltered && (
-          <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-            <Filter className="h-4 w-4 text-blue-600" />
-            <span className="text-sm text-blue-700 dark:text-blue-300">
-              {getFilterSummary()}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearAllFilters}
-              className={`${touchButtonClasses} ml-auto text-blue-600 hover:text-blue-700`}
-            >
-              Limpiar filtros
-            </Button>
-          </div>
-        )}
       </motion.div>
-      
-      {/* 🔍 Advanced Filters Panel */}
-      <AnimatePresence>
-        {showFilters && (
-          <motion.div
-            variants={loadingVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-          >
-            <Suspense fallback={<FiltersSkeleton />}>
-              <ListaEquipoMasterFilters
-                filters={advancedFilters}
-                onFiltersChange={handleFiltersChange}
-                listas={lists}
-                loading={loading}
-                onClose={() => setShowFilters(false)}
-              />
-            </Suspense>
-          </motion.div>
-        )}
-      </AnimatePresence>
       
       <Separator />
       

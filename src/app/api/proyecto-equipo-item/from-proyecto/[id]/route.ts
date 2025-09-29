@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const { id } = await context.params
     const soloDisponibles = req.nextUrl.searchParams.get('soloDisponibles') === 'true'
 
-    const items = await prisma.proyectoEquipoItem.findMany({
+    const items = await prisma.proyectoEquipoCotizadoItem.findMany({
       where: {
         proyectoEquipo: {
           proyectoId: id,

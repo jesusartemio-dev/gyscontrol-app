@@ -32,6 +32,12 @@ export interface ListaEquipoMaster {
     itemsRechazados: number
     costoTotal: number
     costoAprobado: number
+    // 📦 Estadísticas de pedidos
+    itemsConPedido: number
+    itemsSinPedido: number
+    pedidosCompletos: number
+    pedidosParciales: number
+    pedidosPendientes: number
   }
   
   // 🏗️ Información mínima del proyecto
@@ -106,12 +112,7 @@ export async function getTodasLasListas(): Promise<ListaEquipo[]> {
 // Use getListasEquipoMaster with proyectoId filter for better performance
 export async function getListaEquiposPorProyecto(proyectoId: string): Promise<ListaEquipo[]> {
   try {
-    // ✅ Use absolute URL for server-side requests
-    const baseUrl = typeof window === 'undefined' 
-      ? process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      : ''
-    const url = `${baseUrl}${BASE_URL}?proyectoId=${proyectoId}`
-    
+    const url = buildApiUrl(`${BASE_URL}?proyectoId=${proyectoId}`)
     const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error('Error al obtener listas por proyecto')
     return await res.json()
@@ -433,12 +434,7 @@ export async function getListasEquipoMaster(filters: ListaEquipoFilters = {}): P
 // ✅ Obtener lista específica con datos completos para vista Detail (OPTIMIZED)
 export async function getListaEquipoDetail(id: string): Promise<ListaEquipo | null> {
   try {
-    // 🔧 Server-side: use absolute URL for internal API calls
-    const baseUrl = typeof window === 'undefined' 
-      ? process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      : ''
-    const url = `${baseUrl}${DETAIL_URL}/${id}`
-    
+    const url = buildApiUrl(`${DETAIL_URL}/${id}`)
     const res = await fetch(url, {
       method: 'GET',
       headers: {
@@ -447,7 +443,7 @@ export async function getListaEquipoDetail(id: string): Promise<ListaEquipo | nu
       credentials: 'include',
       cache: 'no-store'
     })
-    
+
     if (!res.ok) {
       if (res.status === 401) {
         // Solo redirigir en el cliente, no en el servidor
@@ -461,7 +457,7 @@ export async function getListaEquipoDetail(id: string): Promise<ListaEquipo | nu
       }
       throw new Error(`Error ${res.status}: ${res.statusText}`)
     }
-    
+
     return await res.json()
   } catch (error) {
     console.error('getListaEquipoDetail:', error)

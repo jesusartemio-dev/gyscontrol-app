@@ -25,7 +25,6 @@ import ModalReemplazarReemplazoDesdeCatalogo from './ModalReemplazarReemplazoDes
 import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
 import ModalAgregarItemDesdeEquipo from './ModalAgregarItemDesdeEquipo'
 import { calcularCostoItem, calcularCostoTotal, formatCurrency } from '@/lib/utils/costoCalculations'
-import { motion, AnimatePresence } from 'framer-motion'
 // import { DebugLogger, useRenderTracker } from '@/components/debug/DebugLogger'
 // import MotionRefDebugger from '@/components/debug/MotionRefDebugger'
 // import RenderLoopDetector, { useRenderLoopDetection } from '@/components/debug/RenderLoopDetector'
@@ -45,8 +44,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { useOptimizedRenderCounter, useOptimizedRenderTracker, useOptimizedAnimatePresenceDebug } from '@/components/debug/OptimizedDebugHooks'
-import { MotionDebugger } from '@/components/debug/MotionDebugger'
 import { CotizacionInfo, CotizacionCodigoSimple } from './CotizacionSelector'
 import { 
   calcularResumenPedidos, 
@@ -76,6 +73,7 @@ interface Props {
   onCreated?: () => void | Promise<void>
   onItemUpdated?: (itemId: string) => Promise<void>
   onItemsUpdated?: () => Promise<void>
+  onDeleted?: () => void | Promise<void>
   onRefresh?: () => Promise<void>
 }
 
@@ -105,24 +103,8 @@ const getOrigenVariant = (origen: string): "default" | "secondary" | "outline" =
   }
 }
 
-// 🎨 Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-}
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 }
-}
-
-export default function ListaEquipoItemList({ listaId, proyectoId, items, editable = true, onCreated, onItemUpdated, onItemsUpdated, onRefresh }: Props) {
+export default function ListaEquipoItemList({ listaId, proyectoId, items, editable = true, onCreated, onItemUpdated, onItemsUpdated, onDeleted, onRefresh }: Props) {
   const router = useRouter()
   const [editCantidadItemId, setEditCantidadItemId] = useState<string | null>(null)
   const [editCantidadValues, setEditCantidadValues] = useState<Record<string, string>>({})
@@ -139,33 +121,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   const [showModalAgregarCatalogo, setShowModalAgregarCatalogo] = useState(false)
   const [showModalAgregarEquipo, setShowModalAgregarEquipo] = useState(false)
   
-  // 🔍 Debug: Optimized render tracking (prevents infinite loops)
-  const renderCount = useOptimizedRenderCounter('ListaEquipoItemList', [items?.length, searchTerm], {
-    logThreshold: 10,
-    throttleMs: 1000,
-    maxLogs: 5
-  })
-  
-  // 📊 Hook para trackear renders detallados (optimized version)
-  const detailedRenderCount = useOptimizedRenderTracker('ListaEquipoItemList', [items?.length, searchTerm, viewMode, compactMode], {
-    enableDetailedLogging: false, // Only enable when debugging
-    maxRenderWarning: 30,
-    throttleMs: 2000
-  })
-  
-  // 🎬 Hook para detectar problemas con AnimatePresence (optimized version)
-  const motionRenderCount = useOptimizedAnimatePresenceDebug('ListaEquipoItemList', items, {
-    logChanges: false, // Only enable when debugging
-    throttleMs: 1000
-  })
-  
-  // 🔍 Debug: Track re-renders
-  // useRenderTracker('ListaEquipoItemList', { itemsLength: items?.length, listaId, proyectoId, viewMode })
   const [visibleColumns, setVisibleColumns] = useState({
     codigoDescripcion: true, // ✅ Combined column
     unidad: false, // ✅ Oculta cuando está activa la unificada
     cantidad: false, // ✅ Oculta cuando está activa la unificada
     cantidadUnidad: true, // ✅ Nueva columna unificada (activada por defecto)
+    pedidos: true, // ✅ Nueva columna: estado de pedidos
     cotizacion: true,
     costo: true,
     entrega: false,
@@ -173,7 +134,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     estado: true,
     verificado: true,
     comentario: true, // ✅ Visible by default
-    pedidos: true, // ✅ Nueva columna de pedidos
+    pedidosLinks: true, // ✅ Nueva columna de pedidos (links)
     equipo: false,
     acciones: true
   })
@@ -301,6 +262,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       if (ok) {
         toast.success('🗑️ Ítem eliminado')
         onItemsUpdated?.()
+        onDeleted?.()
       }
     } catch {
       toast.error('❌ No se pudo eliminar el ítem')
@@ -322,11 +284,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
 
   // 🎨 Render header with search and actions only
   const renderHeader = () => (
-    <motion.div 
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mb-6"
-    >
+    <div className="mb-6">
 
       {/* Search, Filter and View Toggle */}
        <div className="flex flex-col sm:flex-row gap-4">
@@ -433,6 +391,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                      unidad: 'Unidad',
                      cantidad: 'Cantidad',
                      cantidadUnidad: 'Cant./Unidad',
+                     pedidos: 'Pedidos',
                      cotizacion: 'Cotización',
                      costo: 'Costo',
                      entrega: 'Entrega',
@@ -469,16 +428,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
            )}
          </div>
        </div>
-    </motion.div>
+    </div>
   )
 
   // 🎨 Render empty state
   const renderEmptyState = () => (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="text-center py-12"
-    >
+    <div className="text-center py-12">
       <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
       <h3 className="text-lg font-semibold mb-2">No hay ítems técnicos</h3>
       <p className="text-muted-foreground mb-4">
@@ -496,7 +451,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
           Limpiar búsqueda
         </Button>
       )}
-    </motion.div>
+    </div>
   )
 
   // 🎨 Render loading skeleton
@@ -527,12 +482,13 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       unidad: 'w-16',
       cantidad: 'w-20',
       cantidadUnidad: 'w-28', // ✅ Nueva columna unificada Cantidad/Unidad
+      pedidos: 'w-24', // ✅ Nueva columna: estado de pedidos
       cotizacion: 'w-28',
       costo: 'w-24',
       entrega: 'w-20',
       origen: 'w-20',
       estado: 'w-24',
-      pedidos: 'w-32', // ✅ Nueva columna para pedidos
+      pedidosLinks: 'w-32', // ✅ Nueva columna para pedidos (links)
       verificado: 'w-12',
       comentario: compactMode ? 'w-56' : 'w-64', // ✅ Significantly increased width for optimal comment editing
       equipo: 'w-24',
@@ -563,6 +519,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                 {visibleColumns.cantidadUnidad && (
                   <th className={`${cellPadding} ${columnWidths.cantidadUnidad} text-center font-semibold text-gray-900 tracking-tight`}>
                     Cant./Unidad
+                  </th>
+                )}
+                {visibleColumns.pedidos && (
+                  <th className={`${cellPadding} ${columnWidths.pedidos} text-center font-semibold text-gray-900 tracking-tight`}>
+                    Pedidos
                   </th>
                 )}
                 {visibleColumns.cotizacion && (
@@ -618,9 +579,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
               </tr>
             </thead>
           <tbody>
-            <MotionDebugger componentName="ListaEquipoItemList-AnimatePresence">
-              <AnimatePresence>
-                {filteredItems.map((item) => {
+            {filteredItems.map((item) => {
               const isEditingCantidad = editCantidadItemId === item.id
               const isEditingComentario = editComentarioItemId === item.id
               const costoTotal = calcularCostoItem(item)
@@ -631,14 +590,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                 // console.log('🔍 ListaEquipoItemList - Rendering motion.tr for item:', item.id, { estado: item.estado, resumenPedidos })
 
               return (
-                <motion.tr
+                <tr
                    key={item.id}
-                   variants={itemVariants}
-                   initial="hidden"
-                   animate="visible"
-                   exit="exit"
                    className={`border-b hover:bg-gray-50 transition-colors ${
-                     item.estado === 'rechazado' ? 'bg-red-50/50' : 
+                     item.estado === 'rechazado' ? 'bg-red-50/50' :
                      item.estado === 'aprobado' ? 'bg-green-50/50' : ''
                    } ${clasesFilaPorEstado}`}
                  >
@@ -715,6 +670,22 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                           {editable && <Pencil className="h-3 w-3 text-muted-foreground" />}
                         </div>
                       )}
+                     </td>
+                   )}
+                   {visibleColumns.pedidos && (
+                     <td className={`${cellPadding} ${columnWidths.pedidos} text-center`}>
+                       {(() => {
+                         const cantidadPedida = item.cantidadPedida || 0
+                         const cantidadTotal = item.cantidad || 0
+
+                         if (cantidadPedida === 0) {
+                           return <Badge variant="outline" className="text-xs">Sin pedidos</Badge>
+                         } else if (cantidadPedida >= cantidadTotal) {
+                           return <Badge variant="default" className="text-xs bg-green-600">Completo</Badge>
+                         } else {
+                           return <Badge variant="secondary" className="text-xs">{cantidadPedida}/{cantidadTotal}</Badge>
+                         }
+                       })()}
                      </td>
                    )}
                    {visibleColumns.cotizacion && (
@@ -928,12 +899,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                       </div>
                      </td>
                    )}
-                   </motion.tr>
+                   </tr>
               )
                 })
               }
-              </AnimatePresence>
-            </MotionDebugger>
           </tbody>
           </table>
         </div>
@@ -950,8 +919,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       ) : filteredItems.length === 0 ? (
         renderEmptyState()
       ) : viewMode === 'cards' ? (
-        <MotionDebugger componentName="ListaEquipoItemList-CardsView">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredItems.map((item) => {
               const isEditingCantidad = editCantidadItemId === item.id
               const isEditingComentario = editComentarioItemId === item.id
@@ -1169,7 +1137,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
               )
             })}
           </div>
-        </MotionDebugger>
       ) : (
         renderListView()
       )}

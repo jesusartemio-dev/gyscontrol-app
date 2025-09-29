@@ -393,7 +393,7 @@ export interface ProyectoPayload {
 
 export interface ProyectoUpdatePayload extends Partial<ProyectoPayload> {}
 
-export interface ProyectoEquipoPayload {
+export interface ProyectoEquipoCotizadoPayload {
   proyectoId: string
   responsableId: string
   nombre: string
@@ -402,10 +402,10 @@ export interface ProyectoEquipoPayload {
   subtotalCliente: number
 }
 
-export interface ProyectoEquipoUpdatePayload extends Partial<ProyectoEquipoPayload> {}
+export interface ProyectoEquipoCotizadoUpdatePayload extends Partial<ProyectoEquipoCotizadoPayload> {}
 
 
-export interface ProyectoEquipoItemPayload {
+export interface ProyectoEquipoCotizadoItemPayload {
   proyectoEquipoId: string
   catalogoEquipoId?: string
   listaId?: string
@@ -433,11 +433,11 @@ export interface ProyectoEquipoItemPayload {
   estado?: EstadoEquipoItem
 }
 
-export interface ProyectoEquipoItemUpdatePayload extends Partial<ProyectoEquipoItemPayload> {}
+export interface ProyectoEquipoCotizadoItemUpdatePayload extends Partial<ProyectoEquipoCotizadoItemPayload> {}
 
 
 
-export interface ProyectoServicioPayload {
+export interface ProyectoServicioCotizadoPayload {
   proyectoId: string
   responsableId: string
   nombre: string
@@ -446,10 +446,10 @@ export interface ProyectoServicioPayload {
   subtotalCliente: number
 }
 
-export interface ProyectoServicioUpdatePayload extends Partial<ProyectoServicioPayload> {}
+export interface ProyectoServicioCotizadoUpdatePayload extends Partial<ProyectoServicioCotizadoPayload> {}
 
 
-export interface ProyectoServicioItemPayload {
+export interface ProyectoServicioCotizadoItemPayload {
   proyectoServicioId: string
   catalogoServicioId?: string
   responsableId: string
@@ -468,10 +468,10 @@ export interface ProyectoServicioItemPayload {
   nuevo?: boolean
 }
 
-export interface ProyectoServicioItemUpdatePayload extends Partial<ProyectoServicioItemPayload> {}
+export interface ProyectoServicioCotizadoItemUpdatePayload extends Partial<ProyectoServicioCotizadoItemPayload> {}
 
 
-export interface ProyectoGastoPayload {
+export interface ProyectoCotizadoGastoPayload {
   proyectoId: string
   nombre: string
   descripcion?: string
@@ -479,9 +479,9 @@ export interface ProyectoGastoPayload {
   subtotalCliente: number
 }
 
-export interface ProyectoGastoUpdatePayload extends Partial<ProyectoGastoPayload> {}
+export interface ProyectoCotizadoGastoUpdatePayload extends Partial<ProyectoCotizadoGastoPayload> {}
 
-export interface ProyectoGastoItemPayload {
+export interface ProyectoGastoCotizadoItemPayload {
   gastoId: string
   nombre: string
   descripcion?: string
@@ -494,7 +494,7 @@ export interface ProyectoGastoItemPayload {
   costoReal?: number
 }
 
-export interface ProyectoGastoItemUpdatePayload extends Partial<ProyectoGastoItemPayload> {}
+export interface ProyectoGastoCotizadoItemUpdatePayload extends Partial<ProyectoGastoCotizadoItemPayload> {}
 
 
 

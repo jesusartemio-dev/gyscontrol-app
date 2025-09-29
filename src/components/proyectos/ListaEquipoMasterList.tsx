@@ -63,6 +63,12 @@ import {
 import ListaEquipoMasterCard from './ListaEquipoMasterCard';
 import { ListaEquipoMaster } from '@/types/master-detail';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
+import { getListaEquipoDetail } from '@/lib/services/listaEquipo';
+import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
+import { toast } from 'sonner';
+import type { ListaEquipo } from '@/types';
+import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog';
 
 // ✅ Props interface
 interface ListaEquipoMasterListProps {
@@ -132,7 +138,17 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
     const gridClasses = getResponsiveClasses(gridConfigs.masterList);
     const containerSpacing = getResponsiveClasses(spacing.container);
     const touchButtonClasses = isTouchDevice ? touchInteractions.button.touch : touchInteractions.button.desktop;
-  // 🔁 Handle select all
+
+    // 📦 Order modal state
+    const [selectedListaForOrder, setSelectedListaForOrder] = useState<ListaEquipo | null>(null);
+    const [orderModalOpen, setOrderModalOpen] = useState(false);
+    const [orderModalLoading, setOrderModalLoading] = useState(false);
+
+    // 🗑️ Delete confirmation state
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [listaToDelete, setListaToDelete] = useState<ListaEquipoMaster | null>(null);
+
+  //  Handle select all
   const handleSelectAll = (checked: boolean) => {
     if (!onSelectionChange) return;
     
@@ -158,6 +174,61 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
   // 📊 Calculate selection state
   const isAllSelected = listas.length > 0 && selectedIds.length === listas.length;
   const isPartiallySelected = selectedIds.length > 0 && selectedIds.length < listas.length;
+
+  // 📦 Handle opening order modal
+  const handleOpenOrderModal = async (listaId: string) => {
+    try {
+      setOrderModalLoading(true);
+      const fullLista = await getListaEquipoDetail(listaId);
+      if (fullLista) {
+        setSelectedListaForOrder(fullLista);
+        setOrderModalOpen(true);
+      } else {
+        toast.error('No se pudo cargar la información completa de la lista');
+      }
+    } catch (error) {
+      console.error('Error loading lista for order modal:', error);
+      toast.error('Error al cargar la lista para crear pedido');
+    } finally {
+      setOrderModalLoading(false);
+    }
+  };
+
+  // 📦 Handle order creation
+  const handleOrderCreated = async (payload: any) => {
+    try {
+      const result = await createPedidoDesdeListaContextual(payload);
+      if (result) {
+        toast.success('Pedido creado exitosamente');
+        // Close modal
+        setOrderModalOpen(false);
+        setSelectedListaForOrder(null);
+        // Optionally refresh the list data
+        // This would require passing a refresh callback from parent
+        return result;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast.error('Error al crear el pedido');
+      return null;
+    }
+  };
+
+  // 🗑️ Handle delete confirmation
+  const handleDeleteClick = (lista: ListaEquipoMaster) => {
+    setListaToDelete(lista);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (listaToDelete && onDelete) {
+      await onDelete(listaToDelete.id);
+      setDeleteDialogOpen(false);
+      setListaToDelete(null);
+    }
+  };
+
   
   // 🎯 Render empty state
   const renderEmptyState = () => (
@@ -221,19 +292,39 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
             <TableHead>Lista</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="text-right">Items</TableHead>
+            <TableHead className="text-right">Items con Pedido</TableHead>
+            <TableHead className="text-center">Estado Pedidos</TableHead>
             <TableHead className="text-right">Progreso</TableHead>
             <TableHead className="text-right">Costo Total</TableHead>
             <TableHead>Actualizado</TableHead>
-            {showActions && <TableHead className="w-20">Acciones</TableHead>}
+            {showActions && <TableHead className="w-32">Acciones</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           <AnimatePresence>
             {listas.map((lista, index) => {
               const StatusIcon = statusIcons[lista.estado] || Clock;
-              const progressPercentage = lista.stats.totalItems > 0 
+              const progressPercentage = lista.stats.totalItems > 0
                 ? Math.round((lista.stats.itemsVerificados / lista.stats.totalItems) * 100)
                 : 0;
+
+              // 📦 Calculate order status for display
+              const getOrderStatus = () => {
+                const { itemsConPedido, itemsSinPedido, pedidosCompletos, pedidosParciales } = lista.stats;
+
+                if (itemsSinPedido === lista.stats.totalItems) {
+                  return { label: 'Sin Pedido', variant: 'secondary' as const, color: 'text-gray-600' };
+                }
+                if (pedidosCompletos === itemsConPedido) {
+                  return { label: 'Completo', variant: 'default' as const, color: 'text-green-600' };
+                }
+                if (pedidosParciales > 0) {
+                  return { label: 'Parcial', variant: 'outline' as const, color: 'text-yellow-600' };
+                }
+                return { label: 'En Proceso', variant: 'outline' as const, color: 'text-blue-600' };
+              };
+
+              const orderStatus = getOrderStatus();
               
               return (
                 <motion.tr
@@ -243,10 +334,9 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ delay: index * 0.05 }}
                   className={cn(
-                    'hover:bg-gray-50 cursor-pointer transition-colors',
+                    'hover:bg-gray-50 transition-colors cursor-default',
                     selectedIds.includes(lista.id) && 'bg-blue-50'
                   )}
-                  onClick={() => onItemSelect?.(lista.id)}
                 >
                   {showSelection && (
                     <TableCell onClick={(e) => e.stopPropagation()}>
@@ -284,7 +374,22 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
                   <TableCell className="text-right font-medium">
                     {lista.stats.totalItems}
                   </TableCell>
-                  
+
+                  <TableCell className="text-right font-medium">
+                    <span className={lista.stats.itemsConPedido > 0 ? 'text-green-600' : 'text-gray-400'}>
+                      {lista.stats.itemsConPedido}
+                    </span>
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    <Badge
+                      variant={orderStatus.variant}
+                      className={`text-xs ${orderStatus.color}`}
+                    >
+                      {orderStatus.label}
+                    </Badge>
+                  </TableCell>
+
                   <TableCell className="text-right">
                     <div className="flex items-center gap-2">
                       <Progress value={progressPercentage} className="w-16 h-2" />
@@ -303,27 +408,58 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
                   </TableCell>
                   
                   {showActions && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell>
                       <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className={`${touchButtonClasses} h-8 w-8 p-0`}
+                          className={`${touchButtonClasses} h-8 px-2 text-xs`}
                           onClick={() => onItemSelect?.(lista.id)}
+                          title="Ver detalles completos"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3 h-3 mr-1" />
+                          Ver
                         </Button>
+
+                        {lista.stats.itemsSinPedido === lista.stats.totalItems && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`${touchButtonClasses} h-8 px-2 text-xs hover:bg-blue-50 hover:border-blue-200`}
+                            onClick={() => handleOpenOrderModal(lista.id)}
+                            disabled={orderModalLoading}
+                            title="Crear pedido"
+                          >
+                            <Package className="w-3 h-3 mr-1" />
+                            Pedido
+                          </Button>
+                        )}
+
+                        {lista.stats.numeroPedidos > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`${touchButtonClasses} h-8 px-2 text-xs hover:bg-green-50 hover:border-green-200`}
+                            onClick={() => onItemSelect?.(lista.id)}
+                            title={`Ver ${lista.stats.numeroPedidos} pedidos`}
+                          >
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            {lista.stats.numeroPedidos} Pedidos
+                          </Button>
+                        )}
+
                         {onDelete && (
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onDelete(lista.id);
+                              handleDeleteClick(lista);
                             }}
                             className={`${touchButtonClasses} h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600`}
+                            title="Eliminar lista"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         )}
                       </div>
@@ -411,6 +547,37 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
           {renderPagination()}
         </>
       )}
+
+      {/* 📦 Order Creation Modal */}
+      {selectedListaForOrder && (
+        <PedidoDesdeListaModal
+          lista={selectedListaForOrder}
+          proyectoId={proyectoId}
+          responsableId={selectedListaForOrder.responsableId || 'default-user'}
+          onCreated={handleOrderCreated}
+          onRefresh={() => {
+            // TODO: Implement refresh logic if needed
+            console.log('Refresh after order creation');
+          }}
+          open={orderModalOpen}
+          onOpenChange={(open) => {
+            setOrderModalOpen(open);
+            if (!open) {
+              setSelectedListaForOrder(null);
+            }
+          }}
+        />
+      )}
+
+      {/* 🗑️ Delete Confirmation Dialog */}
+      <DeleteAlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Eliminar Lista de Equipos"
+        description={`¿Estás seguro de que deseas eliminar la lista "${listaToDelete?.nombre}"? Esta acción no se puede deshacer y eliminará todos los items asociados.`}
+      />
+
     </div>
     </>
   );

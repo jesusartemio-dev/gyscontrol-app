@@ -271,15 +271,6 @@ export default function EquipmentListsPage({ params }: PageProps) {
         >
           <Button 
             variant="outline" 
-            size="sm" 
-            onClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas-integradas`)}
-            className="hover:bg-blue-50 hover:border-blue-200 transition-all duration-200"
-          >
-            <Grid3X3 className="h-4 w-4 mr-2" />
-            Vista Integrada
-          </Button>
-          <Button 
-            variant="outline" 
             size="sm"
             className="hover:bg-green-50 hover:border-green-200 transition-all duration-200"
           >

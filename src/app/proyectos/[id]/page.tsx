@@ -17,7 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
 import {
   Package,
   Settings,
@@ -177,11 +176,7 @@ export default function ProyectoDetallePage() {
   if (!proyecto) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4"
-        >
+        <div className="text-center space-y-4">
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto" />
           <h2 className="text-2xl font-bold text-gray-900">Proyecto no encontrado</h2>
           <p className="text-gray-600">El proyecto que buscas no existe o ha sido eliminado.</p>
@@ -189,7 +184,7 @@ export default function ProyectoDetallePage() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a Proyectos
           </Button>
-        </motion.div>
+        </div>
       </div>
     )
   }
@@ -199,17 +194,39 @@ export default function ProyectoDetallePage() {
     const equiposCount = proyecto.equipos?.length || 0
     const serviciosCount = proyecto.servicios?.length || 0
     const gastosCount = proyecto.gastos?.length || 0
+    const listasCount = (proyecto as any).listaEquipos?.length || 0
+    const pedidosCount = (proyecto as any).pedidos?.length || 0
 
     const equiposItems = proyecto.equipos?.reduce((sum, eq) => sum + (eq.items?.length || 0), 0) || 0
+
+    // Calculate total quantities in equipos
+    const equiposCantidades = proyecto.equipos?.reduce((sum: number, eq: any) =>
+      sum + (eq.items?.reduce((itemSum: number, item: any) => itemSum + (item.cantidad || 0), 0) || 0), 0) || 0
     const serviciosItems = proyecto.servicios?.reduce((sum, sv) => sum + (sv.items?.length || 0), 0) || 0
     const gastosItems = proyecto.gastos?.reduce((sum, ga) => sum + (ga.items?.length || 0), 0) || 0
+
+    // For listas items, we need to count items in each lista
+    const listasItems = (proyecto as any).listaEquipos?.reduce((sum: number, lista: any) => sum + (lista.items?.length || 0), 0) || 0
+
+    // Calculate total quantities in listas
+    const listasCantidades = (proyecto as any).listaEquipos?.reduce((sum: number, lista: any) =>
+      sum + (lista.items?.reduce((itemSum: number, item: any) => itemSum + (item.cantidad || 0), 0) || 0), 0) || 0
+
+    // For pedidos items, we need to count items in each pedido
+    const pedidosItems = (proyecto as any).pedidos?.reduce((sum: number, pedido: any) => sum + (pedido.items?.length || 0), 0) || 0
+
+    // Calculate total quantities ordered in pedidos
+    const pedidosCantidades = (proyecto as any).pedidos?.reduce((sum: number, pedido: any) =>
+      sum + (pedido.items?.reduce((itemSum: number, item: any) => itemSum + (item.cantidadPedida || 0), 0) || 0), 0) || 0
 
     const totalItems = equiposItems + serviciosItems + gastosItems
 
     return {
-      equipos: { count: equiposCount, items: equiposItems },
+      equipos: { count: equiposCount, items: equiposItems, cantidades: equiposCantidades },
       servicios: { count: serviciosCount, items: serviciosItems },
       gastos: { count: gastosCount, items: gastosItems },
+      listas: { count: listasCount, items: listasItems, cantidades: listasCantidades },
+      pedidos: { count: pedidosCount, items: pedidosItems, cantidades: pedidosCantidades },
       totalItems,
       totalCost: proyecto.grandTotal || 0,
       daysElapsed: Math.round(((new Date().getTime() - new Date(proyecto.fechaInicio).getTime()) / (1000 * 60 * 60 * 24)))
@@ -221,11 +238,7 @@ export default function ProyectoDetallePage() {
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center space-y-4"
-      >
+      <div className="text-center space-y-4">
         <div className="flex items-center justify-center gap-3">
           <Eye className="h-8 w-8 text-blue-600" />
           <h1 className="text-3xl font-bold text-gray-900">Resumen del Proyecto</h1>
@@ -237,35 +250,35 @@ export default function ProyectoDetallePage() {
           {getStatusInfo(proyecto.estado).icon}
           {getStatusInfo(proyecto.estado).label}
         </Badge>
-      </motion.div>
+      </div>
 
       {/* Summary Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Equipos Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+        <div>
           <Link href={`/proyectos/${id}/equipos`}>
             <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-blue-200 hover:border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-lg">
                   <div className="flex items-center gap-2">
                     <Package className="h-6 w-6 text-blue-600" />
-                    Equipos
+                    Equipos Cotizados
                   </div>
                   <ArrowRight className="h-5 w-5 text-blue-600" />
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-blue-700 font-medium">Grupos</span>
+                  <span className="text-sm text-blue-700 font-medium">Equipos</span>
                   <span className="text-2xl font-bold text-blue-900">{stats.equipos.count}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-blue-700 font-medium">Items Totales</span>
                   <span className="text-lg font-semibold text-blue-800">{stats.equipos.items}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-blue-700 font-medium">Cantidades Totales</span>
+                  <span className="text-lg font-semibold text-blue-800">{stats.equipos.cantidades}</span>
                 </div>
                 <div className="pt-2 border-t border-blue-200">
                   <p className="text-xs text-blue-600">
@@ -275,21 +288,17 @@ export default function ProyectoDetallePage() {
               </CardContent>
             </Card>
           </Link>
-        </motion.div>
+        </div>
 
         {/* Servicios Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <div>
           <Link href={`/proyectos/${id}/servicios`}>
             <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-purple-200 hover:border-purple-300 bg-gradient-to-br from-purple-50 to-purple-100">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-lg">
                   <div className="flex items-center gap-2">
                     <Settings className="h-6 w-6 text-purple-600" />
-                    Servicios
+                    Servicios Cotizados
                   </div>
                   <ArrowRight className="h-5 w-5 text-purple-600" />
                 </CardTitle>
@@ -311,21 +320,17 @@ export default function ProyectoDetallePage() {
               </CardContent>
             </Card>
           </Link>
-        </motion.div>
+        </div>
 
         {/* Gastos Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
+        <div>
           <Link href={`/proyectos/${id}/gastos`}>
             <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-orange-200 hover:border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-lg">
                   <div className="flex items-center gap-2">
                     <Receipt className="h-6 w-6 text-orange-600" />
-                    Gastos
+                    Gastos Cotizados
                   </div>
                   <ArrowRight className="h-5 w-5 text-orange-600" />
                 </CardTitle>
@@ -347,14 +352,10 @@ export default function ProyectoDetallePage() {
               </CardContent>
             </Card>
           </Link>
-        </motion.div>
+        </div>
 
         {/* Financial Summary Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
+        <div>
           <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-green-200 hover:border-green-300 bg-gradient-to-br from-green-50 to-green-100">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-lg">
@@ -381,13 +382,10 @@ export default function ProyectoDetallePage() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
         {/* Project Timeline Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+        <div
           onClick={() => router.push(`/proyectos/${id}/cronograma`)}
           className="cursor-pointer"
         >
@@ -421,14 +419,82 @@ export default function ProyectoDetallePage() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
+
+        {/* Listas Card */}
+        <div>
+          <Link href={`/proyectos/${id}/equipos/listas`}>
+            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-emerald-200 hover:border-emerald-300 bg-gradient-to-br from-emerald-50 to-emerald-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-lg">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-6 w-6 text-emerald-600" />
+                    Gestionar Listas
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-emerald-600" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-emerald-700 font-medium">Listas</span>
+                  <span className="text-2xl font-bold text-emerald-900">{stats.listas.count}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-emerald-700 font-medium">Items Totales</span>
+                  <span className="text-lg font-semibold text-emerald-800">{stats.listas.items}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-emerald-700 font-medium">Cantidades Totales</span>
+                  <span className="text-lg font-semibold text-emerald-800">{stats.listas.cantidades}</span>
+                </div>
+                <div className="pt-2 border-t border-emerald-200">
+                  <p className="text-xs text-emerald-600">
+                    Gestiona listas técnicas y control de requerimientos
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Pedidos Card */}
+        <div>
+          <Link href={`/proyectos/${id}/equipos/pedidos`}>
+            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-cyan-200 hover:border-cyan-300 bg-gradient-to-br from-cyan-50 to-cyan-100">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-lg">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-6 w-6 text-cyan-600" />
+                    Gestionar Pedidos
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-cyan-600" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-cyan-700 font-medium">Pedidos</span>
+                  <span className="text-2xl font-bold text-cyan-900">{stats.pedidos.count}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-cyan-700 font-medium">Items Totales</span>
+                  <span className="text-lg font-semibold text-cyan-800">{stats.pedidos.items}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-cyan-700 font-medium">Cantidades Pedidas</span>
+                  <span className="text-lg font-semibold text-cyan-800">{stats.pedidos.cantidades}</span>
+                </div>
+                <div className="pt-2 border-t border-cyan-200">
+                  <p className="text-xs text-cyan-600">
+                    Gestiona pedidos de compra y seguimiento logístico
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
 
         {/* Quick Actions Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
+        <div>
           <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-indigo-200 hover:border-indigo-300 bg-gradient-to-br from-indigo-50 to-indigo-100">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-lg">
@@ -448,7 +514,7 @@ export default function ProyectoDetallePage() {
                   onClick={() => router.push(`/proyectos/${id}/equipos/listas`)}
                 >
                   <Package className="h-4 w-4 mr-2" />
-                  Gestionar Listas Técnicas
+                  Gestionar Listas
                 </Button>
                 <Button
                   variant="outline"
@@ -467,16 +533,12 @@ export default function ProyectoDetallePage() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
       </div>
 
       {/* Project Status Alert */}
       {proyecto.estado === 'creado' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
+        <div>
           <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
@@ -497,7 +559,7 @@ export default function ProyectoDetallePage() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
       )}
     </div>
   )

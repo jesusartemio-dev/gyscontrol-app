@@ -62,11 +62,14 @@ import {
   FolderOpen,
   BarChart3,
   Activity,
-  Target
+  Target,
+  Grid3X3,
+  Table
 } from 'lucide-react'
 
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
-import PedidoEquipoAccordion from '@/components/equipos/PedidoEquipoAccordion'
+import PedidoEquiposTableView from '@/components/equipos/PedidoEquiposTableView'
+import PedidoEquiposCardView from '@/components/equipos/PedidoEquiposCardView'
 
 // Helper functions for UI enhancements
 const getStatusVariant = (estado: string): "default" | "outline" => {
@@ -105,6 +108,7 @@ export default function PedidosProyectoPage() {
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
   const cargarDatos = async () => {
     try {
@@ -187,6 +191,11 @@ export default function PedidosProyectoPage() {
     } else {
       toast.error('Error al actualizar pedido')
     }
+  }
+
+  const handleEditPedido = (pedido: PedidoEquipo) => {
+    // TODO: Implementar modal de edición de pedido
+    toast.info('Funcionalidad de edición próximamente')
   }
 
   const handleDelete = async (id: string) => {
@@ -365,9 +374,29 @@ export default function PedidosProyectoPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button 
+          <div className="flex items-center gap-1 border rounded-lg p-1">
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="h-8"
+            >
+              <Table className="h-4 w-4 mr-2" />
+              Tabla
+            </Button>
+            <Button
+              variant={viewMode === 'card' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('card')}
+              className="h-8"
+            >
+              <Grid3X3 className="h-4 w-4 mr-2" />
+              Cards
+            </Button>
+          </div>
+          <Button
             onClick={() => router.push('/gestion/reportes/pedidos')}
-            variant="default" 
+            variant="default"
             size="sm"
           >
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -471,10 +500,15 @@ export default function PedidosProyectoPage() {
         transition={{ delay: 0.4 }}
         className="space-y-4"
       >
-        <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          Pedidos Realizados
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Pedidos Realizados
+          </h2>
+          <Badge variant="secondary" className="px-3 py-1">
+            {viewMode === 'table' ? 'Vista Tabla' : 'Vista Cards'}
+          </Badge>
+        </div>
 
         {pedidos.length === 0 ? (
           <Card>
@@ -488,39 +522,25 @@ export default function PedidosProyectoPage() {
           </Card>
         ) : (
           <motion.div
-            className="space-y-4"
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden: { opacity: 0 },
-              visible: {
-                opacity: 1,
-                transition: {
-                  staggerChildren: 0.1
-                }
-              }
-            }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
           >
-            {pedidos.map((pedido, index) => (
-              <motion.div
-                key={pedido.id}
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: { opacity: 1, y: 0 }
-                }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <PedidoEquipoAccordion
-                  pedido={pedido}
-                  responsableId={session?.user.id || ''}
-                  onCreateItem={handleCreateItem}
-                  onUpdateItem={handleUpdateItem}
-                  onDeleteItem={handleDeleteItem}
-                  onDelete={handleDelete}
-                  onUpdate={handleUpdate}
-                />
-              </motion.div>
-            ))}
+            {viewMode === 'table' ? (
+              <PedidoEquiposTableView
+                pedidos={pedidos}
+                proyectoId={proyectoId}
+                onEdit={handleEditPedido}
+                onDelete={handleDelete}
+              />
+            ) : (
+              <PedidoEquiposCardView
+                pedidos={pedidos}
+                proyectoId={proyectoId}
+                onEdit={handleEditPedido}
+                onDelete={handleDelete}
+              />
+            )}
           </motion.div>
         )}
       </motion.div>

@@ -33,6 +33,16 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         },
         servicios: { include: { items: true } },
         gastos: { include: { items: true } },
+        listaEquipos: {
+          include: {
+            items: true
+          }
+        },
+        pedidos: {
+          include: {
+            items: true
+          }
+        },
       },
     })
 
@@ -189,46 +199,46 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
     }
 
     // Eliminar equipos del proyecto
-    const equipos = await prisma.proyectoEquipo.findMany({
+    const equipos = await prisma.proyectoEquipoCotizado.findMany({
       where: { proyectoId: id },
       select: { id: true }
     })
 
     for (const equipo of equipos) {
-      await prisma.proyectoEquipoItem.deleteMany({
+      await prisma.proyectoEquipoCotizadoItem.deleteMany({
         where: { proyectoEquipoId: equipo.id }
       })
-      await prisma.proyectoEquipo.delete({
+      await prisma.proyectoEquipoCotizado.delete({
         where: { id: equipo.id }
       })
     }
 
     // Eliminar servicios del proyecto
-    const servicios = await prisma.proyectoServicio.findMany({
+    const servicios = await prisma.proyectoServicioCotizado.findMany({
       where: { proyectoId: id },
       select: { id: true }
     })
 
     for (const servicio of servicios) {
-      await prisma.proyectoServicioItem.deleteMany({
+      await prisma.proyectoServicioCotizadoItem.deleteMany({
         where: { proyectoServicioId: servicio.id }
       })
-      await prisma.proyectoServicio.delete({
+      await prisma.proyectoServicioCotizado.delete({
         where: { id: servicio.id }
       })
     }
 
     // Eliminar gastos del proyecto
-    const gastos = await prisma.proyectoGasto.findMany({
+    const gastos = await prisma.proyectoCotizadoGasto.findMany({
       where: { proyectoId: id },
       select: { id: true }
     })
 
     for (const gasto of gastos) {
-      await prisma.proyectoGastoItem.deleteMany({
+      await prisma.proyectoGastoCotizadoItem.deleteMany({
         where: { gastoId: gasto.id }
       })
-      await prisma.proyectoGasto.delete({
+      await prisma.proyectoCotizadoGasto.delete({
         where: { id: gasto.id }
       })
     }

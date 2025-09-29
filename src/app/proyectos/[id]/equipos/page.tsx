@@ -20,15 +20,17 @@ import { Suspense, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { getProyectoById } from '@/lib/services/proyecto';
 import { getProyectoEquipos } from '@/lib/services/proyectoEquipo';
-import ProyectoEquipoList from '@/components/proyectos/equipos/ProyectoEquipoList';
+import EquiposTableView from '@/components/proyectos/equipos/EquiposTableView';
+import EquiposCardView from '@/components/proyectos/equipos/EquiposCardView';
+import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { 
-  Package, 
-  DollarSign, 
+import {
+  Package,
+  DollarSign,
   Calendar,
   ArrowLeft,
   Settings,
@@ -36,10 +38,12 @@ import {
   Share2,
   List,
   BarChart3,
-  Plus
+  Plus,
+  Grid3X3,
+  Table
 } from 'lucide-react';
 import Link from 'next/link';
-import type { Proyecto, ProyectoEquipo } from '@/types';
+import type { Proyecto, ProyectoEquipoCotizado } from '@/types';
 import { useDebugPanel, DebugPanel } from '@/components/debug/DebugPanel';
 
 // ✅ Page props interface
@@ -108,10 +112,13 @@ function EquipmentPageSkeleton() {
 // ✅ Main page component
 export default function ProjectEquipmentPage({ params }: PageProps) {
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
-  const [equipos, setEquipos] = useState<ProyectoEquipo[]>([]);
+  const [equipos, setEquipos] = useState<ProyectoEquipoCotizado[]>([]);
   const [loading, setLoading] = useState(true);
   const [proyectoId, setProyectoId] = useState<string>('');
-  
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedEquipo, setSelectedEquipo] = useState<ProyectoEquipoCotizado | null>(null);
+
   // 🐛 Debug panel for monitoring re-renders
   const { DebugPanel } = useDebugPanel();
 
@@ -158,6 +165,22 @@ export default function ProjectEquipmentPage({ params }: PageProps) {
   if (!proyecto) {
     notFound();
   }
+
+  // ✅ Handle modal opening
+  const handleOpenModal = (equipo: ProyectoEquipoCotizado) => {
+    setSelectedEquipo(equipo);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedEquipo(null);
+  };
+
+  const handleDistribucionCompletada = (listaId: string) => {
+    console.log('Lista creada:', listaId);
+    // TODO: Refresh data or navigate to list
+  };
 
   // ✅ Calculate statistics
   const stats = {
@@ -215,6 +238,26 @@ export default function ProjectEquipmentPage({ params }: PageProps) {
         </div>
         
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 border rounded-lg p-1">
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="h-8"
+            >
+              <Table className="h-4 w-4 mr-2" />
+              Tabla
+            </Button>
+            <Button
+              variant={viewMode === 'card' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('card')}
+              className="h-8"
+            >
+              <Grid3X3 className="h-4 w-4 mr-2" />
+              Cards
+            </Button>
+          </div>
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Exportar
@@ -299,32 +342,56 @@ export default function ProjectEquipmentPage({ params }: PageProps) {
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-600" />
             Equipos Técnicos del Proyecto
+            <Badge variant="secondary" className="ml-auto">
+              {viewMode === 'table' ? 'Vista Tabla' : 'Vista Cards'}
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <Suspense fallback={<EquipmentPageSkeleton />}>
-            <ProyectoEquipoList 
-              equipos={equipos}
-              onItemChange={(equipoId, items) => {
-                console.log('Item change:', equipoId, items);
-                // TODO: Implement item update logic
-              }}
-              onUpdatedNombre={(equipoId, nuevoNombre) => {
-                console.log('Nombre updated:', equipoId, nuevoNombre);
-                // TODO: Implement name update logic
-              }}
-              onDeletedGrupo={(equipoId) => {
-                console.log('Grupo deleted:', equipoId);
-                // TODO: Implement group delete logic
-              }}
-              onChange={(equipoId, changes) => {
-                console.log('Equipo changed:', equipoId, changes);
-                // TODO: Implement equipment update logic
-              }}
-            />
+            {viewMode === 'table' ? (
+              <EquiposTableView
+                equipos={equipos}
+                proyectoId={proyectoId}
+                onCreateList={handleOpenModal}
+                onEquipoChange={(equipoId, changes) => {
+                  console.log('Equipo changed:', equipoId, changes);
+                  // TODO: Implement equipment update logic
+                }}
+                onEquipoDelete={(equipoId) => {
+                  console.log('Equipo deleted:', equipoId);
+                  // TODO: Implement equipment delete logic
+                }}
+              />
+            ) : (
+              <EquiposCardView
+                equipos={equipos}
+                proyectoId={proyectoId}
+                onCreateList={handleOpenModal}
+                onEquipoChange={(equipoId, changes) => {
+                  console.log('Equipo changed:', equipoId, changes);
+                  // TODO: Implement equipment update logic
+                }}
+                onEquipoDelete={(equipoId) => {
+                  console.log('Equipo deleted:', equipoId);
+                  // TODO: Implement equipment delete logic
+                }}
+              />
+            )}
           </Suspense>
         </CardContent>
       </Card>
+
+      {/* Modal for creating lists */}
+      {selectedEquipo && (
+        <CrearListaMultipleModal
+          isOpen={modalOpen}
+          onClose={handleCloseModal}
+          proyectoEquipo={selectedEquipo}
+          proyectoId={proyectoId}
+          onDistribucionCompletada={handleDistribucionCompletada}
+        />
+      )}
     </div>
   );
 }

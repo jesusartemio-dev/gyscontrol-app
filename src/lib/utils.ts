@@ -38,8 +38,12 @@ export const formatPercentage = (value: number): string => {
 export const getBaseUrl = (): string => {
   // En el servidor, necesitamos una URL absoluta
   if (typeof window === 'undefined') {
-    // En producción, usar NEXTAUTH_URL o construir desde headers
-    return process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    // En producción, usar NEXTAUTH_URL. Si no existe, error crítico
+    const nextAuthUrl = process.env.NEXTAUTH_URL
+    if (!nextAuthUrl) {
+      throw new Error('NEXTAUTH_URL environment variable is required for server-side API calls')
+    }
+    return nextAuthUrl
   }
   // En el cliente, usar URL relativa
   return ''

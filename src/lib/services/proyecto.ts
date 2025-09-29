@@ -4,12 +4,7 @@ import { buildApiUrl } from '@/lib/utils'
 
 // Obtener todos los proyectos
 export async function getProyectos(): Promise<Proyecto[]> {
-  // ✅ Use absolute URL for server-side requests
-  const baseUrl = typeof window === 'undefined' 
-    ? process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    : ''
-  const url = `${baseUrl}/api/proyecto`
-  
+  const url = buildApiUrl('/api/proyecto')
   const res = await fetch(url)
   if (!res.ok) throw new Error('Error al obtener proyectos')
   return res.json()
@@ -75,12 +70,7 @@ export async function crearProyectoDesdeCotizacion(
 // Obtener un proyecto por su ID
 export async function getProyectoById(id: string): Promise<Proyecto | null> {
   try {
-    // ✅ Use absolute URL for server-side requests
-    const baseUrl = typeof window === 'undefined' 
-      ? process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      : ''
-    const url = `${baseUrl}/api/proyecto/${id}`
-    
+    const url = buildApiUrl(`/api/proyecto/${id}`)
     const res = await fetch(url, {
       headers: {
         'Content-Type': 'application/json'
@@ -88,7 +78,7 @@ export async function getProyectoById(id: string): Promise<Proyecto | null> {
       credentials: 'include',
       cache: 'no-store'
     })
-    
+
     if (!res.ok) {
       if (res.status === 404) {
         console.warn(`Proyecto no encontrado: ${id}`)
@@ -101,7 +91,7 @@ export async function getProyectoById(id: string): Promise<Proyecto | null> {
       console.error(`Error ${res.status}: ${res.statusText}`)
       return null
     }
-    
+
     return await res.json()
   } catch (error) {
     console.error('getProyectoById:', error)

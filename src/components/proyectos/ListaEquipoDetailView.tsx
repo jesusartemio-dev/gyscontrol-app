@@ -39,14 +39,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { DetailBreadcrumb } from '@/components/common/DetailBreadcrumb';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
+import {
   ArrowLeft,
   Package,
   Settings,
@@ -66,14 +60,15 @@ import {
   Calendar,
   User,
   FileText,
-  ShoppingCart
+  ShoppingCart,
+  Target
 } from 'lucide-react';
 import ListaEquipoItemList from '@/components/equipos/ListaEquipoItemList';
 import ListaEquipoForm from '@/components/equipos/ListaEquipoForm';
 import ListaEquipoEditModal from '@/components/equipos/ListaEquipoEditModal';
 import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
-import ListaEstadoFlujo from '@/components/equipos/ListaEstadoFlujo';
 import ListaEstadoFlujoBanner from '@/components/equipos/ListaEstadoFlujoBanner';
+import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial';
 import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
@@ -165,11 +160,11 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
   
   // 🔄 Local state management
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('items');
   
   // Handle lista updated from modal
-  const handleListaUpdated = (updatedLista: ListaEquipo) => {
-    // The hook will refresh the data, but we can also update local state if needed
+  const handleListaUpdated = async (updatedLista: ListaEquipo) => {
+    // Force refresh the data to ensure we have the latest information
+    await refreshItems();
     toast.success('Lista actualizada correctamente');
   };
   
@@ -295,6 +290,12 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                       <Calendar className="w-4 h-4" />
                       Actualizado {lista ? formatDate(lista.updatedAt) : 'N/A'}
                     </div>
+                    {lista?.fechaNecesaria && lista.fechaNecesaria !== '' && (
+                      <div className="flex items-center gap-1">
+                        <Target className="w-4 h-4" />
+                        Fecha Necesaria: {formatDate(lista.fechaNecesaria)}
+                      </div>
+                    )}
                     {/* Responsable info removed - not available in ListaEquipo schema */}
                   </div>
                 </div>
@@ -371,21 +372,15 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
         </motion.div>
       )}
 
-      {/* 📑 Primary Content - Always Visible */}
+      {/* 📑 Primary Content - Items List */}
       <motion.div variants={staggerItemVariants}>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="items" className="flex items-center gap-2">
-                <Package className="w-4 h-4" />
-                Items
-              </TabsTrigger>
-              <TabsTrigger value="estados" className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                Estados
-              </TabsTrigger>
-            </TabsList>
-            
+            <div className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-blue-600" />
+              <h3 className="text-lg font-semibold">Items de la Lista</h3>
+            </div>
+
             <div className="flex gap-2">
               {lista && (
                 <PedidoDesdeListaModal
@@ -399,6 +394,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                         toast.success('Pedido creado exitosamente');
                         // Refresh the lista data to update cantidadPedida
                         await refreshItems();
+                        // Navigate to the pedido detail page
+                        router.push(`/proyectos/${proyectoId}/equipos/pedidos/${result.id}`);
                         return result;
                       }
                       return null;
@@ -410,9 +407,9 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                   }}
                   onRefresh={refreshItems}
                   trigger={
-                    <Button 
-                      variant="default" 
-                      size="sm" 
+                    <Button
+                      variant="default"
+                      size="sm"
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       <ShoppingCart className="w-4 h-4 mr-1" />
@@ -421,9 +418,9 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                   }
                 />
               )}
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleRefreshItems}
                 disabled={itemsLoading}
               >
@@ -436,105 +433,64 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
               </Button>
             </div>
           </div>
-          
-          <TabsContent value="items" className="space-y-4">
-            <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-              <ListaEquipoItemList
-                  listaId={listaId}
-                  proyectoId={proyectoId}
-                  items={items}
-                  editable={true}
-                  onCreated={handleRefreshItems}
-                />
-            </Suspense>
-          </TabsContent>
-          
-          <TabsContent value="estados" className="space-y-4">
-            {lista && (
-              <ListaEstadoFlujo 
-                estado={lista.estado}
-                listaId={lista.id}
-                onUpdated={async (nuevoEstado) => {
-                  try {
-                    await updateLista({ estado: nuevoEstado });
-                    toast.success(`Estado actualizado a: ${nuevoEstado}`);
-                  } catch (error) {
-                    console.error('Error updating estado:', error);
-                    toast.error('Error al actualizar el estado');
-                  }
-                }}
+
+          <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <ListaEquipoItemList
+                listaId={listaId}
+                proyectoId={proyectoId}
+                items={items}
+                editable={true}
+                onCreated={handleRefreshItems}
+                onDeleted={handleRefreshItems}
               />
-            )}
-          </TabsContent>
-        </Tabs>
+          </Suspense>
+        </div>
       </motion.div>
 
-      {/* 📊 Additional Information - Secondary Tabs */}
+      {/* 📊 Additional Information */}
       <motion.div variants={staggerItemVariants} className="mt-8 pt-6 border-t border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5" />
           Información Adicional
         </h3>
-        
-        <Tabs defaultValue="timeline" className="space-y-4">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
-            <TabsTrigger value="timeline" className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Timeline
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <History className="w-4 h-4" />
-              Historial
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              Configuración
-            </TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="timeline" className="space-y-4">
+        <div className="space-y-6">
+          {/* Timeline Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-600" />
+              <h4 className="text-md font-semibold">Timeline de la Lista</h4>
+            </div>
             {lista && (
-              <ListaEquipoTimeline 
+              <ListaEquipoTimeline
                 lista={lista}
                 className="w-full"
               />
             )}
-          </TabsContent>
-          
-          <TabsContent value="history" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="w-5 h-5" />
-                  Historial de Cambios
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Historial de cambios próximamente</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="settings" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Configuración de Lista
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Settings className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Configuraciones avanzadas próximamente</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+
+          {/* History Section */}
+          <ListaEquipoHistorial
+            listaId={listaId}
+            className="w-full"
+          />
+
+          {/* Settings Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Configuración de Lista
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <Settings className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Configuraciones avanzadas próximamente</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </motion.div>
 
 

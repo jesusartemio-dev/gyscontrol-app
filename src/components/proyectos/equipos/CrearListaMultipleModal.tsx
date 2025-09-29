@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Dialog,
   DialogContent,
@@ -24,15 +25,27 @@ import {
   Loader2,
   Search,
   Filter,
-  X
+  X,
+  Eye,
+  EyeOff,
+  Group,
+  Ungroup,
+  Tag,
+  Layers,
+  Info
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@prisma/client'
+
+// Extended type that includes items relation
+type ProyectoEquipoCotizadoWithItems = ProyectoEquipoCotizado & {
+  items: ProyectoEquipoCotizadoItem[]
+}
 
 interface Props {
   isOpen: boolean
   onClose: () => void
-  proyectoEquipo: ProyectoEquipo
+  proyectoEquipo: ProyectoEquipoCotizadoWithItems
   proyectoId: string
   onDistribucionCompletada: (listaId: string) => void
 }
@@ -44,13 +57,18 @@ export default function CrearListaMultipleModal({
   proyectoId,
   onDistribucionCompletada
 }: Props) {
-  const [itemsDisponibles, setItemsDisponibles] = useState<ProyectoEquipoItem[]>([])
+  const [itemsDisponibles, setItemsDisponibles] = useState<ProyectoEquipoCotizadoItem[]>([])
   const [itemsSeleccionados, setItemsSeleccionados] = useState<string[]>([])
   const [cargando, setCargando] = useState(false)
   const [nombreLista, setNombreLista] = useState('')
   const [descripcionLista, setDescripcionLista] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('__ALL__')
   const [busqueda, setBusqueda] = useState('')
+  const [agruparPorCategoria, setAgruparPorCategoria] = useState(false)
+  const [mostrarDetalles, setMostrarDetalles] = useState<string | null>(null)
+  const [codigoLista, setCodigoLista] = useState('')
+  const [fechaRequerida, setFechaRequerida] = useState('')
+  const router = useRouter()
 
   // Función para cargar items disponibles desde la base de datos
   const cargarItemsDisponibles = async () => {
@@ -91,7 +109,7 @@ export default function CrearListaMultipleModal({
   }
 
   // Función para obtener la categoría predominante
-  const getCategoriaPredominante = (items: ProyectoEquipoItem[]) => {
+  const getCategoriaPredominante = (items: ProyectoEquipoCotizadoItem[]) => {
     const categorias = items.reduce((acc, item) => {
       const categoria = item.categoria || 'SIN-CATEGORIA'
       acc[categoria] = (acc[categoria] || 0) + 1
@@ -106,6 +124,39 @@ export default function CrearListaMultipleModal({
       : 'Equipos'
   }
 
+  // Función para obtener el código de lista preview
+  const obtenerCodigoListaPreview = async () => {
+    try {
+      // Obtener información del proyecto
+      const proyectoResponse = await fetch(`/api/proyecto/${proyectoId}`)
+      if (!proyectoResponse.ok) {
+        throw new Error('No se pudo obtener información del proyecto')
+      }
+      const proyecto = await proyectoResponse.json()
+
+      // Obtener las listas existentes del proyecto para calcular el siguiente número
+      const listasResponse = await fetch(`/api/lista-equipo?proyectoId=${proyectoId}`)
+      let nextSequence = 1
+
+      if (listasResponse.ok) {
+        const listas = await listasResponse.json()
+        if (listas.length > 0) {
+          // Encontrar el número de secuencia más alto
+          const maxSequence = Math.max(...listas.map((lista: any) => lista.numeroSecuencia || 0))
+          nextSequence = maxSequence + 1
+        }
+      }
+
+      // Generar código siguiendo el patrón exacto: {codigoProyecto}-LST-{correlativo}
+      const codigo = `${proyecto.codigo}-LST-${String(nextSequence).padStart(3, '0')}`
+      setCodigoLista(codigo)
+    } catch (error) {
+      console.error('Error obteniendo código de lista preview:', error)
+      // Fallback: usar un código genérico
+      setCodigoLista('CÓDIGO-PENDIENTE')
+    }
+  }
+
   // Inicializar datos cuando se abre el modal
   useEffect(() => {
     if (isOpen) {
@@ -114,11 +165,13 @@ export default function CrearListaMultipleModal({
       // Obtener datos frescos de los items disponibles
       cargarItemsDisponibles()
 
+      // Obtener código de lista preview
+      obtenerCodigoListaPreview()
+
       // Resetear estado
       setItemsSeleccionados([])
       const categoriaPredominante = getCategoriaPredominante(proyectoEquipo.items || [])
       setNombreLista(`Lista de ${categoriaPredominante}`)
-      setDescripcionLista(`Lista técnica de ${categoriaPredominante} para ${proyectoEquipo.nombre}`)
       setFiltroCategoria('__ALL__')
       setBusqueda('')
     }
@@ -178,13 +231,70 @@ export default function CrearListaMultipleModal({
     return itemsDisponibles.filter(item => {
       const coincideBusqueda = busqueda === '' ||
         (item.descripcion?.toLowerCase().includes(busqueda.toLowerCase()) ?? false) ||
-        (item.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ?? false)
+        (item.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ?? false) ||
+        (item.categoria?.toLowerCase().includes(busqueda.toLowerCase()) ?? false) ||
+        (item.unidad?.toLowerCase().includes(busqueda.toLowerCase()) ?? false)
 
       const coincideCategoria = filtroCategoria === '__ALL__' ||
         item.categoria === filtroCategoria
 
       return coincideBusqueda && coincideCategoria
     })
+  }
+
+  // Agrupar items por categoría
+  const getItemsAgrupadosPorCategoria = () => {
+    const itemsFiltrados = getItemsFiltrados()
+    const agrupados: Record<string, ProyectoEquipoCotizadoItem[]> = {}
+
+    itemsFiltrados.forEach(item => {
+      const categoria = item.categoria || 'SIN-CATEGORIA'
+      if (!agrupados[categoria]) {
+        agrupados[categoria] = []
+      }
+      agrupados[categoria].push(item)
+    })
+
+    return agrupados
+  }
+
+  // Seleccionar/deseleccionar todos los items de una categoría
+  const toggleCategoriaSeleccion = (categoria: string, seleccionar: boolean) => {
+    const itemsDeCategoria = itemsDisponibles.filter(item =>
+      (item.categoria || 'SIN-CATEGORIA') === categoria
+    )
+    const idsDeCategoria = itemsDeCategoria.map(item => item.id)
+
+    setItemsSeleccionados(prev => {
+      if (seleccionar) {
+        return [...new Set([...prev, ...idsDeCategoria])]
+      } else {
+        return prev.filter(id => !idsDeCategoria.includes(id))
+      }
+    })
+  }
+
+  // Verificar si una categoría está completamente seleccionada
+  const isCategoriaCompletamenteSeleccionada = (categoria: string) => {
+    const itemsDeCategoria = itemsDisponibles.filter(item =>
+      (item.categoria || 'SIN-CATEGORIA') === categoria
+    )
+    const idsDeCategoria = itemsDeCategoria.map(item => item.id)
+    return idsDeCategoria.length > 0 &&
+           idsDeCategoria.every(id => itemsSeleccionados.includes(id))
+  }
+
+  // Verificar si una categoría tiene items parcialmente seleccionados
+  const isCategoriaParcialmenteSeleccionada = (categoria: string) => {
+    const itemsDeCategoria = itemsDisponibles.filter(item =>
+      (item.categoria || 'SIN-CATEGORIA') === categoria
+    )
+    const idsDeCategoria = itemsDeCategoria.map(item => item.id)
+    const seleccionadosEnCategoria = idsDeCategoria.filter(id =>
+      itemsSeleccionados.includes(id)
+    )
+    return seleccionadosEnCategoria.length > 0 &&
+           seleccionadosEnCategoria.length < idsDeCategoria.length
   }
 
   // Obtener categorías únicas
@@ -215,6 +325,11 @@ export default function CrearListaMultipleModal({
       return
     }
 
+    if (!fechaRequerida) {
+      toast.error('La fecha requerida es obligatoria')
+      return
+    }
+
     if (itemsSeleccionados.length === 0) {
       toast.error('Debe seleccionar al menos un item')
       return
@@ -228,6 +343,7 @@ export default function CrearListaMultipleModal({
         proyectoEquipoId: proyectoEquipo.id,
         nombre: nombreLista.trim(),
         descripcion: descripcionLista.trim(),
+        fechaRequerida,
         itemsIds: itemsSeleccionados
       }
 
@@ -245,8 +361,9 @@ export default function CrearListaMultipleModal({
       const listaCreada = await response.json()
 
       toast.success(`✅ Lista "${nombreLista}" creada exitosamente con ${itemsSeleccionados.length} items`)
-      onDistribucionCompletada(listaCreada.id)
-      onClose()
+
+      // Navegar al detalle de la lista creada
+      router.push(`/proyectos/${proyectoId}/equipos/listas/${listaCreada.id}`)
 
     } catch (error) {
       console.error('Error creando lista:', error)
@@ -261,15 +378,15 @@ export default function CrearListaMultipleModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
         <DialogHeader className="pb-4">
-          <DialogTitle className="text-lg font-medium">Crear Lista Múltiple</DialogTitle>
+          <DialogTitle className="text-lg font-medium text-blue-900">Crear Lista Múltiple</DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="flex-1 h-[60vh] pr-6">
           <div className="space-y-4 pb-6">
             {/* Información básica */}
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="nombre-lista" className="text-sm font-medium">Nombre *</Label>
                 <Input
@@ -281,19 +398,36 @@ export default function CrearListaMultipleModal({
                 />
               </div>
               <div>
-                <Label htmlFor="descripcion-lista" className="text-sm font-medium">Descripción</Label>
+                <Label htmlFor="codigo-lista" className="text-sm font-medium">Código de Lista</Label>
                 <Input
-                  id="descripcion-lista"
-                  value={descripcionLista}
-                  onChange={(e) => setDescripcionLista(e.target.value)}
-                  placeholder="Descripción opcional"
-                  className="mt-1"
+                  id="codigo-lista"
+                  value={codigoLista}
+                  readOnly
+                  placeholder="Se generará automáticamente"
+                  className="mt-1 bg-muted/50 font-mono text-sm"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Código único que se asignará a la lista
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="fecha-requerida" className="text-sm font-medium">Fecha Requerida *</Label>
+                <Input
+                  id="fecha-requerida"
+                  type="date"
+                  value={fechaRequerida}
+                  onChange={(e) => setFechaRequerida(e.target.value)}
+                  className="mt-1"
+                  min={new Date().toISOString().split('T')[0]} // No permitir fechas pasadas
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Fecha límite para tener lista la compra
+                </p>
               </div>
             </div>
 
-            {/* Filtros simples */}
-            <div className="flex gap-3">
+            {/* Filtros y opciones avanzadas - Todo en una fila */}
+            <div className="flex gap-3 items-end">
               <div className="flex-1">
                 <Label className="text-sm font-medium">Buscar</Label>
                 <div className="relative mt-1">
@@ -301,7 +435,7 @@ export default function CrearListaMultipleModal({
                   <Input
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
-                    placeholder="Buscar items..."
+                    placeholder="Buscar por código, descripción, categoría..."
                     className="pl-9 h-9"
                   />
                 </div>
@@ -321,6 +455,21 @@ export default function CrearListaMultipleModal({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={agruparPorCategoria ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAgruparPorCategoria(!agruparPorCategoria)}
+                  className="h-9"
+                >
+                  {agruparPorCategoria ? (
+                    <Ungroup className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Group className="h-4 w-4 mr-2" />
+                  )}
+                  {agruparPorCategoria ? 'Sin agrupar' : 'Agrupar'}
+                </Button>
               </div>
             </div>
 
@@ -359,12 +508,98 @@ export default function CrearListaMultipleModal({
 
               <div className="h-80 border rounded-lg overflow-hidden">
                 <ScrollArea className="h-full">
-                  <div className="p-2 space-y-1">
+                  <div className="p-2 space-y-2">
                     {itemsFiltrados.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <p className="text-sm">No hay items disponibles</p>
                       </div>
+                    ) : agruparPorCategoria ? (
+                      // Vista agrupada por categoría
+                      Object.entries(getItemsAgrupadosPorCategoria()).map(([categoria, itemsCategoria]) => {
+                        const categoriaCompletamenteSeleccionada = isCategoriaCompletamenteSeleccionada(categoria)
+                        const categoriaParcialmenteSeleccionada = isCategoriaParcialmenteSeleccionada(categoria)
+
+                        return (
+                          <div key={categoria} className="space-y-2">
+                            {/* Header de categoría */}
+                            <div className="flex items-center justify-between bg-muted/50 px-3 py-2 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <Tag className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium text-sm">
+                                  {categoria === 'SIN-CATEGORIA' ? 'Sin Categoría' : categoria}
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {itemsCategoria.length}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={categoriaCompletamenteSeleccionada}
+                                  onChange={() => toggleCategoriaSeleccion(categoria, !categoriaCompletamenteSeleccionada)}
+                                  className="h-4 w-4"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleCategoriaSeleccion(categoria, !categoriaCompletamenteSeleccionada)}
+                                  className="h-6 px-2 text-xs"
+                                >
+                                  {categoriaCompletamenteSeleccionada ? 'Quitar' : 'Seleccionar'}
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Items de la categoría */}
+                            <div className="space-y-1 ml-4">
+                              {itemsCategoria.map((item) => {
+                                const isSelected = itemsSeleccionados.includes(item.id)
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className={`p-3 border rounded cursor-pointer transition-colors ${
+                                      isSelected
+                                        ? 'bg-blue-50 border-blue-200'
+                                        : 'bg-white border-gray-200 hover:border-gray-300'
+                                    }`}
+                                    onClick={() => toggleItemSeleccion(item.id)}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onChange={() => toggleItemSeleccion(item.id)}
+                                        className="pointer-events-none"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <div className="font-medium text-sm truncate flex-1">
+                                            {item.descripcion || item.codigo || 'Sin descripción'}
+                                          </div>
+                                          <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                                            {item.categoria || 'Sin categoría'}
+                                          </Badge>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                          <span className="font-mono">{item.codigo}</span>
+                                          <span>Cant: {item.cantidad || 0}</span>
+                                          <span>{item.unidad || 'Sin unidad'}</span>
+                                          <span className="text-green-600 font-medium">
+                                            ${item.precioCliente?.toFixed(2) || '0.00'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      {isSelected && (
+                                        <CheckCircle2 className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })
                     ) : (
+                      // Vista sin agrupar (lista plana)
                       itemsFiltrados.map((item) => {
                         const isSelected = itemsSeleccionados.includes(item.id)
                         return (
@@ -384,17 +619,21 @@ export default function CrearListaMultipleModal({
                                 className="pointer-events-none"
                               />
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-sm truncate">
-                                  {item.descripcion || item.codigo || 'Sin descripción'}
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className="font-medium text-sm truncate flex-1">
+                                    {item.descripcion || item.codigo || 'Sin descripción'}
+                                  </div>
+                                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                                    {item.categoria || 'Sin categoría'}
+                                  </Badge>
                                 </div>
-                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span className="font-mono">{item.codigo}</span>
                                   <span>Cant: {item.cantidad || 0}</span>
                                   <span>{item.unidad || 'Sin unidad'}</span>
-                                  {item.categoria && item.categoria !== 'SIN-CATEGORIA' && (
-                                    <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                                      {item.categoria}
-                                    </span>
-                                  )}
+                                  <span className="text-green-600 font-medium">
+                                    ${item.precioCliente?.toFixed(2) || '0.00'}
+                                  </span>
                                 </div>
                               </div>
                               {isSelected && (
@@ -412,8 +651,8 @@ export default function CrearListaMultipleModal({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="gap-3 pt-4 border-t bg-muted/20 -mx-6 -mb-6 px-6 py-4">
-          <Button variant="outline" onClick={onClose} className="flex-1">
+        <DialogFooter className="gap-3 pt-4 border-t border-blue-200 bg-blue-50/50 -mx-6 -mb-6 px-6 py-4">
+          <Button variant="outline" onClick={onClose} className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-100">
             Cancelar
           </Button>
           <Button

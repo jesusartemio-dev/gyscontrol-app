@@ -48,7 +48,19 @@ export default function CrmIntegrationNotification({
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al crear oportunidad')
+        const errorMessage = errorData.error || 'Error al crear oportunidad'
+
+        // Check if the error is about existing opportunity
+        if (errorMessage.includes('Ya existe una oportunidad') || errorMessage.includes('ya existe')) {
+          toast.info('Esta cotización ya tiene una oportunidad asociada en el CRM', {
+            description: 'No es necesario crear otra oportunidad.',
+            duration: 5000,
+          })
+          setIsVisible(false)
+          return
+        }
+
+        throw new Error(errorMessage)
       }
 
       const oportunidad = await response.json()

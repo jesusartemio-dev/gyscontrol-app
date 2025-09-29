@@ -149,8 +149,8 @@ export default function CrearCotizacionDesdeOportunidadModal({
       onSuccess(nuevaCotizacion.id)
       handleClose()
 
-      // Redirigir a la página de edición de cotización
-      window.location.href = `/comercial/cotizaciones/${nuevaCotizacion.id}`
+      // Redirigir a la página de edición de cotización (client-side navigation)
+      router.push(`/comercial/cotizaciones/${nuevaCotizacion.id}`)
 
     } catch (error: any) {
       console.error('Error al crear cotización:', error)

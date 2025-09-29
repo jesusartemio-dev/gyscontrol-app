@@ -95,10 +95,13 @@ export async function GET(req: NextRequest) {
               },
               take: 1
             },
-            // 📦 Pedidos count
-            _count: {
+            // 📦 Pedidos information
+            pedidos: {
               select: {
-                pedidos: true
+                id: true,
+                estado: true,
+                cantidadPedida: true,
+                cantidadAtendida: true
               }
             }
           }
@@ -112,30 +115,61 @@ export async function GET(req: NextRequest) {
     })
 
     // 🧮 Calculate summary statistics for each lista
-    const listasWithStats = listas.map(lista => {
+    const listasWithStats = listas.map((lista: any) => {
       const totalItems = lista._count.items
-      
+
       // 💰 Calculate costs and statistics
       let costoTotal = 0
       let costoAprobado = 0
       let itemsVerificados = 0
       let itemsAprobados = 0
       let itemsRechazados = 0
-      
-      lista.items.forEach(item => {
+
+      // 📦 Calculate order statistics
+      let itemsConPedido = 0
+      let itemsSinPedido = 0
+      let pedidosCompletos = 0
+      let pedidosParciales = 0
+      let pedidosPendientes = 0
+      let numeroPedidos = 0
+
+      lista.items.forEach((item: any) => {
         const mejorCotizacion = item.cotizaciones[0]?.precioUnitario || 0
-        const precioUnitario = mejorCotizacion > 0 
-          ? mejorCotizacion 
+        const precioUnitario = mejorCotizacion > 0
+          ? mejorCotizacion
           : (item.precioElegido || item.presupuesto || 0)
-        
+
         const costoItem = precioUnitario * (item.cantidad || 0)
         costoTotal += costoItem
-        
+
         // Note: We would need item status to calculate these properly
         // For now, using basic logic based on available data
         if (item.cotizaciones.length > 0) {
           itemsVerificados++
           costoAprobado += costoItem
+        }
+
+        // 📦 Calculate order statistics
+        const tienePedidos = item.pedidos.length > 0
+        if (tienePedidos) {
+          itemsConPedido++
+          numeroPedidos += item.pedidos.length // Count each pedido
+
+          // Calculate order status for each pedido
+          item.pedidos.forEach((pedido: any) => {
+            const cantidadPedida = pedido.cantidadPedida || 0
+            const cantidadAtendida = pedido.cantidadAtendida || 0
+
+            if (cantidadAtendida >= cantidadPedida && cantidadPedida > 0) {
+              pedidosCompletos++
+            } else if (cantidadAtendida > 0) {
+              pedidosParciales++
+            } else {
+              pedidosPendientes++
+            }
+          })
+        } else {
+          itemsSinPedido++
         }
       })
 
@@ -155,7 +189,14 @@ export async function GET(req: NextRequest) {
           itemsAprobados,
           itemsRechazados,
           costoTotal,
-          costoAprobado
+          costoAprobado,
+          // 📦 Estadísticas de pedidos
+          itemsConPedido,
+          itemsSinPedido,
+          numeroPedidos,
+          pedidosCompletos,
+          pedidosParciales,
+          pedidosPendientes
         },
         
         // 🏗️ Información mínima del proyecto

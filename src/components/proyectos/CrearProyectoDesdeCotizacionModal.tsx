@@ -19,8 +19,8 @@ interface Props {
   showIcon?: boolean
 }
 
-export default function CrearProyectoDesdeCotizacionModal({ 
-  cotizacion, 
+export default function CrearProyectoDesdeCotizacionModal({
+  cotizacion,
   buttonVariant = 'default',
   buttonSize = 'default',
   buttonClassName = '',
@@ -32,30 +32,25 @@ export default function CrearProyectoDesdeCotizacionModal({
   const [fechaFin, setFechaFin] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // ✅ Validación: solo fechaInicio es requerida (nombre viene de la cotización)
-  const puedeCrear = fechaInicio && !loading
+  // ✅ Validaciones de negocio (re-evaluadas en cada render)
+  const cotizacionAprobada = cotizacion.estado === 'aprobada'
+  const tieneCliente = !!cotizacion.cliente?.id
+  const tieneComercial = !!cotizacion.comercial?.id
+  const puedeCrearProyecto = cotizacionAprobada && tieneCliente && tieneComercial
+
+  // ✅ Validación: fecha requerida + condiciones de negocio + no loading
+  const puedeCrear = puedeCrearProyecto && fechaInicio && !loading
 
   const handleCrear = async () => {
     if (!puedeCrear) return
-
-    // ✅ Validate required fields before sending
-    if (!cotizacion.cliente?.id) {
-      toast.error('La cotización debe tener un cliente asignado')
-      return
-    }
-
-    if (!cotizacion.comercial?.id) {
-      toast.error('La cotización debe tener un comercial asignado')
-      return
-    }
 
     setLoading(true)
     try {
       // 📡 Call service to create project from cotización
       const proyecto = await crearProyectoDesdeCotizacion(cotizacion.id, {
-        clienteId: cotizacion.cliente.id,
-        comercialId: cotizacion.comercial.id,
-        gestorId: cotizacion.comercial.id, // ✅ Use comercial as default gestor
+        clienteId: cotizacion.cliente!.id,
+        comercialId: cotizacion.comercial!.id,
+        gestorId: cotizacion.comercial!.id, // ✅ Use comercial as default gestor
         cotizacionId: cotizacion.id,
         nombre: cotizacion.nombre, // ✅ Use cotización name automatically
         totalEquiposInterno: cotizacion.totalEquiposInterno,
@@ -77,8 +72,8 @@ export default function CrearProyectoDesdeCotizacionModal({
       setFechaInicio('')
       setFechaFin('')
 
-      // Navigate to the new project
-      window.location.href = `/proyectos/${proyecto.id}`
+      // Navigate to the new project (client-side navigation)
+      router.push(`/proyectos/${proyecto.id}`)
     } catch (error) {
       console.error('Error al crear proyecto:', error)
       // ✅ Show more specific error message
@@ -92,14 +87,26 @@ export default function CrearProyectoDesdeCotizacionModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
+        <Button
           variant={buttonVariant}
           size={buttonSize}
-          className={`${buttonVariant === 'default' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''} ${buttonClassName}`}
+          disabled={!puedeCrearProyecto}
+          className={`${
+            buttonVariant === 'default' && puedeCrearProyecto
+              ? 'bg-purple-600 hover:bg-purple-700 text-white'
+              : !puedeCrearProyecto
+              ? 'bg-gray-400 cursor-not-allowed text-gray-200'
+              : ''
+          } ${buttonClassName}`}
+          title={!puedeCrearProyecto ? 'La cotización debe estar aprobada y tener cliente/comercial asignados' : undefined}
         >
           {showIcon && <FolderPlus className="h-4 w-4 mr-2" />}
-          <span className="hidden sm:inline">Crear Proyecto</span>
-          <span className="sm:hidden">Proyecto</span>
+          <span className="hidden sm:inline">
+            {!puedeCrearProyecto ? 'Cotización no válida' : 'Crear Proyecto'}
+          </span>
+          <span className="sm:hidden">
+            {!puedeCrearProyecto ? 'No válido' : 'Proyecto'}
+          </span>
         </Button>
       </DialogTrigger>
       <DialogContent className="space-y-4">
@@ -108,6 +115,52 @@ export default function CrearProyectoDesdeCotizacionModal({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          {/* Estado de la cotización */}
+          <div className={`p-4 border rounded-lg ${
+            cotizacionAprobada
+              ? 'bg-green-50 border-green-200'
+              : 'bg-yellow-50 border-yellow-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${
+                cotizacionAprobada ? 'bg-green-100' : 'bg-yellow-100'
+              }`}>
+                <FolderPlus className={`h-5 w-5 ${
+                  cotizacionAprobada ? 'text-green-600' : 'text-yellow-600'
+                }`} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">Estado de la Cotización</p>
+                <p className={`text-lg font-semibold ${
+                  cotizacionAprobada ? 'text-green-800' : 'text-yellow-800'
+                }`}>
+                  {cotizacionAprobada ? '✅ Aprobada' : '⚠️ Pendiente de Aprobación'}
+                </p>
+                <p className="text-xs text-gray-600 mt-1">
+                  Código: {cotizacion.codigo}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Requisitos para crear proyecto */}
+          {!puedeCrearProyecto && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <h4 className="text-sm font-medium text-red-900 mb-2">Requisitos faltantes:</h4>
+              <ul className="text-sm text-red-800 space-y-1">
+                {!cotizacionAprobada && (
+                  <li>• La cotización debe estar en estado "aprobada"</li>
+                )}
+                {!tieneCliente && (
+                  <li>• La cotización debe tener un cliente asignado</li>
+                )}
+                {!tieneComercial && (
+                  <li>• La cotización debe tener un comercial asignado</li>
+                )}
+              </ul>
+            </div>
+          )}
+
           {/* Información del proyecto */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center gap-3">
@@ -154,9 +207,15 @@ export default function CrearProyectoDesdeCotizacionModal({
           <Button
             onClick={handleCrear}
             disabled={!puedeCrear || loading}
-            className="bg-purple-600 text-white"
+            className={`${
+              puedeCrearProyecto
+                ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                : 'bg-gray-400 cursor-not-allowed text-gray-200'
+            }`}
           >
-            {loading ? 'Creando...' : 'Crear Proyecto'}
+            {loading ? 'Creando...' :
+             !puedeCrearProyecto ? 'Cotización no válida' :
+             'Crear Proyecto'}
           </Button>
         </div>
       </DialogContent>

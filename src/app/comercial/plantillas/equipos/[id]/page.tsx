@@ -9,6 +9,8 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import PlantillaEquipoIndependienteMultiAddModal from '@/components/plantillas/equipos/PlantillaEquipoIndependienteMultiAddModal'
 import PlantillaEquiposView from '@/components/plantillas/equipos/PlantillaEquiposView'
+import PlantillaEquipoEditModal from '@/components/plantillas/equipos/PlantillaEquipoEditModal'
+import { useEquipmentPermissions } from '@/hooks/usePermissions'
 
 import {
   Plus,
@@ -18,7 +20,8 @@ import {
   AlertCircle,
   Loader2,
   Wrench,
-  DollarSign
+  DollarSign,
+  Edit
 } from 'lucide-react'
 
 // Types for independent equipment templates
@@ -96,6 +99,10 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
   const [error, setError] = useState<string | null>(null)
   const [id, setId] = useState<string>('')
   const [showMultiAddModal, setShowMultiAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+
+  // Check permissions for editing
+  const { canEdit, loading: permissionsLoading } = useEquipmentPermissions()
 
   useEffect(() => {
     const unwrapParams = async () => {
@@ -141,6 +148,36 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
       } : null)
     })
     setShowMultiAddModal(false)
+  }
+
+  // Handle plantilla update
+  const handlePlantillaUpdated = (updatedPlantilla: PlantillaEquipoIndependiente) => {
+    setPlantilla(updatedPlantilla)
+    setShowEditModal(false)
+  }
+
+  // Handle item update (optimistic update)
+  const handleItemUpdated = (itemId: string, updates: Partial<PlantillaEquipoItemIndependiente>) => {
+    setPlantilla(prev => {
+      if (!prev) return prev
+
+      const updatedItems = prev.items?.map(item =>
+        item.id === itemId ? { ...item, ...updates } : item
+      ) || []
+
+      // Recalculate totals
+      const totalInterno = updatedItems.reduce((sum, item) => sum + item.costoInterno, 0)
+      const totalCliente = updatedItems.reduce((sum, item) => sum + item.costoCliente, 0)
+      const grandTotal = totalCliente - (prev.descuento || 0)
+
+      return {
+        ...prev,
+        items: updatedItems,
+        totalInterno,
+        totalCliente,
+        grandTotal
+      }
+    })
   }
 
   if (loading) {
@@ -218,6 +255,12 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
           </div>
 
           <div className="flex gap-2">
+            {canEdit && (
+              <Button variant="default" size="sm" onClick={() => setShowEditModal(true)} className="bg-blue-600 hover:bg-blue-700">
+                <Edit className="h-4 w-4 mr-2" />
+                Editar Plantilla
+              </Button>
+            )}
             <Button variant="outline" size="sm">
               <Share2 className="h-4 w-4 mr-2" />
               Compartir
@@ -299,6 +342,7 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
                 } : null)
               }}
               onRefresh={loadPlantilla}
+              onUpdateItem={handleItemUpdated}
             />
           </CardContent>
         </Card>
@@ -310,6 +354,14 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
         onClose={() => setShowMultiAddModal(false)}
         plantillaId={id}
         onItemsCreated={handleMultipleItemsCreated}
+      />
+
+      {/* Edit modal */}
+      <PlantillaEquipoEditModal
+        plantilla={plantilla}
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        onUpdated={handlePlantillaUpdated}
       />
     </motion.div>
   )

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
 import type { EstadoListaEquipo } from '@/types/modelos'
+import { logStatusChange } from '@/lib/services/auditLogger'
 
 import {
   AlertDialog,
@@ -162,14 +163,25 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
   const siguienteEstado = estados.find(e => e.key === flujo.siguiente)
   const currentIndex = estados.findIndex(e => e.key === estado)
 
-  // ✅ Enhanced state change with loading states
+  // ✅ Enhanced state change with loading states and audit logging
   const cambiarEstado = async (nuevoEstado: EstadoListaEquipo, mensaje: string) => {
-    if (!listaId) return
-    
+    if (!listaId || !session?.user?.id) return
+
     setLoading(true)
     try {
+      const estadoAnterior = estado
       const updated = await updateListaEstado(listaId, nuevoEstado)
       if (updated) {
+        // ✅ Registrar el cambio en el historial de auditoría
+        await logStatusChange({
+          entityType: 'LISTA_EQUIPO',
+          entityId: listaId,
+          userId: session.user.id,
+          oldStatus: estadoAnterior,
+          newStatus: nuevoEstado,
+          description: `Lista ${updated.nombre || 'sin nombre'}`
+        })
+
         toast.success(mensaje)
         onUpdated?.(nuevoEstado)
       }
@@ -182,9 +194,9 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
   }
 
   return (
-    <motion.div 
+    <motion.div
       className={cn(
-        'bg-white border border-gray-200 rounded-lg p-4 shadow-sm',
+        'bg-white border border-gray-200 rounded-lg p-3 shadow-sm',
         'sticky top-0 z-10 backdrop-blur-sm bg-white/95',
         className
       )}
@@ -193,88 +205,114 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
       transition={{ duration: 0.3 }}
     >
       <div className="flex items-center justify-between gap-4">
-        {/* 📊 Current Status & Progress */}
-        <div className="flex items-center gap-4 flex-1">
-          {/* Current Status Badge */}
+        {/* 📊 Current Status Badge - Left */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           {estadoActual && (
-            <div className="flex items-center gap-2">
-              <Badge 
-                variant="outline"
-                className={cn(
-                  'px-3 py-1.5 text-sm font-medium border-2',
-                  estadoActual.bgColor,
-                  estadoActual.color
-                )}
-              >
-                <estadoActual.icon className="w-4 h-4 mr-2" />
-                {estadoActual.label}
-              </Badge>
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                {estadoActual.description}
-              </span>
-            </div>
+            <Badge
+              variant="outline"
+              className={cn(
+                'px-2 py-0.5 text-xs font-medium border shadow-sm',
+                estadoActual.bgColor,
+                estadoActual.color
+              )}
+            >
+              <estadoActual.icon className="w-3 h-3 mr-1" />
+              {estadoActual.label}
+            </Badge>
           )}
-          
-          {/* Progress Indicator */}
-          <div className="flex items-center gap-1 flex-1 max-w-md">
-            {estados.map((etapa, i) => {
-              const isActive = estado === etapa.key
-              const isPast = currentIndex > i
-              const isCurrent = currentIndex === i
-              
-              return (
-                <div key={etapa.key} className="flex items-center">
-                  <div 
-                    className={cn(
-                      'w-2 h-2 rounded-full transition-all duration-300',
-                      isPast ? 'bg-green-500' : 
-                      isCurrent ? etapa.color.replace('text-', 'bg-') : 
-                      'bg-gray-200'
-                    )}
-                  />
-                  {i < estados.length - 1 && (
-                    <div 
-                      className={cn(
-                        'w-4 h-0.5 transition-all duration-300',
-                        isPast ? 'bg-green-300' : 'bg-gray-200'
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            {currentIndex + 1}/{estados.length}
+          </span>
+        </div>
+
+        {/* 🎯 Compact Progress Flow - Center */}
+        <div className="flex-1 min-w-0">
+          <div className="relative overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex items-center justify-center min-w-max px-2 py-2 gap-3">
+              {estados.map((etapa, i) => {
+                const isActive = estado === etapa.key
+                const isPast = currentIndex > i
+                const isCurrent = currentIndex === i
+                const isFuture = currentIndex < i
+
+                return (
+                  <div key={etapa.key} className="flex flex-col items-center gap-1 flex-shrink-0">
+                    {/* Status Circle */}
+                    <div className="relative">
+                      <div
+                        className={cn(
+                          'w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300',
+                          isActive ? `${etapa.bgColor} ${etapa.color} border-current shadow-md scale-105 ring-2 ring-current ring-opacity-30` :
+                          isPast ? 'bg-green-500 border-green-500 text-white' :
+                          isCurrent ? `${etapa.bgColor} ${etapa.color} border-current` :
+                          'bg-gray-100 border-gray-300 text-gray-400'
+                        )}
+                      >
+                        <etapa.icon className="w-3.5 h-3.5" />
+                      </div>
+
+                      {/* Current status indicator */}
+                      {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse border border-white" />
                       )}
-                    />
-                  )}
-                </div>
-              )
-            })}
-            
-            {/* Progress Text */}
-            <span className="text-xs text-muted-foreground ml-2 hidden md:inline">
-              {currentIndex + 1} de {estados.length}
-            </span>
+                    </div>
+
+                    {/* Status Label */}
+                    <div className="text-center min-w-14 max-w-16">
+                      <span
+                        className={cn(
+                          'text-xs font-medium block leading-tight text-center',
+                          isActive ? `${etapa.color} font-bold` :
+                          isPast ? 'text-green-600' :
+                          isCurrent ? etapa.color :
+                          'text-gray-400'
+                        )}
+                      >
+                        {etapa.label}
+                      </span>
+                    </div>
+
+                    {/* Connection Line */}
+                    {i < estados.length - 1 && (
+                      <div className="absolute top-3.5 left-full w-3 h-0.5 bg-gray-300 -translate-x-1/2 z-0">
+                        <div
+                          className={cn(
+                            'w-full h-full transition-all duration-500 rounded',
+                            isPast ? 'bg-green-500' : 'bg-gray-300'
+                          )}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
 
-        {/* 🎯 Action Buttons */}
-        <div className="flex items-center gap-2">
+        {/* 🎯 Action Buttons - Right */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           {loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="hidden sm:inline">Actualizando...</span>
             </div>
           )}
-          
+
           {/* Advance Button */}
           {puedeAvanzar && flujo.siguiente && siguienteEstado && (
             <Button
-              onClick={() => cambiarEstado(flujo.siguiente!, `➡️ Estado actualizado a "${siguienteEstado.label}"`)}              
+              onClick={() => cambiarEstado(flujo.siguiente!, `➡️ Estado actualizado a "${siguienteEstado.label}"`)}
               size="sm"
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
                   <ArrowRight className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Avanzar a </span>
-                  {siguienteEstado.label}
+                  <span className="hidden sm:inline">Avanzar</span>
                 </>
               )}
             </Button>
@@ -288,7 +326,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
                   variant="outline"
                   size="sm"
                   disabled={loading}
-                  className="border-red-200 text-red-600 hover:bg-red-50"
+                  className="border-red-200 text-red-600 hover:bg-red-50 shadow-sm"
                 >
                   <X className="w-4 h-4 mr-1" />
                   <span className="hidden sm:inline">Rechazar</span>
@@ -304,7 +342,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
                     Esta acción cambiará el estado a "Rechazado". Por favor, indica la razón del rechazo.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
                     Justificación del rechazo *
@@ -317,7 +355,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
                     className="resize-none"
                   />
                 </div>
-                
+
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={loading}>
                     Cancelar
@@ -357,7 +395,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
                   variant="outline"
                   size="sm"
                   disabled={loading}
-                  className="border-amber-200 text-amber-600 hover:bg-amber-50"
+                  className="border-amber-200 text-amber-600 hover:bg-amber-50 shadow-sm"
                 >
                   <RotateCcw className="w-4 h-4 mr-1" />
                   <span className="hidden sm:inline">Restaurar</span>
@@ -373,7 +411,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
                     Esta acción reiniciará completamente el flujo de aprobación.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                
+
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={loading}>
                     Cancelar

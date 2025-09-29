@@ -39,7 +39,16 @@ export default function ListaEquipoEditModal({ lista, open, onOpenChange, onUpda
   useEffect(() => {
     if (lista) {
       setNombre(lista.nombre || '')
-      setFechaNecesaria(lista.fechaNecesaria || '')
+      // Convert ISO date string to YYYY-MM-DD format for date input
+      if (lista.fechaNecesaria) {
+        const date = new Date(lista.fechaNecesaria)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        setFechaNecesaria(`${year}-${month}-${day}`)
+      } else {
+        setFechaNecesaria('')
+      }
       setErrors({})
     }
   }, [lista])
@@ -82,7 +91,9 @@ export default function ListaEquipoEditModal({ lista, open, onOpenChange, onUpda
       // Preparar payload para API
       const payload = {
         nombre: nombre.trim(),
-        ...(fechaNecesaria && { fechaNecesaria })
+        ...(fechaNecesaria && {
+          fechaNecesaria: new Date(fechaNecesaria + 'T12:00:00').toISOString()
+        })
       }
 
       console.log('🔍 Enviando payload de actualización:', payload)
@@ -171,7 +182,16 @@ export default function ListaEquipoEditModal({ lista, open, onOpenChange, onUpda
       // Reset form to original values
       if (lista) {
         setNombre(lista.nombre || '')
-        setFechaNecesaria(lista.fechaNecesaria || '')
+        // Convert ISO date string to YYYY-MM-DD format for date input
+        if (lista.fechaNecesaria) {
+          const date = new Date(lista.fechaNecesaria)
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          setFechaNecesaria(`${year}-${month}-${day}`)
+        } else {
+          setFechaNecesaria('')
+        }
         setErrors({})
       }
     }

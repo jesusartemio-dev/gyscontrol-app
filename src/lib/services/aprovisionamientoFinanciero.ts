@@ -12,6 +12,7 @@
 // ===================================================
 
 import { z } from 'zod'
+import { buildApiUrl } from '@/lib/utils'
 
 // ✅ Tipos para el servicio
 export interface ProyectoConsolidado {
@@ -93,13 +94,7 @@ const FiltrosSchema = z.object({
   alertas: z.boolean().optional()
 })
 
-// 🌐 Base URL para las APIs
-const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    return '' // En el cliente, usar URL relativa
-  }
-  return process.env.NEXTAUTH_URL || 'http://localhost:3000'
-}
+// 🌐 Base URL para las APIs - REMOVED: Ahora usa buildApiUrl de utils.ts
 
 /**
  * 📊 Obtener proyectos consolidados con filtros y paginación
@@ -116,16 +111,15 @@ export async function obtenerProyectosConsolidados(
     const filtrosValidados = FiltrosSchema.parse(filtros)
     
     // 🔗 Construir URL con parámetros de búsqueda y paginación
-    const baseUrl = getBaseUrl()
     const searchParams = new URLSearchParams()
-    
+
     Object.entries(filtrosValidados).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         searchParams.append(key, String(value))
       }
     })
-    
-    const url = `${baseUrl}/api/finanzas/aprovisionamiento/proyectos?${searchParams.toString()}`
+
+    const url = buildApiUrl(`/api/finanzas/aprovisionamiento/proyectos?${searchParams.toString()}`)
     console.log('📡 Llamando a:', url)
     
     // 🍪 Obtener cookies para autenticación en server-side

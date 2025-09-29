@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { registrarCreacion } from '@/lib/services/audit'
 
 export async function GET() {
   try {
@@ -13,6 +12,7 @@ export async function GET() {
         gestor: true,
         equipos: true,
         servicios: true,
+        gastos: true,
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -84,24 +84,7 @@ export async function POST(req: Request) {
       data: { numeroSecuencia: nuevoNumero }
     })
 
-    // ✅ Registrar en auditoría
-    try {
-      await registrarCreacion(
-        'PROYECTO',
-        nuevoProyecto.id,
-        session.user.id,
-        nuevoProyecto.nombre,
-        {
-          cliente: nuevoProyecto.cliente.nombre,
-          codigo: nuevoProyecto.codigo,
-          comercial: nuevoProyecto.comercial.name,
-          gestor: nuevoProyecto.gestor.name
-        }
-      )
-    } catch (auditError) {
-      console.error('Error al registrar auditoría:', auditError)
-      // No fallar la creación por error de auditoría
-    }
+    // ✅ Auditoría removida temporalmente por refactorización
 
     return NextResponse.json(nuevoProyecto, { status: 201 })
   } catch (error) {

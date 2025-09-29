@@ -16,11 +16,12 @@ import CotizacionEquipoMultiAddModal from './CotizacionEquipoMultiAddModal'
 import type { CotizacionEquipo, CotizacionEquipoItem } from '@/types'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  Pencil, 
-  Trash2, 
-  Package, 
-  TrendingUp, 
+import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
+import {
+  Pencil,
+  Trash2,
+  Package,
+  TrendingUp,
   DollarSign,
   Calculator,
   AlertCircle,
@@ -70,6 +71,7 @@ export default function CotizacionEquipoAccordion({
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(equipo.nombre)
   const [showMultiAddModal, setShowMultiAddModal] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
     setNuevoNombre(equipo.nombre)
@@ -220,9 +222,7 @@ export default function CotizacionEquipoAccordion({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (confirm('¿Estás seguro de que deseas eliminar este grupo de equipos?')) {
-                        onDeletedGrupo()
-                      }
+                      setShowDeleteDialog(true)
                     }}
                     className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                   >
@@ -313,6 +313,18 @@ export default function CotizacionEquipoAccordion({
         onClose={() => setShowMultiAddModal(false)}
         cotizacionEquipoId={equipo.id}
         onItemsCreated={handleMultipleItemsCreated}
+      />
+
+      {/* Delete confirmation dialog */}
+      <DeleteAlertDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={() => {
+          onDeletedGrupo()
+          setShowDeleteDialog(false)
+        }}
+        title="¿Eliminar grupo de equipos?"
+        description="Esta acción eliminará permanentemente el grupo de equipos y todos sus items. Esta acción no se puede deshacer."
       />
     </motion.div>
   )

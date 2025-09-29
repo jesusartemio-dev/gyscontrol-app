@@ -7,6 +7,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import {
   Grid3X3,
   List,
@@ -15,7 +18,8 @@ import {
   Package,
   DollarSign,
   Trash2,
-  Wrench
+  Wrench,
+  Edit
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -49,6 +53,7 @@ interface PlantillaEquiposViewProps {
   plantillaId: string
   onDeleteItem: (itemId: string) => void
   onRefresh: () => void
+  onUpdateItem: (itemId: string, updates: Partial<PlantillaEquipoItemIndependiente>) => void
 }
 
 type ViewMode = 'table' | 'cards'
@@ -57,12 +62,16 @@ export default function PlantillaEquiposView({
   items,
   plantillaId,
   onDeleteItem,
-  onRefresh
+  onRefresh,
+  onUpdateItem
 }: PlantillaEquiposViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [brandFilter, setBrandFilter] = useState<string>('all')
+  const [editingItem, setEditingItem] = useState<PlantillaEquipoItemIndependiente | null>(null)
+  const [editQuantity, setEditQuantity] = useState<number>(1)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   // Get unique categories and brands for filters
   const categories = useMemo(() => {
@@ -101,8 +110,6 @@ export default function PlantillaEquiposView({
   }
 
   const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este equipo?')) return
-
     try {
       const response = await fetch(`/api/plantillas/equipos/${plantillaId}/items/${itemId}`, {
         method: 'DELETE'
@@ -115,6 +122,50 @@ export default function PlantillaEquiposView({
     } catch (err) {
       console.error('Error deleting item:', err)
       toast.error('Error al eliminar el equipo')
+    }
+  }
+
+  const openEditModal = (item: PlantillaEquipoItemIndependiente) => {
+    setEditingItem(item)
+    setEditQuantity(item.cantidad)
+    setShowEditModal(true)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!editingItem || editQuantity < 1) {
+      toast.error('Cantidad debe ser al menos 1')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/plantillas/equipos/${plantillaId}/items/${editingItem.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          cantidad: editQuantity
+        })
+      })
+
+      if (!response.ok) throw new Error('Error al actualizar item')
+
+      toast.success('Cantidad actualizada exitosamente')
+      setShowEditModal(false)
+
+      // Update local state instead of full refresh
+      onUpdateItem(editingItem.id, {
+        cantidad: editQuantity,
+        costoInterno: editQuantity * editingItem.precioInterno,
+        costoCliente: editQuantity * editingItem.precioCliente
+      })
+
+      setEditingItem(null)
+    } catch (err) {
+      console.error('Error updating item:', err)
+      toast.error('Error al actualizar la cantidad')
     }
   }
 
@@ -256,13 +307,20 @@ export default function PlantillaEquiposView({
                       {formatCurrency(item.costoCliente)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteItem(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditModal(item)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <DeleteAlertDialog
+                          onConfirm={() => handleDeleteItem(item.id)}
+                          title="¿Eliminar equipo?"
+                          description="Esta acción eliminará el equipo de la plantilla permanentemente."
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -282,13 +340,20 @@ export default function PlantillaEquiposView({
                       {item.categoria}
                     </Badge>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteItem(item.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditModal(item)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <DeleteAlertDialog
+                      onConfirm={() => handleDeleteItem(item.id)}
+                      title="¿Eliminar equipo?"
+                      description="Esta acción eliminará el equipo de la plantilla permanentemente."
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -333,6 +398,47 @@ export default function PlantillaEquiposView({
           ))}
         </div>
       )}
+
+      {/* Edit Quantity Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar Cantidad</DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-quantity">Cantidad</Label>
+              <Input
+                id="edit-quantity"
+                type="number"
+                min="1"
+                value={editQuantity}
+                onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
+                placeholder="Ingrese la cantidad"
+              />
+              {editingItem && (
+                <p className="text-sm text-muted-foreground">
+                  Equipo: {editingItem.descripcion}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowEditModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">
+                Actualizar Cantidad
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
