@@ -10,14 +10,16 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { FileText, Plus } from 'lucide-react'
+import { FileText, Plus, Lightbulb, Target } from 'lucide-react'
 import { getLogisticaListaById } from '@/lib/services/logisticaLista'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
 import LogisticaListaDetalleItemTableProfessional from '@/components/logistica/LogisticaListaDetalleItemTableProfessional'
 import ModalCrearCotizacionDesdeLista from '@/components/logistica/ModalCrearCotizacionDesdeLista'
 import type { ListaEquipo } from '@/types'
+import Link from 'next/link'
 
 export default function LogisticaListaDetallePage() {
   const { id } = useParams<{ id: string }>()
@@ -92,6 +94,28 @@ export default function LogisticaListaDetallePage() {
             )}
           </div>
         </div>
+
+      {/* Nuevo: Centro Unificado de Cotizaciones */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-blue-900">
+            <Lightbulb className="h-5 w-5" />
+            ✨ Nuevo: Centro Unificado de Cotizaciones
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-blue-800 mb-4">
+            Gestiona todas las cotizaciones de esta lista desde un solo lugar.
+            Acceso rápido a actualización masiva y selección de ganadores.
+          </p>
+          <Button asChild className="bg-blue-600 hover:bg-blue-700">
+            <Link href={`/logistica/listas/${id}/cotizaciones`}>
+              <Target className="h-4 w-4 mr-2" />
+              Probar el Nuevo Centro de Cotizaciones
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       {lista.items.length > 0 ? (
         <LogisticaListaDetalleItemTableProfessional items={lista.items} onUpdated={handleRefetch} />

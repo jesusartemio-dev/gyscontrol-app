@@ -20,7 +20,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react'
 
 interface Props {
@@ -66,6 +67,31 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
       }
     } catch (error) {
       toast.error('❌ Error inesperado al seleccionar cotización')
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
+  // ❌ Deseleccionar cotización actual
+  const handleDeseleccionar = async () => {
+    setIsConfirming(true)
+    try {
+      const res = await fetch(`/api/lista-equipo-item/${item.id}/seleccionar-cotizacion`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cotizacionProveedorItemId: null }), // Enviar null para deseleccionar
+      })
+
+      if (res.ok) {
+        toast.success('✅ Cotización deseleccionada correctamente')
+        setSelectedCotizacionId(null)
+        onUpdated?.()
+      } else {
+        const data = await res.json()
+        toast.error(`❌ Error: ${data.error || 'No se pudo deseleccionar cotización'}`)
+      }
+    } catch (error) {
+      toast.error('❌ Error inesperado al deseleccionar cotización')
     } finally {
       setIsConfirming(false)
     }
@@ -206,9 +232,33 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
         </div>
       )}
 
-      {/* Botón de confirmación */}
+      {/* Botones de acción */}
       {availableCotizaciones.length > 0 && (
-        <div className="flex justify-center pt-4 border-t">
+        <div className="flex justify-center gap-3 pt-4 border-t">
+          {/* Botón para deseleccionar */}
+          {item.cotizacionSeleccionadaId && (
+            <Button
+              onClick={handleDeseleccionar}
+              disabled={isConfirming}
+              variant="outline"
+              className="px-6 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+              size="lg"
+            >
+              {isConfirming ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deseleccionando...
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4 mr-2" />
+                  Deseleccionar
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Botón de confirmación */}
           <Button
             onClick={handleConfirmarSeleccion}
             disabled={!selectedCotizacionId || isConfirming || selectedCotizacionId === item.cotizacionSeleccionadaId}

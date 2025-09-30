@@ -21,6 +21,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { getCotizacionProveedorById } from '@/lib/services/cotizacionProveedor';
 import { useSession } from 'next-auth/react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,7 +36,8 @@ import {
   Edit,
   Package,
   DollarSign,
-  TrendingUp
+  TrendingUp,
+  Mail
 } from 'lucide-react';
 import Link from 'next/link';
 import type { CotizacionProveedor } from '@/types';
@@ -158,6 +160,46 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
       ((cotizacion.items.filter(item => item.esSeleccionada).length / cotizacion.items.length) * 100) : 0
   };
 
+  // ✅ Generate email for quotation request
+  const handleSolicitarCotizacion = () => {
+    if (!cotizacion.proveedor?.correo) {
+      toast.error('El proveedor no tiene correo electrónico registrado');
+      return;
+    }
+
+    // Generate email content
+    const subject = `Solicitud de Cotización - ${cotizacion.codigo}`;
+
+    const body = `Estimado proveedor ${cotizacion.proveedor.nombre},
+
+Le solicitamos cotización para los siguientes ítems del proyecto ${cotizacion.proyecto?.nombre || 'Proyecto'}:
+
+${cotizacion.items?.map((item, index) => {
+  return `${index + 1}. ${item.descripcion}
+   Código: ${item.codigo}
+   Cantidad: ${item.cantidad}
+   Unidad: ${item.unidad}
+   ${item.presupuesto ? `Presupuesto estimado: $${item.presupuesto.toFixed(2)}` : ''}
+
+`;
+}).join('') || 'No hay ítems en esta cotización.'}
+
+Proyecto: ${cotizacion.proyecto?.codigo} - ${cotizacion.proyecto?.nombre}
+Cotización: ${cotizacion.codigo}
+
+Por favor, envíenos su cotización lo antes posible.
+
+Atentamente,
+Equipo de Compras
+GYS Control`;
+
+    // Create Gmail compose URL
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cotizacion.proveedor.correo)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    // Open Gmail in new tab
+    window.open(gmailUrl, '_blank');
+  };
+
   return (
     <div className="space-y-6">
       {/* 📋 Breadcrumb Navigation */}
@@ -216,6 +258,15 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
               Cards
             </Button>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSolicitarCotizacion}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Mail className="h-4 w-4 mr-2" />
+            Solicitar Cotización
+          </Button>
           <Button variant="outline" size="sm">
             <Edit className="h-4 w-4 mr-2" />
             Editar Cotización

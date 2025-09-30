@@ -15,7 +15,31 @@ export async function PATCH(
     const { id } = await params
     const { cotizacionProveedorItemId } = await req.json()
 
-    // ✅ Buscar la cotización seleccionada
+    // 🔄 Paso 1: desmarcar todas las cotizaciones previas del ítem
+    await prisma.cotizacionProveedorItem.updateMany({
+      where: { listaEquipoItemId: id },
+      data: { esSeleccionada: false },
+    })
+
+    // ✅ Verificar si es una deselección (cotizacionProveedorItemId es null)
+    if (cotizacionProveedorItemId === null) {
+      // 📝 Paso 2: actualizar el ListaEquipoItem limpiando la selección
+      const updatedItem = await prisma.listaEquipoItem.update({
+        where: { id },
+        data: {
+          cotizacionSeleccionadaId: null,
+          precioElegido: null,
+          costoElegido: 0,
+          tiempoEntrega: null,
+          tiempoEntregaDias: null,
+        },
+      })
+
+      // 🎉 Listo - deselección completada
+      return NextResponse.json(updatedItem)
+    }
+
+    // ✅ Es una selección normal - buscar la cotización seleccionada
     const cotizacionItem = await prisma.cotizacionProveedorItem.findUnique({
       where: { id: cotizacionProveedorItemId },
     })
@@ -27,12 +51,6 @@ export async function PATCH(
         { status: 400 }
       )
     }
-
-    // 🔄 Paso 1: desmarcar todas las cotizaciones previas del ítem
-    await prisma.cotizacionProveedorItem.updateMany({
-      where: { listaEquipoItemId: id },
-      data: { esSeleccionada: false },
-    })
 
     // ✅ Paso 2: marcar como seleccionada la cotización elegida
     await prisma.cotizacionProveedorItem.update({
