@@ -71,7 +71,7 @@ export async function PUT(request: Request) {
     }
 
     // Verificar que no sea un permiso del sistema
-    const permission = await (prisma as any).permission.findUnique({ where: { id } })
+    const permission = await prisma.permission.findUnique({ where: { id } })
     if (!permission) {
       return NextResponse.json({ message: 'Permiso no encontrado' }, { status: 404 })
     }
@@ -104,7 +104,7 @@ export async function DELETE(request: Request) {
     }
 
     // Verificar que no sea un permiso del sistema
-    const permission = await prisma.permission.findUnique({ where: { id } })
+    const permission = await (prisma as any).permission.findUnique({ where: { id } })
     if (!permission) {
       return NextResponse.json({ message: 'Permiso no encontrado' }, { status: 404 })
     }

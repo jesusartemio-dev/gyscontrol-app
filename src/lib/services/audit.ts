@@ -181,3 +181,116 @@ export async function registrarEliminacion(
     throw error;
   }
 }
+
+// ✅ Obtener historial de entidad con filtros y paginación
+export async function obtenerHistorialEntidad(
+  entidadTipo: string,
+  entidadId: string,
+  filtros: {
+    usuarioId?: string;
+    accion?: string;
+    fechaDesde?: Date;
+    fechaHasta?: Date;
+    limite?: number;
+    pagina?: number;
+  }
+) {
+  try {
+    const { prisma } = await import('@/lib/prisma');
+
+    const {
+      usuarioId,
+      accion,
+      fechaDesde,
+      fechaHasta,
+      limite = 50,
+      pagina = 1
+    } = filtros;
+
+    const skip = (pagina - 1) * limite;
+
+    // Construir filtros
+    const where: any = {
+      entidadTipo,
+      entidadId
+    };
+
+    if (usuarioId) where.usuarioId = usuarioId;
+    if (accion) where.accion = accion;
+    if (fechaDesde || fechaHasta) {
+      where.createdAt = {};
+      if (fechaDesde) where.createdAt.gte = fechaDesde;
+      if (fechaHasta) where.createdAt.lte = fechaHasta;
+    }
+
+    // Obtener total para paginación
+    const total = await prisma.auditLog.count({ where });
+
+    // Obtener registros con usuario
+    const data = await prisma.auditLog.findMany({
+      where,
+      include: {
+        usuario: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip,
+      take: limite
+    });
+
+    const totalPaginas = Math.ceil(total / limite);
+
+    return {
+      data,
+      pagina,
+      totalPaginas,
+      total,
+      limite
+    };
+  } catch (error) {
+    console.error('Error al obtener historial de entidad:', error);
+    throw error;
+  }
+}
+
+// ✅ Obtener actividad reciente del sistema
+export async function obtenerActividadReciente(
+  limite: number = 20,
+  usuarioId?: string
+) {
+  try {
+    const { prisma } = await import('@/lib/prisma');
+
+    const where: any = {};
+    if (usuarioId) where.usuarioId = usuarioId;
+
+    const actividad = await prisma.auditLog.findMany({
+      where,
+      include: {
+        usuario: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: limite
+    });
+
+    return actividad;
+  } catch (error) {
+    console.error('Error al obtener actividad reciente:', error);
+    throw error;
+  }
+}
