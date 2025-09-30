@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const listas = await prisma.listaEquipo.findMany({
       where: {
         estado: {
-          in: ['por_cotizar', 'por_validar', 'por_aprobar'],
+          in: ['por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'completada'],
         },
         ...(proyectoId && { proyectoId }), // ✅ aplicar filtro si existe
       },
@@ -31,7 +31,20 @@ export async function GET(request: Request) {
         },
         items: {
           include: {
-            cotizaciones: true,
+            cotizaciones: {
+              include: {
+                cotizacion: {
+                  include: {
+                    proveedor: {
+                      select: {
+                        id: true,
+                        nombre: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -47,6 +60,7 @@ export async function GET(request: Request) {
         i.cotizaciones.some(c => c.estado === EstadoCotizacionProveedor.cotizado)
       ).length
       const pendientes = totalItems - cotizados
+
 
       return {
         ...lista,

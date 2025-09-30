@@ -8,15 +8,30 @@ export function cn(...inputs: ClassValue[]) {
 // 📅 Date formatting utilities
 export const formatDate = (date: Date | string): string => {
   const dateObj = typeof date === 'string' ? new Date(date) : date
-  
+
+  // For date-only values stored as UTC, extract date components directly to avoid timezone issues
+  const year = dateObj.getUTCFullYear()
+  const month = dateObj.getUTCMonth()
+  const day = dateObj.getUTCDate()
+
+  // Create a new date in UTC with the extracted components
+  const utcDate = new Date(Date.UTC(year, month, day))
+
   return new Intl.DateTimeFormat('es-PE', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
-  }).format(dateObj)
+    day: 'numeric',
+    timeZone: 'UTC'
+  }).format(utcDate)
 }
 
-// 💰 Currency formatting utilities
+// 📅 Date parsing utilities for date-only values (timezone-safe)
+export const parseDateOnly = (dateString: string): Date => {
+  // For date-only strings like "2025-10-15", append UTC time to avoid timezone conversion
+  return new Date(dateString + 'T00:00:00.000Z')
+}
+
+//  Currency formatting utilities
 export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

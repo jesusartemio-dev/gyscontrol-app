@@ -233,126 +233,45 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
         />
       </div>
 
-      {/* Status Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Status Cards */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Distribución por Estado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {Object.entries(ESTADOS_CONFIG).map(([estado, config]) => {
-                const count = stats.porEstado[estado as EstadoListaEquipo] || 0
-                const percentage = stats.total > 0 ? Math.round((count / stats.total) * 100) : 0
-                const Icon = config.icon
-                
-                return (
-                  <div key={estado} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${config.bgColor}`}>
-                        <Icon className={`h-4 w-4 ${config.color}`} />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{config.label}</p>
-                        <p className="text-xs text-gray-500">{percentage}% del total</p>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className={`${config.color} ${config.bgColor} border-0`}>
-                      {count}
-                    </Badge>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Compact Status Overview */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+              Estado de Listas
+            </h3>
+            <Badge variant="outline" className="text-blue-700 border-blue-300 bg-white">
+              {stats.completionRate}% Completado
+            </Badge>
+          </div>
 
-        {/* Progress Overview */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Progreso General
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Completion Rate */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Tasa de Completación</span>
-                <span className="text-sm text-gray-600">{stats.completionRate}%</span>
-              </div>
-              <Progress value={stats.completionRate} className="h-2" />
-              <p className="text-xs text-gray-500 mt-1">
-                {stats.porEstado.aprobado} de {stats.total} listas aprobadas
-              </p>
+          {/* Status Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-gray-700">Aprobadas: {stats.porEstado.aprobado}</span>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-yellow-500" />
+              <span className="text-gray-700">En Proceso: {stats.porEstado.por_revisar + stats.porEstado.por_cotizar + stats.porEstado.por_validar + stats.porEstado.por_aprobar}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <span className="text-gray-700">Por Cotizar: {stats.porEstado.por_cotizar}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-gray-700">Rechazadas: {stats.porEstado.rechazado}</span>
+            </div>
+          </div>
 
-            {/* In Progress */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">En Proceso</span>
-                <span className="text-sm text-gray-600">
-                  {stats.porEstado.por_revisar + stats.porEstado.por_cotizar + stats.porEstado.por_validar + stats.porEstado.por_aprobar}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
-                  <span>Por Revisar: {stats.porEstado.por_revisar}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-400" />
-                  <span>Por Cotizar: {stats.porEstado.por_cotizar}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-400" />
-                  <span>Por Validar: {stats.porEstado.por_validar}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-purple-400" />
-                  <span>Por Aprobar: {stats.porEstado.por_aprobar}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="pt-4 border-t">
-              <h4 className="text-sm font-medium mb-3">Acciones Rápidas</h4>
-              <div className="space-y-2">
-                {stats.porEstado.por_revisar > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-yellow-700">Requieren revisión</span>
-                    <Badge variant="outline" className="text-yellow-700 border-yellow-300">
-                      {stats.porEstado.por_revisar}
-                    </Badge>
-                  </div>
-                )}
-                {stats.porEstado.por_cotizar > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-blue-700">Listas para cotizar</span>
-                    <Badge variant="outline" className="text-blue-700 border-blue-300">
-                      {stats.porEstado.por_cotizar}
-                    </Badge>
-                  </div>
-                )}
-                {stats.porEstado.rechazado > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-red-700">Requieren atención</span>
-                    <Badge variant="outline" className="text-red-700 border-red-300">
-                      {stats.porEstado.rechazado}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Progress Bar */}
+          <div className="mt-3">
+            <Progress value={stats.completionRate} className="h-1.5" />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

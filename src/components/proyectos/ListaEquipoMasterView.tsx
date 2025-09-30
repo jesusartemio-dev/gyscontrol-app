@@ -83,6 +83,7 @@ import ModalCrearListaEquipo from '@/components/equipos/ModalCrearListaEquipo';
 // ✅ Component props interface
 interface ListaEquipoMasterViewProps {
   proyectoId: string;
+  proyectoCodigo?: string;
   initialLists?: ListaEquipoMaster[];
   initialStats?: ReturnType<typeof calculateMasterListStats>;
 }
@@ -97,6 +98,7 @@ type ViewMode = 'grid' | 'table';
 // ✅ Main component
 export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
   proyectoId,
+  proyectoCodigo,
   initialLists = [],
   initialStats
 }) => {
@@ -222,13 +224,22 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
   };
   
   return (
-    <motion.div
-      variants={pageTransitionVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className={containerSpacing}
-    >
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Package className="h-5 w-5 text-blue-600" />
+          {proyectoCodigo ? `${proyectoCodigo} - Lista de Equipos por Proyecto` : 'Lista de Equipos por Proyecto'}
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        <motion.div
+          variants={pageTransitionVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className={containerSpacing}
+        >
      
       {/* 🎛️ Controls Section */}
       <motion.div variants={staggerItemVariants} className="space-y-4">
@@ -372,8 +383,10 @@ export const ListaEquipoMasterView: React.FC<ListaEquipoMasterViewProps> = ({
         )}
       </motion.div>
       
-      {/* 📊 Status distribution is now handled by MasterStatsHeader in the parent page */}
-    </motion.div>
+          {/* 📊 Status distribution is now handled by MasterStatsHeader in the parent page */}
+        </motion.div>
+      </CardContent>
+    </Card>
   );
 };
 

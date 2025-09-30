@@ -10,17 +10,19 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  ChevronUp, 
-  ChevronDown, 
-  Eye, 
-  Edit, 
+import {
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  Edit,
   MoreHorizontal,
   Calendar,
   Package,
   Building2,
   Hash,
-  FileText
+  FileText,
+  Trash2,
+  Clock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,8 +43,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ListaEquipo, EstadoListaEquipo, Proyecto } from '@/types'
+import {
+  calcularStatsCotizacionLista,
+  getEstadoCotizacionText,
+  getEstadoCotizacionVariant,
+  type ListaCotizacionStats
+} from '@/lib/services/listaCotizacionStats'
 
-type SortField = 'codigo' | 'nombre' | 'proyecto' | 'estado' | 'createdAt' | 'itemsCount'
+type SortField = 'codigo' | 'nombre' | 'proyecto' | 'estado' | 'createdAt' | 'itemsCount' | 'cotizacionesCount' | 'estadoCotizacion' | 'fechaNecesaria'
 type SortDirection = 'asc' | 'desc'
 
 interface LogisticaListasTableProps {
@@ -106,6 +114,22 @@ export default function LogisticaListasTable({ listas, proyectos, loading = fals
           aValue = a.items?.length || 0
           bValue = b.items?.length || 0
           break
+        case 'cotizacionesCount':
+          const aStats = calcularStatsCotizacionLista(a)
+          const bStats = calcularStatsCotizacionLista(b)
+          aValue = aStats.cotizacionesCount
+          bValue = bStats.cotizacionesCount
+          break
+        case 'estadoCotizacion':
+          const aStatsCot = calcularStatsCotizacionLista(a)
+          const bStatsCot = calcularStatsCotizacionLista(b)
+          aValue = aStatsCot.todosCotizados ? 2 : aStatsCot.itemsCotizados > 0 ? 1 : 0
+          bValue = bStatsCot.todosCotizados ? 2 : bStatsCot.itemsCotizados > 0 ? 1 : 0
+          break
+        case 'fechaNecesaria':
+          aValue = a.fechaNecesaria ? new Date(a.fechaNecesaria).getTime() : 0
+          bValue = b.fechaNecesaria ? new Date(b.fechaNecesaria).getTime() : 0
+          break
         default:
           return 0
       }
@@ -136,6 +160,11 @@ export default function LogisticaListasTable({ listas, proyectos, loading = fals
 
   const handleViewDetails = (listaId: string) => {
     router.push(`/logistica/listas/${listaId}`)
+  }
+
+  const handleDelete = (listaId: string) => {
+    // TODO: Implement delete functionality
+    console.log('Delete lista:', listaId)
   }
 
   const formatDate = (dateString: string) => {
@@ -233,6 +262,17 @@ export default function LogisticaListasTable({ listas, proyectos, loading = fals
                 <SortableHeader field="itemsCount">
                   Ítems
                 </SortableHeader>
+                <SortableHeader field="cotizacionesCount">
+                  <FileText className="h-4 w-4" />
+                  Cotizaciones
+                </SortableHeader>
+                <SortableHeader field="estadoCotizacion">
+                  Estado Ítems
+                </SortableHeader>
+                <SortableHeader field="fechaNecesaria">
+                  <Clock className="h-4 w-4" />
+                  Fecha Necesaria
+                </SortableHeader>
                 <SortableHeader field="createdAt">
                   <Calendar className="h-4 w-4" />
                   Fecha Creación
@@ -244,7 +284,8 @@ export default function LogisticaListasTable({ listas, proyectos, loading = fals
               {currentListas.map((lista) => {
                 const estadoConfig = ESTADOS_CONFIG[lista.estado]
                 const itemsCount = lista.items?.length || 0
-                
+                const cotizacionStats = calcularStatsCotizacionLista(lista)
+
                 return (
                   <TableRow key={lista.id} className="hover:bg-gray-50">
                     <TableCell className="font-mono text-sm">
@@ -261,8 +302,8 @@ export default function LogisticaListasTable({ listas, proyectos, loading = fals
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className={`${estadoConfig.color} ${estadoConfig.bgColor} border-0`}
                       >
                         {estadoConfig.label}
@@ -276,27 +317,56 @@ export default function LogisticaListasTable({ listas, proyectos, loading = fals
                         </span>
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <FileText className="h-4 w-4 text-blue-500" />
+                        <span className={cotizacionStats.cotizacionesCount > 0 ? 'text-blue-600 font-medium' : 'text-gray-400'}>
+                          {cotizacionStats.cotizacionesCount}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={getEstadoCotizacionVariant(cotizacionStats)}
+                        className="text-xs"
+                      >
+                        {getEstadoCotizacionText(cotizacionStats)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-gray-600">
+                      {lista.fechaNecesaria ? (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(lista.fechaNecesaria)}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-gray-600">
                       {formatDate(lista.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewDetails(lista.id)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver detalles
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewDetails(lista.id)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDetails(lista.id)}
+                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="Ver detalles"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(lista.id)}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )

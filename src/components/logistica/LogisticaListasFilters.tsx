@@ -222,7 +222,7 @@ export default function LogisticaListasFilters({ proyectos, listas, onFiltersCha
               <SelectItem value="all">Todos los proyectos</SelectItem>
               {proyectos.map(proyecto => (
                 <SelectItem key={proyecto.id} value={proyecto.id}>
-                  {proyecto.nombre}
+                  {proyecto.codigo} - {proyecto.nombre}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -329,9 +329,12 @@ export default function LogisticaListasFilters({ proyectos, listas, onFiltersCha
             )}
             {filters.proyectoId && filters.proyectoId !== 'all' && (
               <Badge variant="outline" className="flex items-center gap-1">
-                Proyecto: {proyectos.find(p => p.id === filters.proyectoId)?.nombre}
-                <X 
-                  className="h-3 w-3 cursor-pointer" 
+                Proyecto: {(() => {
+                  const proyecto = proyectos.find(p => p.id === filters.proyectoId);
+                  return proyecto ? `${proyecto.codigo} - ${proyecto.nombre}` : '';
+                })()}
+                <X
+                  className="h-3 w-3 cursor-pointer"
                   onClick={() => handleFilterChange('proyectoId', 'all')}
                 />
               </Badge>

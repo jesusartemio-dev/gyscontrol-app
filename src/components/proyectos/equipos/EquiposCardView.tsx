@@ -11,7 +11,7 @@
 'use client'
 
 import React, { memo, useMemo, useState } from 'react'
-import type { ProyectoEquipo } from '@/types'
+import type { ProyectoEquipoCotizado } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -20,11 +20,11 @@ import { Search, Eye, Edit, Trash2, User, Package, DollarSign, TrendingUp, List 
 import Link from 'next/link'
 
 interface Props {
-  equipos: ProyectoEquipo[]
+  equipos: ProyectoEquipoCotizado[]
   proyectoId: string
-  onEquipoChange?: (equipoId: string, changes: Partial<ProyectoEquipo>) => void
+  onEquipoChange?: (equipoId: string, changes: Partial<ProyectoEquipoCotizado>) => void
   onEquipoDelete?: (equipoId: string) => void
-  onCreateList?: (equipo: ProyectoEquipo) => void
+  onCreateList?: (equipo: ProyectoEquipoCotizado) => void
 }
 
 const EquiposCardView = memo(function EquiposCardView({
@@ -49,17 +49,18 @@ const EquiposCardView = memo(function EquiposCardView({
   }, [equipos, searchTerm])
 
   // ✅ Calcular estadísticas de un equipo
-  const getEquipoStats = (equipo: ProyectoEquipo) => {
+  const getEquipoStats = (equipo: ProyectoEquipoCotizado) => {
     const totalItems = equipo.items?.length || 0
     const totalCost = equipo.items?.reduce((sum, item) =>
       sum + (item.precioCliente * item.cantidad), 0
     ) || 0
     const completedItems = equipo.items?.filter(item =>
-      item.estado === 'en_lista' || item.estado === 'reemplazado'
+      item.estado === 'en_lista' || item.estado === 'reemplazado' || item.listaId
     ).length || 0
     const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
+    const hasListsCreated = completedItems > 0
 
-    return { totalItems, totalCost, completedItems, progress }
+    return { totalItems, totalCost, completedItems, progress, hasListsCreated }
   }
 
   return (
@@ -110,16 +111,6 @@ const EquiposCardView = memo(function EquiposCardView({
                           <Eye className="h-4 w-4" />
                         </Link>
                       </Button>
-                      {onCreateList && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onCreateList(equipo)}
-                        >
-                          <List className="h-4 w-4 mr-1" />
-                          + Lista
-                        </Button>
-                      )}
                       <Button
                         variant="outline"
                         size="sm"

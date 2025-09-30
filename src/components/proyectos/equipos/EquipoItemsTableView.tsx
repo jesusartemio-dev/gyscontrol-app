@@ -58,14 +58,7 @@ const EquipoItemsTableView = memo(function EquipoItemsTableView({
       let aValue: any = a[sortField as keyof ProyectoEquipoCotizadoItem]
       let bValue: any = b[sortField as keyof ProyectoEquipoCotizadoItem]
 
-      // Manejar campos especiales
-      if (sortField === 'costoInterno') {
-        aValue = a.cantidad * a.precioInterno
-        bValue = b.cantidad * b.precioInterno
-      } else if (sortField === 'costoCliente') {
-        aValue = a.cantidad * a.precioCliente
-        bValue = b.cantidad * b.precioCliente
-      }
+      // No special sorting fields needed for technical view
 
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
@@ -130,10 +123,8 @@ const EquipoItemsTableView = memo(function EquipoItemsTableView({
   // ✅ Calcular totales
   const totales = useMemo(() => {
     return sortedItems.reduce((acc, item) => ({
-      cantidad: acc.cantidad + item.cantidad,
-      costoInterno: acc.costoInterno + (item.cantidad * item.precioInterno),
-      costoCliente: acc.costoCliente + (item.cantidad * item.precioCliente)
-    }), { cantidad: 0, costoInterno: 0, costoCliente: 0 })
+      cantidad: acc.cantidad + item.cantidad
+    }), { cantidad: 0 })
   }, [sortedItems])
 
   return (
@@ -210,40 +201,10 @@ const EquipoItemsTableView = memo(function EquipoItemsTableView({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleSort('precioInterno')}
+                    onClick={() => handleSort('cantidad')}
                     className="h-auto p-0 font-semibold hover:bg-transparent"
                   >
-                    Precio Interno {getSortIcon('precioInterno')}
-                  </Button>
-                </TableHead>
-                <TableHead className="font-semibold text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort('precioCliente')}
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                  >
-                    Precio Cliente {getSortIcon('precioCliente')}
-                  </Button>
-                </TableHead>
-                <TableHead className="font-semibold text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort('costoInterno')}
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                  >
-                    Costo Interno {getSortIcon('costoInterno')}
-                  </Button>
-                </TableHead>
-                <TableHead className="font-semibold text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort('costoCliente')}
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
-                  >
-                    Costo Cliente {getSortIcon('costoCliente')}
+                    Cantidad {getSortIcon('cantidad')}
                   </Button>
                 </TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
@@ -254,7 +215,7 @@ const EquipoItemsTableView = memo(function EquipoItemsTableView({
             <TableBody>
               {sortedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     No se encontraron ítems que coincidan con los filtros
                   </TableCell>
                 </TableRow>
@@ -269,18 +230,6 @@ const EquipoItemsTableView = memo(function EquipoItemsTableView({
                     </TableCell>
                     <TableCell>{item.unidad}</TableCell>
                     <TableCell className="text-right font-mono">{item.cantidad}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${item.precioInterno.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${item.precioCliente.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${(item.cantidad * item.precioInterno).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${(item.cantidad * item.precioCliente).toFixed(2)}
-                    </TableCell>
                     <TableCell>
                       <Badge className={getEstadoColor(item.estado)}>
                         {item.estado.replace('_', ' ').toUpperCase()}
@@ -316,16 +265,8 @@ const EquipoItemsTableView = memo(function EquipoItemsTableView({
       {sortedItems.length > 0 && (
         <div className="flex justify-end">
           <div className="bg-gray-50 p-4 rounded-lg border">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="font-medium">Total Ítems:</span> {totales.cantidad}
-              </div>
-              <div>
-                <span className="font-medium">Total Costo Interno:</span> ${totales.costoInterno.toFixed(2)}
-              </div>
-              <div>
-                <span className="font-medium">Total Costo Cliente:</span> ${totales.costoCliente.toFixed(2)}
-              </div>
+            <div className="text-sm">
+              <span className="font-medium">Total Ítems:</span> {totales.cantidad}
             </div>
           </div>
         </div>

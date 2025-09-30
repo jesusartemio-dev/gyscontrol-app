@@ -13,12 +13,14 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarCreacion } from '@/lib/services/audit'
+import { parseDateOnly } from '@/lib/utils'
 
 interface DistribucionPayload {
   proyectoId: string
   proyectoEquipoId: string
   nombre: string
   descripcion: string
+  fechaNecesaria?: string
   itemsIds: string[]
 }
 
@@ -34,7 +36,7 @@ export async function POST(req: Request) {
     }
 
     const payload: DistribucionPayload = await req.json()
-    const { proyectoId, proyectoEquipoId, nombre, descripcion, itemsIds } = payload
+    const { proyectoId, proyectoEquipoId, nombre, descripcion, fechaNecesaria, itemsIds } = payload
 
     // ✅ Validar parámetros
     if (!proyectoId || !proyectoEquipoId || !nombre || !itemsIds || itemsIds.length === 0) {
@@ -122,6 +124,7 @@ export async function POST(req: Request) {
           numeroSecuencia,
           proyectoId,
           responsableId: session.user.id,
+          fechaNecesaria: fechaNecesaria ? parseDateOnly(fechaNecesaria) : null,
           createdAt: new Date(),
           updatedAt: new Date()
         }

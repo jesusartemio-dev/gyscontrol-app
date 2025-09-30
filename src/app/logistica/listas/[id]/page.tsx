@@ -10,16 +10,19 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { FileText, Plus } from 'lucide-react'
 import { getLogisticaListaById } from '@/lib/services/logisticaLista'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
 import LogisticaListaDetalleItemTableProfessional from '@/components/logistica/LogisticaListaDetalleItemTableProfessional'
+import ModalCrearCotizacionDesdeLista from '@/components/logistica/ModalCrearCotizacionDesdeLista'
 import type { ListaEquipo } from '@/types'
 
 export default function LogisticaListaDetallePage() {
   const { id } = useParams<{ id: string }>()
   const [lista, setLista] = useState<ListaEquipo | null>(null)
+  const [showCrearCotizacion, setShowCrearCotizacion] = useState(false)
 
   const handleRefetch = async () => {
     try {
@@ -56,8 +59,18 @@ export default function LogisticaListaDetallePage() {
             <strong>Costo Total Elegido:</strong>{' '}
             $ {(lista.items?.reduce((total, item) => total + (item.costoElegido ?? 0), 0) ?? 0).toFixed(2)}
           </p>
-          {lista.estado === 'por_cotizar' && (
-            <div className="pt-2">
+
+          {/* Botones de acción */}
+          <div className="pt-4 flex flex-wrap gap-3">
+            <Button
+              onClick={() => setShowCrearCotizacion(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Crear Cotización
+            </Button>
+
+            {lista.estado === 'por_cotizar' && (
               <Button
                 onClick={async () => {
                   try {
@@ -72,18 +85,33 @@ export default function LogisticaListaDetallePage() {
                     toast.error('Error al avanzar estado')
                   }
                 }}
-                className="bg-green-600 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white"
               >
                 Avanzar a Por Validar
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
       {lista.items.length > 0 ? (
         <LogisticaListaDetalleItemTableProfessional items={lista.items} onUpdated={handleRefetch} />
       ) : (
         <p className="text-gray-500">No hay ítems en esta lista.</p>
+      )}
+
+      {/* Modal para crear cotización desde lista */}
+      {lista.proyecto && (
+        <ModalCrearCotizacionDesdeLista
+          open={showCrearCotizacion}
+          onClose={() => setShowCrearCotizacion(false)}
+          lista={lista}
+          proyecto={lista.proyecto}
+          onCreated={() => {
+            toast.success('Cotización creada exitosamente')
+            // Opcional: redirigir a la página de cotizaciones
+            // router.push('/logistica/cotizaciones')
+          }}
+        />
       )}
     </div>
   )

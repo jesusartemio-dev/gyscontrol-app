@@ -290,12 +290,16 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                       <Calendar className="w-4 h-4" />
                       Actualizado {lista ? formatDate(lista.updatedAt) : 'N/A'}
                     </div>
-                    {lista?.fechaNecesaria && lista.fechaNecesaria !== '' && (
+                    {lista?.codigo && (
                       <div className="flex items-center gap-1">
-                        <Target className="w-4 h-4" />
-                        Fecha Necesaria: {formatDate(lista.fechaNecesaria)}
+                        <FileText className="w-4 h-4" />
+                        Código: {lista.codigo}
                       </div>
                     )}
+                    <div className="flex items-center gap-1">
+                      <Target className="w-4 h-4" />
+                      Fecha Necesaria: {lista?.fechaNecesaria ? formatDate(lista.fechaNecesaria) : 'No definida'}
+                    </div>
                     {/* Responsable info removed - not available in ListaEquipo schema */}
                   </div>
                 </div>
@@ -413,7 +417,7 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       <ShoppingCart className="w-4 h-4 mr-1" />
-                      Crear Pedidos
+                      Crear Pedido
                     </Button>
                   }
                 />

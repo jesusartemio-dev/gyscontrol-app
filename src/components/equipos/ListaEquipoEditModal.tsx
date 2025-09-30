@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner'
 import { ListaEquipo } from '@/types/modelos'
 import { Loader2, FileText, Calendar } from 'lucide-react'
+import { parseDateOnly } from '@/lib/utils'
 
 interface Props {
   lista: ListaEquipo | null
@@ -39,12 +40,12 @@ export default function ListaEquipoEditModal({ lista, open, onOpenChange, onUpda
   useEffect(() => {
     if (lista) {
       setNombre(lista.nombre || '')
-      // Convert ISO date string to YYYY-MM-DD format for date input
+      // Convert ISO date string to YYYY-MM-DD format for date input (UTC-based)
       if (lista.fechaNecesaria) {
         const date = new Date(lista.fechaNecesaria)
-        const year = date.getFullYear()
-        const month = String(date.getMonth() + 1).padStart(2, '0')
-        const day = String(date.getDate()).padStart(2, '0')
+        const year = date.getUTCFullYear()
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+        const day = String(date.getUTCDate()).padStart(2, '0')
         setFechaNecesaria(`${year}-${month}-${day}`)
       } else {
         setFechaNecesaria('')
@@ -92,7 +93,7 @@ export default function ListaEquipoEditModal({ lista, open, onOpenChange, onUpda
       const payload = {
         nombre: nombre.trim(),
         ...(fechaNecesaria && {
-          fechaNecesaria: new Date(fechaNecesaria + 'T12:00:00').toISOString()
+          fechaNecesaria: parseDateOnly(fechaNecesaria).toISOString()
         })
       }
 
@@ -182,12 +183,12 @@ export default function ListaEquipoEditModal({ lista, open, onOpenChange, onUpda
       // Reset form to original values
       if (lista) {
         setNombre(lista.nombre || '')
-        // Convert ISO date string to YYYY-MM-DD format for date input
+        // Convert ISO date string to YYYY-MM-DD format for date input (UTC-based)
         if (lista.fechaNecesaria) {
           const date = new Date(lista.fechaNecesaria)
-          const year = date.getFullYear()
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-          const day = String(date.getDate()).padStart(2, '0')
+          const year = date.getUTCFullYear()
+          const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+          const day = String(date.getUTCDate()).padStart(2, '0')
           setFechaNecesaria(`${year}-${month}-${day}`)
         } else {
           setFechaNecesaria('')
@@ -243,7 +244,7 @@ export default function ListaEquipoEditModal({ lista, open, onOpenChange, onUpda
 
           <div className="space-y-2">
             <Label htmlFor="fechaNecesaria" className="text-sm font-medium text-gray-700">
-              Fecha Necesaria (Opcional)
+              Fecha Necesaria
             </Label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />

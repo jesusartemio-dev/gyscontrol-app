@@ -173,11 +173,11 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
       sum + (item.precioCliente * item.cantidad), 0
     ) || 0,
     completedItems: equipo.items?.filter(item =>
-      item.estado === 'en_lista' || item.estado === 'reemplazado'
+      item.estado === 'en_lista' || item.estado === 'reemplazado' || item.listaId
     ).length || 0,
     progressPercentage: equipo.items?.length ?
       ((equipo.items.filter(item =>
-        item.estado === 'en_lista' || item.estado === 'reemplazado'
+        item.estado === 'en_lista' || item.estado === 'reemplazado' || item.listaId
       ).length / equipo.items.length) * 100) : 0
   };
 
@@ -220,7 +220,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
             <Package className="h-8 w-8 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                {equipo.nombre}
+                {proyecto.codigo} - {equipo.nombre}
               </h1>
               <p className="text-gray-600">
                 Detalle del equipo - {proyecto.nombre}

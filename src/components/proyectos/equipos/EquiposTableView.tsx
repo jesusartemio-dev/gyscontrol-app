@@ -11,7 +11,7 @@
 'use client'
 
 import React, { memo, useMemo, useState } from 'react'
-import type { ProyectoEquipo } from '@/types'
+import type { ProyectoEquipoCotizado } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -20,11 +20,11 @@ import { ArrowUpDown, ArrowUp, ArrowDown, Search, Eye, Edit, Trash2, User, List 
 import Link from 'next/link'
 
 interface Props {
-  equipos: ProyectoEquipo[]
+  equipos: ProyectoEquipoCotizado[]
   proyectoId: string
-  onEquipoChange?: (equipoId: string, changes: Partial<ProyectoEquipo>) => void
+  onEquipoChange?: (equipoId: string, changes: Partial<ProyectoEquipoCotizado>) => void
   onEquipoDelete?: (equipoId: string) => void
-  onCreateList?: (equipo: ProyectoEquipo) => void
+  onCreateList?: (equipo: ProyectoEquipoCotizado) => void
 }
 
 const EquiposTableView = memo(function EquiposTableView({
@@ -53,8 +53,8 @@ const EquiposTableView = memo(function EquiposTableView({
   // ✅ Ordenar equipos
   const sortedEquipos = useMemo(() => {
     return [...filteredEquipos].sort((a, b) => {
-      let aValue: any = a[sortField as keyof ProyectoEquipo]
-      let bValue: any = b[sortField as keyof ProyectoEquipo]
+      let aValue: any = a[sortField as keyof ProyectoEquipoCotizado]
+      let bValue: any = b[sortField as keyof ProyectoEquipoCotizado]
 
       // Manejar campos especiales
       if (sortField === 'totalItems') {
@@ -95,17 +95,18 @@ const EquiposTableView = memo(function EquiposTableView({
   }
 
   // ✅ Calcular estadísticas de un equipo
-  const getEquipoStats = (equipo: ProyectoEquipo) => {
+  const getEquipoStats = (equipo: ProyectoEquipoCotizado) => {
     const totalItems = equipo.items?.length || 0
     const totalCost = equipo.items?.reduce((sum, item) =>
       sum + (item.precioCliente * item.cantidad), 0
     ) || 0
     const completedItems = equipo.items?.filter(item =>
-      item.estado === 'en_lista' || item.estado === 'reemplazado'
+      item.estado === 'en_lista' || item.estado === 'reemplazado' || item.listaId
     ).length || 0
     const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
+    const hasListsCreated = completedItems > 0
 
-    return { totalItems, totalCost, completedItems, progress }
+    return { totalItems, totalCost, completedItems, progress, hasListsCreated }
   }
 
   return (
@@ -173,13 +174,14 @@ const EquiposTableView = memo(function EquiposTableView({
                   </Button>
                 </TableHead>
                 <TableHead className="font-semibold text-center">Progreso</TableHead>
+                <TableHead className="font-semibold text-center">Estado</TableHead>
                 <TableHead className="font-semibold">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedEquipos.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     No se encontraron equipos que coincidan con la búsqueda
                   </TableCell>
                 </TableRow>
@@ -219,6 +221,18 @@ const EquiposTableView = memo(function EquiposTableView({
                           <span className="text-xs font-medium">{stats.progress.toFixed(0)}%</span>
                         </div>
                       </TableCell>
+                      <TableCell className="text-center">
+                        {stats.hasListsCreated ? (
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 border-green-200">
+                            <List className="w-3 h-3 mr-1" />
+                            Lista Creada
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            Pendiente
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button variant="outline" size="sm" asChild>
@@ -227,16 +241,6 @@ const EquiposTableView = memo(function EquiposTableView({
                               Ver
                             </Link>
                           </Button>
-                          {onCreateList && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onCreateList(equipo)}
-                            >
-                              <List className="h-4 w-4 mr-1" />
-                              + Lista
-                            </Button>
-                          )}
                           <Button
                             variant="outline"
                             size="sm"

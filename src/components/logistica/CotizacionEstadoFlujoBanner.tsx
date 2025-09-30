@@ -26,7 +26,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { logStatusChange } from '@/lib/services/auditLogger';
+// Removida la importación directa del servicio de auditoría
 
 // ✅ Props interface
 interface CotizacionEstadoFlujoBannerProps {
@@ -142,14 +142,25 @@ const CotizacionEstadoFlujoBanner: React.FC<CotizacionEstadoFlujoBannerProps> = 
 
       // Registrar auditoría del cambio de estado
       if (usuarioId) {
-        await logStatusChange({
-          entityType: 'COTIZACION',
-          entityId: cotizacionId,
-          userId: usuarioId,
-          oldStatus: estado,
-          newStatus: pendingEstado,
-          description: cotizacionNombre || `Cotización ${cotizacionId}`
-        });
+        try {
+          await fetch('/api/audit/log-status-change', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              entityType: 'COTIZACION_PROVEEDOR',
+              entityId: cotizacionId,
+              userId: usuarioId,
+              oldStatus: estado,
+              newStatus: pendingEstado,
+              description: cotizacionNombre || `Cotización ${cotizacionId}`
+            }),
+          });
+        } catch (auditError) {
+          console.warn('Error logging status change to audit:', auditError);
+          // No lanzamos error para no interrumpir el flujo principal
+        }
       }
 
       toast.success(`✅ Estado actualizado a: ${getEstadoInfo(pendingEstado).label}`);

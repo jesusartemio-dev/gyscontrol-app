@@ -170,7 +170,7 @@ export default function Sidebar() {
         },
       ],
     },
-    // 3. Logística - Listas, pedidos y cotizaciones
+    // 3. Logística - Gestión completa de la cadena logística
     {
       key: 'logistica',
       title: 'Logística',
@@ -178,18 +178,12 @@ export default function Sidebar() {
       color: 'text-orange-400',
       roles: ['admin', 'gerente', 'logistico'],
       links: [
-        { href: '/logistica/listas', label: 'Listas', icon: FileText },
-        { 
-          href: '/logistica/pedidos', 
-          label: 'Pedidos', 
-          icon: Package,
-          submenu: [
-            { href: '/logistica/pedidos', label: 'Ver Pedidos', icon: Package },
-            { href: '/gestion/reportes/pedidos', label: 'Reportes Pedidos', icon: BarChart3 },
-            { href: '/gestion/reportes/trazabilidad', label: 'Trazabilidad', icon: Activity }
-          ]
-        },
-        { href: '/logistica/cotizaciones', label: 'Cotizaciones', icon: Calculator },
+        { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText },
+        { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package },
+        { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
+        { href: '/gestion/reportes/pedidos', label: 'Dashboard de Pedidos', icon: BarChart3 },
+        { href: '/gestion/reportes/trazabilidad', label: 'Trazabilidad', icon: Activity },
+        { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
       ],
     },
     // 4. Finanzas - Control financiero y flujo de caja
@@ -257,7 +251,6 @@ export default function Sidebar() {
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },
         // 🏢 Entidades maestras del negocio
         { href: '/comercial/clientes', label: 'Clientes', icon: Building2 },
-        { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         // 📦 Catálogos de productos y servicios
         { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
         { href: '/catalogo/servicios', label: 'Catálogo Servicios', icon: FileText },

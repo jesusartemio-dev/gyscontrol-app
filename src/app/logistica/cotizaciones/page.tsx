@@ -29,6 +29,7 @@ import { getProveedores } from '@/lib/services/proveedor'
 
 import CotizacionProveedorAccordion from '@/components/logistica/CotizacionProveedorAccordion'
 import ModalCrearCotizacionProveedor from '@/components/logistica/ModalCrearCotizacionProveedor'
+import ModalCrearCotizacionCompleta from '@/components/logistica/ModalCrearCotizacionCompleta'
 import CotizacionesProveedorTableView from '@/components/logistica/CotizacionesProveedorTableView'
 import CotizacionesProveedorCardView from '@/components/logistica/CotizacionesProveedorCardView'
 import { Button } from '@/components/ui/button'
@@ -42,6 +43,7 @@ export default function CotizacionesPage() {
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [openModal, setOpenModal] = useState(false)
+  const [openModalCompleta, setOpenModalCompleta] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingAction, setLoadingAction] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
@@ -294,23 +296,35 @@ export default function CotizacionesPage() {
               </Button>
             </div>
 
-            <Button
-              onClick={() => setOpenModal(true)}
-              disabled={loadingAction}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              {loadingAction ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nueva Cotización
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setOpenModalCompleta(true)}
+                disabled={loadingAction}
+                className="bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                {loadingAction ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Cotización
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setOpenModal(true)}
+                disabled={loadingAction}
+                className="hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Cotización Rápida
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -432,10 +446,19 @@ export default function CotizacionesPage() {
         )}
       </motion.div>
 
-      {/* Modal para crear cotización */}
+      {/* Modal para crear cotización rápida */}
       <ModalCrearCotizacionProveedor
         open={openModal}
         onClose={() => setOpenModal(false)}
+        proyectos={proyectos}
+        proveedores={proveedores}
+        onCreated={cargarCotizaciones}
+      />
+
+      {/* Modal para crear cotización completa */}
+      <ModalCrearCotizacionCompleta
+        open={openModalCompleta}
+        onClose={() => setOpenModalCompleta(false)}
         proyectos={proyectos}
         proveedores={proveedores}
         onCreated={cargarCotizaciones}

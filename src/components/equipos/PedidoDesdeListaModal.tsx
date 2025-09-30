@@ -82,9 +82,20 @@ export default function PedidoDesdeListaModal({
   const setOpen = externalOnOpenChange || setInternalOpen
   const [loading, setLoading] = useState(false)
   const [observacion, setObservacion] = useState('')
-  const [fechaNecesaria, setFechaNecesaria] = useState(
-    format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd') // Default: 7 days from now
-  )
+  // Default to lista.fechaNecesaria if available, otherwise 7 days from now
+  const getDefaultFechaNecesaria = () => {
+    if (lista.fechaNecesaria) {
+      const date = new Date(lista.fechaNecesaria)
+      const year = date.getUTCFullYear()
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(date.getUTCDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+    // Fallback: 7 days from now
+    return format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+  }
+
+  const [fechaNecesaria, setFechaNecesaria] = useState(getDefaultFechaNecesaria())
   const [prioridad, setPrioridad] = useState<'baja' | 'media' | 'alta' | 'critica'>('media')
   const [esUrgente, setEsUrgente] = useState(false)
 
@@ -257,7 +268,7 @@ export default function PedidoDesdeListaModal({
   // ✅ Reset form
   const resetForm = () => {
     setObservacion('')
-    setFechaNecesaria(format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'))
+    setFechaNecesaria(getDefaultFechaNecesaria())
     setPrioridad('media')
     setEsUrgente(false)
     // Reset selections - recalculate available quantities

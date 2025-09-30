@@ -174,6 +174,8 @@ export default function CrearListaMultipleModal({
       setNombreLista(`Lista de ${categoriaPredominante}`)
       setFiltroCategoria('__ALL__')
       setBusqueda('')
+      // Reset fecha requerida
+      setFechaRequerida('')
     }
   }, [isOpen, proyectoEquipo.id, proyectoId])
 
@@ -343,7 +345,7 @@ export default function CrearListaMultipleModal({
         proyectoEquipoId: proyectoEquipo.id,
         nombre: nombreLista.trim(),
         descripcion: descripcionLista.trim(),
-        fechaRequerida,
+        fechaNecesaria: fechaRequerida,
         itemsIds: itemsSeleccionados
       }
 
@@ -411,9 +413,9 @@ export default function CrearListaMultipleModal({
                 </p>
               </div>
               <div>
-                <Label htmlFor="fecha-requerida" className="text-sm font-medium">Fecha Requerida *</Label>
+                <Label htmlFor="fecha-necesaria" className="text-sm font-medium">Fecha Necesaria *</Label>
                 <Input
-                  id="fecha-requerida"
+                  id="fecha-necesaria"
                   type="date"
                   value={fechaRequerida}
                   onChange={(e) => setFechaRequerida(e.target.value)}
@@ -657,7 +659,7 @@ export default function CrearListaMultipleModal({
           </Button>
           <Button
             onClick={crearLista}
-            disabled={cargando || itemsSeleccionados.length === 0 || !nombreLista.trim()}
+            disabled={cargando || itemsSeleccionados.length === 0 || !nombreLista.trim() || !fechaRequerida}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium"
             size="lg"
           >

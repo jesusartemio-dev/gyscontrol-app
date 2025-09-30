@@ -228,7 +228,7 @@ export default function ProjectEquipmentPage({ params }: PageProps) {
             <Package className="h-8 w-8 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                Equipos del Proyecto
+                {proyecto.codigo} - Equipos Cotizados
               </h1>
               <p className="text-gray-600">
                 Equipos provenientes de la cotización comercial
@@ -341,7 +341,7 @@ export default function ProjectEquipmentPage({ params }: PageProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-600" />
-            Equipos Técnicos del Proyecto
+            {proyecto.codigo} - Equipos Cotizados por Comercial
             <Badge variant="secondary" className="ml-auto">
               {viewMode === 'table' ? 'Vista Tabla' : 'Vista Cards'}
             </Badge>
@@ -387,7 +387,7 @@ export default function ProjectEquipmentPage({ params }: PageProps) {
         <CrearListaMultipleModal
           isOpen={modalOpen}
           onClose={handleCloseModal}
-          proyectoEquipo={selectedEquipo}
+          proyectoEquipo={selectedEquipo as any}
           proyectoId={proyectoId}
           onDistribucionCompletada={handleDistribucionCompletada}
         />

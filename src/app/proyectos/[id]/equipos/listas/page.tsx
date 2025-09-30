@@ -249,10 +249,10 @@ export default function EquipmentListsPage({ params }: PageProps) {
               <List className="h-6 w-6 text-white" />
             </div>
             <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Listas de Equipos
+              {proyecto.codigo} - Listas de Equipos
             </span>
           </motion.h1>
-          <motion.p 
+          <motion.p
             className="text-muted-foreground text-lg"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -312,37 +312,25 @@ export default function EquipmentListsPage({ params }: PageProps) {
       </motion.div>
 
       {/* 🎯 Enhanced Master View Component */}
-      <motion.div 
-        variants={itemVariants}
-        className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden"
-      >
-        <AnimatePresence mode="wait">
-          <motion.div
-            key="master-view"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Suspense 
-              fallback={
-                <div className="p-8 space-y-4">
-                  <div className="flex items-center gap-2 mb-6">
-                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                    <span className="text-sm text-muted-foreground">Cargando vista maestra...</span>
-                  </div>
-                  <EnhancedSkeleton />
-                </div>
-              }
-            >
-              <ListaEquipoMasterView 
-                proyectoId={proyectoId}
-                initialLists={masterLists}
-                initialStats={masterStats}
-              />
-            </Suspense>
-          </motion.div>
-        </AnimatePresence>
+      <motion.div variants={itemVariants}>
+        <Suspense
+          fallback={
+            <div className="p-8 space-y-4">
+              <div className="flex items-center gap-2 mb-6">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                <span className="text-sm text-muted-foreground">Cargando vista maestra...</span>
+              </div>
+              <EnhancedSkeleton />
+            </div>
+          }
+        >
+          <ListaEquipoMasterView
+            proyectoId={proyectoId}
+            proyectoCodigo={proyecto.codigo}
+            initialLists={masterLists}
+            initialStats={masterStats}
+          />
+        </Suspense>
       </motion.div>
     </motion.div>
   );
