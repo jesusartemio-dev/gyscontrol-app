@@ -6,7 +6,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse, NextRequest } from 'next/server'
-import type { ProyectoEquipoItemUpdatePayload } from '@/types'
+import type { ProyectoEquipoCotizadoItemUpdatePayload } from '@/types'
 
 export const dynamic = 'force-dynamic' // ✅ Para evitar problemas de caché en rutas dinámicas
 
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic' // ✅ Para evitar problemas de caché en
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    const item = await prisma.proyectoEquipoItem.findUnique({
+    const item = await prisma.proyectoEquipoCotizadoItem.findUnique({
       where: { id },
       include: {
         catalogoEquipo: true,
@@ -41,12 +41,12 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
-    const body: ProyectoEquipoItemUpdatePayload = await req.json()
+    const body: ProyectoEquipoCotizadoItemUpdatePayload = await req.json()
     
     // 🔧 Excluir campos de relación que no se pueden actualizar directamente
     const { listaId, proyectoEquipoId, catalogoEquipoId, listaEquipoSeleccionadoId, ...data } = body
 
-    const actualizado = await prisma.proyectoEquipoItem.update({
+    const actualizado = await prisma.proyectoEquipoCotizadoItem.update({
       where: { id },
       data,
     })
@@ -63,7 +63,7 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
   try {
     const { id } = await context.params
 
-    await prisma.proyectoEquipoItem.delete({ where: { id } })
+    await prisma.proyectoEquipoCotizadoItem.delete({ where: { id } })
 
     return NextResponse.json({ status: 'ok' })
   } catch (error) {

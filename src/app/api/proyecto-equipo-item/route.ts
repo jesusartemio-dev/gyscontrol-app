@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       costoReal,
     } = body
 
-    const nuevoItem = await prisma.proyectoEquipoItem.create({
+    const nuevoItem = await prisma.proyectoEquipoCotizadoItem.create({
       data: {
         proyectoEquipoId,
         catalogoEquipoId,

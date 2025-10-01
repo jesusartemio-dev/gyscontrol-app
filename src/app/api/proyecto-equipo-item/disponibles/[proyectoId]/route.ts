@@ -12,7 +12,7 @@ export async function GET(_: Request, context: { params: Promise<{ proyectoId: s
   const { proyectoId } = await context.params
 
   try {
-      const items = await prisma.proyectoEquipoItem.findMany({
+      const items = await prisma.proyectoEquipoCotizadoItem.findMany({
         where: {
           proyectoEquipo: {
             proyectoId: proyectoId,

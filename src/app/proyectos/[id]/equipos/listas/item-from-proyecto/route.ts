@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     }
 
     // Obtener el ítem del proyecto
-    const item = await prisma.proyectoEquipoItem.findUnique({
+    const item = await prisma.proyectoEquipoCotizadoItem.findUnique({
       where: { id: proyectoEquipoItemId },
     })
 

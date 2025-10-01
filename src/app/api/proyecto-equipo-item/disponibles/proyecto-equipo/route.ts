@@ -37,7 +37,7 @@ export async function GET(req: Request, context: { params: Promise<{ proyectoEqu
     }
 
     // ✅ Verificar que el ProyectoEquipo existe
-    const proyectoEquipo = await prisma.proyectoEquipo.findUnique({
+    const proyectoEquipo = await prisma.proyectoEquipoCotizado.findUnique({
       where: { id: proyectoEquipoId },
       select: { id: true, proyectoId: true }
     })
@@ -52,7 +52,7 @@ export async function GET(req: Request, context: { params: Promise<{ proyectoEqu
     // 🔍 Debug: Primero obtener TODOS los items para ver qué estados tienen
     console.log('🔍 Ejecutando consulta Prisma para TODOS los items...')
 
-    const todosLosItems = await prisma.proyectoEquipoItem.findMany({
+    const todosLosItems = await prisma.proyectoEquipoCotizadoItem.findMany({
       where: {
         proyectoEquipoId: proyectoEquipoId
       },
@@ -98,7 +98,7 @@ export async function GET(req: Request, context: { params: Promise<{ proyectoEqu
     console.log('🎯 Ejecutando consulta Prisma para items DISPONIBLES...')
     console.log('🎯 Parámetros de consulta:', { proyectoEquipoId, type: typeof proyectoEquipoId })
 
-    const itemsDisponibles = await prisma.proyectoEquipoItem.findMany({
+    const itemsDisponibles = await prisma.proyectoEquipoCotizadoItem.findMany({
       where: {
         proyectoEquipoId: proyectoEquipoId
         // ✅ Sin filtro de estado - permitir todos los items para múltiples listas
@@ -127,7 +127,7 @@ export async function GET(req: Request, context: { params: Promise<{ proyectoEqu
       console.log('⚠️ ADVERTENCIA: La consulta no encontró items. Verificando existencia del ProyectoEquipo...')
 
       // Verificar si el ProyectoEquipo existe y tiene items
-      const proyectoEquipoConItems = await prisma.proyectoEquipo.findUnique({
+      const proyectoEquipoConItems = await prisma.proyectoEquipoCotizado.findUnique({
         where: { id: proyectoEquipoId },
         include: {
           items: {

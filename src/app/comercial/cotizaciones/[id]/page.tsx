@@ -1267,7 +1267,8 @@ export default function CotizacionDetallePage() {
         onClose={() => setShowCrearOportunidad(false)}
         onSuccess={(oportunidad) => {
           console.log('Oportunidad creada:', oportunidad)
-          // Aquí podríamos actualizar el estado de la cotización si es necesario
+          // Redirigir a la página de la nueva oportunidad
+          router.push(`/crm/${oportunidad.id}`)
         }}
       />
 

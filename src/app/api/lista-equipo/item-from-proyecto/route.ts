@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     }
 
     // ✅ 1. Buscar el ProyectoEquipoItem
-    const item = await prisma.proyectoEquipoItem.findUnique({
+    const item = await prisma.proyectoEquipoCotizadoItem.findUnique({
       where: { id: proyectoEquipoItemId },
     })
 
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     })
 
     // ✅ 3. Actualizar ProyectoEquipoItem
-    await prisma.proyectoEquipoItem.update({
+    await prisma.proyectoEquipoCotizadoItem.update({
       where: { id: proyectoEquipoItemId },
       data: {
         listaEquipoSeleccionadoId: nuevo.id,

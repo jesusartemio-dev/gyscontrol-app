@@ -17,6 +17,8 @@ import { CrmOportunidad } from '@/lib/services/crm'
 import { getClientes } from '@/lib/services/cliente'
 import { getUsuarios } from '@/lib/services/usuario'
 import CrearCotizacionDesdeOportunidadModal from '@/components/crm/CrearCotizacionDesdeOportunidadModal'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { toast } from 'sonner'
 
 // ✅ Tipos para datos reales
 interface Cliente {
@@ -90,6 +92,10 @@ export default function CrmDashboardPage() {
   const [loadingData, setLoadingData] = useState(true)
   const [showCotizacionModal, setShowCotizacionModal] = useState(false)
   const [selectedOportunidad, setSelectedOportunidad] = useState<CrmOportunidad | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean
+    oportunidad: CrmOportunidad | null
+  }>({ open: false, oportunidad: null })
 
   // ✅ Cargar datos del dashboard
   useEffect(() => {
@@ -137,8 +143,35 @@ export default function CrmDashboardPage() {
 
   // ✅ Manejar eliminación de oportunidad
   const handleDeleteOportunidad = (oportunidad: CrmOportunidad) => {
-    // Aquí iría la lógica de confirmación y eliminación
-    console.log('Eliminar oportunidad:', oportunidad.id)
+    setDeleteConfirm({ open: true, oportunidad })
+  }
+
+  // ✅ Ejecutar eliminación de oportunidad
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.oportunidad) return
+
+    try {
+      const response = await fetch(`/api/crm/oportunidades/${deleteConfirm.oportunidad.id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al eliminar oportunidad')
+      }
+
+      toast.success('Oportunidad eliminada exitosamente')
+      setRefreshKey(prev => prev + 1) // Forzar recarga de la lista
+      setDeleteConfirm({ open: false, oportunidad: null })
+    } catch (error) {
+      console.error('Error deleting oportunidad:', error)
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar oportunidad')
+    }
+  }
+
+  // ✅ Cancelar eliminación
+  const handleCancelDelete = () => {
+    setDeleteConfirm({ open: false, oportunidad: null })
   }
 
   // ✅ Manejar éxito del formulario
@@ -272,6 +305,22 @@ export default function CrmDashboardPage() {
           }}
         />
       )}
+
+      {/* 🗑️ Diálogo de confirmación para eliminar */}
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) => !open && handleCancelDelete()}
+        title="¿Eliminar oportunidad?"
+        description={
+          deleteConfirm.oportunidad
+            ? `¿Estás seguro de que quieres eliminar la oportunidad "${deleteConfirm.oportunidad.nombre}"? Esta acción no se puede deshacer y eliminará también todas las actividades relacionadas.`
+            : "Esta acción no se puede deshacer."
+        }
+        onConfirm={handleConfirmDelete}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="destructive"
+      />
     </div>
   )
 }

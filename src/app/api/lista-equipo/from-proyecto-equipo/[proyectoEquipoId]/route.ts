@@ -37,7 +37,7 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
     }
 
     // ✅ Verificar que el ProyectoEquipo existe y pertenece al proyecto
-    const proyectoEquipo = await prisma.proyectoEquipo.findFirst({
+    const proyectoEquipo = await prisma.proyectoEquipoCotizado.findFirst({
       where: {
         id: proyectoEquipoId,
         proyectoId: proyectoId
@@ -55,7 +55,7 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
     }
 
     // ✅ Obtener los items disponibles del ProyectoEquipo
-    const proyectoEquipoItems = await prisma.proyectoEquipoItem.findMany({
+    const proyectoEquipoItems = await prisma.proyectoEquipoCotizadoItem.findMany({
       where: {
         proyectoEquipoId: proyectoEquipoId,
         OR: [
@@ -145,7 +145,7 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
 
       // 3. Asociar los ProyectoEquipoItem a la lista (mantener estado 'pendiente')
       // Solo cambiar a 'en_lista' cuando se convierta en pedido
-      await tx.proyectoEquipoItem.updateMany({
+      await tx.proyectoEquipoCotizadoItem.updateMany({
         where: {
           id: { in: proyectoEquipoItems.map(item => item.id) }
         },

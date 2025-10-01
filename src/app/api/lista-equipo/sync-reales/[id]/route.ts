@@ -30,7 +30,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       lista.items
         .filter(item => item.proyectoEquipoItemId)
         .map(item =>
-          prisma.proyectoEquipoItem.update({
+          prisma.proyectoEquipoCotizadoItem.update({
             where: { id: item.proyectoEquipoItemId! },
             data: {
               cantidadReal: item.cantidad,

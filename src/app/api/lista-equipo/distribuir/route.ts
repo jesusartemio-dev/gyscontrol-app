@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     }
 
     // ✅ Verificar que el ProyectoEquipo existe y pertenece al proyecto
-    const proyectoEquipo = await prisma.proyectoEquipo.findFirst({
+    const proyectoEquipo = await prisma.proyectoEquipoCotizado.findFirst({
       where: {
         id: proyectoEquipoId,
         proyectoId: proyectoId
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     }
 
     // ✅ Verificar que los items existen y pertenecen al ProyectoEquipo
-    const proyectoEquipoItems = await prisma.proyectoEquipoItem.findMany({
+    const proyectoEquipoItems = await prisma.proyectoEquipoCotizadoItem.findMany({
       where: {
         id: { in: itemsIds },
         proyectoEquipoId: proyectoEquipoId
@@ -130,7 +130,7 @@ export async function POST(req: Request) {
       }
 
       // 3. Actualizar el estado de los ProyectoEquipoItem a 'en_lista'
-      await tx.proyectoEquipoItem.updateMany({
+      await tx.proyectoEquipoCotizadoItem.updateMany({
         where: {
           id: { in: itemsIds }
         },

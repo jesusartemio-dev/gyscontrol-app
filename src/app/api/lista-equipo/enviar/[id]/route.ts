@@ -24,7 +24,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     const actualizaciones = items
       .filter((item) => item.proyectoEquipoItemId)
       .map((item) =>
-        prisma.proyectoEquipoItem.update({
+        prisma.proyectoEquipoCotizadoItem.update({
           where: { id: item.proyectoEquipoItemId! },
           data: { estado: 'en_lista' },
         })

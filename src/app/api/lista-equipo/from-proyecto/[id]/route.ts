@@ -26,7 +26,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       )
     }
     // 1. Obtener todos los ProyectoEquipoItem del proyecto
-    const items = await prisma.proyectoEquipoItem.findMany({
+    const items = await prisma.proyectoEquipoCotizadoItem.findMany({
       where: { proyectoEquipo: { proyectoId } },
       include: {
         proyectoEquipo: true,
