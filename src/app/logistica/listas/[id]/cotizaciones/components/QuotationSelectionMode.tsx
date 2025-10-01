@@ -20,7 +20,7 @@ interface SelectionStats {
 }
 
 export default function QuotationSelectionMode({ listaId }: { listaId: string }) {
-  const [selections, setSelections] = useState<Record<string, string>>({})
+  const [selections, setSelections] = useState<Record<string, string | null>>({})
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [stats, setStats] = useState<SelectionStats>({
     totalItems: 0,
@@ -49,32 +49,46 @@ export default function QuotationSelectionMode({ listaId }: { listaId: string })
     }
   }
 
-  const handleWinnerSelected = (itemId: string, winnerId: string) => {
+  const handleWinnerSelected = async (itemId: string, winnerId: string | null) => {
+    // Update local state immediately for UI feedback
     setSelections(prev => ({
       ...prev,
       [itemId]: winnerId
     }))
-  }
 
-  const handleConfirmSelections = async () => {
+    // Save selection immediately to database using the same API as the main list page
     try {
-      const response = await fetch(`/api/logistica/listas/${listaId}/cotizaciones/select-winners`, {
-        method: 'POST',
+      const response = await fetch(`/api/lista-equipo-item/${itemId}/seleccionar-cotizacion`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selections })
+        body: JSON.stringify({ cotizacionProveedorItemId: winnerId })
       })
 
-      if (response.ok) {
-        toast.success('Ganadores seleccionados exitosamente')
-        setSelections({})
-        loadSelectionStats()
-      } else {
-        throw new Error('Error al seleccionar ganadores')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al guardar selección')
       }
+
+      // Refresh stats after successful save
+      loadSelectionStats()
+      toast.success('Ganador seleccionado exitosamente')
     } catch (error) {
-      console.error('Error confirming selections:', error)
-      toast.error('Error al confirmar selecciones')
+      console.error('Error saving winner selection:', error)
+      toast.error('Error al guardar la selección del ganador')
+
+      // Revert local state on error
+      setSelections(prev => {
+        const newSelections = { ...prev }
+        delete newSelections[itemId]
+        return newSelections
+      })
     }
+  }
+
+  const handleConfirmSelections = () => {
+    // Since selections are saved immediately, this just shows the summary
+    // The modal will display current selections from the database
+    setShowConfirmModal(true)
   }
 
   return (

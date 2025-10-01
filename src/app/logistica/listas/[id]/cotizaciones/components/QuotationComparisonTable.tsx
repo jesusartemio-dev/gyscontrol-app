@@ -117,7 +117,7 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
     return <Minus className="h-4 w-4 text-yellow-600" />
   }
 
-  const handleWinnerSelection = (itemId: string, winnerId: string) => {
+  const handleWinnerSelection = (itemId: string, winnerId: string | null) => {
     setComparisonData(prev =>
       prev.map(item =>
         item.itemId === itemId
@@ -125,7 +125,7 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
           : item
       )
     )
-    onWinnerSelected(itemId, winnerId)
+    onWinnerSelected(itemId, winnerId || '')
   }
 
   const getRecommendation = (quotations: QuotationItem[]) => {
@@ -238,7 +238,7 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleWinnerSelection(itemData.itemId, '')}
+                            onClick={() => handleWinnerSelection(itemData.itemId, null)}
                             className="text-gray-500 hover:text-red-600 hover:bg-red-50"
                           >
                             Limpiar

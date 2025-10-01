@@ -18,7 +18,7 @@ interface SelectionStats {
 
 interface SelectionSummaryProps {
   stats: SelectionStats
-  selections: Record<string, string>
+  selections: Record<string, string | null>
 }
 
 export default function SelectionSummary({ stats, selections }: SelectionSummaryProps) {

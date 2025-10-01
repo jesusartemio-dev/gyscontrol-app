@@ -19,7 +19,7 @@ interface SelectionSummary {
 interface WinnerSelectionModalProps {
   isOpen: boolean
   onClose: () => void
-  selections: Record<string, string>
+  selections: Record<string, string | null>
   onConfirm: () => void
   summary: SelectionSummary
 }
@@ -57,11 +57,11 @@ export default function WinnerSelectionModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Award className="h-5 w-5 text-blue-600" />
-            Confirmar Selección de Ganadores
-          </DialogTitle>
-        </DialogHeader>
+           <DialogTitle className="flex items-center gap-2">
+             <Award className="h-5 w-5 text-blue-600" />
+             Resumen de Selecciones de Ganadores
+           </DialogTitle>
+         </DialogHeader>
 
         <div className="space-y-6">
           {/* Summary Cards */}
@@ -172,28 +172,18 @@ export default function WinnerSelectionModal({
           )}
 
           {/* Action Buttons */}
-          <DialogFooter className="gap-3">
-            <Button variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleConfirm}
-              disabled={!canConfirm || confirming}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {confirming ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Confirmando...
-                </>
-              ) : (
-                <>
-                  <Award className="h-4 w-4 mr-2" />
-                  Confirmar Selecciones
-                </>
-              )}
-            </Button>
-          </DialogFooter>
+           <DialogFooter className="gap-3">
+             <Button variant="outline" onClick={onClose}>
+               Cerrar
+             </Button>
+             <Button
+               onClick={onClose}
+               className="bg-green-600 hover:bg-green-700"
+             >
+               <CheckCircle className="h-4 w-4 mr-2" />
+               Aceptar
+             </Button>
+           </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>
