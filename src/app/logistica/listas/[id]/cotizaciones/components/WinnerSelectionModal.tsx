@@ -51,7 +51,7 @@ export default function WinnerSelectionModal({
     ? (summary.selectedWinners / summary.totalItems) * 100
     : 0
 
-  const canConfirm = summary.selectedWinners > 0 && summary.selectedWinners === summary.totalItems
+  const canConfirm = summary.selectedWinners > 0
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
