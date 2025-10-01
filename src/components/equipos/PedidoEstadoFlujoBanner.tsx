@@ -37,7 +37,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { logStatusChange } from '@/lib/services/auditLogger';
 
 // ✅ Props interface
 interface PedidoEstadoFlujoBannerProps {
@@ -157,20 +156,19 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
     try {
       setIsUpdating(true);
 
-      // Aquí iría la llamada a la API para actualizar el estado
-      // Por ahora simulamos la actualización
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Actualizar el estado a través de la API
+      const response = await fetch(`/api/pedido-equipo/${pedidoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          estado: pendingEstado
+        }),
+      });
 
-      // Registrar auditoría del cambio de estado
-      if (usuarioId) {
-        await logStatusChange({
-          entityType: 'PEDIDO_EQUIPO',
-          entityId: pedidoId,
-          userId: usuarioId,
-          oldStatus: estado,
-          newStatus: pendingEstado,
-          description: pedidoNombre || `Pedido ${pedidoId}`
-        });
+      if (!response.ok) {
+        throw new Error('Error al actualizar el estado');
       }
 
       toast.success(`Estado actualizado a: ${getEstadoInfo(pendingEstado).label}`);

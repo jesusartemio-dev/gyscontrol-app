@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
 import type { EstadoListaEquipo } from '@/types/modelos'
-import { logStatusChange } from '@/lib/services/auditLogger'
 
 import {
   AlertDialog,
@@ -169,19 +168,8 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
 
     setLoading(true)
     try {
-      const estadoAnterior = estado
       const updated = await updateListaEstado(listaId, nuevoEstado)
       if (updated) {
-        // ✅ Registrar el cambio en el historial de auditoría
-        await logStatusChange({
-          entityType: 'LISTA_EQUIPO',
-          entityId: listaId,
-          userId: session.user.id,
-          oldStatus: estadoAnterior,
-          newStatus: nuevoEstado,
-          description: `Lista ${updated.nombre || 'sin nombre'}`
-        })
-
         toast.success(mensaje)
         onUpdated?.(nuevoEstado)
       }

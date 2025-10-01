@@ -12,6 +12,9 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { ListaEquipoUpdatePayload } from '@/types/payloads'
 import type { EstadoListaEquipo } from '@prisma/client'
+import { logStatusChange } from '@/lib/services/auditLogger'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 // ✅ Obtener ListaEquipo por ID (GET)
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -70,6 +73,15 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     const { id } = await context.params
     const body: ListaEquipoUpdatePayload = await req.json()
 
+    // ✅ Verificar autenticación
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     if (!id || typeof id !== 'string') {
       return NextResponse.json(
         { error: 'ID inválido o no proporcionado' },
@@ -122,6 +134,23 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       where: { id },
       data: updateData,
     })
+
+    // ✅ Registrar el cambio de estado en auditoría si hubo cambio de estado
+    if (body.estado && body.estado !== existe.estado) {
+      try {
+        await logStatusChange({
+          userId: session.user.id,
+          entityType: 'LISTA_EQUIPO',
+          entityId: id,
+          oldStatus: existe.estado,
+          newStatus: body.estado,
+          description: `Lista ${data.nombre || data.codigo || 'sin nombre'}`
+        })
+      } catch (auditError) {
+        console.error('Error logging status change:', auditError)
+        // No fallar la operación principal por error de auditoría
+      }
+    }
 
     return NextResponse.json(data)
   } catch (error) {
