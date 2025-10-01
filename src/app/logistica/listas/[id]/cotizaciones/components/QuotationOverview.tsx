@@ -117,6 +117,48 @@ export default function QuotationOverview({ listaId }: { listaId: string }) {
         </p>
       </div>
 
+      {/* Quick Actions Banner */}
+      {stats.totalItems > 0 && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="text-green-600">
+                  <CheckCircle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-green-900">Acciones Rápidas</h3>
+                  <p className="text-sm text-green-700">
+                    {stats.receivedQuotations === 0
+                      ? "Necesitas solicitar cotizaciones a proveedores"
+                      : stats.selectedCount === 0
+                      ? `${stats.receivedQuotations} cotizaciones listas para selección`
+                      : `${stats.selectedCount} ganadores seleccionados - listo para pedidos`
+                    }
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {stats.receivedQuotations > 0 && stats.selectedCount === 0 && (
+                  <Button size="sm" asChild className="bg-green-600 hover:bg-green-700">
+                    <Link href={`/logistica/listas/${listaId}/cotizaciones?tab=seleccionar`}>
+                      🏆 Seleccionar Ahora
+                    </Link>
+                  </Button>
+                )}
+                {stats.selectedCount > 0 && (
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href={`/logistica/listas/${listaId}`}>
+                      📦 Crear Pedidos
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Empty State */}
       {stats.totalItems === 0 ? (
         <Card className="border-dashed">
@@ -267,17 +309,22 @@ export default function QuotationOverview({ listaId }: { listaId: string }) {
               <CardContent>
                 <div className="space-y-2">
                   <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                    <Link href={`/logistica/listas/${listaId}/cotizaciones`}>
-                      Actualizar Cotizaciones
+                    <Link href={`/logistica/listas/${listaId}/cotizaciones?tab=actualizar`}>
+                      📝 Actualizar Cotizaciones
                     </Link>
                   </Button>
                   {stats.receivedQuotations > 0 && (
                     <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                      <Link href={`/logistica/listas/${listaId}/cotizaciones`}>
-                        Seleccionar Ganadores
+                      <Link href={`/logistica/listas/${listaId}/cotizaciones?tab=seleccionar`}>
+                        🏆 Seleccionar Ganadores
                       </Link>
                     </Button>
                   )}
+                  <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+                    <Link href={`/logistica/listas/${listaId}`}>
+                      ➕ Crear Nueva Cotización
+                    </Link>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
