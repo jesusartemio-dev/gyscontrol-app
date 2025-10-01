@@ -121,7 +121,7 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
     setComparisonData(prev =>
       prev.map(item =>
         item.itemId === itemId
-          ? { ...item, selectedWinner: winnerId }
+          ? { ...item, selectedWinner: winnerId || undefined }
           : item
       )
     )
@@ -215,22 +215,36 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                           Recomendado
                         </Badge>
                       )}
-                      <Select
-                        value={itemData.selectedWinner || ''}
-                        onValueChange={(value) => handleWinnerSelection(itemData.itemId, value)}
-                      >
-                        <SelectTrigger className="w-48">
-                          <SelectValue placeholder="Seleccionar ganador" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {itemData.quotations.map((quotation) => (
-                            <SelectItem key={quotation.id} value={quotation.id}>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {itemData.quotations.map((quotation) => {
+                          const isSelected = itemData.selectedWinner === quotation.id
+                          const isRecommended = recommendedWinner === quotation.id
+
+                          return (
+                            <Button
+                              key={quotation.id}
+                              variant={isSelected ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleWinnerSelection(itemData.itemId, quotation.id)}
+                              className={`relative transition-all ${isSelected ? 'ring-2 ring-green-500 bg-green-600 hover:bg-green-700' : 'hover:bg-gray-100'} ${isRecommended ? 'border-yellow-400 shadow-sm' : ''}`}
+                            >
                               {quotation.cotizacion.proveedor.nombre}
-                              {quotation.id === recommendedWinner && ' ⭐'}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                              {isRecommended && <Star className="h-3 w-3 ml-1 text-yellow-500" />}
+                              {isSelected && <CheckCircle className="h-3 w-3 ml-1 text-white" />}
+                            </Button>
+                          )
+                        })}
+                        {itemData.selectedWinner && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleWinnerSelection(itemData.itemId, '')}
+                            className="text-gray-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            Limpiar
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -241,7 +255,6 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                         <TableHead className="text-right">Precio Unitario</TableHead>
                         <TableHead className="text-right">Tiempo Entrega</TableHead>
                         <TableHead className="text-center">Estado</TableHead>
-                        <TableHead className="text-center">Ganador</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -288,9 +301,6 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                               >
                                 {quotation.estado}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {isWinner && <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />}
                             </TableCell>
                           </TableRow>
                         )
