@@ -170,19 +170,20 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
     // Generate email content
     const subject = `Solicitud de Cotización - ${cotizacion.codigo}`;
 
+    // Format items as a clean bullet list
+    const formatItemsAsTable = (items: any[]) => {
+      if (!items || items.length === 0) return 'No hay ítems en esta cotización.';
+
+      return items.map((item) => {
+        return `• ${item.descripcion} (${item.codigo}) - ${item.cantidad} ${item.unidad}`;
+      }).join('\n');
+    };
+
     const body = `Estimado proveedor ${cotizacion.proveedor.nombre},
 
 Le solicitamos cotización para los siguientes ítems del proyecto ${cotizacion.proyecto?.nombre || 'Proyecto'}:
 
-${cotizacion.items?.map((item, index) => {
-  return `${index + 1}. ${item.descripcion}
-   Código: ${item.codigo}
-   Cantidad: ${item.cantidad}
-   Unidad: ${item.unidad}
-   ${item.presupuesto ? `Presupuesto estimado: $${item.presupuesto.toFixed(2)}` : ''}
-
-`;
-}).join('') || 'No hay ítems en esta cotización.'}
+${formatItemsAsTable(cotizacion.items)}
 
 Proyecto: ${cotizacion.proyecto?.codigo} - ${cotizacion.proyecto?.nombre}
 Cotización: ${cotizacion.codigo}

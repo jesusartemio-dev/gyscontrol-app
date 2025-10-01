@@ -121,214 +121,257 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border">
-        <thead className="bg-gray-100 text-gray-700">
-          <tr>
-            <th className="p-2 text-left">Descripción</th>
-            <th className="p-2 text-center">Lista</th>
-            <th className="p-2 text-center">Item Lista</th>
-            <th className="p-2 text-center">Cantidad</th>
-            <th className="p-2 text-center">Precio Unitario (USD)</th>
-            <th className="p-2 text-center">Costo Total (USD)</th>
-            <th className="p-2 text-center">Tiempo Entrega</th>
-            <th className="p-2 text-center">Estado</th>
-            <th className="p-2 text-center">¿Seleccionada?</th>
-            <th className="p-2 text-center">Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items
-            .slice()
-            .sort((a, b) => (a.listaEquipoItem?.codigo || '').localeCompare(b.listaEquipoItem?.codigo || ''))
-            .map((item) => {
-              const isEdit = editModeId === item.id
-              const edited = editValues[item.id] || {}
-              const isLoading = loadingItems[item.id] || false
-              const cantidad = item.cantidad ?? item.cantidadOriginal ?? 0
-              const precioEditado =
-                edited.precioUnitario !== undefined
-                  ? parseFloat(edited.precioUnitario as any)
-                  : item.precioUnitario || 0
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Ítem
+              </th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Lista
+              </th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Estado
+              </th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Cantidad
+              </th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Precio Unit.
+              </th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Total
+              </th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Entrega
+              </th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {items
+              .slice()
+              .sort((a, b) => (a.listaEquipoItem?.codigo || '').localeCompare(b.listaEquipoItem?.codigo || ''))
+              .map((item) => {
+                const isEdit = editModeId === item.id
+                const edited = editValues[item.id] || {}
+                const isLoading = loadingItems[item.id] || false
+                const cantidad = item.cantidad ?? item.cantidadOriginal ?? 0
+                const precioEditado =
+                  edited.precioUnitario !== undefined
+                    ? parseFloat(edited.precioUnitario as any)
+                    : item.precioUnitario || 0
 
-              return (
-                <tr key={item.id} className="border-t">
-                  <td className="p-2">
-                    <strong>{item.descripcion}</strong>
-                    <div className="text-xs text-gray-600">
-                      {item.codigo} • {item.unidad}
-                    </div>
-                  </td>
-                  <td className="p-2 text-center text-xs text-gray-700">
-                    {item.lista ? (
-                      <>
-                        <div className="font-semibold text-sm">
-                          {item.lista.nombre}
+                return (
+                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    {/* Ítem Description */}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <div className="text-sm font-medium text-gray-900 leading-tight">
+                          {item.descripcion}
                         </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {item.codigo} • {item.unidad}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Lista */}
+                    <td className="px-6 py-4 text-center">
+                      {item.lista ? (
+                        <div className="text-xs">
+                          <div className="font-medium text-gray-900">{item.lista.nombre}</div>
+                          <div className="text-gray-500">{item.lista.codigo}</div>
+                        </div>
+                      ) : (
+                        <Badge variant="destructive" className="text-xs">Eliminada</Badge>
+                      )}
+                    </td>
+
+                    {/* Estado Combinado */}
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        {/* Estado del ítem */}
+                        <Badge
+                          variant={
+                            item.estado === 'cotizado' ? 'default' :
+                            item.estado === 'solicitado' ? 'secondary' :
+                            item.estado === 'rechazado' ? 'destructive' :
+                            'outline'
+                          }
+                          className="text-xs"
+                        >
+                          {item.estado || 'pendiente'}
+                        </Badge>
+
+                        {/* Estado de conexión */}
+                        {item.listaEquipoItemId ? (
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                            Conectado
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                            Eliminado
+                          </Badge>
+                        )}
+
+                        {/* Estado de selección */}
+                        {item.esSeleccionada && (
+                          <Badge className="text-xs bg-indigo-100 text-indigo-800 border-indigo-200">
+                            ✓ Seleccionada
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Cantidad */}
+                    <td className="px-6 py-4 text-center">
+                      <div className="text-sm font-medium text-gray-900">
+                        {cantidad}
+                      </div>
+                      {item.cantidadOriginal !== cantidad && (
                         <div className="text-xs text-gray-500">
-                          {item.lista.codigo}
+                          Orig: {item.cantidadOriginal}
                         </div>
-                      </>
-                    ) : (
-                      <span className="text-red-600">Eliminada</span>
-                    )}
-                  </td>
-                  <td className="p-2 text-center">
-                    {item.listaEquipoItemId ? (
-                      <Badge className="bg-green-600 text-white">🟢 Conectado</Badge>
-                    ) : (
-                      <Badge className="bg-red-600 text-white">🔴 Eliminado</Badge>
-                    )}
-                  </td>
-                  <td className="p-2 text-center">
-                    {cantidad} / Orig. {item.cantidadOriginal}
-                  </td>
-                  <td className="p-2 text-center">
-                    {isEdit && !item.esSeleccionada ? (
-                      <Input
-                        type="number"
-                        value={edited.precioUnitario ?? item.precioUnitario ?? ''}
-                        onChange={(e) => handleChange(item.id, 'precioUnitario', e.target.value)}
-                        className="w-24 text-center"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center gap-2">
-                        {`$${item.precioUnitario?.toFixed(2) ?? '0.00'}`}
-                        {item.esSeleccionada && (
-                          <Badge className="bg-green-100 text-green-700 text-xs px-1 py-0">✓ Seleccionada</Badge>
-                        )}
+                      )}
+                    </td>
+
+                    {/* Precio Unitario */}
+                    <td className="px-6 py-4 text-center">
+                      {isEdit && !item.esSeleccionada ? (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={edited.precioUnitario ?? item.precioUnitario ?? ''}
+                          onChange={(e) => handleChange(item.id, 'precioUnitario', e.target.value)}
+                          className="w-24 text-center text-sm"
+                          placeholder="0.00"
+                        />
+                      ) : (
+                        <div className="text-sm font-medium text-gray-900">
+                          ${item.precioUnitario?.toFixed(2) ?? '0.00'}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Costo Total */}
+                    <td className="px-6 py-4 text-center">
+                      <div className="text-sm font-semibold text-gray-900">
+                        ${(precioEditado * cantidad).toFixed(2)}
                       </div>
-                    )}
-                  </td>
-                  <td className="p-2 text-center">
-                    ${(precioEditado * cantidad).toFixed(2)}
-                  </td>
-                  <td className="p-2 text-center">
-                    {isEdit && !item.esSeleccionada ? (
-                      <div className="flex gap-1 items-center">
-                        <Select
-                          value={edited.tiempoEntregaModo ?? 'stock'}
-                          onValueChange={(value) => handleChange(item.id, 'tiempoEntregaModo', value)}
-                        >
-                          <SelectTrigger className="w-28 text-xs">
-                            <SelectValue placeholder="Modo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="stock">Stock</SelectItem>
-                            <SelectItem value="dias">Días</SelectItem>
-                            <SelectItem value="semanas">Semanas</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {(edited.tiempoEntregaModo === 'dias' || edited.tiempoEntregaModo === 'semanas') && (
-                          <Input
-                            type="number"
-                            value={edited.tiempoEntregaValor?.toString() ?? ''}
-                            onChange={(e) =>
-                              handleChange(item.id, 'tiempoEntregaValor', parseInt(e.target.value) || 0)
-                            }
-                            className="w-20 text-center"
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-2">
-                        {item.tiempoEntrega || 'N/D'}
-                        {item.esSeleccionada && (
-                          <span className="text-xs text-green-600 font-medium">🔒</span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-2 text-center capitalize">
-                    {isEdit && !item.esSeleccionada ? (
-                      <Select
-                        value={edited.estado ?? item.estado}
-                        onValueChange={(value) => handleChange(item.id, 'estado', value)}
-                      >
-                        <SelectTrigger className="w-28 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {['pendiente', 'solicitado', 'cotizado', 'rechazado', 'seleccionado'].map(
-                            (estado) => (
-                              <SelectItem key={estado} value={estado}>
-                                {estado}
-                              </SelectItem>
-                            )
+                    </td>
+
+                    {/* Tiempo de Entrega */}
+                    <td className="px-6 py-4 text-center">
+                      {isEdit && !item.esSeleccionada ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Select
+                            value={edited.tiempoEntregaModo ?? 'stock'}
+                            onValueChange={(value) => handleChange(item.id, 'tiempoEntregaModo', value)}
+                          >
+                            <SelectTrigger className="w-24 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="stock">Stock</SelectItem>
+                              <SelectItem value="dias">Días</SelectItem>
+                              <SelectItem value="semanas">Semanas</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {(edited.tiempoEntregaModo === 'dias' || edited.tiempoEntregaModo === 'semanas') && (
+                            <Input
+                              type="number"
+                              min="0"
+                              value={edited.tiempoEntregaValor?.toString() ?? ''}
+                              onChange={(e) =>
+                                handleChange(item.id, 'tiempoEntregaValor', parseInt(e.target.value) || 0)
+                              }
+                              className="w-16 text-center text-xs"
+                              placeholder="0"
+                            />
                           )}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="flex items-center justify-center gap-2">
-                        <Badge>{item.estado || 'N/D'}</Badge>
-                        {item.esSeleccionada && (
-                          <span className="text-xs text-green-600 font-medium">🔒</span>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-900">
+                          {item.tiempoEntrega || 'Stock'}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Acciones */}
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        {isEdit ? (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleSave(item)}
+                              disabled={isLoading}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              {isLoading ? (
+                                <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              ) : (
+                                <Save className="w-4 h-4" />
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCancel(item.id)}
+                              className="border-gray-300"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={item.esSeleccionada}
+                              onClick={() => {
+                                if (!item.esSeleccionada) {
+                                  setEditModeId(item.id)
+                                  setEditValues((prev) => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      precioUnitario: item.precioUnitario,
+                                      tiempoEntregaModo: 'stock',
+                                      tiempoEntregaValor: 0,
+                                      estado: item.estado,
+                                    },
+                                  }))
+                                }
+                              }}
+                              title={item.esSeleccionada ? 'No se puede editar una cotización seleccionada' : 'Editar cotización'}
+                              className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(item.id)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              title="Eliminar ítem"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </>
                         )}
                       </div>
-                    )}
-                  </td>
-                  <td className="p-2 text-center">
-                    {item.esSeleccionada ? (
-                      <Badge className="bg-green-600 text-white">✅ Sí</Badge>
-                    ) : (
-                      <Badge className="bg-gray-400 text-white">—</Badge>
-                    )}
-                  </td>
-                  <td className="p-2 text-center space-x-1">
-                    {isEdit ? (
-                      <>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 text-white"
-                          onClick={() => handleSave(item)}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? 'Guardando...' : <Save className="w-4 h-4" />}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleCancel(item.id)}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={item.esSeleccionada}
-                          onClick={() => {
-                            if (!item.esSeleccionada) {
-                              setEditModeId(item.id)
-                              setEditValues((prev) => ({
-                                ...prev,
-                                [item.id]: {
-                                  precioUnitario: item.precioUnitario,
-                                  tiempoEntregaModo: 'stock',
-                                  tiempoEntregaValor: 0,
-                                  estado: item.estado,
-                                },
-                              }))
-                            }
-                          }}
-                          title={item.esSeleccionada ? 'No se puede editar una cotización seleccionada' : 'Editar cotización'}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-600"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-        </tbody>
-      </table>
+                    </td>
+                  </tr>
+                )
+              })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CheckCircle, Star, TrendingUp, TrendingDown, Minus, Award } from 'lucide-react'
+import { CheckCircle, Award, DollarSign, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface QuotationItem {
@@ -105,16 +105,28 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
     }
   }
 
-  const getPriceIcon = (price: number, comparison: { min: number; max: number; avg: number }) => {
-    if (price === comparison.min) return <TrendingDown className="h-4 w-4 text-green-600" />
-    if (price === comparison.max) return <TrendingUp className="h-4 w-4 text-red-600" />
-    return <Minus className="h-4 w-4 text-yellow-600" />
+  const getBestPriceIcon = (quotation: QuotationItem, allQuotations: QuotationItem[]) => {
+    if (!quotation.precioUnitario) return null
+
+    const validPrices = allQuotations
+      .filter(q => q.precioUnitario && q.precioUnitario > 0)
+      .map(q => q.precioUnitario!)
+
+    const minPrice = Math.min(...validPrices)
+    return quotation.precioUnitario === minPrice ?
+      <span title="Mejor precio"><DollarSign className="h-4 w-4 text-green-600 ml-1" /></span> : null
   }
 
-  const getDeliveryIcon = (days: number, comparison: { min: number; max: number; avg: number }) => {
-    if (days === comparison.min) return <TrendingDown className="h-4 w-4 text-green-600" />
-    if (days === comparison.max) return <TrendingUp className="h-4 w-4 text-red-600" />
-    return <Minus className="h-4 w-4 text-yellow-600" />
+  const getBestDeliveryIcon = (quotation: QuotationItem, allQuotations: QuotationItem[]) => {
+    if (!quotation.tiempoEntregaDias) return null
+
+    const validTimes = allQuotations
+      .filter(q => q.tiempoEntregaDias && q.tiempoEntregaDias > 0)
+      .map(q => q.tiempoEntregaDias!)
+
+    const minTime = Math.min(...validTimes)
+    return quotation.tiempoEntregaDias === minTime ?
+      <span title="Mejor tiempo de entrega"><Clock className="h-4 w-4 text-blue-600 ml-1" /></span> : null
   }
 
   const handleWinnerSelection = (itemId: string, winnerId: string | null) => {
@@ -128,26 +140,6 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
     onWinnerSelected(itemId, winnerId || '')
   }
 
-  const getRecommendation = (quotations: QuotationItem[]) => {
-    if (quotations.length === 0) return null
-
-    // Simple recommendation algorithm: best price with reasonable delivery time
-    const validQuotations = quotations.filter(q =>
-      q.precioUnitario && q.precioUnitario > 0 && q.tiempoEntregaDias && q.tiempoEntregaDias > 0
-    )
-
-    if (validQuotations.length === 0) return null
-
-    // Score each quotation: 70% price, 30% delivery time
-    const scored = validQuotations.map(q => {
-      const priceScore = 1 / q.precioUnitario! // Lower price = higher score
-      const timeScore = 1 / q.tiempoEntregaDias! // Shorter time = higher score
-      const totalScore = (priceScore * 0.7) + (timeScore * 0.3)
-      return { ...q, score: totalScore }
-    })
-
-    return scored.sort((a, b) => b.score - a.score)[0].id
-  }
 
   if (loading) {
     return (
@@ -195,7 +187,6 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
             {comparisonData.map((itemData) => {
               const priceComparison = getPriceComparison(itemData.quotations)
               const deliveryComparison = getDeliveryTimeComparison(itemData.quotations)
-              const recommendedWinner = getRecommendation(itemData.quotations)
 
               return (
                 <div key={itemData.itemId} className="border rounded-lg p-4">
@@ -209,16 +200,9 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {recommendedWinner && (
-                        <Badge variant="outline" className="flex items-center gap-1">
-                          <Star className="h-3 w-3" />
-                          Recomendado
-                        </Badge>
-                      )}
-                      <div className="flex flex-wrap gap-2 items-center">
+                       <div className="flex flex-wrap gap-2 items-center">
                         {itemData.quotations.map((quotation) => {
                           const isSelected = itemData.selectedWinner === quotation.id
-                          const isRecommended = recommendedWinner === quotation.id
 
                           return (
                             <Button
@@ -226,11 +210,12 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                               variant={isSelected ? "default" : "outline"}
                               size="sm"
                               onClick={() => handleWinnerSelection(itemData.itemId, quotation.id)}
-                              className={`relative transition-all ${isSelected ? 'ring-2 ring-green-500 bg-green-600 hover:bg-green-700' : 'hover:bg-gray-100'} ${isRecommended ? 'border-yellow-400 shadow-sm' : ''}`}
+                              className={`relative transition-all ${isSelected ? 'ring-2 ring-green-500 bg-green-600 hover:bg-green-700' : 'hover:bg-gray-100'}`}
                             >
                               {quotation.cotizacion.proveedor.nombre}
-                              {isRecommended && <Star className="h-3 w-3 ml-1 text-yellow-500" />}
                               {isSelected && <CheckCircle className="h-3 w-3 ml-1 text-white" />}
+                              {getBestPriceIcon(quotation, itemData.quotations) && <DollarSign className="h-3 w-3 ml-1 text-green-600" />}
+                              {getBestDeliveryIcon(quotation, itemData.quotations) && <Clock className="h-3 w-3 ml-1 text-blue-600" />}
                             </Button>
                           )
                         })}
@@ -260,7 +245,6 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                     <TableBody>
                       {itemData.quotations.map((quotation) => {
                         const isWinner = itemData.selectedWinner === quotation.id
-                        const isRecommended = recommendedWinner === quotation.id
 
                         return (
                           <TableRow
@@ -269,14 +253,13 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                           >
                             <TableCell className="font-medium">
                               {quotation.cotizacion.proveedor.nombre}
-                              {isRecommended && <Star className="h-4 w-4 text-yellow-500 inline ml-1" />}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {quotation.precioUnitario ? (
                                   <>
                                     ${quotation.precioUnitario.toFixed(2)}
-                                    {priceComparison && getPriceIcon(quotation.precioUnitario, priceComparison)}
+                                    {getBestPriceIcon(quotation, itemData.quotations)}
                                   </>
                                 ) : (
                                   <span className="text-muted-foreground">-</span>
@@ -288,7 +271,7 @@ export default function QuotationComparisonTable({ listaId, onWinnerSelected }: 
                                 {quotation.tiempoEntregaDias ? (
                                   <>
                                     {quotation.tiempoEntregaDias} días
-                                    {deliveryComparison && getDeliveryIcon(quotation.tiempoEntregaDias, deliveryComparison)}
+                                    {getBestDeliveryIcon(quotation, itemData.quotations)}
                                   </>
                                 ) : (
                                   <span className="text-muted-foreground">-</span>

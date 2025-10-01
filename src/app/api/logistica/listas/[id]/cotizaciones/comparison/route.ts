@@ -32,7 +32,8 @@ export async function GET(
             descripcion: true,
             codigo: true,
             cantidad: true,
-            unidad: true
+            unidad: true,
+            cotizacionSeleccionadaId: true // Include selected winner
           }
         }
       },
@@ -51,7 +52,8 @@ export async function GET(
         acc[itemId] = {
           itemId,
           item: quotation.listaEquipoItem,
-          quotations: []
+          quotations: [],
+          selectedWinner: quotation.listaEquipoItem?.cotizacionSeleccionadaId || undefined
         }
       }
 
