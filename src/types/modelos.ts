@@ -2094,9 +2094,9 @@ export interface AuditLog {
   accion: string // 'CREAR', 'ACTUALIZAR', 'ELIMINAR', 'CAMBIAR_ESTADO', etc.
   usuarioId: string // Usuario que realizó la acción
   descripcion: string // Descripción legible de la acción
-  cambios?: string // JSON con { campo: { anterior: valor, nuevo: valor } }
-  metadata?: string // JSON con información adicional del contexto
-  createdAt: string
+  cambios: string | null // JSON con { campo: { anterior: valor, nuevo: valor } }
+  metadata: string | null // JSON con información adicional del contexto
+  createdAt: Date
 
   // Relación con usuario
   usuario: {

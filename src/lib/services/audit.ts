@@ -194,7 +194,13 @@ export async function obtenerHistorialEntidad(
     limite?: number;
     pagina?: number;
   }
-) {
+): Promise<{
+  data: AuditLog[];
+  pagina: number;
+  totalPaginas: number;
+  total: number;
+  limite: number;
+}> {
   try {
     const { prisma } = await import('@/lib/prisma');
 
@@ -264,7 +270,7 @@ export async function obtenerHistorialEntidad(
 export async function obtenerActividadReciente(
   limite: number = 20,
   usuarioId?: string
-) {
+): Promise<AuditLog[]> {
   try {
     const { prisma } = await import('@/lib/prisma');
 
