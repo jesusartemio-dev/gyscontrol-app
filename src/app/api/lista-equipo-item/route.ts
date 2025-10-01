@@ -219,7 +219,7 @@ export async function POST(request: Request) {
 
     // 🔄 Paso 2: Actualizar listaEquipoSeleccionadoId en ProyectoEquipoItem si aplica
     if (body.proyectoEquipoItemId) {
-      await prisma.proyectoEquipoItem.update({
+      await prisma.proyectoEquipoCotizadoItem.update({
         where: { id: body.proyectoEquipoItemId },
         data: {
           listaEquipoSeleccionadoId: nuevo.id,

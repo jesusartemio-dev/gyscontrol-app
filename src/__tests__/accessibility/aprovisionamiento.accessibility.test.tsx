@@ -12,18 +12,21 @@ import { jest } from '@jest/globals';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider } from 'next-auth/react';
 
-// ✅ Components to test
-import AprovisionamientoPage from '@/app/(finanzas)/finanzas/aprovisionamiento/page';
-import ProyectosPage from '@/app/(finanzas)/finanzas/aprovisionamiento/proyectos/page';
-import ListasPage from '@/app/(finanzas)/finanzas/aprovisionamiento/listas/page';
-import PedidosPage from '@/app/(finanzas)/finanzas/aprovisionamiento/pedidos/page';
-import TimelinePage from '@/app/(finanzas)/finanzas/aprovisionamiento/timeline/page';
+// ✅ Components to test - Fixed import paths
+import AprovisionamientoPage from '@/app/finanzas/aprovisionamiento/page';
+import ProyectosPage from '@/app/finanzas/aprovisionamiento/proyectos/page';
+import ListasPage from '@/app/finanzas/aprovisionamiento/listas/page';
+import PedidosPage from '@/app/finanzas/aprovisionamiento/pedidos/page';
+import TimelinePage from '@/app/finanzas/aprovisionamiento/timeline/page';
 
 // 🔁 Components
 import { ProyectoAprovisionamientoTable } from '@/components/finanzas/aprovisionamiento/ProyectoAprovisionamientoTable';
 import { ProyectoAprovisionamientoFilters } from '@/components/finanzas/aprovisionamiento/ProyectoAprovisionamientoFilters';
 import { GanttChart } from '@/components/finanzas/aprovisionamiento/GanttChart';
 import { ProyectoCoherenciaIndicator } from '@/components/finanzas/aprovisionamiento/ProyectoCoherenciaIndicator';
+
+// 📊 Types
+import type { ProyectoAprovisionamiento, GanttItem } from '@/types/aprovisionamiento';
 
 // 📡 Mock services
 jest.mock('@/lib/services/aprovisionamiento');
@@ -40,18 +43,18 @@ jest.mock('next/navigation', () => ({
 // 🧮 Extend Jest matchers
 expect.extend(toHaveNoViolations);
 
-// 📊 Mock data
+// 📊 Mock data - Fixed types
 const mockSession = {
   user: {
     id: 'user-1',
     email: 'test@example.com',
     name: 'Test User',
-    role: 'Admin'
+    role: 'Admin' as const
   },
   expires: '2024-12-31'
 };
 
-const mockProyectos = [
+const mockProyectos: ProyectoAprovisionamiento[] = [
   {
     id: 'proyecto-1',
     nombre: 'Proyecto Alpha',
@@ -59,49 +62,68 @@ const mockProyectos = [
     fechaInicio: new Date('2024-01-01'),
     fechaFin: new Date('2024-12-31'),
     totalInterno: 100000,
+    totalCliente: 120000,
     totalReal: 75000,
-    estado: 'activo',
-    comercial: { id: '1', nombre: 'Juan Pérez' },
-    gestor: { id: '2', nombre: 'María García' },
-    cliente: { id: '1', nombre: 'Cliente Alpha' },
-    _count: { listaEquipos: 3, pedidos: 5 }
+    estado: 'en_ejecucion',
+    comercialNombre: 'Juan Pérez',
+    gestorNombre: 'María García',
+    clienteNombre: 'Cliente Alpha',
+    totalListas: 3,
+    totalPedidos: 5,
+    montoTotalListas: 15000,
+    montoTotalPedidos: 12000,
+    coherenciaEstado: 'ok',
+    porcentajeEjecucion: 75
   }
 ];
 
-const mockListas = [
-  {
-    id: 'lista-1',
-    codigo: 'LST-001',
-    proyectoId: 'proyecto-1',
-    fechaNecesaria: new Date('2024-06-15'),
-    estado: 'aprobado',
-    proyecto: mockProyectos[0],
-    items: [
-      {
-        id: 'item-1',
-        cantidad: 10,
-        precioElegido: 500,
-        tiempoEntregaDias: 30,
-        descripcion: 'Bomba centrífuga'
-      }
-    ],
-    pedidos: []
-  }
-];
-
-const mockGanttData = {
-  ganttData: [
+const mockTimelineData = {
+  items: [
     {
       id: 'lista-1',
-      nombre: 'LST-001',
+      label: 'LST-001',
+      titulo: 'Lista de Equipos Alpha',
+      tipo: 'lista' as const,
+      start: new Date('2024-05-15'),
+      end: new Date('2024-06-15'),
       fechaInicio: new Date('2024-05-15'),
       fechaFin: new Date('2024-06-15'),
-      montoProyectado: 5000,
-      criticidad: 'media',
-      progreso: 60
+      amount: 5000,
+      estado: 'aprobado',
+      progress: 60,
+      progreso: 60,
+      coherencia: 85
     }
   ],
-  fechasCriticas: []
+  resumen: {
+    totalItems: 1,
+    montoTotal: 5000,
+    itemsVencidos: 0,
+    itemsEnRiesgo: 0,
+    itemsConAlertas: 0,
+    porcentajeCompletado: 60,
+    coherenciaPromedio: 85,
+    distribucionPorTipo: {
+      listas: 1,
+      pedidos: 0
+    },
+    alertasPorPrioridad: {
+      alta: 0,
+      media: 0,
+      baja: 0
+    }
+  }
+};
+
+const mockCoherenciaIndicator = {
+  estado: 'ok' as const,
+  mensaje: 'Proyecto coherente',
+  porcentaje: 85,
+  desviacionMonto: 0,
+  montoLista: 10000,
+  montoPedidos: 10000,
+  detalles: ['Sin desviaciones significativas'],
+  proyectoId: 'proyecto-1'
 };
 
 // 📊 Test wrapper with accessibility considerations
@@ -202,7 +224,7 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('Dashboard page should be accessible', async () => {
       const { container } = render(
         <AccessibleTestWrapper>
-          <AprovisionamientoPage />
+          <AprovisionamientoPage searchParams={Promise.resolve({})} />
         </AccessibleTestWrapper>
       );
 
@@ -221,7 +243,7 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('Projects page should be accessible', async () => {
       const { container } = render(
         <AccessibleTestWrapper>
-          <ProyectosPage />
+          <ProyectosPage searchParams={Promise.resolve({})} />
         </AccessibleTestWrapper>
       );
 
@@ -267,7 +289,7 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('Timeline page should be accessible', async () => {
       const { container } = render(
         <AccessibleTestWrapper>
-          <TimelinePage />
+          <TimelinePage searchParams={Promise.resolve({})} />
         </AccessibleTestWrapper>
       );
 
@@ -283,12 +305,12 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('ProyectoAprovisionamientoTable should be accessible', async () => {
       const { container } = render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoTable 
+          <ProyectoAprovisionamientoTable
             proyectos={mockProyectos}
             loading={false}
-            onEdit={jest.fn()}
-            onView={jest.fn()}
-            onDelete={jest.fn()}
+            onProyectoClick={jest.fn()}
+            onVerListas={jest.fn()}
+            onVerPedidos={jest.fn()}
           />
         </AccessibleTestWrapper>
       );
@@ -313,8 +335,9 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('ProyectoAprovisionamientoFilters should be accessible', async () => {
       const { container } = render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoFilters 
-            onFiltersChange={jest.fn()}
+          <ProyectoAprovisionamientoFilters
+            filtros={{}}
+            onFiltrosChange={jest.fn()}
             loading={false}
           />
         </AccessibleTestWrapper>
@@ -340,10 +363,8 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('GanttChart should be accessible', async () => {
       const { container } = render(
         <AccessibleTestWrapper>
-          <GanttChart 
-            data={mockGanttData.ganttData}
-            fechasCriticas={mockGanttData.fechasCriticas}
-            tipo="listas"
+          <GanttChart
+            data={mockTimelineData}
           />
         </AccessibleTestWrapper>
       );
@@ -367,10 +388,8 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('ProyectoCoherenciaIndicator should be accessible', async () => {
       const { container } = render(
         <AccessibleTestWrapper>
-          <ProyectoCoherenciaIndicator 
-            coherencia={85}
-            alertas={2}
-            proyectoId="proyecto-1"
+          <ProyectoCoherenciaIndicator
+            coherencia={mockCoherenciaIndicator}
           />
         </AccessibleTestWrapper>
       );
@@ -395,12 +414,12 @@ describe('Accessibility: Aprovisionamiento Module', () => {
       
       render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoTable 
+          <ProyectoAprovisionamientoTable
             proyectos={mockProyectos}
             loading={false}
-            onEdit={jest.fn()}
-            onView={jest.fn()}
-            onDelete={jest.fn()}
+            onProyectoClick={jest.fn()}
+            onVerListas={jest.fn()}
+            onVerPedidos={jest.fn()}
           />
         </AccessibleTestWrapper>
       );
@@ -426,8 +445,9 @@ describe('Accessibility: Aprovisionamiento Module', () => {
       
       render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoFilters 
-            onFiltersChange={jest.fn()}
+          <ProyectoAprovisionamientoFilters
+            filtros={{}}
+            onFiltrosChange={jest.fn()}
             loading={false}
           />
         </AccessibleTestWrapper>
@@ -452,10 +472,8 @@ describe('Accessibility: Aprovisionamiento Module', () => {
       
       render(
         <AccessibleTestWrapper>
-          <GanttChart 
-            data={mockGanttData.ganttData}
-            fechasCriticas={mockGanttData.fechasCriticas}
-            tipo="listas"
+          <GanttChart
+            data={mockTimelineData}
           />
         </AccessibleTestWrapper>
       );
@@ -474,12 +492,12 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('should provide proper ARIA labels for data tables', () => {
       render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoTable 
+          <ProyectoAprovisionamientoTable
             proyectos={mockProyectos}
             loading={false}
-            onEdit={jest.fn()}
-            onView={jest.fn()}
-            onDelete={jest.fn()}
+            onProyectoClick={jest.fn()}
+            onVerListas={jest.fn()}
+            onVerPedidos={jest.fn()}
           />
         </AccessibleTestWrapper>
       );
@@ -502,12 +520,12 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('should provide status announcements for dynamic content', async () => {
       const { rerender } = render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoTable 
+          <ProyectoAprovisionamientoTable
             proyectos={[]}
             loading={true}
-            onEdit={jest.fn()}
-            onView={jest.fn()}
-            onDelete={jest.fn()}
+            onProyectoClick={jest.fn()}
+            onVerListas={jest.fn()}
+            onVerPedidos={jest.fn()}
           />
         </AccessibleTestWrapper>
       );
@@ -518,12 +536,12 @@ describe('Accessibility: Aprovisionamiento Module', () => {
       // 🔍 Check loaded state announcement
       rerender(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoTable 
+          <ProyectoAprovisionamientoTable
             proyectos={mockProyectos}
             loading={false}
-            onEdit={jest.fn()}
-            onView={jest.fn()}
-            onDelete={jest.fn()}
+            onProyectoClick={jest.fn()}
+            onVerListas={jest.fn()}
+            onVerPedidos={jest.fn()}
           />
         </AccessibleTestWrapper>
       );
@@ -534,8 +552,9 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('should provide proper form field descriptions', () => {
       render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoFilters 
-            onFiltersChange={jest.fn()}
+          <ProyectoAprovisionamientoFilters
+            filtros={{}}
+            onFiltrosChange={jest.fn()}
             loading={false}
           />
         </AccessibleTestWrapper>
@@ -556,10 +575,8 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('should not rely solely on color for information', () => {
       render(
         <AccessibleTestWrapper>
-          <ProyectoCoherenciaIndicator 
-            coherencia={85}
-            alertas={2}
-            proyectoId="proyecto-1"
+          <ProyectoCoherenciaIndicator
+            coherencia={mockCoherenciaIndicator}
           />
         </AccessibleTestWrapper>
       );
@@ -578,7 +595,7 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('should have sufficient color contrast', async () => {
       const { container } = render(
         <AccessibleTestWrapper>
-          <AprovisionamientoPage />
+          <AprovisionamientoPage searchParams={Promise.resolve({})} />
         </AccessibleTestWrapper>
       );
 
@@ -599,12 +616,12 @@ describe('Accessibility: Aprovisionamiento Module', () => {
       
       render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoTable 
+          <ProyectoAprovisionamientoTable
             proyectos={mockProyectos}
             loading={false}
-            onEdit={jest.fn()}
-            onView={jest.fn()}
-            onDelete={jest.fn()}
+            onProyectoClick={jest.fn()}
+            onVerListas={jest.fn()}
+            onVerPedidos={jest.fn()}
           />
         </AccessibleTestWrapper>
       );
@@ -629,12 +646,12 @@ describe('Accessibility: Aprovisionamiento Module', () => {
       
       render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoTable 
+          <ProyectoAprovisionamientoTable
             proyectos={mockProyectos}
             loading={false}
-            onEdit={jest.fn()}
-            onView={jest.fn()}
-            onDelete={jest.fn()}
+            onProyectoClick={jest.fn()}
+            onVerListas={jest.fn()}
+            onVerPedidos={jest.fn()}
           />
         </AccessibleTestWrapper>
       );
@@ -657,8 +674,9 @@ describe('Accessibility: Aprovisionamiento Module', () => {
     test('should announce errors to screen readers', async () => {
       render(
         <AccessibleTestWrapper>
-          <ProyectoAprovisionamientoFilters 
-            onFiltersChange={jest.fn()}
+          <ProyectoAprovisionamientoFilters
+            filtros={{}}
+            onFiltrosChange={jest.fn()}
             loading={false}
           />
         </AccessibleTestWrapper>
@@ -687,7 +705,7 @@ describe('Accessibility: Aprovisionamiento Module', () => {
       
       render(
         <AccessibleTestWrapper>
-          <AprovisionamientoPage />
+          <AprovisionamientoPage searchParams={Promise.resolve({})} />
         </AccessibleTestWrapper>
       );
 

@@ -45,7 +45,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'proyectoEquipoItemId requerido' }, { status: 400 })
     }
 
-    const proyectoItem = await prisma.proyectoEquipoItem.findUnique({
+    const proyectoItem = await prisma.proyectoEquipoCotizadoItem.findUnique({
       where: { id: nuevo.proyectoEquipoItemId },
     })
 
@@ -84,7 +84,7 @@ export async function PATCH(
     })
 
     // 5. Actualizar ProyectoEquipoItem con el nuevo ítem
-    await prisma.proyectoEquipoItem.update({
+    await prisma.proyectoEquipoCotizadoItem.update({
       where: { id: nuevo.proyectoEquipoItemId },
       data: {
         listaEquipoSeleccionadoId: nuevoItem.id,
