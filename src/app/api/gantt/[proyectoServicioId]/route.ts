@@ -47,7 +47,7 @@ export async function GET(
     const { includeCompleted, includeCanceled, dateFrom, dateTo } = querySchema.parse(queryParams)
     
     // 🔍 Verificar que el proyecto servicio existe
-    const proyectoServicio = await prisma.proyectoServicioCotizado.findUnique({
+    const proyectoServicio = await (prisma as any).proyectoServicioCotizado.findUnique({
       where: { id: proyectoServicioId },
       select: {
         id: true,
