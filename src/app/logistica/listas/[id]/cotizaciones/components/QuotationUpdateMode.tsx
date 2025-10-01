@@ -34,6 +34,7 @@ export default function QuotationUpdateMode({ listaId }: { listaId: string }) {
           }}
           onSelectQuotation={setSelectedQuotation}
           loading={false}
+          refreshKey={refreshKey}
         />
       </div>
 

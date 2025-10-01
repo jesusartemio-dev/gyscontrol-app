@@ -41,8 +41,8 @@ export default function QuotationUpdateForm({ quotationId, onUpdate }: Quotation
   // Form state
   const [estado, setEstado] = useState('')
   const [precioUnitario, setPrecioUnitario] = useState('')
-  const [tiempoEntrega, setTiempoEntrega] = useState('')
-  const [tiempoEntregaDias, setTiempoEntregaDias] = useState('')
+  const [tiempoEntregaModo, setTiempoEntregaModo] = useState<'stock' | 'dias' | 'semanas'>('stock')
+  const [tiempoEntregaValor, setTiempoEntregaValor] = useState('')
   const [observaciones, setObservaciones] = useState('')
 
   useEffect(() => {
@@ -69,8 +69,25 @@ export default function QuotationUpdateForm({ quotationId, onUpdate }: Quotation
         // Populate form
         setEstado(data.estado || '')
         setPrecioUnitario(data.precioUnitario?.toString() || '')
-        setTiempoEntrega(data.tiempoEntrega || '')
-        setTiempoEntregaDias(data.tiempoEntregaDias?.toString() || '')
+
+        // Parse tiempoEntrega to determine mode and value
+        const tiempoEntrega = data.tiempoEntrega || ''
+        if (tiempoEntrega.toLowerCase().includes('stock')) {
+          setTiempoEntregaModo('stock')
+          setTiempoEntregaValor('')
+        } else if (tiempoEntrega.toLowerCase().includes('semanas')) {
+          setTiempoEntregaModo('semanas')
+          const match = tiempoEntrega.match(/(\d+)/)
+          setTiempoEntregaValor(match ? match[1] : '')
+        } else if (tiempoEntrega.toLowerCase().includes('días') || tiempoEntrega.toLowerCase().includes('dias')) {
+          setTiempoEntregaModo('dias')
+          const match = tiempoEntrega.match(/(\d+)/)
+          setTiempoEntregaValor(match ? match[1] : '')
+        } else {
+          setTiempoEntregaModo('stock')
+          setTiempoEntregaValor('')
+        }
+
         setObservaciones(data.observaciones || '')
       }
     } catch (error) {
@@ -85,8 +102,8 @@ export default function QuotationUpdateForm({ quotationId, onUpdate }: Quotation
     setQuotation(null)
     setEstado('')
     setPrecioUnitario('')
-    setTiempoEntrega('')
-    setTiempoEntregaDias('')
+    setTiempoEntregaModo('stock')
+    setTiempoEntregaValor('')
     setObservaciones('')
   }
 
@@ -95,11 +112,25 @@ export default function QuotationUpdateForm({ quotationId, onUpdate }: Quotation
 
     setSaving(true)
     try {
+      // Calculate tiempoEntrega and tiempoEntregaDias based on mode and value
+      let tiempoEntrega = 'Stock'
+      let tiempoEntregaDias = 0
+
+      if (tiempoEntregaModo === 'dias') {
+        const valor = parseInt(tiempoEntregaValor) || 0
+        tiempoEntregaDias = valor
+        tiempoEntrega = `${valor} días`
+      } else if (tiempoEntregaModo === 'semanas') {
+        const valor = parseInt(tiempoEntregaValor) || 0
+        tiempoEntregaDias = valor * 7
+        tiempoEntrega = `${valor} semanas`
+      }
+
       const updateData = {
         estado,
         precioUnitario: precioUnitario ? parseFloat(precioUnitario) : null,
-        tiempoEntrega: tiempoEntrega || null,
-        tiempoEntregaDias: tiempoEntregaDias ? parseInt(tiempoEntregaDias) : null,
+        tiempoEntrega,
+        tiempoEntregaDias,
         observaciones: observaciones || null
       }
 
@@ -246,26 +277,29 @@ export default function QuotationUpdateForm({ quotationId, onUpdate }: Quotation
         </div>
 
         {/* Tiempo de Entrega */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="tiempoEntrega">Tiempo de Entrega</Label>
-            <Input
-              id="tiempoEntrega"
-              value={tiempoEntrega}
-              onChange={(e) => setTiempoEntrega(e.target.value)}
-              placeholder="ej: 15 días hábiles"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="tiempoEntregaDias">Días</Label>
-            <Input
-              id="tiempoEntregaDias"
-              type="number"
-              min="0"
-              value={tiempoEntregaDias}
-              onChange={(e) => setTiempoEntregaDias(e.target.value)}
-              placeholder="15"
-            />
+        <div className="space-y-2">
+          <Label>Tiempo de Entrega</Label>
+          <div className="flex gap-2 items-center">
+            <Select value={tiempoEntregaModo} onValueChange={(value: 'stock' | 'dias' | 'semanas') => setTiempoEntregaModo(value)}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Modo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stock">Stock</SelectItem>
+                <SelectItem value="dias">Días</SelectItem>
+                <SelectItem value="semanas">Semanas</SelectItem>
+              </SelectContent>
+            </Select>
+            {(tiempoEntregaModo === 'dias' || tiempoEntregaModo === 'semanas') && (
+              <Input
+                type="number"
+                min="0"
+                value={tiempoEntregaValor}
+                onChange={(e) => setTiempoEntregaValor(e.target.value)}
+                placeholder={tiempoEntregaModo === 'dias' ? '15' : '2'}
+                className="w-24"
+              />
+            )}
           </div>
         </div>
 

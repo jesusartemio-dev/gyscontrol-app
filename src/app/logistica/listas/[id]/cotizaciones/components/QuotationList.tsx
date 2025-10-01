@@ -32,6 +32,7 @@ interface QuotationListProps {
   onSelectionChange: (ids: string[]) => void
   onSelectQuotation: (quotationId: string) => void
   loading?: boolean
+  refreshKey?: number
 }
 
 export default function QuotationList({
@@ -39,7 +40,8 @@ export default function QuotationList({
   selectedIds,
   onSelectionChange,
   onSelectQuotation,
-  loading = false
+  loading = false,
+  refreshKey
 }: QuotationListProps) {
   const [quotations, setQuotations] = useState<QuotationItem[]>([])
   const [filteredQuotations, setFilteredQuotations] = useState<QuotationItem[]>([])
@@ -48,7 +50,7 @@ export default function QuotationList({
 
   useEffect(() => {
     loadQuotations()
-  }, [listaId])
+  }, [listaId, refreshKey])
 
   useEffect(() => {
     filterQuotations()
