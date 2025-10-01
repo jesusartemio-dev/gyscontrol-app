@@ -114,7 +114,7 @@ export async function DELETE(request: Request) {
     }
 
     // Verificar que no esté asignado a ningún usuario
-    const userPermissions = await prisma.userPermission.findFirst({
+    const userPermissions = await (prisma as any).userPermission.findFirst({
       where: { permissionId: id }
     })
 
