@@ -45,17 +45,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'proyectoEquipoItemId requerido' }, { status: 400 })
     }
 
-    // TODO: Re-enable when Prisma client is updated
-    // const proyectoItem = await prisma.proyectoEquipoCotizadoItem.findUnique({
-    //   where: { id: nuevo.proyectoEquipoItemId },
-    // })
-    //
-    // if (!proyectoItem) {
-    //   return NextResponse.json({ error: 'ID de ProyectoEquipoItem no válido' }, { status: 400 })
-    // }
+    const proyectoItem = await prisma.proyectoEquipoCotizadoItem.findUnique({
+      where: { id: nuevo.proyectoEquipoItemId },
+    })
 
-    // Mock validation for now
-    const proyectoItem = { id: nuevo.proyectoEquipoItemId }
+    if (!proyectoItem) {
+      return NextResponse.json({ error: 'ID de ProyectoEquipoItem no válido' }, { status: 400 })
+    }
 
     // 3. Rechazar ítem original
     await prisma.listaEquipoItem.update({
@@ -63,7 +59,7 @@ export async function PATCH(
       data: {
         estado: 'rechazado',
         proyectoEquipoItemId: null,
-        reemplazaProyectoEquipoItemId: null,
+        reemplazaProyectoEquipoCotizadoItemId: null,
         cotizacionSeleccionadaId: null,
       },
     })
@@ -83,22 +79,21 @@ export async function PATCH(
         verificado: false,
         cotizacionSeleccionadaId: nuevo.cotizacionSeleccionadaId || undefined,
         proyectoEquipoItemId: nuevo.proyectoEquipoItemId,
-        reemplazaProyectoEquipoItemId: original.proyectoEquipoItemId || undefined, // ✅ nuevo campo correcto
+        reemplazaProyectoEquipoCotizadoItemId: original.proyectoEquipoItemId || undefined, // ✅ nuevo campo correcto
       },
     })
 
-    // 5. Actualizar ProyectoEquipoItem con el nuevo ítem (temporalmente deshabilitado)
-    // TODO: Re-enable when Prisma client is updated
-    // await prisma.proyectoEquipoCotizadoItem.update({
-    //   where: { id: nuevo.proyectoEquipoItemId },
-    //   data: {
-    //     listaEquipoSeleccionadoId: nuevoItem.id,
-    //     estado: 'en_lista',
-    //     cantidadReal: nuevo.cantidad,
-    //     precioReal: nuevo.precioElegido ?? undefined,
-    //     costoReal: (nuevo.cantidad ?? 0) * (nuevo.precioElegido ?? 0),
-    //   },
-    // })
+    // 5. Actualizar ProyectoEquipoItem con el nuevo ítem
+    await prisma.proyectoEquipoCotizadoItem.update({
+      where: { id: nuevo.proyectoEquipoItemId },
+      data: {
+        listaEquipoSeleccionadoId: nuevoItem.id,
+        estado: 'en_lista',
+        cantidadReal: nuevo.cantidad,
+        precioReal: nuevo.precioElegido ?? undefined,
+        costoReal: (nuevo.cantidad ?? 0) * (nuevo.precioElegido ?? 0),
+      },
+    })
 
     return NextResponse.json(nuevoItem)
   } catch (error) {
