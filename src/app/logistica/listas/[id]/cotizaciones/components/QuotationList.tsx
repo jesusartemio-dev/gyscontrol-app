@@ -18,6 +18,7 @@ interface QuotationItem {
   tiempoEntrega?: string
   tiempoEntregaDias?: number
   cotizacion: {
+    id: string
     proveedor: {
       nombre: string
     }
@@ -47,6 +48,7 @@ export default function QuotationList({
   const [filteredQuotations, setFilteredQuotations] = useState<QuotationItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [quotationFilter, setQuotationFilter] = useState('all')
 
   useEffect(() => {
     loadQuotations()
@@ -54,7 +56,7 @@ export default function QuotationList({
 
   useEffect(() => {
     filterQuotations()
-  }, [quotations, searchTerm, statusFilter])
+  }, [quotations, searchTerm, statusFilter, quotationFilter])
 
   const loadQuotations = async () => {
     try {
@@ -83,6 +85,11 @@ export default function QuotationList({
     // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter(q => q.estado === statusFilter)
+    }
+
+    // Filter by quotation (provider)
+    if (quotationFilter !== 'all') {
+      filtered = filtered.filter(q => q.cotizacion?.id === quotationFilter)
     }
 
     setFilteredQuotations(filtered)
@@ -188,6 +195,23 @@ export default function QuotationList({
               className="pl-10"
             />
           </div>
+          <Select value={quotationFilter} onValueChange={setQuotationFilter}>
+            <SelectTrigger className="w-48">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Todas las cotizaciones" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las cotizaciones</SelectItem>
+              {[...new Set(quotations.map(q => q.cotizacion?.id).filter(Boolean))].map(quotationId => {
+                const quotation = quotations.find(q => q.cotizacion?.id === quotationId)
+                return quotation ? (
+                  <SelectItem key={quotationId} value={quotationId!}>
+                    {quotation.cotizacion.proveedor.nombre}
+                  </SelectItem>
+                ) : null
+              })}
+            </SelectContent>
+          </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40">
               <Filter className="h-4 w-4 mr-2" />
