@@ -8,13 +8,13 @@
 // 📅 Última actualización: 2025-01-27
 // ===================================================
 
-import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@/types'
 
 export interface AnalisisCategoria {
   nombre: string
   cantidadItems: number
   porcentaje: number
-  items: ProyectoEquipoItem[]
+  items: ProyectoEquipoCotizadoItem[]
 }
 
 export interface SugerenciaLista {
@@ -69,7 +69,7 @@ const REGLAS_DISTRIBUCION = {
 }
 
 // 🎯 Función principal de análisis inteligente
-export async function analizarProyectoEquipo(proyectoEquipo: ProyectoEquipo): Promise<ResultadoAnalisis> {
+export async function analizarProyectoEquipo(proyectoEquipo: ProyectoEquipoCotizado): Promise<ResultadoAnalisis> {
   // 🔍 Debug: Información inicial
   console.log('🔍 Iniciando análisis inteligente para ProyectoEquipo:', {
     id: proyectoEquipo.id,
@@ -82,7 +82,7 @@ export async function analizarProyectoEquipo(proyectoEquipo: ProyectoEquipo): Pr
   })
 
   // Obtener datos frescos de items disponibles
-  let itemsDisponibles: ProyectoEquipoItem[] = []
+  let itemsDisponibles: ProyectoEquipoCotizadoItem[] = []
 
   try {
     console.log('🔍 Consultando API de items disponibles...')
@@ -150,7 +150,7 @@ export async function analizarProyectoEquipo(proyectoEquipo: ProyectoEquipo): Pr
   console.log('✅ Procediendo con análisis de', itemsDisponibles.length, 'items')
 
   // 1. 📊 Contar items por categoría
-  const categoriasMap = new Map<string, ProyectoEquipoItem[]>()
+  const categoriasMap = new Map<string, ProyectoEquipoCotizadoItem[]>()
 
   itemsDisponibles.forEach(item => {
     // ✅ Priorizar categoría del catálogo si está disponible
@@ -316,9 +316,9 @@ function calcularConfianzaGeneral(sugerencias: SugerenciaLista[], totalItems: nu
 }
 
 // 🎯 Función de utilidad para obtener estadísticas rápidas
-export async function obtenerEstadisticasRapidas(proyectoEquipo: ProyectoEquipo) {
+export async function obtenerEstadisticasRapidas(proyectoEquipo: ProyectoEquipoCotizado) {
   // Obtener datos frescos de items disponibles
-  let itemsDisponibles: ProyectoEquipoItem[] = []
+  let itemsDisponibles: ProyectoEquipoCotizadoItem[] = []
 
   try {
     const response = await fetch(`/api/proyecto-equipo-item/disponibles/proyecto-equipo/${proyectoEquipo.id}`)

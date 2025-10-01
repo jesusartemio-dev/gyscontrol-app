@@ -886,7 +886,7 @@ model Proyecto {
   cotizacion            Cotizacion?                @relation(fields: [cotizacionId], references: [id])
   gestor                User                       @relation("GestorProyecto", fields: [gestorId], references: [id])
   equipos               ProyectoEquipoCotizado[]
-  gastos                ProyectoCotizadoGasto[]
+  gastos                ProyectoGastoCotizado[]
   servicios             ProyectoServicioCotizado[]
   registrosHoras        RegistroHoras[]
   valorizaciones        Valorizacion[]
@@ -1242,7 +1242,7 @@ model ProyectoServicioCotizadoItem {
   proyectoServicio   ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id])
 }
 
-model ProyectoCotizadoGasto {
+model ProyectoGastoCotizado {
   id              String                      @id @default(cuid())
   proyectoId      String
   nombre          String
@@ -1270,7 +1270,7 @@ model ProyectoGastoCotizadoItem {
   costoReal       Float                 @default(0)
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
-  gasto           ProyectoCotizadoGasto @relation(fields: [gastoId], references: [id])
+  gasto           ProyectoGastoCotizado @relation(fields: [gastoId], references: [id])
 }
 
 model ListaEquipo {
@@ -1329,7 +1329,7 @@ model ListaEquipoItem {
   createdAt                     DateTime                     @default(now())
   updatedAt                     DateTime                     @updatedAt
   origen                        OrigenListaItem              @default(nuevo)
-  reemplazaProyectoEquipoItemId String?
+  reemplazaProyectoEquipoCotizadoItemId String?
   tiempoEntrega                 String?
   tiempoEntregaDias             Int?
   responsableId                 String
@@ -1339,7 +1339,7 @@ model ListaEquipoItem {
   proveedor                     Proveedor?                   @relation(fields: [proveedorId], references: [id])
   proyectoEquipo                ProyectoEquipoCotizado?      @relation(fields: [proyectoEquipoId], references: [id])
   proyectoEquipoItem            ProyectoEquipoCotizadoItem?  @relation(fields: [proyectoEquipoItemId], references: [id])
-  reemplazaProyectoEquipoItem   ProyectoEquipoCotizadoItem?  @relation("ReemplazoCotizado", fields: [reemplazaProyectoEquipoItemId], references: [id])
+  reemplazaProyectoEquipoCotizadoItem   ProyectoEquipoCotizadoItem?  @relation("ReemplazoCotizado", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
   responsable                   User                         @relation(fields: [responsableId], references: [id])
   pedidos                       PedidoEquipoItem[]
   listaSeleccionadaDe           ProyectoEquipoCotizadoItem[] @relation("ListaSeleccionada")

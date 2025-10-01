@@ -10,7 +10,7 @@ Renombrar los siguientes modelos para mayor claridad semántica:
 - `ProyectoEquipoItem` → `ProyectoEquipoCotizadoItem`
 - `ProyectoServicio` → `ProyectoServicioCotizado`
 - `ProyectoServicioItem` → `ProyectoServicioCotizadoItem`
-- `ProyectoGasto` → `ProyectoCotizadoGasto`
+- `ProyectoGasto` → `ProyectoGastoCotizado`
 - `ProyectoGastoItem` → `ProyectoGastoCotizadoItem`
 
 ### ✅ Garantías

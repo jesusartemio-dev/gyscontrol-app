@@ -266,8 +266,8 @@ export interface User {
   proyectosComercial: Proyecto[]
   proyectosGestor: Proyecto[]
   cotizaciones: Cotizacion[]
-  ProyectoEquipos: ProyectoEquipoCotizado[]
-  ProyectoEquipoItems: ProyectoEquipoCotizadoItem[]
+  ProyectoEquiposCotizados: ProyectoEquipoCotizado[]
+  ProyectoEquipoCotizadoItems: ProyectoEquipoCotizadoItem[]
   ProyectoServicios: ProyectoServicioCotizado[]
   ProyectoServicioItems: ProyectoServicioCotizadoItem[]
 }
@@ -879,9 +879,9 @@ export interface Proyecto {
   gestor: User
   cotizacion?: Cotizacion
 
-  equipos: ProyectoEquipoCotizado[]
+  equiposCotizados: ProyectoEquipoCotizado[]
   servicios: ProyectoServicioCotizado[]
-  gastos: ProyectoCotizadoGasto[]
+  gastosCotizados: ProyectoGastoCotizado[]
   ListaEquipo: ListaEquipo[]
   cotizaciones: CotizacionProveedor[]
   valorizaciones: Valorizacion[]
@@ -999,7 +999,7 @@ export interface ProyectoServicioCotizadoItem {
   catalogoServicio?: CatalogoServicio
 }
 
-export interface ProyectoCotizadoGasto {
+export interface ProyectoGastoCotizado {
   id: string
   proyectoId: string
 
@@ -1032,7 +1032,7 @@ export interface ProyectoGastoCotizadoItem {
   createdAt: string
   updatedAt: string
 
-  gasto: ProyectoCotizadoGasto
+  gasto: ProyectoGastoCotizado
 }
 
 // ============================
