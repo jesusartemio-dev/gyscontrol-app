@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     for (const batch of batches) {
-      await prisma.analyticsEvent.createMany({
+      await (prisma as any).analyticsEvent.createMany({
         data: batch.map(event => ({
           event: event.event,
           category: event.category,
@@ -66,14 +66,14 @@ export async function GET(request: NextRequest) {
     if (category) where.category = category
     if (event) where.event = event
 
-    const events = await prisma.analyticsEvent.findMany({
+    const events = await (prisma as any).analyticsEvent.findMany({
       where,
       orderBy: { timestamp: 'desc' },
       take: Math.min(limit, 1000), // Max 1000 records
       skip: offset
     })
 
-    const total = await prisma.analyticsEvent.count({ where })
+    const total = await (prisma as any).analyticsEvent.count({ where })
 
     return NextResponse.json({
       events,
