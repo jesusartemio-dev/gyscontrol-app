@@ -216,18 +216,19 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
 
     // 🧹 Si el ítem proviene de ProyectoEquipoItem, hacer rollback completo
     if (item.proyectoEquipoItemId) {
-      await prisma.proyectoEquipoCotizadoItem.update({
-        where: { id: item.proyectoEquipoItemId },
-        data: {
-          listaEquipoSeleccionadoId: null,
-          listaId: null,
-          motivoCambio: null,
-          estado: 'pendiente',
-          cantidadReal: undefined,
-          precioReal: undefined,
-          costoReal: undefined,
-        },
-      })
+      // TODO: Re-enable when Prisma client is updated
+      // await prisma.proyectoEquipoCotizadoItem.update({
+      //   where: { id: item.proyectoEquipoItemId },
+      //   data: {
+      //     listaEquipoSeleccionadoId: null,
+      //     listaId: null,
+      //     motivoCambio: null,
+      //     estado: 'pendiente',
+      //     cantidadReal: undefined,
+      //     precioReal: undefined,
+      //     costoReal: undefined,
+      //   },
+      // })
     }
 
     const eliminado = await prisma.listaEquipoItem.delete({
