@@ -65,7 +65,7 @@ import { useToast } from '@/hooks/use-toast'
 
 import { ProyectoGanttChart } from '@/components/proyectos/cronograma/ProyectoGanttChart'
 
-import type { ProyectoServicio, User } from '@/types/modelos'
+import type { ProyectoServicioCotizado, User } from '@/types/modelos'
 import type { GanttChartPayload, GanttMetricsPayload } from '@/types/payloads'
 import { getGanttData, exportarDatosGantt, generarReporteProgreso } from '@/lib/services/gantt'
 
@@ -89,7 +89,7 @@ interface GanttFilters {
 
 const GanttPage: React.FC = () => {
   // 🔄 Estados del componente
-  const [proyectosServicios, setProyectosServicios] = useState<ProyectoServicio[]>([])
+  const [proyectosServicios, setProyectosServicios] = useState<ProyectoServicioCotizado[]>([])
   const [usuarios, setUsuarios] = useState<User[]>([])
   const [selectedProyectoServicio, setSelectedProyectoServicio] = useState<string>('')
   const [ganttData, setGanttData] = useState<GanttChartPayload | null>(null)
@@ -131,7 +131,7 @@ const GanttPage: React.FC = () => {
       
       // Mock data por ahora
       const usuariosData: User[] = []
-      const proyectosData: ProyectoServicio[] = []
+      const proyectosData: ProyectoServicioCotizado[] = []
       
       setUsuarios(usuariosData)
       setProyectosServicios(proyectosData)
