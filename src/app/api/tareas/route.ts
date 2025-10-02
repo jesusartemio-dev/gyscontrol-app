@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
     const validatedData = createTareaSchema.parse(body)
     
     // 🔍 Verificar que el proyecto servicio existe
-    const proyectoServicio = await prisma.proyectoServicio.findUnique({
+    const proyectoServicio = await prisma.proyectoServicioCotizado.findUnique({
       where: { id: validatedData.proyectoServicioId },
       select: { id: true }
     })
