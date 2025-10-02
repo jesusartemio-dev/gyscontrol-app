@@ -20,7 +20,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Search, Filter, Edit, Package, DollarSign, Hash } from 'lucide-react'
 
 interface Props {
-  equipo: ProyectoEquipoCotizado
+  equipo: ProyectoEquipoCotizado & {
+    items: ProyectoEquipoCotizadoItem[]
+  }
   onItemChange: (items: ProyectoEquipoCotizadoItem[]) => void
 }
 
