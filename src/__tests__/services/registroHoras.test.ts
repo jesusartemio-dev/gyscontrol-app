@@ -60,6 +60,8 @@ const mockRegistroHoras: RegistroHoras = {
     updatedAt: '2024-01-01T00:00:00Z',
     cliente: {
       id: 'client-001',
+      codigo: 'CLI-001',
+      numeroSecuencia: 1,
       nombre: 'Cliente Test',
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z'
@@ -69,9 +71,7 @@ const mockRegistroHoras: RegistroHoras = {
       name: 'Comercial Test',
       email: 'comercial@test.com',
       password: 'hashed',
-      role: 'Comercial',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
+      role: 'comercial',
       proyectosComercial: [],
       proyectosGestor: [],
       cotizaciones: [],
@@ -85,9 +85,7 @@ const mockRegistroHoras: RegistroHoras = {
       name: 'Gestor Test',
       email: 'gestor@test.com',
       password: 'hashed',
-      role: 'Gestor',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
+      role: 'gestor',
       proyectosComercial: [],
       proyectosGestor: [],
       cotizaciones: [],
@@ -102,12 +100,14 @@ const mockRegistroHoras: RegistroHoras = {
     ListaEquipo: [],
     cotizaciones: [],
     valorizaciones: [],
-    registrosHoras: []
+    registrosHoras: [],
+    cronogramas: []
   },
   proyectoServicio: {
     id: 'ps-001',
     proyectoId: 'proj-001',
     responsableId: 'user-001',
+    nombre: 'Servicio de Instalación',
     categoria: 'Instalación',
     subtotalInterno: 5000,
     subtotalCliente: 6000,
@@ -120,9 +120,7 @@ const mockRegistroHoras: RegistroHoras = {
       name: 'Técnico Test',
       email: 'tecnico@test.com',
       password: 'hashed',
-      role: 'Colaborador',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
+      role: 'colaborador',
       proyectosComercial: [],
       proyectosGestor: [],
       cotizaciones: [],
@@ -458,7 +456,8 @@ describe('RegistroHoras Service', () => {
       const result = await createRegistroHoras(zeroHoursPayload)
 
       // 🔍 Assert
-      expect(result.horasTrabajadas).toBe(0)
+      expect(result).not.toBeNull()
+      expect(result!.horasTrabajadas).toBe(0)
     })
   })
 })
