@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ProyectoEquipoItem, EstadoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizadoItem, EstadoEquipoItem } from '@/types'
 import { getProyectoEquipoItems } from '@/lib/services/proyectoEquipoItem'
 
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ interface Props {
   proyectoId: string
   filtroEquipoId?: string
   modoRevision?: boolean
-  onUpdated?: (item: ProyectoEquipoItem) => void
+  onUpdated?: (item: ProyectoEquipoCotizadoItem) => void
 }
 
 const coloresEstado: Record<EstadoEquipoItem, string> = {
@@ -22,7 +22,7 @@ const coloresEstado: Record<EstadoEquipoItem, string> = {
 }
 
 export default function ProyectoEquipoItemList({ proyectoId, filtroEquipoId, modoRevision }: Props) {
-  const [items, setItems] = useState<ProyectoEquipoItem[]>([])
+  const [items, setItems] = useState<ProyectoEquipoCotizadoItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
