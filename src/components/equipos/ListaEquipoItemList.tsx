@@ -849,7 +849,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                      <td className={`${cellPadding} ${columnWidths.acciones} text-center`}>
                       <div className="flex justify-end gap-1 items-center">
                         {(item.estado !== 'rechazado') && (item.origen === 'cotizado' || item.origen === 'reemplazo') && (
-                          !item.reemplazaProyectoEquipoItemId ? (
+                          !item.reemplazaProyectoEquipoCotizadoItemId ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button 
@@ -1093,7 +1093,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                       <div className="flex justify-between items-center pt-2">
                         <div className="flex gap-2">
                           {(item.estado !== 'rechazado') && (item.origen === 'cotizado' || item.origen === 'reemplazo') && (
-                            !item.reemplazaProyectoEquipoItemId ? (
+                            !item.reemplazaProyectoEquipoCotizadoItemId ? (
                               <Button 
                                 size="sm" 
                                 onClick={() => setItemReemplazoOriginal(item)} 
