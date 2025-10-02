@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         listaId: body.listaId,
         proyectoEquipoItemId: body.proyectoEquipoItemId || null,
         proyectoEquipoId: body.proyectoEquipoId || null,
-        reemplazaProyectoEquipoItemId: body.reemplazaProyectoEquipoItemId || null, // ✅ actualizado
+        reemplazaProyectoEquipoCotizadoItemId: body.reemplazaProyectoEquipoCotizadoItemId || null, // ✅ actualizado
         proveedorId: body.proveedorId || null,
         cotizacionSeleccionadaId: body.cotizacionSeleccionadaId || null,
         responsableId: session.user.id,
