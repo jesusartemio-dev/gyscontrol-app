@@ -134,7 +134,7 @@ export default function ModalReemplazarReemplazoDesdeCatalogo({
       setLoading(true)
 
       // ✅ Obtener el ProyectoEquipoItemId original (trazabilidad)
-      const proyectoEquipoItemOriginal = item.reemplazaProyectoEquipoItemId || item.proyectoEquipoItemId
+      const proyectoEquipoItemOriginal = item.reemplazaProyectoEquipoCotizadoItemId || item.proyectoEquipoItemId
       
       if (!proyectoEquipoItemOriginal) {
         throw new Error('No se pudo identificar el ProyectoEquipoItem original')
@@ -158,7 +158,7 @@ export default function ModalReemplazarReemplazoDesdeCatalogo({
         listaId,
         proyectoEquipoItemId: proyectoEquipoItemOriginal, // ✅ Referencia al ProyectoEquipoItem original
         proyectoEquipoId: item.proyectoEquipoId,
-        reemplazaProyectoEquipoItemId: proyectoEquipoItemOriginal, // ✅ Mantiene trazabilidad
+        reemplazaProyectoEquipoCotizadoItemId: proyectoEquipoItemOriginal, // ✅ Mantiene trazabilidad
         responsableId: session.user.id,
       })
 
