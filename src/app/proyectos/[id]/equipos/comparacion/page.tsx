@@ -209,7 +209,7 @@ export default function ComparacionEquiposPage() {
         const itemsDirectos = listaItems.filter(lei => lei.proyectoEquipoItemId === pei.id)
         
         // 🔁 Find replacement items (items that replace this PEI)
-        const itemsReemplazo = listaItems.filter(lei => lei.reemplazaProyectoEquipoItemId === pei.id)
+        const itemsReemplazo = listaItems.filter(lei => lei.reemplazaProyectoEquipoCotizadoItemId === pei.id)
         
         if (pei.estado === 'reemplazado') {
           // ✅ Item was replaced - show original and replacement
@@ -300,7 +300,7 @@ export default function ComparacionEquiposPage() {
     proyecto.equipos.forEach(grupo => {
       const itemsNuevos = listaItems.filter(lei => 
         !lei.proyectoEquipoItemId && 
-        !lei.reemplazaProyectoEquipoItemId &&
+        !lei.reemplazaProyectoEquipoCotizadoItemId &&
         lei.proyectoEquipoId === grupo.id
       )
       
