@@ -19,11 +19,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Search, Filter, Edit, Package, DollarSign, Hash } from 'lucide-react'
 
+type EquipoWithItems = Omit<ProyectoEquipoCotizado, 'proyecto' | 'responsable'> & {
+  items: ProyectoEquipoCotizadoItem[]
+}
+
 interface Props {
-  equipo: ProyectoEquipoCotizado & {
-    items: ProyectoEquipoCotizadoItem[]
+  equipo: {
+    id: string
+    nombre: string
+    descripcion: string | null
+    subtotalInterno: number
+    subtotalCliente: number
+    subtotalReal: number
+    createdAt: Date
+    updatedAt: Date
+    proyectoId: string
+    responsableId: string
+    items: any[]
   }
-  onItemChange: (items: ProyectoEquipoCotizadoItem[]) => void
+  onItemChange: (items: any[]) => void
 }
 
 // ✅ Función para obtener color del estado
