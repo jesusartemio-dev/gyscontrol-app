@@ -153,7 +153,7 @@ const CotizacionProveedorHistorial: React.FC<Props> = ({
                         {entry.accion.replace('_', ' ')}
                       </Badge>
                       <span className="text-sm text-gray-600">
-                        {formatDate(entry.createdAt)}
+                        {formatDate(entry.createdAt.toISOString())}
                       </span>
                     </div>
                     <p className="text-sm font-medium text-gray-900">
