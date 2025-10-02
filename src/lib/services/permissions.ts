@@ -40,7 +40,15 @@ export async function checkUserPermission(
         }
       },
       include: {
-        permission: true
+        permission: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
       }
     });
 
@@ -51,7 +59,7 @@ export async function checkUserPermission(
     if (directDeny) {
       return {
         hasPermission: false,
-        userPermission: directDeny,
+        userPermission: directDeny as any,
         reason: 'Permiso denegado explícitamente'
       };
     }
@@ -59,8 +67,8 @@ export async function checkUserPermission(
     if (directPermission) {
       return {
         hasPermission: true,
-        permission: directPermission.permission,
-        userPermission: directPermission
+        permission: directPermission.permission as any,
+        userPermission: directPermission as any
       };
     }
 
@@ -122,7 +130,15 @@ export async function getUserPermissions(userId: string): Promise<UserWithPermis
       include: {
         userPermissions: {
           include: {
-            permission: true
+            permission: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true
+              }
+            }
           }
         }
       }
@@ -163,16 +179,16 @@ export async function getUserPermissions(userId: string): Promise<UserWithPermis
         if (existingIndex >= 0) {
           effectivePermissions.splice(existingIndex, 1);
         }
-        effectivePermissions.push(userPerm.permission);
+        effectivePermissions.push(userPerm.permission as any);
       }
     }
 
     return {
       id: user.id,
-      name: user.name,
+      name: user.name || undefined,
       email: user.email,
       role: user.role,
-      userPermissions: user.userPermissions,
+      userPermissions: user.userPermissions as any,
       effectivePermissions
     };
 
@@ -239,7 +255,7 @@ export async function assignPermissionToUser(
     //   newValues: { type: payload.type }
     // });
 
-    return userPermission;
+    return userPermission as any;
 
   } catch (error) {
     console.error('Error assigning permission:', error);
@@ -315,7 +331,7 @@ export async function createPermission(
       }
     });
 
-    return permission;
+    return permission as any;
 
   } catch (error) {
     console.error('Error creating permission:', error);
@@ -347,7 +363,7 @@ export async function updatePermission(
       data: payload
     });
 
-    return updated;
+    return updated as any;
 
   } catch (error) {
     console.error('Error updating permission:', error);
