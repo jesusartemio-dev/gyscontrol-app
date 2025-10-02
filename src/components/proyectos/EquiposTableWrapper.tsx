@@ -64,10 +64,10 @@ import {
 } from '@/components/ui/pagination'
 
 // 🔧 Types
-import type { ProyectoEquipoItem, Proyecto } from '@/types'
+import type { ProyectoEquipoCotizadoItem, Proyecto } from '@/types'
 
 interface EquiposTableWrapperProps {
-  data: (ProyectoEquipoItem & { proyecto?: Proyecto })[]
+  data: (ProyectoEquipoCotizadoItem & { proyecto?: Proyecto })[]
   pagination: {
     page: number
     limit: number
