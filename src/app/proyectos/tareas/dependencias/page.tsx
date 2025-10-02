@@ -83,7 +83,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 
-import type { DependenciaTarea, Tarea, ProyectoServicio } from '@/types/modelos'
+import type { DependenciaTarea, Tarea, ProyectoServicioCotizado } from '@/types/modelos'
 import {
   getDependencias,
   createDependencia,
@@ -128,7 +128,7 @@ interface NuevaDependencia {
 
 const DependenciasPage: React.FC = () => {
   // 🔄 Estados del componente
-  const [proyectosServicios, setProyectosServicios] = useState<ProyectoServicio[]>([])
+  const [proyectosServicios, setProyectosServicios] = useState<ProyectoServicioCotizado[]>([])
   const [selectedProyectoServicio, setSelectedProyectoServicio] = useState<string>('')
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [dependencias, setDependencias] = useState<DependenciaTarea[]>([])
@@ -186,7 +186,7 @@ const DependenciasPage: React.FC = () => {
       // const proyectosData = await getProyectosServicios()
       
       // Mock data por ahora
-      const proyectosData: ProyectoServicio[] = []
+      const proyectosData: ProyectoServicioCotizado[] = []
       
       setProyectosServicios(proyectosData)
       
