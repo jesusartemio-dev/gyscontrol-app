@@ -236,7 +236,7 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
         // Convert null to undefined for compatibility with TypeScript types
         proyectoEquipoItemId: item.proyectoEquipoItemId ?? undefined,
         proyectoEquipoId: item.proyectoEquipoId ?? undefined,
-        reemplazaProyectoEquipoItemId: item.reemplazaProyectoEquipoItemId ?? undefined,
+        reemplazaProyectoEquipoCotizadoItemId: item.reemplazaProyectoEquipoCotizadoItemId ?? undefined,
         proveedorId: item.proveedorId ?? undefined,
         cotizacionSeleccionadaId: item.cotizacionSeleccionadaId ?? undefined,
         comentarioRevision: item.comentarioRevision ?? undefined,
