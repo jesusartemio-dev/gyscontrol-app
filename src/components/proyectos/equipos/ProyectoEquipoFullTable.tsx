@@ -11,7 +11,7 @@
 'use client'
 
 import React, { memo, useMemo, useState } from 'react'
-import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -20,15 +20,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from 'lucide-react'
 
 interface Props {
-  equipos: ProyectoEquipo[]
-  onItemChange: (equipoId: string, items: ProyectoEquipoItem[]) => void
+  equipos: ProyectoEquipoCotizado[]
+  onItemChange: (equipoId: string, items: ProyectoEquipoCotizadoItem[]) => void
   onUpdatedNombre: (equipoId: string, nuevoNombre: string) => void
   onDeletedGrupo: (equipoId: string) => void
-  onChange: (equipoId: string, changes: Partial<ProyectoEquipo>) => void
+  onChange: (equipoId: string, changes: Partial<ProyectoEquipoCotizado>) => void
 }
 
 // Tipo para ítem con información del grupo
-interface ItemWithGroup extends ProyectoEquipoItem {
+interface ItemWithGroup extends ProyectoEquipoCotizadoItem {
   grupoId: string
   grupoNombre: string
   grupoResponsable?: string
