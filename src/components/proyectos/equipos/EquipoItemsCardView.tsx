@@ -11,7 +11,7 @@
 'use client'
 
 import React, { memo, useMemo, useState } from 'react'
-import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -20,8 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Search, Filter, Edit, Package, DollarSign, Hash } from 'lucide-react'
 
 interface Props {
-  equipo: ProyectoEquipo
-  onItemChange: (items: ProyectoEquipoItem[]) => void
+  equipo: ProyectoEquipoCotizado
+  onItemChange: (items: ProyectoEquipoCotizadoItem[]) => void
 }
 
 // ✅ Función para obtener color del estado
