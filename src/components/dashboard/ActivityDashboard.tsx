@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import type { AuditLogEntry } from '@/lib/services/audit'
+import type { AuditLog } from '@/types/modelos'
 import { formatDistanceToNow, format } from 'date-fns'
 
 interface ActivityDashboardProps {
@@ -137,7 +137,7 @@ export default function ActivityDashboard({
   intervaloRefresh = 5,
   mostrarFiltros = true
 }: ActivityDashboardProps) {
-  const [actividad, setActividad] = useState<AuditLogEntry[]>([])
+  const [actividad, setActividad] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filtroUsuario, setFiltroUsuario] = useState<string>('')
@@ -422,8 +422,8 @@ export default function ActivityDashboard({
 
                         <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                           <Clock className="w-3 h-3" />
-                          <span title={formatDate(evento.createdAt)}>
-                            {formatRelativeTime(evento.createdAt)}
+                          <span title={formatDate(evento.createdAt.toISOString())}>
+                            {formatRelativeTime(evento.createdAt.toISOString())}
                           </span>
                         </div>
                       </div>
