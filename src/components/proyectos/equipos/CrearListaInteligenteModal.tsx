@@ -34,12 +34,12 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { analizarProyectoEquipo, obtenerEstadisticasRapidas, type ResultadoAnalisis, type SugerenciaLista } from '@/lib/services/analisisInteligente'
-import type { ProyectoEquipo } from '@/types'
+import type { ProyectoEquipoCotizado } from '@/types'
 
 interface Props {
   isOpen: boolean
   onClose: () => void
-  proyectoEquipo: ProyectoEquipo
+  proyectoEquipo: ProyectoEquipoCotizado
   proyectoId: string
   onDistribucionCompletada: (listaId: string) => void
   refreshData?: () => void // Nueva prop para refrescar datos
