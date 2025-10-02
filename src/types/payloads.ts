@@ -522,7 +522,7 @@ export interface ListaEquipoItemPayload {
   listaId: string
   proyectoEquipoItemId?: string
   proyectoEquipoId?: string
-  reemplazaProyectoEquipoItemId?: string // 🆕 Nuevo campo claro
+  reemplazaProyectoEquipoCotizadoItemId?: string // 🆕 Nuevo campo claro
   responsableId?: string // 🆕 Campo para identificar quién registra el item
 
   proveedorId?: string
