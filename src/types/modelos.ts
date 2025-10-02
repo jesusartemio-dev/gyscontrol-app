@@ -879,9 +879,9 @@ export interface Proyecto {
   gestor: User
   cotizacion?: Cotizacion
 
-  equiposCotizados: ProyectoEquipoCotizado[]
+  equipos: ProyectoEquipoCotizado[]
   servicios: ProyectoServicioCotizado[]
-  gastosCotizados: ProyectoGastoCotizado[]
+  gastos: ProyectoGastoCotizado[]
   ListaEquipo: ListaEquipo[]
   cotizaciones: CotizacionProveedor[]
   valorizaciones: Valorizacion[]
