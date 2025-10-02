@@ -41,7 +41,14 @@ export const calculateMasterStats = (items: ListaEquipoItem[]): ListaEquipoMaste
     itemsAprobados: 0,
     itemsRechazados: 0,
     costoTotal: 0,
-    costoAprobado: 0
+    costoAprobado: 0,
+    // 📦 Estadísticas de pedidos (inicializadas en 0, se calculan en otro lugar)
+    itemsConPedido: 0,
+    itemsSinPedido: 0,
+    numeroPedidos: 0,
+    pedidosCompletos: 0,
+    pedidosParciales: 0,
+    pedidosPendientes: 0
   };
 
   items.forEach(item => {
