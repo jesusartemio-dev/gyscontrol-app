@@ -78,7 +78,7 @@ export async function PUT(
       proyectoEquipoId: payload.proyectoEquipoId,
       proveedorId: payload.proveedorId,
       estado: payload.estado,
-      reemplazaProyectoEquipoItemId: payload.reemplazaProyectoEquipoItemId ?? undefined,
+      reemplazaProyectoEquipoCotizadoItemId: payload.reemplazaProyectoEquipoCotizadoItemId ?? undefined,
     }
 
     // 🧠 Si hay cotización seleccionada, copiar tiempoEntrega y tiempoEntregaDias
