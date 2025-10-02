@@ -11,15 +11,15 @@
 'use client'
 
 import React, { memo, useMemo } from 'react'
-import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@/types'
 import ProyectoEquipoAccordion from './ProyectoEquipoAccordion'
 
 interface Props {
-  equipos: ProyectoEquipo[]
-  onItemChange: (equipoId: string, items: ProyectoEquipoItem[]) => void
+  equipos: ProyectoEquipoCotizado[]
+  onItemChange: (equipoId: string, items: ProyectoEquipoCotizadoItem[]) => void
   onUpdatedNombre: (equipoId: string, nuevoNombre: string) => void
   onDeletedGrupo: (equipoId: string) => void
-  onChange: (equipoId: string, changes: Partial<ProyectoEquipo>) => void
+  onChange: (equipoId: string, changes: Partial<ProyectoEquipoCotizado>) => void
 }
 
 const ProyectoEquipoList = memo(function ProyectoEquipoList({
@@ -33,10 +33,10 @@ const ProyectoEquipoList = memo(function ProyectoEquipoList({
     <div className="space-y-4">
       {equipos.map((equipo) => {
         // 🔁 Handlers por cada equipo (evita redefinir inline en render)
-        const handleItemChange = (items: ProyectoEquipoItem[]) =>
+        const handleItemChange = (items: ProyectoEquipoCotizadoItem[]) =>
           onItemChange(equipo.id, items)
 
-        const handleEquipoChange = (changes: Partial<ProyectoEquipo>) =>
+        const handleEquipoChange = (changes: Partial<ProyectoEquipoCotizado>) =>
           onChange(equipo.id, changes)
 
         const handleNombreUpdate = (nuevoNombre: string) =>

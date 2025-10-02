@@ -12,14 +12,14 @@
 
 import React, { memo, useMemo } from 'react'
 import { useEffect, useState } from 'react'
-import type { ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizadoItem } from '@/types'
 import { Input } from '@/components/ui/input'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface Props {
-  item: ProyectoEquipoItem
-  onUpdate: (id: string, changes: Partial<ProyectoEquipoItem>) => void
+  item: ProyectoEquipoCotizadoItem
+  onUpdate: (id: string, changes: Partial<ProyectoEquipoCotizadoItem>) => void
   onDelete: (id: string) => void
 }
 
@@ -32,7 +32,7 @@ const ProyectoEquipoItemRow = memo(function ProyectoEquipoItemRow({ item, onUpda
   }, [item])
 
   // ✅ Manejar cambios en campos editables
-  const handleChange = (field: keyof ProyectoEquipoItem, value: string | number) => {
+  const handleChange = (field: keyof ProyectoEquipoCotizadoItem, value: string | number) => {
     const parsed = typeof value === 'string' ? parseFloat(value) || 0 : value
     const updated = { ...localItem, [field]: parsed }
 

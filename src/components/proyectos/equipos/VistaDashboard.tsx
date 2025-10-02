@@ -45,13 +45,13 @@ import {
   Award
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils/currency'
-import type { ProyectoEquipoItem, ListaEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizadoItem, ListaEquipoItem } from '@/types'
 
 // 🎯 Tipos para el componente
 interface ComparisonData {
   type: 'mantenido' | 'reemplazado' | 'agregado' | 'descartado' | 'no_incluido'
   category: string
-  pei: ProyectoEquipoItem | null
+  pei: ProyectoEquipoCotizadoItem | null
   lei: ListaEquipoItem | null
   grupo: string
   costoPEI: number
@@ -59,7 +59,7 @@ interface ComparisonData {
   diferencia: number
   estado: string
   trazabilidad?: {
-    original: ProyectoEquipoItem
+    original: ProyectoEquipoCotizadoItem
     reemplazo: ListaEquipoItem
     motivo: string
   }

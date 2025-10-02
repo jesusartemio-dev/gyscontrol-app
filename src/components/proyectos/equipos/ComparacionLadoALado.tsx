@@ -1,7 +1,7 @@
 'use client'
 
 // ✅ Componente de comparación lado a lado mejorado para equipos
-// 📡 Muestra diferencias detalladas entre ProyectoEquipoItem y ListaEquipoItem
+// 📡 Muestra diferencias detalladas entre ProyectoEquipoCotizadoItem y ListaEquipoItem
 // 🎯 Incluye trazabilidad, diferencias financieras y estados visuales
 
 import React, { memo, useMemo } from 'react'

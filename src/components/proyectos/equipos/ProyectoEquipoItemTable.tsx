@@ -11,17 +11,17 @@
 'use client'
 
 import React, { memo, useMemo } from 'react'
-import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@/types'
 import ProyectoEquipoItemRow from './ProyectoEquipoItemRow'
 
 interface Props {
-  equipo: ProyectoEquipo
-  onItemChange: (items: ProyectoEquipoItem[]) => void
+  equipo: ProyectoEquipoCotizado
+  onItemChange: (items: ProyectoEquipoCotizadoItem[]) => void
 }
 
 const ProyectoEquipoItemTable = memo(function ProyectoEquipoItemTable({ equipo, onItemChange }: Props) {
   // ✅ Actualizar un ítem por ID
-  const handleUpdateItem = (id: string, changes: Partial<ProyectoEquipoItem>) => {
+  const handleUpdateItem = (id: string, changes: Partial<ProyectoEquipoCotizadoItem>) => {
     const nuevosItems = equipo.items.map((item) =>
       item.id === id ? { ...item, ...changes } : item
     )
