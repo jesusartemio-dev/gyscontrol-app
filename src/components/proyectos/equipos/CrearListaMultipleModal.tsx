@@ -45,7 +45,7 @@ type ProyectoEquipoCotizadoWithItems = ProyectoEquipoCotizado & {
 interface Props {
   isOpen: boolean
   onClose: () => void
-  proyectoEquipo: ProyectoEquipoCotizadoWithItems
+  proyectoEquipo: any
   proyectoId: string
   onDistribucionCompletada: (listaId: string) => void
 }

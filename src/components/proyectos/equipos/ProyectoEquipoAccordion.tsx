@@ -22,14 +22,14 @@ import { Settings, Brain, Package, DollarSign, User, ChevronDown, ChevronRight, 
 import ProyectoEquipoItemTable from './ProyectoEquipoItemTable'
 import CrearListaMultipleModal from './CrearListaMultipleModal'
 import CrearListaInteligenteModal from './CrearListaInteligenteModal'
-import type { ProyectoEquipo, ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@/types'
 
 interface Props {
-  equipo: ProyectoEquipo
-  onItemChange: (items: ProyectoEquipoItem[]) => void
+  equipo: ProyectoEquipoCotizado
+  onItemChange: (items: ProyectoEquipoCotizadoItem[]) => void
   onUpdatedNombre: (nuevo: string) => void
   onDeletedGrupo: () => void
-  onChange: (changes: Partial<ProyectoEquipo>) => void
+  onChange: (changes: Partial<ProyectoEquipoCotizado>) => void
 }
 
 const ProyectoEquipoAccordion = memo(function ProyectoEquipoAccordion({
