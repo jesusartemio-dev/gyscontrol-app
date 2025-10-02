@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
-import { ProyectoEquipoItem } from '@/types'
+import { ProyectoEquipoCotizadoItem } from '@/types'
 import { createListaEquipoItemFromProyecto } from '@/lib/services/listaEquipoItem'
 import { getProyectoEquipoItemsDisponibles, updateProyectoEquipoItem } from '@/lib/services/proyectoEquipoItem'
 import { toast } from 'sonner'
@@ -47,7 +47,7 @@ interface Props {
 }
 
 export default function ModalAgregarItemDesdeEquipo({ isOpen, proyectoId, listaId, onClose, onSuccess, onCreated }: Props) {
-  const [items, setItems] = useState<ProyectoEquipoItem[]>([])
+  const [items, setItems] = useState<ProyectoEquipoCotizadoItem[]>([])
   
   // 🐛 Debug logger to track re-renders
   const renderCount = useRenderTracker('ModalAgregarItemDesdeEquipo', [proyectoId, listaId, items?.length])
