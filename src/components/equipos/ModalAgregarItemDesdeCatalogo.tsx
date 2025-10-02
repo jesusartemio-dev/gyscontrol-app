@@ -38,7 +38,7 @@ import {
 import type {
   CatalogoEquipo,
   CategoriaEquipo,
-  ProyectoEquipo,
+  ProyectoEquipoCotizado,
 } from '@/types'
 
 interface Props {
@@ -61,7 +61,7 @@ export default function ModalAgregarItemDesdeCatalogo({
   const { data: session } = useSession()
   const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])
   const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
-  const [secciones, setSecciones] = useState<ProyectoEquipo[]>([])
+  const [secciones, setSecciones] = useState<ProyectoEquipoCotizado[]>([])
   const [categoriaFiltro, setCategoriaFiltro] = useState('todas')
   const [search, setSearch] = useState('')
   const [seleccionados, setSeleccionados] = useState<string[]>([])
