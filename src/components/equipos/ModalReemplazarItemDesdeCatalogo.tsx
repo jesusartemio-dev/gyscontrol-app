@@ -198,7 +198,7 @@ export default function ModalReemplazarItemDesdeCatalogo({
         listaId,
         proyectoEquipoItemId: proyectoEquipoItemId,
         proyectoEquipoId: item.proyectoEquipoId,
-        reemplazaProyectoEquipoItemId: proyectoEquipoItemId,
+        reemplazaProyectoEquipoCotizadoItemId: proyectoEquipoItemId,
         responsableId: session.user.id, // ✅ Agregar responsableId
       })
 
