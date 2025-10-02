@@ -9,7 +9,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ProyectoEquipoItem } from '@/types'
+import type { ProyectoEquipoCotizadoItem } from '@/types'
 import { getProyectoEquipoItemsDisponibles } from '@/lib/services/proyectoEquipoItem'
 import {
   Dialog,
@@ -25,11 +25,11 @@ interface Props {
   proyectoId: string
   open: boolean
   onClose: () => void
-  onSelected: (items: ProyectoEquipoItem[]) => void
+  onSelected: (items: ProyectoEquipoCotizadoItem[]) => void
 }
 
 export default function ProyectoEquipoSeleccionModal({ proyectoId, open, onClose, onSelected }: Props) {
-  const [items, setItems] = useState<ProyectoEquipoItem[]>([])
+  const [items, setItems] = useState<ProyectoEquipoCotizadoItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
