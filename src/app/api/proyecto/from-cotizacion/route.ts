@@ -459,7 +459,7 @@ export async function POST(request: NextRequest) {
                   if (tareaComercial.horasEstimadas && Number(tareaComercial.horasEstimadas) > 0) {
                     try {
                       // Obtener el primer servicio de proyecto para asociar las horas
-                      const primerServicioProyecto = await prisma.proyectoServicio.findFirst({
+                      const primerServicioProyecto = await prisma.proyectoServicioCotizado.findFirst({
                         where: { proyectoId: proyecto.id }
                       })
 
