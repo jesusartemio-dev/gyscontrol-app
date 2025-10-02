@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
-import type { ProyectoEquipo } from '@/types'
+import type { ProyectoEquipoCotizado } from '@/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -21,7 +21,7 @@ interface Props {
 }
 
 export default function ProyectoEquipoList({ proyectoId, onSelect, onCreated }: Props) {
-  const [equipos, setEquipos] = useState<ProyectoEquipo[]>([])
+  const [equipos, setEquipos] = useState<ProyectoEquipoCotizado[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
