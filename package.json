@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
@@ -62,6 +62,7 @@
     "db:audit": "npm run audit:consistency && npm run type-check",
     "db:backup": "tsx scripts/extract-current-data.ts",
     "db:restore": "tsx scripts/restore-current-data.ts",
+    "postinstall": "prisma generate",
     "prepare": "husky install"
   },
   "dependencies": {
