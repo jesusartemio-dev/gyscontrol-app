@@ -73,9 +73,9 @@ export async function GET(
     })
 
     // 🔍 Verificar que el proyecto existe
-    const proyecto = await prisma.proyectoServicio.findUnique({
+    const proyecto = await prisma.proyectoServicioCotizado.findUnique({
       where: { id: proyectoId },
-      select: { 
+      select: {
         id: true,
         proyecto: {
           select: {
