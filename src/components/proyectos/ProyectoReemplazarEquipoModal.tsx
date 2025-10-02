@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { updateProyectoEquipoItem } from '@/lib/services/proyectoEquipoItem'
-import { ProyectoEquipoItem } from '@/types'
+import { ProyectoEquipoCotizadoItem } from '@/types'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 interface Props {
   open: boolean
   onClose: () => void
-  equipo: ProyectoEquipoItem
+  equipo: ProyectoEquipoCotizadoItem
   onUpdated?: () => void
 }
 
