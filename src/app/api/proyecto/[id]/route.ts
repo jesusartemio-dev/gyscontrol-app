@@ -229,7 +229,7 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
     }
 
     // Eliminar gastos del proyecto
-    const gastos = await prisma.proyectoCotizadoGasto.findMany({
+    const gastos = await prisma.proyectoGastoCotizado.findMany({
       where: { proyectoId: id },
       select: { id: true }
     })
@@ -238,7 +238,7 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
       await prisma.proyectoGastoCotizadoItem.deleteMany({
         where: { gastoId: gasto.id }
       })
-      await prisma.proyectoCotizadoGasto.delete({
+      await prisma.proyectoGastoCotizado.delete({
         where: { id: gasto.id }
       })
     }
