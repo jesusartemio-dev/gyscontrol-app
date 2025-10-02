@@ -13,7 +13,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   try {
     const { id } = await context.params
 
-    const gastos = await prisma.proyectoCotizadoGasto.findMany({
+    const gastos = await prisma.proyectoGastoCotizado.findMany({
       where: { proyectoId: id },
       include: {
         items: true,
