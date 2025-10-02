@@ -76,7 +76,7 @@ const mockRegistroHoras: RegistroHoras = {
       proyectosGestor: [],
       cotizaciones: [],
       ProyectoEquipos: [],
-      ProyectoEquipoItems: [],
+      ProyectoEquiposItems: [],
       ProyectoServicios: [],
       ProyectoServicioItems: []
     },
@@ -92,7 +92,7 @@ const mockRegistroHoras: RegistroHoras = {
       proyectosGestor: [],
       cotizaciones: [],
       ProyectoEquipos: [],
-      ProyectoEquipoItems: [],
+      ProyectoEquiposItems: [],
       ProyectoServicios: [],
       ProyectoServicioItems: []
     },
@@ -127,7 +127,7 @@ const mockRegistroHoras: RegistroHoras = {
       proyectosGestor: [],
       cotizaciones: [],
       ProyectoEquipos: [],
-      ProyectoEquipoItems: [],
+      ProyectoEquiposItems: [],
       ProyectoServicios: [],
       ProyectoServicioItems: []
     },

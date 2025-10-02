@@ -1,11 +1,11 @@
 // 📌 Ubicación: src/lib/services
-// 🔧 Descripción: Servicios para ProyectoCotizadoGasto (grupos técnicos de gastos) e ítems
+// 🔧 Descripción: Servicios para ProyectoGastoCotizado (grupos técnicos de gastos) e ítems
 // ===================================================
 
-import type { ProyectoCotizadoGasto, ProyectoGastoCotizadoItem } from '@/types'
+import type { ProyectoGastoCotizado, ProyectoGastoCotizadoItem } from '@/types'
 
 // ✅ Obtener grupos de gastos por proyecto (secciones técnicas)
-export async function getProyectoGastos(proyectoId: string): Promise<ProyectoCotizadoGasto[]> {
+export async function getProyectoGastos(proyectoId: string): Promise<ProyectoGastoCotizado[]> {
   try {
     const response = await fetch(`/api/proyecto-gasto/from-proyecto/${proyectoId}`)
     if (!response.ok) throw new Error('Error al obtener gastos del proyecto')
@@ -17,7 +17,7 @@ export async function getProyectoGastos(proyectoId: string): Promise<ProyectoCot
 }
 
 // ✅ Obtener un grupo de gasto por ID
-export async function getProyectoGastoById(gastoId: string): Promise<ProyectoCotizadoGasto | null> {
+export async function getProyectoGastoById(gastoId: string): Promise<ProyectoGastoCotizado | null> {
   try {
     const response = await fetch(`/api/proyecto-gasto/${gastoId}`)
     if (!response.ok) throw new Error('Error al obtener gasto')
@@ -45,7 +45,7 @@ export async function createProyectoGasto(data: {
   proyectoId: string
   nombre: string
   descripcion?: string
-}): Promise<ProyectoCotizadoGasto> {
+}): Promise<ProyectoGastoCotizado> {
   try {
     const response = await fetch('/api/proyecto-gasto', {
       method: 'POST',
@@ -67,7 +67,7 @@ export async function updateProyectoGasto(
     nombre: string
     descripcion: string
   }>
-): Promise<ProyectoCotizadoGasto> {
+): Promise<ProyectoGastoCotizado> {
   try {
     const response = await fetch(`/api/proyecto-gasto/${id}`, {
       method: 'PATCH',

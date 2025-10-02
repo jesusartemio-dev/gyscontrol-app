@@ -108,7 +108,7 @@ export const mockProyecto: Proyecto = {
     proyectosGestor: [],
     cotizaciones: [],
     ProyectoEquipos: [],
-    ProyectoEquipoItems: [],
+    ProyectoEquiposItems: [],
     ProyectoServicios: [],
     ProyectoServicioItems: []
   },
@@ -122,7 +122,7 @@ export const mockProyecto: Proyecto = {
     proyectosGestor: [],
     cotizaciones: [],
     ProyectoEquipos: [],
-    ProyectoEquipoItems: [],
+    ProyectoEquiposItems: [],
     ProyectoServicios: [],
     ProyectoServicioItems: []
   },

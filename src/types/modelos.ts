@@ -266,8 +266,8 @@ export interface User {
   proyectosComercial: Proyecto[]
   proyectosGestor: Proyecto[]
   cotizaciones: Cotizacion[]
-  ProyectoEquiposCotizados: ProyectoEquipoCotizado[]
-  ProyectoEquipoCotizadoItems: ProyectoEquipoCotizadoItem[]
+  ProyectoEquipos: ProyectoEquipoCotizado[]
+  ProyectoEquiposItems: ProyectoEquipoCotizadoItem[]
   ProyectoServicios: ProyectoServicioCotizado[]
   ProyectoServicioItems: ProyectoServicioCotizadoItem[]
 }
@@ -1079,7 +1079,7 @@ export interface ListaEquipoItem {
   listaId: string
   proyectoEquipoItemId?: string
   proyectoEquipoId?: string
-  reemplazaProyectoEquipoItemId?: string // 🆕 Si este item reemplaza uno cotizado
+  reemplazaProyectoEquipoCotizadoItemId?: string // 🆕 Si este item reemplaza uno cotizado
   catalogoEquipoId?: string
 
   proveedorId?: string
