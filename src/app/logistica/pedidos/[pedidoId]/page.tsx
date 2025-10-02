@@ -49,6 +49,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -85,7 +86,7 @@ import {
 // 🧩 Custom Components
 import TrazabilidadTimeline from '@/components/trazabilidad/TrazabilidadTimeline'
 import MetricasEntrega, { type MetricaEntrega, crearMetricaEntrega } from '@/components/equipos/MetricasEntrega'
-import PedidoEquipoItemList from '@/components/equipos/PedidoEquipoItemList'
+import PedidoEquipoEstadoLogistico from '@/components/equipos/PedidoEquipoEstadoLogistico'
 import type { MetricasEntregaData } from '@/types/modelos'
 
 // 🔧 Utility functions
@@ -479,10 +480,14 @@ export default function PedidoLogisticaDetailPage() {
         transition={{ duration: 0.5, delay: 0.3 }}
       >
         <Tabs defaultValue="items" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="items" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               Items ({pedido.items?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="logistics" className="flex items-center gap-2">
+              <Truck className="h-4 w-4" />
+              Logística
             </TabsTrigger>
             <TabsTrigger value="timeline" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -509,10 +514,97 @@ export default function PedidoLogisticaDetailPage() {
               </CardHeader>
               <CardContent>
                 {pedido.items && pedido.items.length > 0 ? (
-                  <PedidoEquipoItemList
-                    items={pedido.items}
-                    onUpdate={handleUpdateItem}
-                  />
+                  <div className="space-y-4">
+                    {/* Tabla de Items */}
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-900">Código</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-900">Descripción</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-900">Unidad</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-900">Cant. Pedida</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-900">Cant. Atendida</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-900">Estado</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-900">Precio Unit.</th>
+                            <th className="px-4 py-3 text-right font-semibold text-gray-900">Costo Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {pedido.items.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-medium text-gray-900">
+                                {item.codigo}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700 max-w-xs truncate" title={item.descripcion}>
+                                {item.descripcion}
+                              </td>
+                              <td className="px-4 py-3 text-center text-gray-600">
+                                {item.unidad}
+                              </td>
+                              <td className="px-4 py-3 text-center font-medium text-blue-600">
+                                {item.cantidadPedida}
+                              </td>
+                              <td className="px-4 py-3 text-center font-medium text-green-600">
+                                {item.cantidadAtendida || 0}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <Badge
+                                  variant={
+                                    item.estado === 'entregado' ? 'default' :
+                                    item.estado === 'parcial' ? 'secondary' :
+                                    item.estado === 'atendido' ? 'outline' : 'destructive'
+                                  }
+                                >
+                                  {item.estado || 'pendiente'}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-center font-medium text-green-600">
+                                {item.precioUnitario ? formatCurrency(item.precioUnitario) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-right font-medium text-green-700">
+                                {item.costoTotal ? formatCurrency(item.costoTotal) : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Resumen de Items */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Total Items</p>
+                          <p className="text-xl font-bold text-gray-900">{pedido.items.length}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Entregados</p>
+                          <p className="text-xl font-bold text-green-600">
+                            {pedido.items.filter(item => item.estado === 'entregado').length}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Parciales</p>
+                          <p className="text-xl font-bold text-yellow-600">
+                            {pedido.items.filter(item => item.estado === 'parcial').length}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Pendientes</p>
+                          <p className="text-xl font-bold text-red-600">
+                            {pedido.items.filter(item => item.estado === 'pendiente').length}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Monto Total</p>
+                          <p className="text-xl font-bold text-blue-600">
+                            {formatCurrency(pedido.items.reduce((sum, item) => sum + (item.costoTotal || 0), 0))}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="text-center py-8">
                     <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -524,6 +616,14 @@ export default function PedidoLogisticaDetailPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* 🚛 Tab de Logística */}
+          <TabsContent value="logistics" className="space-y-4">
+            <PedidoEquipoEstadoLogistico
+              pedido={pedido}
+              onUpdate={handleUpdatePedido}
+            />
           </TabsContent>
 
           {/* 📈 Tab de Timeline */}

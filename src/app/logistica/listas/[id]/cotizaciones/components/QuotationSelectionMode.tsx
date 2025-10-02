@@ -69,9 +69,27 @@ export default function QuotationSelectionMode({ listaId }: { listaId: string })
         throw new Error(errorData.error || 'Error al guardar selección')
       }
 
+      const result = await response.json()
+
+      // Show detailed feedback about what was updated
+      const { estadisticas, pedidosActualizados } = result
+
+      if (estadisticas.pedidosAfectados > 0) {
+        toast.success(
+          `Ganador seleccionado. Se actualizaron ${estadisticas.pedidosAfectados} pedidos con ${estadisticas.itemsActualizados} ítems.`,
+          {
+            description: winnerId
+              ? `Precio actualizado en pedidos existentes`
+              : `Precios removidos de pedidos existentes`,
+            duration: 5000
+          }
+        )
+      } else {
+        toast.success('Ganador seleccionado exitosamente')
+      }
+
       // Refresh stats after successful save
       loadSelectionStats()
-      toast.success('Ganador seleccionado exitosamente')
     } catch (error) {
       console.error('Error saving winner selection:', error)
       toast.error('Error al guardar la selección del ganador')

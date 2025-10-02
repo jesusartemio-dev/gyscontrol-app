@@ -23,7 +23,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 
 interface Props {
   pedidos: PedidoEquipo[];
-  proyectoId: string;
+  proyectoId?: string; // Optional: if not provided, assumes logistics context
   onEdit?: (pedido: PedidoEquipo) => void;
   onDelete?: (pedidoId: string) => void;
 }
@@ -72,6 +72,14 @@ const PedidoEquiposCardView = memo(function PedidoEquiposCardView({
 }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState<string>('todos');
+
+  // Determine navigation path based on context
+  const isLogisticsContext = !proyectoId || proyectoId === '';
+  const getDetailUrl = (pedidoId: string) => {
+    return isLogisticsContext
+      ? `/logistica/pedidos/${pedidoId}`
+      : `/proyectos/${proyectoId}/equipos/pedidos/${pedidoId}`;
+  };
 
   // ✅ Filtrar pedidos
   const filteredPedidos = useMemo(() => {
@@ -159,7 +167,7 @@ const PedidoEquiposCardView = memo(function PedidoEquiposCardView({
                         size="sm"
                         asChild
                       >
-                        <Link href={`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`}>
+                        <Link href={getDetailUrl(pedido.id)}>
                           <Eye className="h-4 w-4" />
                         </Link>
                       </Button>

@@ -33,7 +33,7 @@ import {
 
 interface Props {
   pedidos: PedidoEquipo[];
-  proyectoId: string;
+  proyectoId?: string; // Optional: if not provided, assumes logistics context
   onEdit?: (pedido: PedidoEquipo) => void;
   onDelete?: (pedidoId: string) => void;
 }
@@ -68,6 +68,13 @@ const PedidoEquiposTableView = memo(function PedidoEquiposTableView({
   onEdit,
   onDelete
 }: Props) {
+  // Determine navigation path based on context
+  const isLogisticsContext = !proyectoId || proyectoId === '';
+  const getDetailUrl = (pedidoId: string) => {
+    return isLogisticsContext
+      ? `/logistica/pedidos/${pedidoId}`
+      : `/proyectos/${proyectoId}/equipos/pedidos/${pedidoId}`;
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<string>('fechaPedido');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -105,6 +112,9 @@ const PedidoEquiposTableView = memo(function PedidoEquiposTableView({
       } else if (sortField === 'fechaPedido') {
         aValue = new Date(a.fechaPedido).getTime();
         bValue = new Date(b.fechaPedido).getTime();
+      } else if (sortField === 'fechaNecesaria') {
+        aValue = new Date(a.fechaNecesaria).getTime();
+        bValue = new Date(b.fechaNecesaria).getTime();
       }
 
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
@@ -218,6 +228,16 @@ const PedidoEquiposTableView = memo(function PedidoEquiposTableView({
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => handleSort('fechaNecesaria')}
+                    className="h-auto p-0 font-semibold hover:bg-transparent"
+                  >
+                    Fecha Necesaria {getSortIcon('fechaNecesaria', sortField, sortDirection)}
+                  </Button>
+                </TableHead>
+                <TableHead className="font-semibold">
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleSort('totalItems')}
                     className="h-auto p-0 font-semibold hover:bg-transparent"
                   >
@@ -241,7 +261,7 @@ const PedidoEquiposTableView = memo(function PedidoEquiposTableView({
             <TableBody>
               {sortedPedidos.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                     No se encontraron pedidos que coincidan con los filtros
                   </TableCell>
                 </TableRow>
@@ -270,6 +290,9 @@ const PedidoEquiposTableView = memo(function PedidoEquiposTableView({
                       <TableCell className="text-sm">
                         {formatDate(pedido.fechaPedido)}
                       </TableCell>
+                      <TableCell className="text-sm">
+                        {formatDate(pedido.fechaNecesaria)}
+                      </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center gap-1">
                           <Package className="h-4 w-4 text-gray-400" />
@@ -291,7 +314,7 @@ const PedidoEquiposTableView = memo(function PedidoEquiposTableView({
                             size="sm"
                             asChild
                           >
-                            <Link href={`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`}>
+                            <Link href={getDetailUrl(pedido.id)}>
                               <Eye className="h-4 w-4" />
                             </Link>
                           </Button>

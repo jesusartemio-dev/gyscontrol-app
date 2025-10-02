@@ -34,9 +34,70 @@ export async function PATCH(
           tiempoEntregaDias: null,
         },
       })
-
+  
+      // 🔄 Paso 3: limpiar precios en pedidos existentes que referencian este ítem
+      // Buscar todos los PedidoEquipoItem que referencian este ListaEquipoItem
+      const pedidosAfectados = await prisma.pedidoEquipoItem.findMany({
+        where: { listaEquipoItemId: id },
+        include: {
+          pedido: {
+            select: { id: true, codigo: true, proyecto: { select: { nombre: true } } }
+          }
+        }
+      })
+  
+      // Limpiar precios en cada pedido afectado (volver a 0 o null)
+      const pedidosActualizados = []
+      for (const pedidoItem of pedidosAfectados) {
+        await prisma.pedidoEquipoItem.update({
+          where: { id: pedidoItem.id },
+          data: {
+            precioUnitario: 0, // O null, dependiendo de la lógica de negocio
+            costoTotal: 0,
+            tiempoEntrega: null,
+            tiempoEntregaDias: null,
+          },
+        })
+  
+        pedidosActualizados.push({
+          pedidoId: pedidoItem.pedido.id,
+          pedidoCodigo: pedidoItem.pedido.codigo,
+          proyectoNombre: pedidoItem.pedido.proyecto.nombre,
+          itemId: pedidoItem.id,
+          precioAnterior: pedidoItem.precioUnitario,
+          precioNuevo: 0,
+          costoTotalNuevo: 0,
+          accion: 'deseleccion'
+        })
+      }
+  
+      // 📊 Paso 4: recalcular totales de pedidos afectados
+      const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoId))]
+      for (const pedidoId of pedidosIds) {
+        // Recalcular presupuestoTotal del pedido basado en sus items
+        const itemsPedido = await prisma.pedidoEquipoItem.findMany({
+          where: { pedidoId },
+          select: { costoTotal: true }
+        })
+  
+        const nuevoPresupuestoTotal = itemsPedido.reduce((sum, item) => sum + (item.costoTotal || 0), 0)
+  
+        await prisma.pedidoEquipo.update({
+          where: { id: pedidoId },
+          data: { presupuestoTotal: nuevoPresupuestoTotal }
+        })
+      }
+  
       // 🎉 Listo - deselección completada
-      return NextResponse.json(updatedItem)
+      return NextResponse.json({
+        listaItem: updatedItem,
+        pedidosActualizados: pedidosActualizados,
+        estadisticas: {
+          pedidosAfectados: pedidosIds.length,
+          itemsActualizados: pedidosActualizados.length,
+          accion: 'deseleccion'
+        }
+      })
     }
 
     // ✅ Es una selección normal - buscar la cotización seleccionada
@@ -79,8 +140,69 @@ export async function PATCH(
       },
     })
 
-    // 🎉 Listo
-    return NextResponse.json(updatedItem)
+    // 🔄 Paso 6: actualizar pedidos existentes que referencian este ítem
+    // Buscar todos los PedidoEquipoItem que referencian este ListaEquipoItem
+    const pedidosAfectados = await prisma.pedidoEquipoItem.findMany({
+      where: { listaEquipoItemId: id },
+      include: {
+        pedido: {
+          select: { id: true, codigo: true, proyecto: { select: { nombre: true } } }
+        }
+      }
+    })
+
+    // Actualizar cada pedido afectado con los nuevos precios
+    const pedidosActualizados = []
+    for (const pedidoItem of pedidosAfectados) {
+      const nuevoCostoTotal = precioUnitario * pedidoItem.cantidadPedida
+
+      await prisma.pedidoEquipoItem.update({
+        where: { id: pedidoItem.id },
+        data: {
+          precioUnitario: precioUnitario,
+          costoTotal: nuevoCostoTotal,
+          tiempoEntrega: tiempoEntrega,
+          tiempoEntregaDias: tiempoEntregaDias,
+        },
+      })
+
+      pedidosActualizados.push({
+        pedidoId: pedidoItem.pedido.id,
+        pedidoCodigo: pedidoItem.pedido.codigo,
+        proyectoNombre: pedidoItem.pedido.proyecto.nombre,
+        itemId: pedidoItem.id,
+        precioAnterior: pedidoItem.precioUnitario,
+        precioNuevo: precioUnitario,
+        costoTotalNuevo: nuevoCostoTotal
+      })
+    }
+
+    // 📊 Paso 7: recalcular totales de pedidos afectados
+    const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoId))]
+    for (const pedidoId of pedidosIds) {
+      // Recalcular presupuestoTotal del pedido basado en sus items
+      const itemsPedido = await prisma.pedidoEquipoItem.findMany({
+        where: { pedidoId },
+        select: { costoTotal: true }
+      })
+
+      const nuevoPresupuestoTotal = itemsPedido.reduce((sum, item) => sum + (item.costoTotal || 0), 0)
+
+      await prisma.pedidoEquipo.update({
+        where: { id: pedidoId },
+        data: { presupuestoTotal: nuevoPresupuestoTotal }
+      })
+    }
+
+    // 🎉 Listo - devolver información completa de la operación
+    return NextResponse.json({
+      listaItem: updatedItem,
+      pedidosActualizados: pedidosActualizados,
+      estadisticas: {
+        pedidosAfectados: pedidosIds.length,
+        itemsActualizados: pedidosActualizados.length
+      }
+    })
   } catch (error) {
     console.error('❌ Error al seleccionar cotización:', error)
     return NextResponse.json(

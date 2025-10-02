@@ -112,6 +112,18 @@ export type EstadoPedidoItem =
   | 'parcial'
   | 'entregado'
 
+// ✅ Estados logísticos optimizados para gestión de entregas
+export type EstadoPedidoLogistico =
+  | 'solicitado'                  // 📋 Pedido solicitado por área de proyectos
+  | 'oc_emitida'                  // 📄 Orden de compra emitida por logística
+  | 'en_fabricacion'              // 🏭 En proceso de fabricación
+  | 'en_transito'                 // 🚚 En tránsito (puede demorar 2-4 semanas)
+  | 'recibido_almacen'            // 📦 Recibido en almacén
+  | 'entrega_parcial'             // ⚠️ Entrega parcial (algunos items)
+  | 'listo_entrega'               // ✅ Listo para entrega final
+  | 'entregado'                   // 🎉 Entregado al proyecto
+  | 'cancelado'                   // ❌ Cancelado
+
 export enum EstadoEntregaItem {
   PENDIENTE = 'pendiente',
   EN_PROCESO = 'en_proceso',
@@ -1200,8 +1212,25 @@ export interface PedidoEquipo {
   // ✅ Coherencia financiera
   coherencia?: number                  // Porcentaje de coherencia (0-100)
 
+  // 🚛 Campos logísticos para gestión de entregas
+  estadoLogistico?: EstadoPedidoLogistico // Estado actual del proceso logístico
+  responsableLogisticoId?: string      // Responsable de logística asignado
+  fechaEnvioProveedor?: string         // Fecha de envío al proveedor
+  fechaRecepcionProveedor?: string     // Fecha de recepción del proveedor
+  fechaEnvioAlmacen?: string          // Fecha de envío a almacén
+  fechaRecepcionAlmacen?: string      // Fecha de recepción en almacén
+  fechaProgramadaEntrega?: string     // Fecha programada para entrega al proyecto
+  fechaEntregaProyecto?: string       // Fecha real de entrega al proyecto
+  fechaConfirmacionProyecto?: string  // Fecha de confirmación por proyecto
+  ubicacionActual?: string            // Ubicación actual del pedido
+  transportista?: string              // Empresa de transporte
+  numeroGuia?: string                 // Número de guía de transporte
+  costoLogistico?: number             // Costos asociados a logística
+  observacionesLogisticas?: string    // Observaciones específicas de logística
+
   responsable?: User
   lista?: ListaEquipo
+  responsableLogistico?: User         // Relación con responsable de logística
   items: PedidoEquipoItem[]
 }
 

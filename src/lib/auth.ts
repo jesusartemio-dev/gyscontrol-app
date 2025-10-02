@@ -26,8 +26,15 @@ export const authOptions: AuthOptions = {
             return null
           }
 
-          const isValid = await bcrypt.compare(credentials.password, user.password)
-          
+          // Intentar comparar con bcrypt primero
+          let isValid = false
+          try {
+            isValid = await bcrypt.compare(credentials.password, user.password)
+          } catch (error) {
+            // Si falla bcrypt, intentar comparación directa (para usuarios de prueba)
+            isValid = credentials.password === user.password
+          }
+
           if (!isValid) {
             return null
           }

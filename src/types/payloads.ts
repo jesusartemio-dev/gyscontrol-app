@@ -11,14 +11,15 @@
 // ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
 // 📅 Última actualización: 2025-04-19
 // ===================================================
-import type { 
-  TipoFormula, 
-  EstadoEquipoItem, 
-  EstadoListaItem, 
-  EstadoListaEquipo, 
-  EstadoPedido, 
-  EstadoPedidoItem, 
-  EstadoCotizacionProveedor, 
+import type {
+  TipoFormula,
+  EstadoEquipoItem,
+  EstadoListaItem,
+  EstadoListaEquipo,
+  EstadoPedido,
+  EstadoPedidoItem,
+  EstadoPedidoLogistico,
+  EstadoCotizacionProveedor,
   EstadoEntregaItem,
   OrigenListaItem,
   EstadoEdt,
@@ -620,7 +621,23 @@ export interface PedidoEquipoPayload {
 }
 
 
-export interface PedidoEquipoUpdatePayload extends Partial<PedidoEquipoPayload> {}
+export interface PedidoEquipoUpdatePayload extends Partial<PedidoEquipoPayload> {
+  // 🚛 Campos logísticos adicionales para gestión de entregas
+  estadoLogistico?: EstadoPedidoLogistico
+  responsableLogisticoId?: string
+  fechaEnvioProveedor?: string
+  fechaRecepcionProveedor?: string
+  fechaEnvioAlmacen?: string
+  fechaRecepcionAlmacen?: string
+  fechaProgramadaEntrega?: string
+  fechaEntregaProyecto?: string
+  fechaConfirmacionProyecto?: string
+  ubicacionActual?: string
+  transportista?: string
+  numeroGuia?: string
+  costoLogistico?: number
+  observacionesLogisticas?: string
+}
 
 
 export interface PedidoEquipoItemPayload {

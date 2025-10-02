@@ -40,6 +40,25 @@ async function main() {
     }
   })
 
+  // Crear usuario de prueba con contraseña simple (sin hash)
+  const testUser = await prisma.user.upsert({
+    where: { email: 'test@test.com' },
+    update: {},
+    create: {
+      email: 'test@test.com',
+      name: 'Usuario de Prueba',
+      password: 'test123', // Contraseña sin hash para testing
+      role: 'comercial'
+    }
+  })
+
+  console.log('✅ Usuario de prueba creado:', {
+    id: testUser.id,
+    email: testUser.email,
+    name: testUser.name,
+    role: testUser.role
+  })
+
   console.log('✅ Usuario comercial creado:', {
     id: comercialUser.id,
     email: comercialUser.email,
