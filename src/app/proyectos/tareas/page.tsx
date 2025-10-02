@@ -65,7 +65,7 @@ import TareaList from '@/components/proyectos/TareaList'
 import TareaForm from '@/components/proyectos/TareaForm'
 import SubtareaAccordion from '@/components/proyectos/SubtareaAccordion'
 
-import type { Tarea, User, ProyectoServicio } from '@/types/modelos'
+import type { Tarea, User, ProyectoServicioCotizado } from '@/types/modelos'
 import { getTareas } from '@/lib/services/tareas'
 
 // 📊 Métricas del dashboard
@@ -92,7 +92,7 @@ const TareasPage: React.FC = () => {
   // 🔄 Estados del componente
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [usuarios, setUsuarios] = useState<User[]>([])
-  const [proyectosServicios, setProyectosServicios] = useState<ProyectoServicio[]>([])
+  const [proyectosServicios, setProyectosServicios] = useState<ProyectoServicioCotizado[]>([])
   const [loading, setLoading] = useState(true)
   const [filtros, setFiltros] = useState<FiltrosTareas>({
     busqueda: ''
@@ -141,7 +141,7 @@ const TareasPage: React.FC = () => {
       
       // Mock data por ahora
       const usuariosData: User[] = []
-      const proyectosData: ProyectoServicio[] = []
+      const proyectosData: ProyectoServicioCotizado[] = []
       
       setUsuarios(usuariosData)
       setProyectosServicios(proyectosData)
