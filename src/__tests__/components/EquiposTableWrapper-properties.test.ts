@@ -1,13 +1,13 @@
 /**
  * Test para verificar que las propiedades usadas en EquiposTableWrapper
- * existen en la interfaz ProyectoEquipoItem
+ * existen en la interfaz ProyectoEquipoCotizadoItem
  */
 
-import type { ProyectoEquipoItem, Proyecto } from '@/types'
+import type { ProyectoEquipoCotizadoItem, Proyecto } from '@/types'
 
 describe('EquiposTableWrapper Properties Validation', () => {
   // ✅ Mock data que simula la estructura esperada
-  const mockEquipo: ProyectoEquipoItem & { proyecto?: Proyecto } = {
+  const mockEquipo: ProyectoEquipoCotizadoItem & { proyecto?: Proyecto } = {
     id: 'test-id',
     proyectoEquipoId: 'proyecto-equipo-id',
     catalogoEquipoId: 'catalogo-id',
@@ -40,41 +40,8 @@ describe('EquiposTableWrapper Properties Validation', () => {
     proyecto: {
       id: 'proyecto-id',
       nombre: 'Proyecto Test',
-      codigo: 'PROJ-001',
-      clienteId: 'cliente-id',
-      comercialId: 'comercial-id',
-      gestorId: 'gestor-id',
-      cotizacionId: 'cotizacion-id',
-      descripcion: 'Descripción del proyecto',
-      totalEquiposInterno: 1000,
-      totalEquiposCliente: 1200,
-      totalServiciosInterno: 500,
-      totalServiciosCliente: 600,
-      totalGastosInterno: 200,
-      totalGastosCliente: 240,
-      totalInterno: 1700,
-      totalCliente: 2040,
-      totalRealEquipos: 1100,
-      totalRealServicios: 550,
-      totalRealGastos: 220,
-      totalReal: 1870,
-      estado: 'activo',
-      fechaInicio: '2024-01-01',
-      fechaFin: '2024-12-31',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
-      cliente: {} as any,
-      comercial: {} as any,
-      gestor: {} as any,
-      cotizacion: undefined,
-      equipos: [],
-      servicios: [],
-      gastos: [],
-      ListaEquipo: [],
-      cotizaciones: [],
-      valorizaciones: [],
-      registrosHoras: []
-    }
+      codigo: 'PROJ-001'
+    } as any
   }
 
   test('should have all required properties for EquiposTableWrapper', () => {

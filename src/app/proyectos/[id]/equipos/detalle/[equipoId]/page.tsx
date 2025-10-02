@@ -40,7 +40,7 @@ import Link from 'next/link';
 import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@prisma/client';
 
 // Extended type that includes items relation
-type ProyectoEquipoCotizadoWithItems = ProyectoEquipoCotizado & {
+type ProyectoEquipoCotizadoWithItems = Omit<ProyectoEquipoCotizado, 'proyecto' | 'responsable'> & {
   items: ProyectoEquipoCotizadoItem[]
 }
 import EquipoItemsTableView from '@/components/proyectos/equipos/EquipoItemsTableView';

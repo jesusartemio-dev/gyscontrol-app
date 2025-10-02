@@ -1121,13 +1121,6 @@ export interface ListaEquipoItem {
     }
   }
 
-  reemplazaProyectoEquipoItem?: {
-    id: string
-    proyectoEquipo?: {
-      nombre: string
-    }
-  }
-
   proyectoEquipo?: {
     nombre: string
   }
