@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { getRecursos } from '@/lib/services/recurso'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import type { CatalogoServicio, TipoFormula } from '@/types'
 
 // UI Components
@@ -104,7 +104,7 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
         const [unidadesData, recursosData, categoriasData] = await Promise.all([
           getUnidadesServicio(),
           getRecursos(),
-          getCategoriasServicio()
+          getEdts()
         ])
         setUnidades(unidadesData)
         setRecursos(recursosData)
@@ -146,12 +146,25 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
     }
   }
 
-  const serviciosFiltrados = servicios.filter((s) =>
-    (filtroCategoria !== '__ALL__' ? s.categoriaId === filtroCategoria : true) &&
-    (filtroUnidad !== '__ALL__' ? s.unidadServicioId === filtroUnidad : true) &&
-    (filtroRecurso !== '__ALL__' ? s.recursoId === filtroRecurso : true) &&
-    (`${s.nombre} ${s.descripcion}`.toLowerCase().includes(filtroTexto.toLowerCase()))
-  )
+  const serviciosFiltrados = servicios
+    .filter((s) =>
+      (filtroCategoria !== '__ALL__' ? s.categoriaId === filtroCategoria : true) &&
+      (filtroUnidad !== '__ALL__' ? s.unidadServicioId === filtroUnidad : true) &&
+      (filtroRecurso !== '__ALL__' ? s.recursoId === filtroRecurso : true) &&
+      (`${s.nombre} ${s.descripcion}`.toLowerCase().includes(filtroTexto.toLowerCase()))
+    )
+    .sort((a, b) => {
+      // Primero ordenar por EDT (categoría)
+      const categoriaA = a.categoria?.nombre || ''
+      const categoriaB = b.categoria?.nombre || ''
+
+      if (categoriaA !== categoriaB) {
+        return categoriaA.localeCompare(categoriaB)
+      }
+
+      // Luego ordenar por orden dentro de la categoría
+      return (a.orden || 0) - (b.orden || 0)
+    })
 
   const handleSave = (id: string) => {
     const original = servicios.find(s => s.id === id)
@@ -162,17 +175,13 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
     setEditData({})
   }
 
-  const calcularHoras = (formula: TipoFormula, cantidad: number, data: Partial<CatalogoServicio>) => {
-    switch (formula) {
-      case 'Fijo':
-        return data.horaFijo ?? 0
-      case 'Proporcional':
-        return cantidad * (data.horaUnidad ?? 0)
-      case 'Escalonada':
-        return (data.horaBase ?? 0) + Math.max(0, cantidad - 1) * (data.horaRepetido ?? 0)
-      default:
-        return 0
-    }
+  const calcularHoras = (cantidad: number, data: Partial<CatalogoServicio>) => {
+    // Solo fórmula escalonada: HH = HH_base + (cantidad - 1) × HH_repetido
+    const horasBase = (data.horaBase ?? 0) + Math.max(0, cantidad - 1) * (data.horaRepetido ?? 0);
+
+    // Aplicar factor de dificultad
+    const factorDificultad = data.nivelDificultad ?? 1;
+    return horasBase * factorDificultad;
   }
 
   // Loading state
@@ -257,13 +266,13 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                 />
               </div>
               
-              {/* Filtro por Categoría */}
+              {/* Filtro por EDT */}
               <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
                 <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                  <SelectValue placeholder="Todas las categorías" />
+                  <SelectValue placeholder="Todos los EDTs" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__ALL__">Todas las categorías</SelectItem>
+                  <SelectItem value="__ALL__">Todos los EDTs</SelectItem>
                   {categorias.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.nombre}
@@ -331,29 +340,13 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
               </CardTitle>
             </div>
             <CardDescription className="text-sm text-gray-600">
-              Fórmulas utilizadas para el cálculo automático de horas
+              Cálculo automático de horas hombre con factor de dificultad
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Proporcional */}
-              <motion.div 
-                className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-blue-200"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Badge className="bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200">
-                  Proporcional
-                </Badge>
-                <div className="text-sm text-gray-700">
-                  <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                    HH = cantidad × HH_unidad
-                  </code>
-                </div>
-              </motion.div>
-              
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Escalonada */}
-              <motion.div 
+              <motion.div
                 className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-green-200"
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
@@ -367,19 +360,19 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                   </code>
                 </div>
               </motion.div>
-              
-              {/* Fijo */}
-              <motion.div 
-                className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-orange-200"
+
+              {/* Factor de Dificultad */}
+              <motion.div
+                className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-purple-200"
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.2 }}
               >
-                <Badge className="bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200">
-                  Fijo
+                <Badge className="bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200">
+                  Dificultad
                 </Badge>
                 <div className="text-sm text-gray-700">
                   <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                    HH = HH_fijo
+                    HH_total = HH_base × factor_dificultad
                   </code>
                 </div>
               </motion.div>
@@ -447,32 +440,17 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                   <TableHeader>
                     <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100">
                       <TableHead className="text-left font-semibold text-gray-700">Servicio</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Categoría</TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">EDT</TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">Orden</TableHead>
                       <TableHead className="text-center font-semibold text-gray-700">Recurso</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">
-                        <div className="flex items-center justify-center space-x-1">
-                          <DollarSign className="h-4 w-4" />
-                          <span>Hora</span>
-                        </div>
-                      </TableHead>
                       <TableHead className="text-center font-semibold text-gray-700">Unidad</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Fórmula</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Base</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Repetido</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Unidad</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Fijo</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">
-                        <div className="flex items-center justify-center space-x-1">
-                          <Clock className="h-4 w-4" />
-                          <span>Total HH</span>
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">
-                        <div className="flex items-center justify-center space-x-1">
-                          <DollarSign className="h-4 w-4" />
-                          <span>Total</span>
-                        </div>
-                      </TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">Cantidad</TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">Dificultad</TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">HH Base</TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">HH Repetido</TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">HH Total</TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">Costo/Hora</TableHead>
+                      <TableHead className="text-center font-semibold text-gray-700">Costo Total</TableHead>
                       <TableHead className="text-center font-semibold text-gray-700">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -481,7 +459,8 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
               const isEditing = editingId === item.id
               const recursoId = editData.recursoId ?? item.recursoId
               const formula = editData.formula ?? item.formula
-              const horasCalculadas = calcularHoras(formula, cantidad, { ...item, ...editData })
+              const cantidadUsar = editData.cantidad ?? item.cantidad ?? 1
+              const horasCalculadas = calcularHoras(cantidadUsar, { ...item, ...editData })
               const costoHora = recursos.find(r => r.id === recursoId)?.costoHora ?? item.recurso.costoHora
               const costoTotal = horasCalculadas * costoHora
 
@@ -492,23 +471,38 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                 >
                     {/* Nombre del Servicio */}
                     <TableCell className="text-left">
-                      <div className="space-y-1">
-                        <div className="font-medium text-gray-900">{item.nombre}</div>
-                        {item.descripcion && (
-                          <div className="text-xs text-gray-500 truncate max-w-xs" title={item.descripcion}>
-                            {item.descripcion}
-                          </div>
-                        )}
+                      <div
+                        className="font-medium text-gray-900 cursor-help"
+                        title={item.descripcion || 'Sin descripción'}
+                      >
+                        {item.nombre}
                       </div>
                     </TableCell>
-                    
-                    {/* Categoría */}
+
+                    {/* EDT */}
                     <TableCell className="text-center">
                       <Badge variant="outline" className="text-xs">
-                        {item.categoria?.nombre || 'Sin categoría'}
+                        {item.categoria?.nombre || 'Sin EDT'}
                       </Badge>
                     </TableCell>
-                    
+
+                    {/* Orden */}
+                    <TableCell className="text-center">
+                      {isEditing ? (
+                        <Input
+                          type="number"
+                          value={(editData.orden ?? item.orden) ?? 0}
+                          onChange={(e) => setEditData(d => ({ ...d, orden: parseInt(e.target.value) }))}
+                          className="w-20 text-right h-8 text-xs"
+                          min="0"
+                        />
+                      ) : (
+                        <span className="text-sm font-medium text-gray-700">
+                          {item.orden ?? 0}
+                        </span>
+                      )}
+                    </TableCell>
+
                     {/* Recurso */}
                     <TableCell className="text-center">
                       {isEditing ? (
@@ -528,17 +522,7 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                         </Badge>
                       )}
                     </TableCell>
-                    
-                    {/* Costo por Hora */}
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center space-x-1">
-                        <DollarSign className="h-3 w-3 text-green-600" />
-                        <span className="font-semibold text-green-700">
-                          {formatCurrency(costoHora)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    
+
                     {/* Unidad */}
                     <TableCell className="text-center">
                       {isEditing ? (
@@ -558,32 +542,48 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                         </Badge>
                       )}
                     </TableCell>
-                    
-                    {/* Fórmula */}
+
+                    {/* Cantidad */}
                     <TableCell className="text-center">
                       {isEditing ? (
-                        <Select value={formula} onValueChange={(v) => setEditData(d => ({ ...d, formula: v as TipoFormula }))}>
+                        <Input
+                          type="number"
+                          value={(editData.cantidad ?? item.cantidad) ?? 1}
+                          onChange={(e) => setEditData(d => ({ ...d, cantidad: parseInt(e.target.value) }))}
+                          className="w-20 text-right h-8 text-xs"
+                          min="1"
+                        />
+                      ) : (
+                        <span className="text-sm font-medium text-gray-700">
+                          {item.cantidad ?? 1}
+                        </span>
+                      )}
+                    </TableCell>
+
+                    {/* Dificultad */}
+                    <TableCell className="text-center">
+                      {isEditing ? (
+                        <Select value={(editData.nivelDificultad ?? item.nivelDificultad ?? 1).toString()} onValueChange={(v) => setEditData(d => ({ ...d, nivelDificultad: parseInt(v) }))}>
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {['Fijo', 'Proporcional', 'Escalonada'].map(f => (
-                              <SelectItem key={f} value={f}>{f}</SelectItem>
+                            {[1,2,3,4,5].map(level => (
+                              <SelectItem key={level} value={level.toString()}>
+                                Nivel {level} {level === 1 ? '(Fácil)' : level === 3 ? '(Medio)' : level === 5 ? '(Difícil)' : ''}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        <Badge 
-                          variant={getFormulaVariant(item.formula)} 
-                          className={`text-xs ${getFormulaColor(item.formula)}`}
-                        >
-                          {item.formula}
+                        <Badge variant="outline" className="text-xs">
+                          Nivel {item.nivelDificultad ?? 1}
                         </Badge>
                       )}
                     </TableCell>
-                    
-                    {/* Campos de Horas */}
-                    {(['horaBase', 'horaRepetido', 'horaUnidad', 'horaFijo'] as const).map(field => (
+
+                    {/* Campos de Horas - Solo Base y Repetido */}
+                    {(['horaBase', 'horaRepetido'] as const).map(field => (
                       <TableCell className="text-center" key={field}>
                         {isEditing ? (
                           <Input
@@ -611,15 +611,19 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                         </span>
                       </div>
                     </TableCell>
-                    
+
+                    {/* Costo por Hora */}
+                    <TableCell className="text-center">
+                      <span className="font-semibold text-green-700">
+                        {formatCurrency(costoHora)}
+                      </span>
+                    </TableCell>
+
                     {/* Costo Total */}
                     <TableCell className="text-center">
-                      <div className="flex items-center justify-center space-x-1">
-                        <DollarSign className="h-3 w-3 text-green-600" />
-                        <span className="font-semibold text-green-700">
-                          {formatCurrency(costoTotal)}
-                        </span>
-                      </div>
+                      <span className="font-semibold text-green-700">
+                        {formatCurrency(costoTotal)}
+                      </span>
                     </TableCell>
                     
                     {/* Acciones */}

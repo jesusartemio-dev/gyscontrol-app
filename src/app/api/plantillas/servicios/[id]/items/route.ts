@@ -52,17 +52,10 @@ export async function POST(
       )
     }
 
-    // Calcular horas totales basado en la fórmula
-    let horaTotal = 0
-    if (catalogoServicio.formula === 'hora_base') {
-      horaTotal = (catalogoServicio.horaBase || 0) * cantidad
-    } else if (catalogoServicio.formula === 'hora_repetido') {
-      horaTotal = (catalogoServicio.horaRepetido || 0) * cantidad
-    } else if (catalogoServicio.formula === 'hora_unidad') {
-      horaTotal = (catalogoServicio.horaUnidad || 0) * cantidad
-    } else if (catalogoServicio.formula === 'hora_fijo') {
-      horaTotal = catalogoServicio.horaFijo || 0
-    }
+    // Calcular horas totales basado en la fórmula escalonada (única fórmula ahora)
+    const horasBase = (catalogoServicio.horaBase || 0) + Math.max(0, cantidad - 1) * (catalogoServicio.horaRepetido || 0);
+    const factorDificultad = catalogoServicio.nivelDificultad || 1;
+    const horaTotal = horasBase * factorDificultad;
 
     // Calcular costos
     const costoHora = catalogoServicio.recurso.costoHora
@@ -70,7 +63,7 @@ export async function POST(
     const costoCliente = precioCliente * cantidad
 
     // Calcular factor de seguridad y margen (valores por defecto)
-    const factorSeguridad = 1.1 // 10% de seguridad
+    const factorSeguridad = 1.0 // Sin factor de seguridad adicional por defecto
     const margen = precioCliente > 0 ? (precioCliente - precioInterno) / precioInterno : 0
 
     // Crear el item
@@ -83,11 +76,11 @@ export async function POST(
         categoria: catalogoServicio.categoria.nombre,
         unidadServicioNombre: catalogoServicio.unidadServicio.nombre,
         recursoNombre: catalogoServicio.recurso.nombre,
-        formula: catalogoServicio.formula,
+        formula: 'Escalonada', // Solo fórmula escalonada ahora
         horaBase: catalogoServicio.horaBase,
         horaRepetido: catalogoServicio.horaRepetido,
-        horaUnidad: catalogoServicio.horaUnidad,
-        horaFijo: catalogoServicio.horaFijo,
+        horaUnidad: null, // Ya no se usa
+        horaFijo: null, // Ya no se usa
         costoHora,
         cantidad,
         horaTotal,
@@ -97,6 +90,7 @@ export async function POST(
         costoCliente,
         unidadServicioId,
         recursoId,
+        orden: catalogoServicio.orden || 0,
       }
     })
 

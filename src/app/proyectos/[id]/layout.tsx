@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
+import { Suspense } from 'react'
 import type { Proyecto } from '@/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -107,15 +108,30 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-
-
-        {/* Page Content */}
-        <div className="space-y-6">
-          {children}
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="max-w-7xl mx-auto p-6">
+          <div className="space-y-6">
+            <div className="animate-pulse">
+              <div className="h-16 bg-gray-200 rounded-xl mb-6"></div>
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    }>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="max-w-7xl mx-auto p-6 space-y-6">
+          {/* Page Content */}
+          <div className="space-y-6">
+            {children}
+          </div>
+        </div>
+      </div>
+    </Suspense>
   )
 }

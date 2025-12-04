@@ -34,11 +34,11 @@ export async function GET(
       )
     }
 
-    // 🎯 Complete query with all relationships for Detail view
+    // 🎯 Simplified query to avoid Prisma client cache issues
     const lista = await prisma.listaEquipo.findUnique({
       where: { id },
       include: {
-        // 🏢 Complete project information
+        // 🏢 Basic project information
         proyecto: {
           select: {
             id: true,
@@ -56,44 +56,38 @@ export async function GET(
             }
           }
         },
-        // 👤 Complete responsible information
+        // 👤 Basic responsible information
         responsable: {
           select: {
             id: true,
             name: true,
-            email: true,
-            image: true
+            email: true
           }
         },
-        // 📋 Complete items with all relationships
+        // 📋 Simplified items with basic relationships
         items: {
           include: {
-            // 👤 Responsable information
+            // 👤 Basic responsable information
             responsable: {
               select: {
                 id: true,
                 name: true,
-                email: true,
-                image: true
+                email: true
               }
             },
-            // 🏪 Proveedor information
+            // 🏪 Basic proveedor information
             proveedor: {
               select: {
                 id: true,
-                nombre: true,
-                ruc: true
+                nombre: true
               }
             },
-            // 💰 All cotizaciones with details
+            // 💰 Simplified cotizaciones
             cotizaciones: {
               select: {
                 id: true,
                 precioUnitario: true,
                 cantidad: true,
-                cantidadOriginal: true,
-                tiempoEntrega: true,
-                tiempoEntregaDias: true,
                 estado: true,
                 esSeleccionada: true,
                 createdAt: true,
@@ -101,7 +95,6 @@ export async function GET(
                   select: {
                     id: true,
                     codigo: true,
-                    createdAt: true,
                     estado: true,
                     proveedor: {
                       select: {
@@ -116,49 +109,37 @@ export async function GET(
                 precioUnitario: 'asc'
               }
             },
-            // 📦 All pedidos with complete information
+            // 📦 Simplified pedidos
             pedidos: {
               select: {
                 id: true,
                 cantidadPedida: true,
-                precioUnitario: true,
                 estado: true,
                 createdAt: true,
                 pedido: {
                   select: {
                     id: true,
                     codigo: true,
-                    fechaPedido: true,
-                    fechaEntregaEstimada: true,
                     estado: true
                   }
                 }
               }
             },
 
-            // 🏗️ Proyecto equipo relationship
+            // 🏗️ Basic proyecto equipo relationship
             proyectoEquipo: {
               select: {
                 id: true,
-                nombre: true,
-                descripcion: true
+                nombre: true
               }
             },
-            // 📋 Proyecto equipo item relationship
+            // 📋 Basic proyecto equipo item relationship
             proyectoEquipoItem: {
               include: {
                 proyectoEquipo: {
                   select: {
                     id: true,
-                    nombre: true,
-                    descripcion: true
-                  }
-                },
-                listaEquipoSeleccionado: {
-                  select: {
-                    id: true,
-                    codigo: true,
-                    descripcion: true
+                    nombre: true
                   }
                 }
               }

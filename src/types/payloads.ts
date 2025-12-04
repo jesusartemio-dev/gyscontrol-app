@@ -89,12 +89,13 @@ export interface NivelServicioPayload {
 }
 export interface NivelServicioUpdatePayload extends NivelServicioPayload {}
 
-// ✅ CategoriaServicio
-export interface CategoriaServicioPayload {
+// ✅ Edt
+export interface EdtPayload {
   nombre: string
   descripcion?: string
+  faseDefaultId?: string // 🆕 Fase por defecto para este EDT
 }
-export interface CategoriaServicioUpdatePayload extends CategoriaServicioPayload {}
+export interface EdtUpdatePayload extends EdtPayload {}
 
 // ✅ Recurso
 export interface RecursoPayload {
@@ -111,11 +112,11 @@ export interface RecursoUpdatePayload extends RecursoPayload {}
 export interface CatalogoServicioPayload {
   nombre: string
   descripcion: string
-  formula: TipoFormula
+  cantidad: number
   horaBase?: number
   horaRepetido?: number
-  horaUnidad?: number
-  horaFijo?: number
+  orden?: number
+  nivelDificultad?: number
   categoriaId: string
   unidadServicioId: string
   recursoId: string
@@ -335,13 +336,15 @@ export interface CotizacionServicioItemPayload {
   horaUnidad?: number
   horaFijo?: number
   costoHora: number
-  // Datos personalizados  
+  // Datos personalizados
   cantidad: number
   horaTotal: number
   factorSeguridad: number
   margen: number
   costoInterno: number
   costoCliente: number
+  nivelDificultad?: number
+  orden?: number
 }
 
 export interface CotizacionServicioItemUpdatePayload
@@ -531,6 +534,7 @@ export interface ListaEquipoItemPayload {
 
   codigo: string
   descripcion: string
+  categoria: string // ✅ Campo agregado para consistencia con otras entidades
   unidad: string
   cantidad: number
 

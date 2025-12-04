@@ -1,6 +1,7 @@
 // src/components/ui/DeleteAlertDialog.tsx
 "use client"
 
+import React from "react"
 import { Trash2 } from "lucide-react"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -9,7 +10,7 @@ import { useState } from "react"
 interface Props {
   onConfirm: () => void
   title?: string
-  description?: string
+  description?: string | React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
@@ -39,7 +40,11 @@ export function DeleteAlertDialog({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
-            <p className="text-sm text-muted-foreground">{description}</p>
+            {typeof description === 'string' ? (
+              <p className="text-sm text-muted-foreground">{description}</p>
+            ) : (
+              description
+            )}
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
@@ -61,7 +66,11 @@ export function DeleteAlertDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          {typeof description === 'string' ? (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          ) : (
+            description
+          )}
         </DialogHeader>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>

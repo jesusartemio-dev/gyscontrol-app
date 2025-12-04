@@ -38,32 +38,28 @@ export default function CotizacionServicioItemAddModal({
   servicio,
   onAgregarItems,
 }: Props) {
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
-  const [categoriaId, setCategoriaId] = useState('')
   const [catalogo, setCatalogo] = useState<CatalogoServicio[]>([])
   const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    // Find the category ID that matches the servicio's categoria
     getCategoriasServicio()
       .then((cats) => {
-        setCategorias(cats)
-        if (cats.length > 0) setCategoriaId(cats[0].id)
+        const categoriaEncontrada = cats.find(c => c.nombre === servicio.categoria)
+        if (categoriaEncontrada) {
+          return getCatalogoServiciosByCategoriaId(categoriaEncontrada.id)
+        } else {
+          throw new Error('Categoría no encontrada')
+        }
       })
-      .catch(() => toast.error('Error al cargar categorías'))
-  }, [])
-
-  useEffect(() => {
-    if (categoriaId) {
-      getCatalogoServiciosByCategoriaId(categoriaId)
-        .then((res) => {
-          const idsExistentes = new Set(servicio.items.map(i => i.catalogoServicioId))
-          const filtrado = res.filter(s => !idsExistentes.has(s.id))
-          setCatalogo(filtrado)
-        })
-        .catch(() => toast.error('Error al cargar servicios'))
-    }
-  }, [categoriaId, servicio.items])
+      .then((res) => {
+        const idsExistentes = new Set(servicio.items.map(i => i.catalogoServicioId))
+        const filtrado = res.filter(s => !idsExistentes.has(s.id))
+        setCatalogo(filtrado)
+      })
+      .catch(() => toast.error('Error al cargar servicios de la categoría'))
+  }, [servicio.categoria, servicio.items])
 
   const handleToggle = (id: string) => {
     setSeleccionados(prev => ({
@@ -134,24 +130,14 @@ export default function CotizacionServicioItemAddModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl z-50">
         <DialogHeader>
-          <DialogTitle>➕ Agregar Servicios desde Catálogo</DialogTitle>
+          <DialogTitle>➕ Agregar Servicios - {servicio.categoria}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-            <Select value={categoriaId} onValueChange={setCategoriaId}>
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Seleccionar" />
-              </SelectTrigger>
-              <SelectContent>
-                {categorias.map(c => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              Agregando servicios de la categoría: <strong>{servicio.categoria}</strong>
+            </p>
           </div>
 
           <div className="max-h-[300px] overflow-y-auto border rounded">

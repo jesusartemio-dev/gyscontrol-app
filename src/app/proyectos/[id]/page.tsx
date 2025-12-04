@@ -8,10 +8,10 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
-import type { Proyecto } from '@/types'
+import type { Proyecto, ProyectoCronograma } from '@/types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -44,20 +44,128 @@ export default function ProyectoDetallePage() {
   const { id } = useParams()
   const router = useRouter()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
+  const [cronogramas, setCronogramas] = useState<ProyectoCronograma[]>([])
+  const [cronogramaStats, setCronogramaStats] = useState({
+    cronogramas: 0,
+    fases: 0,
+    edts: 0,
+    tareas: 0,
+    activeCronograma: null as any
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
-    getProyectoById(id as string)
-      .then((data) => {
-        if (!data) {
+
+    const fetchData = async () => {
+      try {
+        // Fetch project data
+        const proyectoData = await getProyectoById(id as string)
+        if (!proyectoData) {
           toast.error('❌ No se encontró el proyecto')
           return
         }
-        setProyecto(data)
-      })
-      .catch(() => toast.error('❌ Error al obtener el proyecto'))
-      .finally(() => setLoading(false))
+        setProyecto(proyectoData)
+
+        // Fetch cronograma data
+        try {
+          const cronogramaResponse = await fetch(`/api/proyectos/${id}/cronograma`)
+          if (cronogramaResponse.ok) {
+            const cronogramaData = await cronogramaResponse.json()
+            if (cronogramaData.success) {
+              setCronogramas(cronogramaData.data)
+            }
+          }
+
+          // Fetch fases, edts, and tareas counts
+          const [fasesResponse, edtsResponse, tareasResponse] = await Promise.all([
+            fetch(`/api/proyectos/${id}/cronograma/fases`),
+            fetch(`/api/proyectos/${id}/cronograma/edts`),
+            fetch(`/api/proyectos/${id}/cronograma/tareas`)
+          ])
+
+          let fasesCount = 0
+          let edtsCount = 0
+          let tareasCount = 0
+
+          if (fasesResponse.ok) {
+            const fasesData = await fasesResponse.json()
+            if (fasesData.success) {
+              fasesCount = fasesData.data.length
+            }
+          }
+
+          if (edtsResponse.ok) {
+            const edtsData = await edtsResponse.json()
+            if (edtsData.success) {
+              edtsCount = edtsData.data.length
+            }
+          }
+
+          if (tareasResponse.ok) {
+            const tareasData = await tareasResponse.json()
+            if (tareasData.success) {
+              tareasCount = tareasData.data.length
+            }
+          }
+
+          // ✅ Si no hay cronograma comercial, crear uno automáticamente con EDTs y actividades
+          if (cronogramas.length === 0) {
+            console.log('🔄 [PROYECTO PAGE] No hay cronogramas, creando cronograma comercial por defecto')
+            try {
+              const createResponse = await fetch(`/api/proyectos/${id}/cronograma/generar-desde-cotizacion`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  tipo: 'comercial',
+                  nombre: 'Cronograma Comercial',
+                  esBaseline: false
+                })
+              })
+
+              if (createResponse.ok) {
+                const newCronograma = await createResponse.json()
+                console.log('✅ [PROYECTO PAGE] Cronograma comercial creado con EDTs y actividades:', newCronograma.data)
+                // Recargar cronogramas
+                const updatedCronogramaResponse = await fetch(`/api/proyectos/${id}/cronograma`)
+                if (updatedCronogramaResponse.ok) {
+                  const updatedData = await updatedCronogramaResponse.json()
+                  if (updatedData.success) {
+                    setCronogramas(updatedData.data)
+                  }
+                }
+              } else {
+                console.warn('⚠️ [PROYECTO PAGE] Error creando cronograma comercial por defecto')
+              }
+            } catch (createError) {
+              console.warn('⚠️ [PROYECTO PAGE] Error creando cronograma comercial:', createError)
+            }
+          }
+
+          // Find active/baseline cronograma
+          const activeCronograma = cronogramas.find(c => c.esBaseline) || cronogramas[0] || null
+
+          setCronogramaStats({
+            cronogramas: cronogramas.length,
+            fases: fasesCount,
+            edts: edtsCount,
+            tareas: tareasCount,
+            activeCronograma
+          })
+        } catch (cronogramaError) {
+          console.warn('Error fetching cronograma data:', cronogramaError)
+          // Don't show error for cronograma, just continue without it
+        }
+      } catch (error) {
+        toast.error('❌ Error al obtener el proyecto')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
   }, [id])
 
   // Helper functions
@@ -219,6 +327,18 @@ export default function ProyectoDetallePage() {
     const pedidosCantidades = (proyecto as any).pedidos?.reduce((sum: number, pedido: any) =>
       sum + (pedido.items?.reduce((itemSum: number, item: any) => itemSum + (item.cantidadPedida || 0), 0) || 0), 0) || 0
 
+    // Calculate cronograma statistics from nested cronogramas
+    const cronogramas = (proyecto as any).cronogramas || []
+    const baselineCronograma = cronogramas.find((c: any) => c.esBaseline) || cronogramas[0]
+
+    let edtsCount = 0
+    let fasesCount = 0
+
+    if (baselineCronograma) {
+      edtsCount = baselineCronograma.edts?.length || 0
+      fasesCount = baselineCronograma.fases?.length || 0
+    }
+
     const totalItems = equiposItems + serviciosItems + gastosItems
 
     return {
@@ -227,6 +347,7 @@ export default function ProyectoDetallePage() {
       gastos: { count: gastosCount, items: gastosItems },
       listas: { count: listasCount, items: listasItems, cantidades: listasCantidades },
       pedidos: { count: pedidosCount, items: pedidosItems, cantidades: pedidosCantidades },
+      cronograma: { edts: edtsCount, fases: fasesCount },
       totalItems,
       totalCost: proyecto.grandTotal || 0,
       daysElapsed: Math.round(((new Date().getTime() - new Date(proyecto.fechaInicio).getTime()) / (1000 * 60 * 60 * 24)))
@@ -394,27 +515,59 @@ export default function ProyectoDetallePage() {
               <CardTitle className="flex items-center justify-between text-lg">
                 <div className="flex items-center gap-2">
                   <Target className="h-6 w-6 text-slate-600" />
-                  Cronograma
+                  Cronograma 5 Niveles
                 </div>
                 <ArrowRight className="h-5 w-5 text-slate-600" />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-700 font-medium">EDTs Activos</span>
-                <span className="text-2xl font-bold text-slate-900">
-                  {(proyecto as any).edts?.length || 0}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-700 font-medium">Fases del Proyecto</span>
-                <span className="text-lg font-semibold text-slate-800">
-                  {(proyecto as any).fases?.length || 0}
-                </span>
+              {cronogramaStats.activeCronograma && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-blue-900">Cronograma Activo</span>
+                  </div>
+                  <div className="text-sm text-blue-800">
+                    <div className="font-medium">{cronogramaStats.activeCronograma.nombre}</div>
+                    <div className="text-xs text-blue-600 capitalize">
+                      Tipo: {cronogramaStats.activeCronograma.tipo}
+                      {cronogramaStats.activeCronograma.esBaseline && (
+                        <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Baseline</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-700 font-medium">Cronogramas</span>
+                  <span className="text-xl font-bold text-slate-900">
+                    {cronogramaStats.cronogramas}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-700 font-medium">Fases</span>
+                  <span className="text-lg font-semibold text-slate-800">
+                    {cronogramaStats.fases}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-700 font-medium">EDTs</span>
+                  <span className="text-lg font-semibold text-slate-800">
+                    {cronogramaStats.edts}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-700 font-medium">Tareas</span>
+                  <span className="text-lg font-semibold text-slate-800">
+                    {cronogramaStats.tareas}
+                  </span>
+                </div>
               </div>
               <div className="pt-2 border-t border-slate-200">
                 <p className="text-xs text-slate-600">
-                  Gestiona EDTs, fases y cronograma del proyecto
+                  Gestiona cronogramas, fases, EDTs, actividades y tareas del proyecto
                 </p>
               </div>
             </CardContent>

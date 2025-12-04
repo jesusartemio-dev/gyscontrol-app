@@ -108,28 +108,21 @@ function CronogramaSkeleton() {
 
 // ✅ Componente principal de la página
 export default async function CronogramaPage({ params }: CronogramaPageProps) {
-  console.log('🔍 [CRONOGRAMA] Iniciando carga de página de cronograma');
-
   const { id } = await params;
-  console.log('🔍 [CRONOGRAMA] ID del proyecto:', id);
 
   // ✅ Validar que el ID sea válido
   if (!id || typeof id !== 'string') {
-    console.log('❌ [CRONOGRAMA] ID inválido, redirigiendo a 404');
     notFound();
   }
 
   // ✅ Obtener información básica del proyecto para el breadcrumb
   let proyecto: Proyecto | null = null;
   try {
-    console.log('🔍 [CRONOGRAMA] Obteniendo proyecto por ID...');
     proyecto = await prisma.proyecto.findUnique({
       where: { id },
       select: { id: true, nombre: true, estado: true, fechaFin: true, totalReal: true, totalInterno: true }
     }) as Proyecto | null;
-    console.log('✅ [CRONOGRAMA] Proyecto obtenido:', proyecto?.nombre);
     if (!proyecto) {
-      console.log('❌ [CRONOGRAMA] Proyecto no encontrado');
       // Redirect to 404 page instead of using notFound()
       return (
         <div className="container mx-auto px-4 py-6 space-y-6">
@@ -144,7 +137,7 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
       );
     }
   } catch (error) {
-    console.error('❌ [CRONOGRAMA] Error al cargar proyecto:', error);
+    console.error('Error al cargar proyecto:', error);
     return (
       <div className="container mx-auto px-4 py-6 space-y-6">
         <div className="text-center py-12">
@@ -158,7 +151,6 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
     );
   }
 
-  console.log('✅ [CRONOGRAMA] Proyecto cargado exitosamente, renderizando componente');
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">

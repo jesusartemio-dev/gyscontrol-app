@@ -18,11 +18,12 @@ export async function PATCH(
   try {
     const { id, itemId } = await params
     const data = await req.json()
-    const { cantidad } = data
+    const { cantidad, factorSeguridad } = data
 
-    if (!cantidad || cantidad <= 0) {
+    // Validar que al menos uno de los campos a actualizar esté presente
+    if ((cantidad !== undefined && cantidad <= 0) || (factorSeguridad !== undefined && factorSeguridad < 1)) {
       return NextResponse.json(
-        { error: 'Cantidad inválida' },
+        { error: cantidad !== undefined && cantidad <= 0 ? 'Cantidad inválida' : 'Factor de seguridad debe ser >= 1' },
         { status: 400 }
       )
     }
@@ -42,30 +43,48 @@ export async function PATCH(
       )
     }
 
-    // Calcular nuevas horas totales basado en la fórmula
-    const { calcularHoras } = await import('@/lib/utils/formulas')
-    const horaTotal = calcularHoras({
-      formula: item.formula as 'Fijo' | 'Proporcional' | 'Escalonada',
-      cantidad,
-      horaBase: item.horaBase || undefined,
-      horaRepetido: item.horaRepetido || undefined,
-      horaUnidad: item.horaUnidad || undefined,
-      horaFijo: item.horaFijo || undefined
-    })
+    // Obtener el nivel de dificultad del catálogo de servicios
+    const catalogoServicio = await prisma.catalogoServicio.findUnique({
+      where: { id: item.catalogoServicioId || '' },
+      select: { nivelDificultad: true }
+    });
+
+    // Calcular horas totales - solo si se está actualizando cantidad
+    let horaTotal = item.horaTotal; // Mantener el valor actual por defecto
+
+    if (cantidad !== undefined) {
+      // Calcular nuevas horas totales basado en la fórmula escalonada simplificada
+      const horasBase = (item.horaBase || 0) + Math.max(0, cantidad - 1) * (item.horaRepetido || 0);
+      const factorDificultad = catalogoServicio?.nivelDificultad || 1;
+      horaTotal = horasBase * factorDificultad;
+    }
 
     // Recalcular costos
-    const costoInterno = +(horaTotal * item.costoHora * item.factorSeguridad).toFixed(2)
+    const costoInterno = +(horaTotal * item.costoHora).toFixed(2)
     const costoCliente = +(costoInterno * (1 + item.margen)).toFixed(2)
+
+    // Preparar datos de actualización
+    const updateData: any = {
+      horaTotal,
+      costoInterno,
+      costoCliente
+    }
+
+    if (cantidad !== undefined) {
+      updateData.cantidad = cantidad
+    }
+
+    if (factorSeguridad !== undefined) {
+      updateData.factorSeguridad = factorSeguridad
+      // Recalcular costos con el nuevo factor de seguridad
+      updateData.costoInterno = +(horaTotal * item.costoHora * factorSeguridad).toFixed(2)
+      updateData.costoCliente = +(updateData.costoInterno * (1 + item.margen)).toFixed(2)
+    }
 
     // Actualizar el item
     const updatedItem = await prisma.plantillaServicioItemIndependiente.update({
       where: { id: itemId },
-      data: {
-        cantidad,
-        horaTotal,
-        costoInterno,
-        costoCliente
-      }
+      data: updateData
     })
 
     // Recalcular totales de la plantilla
@@ -114,6 +133,9 @@ export async function DELETE(
       where: {
         id: itemId,
         plantillaServicioId: id
+      },
+      include: {
+        catalogoServicio: true
       }
     })
 

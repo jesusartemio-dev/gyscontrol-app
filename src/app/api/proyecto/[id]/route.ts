@@ -20,29 +20,11 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         cliente: true,
         comercial: true,
         gestor: true,
-        cotizacion: true,
-        equipos: {
-          include: {
-            items: {
-              include: {
-                lista: true, // ✅ Incluye la lista para mostrar item.lista?.nombre
-                listaEquipoSeleccionado: true
-              },
-            },
-          },
-        },
-        servicios: { include: { items: true } },
-        gastos: { include: { items: true } },
-        listaEquipos: {
-          include: {
-            items: true
-          }
-        },
-        pedidos: {
-          include: {
-            items: true
-          }
-        },
+        equipos: true, // ✅ Para contar equipos cotizados
+        servicios: true, // ✅ Para contar servicios
+        gastos: true, // ✅ Para contar gastos
+        listaEquipos: true, // ✅ Para mostrar listas y contar items
+        pedidos: true // ✅ Para contar pedidos
       },
     })
 
@@ -83,11 +65,7 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
     // ✅ Verificar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
       where: { id },
-      select: {
-        id: true,
-        nombre: true,
-        estado: true,
-        // Verificar si tiene relaciones que podrían impedir la eliminación
+      include: {
         listaEquipos: { select: { id: true, estado: true } },
         pedidos: { select: { id: true, estado: true } },
         equipos: { select: { id: true } },

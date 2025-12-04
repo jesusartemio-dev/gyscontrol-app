@@ -88,24 +88,27 @@ export function ProyectoCronogramaMetrics({
     }
   }
 
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(1)}%`
+  const formatPercentage = (value: number | undefined | null) => {
+    const numValue = value ?? 0;
+    return `${numValue.toFixed(1)}%`;
   }
 
-  const formatHours = (hours: number | string) => {
-    const numHours = typeof hours === 'string' ? parseFloat(hours) : hours
-    return `${numHours.toFixed(1)}h`
+  const formatHours = (hours: number | string | undefined | null) => {
+    const numHours = typeof hours === 'string' ? parseFloat(hours) : (hours ?? 0);
+    return `${numHours.toFixed(1)}h`;
   }
 
-  const getEfficiencyColor = (efficiency: number) => {
-    if (efficiency >= 100) return 'text-green-600'
-    if (efficiency >= 80) return 'text-yellow-600'
+  const getEfficiencyColor = (efficiency: number | undefined | null) => {
+    const eff = efficiency ?? 0;
+    if (eff >= 100) return 'text-green-600'
+    if (eff >= 80) return 'text-yellow-600'
     return 'text-red-600'
   }
 
-  const getProgressColor = (progress: number) => {
-    if (progress >= 90) return 'text-green-600'
-    if (progress >= 70) return 'text-yellow-600'
+  const getProgressColor = (progress: number | undefined | null) => {
+    const prog = progress ?? 0;
+    if (prog >= 90) return 'text-green-600'
+    if (prog >= 70) return 'text-yellow-600'
     return 'text-red-600'
   }
 
@@ -191,7 +194,7 @@ export function ProyectoCronogramaMetrics({
               <Activity className="h-8 w-8 text-green-600" />
             </div>
             <div className="mt-4">
-              <Progress value={metricas.promedioAvance} className="h-2" />
+              <Progress value={metricas.promedioAvance ?? 0} className="h-2" />
             </div>
           </CardContent>
         </Card>
@@ -206,7 +209,7 @@ export function ProyectoCronogramaMetrics({
                   {formatPercentage(metricas.eficienciaGeneral)}
                 </p>
               </div>
-              {metricas.eficienciaGeneral >= 100 ? (
+              {(metricas.eficienciaGeneral ?? 0) >= 100 ? (
                 <TrendingUp className="h-8 w-8 text-green-600" />
               ) : (
                 <TrendingDown className="h-8 w-8 text-red-600" />
@@ -310,7 +313,7 @@ export function ProyectoCronogramaMetrics({
                   {formatPercentage(metricas.eficienciaGeneral)}
                 </span>
               </div>
-              <Progress value={Math.min(metricas.eficienciaGeneral, 100)} className="h-2" />
+              <Progress value={Math.min(metricas.eficienciaGeneral ?? 0, 100)} className="h-2" />
             </div>
           </CardContent>
         </Card>
@@ -326,7 +329,7 @@ export function ProyectoCronogramaMetrics({
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {metricas.edtsRetrasados > 0 && (
+            {(metricas.edtsRetrasados ?? 0) > 0 && (
               <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
                 <div>
@@ -340,7 +343,7 @@ export function ProyectoCronogramaMetrics({
               </div>
             )}
 
-            {metricas.eficienciaGeneral < 80 && (
+            {(metricas.eficienciaGeneral ?? 0) < 80 && (
               <div className="flex items-start gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <TrendingDown className="h-5 w-5 text-yellow-600 mt-0.5" />
                 <div>
@@ -355,7 +358,7 @@ export function ProyectoCronogramaMetrics({
               </div>
             )}
 
-            {metricas.cumplimientoFechas < 90 && (
+            {(metricas.cumplimientoFechas ?? 0) < 90 && (
               <div className="flex items-start gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
                 <Calendar className="h-5 w-5 text-orange-600 mt-0.5" />
                 <div>
@@ -370,7 +373,7 @@ export function ProyectoCronogramaMetrics({
               </div>
             )}
 
-            {metricas.promedioAvance >= 90 && metricas.eficienciaGeneral >= 95 && (
+            {(metricas.promedioAvance ?? 0) >= 90 && (metricas.eficienciaGeneral ?? 0) >= 95 && (
               <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
                 <div>

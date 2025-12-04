@@ -25,7 +25,8 @@ import {
   PlayCircle,
   CheckCircle,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ProyectoCronograma } from '@/types/modelos'
@@ -67,8 +68,6 @@ export function ProyectoCronogramaSelector({
   onCronogramaChange,
   onCronogramaCreate
 }: ProyectoCronogramaSelectorProps) {
-  console.log('🔍 [CRONOGRAMA SELECTOR] Iniciando componente ProyectoCronogramaSelector', { proyectoId })
-
   const [cronogramas, setCronogramas] = useState<ProyectoCronograma[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -79,7 +78,6 @@ export function ProyectoCronogramaSelector({
   })
 
   useEffect(() => {
-    console.log('🔄 [CRONOGRAMA SELECTOR] Ejecutando useEffect para cargar cronogramas')
     loadCronogramas()
   }, [proyectoId])
 
@@ -88,7 +86,6 @@ export function ProyectoCronogramaSelector({
     if (cronogramas.length > 0 && !selectedCronograma) {
       const baselineCronograma = cronogramas.find(c => c.esBaseline) || cronogramas[0]
       if (baselineCronograma) {
-        console.log('🔄 [CRONOGRAMA SELECTOR] Setting baseline cronograma as selected:', baselineCronograma)
         onCronogramaChange?.(baselineCronograma)
       }
     }
@@ -96,34 +93,26 @@ export function ProyectoCronogramaSelector({
 
   const loadCronogramas = async () => {
     try {
-      console.log('🔄 [CRONOGRAMA SELECTOR] Iniciando carga de cronogramas desde API')
       setLoading(true)
       const response = await fetch(`/api/proyectos/${proyectoId}/cronograma`)
-      console.log('📡 [CRONOGRAMA SELECTOR] Respuesta de API recibida:', response.status)
 
       if (!response.ok) {
         // If API doesn't exist or returns error, show empty state
-        console.warn('⚠️ [CRONOGRAMA SELECTOR] API no disponible o error:', response.status)
         setCronogramas([])
         return
       }
 
       const data = await response.json()
-      console.log('📦 [CRONOGRAMA SELECTOR] Datos recibidos:', data)
 
       if (data.success) {
-        console.log('✅ [CRONOGRAMA SELECTOR] Cronogramas cargados:', data.data.length)
         setCronogramas(data.data)
       } else {
-        console.warn('⚠️ [CRONOGRAMA SELECTOR] API retornó error:', data.error)
         setCronogramas([])
       }
     } catch (error) {
-      console.error('❌ [CRONOGRAMA SELECTOR] Error cargando cronogramas:', error)
       // Don't show error toast, just show empty state
       setCronogramas([])
     } finally {
-      console.log('🏁 [CRONOGRAMA SELECTOR] Finalizando carga de cronogramas')
       setLoading(false)
     }
   }
@@ -151,7 +140,6 @@ export function ProyectoCronogramaSelector({
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('❌ [FRONTEND] Error response from API:', errorData)
         throw new Error(errorData.error || errorData.details || 'Error al crear cronograma')
       }
 
@@ -177,8 +165,91 @@ export function ProyectoCronogramaSelector({
     onCronogramaChange?.(cronograma)
   }
 
+  const handleToggleBaseline = async (cronograma: ProyectoCronograma) => {
+    try {
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/${cronograma.id}/baseline`, {
+        method: 'PUT'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al cambiar estado baseline')
+      }
+
+      const data = await response.json()
+      toast.success(data.message || 'Estado baseline actualizado')
+
+      // Recargar cronogramas
+      loadCronogramas()
+    } catch (error) {
+      console.error('Error toggling baseline:', error)
+      toast.error(error instanceof Error ? error.message : 'Error al cambiar estado baseline')
+    }
+  }
+
+  const handleDeleteCronograma = async (cronograma: ProyectoCronograma) => {
+    // Prevent deletion of baseline cronogramas
+    if (cronograma.esBaseline) {
+      toast.error('No se puede eliminar el cronograma baseline. Es el cronograma de planificación activo.')
+      return
+    }
+
+    // Prevent deletion of commercial cronogramas
+    if (cronograma.tipo === 'comercial') {
+      toast.error('No se puede eliminar el cronograma comercial. Los cronogramas comerciales son de solo lectura.')
+      return
+    }
+
+    // Prevent deletion of execution cronogramas without baseline
+    if (cronograma.tipo === 'ejecucion') {
+      const baselineExists = cronogramas.some(c => c.esBaseline && c.tipo === 'planificacion')
+      if (!baselineExists) {
+        toast.error('No se puede eliminar el cronograma de ejecución sin un cronograma de planificación baseline.')
+        return
+      }
+    }
+
+    // Confirm deletion
+    if (!confirm(`¿Estás seguro de que quieres eliminar el cronograma "${cronograma.nombre}"? Esta acción no se puede deshacer.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma?cronogramaId=${cronograma.id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al eliminar cronograma')
+      }
+
+      toast.success('Cronograma eliminado exitosamente')
+
+      // If the deleted cronograma was selected, select another one
+      if (selectedCronograma?.id === cronograma.id) {
+        const remainingCronogramas = cronogramas.filter(c => c.id !== cronograma.id)
+        const newSelected = remainingCronogramas.find(c => c.esBaseline) || remainingCronogramas[0]
+        onCronogramaChange?.(newSelected)
+      }
+
+      loadCronogramas()
+    } catch (error) {
+      console.error('Error deleting cronograma:', error)
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar el cronograma')
+    }
+  }
+
   const getCronogramasPorTipo = (tipo: keyof typeof TIPO_CRONOGRAMA_INFO) => {
     return cronogramas.filter(c => c.tipo === tipo)
+  }
+
+  const getCronogramaBaseline = () => {
+    return cronogramas.find(c => c.esBaseline && c.tipo === 'planificacion')
+  }
+
+  const canCreateEjecucion = () => {
+    return getCronogramaBaseline() !== undefined
   }
 
   const getCronogramaActivo = () => {
@@ -333,10 +404,10 @@ export function ProyectoCronogramaSelector({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {cronogramaActivo.esBaseline && (
+                {cronogramaActivo.esBaseline && cronogramaActivo.tipo === 'planificacion' && (
                   <Badge className="bg-green-100 text-green-800">
                     <CheckCircle className="h-3 w-3 mr-1" />
-                    Baseline
+                    Línea Base
                   </Badge>
                 )}
                 <Badge className={TIPO_CRONOGRAMA_INFO[cronogramaActivo.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.color}>
@@ -389,11 +460,40 @@ export function ProyectoCronogramaSelector({
                         <span className="text-sm font-medium truncate">
                           {cronograma.nombre}
                         </span>
-                        {cronograma.esBaseline && (
-                          <Badge className="bg-green-100 text-green-800 text-xs">
-                            Base
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {cronograma.esBaseline && cronograma.tipo === 'planificacion' && (
+                            <Badge className="bg-green-100 text-green-800 text-xs">
+                              Línea Base
+                            </Badge>
+                          )}
+                          {cronograma.tipo === 'planificacion' && !cronograma.esBaseline && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleToggleBaseline(cronograma)
+                              }}
+                              title="Marcar como Línea Base"
+                            >
+                              <CheckCircle className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {!cronograma.esBaseline && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteCronograma(cronograma)
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -407,24 +507,7 @@ export function ProyectoCronogramaSelector({
 
                 {/* Acciones */}
                 <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      setCreateForm(prev => ({
-                        ...prev,
-                        tipo: tipo as keyof typeof TIPO_CRONOGRAMA_INFO,
-                        copiarDesdeId: 'none'
-                      }))
-                      setShowCreateDialog(true)
-                    }}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Crear
-                  </Button>
-
-                  {cronogramasTipo.length > 0 && (
+                  {tipo === 'planificacion' && cronogramasTipo.length === 0 && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -433,14 +516,45 @@ export function ProyectoCronogramaSelector({
                         setCreateForm(prev => ({
                           ...prev,
                           tipo: tipo as keyof typeof TIPO_CRONOGRAMA_INFO,
-                          copiarDesdeId: cronogramasTipo[0].id
+                          copiarDesdeId: 'none'
                         }))
                         setShowCreateDialog(true)
                       }}
                     >
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copiar
+                      <Plus className="h-3 w-3 mr-1" />
+                      Crear Planificación
                     </Button>
+                  )}
+
+                  {tipo === 'ejecucion' && canCreateEjecucion() && cronogramasTipo.length === 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        setCreateForm(prev => ({
+                          ...prev,
+                          tipo: tipo as keyof typeof TIPO_CRONOGRAMA_INFO,
+                          copiarDesdeId: getCronogramaBaseline()?.id || 'none'
+                        }))
+                        setShowCreateDialog(true)
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Crear Ejecución
+                    </Button>
+                  )}
+
+                  {tipo === 'ejecucion' && !canCreateEjecucion() && (
+                    <div className="flex-1 text-xs text-gray-500 text-center py-2">
+                      Requiere baseline de planificación
+                    </div>
+                  )}
+
+                  {tipo === 'comercial' && (
+                    <div className="flex-1 text-xs text-gray-500 text-center py-2">
+                      Automático al crear proyecto
+                    </div>
                   )}
                 </div>
               </CardContent>

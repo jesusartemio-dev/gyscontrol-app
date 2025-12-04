@@ -16,6 +16,36 @@ const mockPrismaClient = {
   },
   proyecto: {
     create: jest.fn()
+  },
+  cliente: {
+    update: jest.fn()
+  },
+  proyectoCronograma: {
+    create: jest.fn()
+  },
+  proyectoFase: {
+    create: jest.fn()
+  },
+  proyectoEdt: {
+    create: jest.fn()
+  },
+  proyectoZona: {
+    create: jest.fn()
+  },
+  proyectoActividad: {
+    create: jest.fn()
+  },
+  proyectoTarea: {
+    create: jest.fn()
+  },
+  registroHoras: {
+    create: jest.fn()
+  },
+  proyectoServicioCotizado: {
+    findFirst: jest.fn()
+  },
+  categoriaServicio: {
+    findFirst: jest.fn()
   }
 }
 
@@ -35,10 +65,15 @@ describe('POST /api/proyecto/from-cotizacion - Estado Fix', () => {
     const mockCotizacion = {
       id: 'cotizacion-1',
       estado: 'aprobada',
-      cliente: { id: 'cliente-1' },
+      clienteId: 'cliente-1',
+      comercialId: 'comercial-1',
+      cliente: { id: 'cliente-1', numeroSecuencia: 1, codigo: 'CLI001' },
       equipos: [],
       servicios: [],
-      gastos: []
+      gastos: [],
+      fases: [],
+      cronograma: [], // Empty cronograma to skip conversion
+      proyectos: [{ id: 'proyecto-1', nombre: 'Proyecto Test' }]
     }
 
     const mockProyecto = {
@@ -50,6 +85,26 @@ describe('POST /api/proyecto/from-cotizacion - Estado Fix', () => {
 
     mockPrisma.cotizacion.findUnique.mockResolvedValue(mockCotizacion as any)
     mockPrisma.proyecto.create.mockResolvedValue(mockProyecto as any)
+    mockPrisma.cliente.update.mockResolvedValue({ id: 'cliente-1', numeroSecuencia: 2 } as any)
+    mockPrisma.proyectoCronograma.create.mockResolvedValue({ id: 'cronograma-1' } as any)
+    mockPrisma.proyectoFase.create.mockResolvedValue({ id: 'fase-1' } as any)
+    mockPrisma.proyectoEdt.create.mockResolvedValue({ id: 'edt-1' } as any)
+    mockPrisma.proyectoZona.create.mockResolvedValue({ id: 'zona-1' } as any)
+    mockPrisma.proyectoActividad.create.mockResolvedValue({ id: 'actividad-1' } as any)
+    mockPrisma.proyectoTarea.create.mockResolvedValue({ id: 'tarea-1' } as any)
+    mockPrisma.registroHoras.create.mockResolvedValue({ id: 'registro-1' } as any)
+    mockPrisma.proyectoServicioCotizado.findFirst.mockResolvedValue({ id: 'servicio-1' } as any)
+    mockPrisma.categoriaServicio.findFirst.mockResolvedValue({ id: 'categoria-1' } as any)
+    mockPrisma.cliente.update.mockResolvedValue({ id: 'cliente-1', numeroSecuencia: 2 } as any)
+    mockPrisma.proyectoCronograma.create.mockResolvedValue({ id: 'cronograma-1' } as any)
+    mockPrisma.proyectoFase.create.mockResolvedValue({ id: 'fase-1' } as any)
+    mockPrisma.proyectoEdt.create.mockResolvedValue({ id: 'edt-1' } as any)
+    mockPrisma.proyectoZona.create.mockResolvedValue({ id: 'zona-1' } as any)
+    mockPrisma.proyectoActividad.create.mockResolvedValue({ id: 'actividad-1' } as any)
+    mockPrisma.proyectoTarea.create.mockResolvedValue({ id: 'tarea-1' } as any)
+    mockPrisma.registroHoras.create.mockResolvedValue({ id: 'registro-1' } as any)
+    mockPrisma.proyectoServicioCotizado.findFirst.mockResolvedValue({ id: 'servicio-1' } as any)
+    mockPrisma.categoriaServicio.findFirst.mockResolvedValue({ id: 'categoria-1' } as any)
 
     // 📡 Crear request
     const requestBody = {
@@ -106,10 +161,15 @@ describe('POST /api/proyecto/from-cotizacion - Estado Fix', () => {
     const mockCotizacion = {
       id: 'cotizacion-1',
       estado: 'aprobada',
-      cliente: { id: 'cliente-1' },
+      clienteId: 'cliente-1',
+      comercialId: 'comercial-1',
+      cliente: { id: 'cliente-1', numeroSecuencia: 1, codigo: 'CLI001' },
       equipos: [],
       servicios: [],
-      gastos: []
+      gastos: [],
+      fases: [],
+      cronograma: [], // Empty cronograma to skip conversion
+      proyectos: [{ id: 'proyecto-1', nombre: 'Proyecto Test' }]
     }
 
     const mockProyecto = {

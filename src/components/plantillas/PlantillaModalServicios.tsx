@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Loader2, AlertCircle, X, Truck } from 'lucide-react'
 import { createPlantilla } from '@/lib/services/plantilla'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
-import type { Plantilla, CategoriaServicio } from '@/types'
+import { getEdts } from '@/lib/services/edt'
+import type { Plantilla, Edt } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,7 +30,7 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
   const [open, setOpen] = useState(false)
   const [nombre, setNombre] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingCategorias, setLoadingCategorias] = useState(false)
@@ -46,7 +46,7 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
   const loadCategorias = async () => {
     setLoadingCategorias(true)
     try {
-      const data = await getCategoriasServicio()
+      const data = await getEdts()
       setCategorias(data)
     } catch (error) {
       console.error('Error loading categorias:', error)

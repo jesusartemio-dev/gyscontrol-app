@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 import {
   Plus,
   Edit,
@@ -28,6 +29,7 @@ import {
   PauseCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ProyectoFaseForm } from '@/components/proyectos/cronograma/ProyectoFaseForm'
 import type { ProyectoFase } from '@/types/modelos'
 
 interface ProyectoFasesListProps {
@@ -50,6 +52,9 @@ export function ProyectoFasesList({
   const [fases, setFases] = useState<ProyectoFase[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedFaseId, setSelectedFaseId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingFase, setEditingFase] = useState<ProyectoFase | null>(null)
 
   useEffect(() => {
     loadFases()
@@ -109,6 +114,29 @@ export function ProyectoFasesList({
       toast.error('Error al eliminar la fase')
     }
   }, [proyectoId, loadFases, onFaseDelete])
+
+  const handleCreateFase = useCallback(() => {
+    setShowCreateModal(true)
+  }, [])
+
+  const handleEditFase = useCallback((fase: ProyectoFase) => {
+    setEditingFase(fase)
+    setShowEditModal(true)
+  }, [])
+
+  const handleFaseSuccess = useCallback((fase: ProyectoFase) => {
+    setShowCreateModal(false)
+    setShowEditModal(false)
+    setEditingFase(null)
+    loadFases()
+    onFaseCreate?.()
+  }, [loadFases, onFaseCreate])
+
+  const handleFaseCancel = useCallback(() => {
+    setShowCreateModal(false)
+    setShowEditModal(false)
+    setEditingFase(null)
+  }, [])
 
   const getStatusInfo = useCallback((estado: string) => {
     const statusMap: Record<string, any> = {
@@ -190,7 +218,7 @@ export function ProyectoFasesList({
             Gestiona las fases y su progreso en el cronograma
           </p>
         </div>
-        <Button onClick={onFaseCreate} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={handleCreateFase} className="bg-blue-600 hover:bg-blue-700">
           <Plus className="h-4 w-4 mr-2" />
           Nueva Fase
         </Button>
@@ -207,7 +235,7 @@ export function ProyectoFasesList({
             <p className="text-gray-600 text-center mb-4">
               Crea tu primera fase para organizar el trabajo del proyecto
             </p>
-            <Button onClick={onFaseCreate} variant="outline">
+            <Button onClick={handleCreateFase} variant="outline">
               <Plus className="h-4 w-4 mr-2" />
               Crear Primera Fase
             </Button>
@@ -290,7 +318,7 @@ export function ProyectoFasesList({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
-                        onFaseEdit?.(fase)
+                        handleEditFase(fase)
                       }}
                       className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
                     >
@@ -314,6 +342,33 @@ export function ProyectoFasesList({
           })}
         </div>
       )}
+
+      {/* Modal Crear Fase */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <ProyectoFaseForm
+            proyectoId={proyectoId}
+            cronogramaId={cronogramaId}
+            onSuccess={handleFaseSuccess}
+            onCancel={handleFaseCancel}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Editar Fase */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {editingFase && (
+            <ProyectoFaseForm
+              proyectoId={proyectoId}
+              cronogramaId={cronogramaId}
+              fase={editingFase}
+              onSuccess={handleFaseSuccess}
+              onCancel={handleFaseCancel}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

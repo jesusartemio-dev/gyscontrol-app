@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import PlantillaServicioIndependienteMultiAddModal from '@/components/plantillas/servicios/PlantillaServicioIndependienteMultiAddModal'
@@ -137,6 +137,7 @@ interface PlantillaServicioItemIndependiente {
   costoInterno: number
   costoCliente: number
   orden?: number
+  nivelDificultad?: number
   createdAt: string
   updatedAt: string
 }
@@ -149,16 +150,12 @@ export default function PlantillaServiciosDetallePage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editingQuantities, setEditingQuantities] = useState<Record<string, number>>({})
+  const [editingFactors, setEditingFactors] = useState<Record<string, number>>({})
+  const [editingDificultades, setEditingDificultades] = useState<Record<string, number>>({})
   const [savingQuantities, setSavingQuantities] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
-  useEffect(() => {
-    if (typeof id === 'string') {
-      loadPlantilla(id)
-    }
-  }, [id])
-
-  const loadPlantilla = async (plantillaId: string) => {
+  const loadPlantilla = useCallback(async (plantillaId: string) => {
     try {
       setLoading(true)
       const response = await fetch(`/api/plantillas/servicios/${plantillaId}`)
@@ -173,7 +170,13 @@ export default function PlantillaServiciosDetallePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (typeof id === 'string') {
+      loadPlantilla(id)
+    }
+  }, [id, loadPlantilla])
 
   const handleItemsAdded = async (newItems: any[]) => {
     if (!plantilla) return
@@ -188,7 +191,7 @@ export default function PlantillaServiciosDetallePage() {
     }
   }
 
-  const handleDeleteItem = async (itemId: string) => {
+  const handleDeleteItem = useCallback(async (itemId: string) => {
     if (!plantilla) return
 
     try {
@@ -200,31 +203,38 @@ export default function PlantillaServiciosDetallePage() {
         throw new Error('Error al eliminar el item')
       }
 
-      // Recargar la plantilla
-      await loadPlantilla(plantilla.id)
+      // Update local state by removing the item and recalculate totals
+      setPlantilla(prev => {
+        if (!prev) return prev
+        const newItems = prev.items.filter(item => item.id !== itemId)
+        const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
+        const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
+        const newGrandTotal = newTotalCliente - prev.descuento
+        return { ...prev, items: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
+      })
       toast.success('Item eliminado de la plantilla')
     } catch (err) {
       console.error('Error deleting item:', err)
       toast.error('Error al eliminar el item')
     }
-  }
+  }, [plantilla, loadPlantilla])
 
-  const handleStartEditQuantity = (itemId: string, currentQuantity: number) => {
+  const handleStartEditQuantity = useCallback((itemId: string, currentQuantity: number) => {
     setEditingQuantities(prev => ({
       ...prev,
       [itemId]: currentQuantity
     }))
-  }
+  }, [])
 
-  const handleCancelEditQuantity = (itemId: string) => {
+  const handleCancelEditQuantity = useCallback((itemId: string) => {
     setEditingQuantities(prev => {
       const newState = { ...prev }
       delete newState[itemId]
       return newState
     })
-  }
+  }, [])
 
-  const handleUpdateQuantity = async (itemId: string) => {
+  const handleUpdateQuantity = useCallback(async (itemId: string) => {
     if (!plantilla) return
 
     const newQuantity = editingQuantities[itemId]
@@ -246,12 +256,24 @@ export default function PlantillaServiciosDetallePage() {
         throw new Error('Error al actualizar la cantidad')
       }
 
-      // Recargar la plantilla para obtener los totales actualizados
-      await loadPlantilla(plantilla.id)
+      // Update the local state with the updated item and recalculate totals
+      const updatedItem = await response.json()
+      setPlantilla(prev => {
+        if (!prev) return prev
+        const newItems = prev.items.map(item => item.id === itemId ? updatedItem : item)
+        const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
+        const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
+        const newGrandTotal = newTotalCliente - prev.descuento
+        return { ...prev, items: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
+      })
       toast.success('Cantidad actualizada')
 
       // Limpiar el estado de edición
-      handleCancelEditQuantity(itemId)
+      setEditingQuantities(prev => {
+        const newState = { ...prev }
+        delete newState[itemId]
+        return newState
+      })
     } catch (err) {
       console.error('Error updating quantity:', err)
       toast.error('Error al actualizar la cantidad')
@@ -262,39 +284,164 @@ export default function PlantillaServiciosDetallePage() {
         return newSet
       })
     }
-  }
+  }, [plantilla, editingQuantities, loadPlantilla])
 
-  const handleQuantityChange = (itemId: string, value: string) => {
+  const handleQuantityChange = useCallback((itemId: string, value: string) => {
     const numValue = parseInt(value) || 0
     setEditingQuantities(prev => ({
       ...prev,
       [itemId]: numValue
     }))
-  }
+  }, [])
+
+  const handleUpdateFactor = useCallback(async (itemId: string) => {
+    if (!plantilla) return
+
+    const newFactor = editingFactors[itemId]
+    if (!newFactor || newFactor < 1) {
+      toast.error('El factor de seguridad debe ser mayor o igual a 1')
+      return
+    }
+
+    setSavingQuantities(prev => new Set(prev).add(itemId))
+
+    try {
+      const response = await fetch(`/api/plantillas/servicios/${plantilla.id}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ factorSeguridad: newFactor })
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al actualizar el factor de seguridad')
+      }
+
+      // Update the local state with the updated item and recalculate totals
+      const updatedItem = await response.json()
+      setPlantilla(prev => {
+        if (!prev) return prev
+        const newItems = prev.items.map(item => item.id === itemId ? updatedItem : item)
+        const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
+        const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
+        const newGrandTotal = newTotalCliente - prev.descuento
+        return { ...prev, items: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
+      })
+      toast.success('Factor de seguridad actualizado')
+
+      // Limpiar el estado de edición
+      setEditingFactors(prev => {
+        const newState = { ...prev }
+        delete newState[itemId]
+        return newState
+      })
+    } catch (err) {
+      console.error('Error updating factor:', err)
+      toast.error('Error al actualizar el factor de seguridad')
+    } finally {
+      setSavingQuantities(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(itemId)
+        return newSet
+      })
+    }
+  }, [plantilla, editingFactors, loadPlantilla])
+
+  const handleUpdateDificultad = useCallback(async (itemId: string) => {
+    if (!plantilla) return
+
+    const newDificultad = editingDificultades[itemId]
+    if (!newDificultad || newDificultad < 1 || newDificultad > 4) {
+      toast.error('La dificultad debe estar entre 1 y 4')
+      return
+    }
+
+    setSavingQuantities(prev => new Set(prev).add(itemId))
+
+    try {
+      const response = await fetch(`/api/plantillas/servicios/${plantilla.id}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nivelDificultad: newDificultad })
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al actualizar la dificultad')
+      }
+
+      // Update the local state with the updated item and recalculate totals
+      const updatedItem = await response.json()
+      setPlantilla(prev => {
+        if (!prev) return prev
+        const newItems = prev.items.map(item => item.id === itemId ? updatedItem : item)
+        const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
+        const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
+        const newGrandTotal = newTotalCliente - prev.descuento
+        return { ...prev, items: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
+      })
+      toast.success('Dificultad actualizada')
+
+      // Limpiar el estado de edición
+      setEditingDificultades(prev => {
+        const newState = { ...prev }
+        delete newState[itemId]
+        return newState
+      })
+    } catch (err) {
+      console.error('Error updating dificultad:', err)
+      toast.error('Error al actualizar la dificultad')
+    } finally {
+      setSavingQuantities(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(itemId)
+        return newSet
+      })
+    }
+  }, [plantilla, editingDificultades, loadPlantilla])
 
   // Determine current view mode based on screen size and user preference
-  const getCurrentViewMode = () => {
+  const currentViewMode = useMemo(() => {
     // On mobile, always show cards
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       return 'card'
     }
     // On desktop, use user preference
     return viewMode
-  }
+  }, [viewMode])
 
   // Table row component for compact view
-  const TableItemRow = ({ item, index }: { item: PlantillaServicioItemIndependiente, index: number }) => {
-    const isEditing = item.id in editingQuantities
-    const isSaving = savingQuantities.has(item.id)
-    const editedQuantity = editingQuantities[item.id] || item.cantidad
+  const TableItemRow = React.memo(({
+    item,
+    index,
+    onQuantityChange,
+    onStartEdit,
+    onCancelEdit,
+    onUpdateQuantity,
+    onDelete,
+    isEditing,
+    editedQuantity,
+    isSaving
+  }: {
+    item: PlantillaServicioItemIndependiente
+    index: number
+    onQuantityChange: (itemId: string, value: string) => void
+    onStartEdit: (itemId: string, quantity: number) => void
+    onCancelEdit: (itemId: string) => void
+    onUpdateQuantity: (itemId: string) => Promise<void>
+    onDelete: (itemId: string) => Promise<void>
+    isEditing: boolean
+    editedQuantity: number
+    isSaving: boolean
+  }) => {
 
     return (
       <motion.tr
-        key={item.id}
         variants={itemVariants}
         transition={{ delay: index * 0.02 }}
         className="border-b hover:bg-gray-50"
       >
+        <td className="p-3 text-center">
+          <span className="text-sm font-medium">{item.orden ?? 0}</span>
+        </td>
         <td className="p-3">
           <div className="flex items-center gap-2">
             <span className="font-medium text-gray-900">{item.nombre}</span>
@@ -302,7 +449,7 @@ export default function PlantillaServiciosDetallePage() {
               {item.unidadServicioNombre}
             </Badge>
             <Badge variant="secondary" className="text-xs">
-              {item.formula}
+              Escalonada
             </Badge>
           </div>
           <div className="text-sm text-gray-600 mt-1">{item.descripcion}</div>
@@ -318,13 +465,13 @@ export default function PlantillaServiciosDetallePage() {
                 type="number"
                 min="1"
                 value={editedQuantity}
-                onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                onChange={(e) => onQuantityChange(item.id, e.target.value)}
                 className="w-20 h-8 text-sm"
                 disabled={isSaving}
               />
               <Button
                 size="sm"
-                onClick={() => handleUpdateQuantity(item.id)}
+                onClick={() => onUpdateQuantity(item.id)}
                 disabled={isSaving || editedQuantity === item.cantidad}
                 className="h-8 px-2"
               >
@@ -333,7 +480,7 @@ export default function PlantillaServiciosDetallePage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleCancelEditQuantity(item.id)}
+                onClick={() => onCancelEdit(item.id)}
                 disabled={isSaving}
                 className="h-8 px-2"
               >
@@ -346,7 +493,7 @@ export default function PlantillaServiciosDetallePage() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => handleStartEditQuantity(item.id, item.cantidad)}
+                onClick={() => onStartEdit(item.id, item.cantidad)}
                 className="h-8 px-2 text-blue-600 hover:text-blue-700"
               >
                 <Edit className="h-3 w-3" />
@@ -354,19 +501,151 @@ export default function PlantillaServiciosDetallePage() {
             </div>
           )}
         </td>
+        <td className="p-3 text-center">
+          {editingDificultades[item.id] !== undefined ? (
+            <div className="flex items-center gap-2">
+              <select
+                className="border rounded px-2 py-1 text-sm"
+                value={editingDificultades[item.id]}
+                onChange={(e) => setEditingDificultades(prev => ({
+                  ...prev,
+                  [item.id]: parseInt(e.target.value)
+                }))}
+                disabled={isSaving}
+              >
+                <option value={1}>Baja (1.0x)</option>
+                <option value={2}>Media (1.2x)</option>
+                <option value={3}>Alta (1.5x)</option>
+                <option value={4}>Crítica (2.0x)</option>
+              </select>
+              <Button
+                size="sm"
+                onClick={() => handleUpdateDificultad(item.id)}
+                disabled={isSaving}
+                className="h-8 px-2"
+              >
+                {isSaving ? <Loader2 className="h-3 w-3" /> : <Save className="h-3 w-3" />}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEditingDificultades(prev => {
+                  const newState = { ...prev }
+                  delete newState[item.id]
+                  return newState
+                })}
+                disabled={isSaving}
+                className="h-8 px-2"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 justify-center">
+              <Badge variant="outline" className="text-xs">
+                {(() => {
+                  const dificultad = item.nivelDificultad || 1;
+                  const labels = { 1: 'Baja (1.0x)', 2: 'Media (1.2x)', 3: 'Alta (1.5x)', 4: 'Crítica (2.0x)' };
+                  return labels[dificultad as keyof typeof labels] || 'Baja (1.0x)';
+                })()}
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditingDificultades(prev => ({
+                  ...prev,
+                  [item.id]: item.nivelDificultad || 1
+                }))}
+                className="h-6 px-1 text-blue-600 hover:text-blue-700"
+              >
+                <Edit className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </td>
+        <td className="p-3 text-center">
+          <span className="text-sm font-medium">{item.horaBase || 0}h</span>
+        </td>
+        <td className="p-3 text-center">
+          <span className="text-sm font-medium">{item.horaRepetido || 0}h</span>
+        </td>
+        <td className="p-3">
+          {editingFactors[item.id] !== undefined ? (
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                step="0.01"
+                min="1.0"
+                value={editingFactors[item.id]}
+                onChange={(e) => setEditingFactors(prev => ({
+                  ...prev,
+                  [item.id]: parseFloat(e.target.value) || 1
+                }))}
+                className="w-16 h-8 text-sm text-center"
+                disabled={isSaving}
+              />
+              <Button
+                size="sm"
+                onClick={() => handleUpdateFactor(item.id)}
+                disabled={isSaving}
+                className="h-8 px-2"
+              >
+                {isSaving ? <Loader2 className="h-3 w-3" /> : <Save className="h-3 w-3" />}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEditingFactors(prev => {
+                  const newState = { ...prev }
+                  delete newState[item.id]
+                  return newState
+                })}
+                disabled={isSaving}
+                className="h-8 px-2"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 justify-center">
+              <span className="text-sm font-medium">{(item.factorSeguridad || 1).toFixed(2)}x</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditingFactors(prev => ({
+                  ...prev,
+                  [item.id]: item.factorSeguridad || 1
+                }))}
+                className="h-6 px-1 text-blue-600 hover:text-blue-700"
+              >
+                <Edit className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+        </td>
+        <td className="p-3 text-center">
+          <span className="text-sm font-medium">{((item.margen || 0) * 100).toFixed(1)}%</span>
+        </td>
+        <td className="p-3 text-center">
+          <span className="text-sm font-medium">${item.costoHora}</span>
+        </td>
         <td className="p-3 text-sm">
           <div className="font-medium">{item.horaTotal}h</div>
           <div className="text-xs text-gray-500">calculado</div>
         </td>
         <td className="p-3 text-right">
+          <div className="font-semibold text-blue-600">{formatCurrency(item.costoInterno)}</div>
+          <div className="text-xs text-gray-500">Interno</div>
+        </td>
+        <td className="p-3 text-right">
           <div className="font-semibold text-green-600">{formatCurrency(item.costoCliente)}</div>
-          <div className="text-xs text-gray-500">Total: {formatCurrency(item.cantidad * item.costoCliente)}</div>
+          <div className="text-xs text-gray-500">Cliente</div>
         </td>
         <td className="p-3">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleDeleteItem(item.id)}
+            onClick={() => onDelete(item.id)}
             className="text-red-600 hover:text-red-700 hover:bg-red-50"
             disabled={isSaving}
           >
@@ -375,7 +654,234 @@ export default function PlantillaServiciosDetallePage() {
         </td>
       </motion.tr>
     )
-  }
+  })
+
+  // Card item component for detailed view
+  const CardItemRow = React.memo(({
+    item,
+    index,
+    onQuantityChange,
+    onStartEdit,
+    onCancelEdit,
+    onUpdateQuantity,
+    onDelete,
+    isEditing,
+    editedQuantity,
+    isSaving
+  }: {
+    item: PlantillaServicioItemIndependiente
+    index: number
+    onQuantityChange: (itemId: string, value: string) => void
+    onStartEdit: (itemId: string, quantity: number) => void
+    onCancelEdit: (itemId: string) => void
+    onUpdateQuantity: (itemId: string) => Promise<void>
+    onDelete: (itemId: string) => Promise<void>
+    isEditing: boolean
+    editedQuantity: number
+    isSaving: boolean
+  }) => {
+
+    return (
+      <motion.div
+        variants={itemVariants}
+        transition={{ delay: index * 0.05 }}
+        className="border rounded-lg p-6 hover:shadow-md transition-all bg-white"
+      >
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <h4 className="font-semibold text-lg text-gray-900">{item.nombre}</h4>
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                {item.unidadServicioNombre}
+              </Badge>
+              <Badge variant="secondary" className="text-xs">
+                Escalonada
+              </Badge>
+            </div>
+            <p className="text-sm text-gray-600 mb-3">{item.descripcion}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(item.id)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              disabled={isSaving}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Formula Details */}
+        <div className="bg-gray-50 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Calculator className="h-4 w-4 text-blue-600" />
+            <span className="font-medium text-sm text-gray-700">Detalles de la Fórmula</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Recurso:</span>
+              <div className="font-medium">{item.recursoNombre}</div>
+              <div className="text-xs text-gray-500">${item.costoHora}/hora</div>
+            </div>
+            <div>
+              <span className="text-gray-500">Fórmula:</span>
+              <div className="font-medium">Escalonada</div>
+            </div>
+            <div>
+              <span className="text-gray-500">Horas Base:</span>
+              <div className="font-medium">{item.horaBase || 0}h</div>
+            </div>
+            <div>
+              <span className="text-gray-500">Horas Repetidas:</span>
+              <div className="font-medium">{item.horaRepetido || 0}h</div>
+            </div>
+            {item.formula === 'Escalonada' && (
+              <>
+                <div>
+                  <span className="text-gray-500">Horas Base:</span>
+                  <div className="font-medium">{item.horaBase || 0}h</div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Horas Repetidas:</span>
+                  <div className="font-medium">{item.horaRepetido || 0}h</div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Quantity, Difficulty and Pricing */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Quantity Section */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Cantidad
+            </Label>
+            {isEditing ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="1"
+                  value={editedQuantity}
+                  onChange={(e) => onQuantityChange(item.id, e.target.value)}
+                  className="w-20"
+                  disabled={isSaving}
+                />
+                <Button
+                  size="sm"
+                  onClick={() => onUpdateQuantity(item.id)}
+                  disabled={isSaving || editedQuantity === item.cantidad}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onCancelEdit(item.id)}
+                  disabled={isSaving}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold text-blue-600">{item.cantidad}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onStartEdit(item.id, item.cantidad)}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Editar
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Difficulty */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              ⚡ Dificultad
+            </Label>
+            <div className="text-center">
+              <Badge variant="outline" className="text-lg px-3 py-1">
+                {(() => {
+                  const dificultad = item.nivelDificultad || 1;
+                  const labels = { 1: 'Baja (1.0x)', 2: 'Media (1.2x)', 3: 'Alta (1.5x)', 4: 'Crítica (2.0x)' };
+                  return labels[dificultad as keyof typeof labels] || 'Baja (1.0x)';
+                })()}
+              </Badge>
+            </div>
+            <div className="text-xs text-gray-500 text-center">
+              Factor de complejidad
+            </div>
+          </div>
+
+          {/* Hours Calculation */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Horas Totales
+            </Label>
+            <div className="text-2xl font-bold text-purple-600">
+              {item.horaTotal}h
+            </div>
+            <div className="text-xs text-gray-500">
+              Con factor dificultad
+            </div>
+          </div>
+
+          {/* Pricing */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Precios
+            </Label>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Interno:</span>
+                <span className="font-semibold text-blue-600">{formatCurrency(item.costoInterno)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Cliente:</span>
+                <span className="font-semibold text-green-600">{formatCurrency(item.costoCliente)}</span>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500">
+              Total: {formatCurrency(item.cantidad * item.costoCliente)}
+            </div>
+          </div>
+        </div>
+
+        {/* Cost Breakdown */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Costo Interno:</span>
+              <div className="font-medium">{formatCurrency(item.costoInterno)}</div>
+            </div>
+            <div>
+              <span className="text-gray-500">Factor Seguridad:</span>
+              <div className="font-medium">{item.factorSeguridad}x</div>
+            </div>
+            <div>
+              <span className="text-gray-500">Margen:</span>
+              <div className="font-medium">{((item.margen || 0) * 100).toFixed(1)}%</div>
+            </div>
+            <div>
+              <span className="text-gray-500">Total Unitario:</span>
+              <div className="font-medium text-green-600">{formatCurrency(item.costoCliente)}</div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    )
+  })
 
   // Loading State
   if (loading) {
@@ -605,12 +1111,15 @@ export default function PlantillaServiciosDetallePage() {
                 </div>
               ) : (
                 <div>
-                  {getCurrentViewMode() === 'table' ? (
+                  {currentViewMode === 'table' ? (
                     /* Table View */
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
+                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Orden
+                            </th>
                             <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Servicio
                             </th>
@@ -621,10 +1130,31 @@ export default function PlantillaServiciosDetallePage() {
                               Cantidad
                             </th>
                             <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Dificultad
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Hora Base
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Hora Repet.
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Factor Seg.
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Margen
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Costo/Hora
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Horas
                             </th>
                             <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Precio
+                              Precio Interno
+                            </th>
+                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Precio Cliente
                             </th>
                             <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Acciones
@@ -632,8 +1162,22 @@ export default function PlantillaServiciosDetallePage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {plantilla.items.map((item, index) => (
-                            <TableItemRow key={item.id} item={item} index={index} />
+                          {plantilla.items
+                            .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+                            .map((item, index) => (
+                            <TableItemRow
+                              key={item.id}
+                              item={item}
+                              index={index}
+                              onQuantityChange={handleQuantityChange}
+                              onStartEdit={handleStartEditQuantity}
+                              onCancelEdit={handleCancelEditQuantity}
+                              onUpdateQuantity={handleUpdateQuantity}
+                              onDelete={handleDeleteItem}
+                              isEditing={item.id in editingQuantities}
+                              editedQuantity={editingQuantities[item.id] || item.cantidad}
+                              isSaving={savingQuantities.has(item.id)}
+                            />
                           ))}
                         </tbody>
                       </table>
@@ -641,191 +1185,23 @@ export default function PlantillaServiciosDetallePage() {
                   ) : (
                     /* Card View */
                     <div className="space-y-6">
-                      {plantilla.items.map((item, index) => {
-                        const isEditing = item.id in editingQuantities
-                        const isSaving = savingQuantities.has(item.id)
-                        const editedQuantity = editingQuantities[item.id] || item.cantidad
-
-                        return (
-                          <motion.div
-                            key={item.id}
-                            variants={itemVariants}
-                            transition={{ delay: index * 0.05 }}
-                            className="border rounded-lg p-6 hover:shadow-md transition-all bg-white"
-                          >
-                            <div className="flex justify-between items-start mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <h4 className="font-semibold text-lg text-gray-900">{item.nombre}</h4>
-                                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                                    {item.unidadServicioNombre}
-                                  </Badge>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {item.formula}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-gray-600 mb-3">{item.descripcion}</p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteItem(item.id)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  disabled={isSaving}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Formula Details */}
-                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                              <div className="flex items-center gap-2 mb-3">
-                                <Calculator className="h-4 w-4 text-blue-600" />
-                                <span className="font-medium text-sm text-gray-700">Detalles de la Fórmula</span>
-                              </div>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <span className="text-gray-500">Recurso:</span>
-                                  <div className="font-medium">{item.recursoNombre}</div>
-                                  <div className="text-xs text-gray-500">${item.costoHora}/hora</div>
-                                </div>
-                                <div>
-                                  <span className="text-gray-500">Fórmula:</span>
-                                  <div className="font-medium">{item.formula}</div>
-                                </div>
-                                {item.formula === 'Fijo' && item.horaFijo && (
-                                  <div>
-                                    <span className="text-gray-500">Horas Fijas:</span>
-                                    <div className="font-medium">{item.horaFijo}h</div>
-                                  </div>
-                                )}
-                                {item.formula === 'Proporcional' && item.horaUnidad && (
-                                  <div>
-                                    <span className="text-gray-500">Horas por Unidad:</span>
-                                    <div className="font-medium">{item.horaUnidad}h</div>
-                                  </div>
-                                )}
-                                {item.formula === 'Escalonada' && (
-                                  <>
-                                    <div>
-                                      <span className="text-gray-500">Horas Base:</span>
-                                      <div className="font-medium">{item.horaBase || 0}h</div>
-                                    </div>
-                                    <div>
-                                      <span className="text-gray-500">Horas Repetidas:</span>
-                                      <div className="font-medium">{item.horaRepetido || 0}h</div>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Quantity and Pricing */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              {/* Quantity Section */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <Package className="h-4 w-4" />
-                                  Cantidad
-                                </Label>
-                                {isEditing ? (
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      type="number"
-                                      min="1"
-                                      value={editedQuantity}
-                                      onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                                      className="w-20"
-                                      disabled={isSaving}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleUpdateQuantity(item.id)}
-                                      disabled={isSaving || editedQuantity === item.cantidad}
-                                      className="bg-green-600 hover:bg-green-700"
-                                    >
-                                      {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleCancelEditQuantity(item.id)}
-                                      disabled={isSaving}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-2xl font-bold text-blue-600">{item.cantidad}</span>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleStartEditQuantity(item.id, item.cantidad)}
-                                      className="text-blue-600 hover:text-blue-700"
-                                    >
-                                      <Edit className="h-3 w-3 mr-1" />
-                                      Editar
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Hours Calculation */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <Clock className="h-4 w-4" />
-                                  Horas Totales
-                                </Label>
-                                <div className="text-2xl font-bold text-purple-600">
-                                  {item.horaTotal}h
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  Calculado según fórmula
-                                </div>
-                              </div>
-
-                              {/* Pricing */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <DollarSign className="h-4 w-4" />
-                                  Precio Cliente
-                                </Label>
-                                <div className="text-2xl font-bold text-green-600">
-                                  {formatCurrency(item.costoCliente)}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  Total: {formatCurrency(item.cantidad * item.costoCliente)}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Cost Breakdown */}
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <span className="text-gray-500">Costo Interno:</span>
-                                  <div className="font-medium">{formatCurrency(item.costoInterno)}</div>
-                                </div>
-                                <div>
-                                  <span className="text-gray-500">Factor Seguridad:</span>
-                                  <div className="font-medium">{item.factorSeguridad}x</div>
-                                </div>
-                                <div>
-                                  <span className="text-gray-500">Margen:</span>
-                                  <div className="font-medium">{(item.margen * 100).toFixed(1)}%</div>
-                                </div>
-                                <div>
-                                  <span className="text-gray-500">Total Unitario:</span>
-                                  <div className="font-medium text-green-600">{formatCurrency(item.costoCliente)}</div>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )
-                      })}
+                      {plantilla.items
+                        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+                        .map((item, index) => (
+                        <CardItemRow
+                          key={item.id}
+                          item={item}
+                          index={index}
+                          onQuantityChange={handleQuantityChange}
+                          onStartEdit={handleStartEditQuantity}
+                          onCancelEdit={handleCancelEditQuantity}
+                          onUpdateQuantity={handleUpdateQuantity}
+                          onDelete={handleDeleteItem}
+                          isEditing={item.id in editingQuantities}
+                          editedQuantity={editingQuantities[item.id] || item.cantidad}
+                          isSaving={savingQuantities.has(item.id)}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>

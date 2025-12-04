@@ -44,6 +44,7 @@ import type { CotizacionProveedor } from '@/types';
 import CotizacionProveedorHistorial from '@/components/logistica/CotizacionProveedorHistorial';
 import CotizacionEstadoFlujoBanner from '@/components/logistica/CotizacionEstadoFlujoBanner';
 import CotizacionProveedorTabla from '@/components/logistica/CotizacionProveedorTabla';
+import ModalAgregarItemCotizacionProveedor from '@/components/logistica/ModalAgregarItemCotizacionProveedor';
 
 // ✅ Page props interface
 interface PageProps {
@@ -108,6 +109,7 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [cotizacionId, setCotizacionId] = useState<string>('');
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [showAgregarItems, setShowAgregarItems] = useState(false);
 
   useEffect(() => {
     const fetchParams = async () => {
@@ -201,6 +203,22 @@ GYS Control`;
     window.open(gmailUrl, '_blank');
   };
 
+  // ✅ Refresh cotizacion data
+  const handleRefreshCotizacion = async () => {
+    if (!cotizacionId) return;
+    
+    try {
+      const updated = await getCotizacionProveedorById(cotizacionId);
+      if (updated) {
+        setCotizacion(updated);
+        toast.success('Cotización actualizada');
+      }
+    } catch (error) {
+      console.error('Error refreshing cotizacion:', error);
+      toast.error('Error al actualizar la cotización');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 📋 Breadcrumb Navigation */}
@@ -259,6 +277,15 @@ GYS Control`;
               Cards
             </Button>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAgregarItems(true)}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Agregar Items
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -404,6 +431,15 @@ GYS Control`;
           />
         </CardContent>
       </Card>
+
+      {/* 🎯 Modal para Agregar Items */}
+      <ModalAgregarItemCotizacionProveedor
+        open={showAgregarItems}
+        onClose={() => setShowAgregarItems(false)}
+        cotizacion={cotizacion}
+        proyectoId={cotizacion.proyectoId || ''}
+        onAdded={handleRefreshCotizacion}
+      />
     </div>
   );
 }

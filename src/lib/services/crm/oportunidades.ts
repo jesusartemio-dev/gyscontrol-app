@@ -177,6 +177,14 @@ export async function getOportunidades(
       }
     })
 
+    if (response.status === 401) {
+      // Redirigir al login si no está autorizado
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+      throw new Error('No autorizado')
+    }
+
     if (!response.ok) {
       throw new Error(`Error al obtener oportunidades: ${response.statusText}`)
     }

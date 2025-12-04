@@ -15,7 +15,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const userPermissions = await getUserPermissions(session.user.id)
+    // Get userId from query params, default to current user
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId') || session.user.id
+
+    // Only allow admins to view other users' permissions
+    if (userId !== session.user.id && session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden: Can only view own permissions' },
+        { status: 403 }
+      )
+    }
+
+    const userPermissions = await getUserPermissions(userId)
 
     return NextResponse.json(userPermissions)
   } catch (error) {

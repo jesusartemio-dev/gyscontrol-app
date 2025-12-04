@@ -56,25 +56,25 @@ export async function GET(req: NextRequest) {
     })
 
     // ✅ Calculate montoEstimado and cantidadPedida for each lista
-    const dataWithMontos = data.map(lista => {
-      const montoEstimado = lista.items.reduce((total, item) => {
+    const dataWithMontos = data.map((lista: any) => {
+      const montoEstimado = lista.items.reduce((total: number, item: any) => {
         // Use the best available price: cotización > precioElegido > presupuesto
-        const mejorCotizacion = item.cotizaciones.length > 0 
-          ? Math.min(...item.cotizaciones.map(c => c.precioUnitario || 0))
+        const mejorCotizacion = item.cotizaciones?.length > 0
+          ? Math.min(...item.cotizaciones.map((c: any) => c.precioUnitario || 0))
           : 0
-        const precioUnitario = mejorCotizacion > 0 
-          ? mejorCotizacion 
+        const precioUnitario = mejorCotizacion > 0
+          ? mejorCotizacion
           : (item.precioElegido || item.presupuesto || 0)
-        
+
         return total + (precioUnitario * (item.cantidad || 0))
       }, 0)
 
       // 🔄 Calculate cantidadPedida for each item
-      const itemsWithCantidadPedida = lista.items.map(item => {
-        const cantidadPedida = item.pedidos.reduce((total, pedidoItem) => {
+      const itemsWithCantidadPedida = lista.items.map((item: any) => {
+        const cantidadPedida = item.pedidos.reduce((total: number, pedidoItem: any) => {
           return total + (pedidoItem.cantidadPedida || 0)
         }, 0)
-        
+
         return {
           ...item,
           cantidadPedida
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         numeroSecuencia: nuevoNumero,
         nombre: parsed.data.nombre,
         fechaNecesaria: parsed.data.fechaNecesaria ? new Date(parsed.data.fechaNecesaria) : null, // ✅ fecha necesaria
-      } satisfies Prisma.ListaEquipoUncheckedCreateInput,
+      },
       include: {
         proyecto: true,
         responsable: true,
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
         session.user.id,
         nuevaLista.nombre,
         {
-          proyecto: nuevaLista.proyecto.nombre,
+          proyecto: proyecto.nombre,
           codigo: nuevaLista.codigo,
           fechaNecesaria: parsed.data.fechaNecesaria
         }

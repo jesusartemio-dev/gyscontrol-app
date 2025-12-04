@@ -93,18 +93,18 @@ export async function GET(request: NextRequest) {
     ]);
 
     // 📊 Calcular métricas EDT si se incluyen
-    const proyectosConMetricas = incluirMetricas ? 
+    const proyectosConMetricas = incluirMetricas ?
       proyectos.map(proyecto => {
         const edts = (proyecto as any).proyectoEdts || [];
         const metricas = {
           totalEdts: edts.length,
           edtsCompletados: edts.filter((e: any) => e.estado === 'completado').length,
-          promedioAvance: edts.length > 0 ? 
+          promedioAvance: edts.length > 0 ?
             edts.reduce((sum: number, e: any) => sum + e.porcentajeAvance, 0) / edts.length : 0,
           horasEstimadasTotal: edts.reduce((sum: number, e: any) => sum + Number(e.horasPlan || 0), 0),
           horasRealesTotal: edts.reduce((sum: number, e: any) => sum + Number(e.horasReales || 0), 0)
         };
-        
+
         const { proyectoEdts, ...proyectoSinEdts } = proyecto as any;
         return {
           ...proyectoSinEdts,
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    
+
     // 🔍 Validar payload con Zod
     let validatedData: ProyectoPayload;
     try {
@@ -170,13 +170,13 @@ export async function POST(request: NextRequest) {
 
     // Verificar que comercial y gestor existen
     const [comercial, gestor] = await Promise.all([
-      validatedData.comercialId ? 
-        prisma.user.findUnique({ 
+      validatedData.comercialId ?
+        prisma.user.findUnique({
           where: { id: validatedData.comercialId },
           select: { id: true, role: true }
         }) : null,
-      validatedData.gestorId ? 
-        prisma.user.findUnique({ 
+      validatedData.gestorId ?
+        prisma.user.findUnique({
           where: { id: validatedData.gestorId },
           select: { id: true, role: true }
         }) : null
@@ -224,31 +224,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 📝 Crear proyecto en transacción para incrementar numeroSecuencia
+    // 📝 Crear proyecto en transacción
     const nuevoProyecto = await prisma.$transaction(async (tx) => {
-      // 🔁 Incrementar numeroSecuencia del cliente
-      const clienteActualizado = await tx.cliente.update({
+      // 🔍 Obtener el cliente actual
+      const clienteActual = await tx.cliente.findUnique({
         where: { id: validatedData.clienteId },
-        data: {
-          numeroSecuencia: {
-            increment: 1
-          }
-        },
-        select: { codigo: true, numeroSecuencia: true }
+        select: { codigo: true }
       });
 
-      // 🏷️ Generar código del proyecto: clienteCodigo + numeroSecuencia (formato: CJM01)
-      // ✅ Handle potential null numeroSecuencia with fallback to 1
-      const numeroSecuencia = clienteActualizado.numeroSecuencia ?? 1;
-      const codigoProyecto = `${clienteActualizado.codigo}${numeroSecuencia.toString().padStart(2, '0')}`;
+      if (!clienteActual) {
+        throw new Error('Cliente no encontrado');
+      }
 
-      // 📝 Crear el proyecto con el código generado
+      // 🏷️ Generar código del proyecto: encontrar el siguiente número disponible
+      // Buscar todos los códigos de proyectos existentes para este cliente
+      const proyectosExistentes = await tx.proyecto.findMany({
+        where: { clienteId: validatedData.clienteId },
+        select: { codigo: true }
+      });
+
+      // Extraer números de los códigos existentes (ej: "MOL01" -> 1, "MOL02" -> 2)
+      const codigosExistentes = proyectosExistentes
+        .map(p => p.codigo)
+        .filter(codigo => codigo.startsWith(clienteActual.codigo))
+        .map(codigo => {
+          const numeroStr = codigo.slice(clienteActual.codigo.length);
+          const numero = parseInt(numeroStr, 10);
+          return isNaN(numero) ? null : numero;
+        })
+        .filter(n => n !== null)
+        .sort((a, b) => a - b);
+
+      // Encontrar el primer número disponible empezando desde 1
+      let numeroSecuencia = 1;
+      for (const num of codigosExistentes) {
+        if (numeroSecuencia === num) {
+          numeroSecuencia++;
+        } else if (numeroSecuencia < num) {
+          break;
+        }
+      }
+
+      const codigoProyecto = `${clienteActual.codigo}${numeroSecuencia.toString().padStart(2, '0')}`;
+
+      //  Crear el proyecto con el código generado
       return await tx.proyecto.create({
         data: {
           ...validatedData,
           codigo: codigoProyecto,
           // Si no se especifica comercial, asignar al usuario actual si es comercial
-          comercialId: validatedData.comercialId || 
+          comercialId: validatedData.comercialId ||
             (session.user.role === 'comercial' ? session.user.id : validatedData.gestorId),
           // Estado por defecto
           estado: (validatedData.estado || 'en_planificacion') as any
@@ -302,7 +327,7 @@ export async function PUT(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const proyectoId = searchParams.get('id');
-    
+
     if (!proyectoId) {
       return NextResponse.json(
         { error: 'ID de proyecto requerido' },
@@ -335,8 +360,8 @@ export async function PUT(request: NextRequest) {
     const rolesConAccesoTotal = ['admin', 'gerente'];
     const esComercialDelProyecto = proyectoExistente.comercialId === session.user.id;
     const esGestorDelProyecto = proyectoExistente.gestorId === session.user.id;
-    
-    if (!rolesConAccesoTotal.includes(session.user.role) && 
+
+    if (!rolesConAccesoTotal.includes(session.user.role) &&
         !esComercialDelProyecto && !esGestorDelProyecto) {
       return NextResponse.json(
         { error: 'Sin permisos para editar este proyecto' },
@@ -344,8 +369,8 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // 🔍 Validaciones de negocio para fechas
-    if (validatedData.fechaFin && validatedData.fechaInicio && 
+    // � Validaciones de negocio para fechas
+    if (validatedData.fechaFin && validatedData.fechaInicio &&
         new Date(validatedData.fechaFin) <= new Date(validatedData.fechaInicio)) {
       return NextResponse.json(
         { error: 'La fecha de fin debe ser posterior a la fecha de inicio' },
@@ -357,7 +382,7 @@ export async function PUT(request: NextRequest) {
     const dataToUpdate = Object.fromEntries(
       Object.entries(validatedData).filter(([_, value]) => value !== undefined)
     );
-    
+
     const proyectoActualizado = await prisma.proyecto.update({
       where: { id: proyectoId },
       data: dataToUpdate,

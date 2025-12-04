@@ -85,6 +85,9 @@ async function main() {
     role: logisticoUser.role
   })
 
+  // Nota: El modelo CalendarioLaboral fue removido del schema actual
+  // Si necesitas calendario laboral, deberás agregarlo de vuelta al schema
+  console.log('ℹ️ Calendario laboral omitido - modelo no disponible en schema actual')
 
   console.log('🎉 Seed completado exitosamente!')
   console.log('\n📋 Credenciales de acceso:')

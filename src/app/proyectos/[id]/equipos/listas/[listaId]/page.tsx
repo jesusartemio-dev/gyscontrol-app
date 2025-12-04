@@ -1,9 +1,9 @@
 /**
  * 📋 Lista de Equipos Detail Page
- * 
+ *
  * Página de detalle para gestión específica de una lista de equipos.
  * Incluye vista completa de items, edición, historial y configuraciones.
- * 
+ *
  * @author GYS Team
  * @version 1.0.0
  */
@@ -43,12 +43,12 @@ const DetailViewSkeleton = () => (
 
 const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ params }) => {
   const resolvedParams = await params;
-  
+
   try {
     // ✅ Validate route parameters
     const validatedParams = validateRouteParams.listaEquipoDetail(resolvedParams);
     const { id: proyectoId, listaId } = validatedParams;
-    
+
     // 🔐 Check authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -57,11 +57,11 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
 
     // 🎯 Server-side data fetching with Prisma directly
     const [lista, proyecto] = await Promise.all([
-      // Get lista with complete data for Detail view
+      // Get lista with simplified data to avoid Prisma client cache issues
       prisma.listaEquipo.findUnique({
         where: { id: listaId },
         include: {
-          // 🏢 Complete project information
+          // 🏢 Basic project information
           proyecto: {
             select: {
               id: true,
@@ -73,57 +73,44 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
               cliente: {
                 select: {
                   id: true,
-                  nombre: true,
-                  correo: true
+                  nombre: true
                 }
               }
             }
           },
-          // 👤 Complete responsible information
+          // 👤 Basic responsible information
           responsable: {
             select: {
               id: true,
               name: true,
-              email: true,
-              image: true
+              email: true
             }
           },
-          // 📋 Complete items with all relationships
+          // 📋 Simplified items with basic relationships
           items: {
             include: {
-              // 📋 Lista relationship
-              lista: {
-                select: {
-                  id: true,
-                  codigo: true,
-                  nombre: true
-                }
-              },
-              // 👤 Responsable information
+              // 👤 Basic responsable information
               responsable: {
                 select: {
                   id: true,
                   name: true,
-                  email: true,
-                  image: true
+                  email: true
                 }
               },
-              // 🏪 Proveedor information
+              // 🏪 Basic proveedor information
               proveedor: {
                 select: {
                   id: true,
-                  nombre: true,
-                  ruc: true
+                  nombre: true
                 }
               },
-              // 💰 All cotizaciones with details
+              // 💰 Simplified cotizaciones
               cotizaciones: {
                 include: {
                   cotizacion: {
                     select: {
                       id: true,
                       codigo: true,
-                      createdAt: true,
                       estado: true,
                       proveedor: {
                         select: {
@@ -138,43 +125,32 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
                   precioUnitario: 'asc'
                 }
               },
-              // 📦 All pedidos with complete information
+              // 📦 Simplified pedidos
               pedidos: {
                 include: {
                   pedido: {
                     select: {
                       id: true,
                       codigo: true,
-                      fechaPedido: true,
-                      fechaEntregaEstimada: true,
                       estado: true
                     }
                   }
                 }
               },
-              // 🏗️ Proyecto equipo relationship
+              // 🏗️ Basic proyecto equipo relationship
               proyectoEquipo: {
                 select: {
                   id: true,
-                  nombre: true,
-                  descripcion: true
+                  nombre: true
                 }
               },
-              // 📋 Proyecto equipo item relationship
+              // 📋 Basic proyecto equipo item relationship
               proyectoEquipoItem: {
                 include: {
                   proyectoEquipo: {
                     select: {
                       id: true,
-                      nombre: true,
-                      descripcion: true
-                    }
-                  },
-                  listaEquipoSeleccionado: {
-                    select: {
-                      id: true,
-                      codigo: true,
-                      descripcion: true
+                      nombre: true
                     }
                   }
                 }
@@ -203,15 +179,15 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
         return null;
       })
     ]);
-    
+
     // Extract items from lista
     const items = lista?.items || [];
-    
+
     // ✅ Handle not found cases
     if (!lista || !proyecto) {
       notFound();
     }
-    
+
     // 🔄 Transform dates to strings for compatibility
     const transformedLista = {
       ...lista,
@@ -229,6 +205,11 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
 
     // 🔄 Transform items dates to strings for compatibility
     const transformedItems = items.map(item => {
+      // ✅ Compute cotizacionSeleccionada from cotizaciones array and cotizacionSeleccionadaId
+      const cotizacionSeleccionada = item.cotizacionSeleccionadaId
+        ? item.cotizaciones.find(cot => cot.id === item.cotizacionSeleccionadaId) || null
+        : null;
+
       const transformedItem = {
         ...item,
         createdAt: item.createdAt.toISOString(),
@@ -239,6 +220,7 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
         reemplazaProyectoEquipoCotizadoItemId: item.reemplazaProyectoEquipoCotizadoItemId ?? undefined,
         proveedorId: item.proveedorId ?? undefined,
         cotizacionSeleccionadaId: item.cotizacionSeleccionadaId ?? undefined,
+        cotizacionSeleccionada: cotizacionSeleccionada || undefined,
         comentarioRevision: item.comentarioRevision ?? undefined,
         presupuesto: item.presupuesto ?? undefined,
         precioElegido: item.precioElegido ?? undefined,
@@ -254,8 +236,7 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
           createdAt: cot.createdAt.toISOString(),
           updatedAt: cot.updatedAt.toISOString(),
           cotizacion: {
-            ...cot.cotizacion,
-            createdAt: cot.cotizacion.createdAt.toISOString()
+            ...cot.cotizacion
           }
         })),
         pedidos: item.pedidos.map(ped => ({
@@ -263,15 +244,13 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
           createdAt: ped.createdAt.toISOString(),
           updatedAt: ped.updatedAt.toISOString(),
           pedido: {
-            ...ped.pedido,
-            fechaPedido: ped.pedido.fechaPedido?.toISOString(),
-            fechaEntregaEstimada: ped.pedido.fechaEntregaEstimada?.toISOString()
+            ...ped.pedido
           }
         }))
       };
       return transformedItem as any;
     });
-    
+
     return (
       <DetailErrorBoundary>
         <div className="container mx-auto py-6">
@@ -289,12 +268,12 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
     );
   } catch (error) {
     console.error('Error loading detail page:', error);
-    
+
     // Handle validation errors specifically
     if (error instanceof RouteValidationError) {
       notFound();
     }
-    
+
     // Re-throw other errors to be caught by error boundary
     throw error;
   }

@@ -1,0 +1,68 @@
+{
+  "metadata": {
+    "description": "Datos reales extraídos de la base de datos GYS",
+    "timestamp": "2025-11-28T21-06-34-028Z",
+    "version": "1.0",
+    "totalRecords": {
+      "users": 4,
+      "clients": 0,
+      "catalogEquipment": 0,
+      "catalogServices": 0,
+      "resources": 0,
+      "providers": 0,
+      "templates": 0
+    }
+  },
+  "data": {
+    "users": [
+      {
+        "id": "cmihogvj20000l84ssnzc7mmy",
+        "name": "Administrador GYS",
+        "email": "admin@gys.com",
+        "emailVerified": null,
+        "password": "$2b$10$8flcJSLpa3kIPN7MCW0YO.IBj0.6UDM8hdIR1WQN7st5496KOn6IW",
+        "role": "admin",
+        "image": null
+      },
+      {
+        "id": "cmihogvj80001l84sq1t45uyy",
+        "name": "Usuario Comercial",
+        "email": "comercial@gys.com",
+        "emailVerified": null,
+        "password": "$2b$10$8flcJSLpa3kIPN7MCW0YO.IBj0.6UDM8hdIR1WQN7st5496KOn6IW",
+        "role": "comercial",
+        "image": null
+      },
+      {
+        "id": "cmihogvja0002l84sa89z9tfx",
+        "name": "Usuario de Prueba",
+        "email": "test@test.com",
+        "emailVerified": null,
+        "password": "test123",
+        "role": "comercial",
+        "image": null
+      },
+      {
+        "id": "cmihogvjd0003l84sdkjhaq53",
+        "name": "Usuario Logístico",
+        "email": "logistico@gys.com",
+        "emailVerified": null,
+        "password": "$2b$10$8flcJSLpa3kIPN7MCW0YO.IBj0.6UDM8hdIR1WQN7st5496KOn6IW",
+        "role": "logistico",
+        "image": null
+      }
+    ],
+    "clients": [],
+    "catalogEquipment": [],
+    "catalogServices": [],
+    "resources": [],
+    "serviceUnits": [],
+    "units": [],
+    "serviceCategories": [],
+    "equipmentCategories": [],
+    "providers": [],
+    "templates": [],
+    "templateExclusions": [],
+    "templateConditions": []
+  }
+}

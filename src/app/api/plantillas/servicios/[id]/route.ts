@@ -39,7 +39,7 @@ export async function GET(
       // Get categoria name if categoria is an ID
       let categoriaNombre = plantilla.categoria
       if (plantilla.categoria) {
-        const categoriaServicio = await prisma.categoriaServicio.findUnique({
+        const categoriaServicio = await prisma.edt.findUnique({
           where: { id: plantilla.categoria }
         })
         if (categoriaServicio) {
@@ -112,7 +112,7 @@ export async function PUT(
     // Get categoria name for the updated plantilla
     let categoriaNombre = plantillaActualizada.categoria
     if (plantillaActualizada.categoria) {
-      const categoriaServicio = await prisma.categoriaServicio.findUnique({
+      const categoriaServicio = await prisma.edt.findUnique({
         where: { id: plantillaActualizada.categoria }
       })
       if (categoriaServicio) {

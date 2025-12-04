@@ -1,0 +1,1 @@
+SELECT 'Database connected' as status;

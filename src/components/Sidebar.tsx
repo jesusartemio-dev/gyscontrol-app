@@ -40,7 +40,10 @@ import {
   GitBranch,
   Calendar,
   FileCheck,
-  Target
+  Target,
+  Shield,
+  UserCheck,
+  History
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -61,6 +64,8 @@ export default function Sidebar() {
     comercial: false,
     crm: false,
     proyectos: false,
+    horasHombre: false,
+    misTareas: false,
     logistica: false,
     finanzas: false,
     gestion: false,
@@ -158,9 +163,9 @@ export default function Sidebar() {
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart },
-        { 
-          href: '/proyectos/tareas', 
-          label: 'Gestión de Tareas', 
+        {
+          href: '/proyectos/tareas',
+          label: 'Gestión de Tareas',
           icon: CheckSquare,
           submenu: [
             { href: '/proyectos/tareas', label: 'Lista de Tareas', icon: CheckSquare },
@@ -169,6 +174,46 @@ export default function Sidebar() {
           ]
         },
       ],
+    },
+    // 2.1. Horas Hombre - Registro y gestión personal de horas
+    {
+      key: 'horas-hombre',
+      title: 'Horas Hombre',
+      icon: Clock,
+      color: 'text-emerald-400',
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador'],
+      links: [
+        { href: '/horas-hombre/timesheet', label: 'Mi Timesheet', icon: Calendar },
+        { href: '/horas-hombre/registro', label: 'Registrar Horas', icon: Clock },
+        { href: '/horas-hombre/historial', label: 'Historial', icon: History },
+        { href: '/horas-hombre/analisis-transversal', label: 'Análisis Transversal EDT', icon: BarChart3 },
+      ]
+    },
+    // 2.2. Supervisión de Horas - Para administradores/gestores
+    {
+      key: 'supervision-horas',
+      title: 'Supervisión',
+      icon: Users,
+      color: 'text-red-400',
+      roles: ['admin', 'gerente', 'gestor', 'coordinador'],
+      links: [
+        { href: '/horas-hombre/supervision', label: 'Horas del Proyecto', icon: Users },
+        { href: '/horas-hombre/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
+        { href: '/horas-hombre/analisis-edt', label: 'Análisis EDT Detallado', icon: Target },
+      ]
+    },
+    // 2.2. Mis Tareas - Gestión personal de tareas asignadas
+    {
+      key: 'mis-tareas',
+      title: 'Mis Tareas',
+      icon: CheckSquare,
+      color: 'text-blue-400',
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador'],
+      links: [
+        { href: '/tareas/asignadas', label: 'Tareas Asignadas', icon: UserCheck },
+        { href: '/tareas/progreso', label: 'Mi Progreso', icon: TrendingUp },
+        { href: '/tareas/equipo', label: 'Equipo', icon: Users },
+      ]
     },
     // 3. Logística - Gestión completa de la cadena logística
     {
@@ -247,6 +292,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'comercial', 'logistico', 'proyectos'],
       links: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+        { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },
         // 🏢 Entidades maestras del negocio
@@ -255,7 +301,7 @@ export default function Sidebar() {
         { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
         { href: '/catalogo/servicios', label: 'Catálogo Servicios', icon: FileText },
         { href: '/catalogo/categorias-equipo', label: 'Categorías Equipo', icon: FolderOpen },
-        { href: '/catalogo/categorias-servicio', label: 'Categorías Servicio', icon: FolderOpen },
+        { href: '/catalogo/edts', label: 'EDTs', icon: FolderOpen },
         { href: '/catalogo/unidades', label: 'Unidades Equipos', icon: Calculator },
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },
         { href: '/catalogo/recursos', label: 'Recursos', icon: Wrench },
@@ -264,6 +310,10 @@ export default function Sidebar() {
         { href: '/catalogo/condiciones', label: 'Condiciones', icon: FileCheck },
         // 🏗️ Configuración de fases
         { href: '/configuracion/fases', label: 'Fases por Defecto', icon: GitBranch },
+        // 📅 Configuración de duraciones de cronograma
+        { href: '/configuracion/duraciones-cronograma', label: 'Duraciones Cronograma', icon: Calendar },
+        // 🗓️ Configuración de calendarios laborales
+        { href: '/configuracion/calendario-laboral', label: 'Calendarios Laborales', icon: Calendar },
       ],
     },
   ]

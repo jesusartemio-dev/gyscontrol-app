@@ -15,6 +15,7 @@ export interface ResultadoConversion {
   proyectoId: string;
   fasesCreadas: number;
   edtsConvertidos: number;
+  actividadesConvertidas: number;
   tareasConvertidas: number;
   errores: string[];
   warnings: string[];
@@ -22,7 +23,10 @@ export interface ResultadoConversion {
 
 export class CronogramaConversionService {
   /**
-   * ✅ Convertir cronograma comercial completo a plan de ejecución
+   * ✅ Convertir cronograma comercial a plan de ejecución de 5 niveles
+   *
+   * Cotizaciones: Proyecto(implícito) → Fases → EDTs → Actividades → Tareas
+   * Proyectos: Proyecto → Fases → EDTs → Actividades → Tareas
    */
   static async convertirCotizacionAProyecto(
     cotizacionId: string,
@@ -32,6 +36,7 @@ export class CronogramaConversionService {
       proyectoId,
       fasesCreadas: 0,
       edtsConvertidos: 0,
+      actividadesConvertidas: 0,
       tareasConvertidas: 0,
       errores: [],
       warnings: []
@@ -40,10 +45,11 @@ export class CronogramaConversionService {
     try {
       logger.info(`Iniciando conversión de cotización ${cotizacionId} a proyecto ${proyectoId}`);
 
-      // 1. Obtener cotización con cronograma comercial
+      // 1. Obtener cotización con cronograma comercial completo de 5 niveles
       const cotizacion = await prisma.cotizacion.findUnique({
         where: { id: cotizacionId },
         include: {
+          // ✅ Proyecto asociado (relación directa)
           proyectos: {
             select: {
               id: true,
@@ -51,32 +57,25 @@ export class CronogramaConversionService {
               fechaInicio: true,
               fechaFin: true
             }
+          }
+        }
+      });
+
+      // 2. Obtener EDTs comerciales
+      const edtsComerciales = await prisma.cotizacionEdt.findMany({
+        where: { cotizacionId },
+        include: {
+          cotizacionServicio: {
+            select: {
+              id: true,
+              nombre: true,
+              categoria: true
+            }
           },
-          cronograma: {
-            include: {
-              cotizacionServicio: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  categoria: true
-                }
-              },
-              categoriaServicio: {
-                select: {
-                  id: true,
-                  nombre: true
-                }
-              },
-              tareas: {
-                include: {
-                  responsable: {
-                    select: {
-                      id: true,
-                      name: true
-                    }
-                  }
-                }
-              }
+          categoriaServicio: {
+            select: {
+              id: true,
+              nombre: true
             }
           }
         }
@@ -107,16 +106,21 @@ export class CronogramaConversionService {
       const fasesProyecto = await this.crearFasesEstandar(proyectoId, proyectoAsociado, cronogramaEjecucion.id);
       resultado.fasesCreadas = fasesProyecto.length;
 
-      // 4. Convertir EDTs comerciales a EDTs de proyecto
+      // 4. Convertir EDTs comerciales a EDTs de proyecto con jerarquía completa
       const asignaciones = await this.convertirEdtsComerciales(
-        cotizacion.cronograma,
+        edtsComerciales,
         fasesProyecto,
         proyectoId,
         cronogramaEjecucion.id
       );
       resultado.edtsConvertidos = asignaciones.length;
 
-      // 4. Convertir tareas comerciales
+      // 5. Convertir actividades comerciales a actividades de proyecto (directamente bajo EDTs)
+      // Primero procesar las asignaciones para obtener actividades directas
+      await this.prepararActividadesDirectas(asignaciones);
+      resultado.actividadesConvertidas = await this.convertirActividadesComerciales(asignaciones);
+
+      // 6. Convertir tareas comerciales a tareas de proyecto
       resultado.tareasConvertidas = await this.convertirTareasComerciales(asignaciones);
 
       // 5. Ajustar fechas de fases basadas en EDTs
@@ -210,69 +214,177 @@ export class CronogramaConversionService {
      proyectoId: string,
      proyectoCronogramaId: string
    ): Promise<any[]> {
-    const asignaciones = [];
+     const asignaciones = [];
 
-    for (const edtComercial of edtsComerciales) {
-      // Determinar fase apropiada
-      const faseAsignada = this.determinarFaseParaEdt(edtComercial, fasesProyecto);
+     for (const edtComercial of edtsComerciales) {
+       // Determinar fase apropiada
+       const faseAsignada = this.determinarFaseParaEdt(edtComercial, fasesProyecto);
 
-      // Crear EDT de proyecto
-      const edtProyecto = await prisma.proyectoEdt.create({
-        data: {
-          proyectoId,
-          proyectoCronogramaId,
-          nombre: edtComercial.nombre || edtComercial.cotizacionServicio?.nombre || 'EDT sin nombre',
-          categoriaServicioId: edtComercial.categoriaServicioId,
-          zona: null,
-          fechaInicioPlan: edtComercial.fechaInicioComercial,
-          fechaFinPlan: edtComercial.fechaFinComercial,
-          horasPlan: edtComercial.horasEstimadas || 0,
-          responsableId: edtComercial.responsableId,
-          descripcion: edtComercial.descripcion,
-          prioridad: edtComercial.prioridad || 'media',
-          estado: 'planificado',
-          porcentajeAvance: 0
-        }
-      });
+       // Crear EDT de proyecto
+       const edtProyecto = await prisma.proyectoEdt.create({
+         data: {
+           proyectoId,
+           proyectoCronogramaId,
+           nombre: edtComercial.nombre || edtComercial.cotizacionServicio?.nombre || 'EDT sin nombre',
+           categoriaServicioId: edtComercial.categoriaServicioId,
+           fechaInicioPlan: edtComercial.fechaInicioComercial,
+           fechaFinPlan: edtComercial.fechaFinComercial,
+           horasPlan: edtComercial.horasEstimadas || 0,
+           responsableId: edtComercial.responsableId,
+           descripcion: edtComercial.descripcion,
+           prioridad: edtComercial.prioridad || 'media',
+           estado: 'planificado',
+           porcentajeAvance: 0
+         }
+       });
 
-      asignaciones.push({
-        edtComercial: edtComercial.id,
-        edtProyecto: edtProyecto.id,
-        proyectoCronogramaId,
-        faseId: faseAsignada.id,
-        faseNombre: faseAsignada.nombre,
-        tareas: edtComercial.tareas || []
-      });
+       // En jerarquía de 5 niveles, las actividades van directamente bajo EDTs
+       asignaciones.push({
+         edtComercial: edtComercial,
+         edtProyecto: edtProyecto.id,
+         proyectoId,
+         proyectoCronogramaId,
+         faseId: faseAsignada.id,
+         faseNombre: faseAsignada.nombre,
+         actividades: edtComercial.actividades || [] // Actividades directas bajo EDT
+       });
+     }
+
+     return asignaciones;
+   }
+
+  /**
+     * ✅ Preparar actividades directas bajo EDTs (jerarquía de 5 niveles)
+     */
+   private static async prepararActividadesDirectas(asignaciones: any[]): Promise<void> {
+     // En la jerarquía de 5 niveles, las actividades van directamente bajo EDTs
+     for (const asignacion of asignaciones) {
+       // Usar actividades que ya están en la asignación (de edtComercial.actividades)
+       asignacion.actividadesDirectas = asignacion.actividades || [];
+     }
+   }
+
+  /**
+    * ✅ Convertir actividades comerciales a actividades de proyecto (directamente bajo EDTs)
+    */
+  private static async convertirActividadesComerciales(asignaciones: any[]): Promise<number> {
+    let totalActividades = 0;
+
+    for (const asignacion of asignaciones) {
+      const edtProyectoId = asignacion.edtProyecto;
+      const actividadesComerciales = asignacion.actividadesDirectas || [];
+
+      // Inicializar array de actividades asignadas
+      asignacion.actividadesAsignadas = [];
+
+      // Procesar actividades comerciales directamente bajo EDT
+      for (const actividadComercial of actividadesComerciales) {
+        const actividadProyecto = await prisma.proyectoActividad.create({
+          data: {
+            proyectoEdtId: edtProyectoId, // ✅ Directamente bajo EDT
+            proyectoCronogramaId: asignacion.proyectoCronogramaId, // ✅ Referencia al cronograma
+            nombre: actividadComercial.nombre,
+            fechaInicioPlan: actividadComercial.fechaInicioComercial,
+            fechaFinPlan: actividadComercial.fechaFinComercial,
+            estado: actividadComercial.estado || 'pendiente',
+            porcentajeAvance: actividadComercial.porcentajeAvance || 0,
+            descripcion: actividadComercial.descripcion,
+            prioridad: actividadComercial.prioridad || 'media',
+            horasPlan: actividadComercial.horasEstimadas || 0
+          }
+        } as any);
+
+        // Agregar actividad asignada
+        asignacion.actividadesAsignadas.push({
+          actividadProyecto: actividadProyecto.id,
+          actividadComercial: actividadComercial,
+          tareas: actividadComercial.tareas || []
+        });
+
+        totalActividades++;
+      }
+
+      // Si no hay actividades comerciales, crear una actividad por defecto
+      if (actividadesComerciales.length === 0) {
+        const actividadProyecto = await prisma.proyectoActividad.create({
+          data: {
+            proyectoEdtId: edtProyectoId,
+            proyectoCronogramaId: asignacion.proyectoCronogramaId,
+            nombre: `Actividad Principal - ${asignacion.edtComercial?.nombre || 'EDT'}`,
+            fechaInicioPlan: asignacion.edtComercial?.fechaInicioComercial,
+            fechaFinPlan: asignacion.edtComercial?.fechaFinComercial,
+            estado: 'pendiente',
+            porcentajeAvance: 0,
+            descripcion: 'Actividad principal del EDT',
+            prioridad: 'media',
+            horasPlan: asignacion.edtComercial?.horasEstimadas || 0
+          }
+        } as any);
+
+        asignacion.actividadesAsignadas = [{
+          actividadProyecto: actividadProyecto.id,
+          actividadComercial: null,
+          tareas: asignacion.edtComercial?.tareas || []
+        }];
+
+        totalActividades++;
+      }
     }
 
-    return asignaciones;
+    return totalActividades;
   }
 
   /**
-   * ✅ Convertir tareas comerciales a tareas de proyecto
-   */
+    * ✅ Convertir tareas comerciales a tareas de proyecto
+    */
   private static async convertirTareasComerciales(asignaciones: any[]): Promise<number> {
     let totalTareas = 0;
 
     for (const asignacion of asignaciones) {
-      for (const tareaComercial of asignacion.tareas) {
-        // Crear tarea de proyecto usando el nuevo modelo ProyectoTarea
-        await prisma.proyectoTarea.create({
-          data: {
-            proyectoEdtId: asignacion.edtProyecto,
-            proyectoCronogramaId: asignacion.proyectoCronogramaId,
-            nombre: tareaComercial.nombre,
-            descripcion: tareaComercial.descripcion,
-            fechaInicio: tareaComercial.fechaInicio,
-            fechaFin: tareaComercial.fechaFin,
-            horasEstimadas: tareaComercial.horasEstimadas,
-            responsableId: tareaComercial.responsableId,
-            prioridad: tareaComercial.prioridad || 'media',
-            estado: 'pendiente'
-          }
-        });
+      // Procesar tareas por actividad asignada
+      for (const actividadAsignacion of asignacion.actividadesAsignadas || []) {
+        const actividadProyectoId = actividadAsignacion.actividadProyecto;
 
-        totalTareas++;
+        // Convertir tareas de esta actividad
+        for (const tareaComercial of actividadAsignacion.tareas || []) {
+          await prisma.proyectoTarea.create({
+            data: {
+              proyectoEdtId: asignacion.edtProyecto,
+              proyectoCronogramaId: asignacion.proyectoCronogramaId,
+              proyectoActividadId: actividadProyectoId,
+              nombre: tareaComercial.nombre,
+              descripcion: tareaComercial.descripcion,
+              fechaInicio: tareaComercial.fechaInicio,
+              fechaFin: tareaComercial.fechaFin,
+              horasEstimadas: tareaComercial.horasEstimadas,
+              responsableId: tareaComercial.responsableId,
+              prioridad: tareaComercial.prioridad || 'media',
+              estado: 'pendiente'
+            }
+          });
+
+          totalTareas++;
+        }
+
+        // Si no hay tareas en la actividad, crear una tarea por defecto
+        if ((actividadAsignacion.tareas || []).length === 0) {
+          await prisma.proyectoTarea.create({
+            data: {
+              proyectoEdtId: asignacion.edtProyecto,
+              proyectoCronogramaId: asignacion.proyectoCronogramaId,
+              proyectoActividadId: actividadProyectoId,
+              nombre: `Tarea Principal - ${actividadAsignacion.actividadComercial?.nombre || 'Actividad'}`,
+              descripcion: 'Tarea principal de la actividad',
+              fechaInicio: actividadAsignacion.actividadComercial?.fechaInicioComercial,
+              fechaFin: actividadAsignacion.actividadComercial?.fechaFinComercial,
+              horasEstimadas: actividadAsignacion.actividadComercial?.horasEstimadas || 0,
+              prioridad: 'media',
+              estado: 'pendiente'
+            }
+          });
+
+          totalTareas++;
+        }
       }
     }
 
@@ -360,6 +472,7 @@ export class CronogramaConversionService {
    */
   static async obtenerPreviewConversion(cotizacionId: string): Promise<any> {
     try {
+      // 1. Obtener cotización básica
       const cotizacion = await prisma.cotizacion.findUnique({
         where: { id: cotizacionId },
         include: {
@@ -369,23 +482,6 @@ export class CronogramaConversionService {
               nombre: true,
               fechaInicio: true,
               fechaFin: true
-            }
-          },
-          cronograma: {
-            include: {
-              cotizacionServicio: {
-                select: {
-                  id: true,
-                  nombre: true
-                }
-              },
-              categoriaServicio: {
-                select: {
-                  id: true,
-                  nombre: true
-                }
-              },
-              tareas: true
             }
           }
         }
@@ -401,21 +497,66 @@ export class CronogramaConversionService {
 
       const proyectoAsociado = cotizacion.proyectos[0];
 
+      // 2. Obtener EDTs comerciales
+      const edtsComerciales = await prisma.cotizacionEdt.findMany({
+        where: { cotizacionId },
+        include: {
+          cotizacionServicio: {
+            select: {
+              id: true,
+              nombre: true
+            }
+          },
+          categoriaServicio: {
+            select: {
+              id: true,
+              nombre: true
+            }
+          }
+        }
+      });
+
       // Simular creación de fases
       const fasesSimuladas = this.simularFasesEstandar(proyectoAsociado);
 
       // Simular asignaciones
       const asignacionesSimuladas = this.simularAsignaciones(
-        cotizacion.cronograma,
+        edtsComerciales,
         fasesSimuladas
       );
+
+      // Contar elementos en la jerarquía de 5 niveles
+      let totalActividades = 0;
+      let totalTareas = 0;
+
+      // Contar actividades y tareas por separado
+      for (const edt of edtsComerciales) {
+        const actividadesCount = await prisma.cotizacionActividad.count({
+          where: { cotizacionEdtId: edt.id }
+        });
+        totalActividades += actividadesCount;
+
+        // Contar tareas de estas actividades
+        const actividades = await prisma.cotizacionActividad.findMany({
+          where: { cotizacionEdtId: edt.id },
+          select: { id: true }
+        });
+
+        for (const actividad of actividades) {
+          const tareasCount = await prisma.cotizacionTarea.count({
+            where: { cotizacionActividadId: actividad.id }
+          });
+          totalTareas += tareasCount;
+        }
+      }
 
       return {
         cotizacion: {
           id: cotizacion.id,
           nombre: cotizacion.nombre,
-          edtsComerciales: cotizacion.cronograma.length,
-          tareasComerciales: cotizacion.cronograma.reduce((sum: number, edt: any) => sum + (edt.tareas?.length || 0), 0)
+          edtsComerciales: edtsComerciales.length,
+          actividadesComerciales: totalActividades,
+          tareasComerciales: totalTareas
         },
         proyecto: proyectoAsociado,
         fasesSimuladas,
@@ -423,7 +564,8 @@ export class CronogramaConversionService {
         resumen: {
           fasesACrear: fasesSimuladas.length,
           edtsAConvertir: asignacionesSimuladas.length,
-          tareasAConvertir: asignacionesSimuladas.reduce((sum: number, a: any) => sum + a.tareasCount, 0)
+          actividadesAConvertir: totalActividades,
+          tareasAConvertir: totalTareas
         }
       };
     } catch (error) {
@@ -471,16 +613,22 @@ export class CronogramaConversionService {
   }
 
   /**
-   * ✅ Simular asignaciones (para preview)
-   */
+     * ✅ Simular asignaciones (para preview) - Jerarquía de 5 niveles
+     */
   private static simularAsignaciones(edtsComerciales: any[], fases: any[]): any[] {
     return edtsComerciales.map(edt => {
       const faseAsignada = this.determinarFaseParaEdt(edt, fases);
+
+      // Para simulación, usamos valores por defecto
+      const actividadesCount = 1; // Asumir al menos 1 actividad por EDT
+      const tareasCount = 2; // Asumir al menos 2 tareas por actividad
+
       return {
         edtNombre: edt.nombre || edt.cotizacionServicio?.nombre || 'Sin nombre',
         categoria: edt.categoriaServicio?.nombre || 'Sin categoría',
         faseAsignada: faseAsignada.nombre,
-        tareasCount: edt.tareas?.length || 0,
+        actividadesCount,
+        tareasCount,
         horasEstimadas: edt.horasEstimadas || 0
       };
     });

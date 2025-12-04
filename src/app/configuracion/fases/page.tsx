@@ -17,17 +17,25 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Edit, Trash2, Settings, Palette, Percent } from 'lucide-react'
+import { Plus, Edit, Trash2, Settings, Palette, Calendar, RotateCcw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { exportarFasesAExcel } from '@/lib/utils/faseExcel'
+import {
+  leerFasesDesdeExcel,
+  validarFases
+} from '@/lib/utils/faseImportUtils'
+import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { AlertCircle, Loader2 } from 'lucide-react'
 
 interface FaseDefault {
   id: string
   nombre: string
   descripcion?: string
   orden: number
-  porcentajeDuracion?: number
+  duracionDias: number
   color?: string
   activo: boolean
   createdAt: string
@@ -36,9 +44,15 @@ interface FaseDefault {
 
 export default function FasesConfiguracionPage() {
   const [fases, setFases] = useState<FaseDefault[]>([])
+  const [allFases, setAllFases] = useState<FaseDefault[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingFase, setEditingFase] = useState<FaseDefault | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [faseToDelete, setFaseToDelete] = useState<FaseDefault | null>(null)
+  const [importando, setImportando] = useState(false)
+  const [errores, setErrores] = useState<string[]>([])
+  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const { toast } = useToast()
 
   // Form state
@@ -46,7 +60,7 @@ export default function FasesConfiguracionPage() {
     nombre: '',
     descripcion: '',
     orden: 0,
-    porcentajeDuracion: 0,
+    duracionDias: 0,
     color: '#3b82f6',
     activo: true
   })
@@ -55,13 +69,20 @@ export default function FasesConfiguracionPage() {
     loadFases()
   }, [])
 
+  useEffect(() => {
+    applyFilter(allFases)
+  }, [filter, allFases])
+
   const loadFases = async () => {
     try {
-      const response = await fetch('/api/configuracion/fases')
+      // Load all phases for proper filtering
+      const response = await fetch('/api/configuracion/fases?all=true')
       const result = await response.json()
 
       if (result.success) {
-        setFases(result.data)
+        setAllFases(result.data)
+        // Apply current filter
+        applyFilter(result.data)
       } else {
         toast({
           title: 'Error',
@@ -80,12 +101,29 @@ export default function FasesConfiguracionPage() {
     }
   }
 
+  const applyFilter = (fasesData: FaseDefault[]) => {
+    let filteredFases: FaseDefault[]
+
+    switch (filter) {
+      case 'active':
+        filteredFases = fasesData.filter(f => f.activo)
+        break
+      case 'inactive':
+        filteredFases = fasesData.filter(f => !f.activo)
+        break
+      default:
+        filteredFases = fasesData
+    }
+
+    setFases(filteredFases)
+  }
+
   const resetForm = () => {
     setFormData({
       nombre: '',
       descripcion: '',
       orden: 0,
-      porcentajeDuracion: 0,
+      duracionDias: 0,
       color: '#3b82f6',
       activo: true
     })
@@ -145,20 +183,23 @@ export default function FasesConfiguracionPage() {
       nombre: fase.nombre,
       descripcion: fase.descripcion || '',
       orden: fase.orden,
-      porcentajeDuracion: fase.porcentajeDuracion || 0,
+      duracionDias: fase.duracionDias || 0,
       color: fase.color || '#3b82f6',
       activo: fase.activo
     })
     setShowForm(true)
   }
 
-  const handleDelete = async (fase: FaseDefault) => {
-    if (!confirm(`¿Estás seguro de desactivar la fase "${fase.nombre}"?`)) {
-      return
-    }
+  const handleDeleteClick = (fase: FaseDefault) => {
+    setFaseToDelete(fase)
+    setShowDeleteDialog(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!faseToDelete) return
 
     try {
-      const response = await fetch(`/api/configuracion/fases/${fase.id}`, {
+      const response = await fetch(`/api/configuracion/fases/${faseToDelete.id}`, {
         method: 'DELETE'
       })
 
@@ -170,6 +211,8 @@ export default function FasesConfiguracionPage() {
           description: 'Fase desactivada exitosamente'
         })
         loadFases()
+        setShowDeleteDialog(false)
+        setFaseToDelete(null)
       } else {
         toast({
           title: 'Error',
@@ -183,6 +226,198 @@ export default function FasesConfiguracionPage() {
         description: 'Error de conexión',
         variant: 'destructive'
       })
+    }
+  }
+
+  const handleReactivate = async (fase: FaseDefault) => {
+    try {
+      const response = await fetch(`/api/configuracion/fases/${fase.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...fase, activo: true })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: 'Éxito',
+          description: 'Fase reactivada exitosamente'
+        })
+        loadFases()
+      } else {
+        toast({
+          title: 'Error',
+          description: result.error || 'Error al reactivar la fase',
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Error de conexión',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleExportar = () => {
+    try {
+      exportarFasesAExcel(fases)
+      toast({
+        title: 'Éxito',
+        description: 'Fases exportadas exitosamente'
+      })
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: 'Error al exportar fases',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Prevent multiple simultaneous imports
+    if (importando) {
+      toast({
+        title: 'Importación en progreso',
+        description: 'Espera a que termine la importación actual',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ]
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: 'Tipo de archivo inválido',
+        description: 'Solo se permiten archivos Excel (.xlsx, .xls)',
+        variant: 'destructive'
+      })
+      e.target.value = ''
+      return
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (file.size > maxSize) {
+      toast({
+        title: 'Archivo demasiado grande',
+        description: 'El archivo no debe superar los 5MB',
+        variant: 'destructive'
+      })
+      e.target.value = ''
+      return
+    }
+
+    setImportando(true)
+    setErrores([])
+
+    try {
+      const datos = await leerFasesDesdeExcel(file)
+
+      // Get ALL phases (active and inactive) for proper validation
+      const responseAll = await fetch('/api/configuracion/fases?all=true')
+      const resultAll = await responseAll.json()
+      const allFases = resultAll.success ? resultAll.data : []
+
+      const nombresExistentes = allFases.map((f: FaseDefault) => f.nombre)
+      const { nuevas, errores: erroresImport, actualizaciones } = validarFases(datos, nombresExistentes)
+
+      // Only validation errors are blocking - updates are allowed
+      if (erroresImport.length > 0) {
+        setErrores(erroresImport)
+        toast({
+          title: 'Errores encontrados',
+          description: 'Se encontraron errores en la importación',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      // Show info about updates if any
+      if (actualizaciones.length > 0) {
+        toast({
+          title: 'Actualizaciones detectadas',
+          description: `${actualizaciones.length} fases serán actualizadas: ${actualizaciones.join(', ')}`,
+        })
+      }
+
+      // Import fases one by one to handle errors better
+      let successCount = 0
+      let errorCount = 0
+      const erroresAPI: string[] = []
+
+      for (const fase of nuevas) {
+        try {
+          // Check if fase already exists (in ALL fases, including deactivated)
+          const existingFase = allFases.find((f: FaseDefault) => f.nombre === fase.nombre)
+
+          const method = existingFase ? 'PUT' : 'POST'
+          const url = existingFase
+            ? `/api/configuracion/fases/${existingFase.id}`
+            : '/api/configuracion/fases'
+
+          // If fase exists but is deactivated, ensure it gets reactivated
+          const faseData = existingFase && !existingFase.activo
+            ? { ...fase, activo: true } // Reactivate if it was deactivated
+            : fase
+
+          const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(faseData)
+          })
+
+          const result = await response.json()
+
+          if (response.ok && result.success) {
+            successCount++
+          } else {
+            errorCount++
+            const action = existingFase ? 'actualizando' : 'creando'
+            erroresAPI.push(`Error ${action} "${fase.nombre}": ${result.error || 'Error desconocido'}`)
+          }
+        } catch (error) {
+          errorCount++
+          erroresAPI.push(`Error de conexión procesando "${fase.nombre}"`)
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: 'Importación completada',
+          description: `${successCount} fases importadas correctamente${errorCount > 0 ? `, ${errorCount} errores` : ''}`
+        })
+        loadFases()
+      }
+
+      if (erroresAPI.length > 0) {
+        setErrores(prev => [...prev, ...erroresAPI])
+      }
+    } catch (err) {
+      const errorMessage = 'Error inesperado en la importación'
+      setErrores([errorMessage])
+      console.error('Error al importar fases:', err)
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive'
+      })
+    } finally {
+      setImportando(false)
+      e.target.value = ''
     }
   }
 
@@ -210,13 +445,21 @@ export default function FasesConfiguracionPage() {
           </p>
         </div>
 
+        <div className="flex items-center gap-3">
+          <Button onClick={() => { resetForm(); setShowForm(true) }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Fase
+          </Button>
+          <BotonesImportExport
+            onExportar={handleExportar}
+            onImportar={handleImportar}
+            importando={importando}
+            exportLabel="Exportar Fases"
+            importLabel="Importar Fases"
+          />
+        </div>
+
         <Dialog open={showForm} onOpenChange={setShowForm}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setShowForm(true) }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Fase
-            </Button>
-          </DialogTrigger>
 
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -261,15 +504,15 @@ export default function FasesConfiguracionPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="porcentajeDuracion">Duración (%)</Label>
+                  <Label htmlFor="duracionDias">Duración (días) *</Label>
                   <Input
-                    id="porcentajeDuracion"
+                    id="duracionDias"
                     type="number"
-                    value={formData.porcentajeDuracion}
-                    onChange={(e) => setFormData({ ...formData, porcentajeDuracion: parseFloat(e.target.value) || 0 })}
-                    min="0"
-                    max="100"
-                    step="0.1"
+                    value={formData.duracionDias}
+                    onChange={(e) => setFormData({ ...formData, duracionDias: parseInt(e.target.value) || 0 })}
+                    min="1"
+                    placeholder="Ej: 45, 90, 120"
+                    required
                   />
                 </div>
               </div>
@@ -316,7 +559,108 @@ export default function FasesConfiguracionPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Eliminación</DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que quieres desactivar esta fase? Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+
+            {faseToDelete && (
+              <div className="py-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Fase:</span>
+                      <span className="text-gray-900">{faseToDelete.nombre}</span>
+                    </div>
+                  </div>
+                  {faseToDelete.descripcion && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      {faseToDelete.descripcion}
+                    </div>
+                  )}
+                  <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
+                    <span>Orden: {faseToDelete.orden}</span>
+                    {faseToDelete.duracionDias && (
+                      <span>Duración: {faseToDelete.duracionDias} días</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteDialog(false)
+                  setFaseToDelete(null)
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Desactivar Fase
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm font-medium text-muted-foreground">Filtrar:</span>
+        <div className="flex rounded-lg border">
+          <Button
+            variant={filter === 'all' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setFilter('all')}
+            className="rounded-r-none"
+          >
+            Todas ({allFases.length})
+          </Button>
+          <Button
+            variant={filter === 'active' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setFilter('active')}
+            className="rounded-none border-x"
+          >
+            Activas ({allFases.filter(f => f.activo).length})
+          </Button>
+          <Button
+            variant={filter === 'inactive' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setFilter('inactive')}
+            className="rounded-l-none"
+          >
+            Inactivas ({allFases.filter(f => !f.activo).length})
+          </Button>
+        </div>
+      </div>
+
+      {/* Import Errors */}
+      {errores.length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Errores de Importación</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc pl-5 mt-2 space-y-1">
+              {errores.map((err, idx) => (
+                <li key={idx}>{err}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Fases Table */}
       <Card>
@@ -324,6 +668,11 @@ export default function FasesConfiguracionPage() {
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
             Fases por Defecto ({fases.length})
+            {filter !== 'all' && (
+              <Badge variant="secondary" className="ml-2">
+                {filter === 'active' ? 'Activas' : 'Inactivas'}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -346,7 +695,7 @@ export default function FasesConfiguracionPage() {
                   <TableHead>Orden</TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Descripción</TableHead>
-                  <TableHead>Duración</TableHead>
+                  <TableHead>Duración (días)</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -361,10 +710,10 @@ export default function FasesConfiguracionPage() {
                       {fase.descripcion || '-'}
                     </TableCell>
                     <TableCell>
-                      {fase.porcentajeDuracion ? (
+                      {fase.duracionDias ? (
                         <Badge variant="secondary" className="flex items-center gap-1 w-fit">
-                          <Percent className="h-3 w-3" />
-                          {fase.porcentajeDuracion}%
+                          <Calendar className="h-3 w-3" />
+                          {fase.duracionDias} días
                         </Badge>
                       ) : (
                         '-'
@@ -395,14 +744,27 @@ export default function FasesConfiguracionPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(fase)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {fase.activo ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(fase)}
+                            className="text-red-600 hover:text-red-700"
+                            title="Desactivar fase"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleReactivate(fase)}
+                            className="text-green-600 hover:text-green-700"
+                            title="Reactivar fase"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

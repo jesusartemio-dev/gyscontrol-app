@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, Minimize2, RotateCcw, Recycle, Plus, ShoppingCart } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, Minimize2, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
 import { updateListaEquipoItem, deleteListaEquipoItem } from '@/lib/services/listaEquipoItem'
@@ -24,7 +24,9 @@ import ModalReemplazarItemDesdeCatalogo from './ModalReemplazarItemDesdeCatalogo
 import ModalReemplazarReemplazoDesdeCatalogo from './ModalReemplazarReemplazoDesdeCatalogo'
 import ModalAgregarItemDesdeCatalogo from './ModalAgregarItemDesdeCatalogo'
 import ModalAgregarItemDesdeEquipo from './ModalAgregarItemDesdeEquipo'
+import ModalImportarExcelLista from './ModalImportarExcelLista'
 import { calcularCostoItem, calcularCostoTotal, formatCurrency } from '@/lib/utils/costoCalculations'
+import { exportarListaEquipoAExcel } from '@/lib/utils/listaEquipoExcel'
 // import { DebugLogger, useRenderTracker } from '@/components/debug/DebugLogger'
 // import MotionRefDebugger from '@/components/debug/MotionRefDebugger'
 // import RenderLoopDetector, { useRenderLoopDetection } from '@/components/debug/RenderLoopDetector'
@@ -120,6 +122,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   const [compactMode, setCompactMode] = useState(true) // ✅ Compact mode by default
   const [showModalAgregarCatalogo, setShowModalAgregarCatalogo] = useState(false)
   const [showModalAgregarEquipo, setShowModalAgregarEquipo] = useState(false)
+  const [showModalImportarExcel, setShowModalImportarExcel] = useState(false)
   
   const [visibleColumns, setVisibleColumns] = useState({
     codigoDescripcion: true, // ✅ Combined column
@@ -274,13 +277,47 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   // 🔗 Función para navegar al pedido
   const handleNavigateToPedido = (item: ListaEquipoItem, resumenPedidos: ReturnType<typeof calcularResumenPedidos>) => {
     const pedidoId = getIdPedidoRelevante(resumenPedidos)
-    
+
     if (pedidoId) {
       router.push(`/proyectos/${proyectoId}/pedidos-equipo/${pedidoId}`)
     } else {
       toast.error('No se encontró un pedido asociado a este ítem')
     }
   }
+
+  // 📊 Handle Excel export
+  const handleExportExcel = useCallback(async () => {
+    try {
+      if (items.length === 0) {
+        toast.error('No hay datos para exportar')
+        return
+      }
+
+      // Get lista information - if not available in items, fetch it
+      let listaNombre = items[0]?.lista?.nombre || 'Lista de Equipos'
+      let listaCodigo = items[0]?.lista?.codigo || 'SIN-CODIGO'
+
+      // If lista info is not available in items, try to fetch it
+      if (!items[0]?.lista?.codigo && listaId) {
+        try {
+          const response = await fetch(`/api/listas-equipo/${listaId}`)
+          if (response.ok) {
+            const listaData = await response.json()
+            listaNombre = listaData.nombre || listaNombre
+            listaCodigo = listaData.codigo || listaCodigo
+          }
+        } catch (error) {
+          console.warn('Could not fetch lista details:', error)
+        }
+      }
+
+      exportarListaEquipoAExcel(items, listaNombre, listaCodigo)
+      toast.success('Lista exportada a Excel correctamente')
+    } catch (error) {
+      console.error('Error exportando a Excel:', error)
+      toast.error('Error al exportar la lista a Excel')
+    }
+  }, [items, listaId])
 
   // 🎨 Render header with search and actions only
   const renderHeader = () => (
@@ -319,7 +356,26 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                className="h-8 px-3"
              >
                <ShoppingCart className="h-4 w-4 mr-1" />
-               Desde Equipo
+               + Desde Cotización
+             </Button>
+             <Button
+               variant="default"
+               size="sm"
+               onClick={() => setShowModalImportarExcel(true)}
+               className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
+             >
+               <FileText className="h-4 w-4 mr-2" />
+               Importar Excel
+             </Button>
+             <Button
+               variant="default"
+               size="sm"
+               onClick={handleExportExcel}
+               disabled={items.length === 0}
+               className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white"
+             >
+               <Download className="h-4 w-4 mr-2" />
+               Exportar Excel
              </Button>
            </div>
          )}
@@ -373,7 +429,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                    {/* ✅ Toggle para columnas unificadas vs separadas */}
                    <div className="flex items-center justify-between py-1">
                      <Label className="text-xs font-medium">Unificadas</Label>
-                     <Switch 
+                      <Switch 
                         checked={visibleColumns.cantidadUnidad} 
                         onCheckedChange={(checked) => { 
                           setVisibleColumns(prev => ({ 
@@ -723,7 +779,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                           {labelOrigen[item.origen] || item.origen}
                         </Badge>
                       </div>
-                    </td>
+                     </td>
                    )}
                    {visibleColumns.estado && (
                      <td className={`${cellPadding} ${columnWidths.estado}`}>
@@ -732,7 +788,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                           {item.estado || 'Sin estado'}
                         </Badge>
                       </div>
-                    </td>
+                     </td>
                    )}
                    {visibleColumns.pedidos && (
                      <td className={`${cellPadding} ${columnWidths.pedidos}`}>
@@ -900,11 +956,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                      </td>
                    )}
                    </tr>
-              )
-                })
-              }
-          </tbody>
-          </table>
+               )
+                 })
+               }
+           </tbody>
+           </table>
         </div>
       </div>
     )
@@ -913,7 +969,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   return (
         <div className="space-y-6">
       {renderHeader()}
-      
+       
       {isLoading ? (
         renderLoadingSkeleton()
       ) : filteredItems.length === 0 ? (
@@ -1197,6 +1253,17 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
         proyectoId={proyectoId}
         onSuccess={() => {
           setShowModalAgregarEquipo(false)
+          onCreated?.()
+        }}
+      />
+
+      <ModalImportarExcelLista
+        isOpen={showModalImportarExcel}
+        onClose={() => setShowModalImportarExcel(false)}
+        listaId={listaId}
+        proyectoId={proyectoId}
+        onSuccess={() => {
+          setShowModalImportarExcel(false)
           onCreated?.()
         }}
       />

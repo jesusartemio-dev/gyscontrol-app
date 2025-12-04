@@ -14,9 +14,9 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getCatalogoServiciosByCategoriaId } from '@/lib/services/catalogoServicio'
 import { createCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { recalcularCotizacionDesdeAPI } from '@/lib/services/cotizacion'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { calcularHoras } from '@/lib/utils/formulas'
-import type { CatalogoServicio, CategoriaServicio } from '@/types'
+import type { CatalogoServicio, Edt } from '@/types'
 
 export default function SelectorServiciosCotizacionPage() {
   const { id } = useParams()
@@ -24,14 +24,14 @@ export default function SelectorServiciosCotizacionPage() {
   const router = useRouter()
   const cotizacionServicioId = searchParams.get('grupo')
 
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('')
   const [catalogo, setCatalogo] = useState<CatalogoServicio[]>([])
   const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({})
   const [cantidades, setCantidades] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    getCategoriasServicio()
+    getEdts()
       .then((cats) => {
         setCategorias(cats)
         if (cats.length > 0) setCategoriaSeleccionada(cats[0].id)
@@ -85,7 +85,8 @@ export default function SelectorServiciosCotizacionPage() {
           factorSeguridad: 1.0,
           margen: 1.35,
           costoInterno: horas * s.recurso.costoHora,
-          costoCliente: horas * s.recurso.costoHora * 1.35
+          costoCliente: horas * s.recurso.costoHora * 1.35,
+          nivelDificultad: s.nivelDificultad
         }
 
         await createCotizacionServicioItem(payload)

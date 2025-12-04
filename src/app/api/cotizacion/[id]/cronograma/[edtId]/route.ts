@@ -42,8 +42,19 @@ export async function GET(
         responsable: {
           select: { id: true, name: true, email: true }
         },
-        tareas: {
-          orderBy: { createdAt: 'asc' }
+        zonas: {
+          include: {
+            actividades: {
+              include: {
+                tareas: true
+              }
+            }
+          }
+        },
+        actividadesDirectas: {
+          include: {
+            tareas: true
+          }
         }
       }
     })
@@ -105,33 +116,16 @@ export async function PUT(
       )
     }
 
-    // Si se está cambiando la categoría o zona, verificar unicidad
-    if (validData.categoriaServicioId || validData.zona !== undefined) {
-      const nuevaCategoria = validData.categoriaServicioId || edtExistente.categoriaServicioId
-      const nuevaZona = validData.zona !== undefined ? validData.zona : edtExistente.zona
-
-      const conflicto = await prisma.cotizacionEdt.findFirst({
-        where: {
-          cotizacionId: id,
-          categoriaServicioId: nuevaCategoria,
-          zona: nuevaZona,
-          id: { not: edtId } // Excluir el EDT actual
-        }
-      })
-
-      if (conflicto) {
-        return NextResponse.json(
-          { error: 'Ya existe un EDT para esta combinación de categoría y zona' },
-          { status: 400 }
-        )
-      }
+    // Si se está cambiando la categoría, verificar unicidad de nombre por cotización
+    if (validData.categoriaServicioId) {
+      // La unicidad se basa en nombre único por cotización (ya definido en el schema)
+      // No necesitamos verificación adicional aquí
     }
 
     const edtActualizado = await prisma.cotizacionEdt.update({
       where: { id: edtId },
       data: {
         ...(validData.categoriaServicioId && { categoriaServicioId: validData.categoriaServicioId }),
-        ...(validData.zona !== undefined && { zona: validData.zona }),
         ...(validData.fechaInicioCom && { fechaInicioComercial: new Date(validData.fechaInicioCom) }),
         ...(validData.fechaFinCom && { fechaFinComercial: new Date(validData.fechaFinCom) }),
         ...(validData.horasCom !== undefined && { horasEstimadas: validData.horasCom }),
@@ -142,7 +136,20 @@ export async function PUT(
       include: {
         categoriaServicio: true,
         responsable: true,
-        tareas: true
+        zonas: {
+          include: {
+            actividades: {
+              include: {
+                tareas: true
+              }
+            }
+          }
+        },
+        actividadesDirectas: {
+          include: {
+            tareas: true
+          }
+        }
       }
     })
 
@@ -194,8 +201,23 @@ export async function DELETE(
         cotizacionId: id
       },
       include: {
-        tareas: {
-          select: { id: true }
+        zonas: {
+          include: {
+            actividades: {
+              include: {
+                tareas: {
+                  select: { id: true }
+                }
+              }
+            }
+          }
+        },
+        actividadesDirectas: {
+          include: {
+            tareas: {
+              select: { id: true }
+            }
+          }
         }
       }
     })
@@ -207,19 +229,62 @@ export async function DELETE(
       )
     }
 
-    // Eliminar el EDT (las tareas se eliminan automáticamente por cascade)
+    // ✅ Eliminar el EDT con todas sus dependencias en orden correcto
+    // 1. Eliminar tareas relacionadas
+    await prisma.cotizacionTarea.deleteMany({
+      where: {
+        cotizacionActividad: {
+          OR: [
+            { cotizacionEdtId: edtId }, // Tareas de actividades directas del EDT
+            {
+              cotizacionZona: {
+                cotizacionEdtId: edtId // Tareas de actividades en zonas del EDT
+              }
+            }
+          ]
+        }
+      }
+    })
+
+    // 2. Eliminar actividades relacionadas
+    await prisma.cotizacionActividad.deleteMany({
+      where: {
+        OR: [
+          { cotizacionEdtId: edtId }, // Actividades directas del EDT
+          {
+            cotizacionZona: {
+              cotizacionEdtId: edtId // Actividades en zonas del EDT
+            }
+          }
+        ]
+      }
+    })
+
+    // 3. Eliminar zonas relacionadas
+    await prisma.cotizacionZona.deleteMany({
+      where: { cotizacionEdtId: edtId }
+    })
+
+    // 4. Finalmente eliminar el EDT
     await prisma.cotizacionEdt.delete({
       where: { id: edtId }
     })
 
-    logger.info(`✅ EDT comercial eliminado: ${edtId} - Tareas eliminadas: ${edt.tareas.length}`)
+    // Calcular total de tareas eliminadas
+    const tareasZonas = edt.zonas.reduce((total, zona) =>
+      total + zona.actividades.reduce((actTotal, act) => actTotal + act.tareas.length, 0), 0
+    )
+    const tareasDirectas = edt.actividadesDirectas.reduce((total, act) => total + act.tareas.length, 0)
+    const totalTareasEliminadas = tareasZonas + tareasDirectas
+
+    logger.info(`✅ EDT comercial eliminado: ${edtId} - Tareas eliminadas: ${totalTareasEliminadas}`)
 
     return NextResponse.json({
       success: true,
       message: 'EDT comercial eliminado exitosamente',
       data: {
         edtId,
-        tareasEliminadas: edt.tareas.length
+        tareasEliminadas: totalTareasEliminadas
       }
     })
 

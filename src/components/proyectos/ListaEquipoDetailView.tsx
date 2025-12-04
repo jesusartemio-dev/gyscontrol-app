@@ -72,6 +72,7 @@ import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial';
 import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
+import { exportarListaEquipoAExcel } from '@/lib/utils/listaEquipoExcel';
 
 // ✅ Props interface
 interface ListaEquipoDetailViewProps {
@@ -184,6 +185,22 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
       toast.error('Error al actualizar los items');
     }
   }, [refreshItems]);
+
+  // 📊 Handle Excel export
+  const handleExportExcel = useCallback(() => {
+    try {
+      if (!lista || items.length === 0) {
+        toast.error('No hay datos para exportar');
+        return;
+      }
+
+      exportarListaEquipoAExcel(items, lista.nombre, lista.codigo);
+      toast.success('Lista exportada a Excel correctamente');
+    } catch (error) {
+      console.error('Error exportando a Excel:', error);
+      toast.error('Error al exportar la lista a Excel');
+    }
+  }, [lista, items]);
   
   // 📊 Calculate statistics
   const stats = useMemo(() => {
@@ -431,9 +448,14 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
                 <RefreshCw className={cn('w-4 h-4 mr-1', itemsLoading && 'animate-spin')} />
                 Actualizar
               </Button>
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportExcel}
+                disabled={itemsLoading || items.length === 0}
+              >
                 <Download className="w-4 h-4 mr-1" />
-                Exportar
+                Exportar Excel
               </Button>
             </div>
           </div>

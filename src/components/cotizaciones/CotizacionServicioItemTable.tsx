@@ -31,6 +31,9 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editableItem, setEditableItem] = useState<Partial<CotizacionServicioItem>>({})
 
+  // ✅ Ordenar items por campo 'orden' antes de renderizar
+  const sortedItems = [...items].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+
   useEffect(() => {
     getRecursos().then(setRecursos)
     getUnidadesServicio().then(setUnidades)
@@ -50,13 +53,13 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
   const handleChange = (field: keyof CotizacionServicioItem, value: any) => {
     setEditableItem(prev => {
       const updated = { ...prev, [field]: value }
-      
+
       // 🔁 Recalculate values when relevant fields change
-      if (['cantidad', 'factorSeguridad', 'margen', 'recursoId'].includes(field)) {
+      if (['cantidad', 'factorSeguridad', 'margen', 'recursoId', 'nivelDificultad'].includes(field)) {
         const original = items.find(i => i.id === editandoId)
         if (original) {
           const merged = { ...original, ...updated }
-          
+
           // Calculate hours
           const horas = calcularHoras({
             formula: merged.formula,
@@ -66,15 +69,27 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
             horaUnidad: merged.horaUnidad ?? 0,
             horaFijo: merged.horaFijo ?? 0
           })
-          
+
           // Get resource cost
           const recurso = recursos.find(r => r.id === merged.recursoId)
           const costoHora = recurso?.costoHora ?? 0
-          
-          // Calculate costs
-          const costoInterno = horas * costoHora * (merged.factorSeguridad ?? 1)
+
+          // Get difficulty multiplier
+          const dificultadMultiplier = (() => {
+            const dificultad = merged.nivelDificultad ?? 1
+            switch (dificultad) {
+              case 1: return 1.0  // Baja
+              case 2: return 1.2  // Media
+              case 3: return 1.5  // Alta
+              case 4: return 2.0  // Crítica
+              default: return 1.0
+            }
+          })()
+
+          // Calculate costs with difficulty multiplier
+          const costoInterno = horas * costoHora * (merged.factorSeguridad ?? 1) * dificultadMultiplier
           const costoCliente = costoInterno * (merged.margen ?? 1)
-          
+
           // Update with calculated values (ensure they're valid numbers)
           updated.horaTotal = isNaN(horas) ? 0 : horas
           updated.costoInterno = isNaN(costoInterno) ? 0 : costoInterno
@@ -85,7 +100,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
           }
         }
       }
-      
+
       return updated
     })
   }
@@ -111,7 +126,20 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
 
     const recurso = recursos.find(r => r.id === updated.recursoId)
     const costoHora = recurso?.costoHora ?? 0
-    const costoInterno = horas * costoHora * (updated.factorSeguridad ?? 1)
+
+    // Get difficulty multiplier
+    const dificultadMultiplier = (() => {
+      const dificultad = updated.nivelDificultad ?? 1
+      switch (dificultad) {
+        case 1: return 1.0  // Baja
+        case 2: return 1.2  // Media
+        case 3: return 1.5  // Alta
+        case 4: return 2.0  // Crítica
+        default: return 1.0
+      }
+    })()
+
+    const costoInterno = horas * costoHora * (updated.factorSeguridad ?? 1) * dificultadMultiplier
     const costoCliente = costoInterno * (updated.margen ?? 1)
 
     const finalUpdated = {
@@ -133,7 +161,8 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
         horaTotal: finalUpdated.horaTotal,
         costoInterno: finalUpdated.costoInterno,
         costoCliente: finalUpdated.costoCliente,
-        costoHora: finalUpdated.costoHora
+        costoHora: finalUpdated.costoHora,
+        orden: finalUpdated.orden
       })
 
       // ✅ Update local state after successful save
@@ -178,6 +207,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
       <table className="w-full text-sm border rounded shadow-sm">
         <thead className="bg-gray-100 text-gray-700">
           <tr>
+            <th className="p-2">Orden</th>
             <th className="p-2">Nombre</th>
             <th className="p-2">Categoría</th>
             <th className="p-2">Recurso</th>
@@ -188,16 +218,29 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
             <th className="p-2 text-center">Factor</th>
             <th className="p-2 text-center text-blue-700">Costo Interno</th>
             <th className="p-2 text-center">Margen</th>
+            <th className="p-2 text-center">Dificultad</th>
             <th className="p-2 text-right text-green-700">Costo Cliente</th>
             <th className="p-2 text-center">Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {items.map((item, index) => {
+          {sortedItems.map((item, index) => {
             const editando = editandoId === item.id
             const key = item.id || `temp-${index}`
             return (
               <tr key={key} className="border-t hover:bg-gray-50">
+                <td className="p-2 text-center">
+                  {editando ? (
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-16 text-center"
+                      value={editableItem.orden ?? item.orden ?? 0}
+                      onChange={(e) => handleChange('orden', +e.target.value)}
+                    />
+                  ) : (
+                    item.orden ?? 0
+                  )}
+                </td>
                 <td className="p-2 flex items-center gap-1">
                   <span>{item.nombre}</span>
                   {item.descripcion && (
@@ -277,7 +320,27 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                       onChange={(e) => handleChange('margen', +e.target.value)}
                     />
                   ) : (
-                    item.margen
+                    (item.margen ?? 0).toFixed(2)
+                  )}
+                </td>
+                <td className="p-2 text-center">
+                  {editando ? (
+                    <select
+                      className="border rounded px-2 py-1 text-sm"
+                      value={editableItem.nivelDificultad ?? item.nivelDificultad ?? 1}
+                      onChange={(e) => handleChange('nivelDificultad', +e.target.value)}
+                    >
+                      <option value={1}>Baja (1.0x)</option>
+                      <option value={2}>Media (1.2x)</option>
+                      <option value={3}>Alta (1.5x)</option>
+                      <option value={4}>Crítica (2.0x)</option>
+                    </select>
+                  ) : (
+                    (() => {
+                      const dificultad = item.nivelDificultad ?? 1;
+                      const labels = { 1: 'Baja (1.0x)', 2: 'Media (1.2x)', 3: 'Alta (1.5x)', 4: 'Crítica (2.0x)' };
+                      return labels[dificultad as keyof typeof labels] || 'Baja (1.0x)';
+                    })()
                   )}
                 </td>
                 <td className="p-2 text-right text-green-700">${(editando && editableItem.costoCliente !== undefined ? editableItem.costoCliente : item.costoCliente)?.toFixed(2)}</td>
@@ -304,7 +367,8 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
             <td className="p-2 text-center">{totals.totalHH.toFixed(2)}</td>
             <td className="p-2 text-center">{totals.promedioFactor.toFixed(2)}</td>
             <td className="p-2 text-center text-blue-700">${totals.totalCostoInterno.toFixed(2)}</td>
-            <td className="p-2 text-center">{totals.promedioMargen.toFixed(2)}</td>
+            <td className="p-2 text-center">{Number(totals.promedioMargen).toFixed(2)}</td>
+            <td className="p-2 text-center">-</td>
             <td className="p-2 text-right text-green-700">${totals.totalCostoCliente.toFixed(2)}</td>
             <td />
           </tr>

@@ -119,7 +119,7 @@ export default function CotizacionEquipoAccordion({
       className="mb-4"
     >
       <Card className="overflow-hidden border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow duration-200">
-        <Accordion type="multiple" className="w-full">
+        <Accordion type="multiple" defaultValue={equipo.items.length > 0 ? [equipo.id] : []} className="w-full">
           <AccordionItem value={equipo.id} className="border-none">
             {/* Header del Accordion */}
             <div className="px-6 py-4">

@@ -1,5 +1,5 @@
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
-import { AuthOptions } from 'next-auth'
+import { AuthOptions, getServerSession } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from './prisma'
 import * as bcrypt from 'bcryptjs'
@@ -88,4 +88,24 @@ export const authOptions: AuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
+}
+
+export async function getCurrentUser() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return null
+  }
+
+  // Get full user data from database
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    }
+  })
+
+  return user
 }

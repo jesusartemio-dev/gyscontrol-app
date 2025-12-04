@@ -1,0 +1,203 @@
+/* ===================================================
+   📁 Archivo: CronogramaTreeView.css
+   📌 Ubicación: src/components/cronograma/
+   🔧 Descripción: Estilos para vista jerárquica del cronograma
+   ✅ Árbol jerárquico, nodos, animaciones, responsive
+   =================================================== */
+
+.tree-container {
+  background: #fafafa;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.tree-node {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+.tree-node:hover {
+  @apply bg-gray-50 rounded-md;
+}
+
+.tree-node.selected {
+  @apply bg-blue-50 border-blue-200;
+}
+
+.tree-children {
+  @apply ml-4 border-l border-gray-200 pl-4 space-y-1;
+}
+
+/* Animaciones de expansión */
+.tree-node .tree-children {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Estados de carga */
+.tree-node-loading {
+  @apply animate-pulse;
+}
+
+.tree-node-loading .skeleton-content {
+  @apply space-y-2;
+}
+
+/* Estados de progreso */
+.progress-indicator {
+  @apply relative;
+}
+
+.progress-indicator::after {
+  content: '';
+  @apply absolute top-0 left-0 h-full bg-primary transition-all duration-300 ease-out;
+  width: var(--progress-width, 0%);
+}
+
+/* Iconos de tipos de nodo */
+.node-icon-fase {
+  @apply text-blue-500;
+}
+
+.node-icon-edt {
+  @apply text-green-500;
+}
+
+.node-icon-zona {
+  @apply text-orange-500;
+}
+
+.node-icon-actividad {
+  @apply text-purple-500;
+}
+
+.node-icon-tarea {
+  @apply text-gray-500;
+}
+
+/* Estados de nodos */
+.node-status-completada {
+  @apply opacity-75;
+}
+
+.node-status-en_progreso {
+  @apply border-l-2 border-l-blue-500;
+}
+
+.node-status-pendiente {
+  @apply border-l-2 border-l-gray-300;
+}
+
+.node-status-pausada {
+  @apply border-l-2 border-l-yellow-500;
+}
+
+.node-status-cancelada {
+  @apply border-l-2 border-l-red-500 opacity-50;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .tree-children {
+    @apply ml-2 pl-2;
+  }
+
+  .tree-node {
+    @apply text-sm;
+  }
+}
+
+/* Tema oscuro */
+@media (prefers-color-scheme: dark) {
+  .tree-node:hover {
+    @apply bg-muted/20;
+  }
+
+  .tree-node.hovered {
+    @apply bg-muted/10;
+  }
+}
+
+/* Animaciones de expansión/colapso */
+.expand-enter {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+.expand-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms, transform 200ms;
+}
+
+.expand-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.expand-exit-active {
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: opacity 200ms, transform 200ms;
+}
+
+/* Estilos para virtualización (si se implementa) */
+.virtual-tree-node {
+  @apply absolute w-full;
+  transform: translateY(var(--offset-y, 0));
+}
+
+/* Indicadores de carga lazy */
+.lazy-loading-indicator {
+  @apply flex items-center justify-center py-2;
+}
+
+.lazy-loading-indicator::after {
+  content: '';
+  @apply w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin;
+}
+
+/* Estilos para drag and drop (futuro) */
+.tree-node.dragging {
+  @apply opacity-50 shadow-lg scale-105;
+}
+
+.tree-node.drag-over {
+  @apply bg-primary/10 border-2 border-dashed border-primary;
+}
+
+/* Estilos para búsqueda y filtrado */
+.tree-node.highlighted {
+  @apply bg-yellow-100 dark:bg-yellow-900/20;
+}
+
+.tree-node.filtered-out {
+  @apply hidden;
+}
+
+/* Estilos para tooltips */
+.tree-node-tooltip {
+  @apply bg-popover text-popover-foreground border rounded-md px-3 py-2 text-sm shadow-md;
+}
+
+/* Estilos para breadcrumbs */
+.tree-breadcrumbs {
+  @apply flex items-center space-x-2 text-sm text-muted-foreground mb-4;
+}
+
+.tree-breadcrumb-item {
+  @apply hover:text-foreground cursor-pointer;
+}
+
+.tree-breadcrumb-separator {
+  @apply text-muted-foreground/50;
+}

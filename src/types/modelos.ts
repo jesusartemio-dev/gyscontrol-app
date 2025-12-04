@@ -212,6 +212,9 @@ export type EstadoOportunidad =
   | 'cerrada_ganada'
   | 'cerrada_perdida'
 
+// ✅ Simplificación: Eliminamos TipoFormula ya que solo usamos Escalonada
+// export type TipoFormula = 'Fijo' | 'Proporcional' | 'Escalonada'
+
 // ===================================================
 // 🆕 MODELOS CRM PARA PROYECTOS INDUSTRIALES
 // ===================================================
@@ -361,13 +364,17 @@ export interface NivelServicio {
   updatedAt: string
 }
 
-export interface CategoriaServicio {
+export interface Edt {
   id: string
   nombre: string
   descripcion?: string
   createdAt: string
   updatedAt: string
   servicios?: CatalogoServicio[] // 🔁 Relación real completa
+
+  // 🆕 RELACIÓN: Fase por defecto para esta categoría
+  faseDefaultId?: string
+  faseDefault?: FaseDefault
 }
 
 
@@ -418,10 +425,13 @@ export interface CatalogoServicio {
   nombre: string
   descripcion: string
   formula: TipoFormula // 'Fijo' | 'Proporcional' | 'Escalonada'
+  cantidad: number
   horaBase?: number
   horaRepetido?: number
   horaUnidad?: number
   horaFijo?: number
+  orden?: number
+  nivelDificultad?: number
   categoriaId: string
   unidadServicioId: string
   recursoId: string
@@ -663,6 +673,10 @@ export interface Cotizacion {
 
    // ✅ NUEVA RELACIÓN CON OPORTUNIDAD CRM
    oportunidadCrm?: CrmOportunidad
+
+   // ✅ CALENDARIO LABORAL ASOCIADO
+   calendarioLaboralId?: string
+   calendarioLaboral?: CalendarioLaboral
 }
 
 
@@ -743,6 +757,8 @@ export interface CotizacionServicioItem {
   margen: number
   costoInterno: number
   costoCliente: number
+  nivelDificultad?: number
+  orden?: number
   // Auditoría
   createdAt: string
   updatedAt: string
@@ -826,7 +842,7 @@ export interface CotizacionEdt {
   updatedAt: string
 
   // Relaciones
-  categoriaServicio: CategoriaServicio
+  categoriaServicio: Edt
   responsable?: User
   tareas: CotizacionTarea[]
 }
@@ -982,6 +998,17 @@ export interface ProyectoServicioCotizado {
   proyecto: Proyecto
   responsable: User
   items: ProyectoServicioCotizadoItem[]
+
+  // ✅ Relación opcional con EDT (incluida en consultas específicas)
+  edt?: {
+    id: string
+    nombre: string
+    categoriaServicioId: string
+    categoriaServicio: {
+      id: string
+      nombre: string
+    }
+  }
 }
 
 export interface ProyectoServicioCotizadoItem {
@@ -1099,6 +1126,7 @@ export interface ListaEquipoItem {
 
   codigo: string
   descripcion: string
+  categoria: string // ✅ Campo agregado para consistencia con otras entidades
   unidad: string
   cantidad: number
   verificado: boolean
@@ -1590,7 +1618,6 @@ export interface ProyectoEdt {
   proyectoId: string
   nombre: string // Nombre descriptivo del EDT
   categoriaServicioId: string
-  zona?: string
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -1602,9 +1629,10 @@ export interface ProyectoEdt {
   porcentajeAvance: number // 0-100
   descripcion?: string
   prioridad: PrioridadEdt
+  orden: number // ✅ Campo para ordenamiento drag & drop
   createdAt: string
   updatedAt: string
-  
+
   // 🔗 Relaciones
   proyecto: {
     id: string
@@ -1676,6 +1704,42 @@ export interface ResumenEdtProyecto {
 // ===================================================
 // 📋 SISTEMA DE CRONOGRAMA DE PROYECTOS - FASE 4
 // ===================================================
+
+// ✅ Nuevo enum para estados de actividad
+export type EstadoActividad =
+  | 'pendiente'
+  | 'en_progreso'
+  | 'completada'
+  | 'pausada'
+  | 'cancelada'
+
+// ✅ Nuevo modelo ProyectoActividad para jerarquía de 5 niveles
+export interface ProyectoActividad {
+  id: string
+  proyectoEdtId: string // ✅ Ahora obligatorio (sin zona intermedia)
+  proyectoCronogramaId: string
+  nombre: string
+  responsableId?: string
+  fechaInicioPlan: string
+  fechaFinPlan: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  estado: EstadoActividad
+  porcentajeAvance: number
+  horasPlan?: number
+  horasReales: number
+  descripcion?: string
+  prioridad: PrioridadEdt
+  orden: number // ✅ Campo para ordenamiento drag & drop
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  responsable?: User
+  proyectoEdt: ProyectoEdt // ✅ Ahora obligatorio
+  proyectoCronograma: ProyectoCronograma
+  tareas: ProyectoTarea[]
+}
 
 // 🎯 Interface para control de tipos de cronograma
 export interface ProyectoCronograma {
@@ -1875,7 +1939,6 @@ export interface ResumenCronograma {
 export interface ComparativoPlanReal {
   categoriaServicioId: string
   categoriaServicioNombre: string
-  zona?: string | null
   horasPlan: number
   horasReales: number
   porcentajeAvance: number
@@ -1890,7 +1953,6 @@ export interface FiltrosCronogramaData {
   responsableId?: string
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
-  zona?: string
   fechaDesde?: Date
   fechaHasta?: Date
   soloConRetrasos?: boolean
@@ -1904,7 +1966,6 @@ export interface CreateProyectoEdtData {
   nombre: string
   categoriaServicioId: string
   responsableId?: string
-  zona?: string | null
   fechaInicioPlan?: Date | null
   fechaFinPlan?: Date | null
   horasPlan?: number | null
@@ -1917,7 +1978,6 @@ export interface UpdateProyectoEdtData {
   id?: string
   nombre?: string
   responsableId?: string
-  zona?: string | null
   fechaInicioPlan?: Date | null
   fechaFinPlan?: Date | null
   fechaInicioReal?: Date | null
@@ -1936,7 +1996,6 @@ export interface ProyectoEdtConRelaciones {
   proyectoId: string
   nombre: string // Nombre descriptivo del EDT
   categoriaServicioId: string
-  zona?: string
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -1948,6 +2007,7 @@ export interface ProyectoEdtConRelaciones {
   porcentajeAvance: number
   descripcion?: string
   prioridad: PrioridadEdt
+  orden: number // ✅ Campo para ordenamiento drag & drop
   createdAt: string
   updatedAt: string
   
@@ -2126,4 +2186,39 @@ export interface AuditLog {
     name: string | null
     email: string
   }
+}
+
+// ✅ Interfaz para fases por defecto del sistema
+export interface FaseDefault {
+  id: string
+  nombre: string
+  descripcion?: string
+  orden: number
+  duracionDias: number
+  color?: string
+  activo: boolean
+  createdAt: string
+  updatedAt: string
+  Edt: Edt[]
+}
+
+// ===================================================
+// 🗓️ SISTEMA DE CALENDARIOS LABORALES
+// ===================================================
+
+export interface CalendarioLaboral {
+  id: string
+  nombre: string
+  descripcion?: string
+  pais?: string
+  empresa?: string
+  activo: boolean
+  horasPorDia: number
+  diasLaborables: string[]
+  horaInicioManana: string
+  horaFinManana: string
+  horaInicioTarde: string
+  horaFinTarde: string
+  createdAt: string
+  updatedAt: string
 }

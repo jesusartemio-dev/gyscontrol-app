@@ -1,0 +1,128 @@
+/**
+ * API para obtener EDTs de un proyecto específico
+ * 
+ * Retorna EDTs disponibles para registro de horas en el proyecto
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { proyectoId: string } }
+) {
+  try {
+    // Verificar sesión
+    const session = await getServerSession()
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
+    const { proyectoId } = params
+
+    // Verificar que el usuario tiene acceso al proyecto
+    const proyectoAcceso = await prisma.proyecto.findFirst({
+      where: {
+        id: proyectoId,
+        OR: [
+          { comercialId: session.user.id },
+          { gestorId: session.user.id },
+          { proyectoEdts: { some: { responsableId: session.user.id } } },
+          { 
+            proyectoEdts: {
+              some: {
+                proyecto_actividad: {
+                  some: {
+                    responsableId: session.user.id
+                  }
+                }
+              }
+            }
+          },
+          { 
+            proyectoEdts: {
+              some: {
+                ProyectoTarea: {
+                  some: { responsableId: session.user.id }
+                }
+              }
+            }
+          }
+        ]
+      },
+      select: { id: true }
+    })
+
+    if (!proyectoAcceso) {
+      return NextResponse.json(
+        { error: 'No tienes acceso a este proyecto' },
+        { status: 403 }
+      )
+    }
+
+    // Obtener EDTs del proyecto
+    const edts = await prisma.proyectoEdt.findMany({
+      where: {
+        proyectoId: proyectoId
+      },
+      select: {
+        id: true,
+        nombre: true,
+        categoriaServicio: {
+          select: {
+            id: true,
+            nombre: true
+          }
+        },
+        responsable: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        horasPlan: true,
+        horasReales: true,
+        estado: true,
+        porcentajeAvance: true,
+        fechaInicioPlan: true,
+        fechaFinPlan: true,
+        descripcion: true,
+        orden: true
+      },
+      orderBy: {
+        orden: 'asc'
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      edts: edts.map(edt => ({
+        id: edt.id,
+        nombre: edt.nombre,
+        categoriaNombre: edt.categoriaServicio?.nombre || 'Sin categoría',
+        responsableNombre: edt.responsable?.name || 'Sin responsable',
+        horasPlan: Number(edt.horasPlan) || 0,
+        horasReales: Number(edt.horasReales) || 0,
+        estado: edt.estado,
+        progreso: edt.porcentajeAvance,
+        fechaInicio: edt.fechaInicioPlan,
+        fechaFin: edt.fechaFinPlan,
+        descripcion: edt.descripcion,
+        orden: edt.orden
+      })),
+      total: edts.length
+    })
+
+  } catch (error) {
+    console.error('Error obteniendo EDTs del proyecto:', error)
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
+      { status: 500 }
+    )
+  }
+}

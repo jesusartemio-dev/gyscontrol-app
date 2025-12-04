@@ -13,13 +13,17 @@ import { NextResponse } from 'next/server'
 export async function GET() {
   try {
     const data = await prisma.catalogoServicio.findMany({
-      orderBy: { nombre: 'asc' },
+      orderBy: [
+        { orden: 'asc' },
+        { nombre: 'asc' }
+      ],
       include: {
         categoria: true,
         unidadServicio: true,
         recurso: true,
       },
     })
+    console.log('📊 Servicios ordenados desde API:', data.map(s => ({ nombre: s.nombre, orden: s.orden })))
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error en GET /catalogo-servicio:', error)

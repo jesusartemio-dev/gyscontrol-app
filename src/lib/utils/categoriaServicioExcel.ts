@@ -7,7 +7,8 @@ import { CategoriaServicio } from '@/types'
 export function exportarCategoriasServicioAExcel(categorias: CategoriaServicio[]) {
   const data = categorias.map((c) => ({
     Nombre: c.nombre,
-    Descripcion: c.descripcion || ''
+    Descripcion: c.descripcion || '',
+    FasePorDefecto: c.faseDefault?.nombre || ''
   }))
   const worksheet = XLSX.utils.json_to_sheet(data)
   const workbook = XLSX.utils.book_new()

@@ -12,7 +12,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
 import CotizacionServicioItemTable from './CotizacionServicioItemTable'
-import CotizacionServicioItemAddModal from './CotizacionServicioItemAddModal'
+import CotizacionServicioItemMultiAddModal from './CotizacionServicioItemMultiAddModal'
 import type {
   CotizacionServicio,
   CotizacionServicioItem,
@@ -33,7 +33,6 @@ import {
   Grid3X3
 } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { createCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 
 // Utility functions
 const formatCurrency = (amount: number): string => {
@@ -60,6 +59,7 @@ const getRentabilityBadgeVariant = (renta: number): 'default' | 'secondary' | 'd
 interface Props {
   servicio: CotizacionServicio
   onCreated: (item: CotizacionServicioItem) => void
+  onMultipleCreated?: (items: CotizacionServicioItem[]) => void
   onDeleted: (itemId: string) => void
   onUpdated: (item: CotizacionServicioItem) => void
   onDeletedGrupo: () => void
@@ -69,6 +69,7 @@ interface Props {
 export default function CotizacionServicioAccordion({
   servicio,
   onCreated,
+  onMultipleCreated,
   onDeleted,
   onUpdated,
   onDeletedGrupo,
@@ -113,7 +114,7 @@ export default function CotizacionServicioAccordion({
         className="mb-4"
       >
         <Card className="overflow-hidden border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow duration-200">
-          <Accordion type="multiple" className="w-full">
+          <Accordion type="multiple" defaultValue={servicio.items.length > 0 ? [servicio.id] : []} className="w-full">
             <AccordionItem value={servicio.id} className="border-none">
               {/* Header del Accordion */}
               <div className="px-6 py-4">
@@ -465,21 +466,15 @@ export default function CotizacionServicioAccordion({
         </Card>
       </motion.div>
 
-      <CotizacionServicioItemAddModal
-        open={modalAbierto}
+      <CotizacionServicioItemMultiAddModal
+        isOpen={modalAbierto}
         onClose={() => setModalAbierto(false)}
         servicio={servicio}
-        onAgregarItems={async (items) => {
-          for (const item of items) {
-            try {
-              const creado = await createCotizacionServicioItem({
-                ...item,
-                cotizacionServicioId: servicio.id
-              } as CotizacionServicioItemPayload)
-              onCreated(creado)
-            } catch (error) {
-              console.error('❌ Error al guardar ítem de servicio:', error)
-            }
+        onItemsCreated={(items) => {
+          if (onMultipleCreated) {
+            onMultipleCreated(items)
+          } else {
+            items.forEach(item => onCreated(item as CotizacionServicioItem))
           }
         }}
       />

@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { getCatalogoServiciosByCategoriaId } from '@/lib/services/catalogoServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { createPlantillaServicioItem } from '@/lib/services/plantillaServicioItem'
 import { recalcularPlantillaDesdeAPI } from '@/lib/services/plantilla'
 import { calcularHoras } from '@/lib/utils/formulas'
@@ -54,7 +54,7 @@ export default function PlantillaServicioItemsModal({
           setLoading(true)
           
           // Get all categories to find the ID by name
-          const categorias = await getCategoriasServicio()
+          const categorias = await getEdts()
           const categoria = categorias.find(c => c.nombre === categoriaNombre)
           
           if (!categoria) {

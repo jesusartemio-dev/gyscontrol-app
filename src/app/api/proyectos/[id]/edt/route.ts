@@ -22,8 +22,7 @@ export async function GET(
     const filtros: FiltrosCronogramaPayload = {
       categoriaServicioId: searchParams.get('categoriaServicioId') || undefined,
       estado: searchParams.get('estado') as any || undefined,
-      responsableId: searchParams.get('responsableId') || undefined,
-      zona: searchParams.get('zona') || undefined
+      responsableId: searchParams.get('responsableId') || undefined
     };
 
     // ✅ Add support for cronogramaId and faseId filtering
@@ -36,7 +35,6 @@ export async function GET(
         ...(filtros.categoriaServicioId && { categoriaServicioId: filtros.categoriaServicioId }),
         ...(filtros.estado && { estado: filtros.estado }),
         ...(filtros.responsableId && { responsableId: filtros.responsableId }),
-        ...(filtros.zona && { zona: filtros.zona }),
         ...(cronogramaId && { proyectoCronogramaId: cronogramaId }),
         ...(faseId && { proyectoFaseId: faseId })
       },
@@ -170,18 +168,17 @@ export async function POST(
       );
     }
 
-    // ✅ Verificar unicidad (proyecto + categoría + zona)
+    // ✅ Verificar unicidad (proyecto + categoría)
     const edtExistente = await prisma.proyectoEdt.findFirst({
       where: {
         proyectoId: id,
-        categoriaServicioId: data.categoriaServicioId,
-        zona: data.zona || null
+        categoriaServicioId: data.categoriaServicioId
       }
     });
 
     if (edtExistente) {
       return NextResponse.json(
-        { error: 'Ya existe un EDT para esta combinación de proyecto, categoría y zona' },
+        { error: 'Ya existe un EDT para esta combinación de proyecto y categoría' },
         { status: 409 }
       );
     }
@@ -193,7 +190,6 @@ export async function POST(
         proyectoCronogramaId: data.proyectoCronogramaId,
         nombre: data.nombre,
         categoriaServicioId: data.categoriaServicioId,
-        zona: data.zona,
         fechaInicioPlan: data.fechaInicio ? new Date(data.fechaInicio) : undefined,
         fechaFinPlan: data.fechaFin ? new Date(data.fechaFin) : undefined,
         horasPlan: data.horasEstimadas,

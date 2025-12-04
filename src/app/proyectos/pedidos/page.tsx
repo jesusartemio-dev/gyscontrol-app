@@ -209,7 +209,7 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">PEN {stats.montoTotal.toLocaleString()}</div>
+              <div className="text-2xl font-bold">${stats.montoTotal.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
                 Valor total equipos
               </p>

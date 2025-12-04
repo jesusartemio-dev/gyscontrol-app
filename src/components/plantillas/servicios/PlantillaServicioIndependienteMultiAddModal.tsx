@@ -11,12 +11,12 @@ import { Search, Plus, Trash2, Package, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { getCatalogoServicios } from '@/lib/services/catalogoServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { getRecursos } from '@/lib/services/recurso'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { formatCurrency } from '@/lib/utils/plantilla-utils'
 import { calcularHoras } from '@/lib/utils/formulas'
-import type { CatalogoServicio, CategoriaServicio, Recurso, UnidadServicio } from '@/types'
+import type { CatalogoServicio, Edt, Recurso, UnidadServicio } from '@/types'
 
 // Define the missing types
 interface PlantillaServicioItemIndependiente {
@@ -69,7 +69,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
   onItemsCreated
 }: Props) {
   const [servicios, setServicios] = useState<CatalogoServicio[]>([])
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [unidadesServicio, setUnidadesServicio] = useState<UnidadServicio[]>([])
   const [filteredServicios, setFilteredServicios] = useState<CatalogoServicio[]>([])
@@ -115,6 +115,8 @@ export default function PlantillaServicioIndependienteMultiAddModal({
       )
     }
 
+    // ✅ Mantener el orden que viene de la API (ya ordenado por orden)
+    console.log('🛠️ Servicios filtrados (manteniendo orden de API):', filtered.map(s => ({ nombre: s.nombre, orden: s.orden })))
     setFilteredServicios(filtered)
   }, [searchTerm, categoriaFiltro, servicios, categoriaId])
 
@@ -124,7 +126,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
     try {
       const [serviciosData, categoriasData, recursosData, unidadesData] = await Promise.all([
         getCatalogoServicios(),
-        getCategoriasServicio(),
+        getEdts(),
         getRecursos(),
         getUnidadesServicio()
       ])
@@ -135,6 +137,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
       console.log('🛠️ recursosData:', recursosData)
       console.log('🛠️ unidadesData:', unidadesData)
 
+      console.log('🛠️ Servicios desde API:', serviciosData.map(s => ({ nombre: s.nombre, orden: s.orden })))
       setServicios(serviciosData)
       setCategorias(categoriasData)
       setRecursos(recursosData)
@@ -167,16 +170,11 @@ export default function PlantillaServicioIndependienteMultiAddModal({
       const defaultRecurso = recursos.find(r => r.nombre === 'Ingeniero Senior') || recursos[0]
       const defaultUnidad = unidadesServicio.find(u => u.nombre === 'hora') || unidadesServicio[0]
 
-      // Calculate default prices using the same logic as CotizacionServicioItemAddModal
+      // Calculate default prices using the new escalonada formula with difficulty
       const cantidad = 1
-      const horaTotal = calcularHoras({
-        formula: servicio.formula,
-        cantidad,
-        horaBase: servicio.horaBase,
-        horaRepetido: servicio.horaRepetido,
-        horaUnidad: servicio.horaUnidad,
-        horaFijo: servicio.horaFijo
-      })
+      const horasBase = (servicio.horaBase || 0) + Math.max(0, cantidad - 1) * (servicio.horaRepetido || 0);
+      const factorDificultad = servicio.nivelDificultad || 1;
+      const horaTotal = horasBase * factorDificultad;
 
       const costoHora = servicio.recurso.costoHora
       const factorSeguridad = 1.0
@@ -422,7 +420,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
                             <p className="text-xs text-gray-600 line-clamp-2">{servicio.descripcion}</p>
                             <div className="flex items-center justify-between text-xs">
                               <span className="text-gray-500">{servicio.categoria.nombre}</span>
-                              <span className="text-gray-500">{servicio.formula}</span>
+                              <span className="text-gray-500">Escalonada (Dificultad: {servicio.nivelDificultad || 1})</span>
                             </div>
                             {isSelected && (
                               <div className="text-blue-600 text-xs font-medium">

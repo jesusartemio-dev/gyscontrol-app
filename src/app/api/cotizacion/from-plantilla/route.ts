@@ -165,6 +165,7 @@ export async function POST(req: Request) {
               margen: item.margen,
               costoInterno: item.costoInterno,
               costoCliente: item.costoCliente,
+              orden: item.orden || 0, // ✅ Copiar orden desde plantilla
             })),
           },
         })),

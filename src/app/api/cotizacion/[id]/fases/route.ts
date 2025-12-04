@@ -32,11 +32,21 @@ export async function GET(
           include: {
             categoriaServicio: true,
             responsable: true,
-            tareas: {
+            zonas: {
               include: {
-                responsable: true
+                actividades: {
+                  include: {
+                    tareas: {
+                      include: {
+                        responsable: true
+                      },
+                      orderBy: { fechaInicio: 'asc' }
+                    }
+                  },
+                  orderBy: { fechaInicioComercial: 'asc' }
+                }
               },
-              orderBy: { fechaInicio: 'asc' }
+              orderBy: { fechaInicioComercial: 'asc' }
             }
           },
           orderBy: { fechaInicioComercial: 'asc' }
@@ -51,8 +61,24 @@ export async function GET(
       meta: {
         totalFases: fases.length,
         totalEdts: fases.reduce((sum: number, f: any) => sum + f.edts.length, 0),
+        totalZonas: fases.reduce((sum: number, f: any) =>
+          sum + f.edts.reduce((sumEdt: number, edt: any) => sumEdt + (edt.zonas?.length || 0), 0), 0
+        ),
+        totalActividades: fases.reduce((sum: number, f: any) =>
+          sum + f.edts.reduce((sumEdt: number, edt: any) =>
+            sumEdt + edt.zonas?.reduce((sumZona: number, zona: any) =>
+              sumZona + (zona.actividades?.length || 0), 0
+            ) || 0, 0
+          ), 0
+        ),
         totalTareas: fases.reduce((sum: number, f: any) =>
-          sum + f.edts.reduce((sumEdt: number, edt: any) => sumEdt + edt.tareas.length, 0), 0
+          sum + f.edts.reduce((sumEdt: number, edt: any) =>
+            sumEdt + edt.zonas?.reduce((sumZona: number, zona: any) =>
+              sumZona + zona.actividades?.reduce((sumAct: number, actividad: any) =>
+                sumAct + (actividad.tareas?.length || 0), 0
+              ) || 0, 0
+            ) || 0, 0
+          ), 0
         )
       }
     })

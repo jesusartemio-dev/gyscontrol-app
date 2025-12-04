@@ -49,17 +49,18 @@ export function CotizacionEdtForm({
   const [fasesLoading, setFasesLoading] = useState(true)
   const [servicios, setServicios] = useState<any[]>([])
   const [fases, setFases] = useState<any[]>([])
+  const [duracionesConfig, setDuracionesConfig] = useState<any[]>([])
   const [formData, setFormData] = useState({
     nombre: '',
     categoriaServicioId: '',
-    zona: '',
     fechaInicioCom: '',
     fechaFinCom: '',
     horasCom: '',
     responsableId: '',
     descripcion: '',
     prioridad: 'media',
-    cotizacionFaseId: 'none'
+    cotizacionFaseId: 'none',
+    posicionamiento: 'despues_ultima' as 'inicio_fase' | 'despues_ultima' // Nueva opción de posicionamiento
   })
   const { toast } = useToast()
 
@@ -92,6 +93,52 @@ export function CotizacionEdtForm({
     }
 
     return fechaActual.toISOString().split('T')[0]
+  }
+
+  // ✅ Función para obtener duración por defecto del EDT desde configuración
+  const obtenerDuracionPorDefecto = (): number => {
+    const configEdt = duracionesConfig.find(config => config.nivel === 'edt')
+    if (configEdt && configEdt.activo) {
+      return configEdt.duracionDias * configEdt.horasPorDia
+    }
+    return 40 // Fallback: 5 días * 8 horas = 40 horas
+  }
+
+  // ✅ Función para calcular fecha de inicio automática basada en EDTs hermanos
+  const calcularFechaInicioAutomatica = async (faseId: string, posicionamiento: 'inicio_fase' | 'despues_ultima'): Promise<string> => {
+    try {
+      // Obtener EDTs existentes en la misma fase
+      const response = await fetch(`/api/cotizacion/${cotizacionId}/cronograma?faseId=${faseId}`)
+      if (response.ok) {
+        const data = await response.json()
+        const edtsEnFase: any[] = data.data || []
+
+        // Obtener fecha de inicio de la fase
+        const faseSeleccionada = fases.find(f => f.id === faseId)
+        const fechaInicioFase = faseSeleccionada?.fechaInicioPlan
+          ? new Date(faseSeleccionada.fechaInicioPlan).toISOString().split('T')[0]
+          : ''
+
+        if (posicionamiento === 'inicio_fase' || edtsEnFase.length === 0) {
+          // Si es al inicio de la fase o primer EDT, usar fecha de inicio de la fase
+          return fechaInicioFase
+        } else {
+          // Si hay EDTs hermanos y se quiere después del último, colocar después del último EDT
+          const ultimoEdt = edtsEnFase
+            .filter((edt: any) => edt.fechaFinComercial)
+            .sort((a: any, b: any) => new Date(b.fechaFinComercial).getTime() - new Date(a.fechaFinComercial).getTime())[0]
+
+          if (ultimoEdt?.fechaFinComercial) {
+            const fechaFinUltimo = new Date(ultimoEdt.fechaFinComercial)
+            fechaFinUltimo.setDate(fechaFinUltimo.getDate() + 1) // +1 día
+            return fechaFinUltimo.toISOString().split('T')[0]
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error calculando fecha inicio automática:', error)
+    }
+    return ''
   }
 
   // Cargar servicios de la cotización
@@ -138,13 +185,31 @@ export function CotizacionEdtForm({
     loadFases()
   }, [cotizacionId])
 
+  // Cargar configuraciones de duración por defecto
+  useEffect(() => {
+    const loadDuracionesConfig = async () => {
+      try {
+        const response = await fetch('/api/configuracion/duraciones-cronograma')
+        if (response.ok) {
+          const data = await response.json()
+          setDuracionesConfig(data.data || [])
+          console.log('Duraciones config loaded:', data.data?.length || 0)
+        } else {
+          console.error('Failed to load duraciones config:', response.status)
+        }
+      } catch (error) {
+        console.error('Error loading duraciones config:', error)
+      }
+    }
+    loadDuracionesConfig()
+  }, [])
+
   // Cargar datos si es edición
   useEffect(() => {
     if (edt) {
       setFormData({
         nombre: edt.nombre || '',
         categoriaServicioId: edt.categoriaServicio?.id || '',
-        zona: edt.zona || '',
         fechaInicioCom: edt.fechaInicioComercial
           ? new Date(edt.fechaInicioComercial).toISOString().split('T')[0]
           : '',
@@ -155,7 +220,8 @@ export function CotizacionEdtForm({
         responsableId: edt.responsableId || '',
         descripcion: edt.descripcion || '',
         prioridad: edt.prioridad || 'media',
-        cotizacionFaseId: edt.cotizacionFaseId || 'none'
+        cotizacionFaseId: edt.cotizacionFaseId || 'none',
+        posicionamiento: 'despues_ultima' // Default for editing
       })
     }
   }, [edt])
@@ -195,7 +261,7 @@ export function CotizacionEdtForm({
       if (!formData.categoriaServicioId) {
         toast({
           title: 'Error de validación',
-          description: 'Debe seleccionar una categoría de servicio.',
+          description: 'Debe seleccionar un servicio.',
           variant: 'destructive'
         })
         return
@@ -207,6 +273,17 @@ export function CotizacionEdtForm({
         toast({
           title: 'Error de validación',
           description: 'El servicio seleccionado no es válido.',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      // Fase is optional - no validation required
+
+      if (!formData.fechaInicioCom) {
+        toast({
+          title: 'Error de validación',
+          description: 'Debe seleccionar una fecha de inicio.',
           variant: 'destructive'
         })
         return
@@ -238,7 +315,6 @@ export function CotizacionEdtForm({
       const requestData = {
         nombre: formData.nombre.trim(),
         categoriaServicioId: formData.categoriaServicioId,
-        zona: formData.zona || undefined,
         fechaInicioCom: formData.fechaInicioCom ? new Date(formData.fechaInicioCom).toISOString() : undefined,
         fechaFinCom: formData.fechaFinCom ? new Date(formData.fechaFinCom).toISOString() : undefined,
         horasCom: horasValue,
@@ -252,7 +328,6 @@ export function CotizacionEdtForm({
       console.log('Request data types:', {
         nombre: typeof requestData.nombre,
         categoriaServicioId: typeof requestData.categoriaServicioId,
-        zona: typeof requestData.zona,
         fechaInicioCom: typeof requestData.fechaInicioCom,
         fechaFinCom: typeof requestData.fechaFinCom,
         horasCom: typeof requestData.horasCom,
@@ -314,69 +389,83 @@ export function CotizacionEdtForm({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="categoriaServicioId">Servicio *</Label>
-              <Select
-                value={formData.categoriaServicioId}
-                onValueChange={(value) => {
-                  // ✅ Auto-cargar horas del servicio seleccionado
-                  const servicioSeleccionado = servicios.find(s => s.categoriaServicioId === value)
-                  const horasTotales = servicioSeleccionado ? calcularHorasTotalesServicio(servicioSeleccionado) : 0
+          <div>
+            <Label htmlFor="categoriaServicioId">Servicio *</Label>
+            <Select
+              value={formData.categoriaServicioId}
+              onValueChange={(value) => {
+                // ✅ Auto-cargar horas del servicio seleccionado
+                const servicioSeleccionado = servicios.find(s => s.categoriaServicioId === value)
+                const horasTotalesServicio = servicioSeleccionado ? calcularHorasTotalesServicio(servicioSeleccionado) : 0
 
-                  setFormData(prev => ({
-                    ...prev,
-                    categoriaServicioId: value,
-                    // ✅ Auto-fill nombre del EDT con el nombre del servicio
-                    nombre: servicioSeleccionado ? servicioSeleccionado.nombre : prev.nombre,
-                    horasCom: horasTotales > 0 ? horasTotales.toString() : prev.horasCom,
-                    // ✅ Auto-calcular fecha fin si hay fecha inicio
-                    fechaFinCom: prev.fechaInicioCom && horasTotales > 0
-                      ? calcularFechaFin(prev.fechaInicioCom, horasTotales)
-                      : prev.fechaFinCom
-                  }))
-                }}
-                disabled={serviciosLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={
-                    serviciosLoading
-                      ? "Cargando servicios..."
-                      : servicios.length === 0
-                        ? "No hay servicios disponibles"
-                        : "Seleccionar servicio"
-                  } />
-                </SelectTrigger>
-                <SelectContent>
-                  {!serviciosLoading && servicios.length > 0 && servicios.map((servicio) => (
-                    <SelectItem key={servicio.id} value={servicio.categoriaServicioId}>
-                      {servicio.nombre} ({servicio.categoria})
+                // ✅ Si no hay horas del servicio, usar configuración por defecto
+                const horasFinales = horasTotalesServicio > 0 ? horasTotalesServicio : obtenerDuracionPorDefecto()
+
+                // ✅ Obtener nombre de la categoría para el EDT
+                const categoriaNombre = servicioSeleccionado?.items[0]?.catalogoServicio?.categoria?.descripcion ||
+                                       servicioSeleccionado?.items[0]?.catalogoServicio?.categoria?.nombre ||
+                                       servicioSeleccionado?.categoria ||
+                                       `EDT ${servicioSeleccionado?.categoria || 'Sin Categoría'}`
+
+                setFormData(prev => ({
+                  ...prev,
+                  categoriaServicioId: value,
+                  // ✅ Auto-fill nombre del EDT con la descripción de la categoría
+                  nombre: categoriaNombre,
+                  horasCom: horasFinales.toString(),
+                  // ✅ Auto-calcular fecha fin si hay fecha inicio
+                  fechaFinCom: prev.fechaInicioCom && horasFinales > 0
+                    ? calcularFechaFin(prev.fechaInicioCom, horasFinales)
+                    : prev.fechaFinCom
+                }))
+              }}
+              disabled={serviciosLoading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={
+                  serviciosLoading
+                    ? "Cargando servicios..."
+                    : servicios.length === 0
+                      ? "No hay servicios disponibles"
+                      : "Seleccionar servicio"
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                {!serviciosLoading && servicios.length > 0 && servicios
+                  .filter(servicio => servicio.categoriaServicioId) // Only show services with categoriaServicioId
+                  .map((servicio) => (
+                    <SelectItem key={servicio.id} value={servicio.categoriaServicioId!}>
+                      {servicio.nombre} - {servicio.items[0]?.catalogoServicio?.categoria?.nombre || servicio.categoria}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="zona">Zona</Label>
-              <Input
-                id="zona"
-                value={formData.zona}
-                onChange={(e) =>
-                  setFormData(prev => ({ ...prev, zona: e.target.value }))
-                }
-                placeholder="Ej: Z1, Planta, Oficina"
-              />
-            </div>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <Label htmlFor="cotizacionFaseId">Fase del Proyecto</Label>
             <Select
               value={formData.cotizacionFaseId}
-              onValueChange={(value) =>
-                setFormData(prev => ({ ...prev, cotizacionFaseId: value }))
-              }
+              onValueChange={async (value) => {
+                if (value !== 'none') {
+                  // ✅ Calcular fecha de inicio automática basada en EDTs hermanos y posicionamiento
+                  const fechaInicioAutomatica = await calcularFechaInicioAutomatica(value, formData.posicionamiento)
+                  const duracionPorDefecto = obtenerDuracionPorDefecto()
+
+                  setFormData(prev => ({
+                    ...prev,
+                    cotizacionFaseId: value,
+                    fechaInicioCom: fechaInicioAutomatica,
+                    horasCom: duracionPorDefecto.toString(),
+                    // ✅ Auto-calcular fecha fin si hay fecha inicio y duración
+                    fechaFinCom: fechaInicioAutomatica && duracionPorDefecto > 0
+                      ? calcularFechaFin(fechaInicioAutomatica, duracionPorDefecto)
+                      : prev.fechaFinCom
+                  }))
+                } else {
+                  setFormData(prev => ({ ...prev, cotizacionFaseId: value }))
+                }
+              }}
               disabled={fasesLoading}
             >
               <SelectTrigger>
@@ -395,6 +484,37 @@ export function CotizacionEdtForm({
                     {fase.nombre} (Orden: {fase.orden})
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="posicionamiento">Posicionamiento en Fase</Label>
+            <Select
+              value={formData.posicionamiento}
+              onValueChange={(value: 'inicio_fase' | 'despues_ultima') => {
+                setFormData(prev => ({ ...prev, posicionamiento: value }))
+                // ✅ Recalcular fecha cuando cambia el posicionamiento
+                if (formData.cotizacionFaseId && formData.cotizacionFaseId !== 'none') {
+                  calcularFechaInicioAutomatica(formData.cotizacionFaseId, value).then(fechaInicio => {
+                    const duracionPorDefecto = obtenerDuracionPorDefecto()
+                    setFormData(prev => ({
+                      ...prev,
+                      fechaInicioCom: fechaInicio,
+                      fechaFinCom: fechaInicio && duracionPorDefecto > 0
+                        ? calcularFechaFin(fechaInicio, duracionPorDefecto)
+                        : prev.fechaFinCom
+                    }))
+                  })
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar posicionamiento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="despues_ultima">Después del Último EDT</SelectItem>
+                <SelectItem value="inicio_fase">Al Inicio de la Fase</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -452,7 +572,7 @@ export function CotizacionEdtForm({
                 Horas Estimadas
                 {formData.horasCom && parseFloat(formData.horasCom) > 0 && (
                   <span className="text-xs text-muted-foreground bg-green-50 px-2 py-1 rounded">
-                    Auto-cargado del servicio
+                    Auto-cargado de configuración
                   </span>
                 )}
               </Label>
@@ -516,7 +636,19 @@ export function CotizacionEdtForm({
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || serviciosLoading || fasesLoading}>
+            <Button
+              type="submit"
+              disabled={
+                loading ||
+                serviciosLoading ||
+                fasesLoading ||
+                !formData.nombre?.trim() ||
+                !formData.categoriaServicioId ||
+                !formData.fechaInicioCom ||
+                !formData.horasCom ||
+                parseFloat(formData.horasCom) <= 0
+              }
+            >
               {loading ? 'Guardando...' : (serviciosLoading || fasesLoading) ? 'Cargando...' : (edt ? 'Actualizar' : 'Crear')} EDT
             </Button>
           </DialogFooter>

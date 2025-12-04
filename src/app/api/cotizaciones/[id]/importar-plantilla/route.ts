@@ -328,6 +328,7 @@ export async function POST(
                     margen: item.margen,
                     costoInterno: item.costoInterno,
                     costoCliente: item.costoCliente,
+                    orden: item.orden || 0,
                   }))
                 }
               })
@@ -375,6 +376,7 @@ export async function POST(
                     margen: item.margen,
                     costoInterno: item.costoInterno,
                     costoCliente: item.costoCliente,
+                    orden: item.orden || 0,
                   }))
                 }
               }

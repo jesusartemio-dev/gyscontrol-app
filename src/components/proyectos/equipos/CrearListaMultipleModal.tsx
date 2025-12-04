@@ -170,8 +170,8 @@ export default function CrearListaMultipleModal({
 
       // Resetear estado
       setItemsSeleccionados([])
-      const categoriaPredominante = getCategoriaPredominante(proyectoEquipo.items || [])
-      setNombreLista(`Lista de ${categoriaPredominante}`)
+      // Usar el nombre del equipo como valor por defecto
+      setNombreLista(proyectoEquipo.nombre || 'Nueva Lista Técnica')
       setFiltroCategoria('__ALL__')
       setBusqueda('')
       // Reset fecha requerida
@@ -186,15 +186,7 @@ export default function CrearListaMultipleModal({
         ? prev.filter(id => id !== itemId)
         : [...prev, itemId]
 
-      // Actualizar nombre basado en items seleccionados
-      if (nuevosSeleccionados.length > 0) {
-        const itemsSeleccionadosData = itemsDisponibles.filter(item =>
-          nuevosSeleccionados.includes(item.id)
-        )
-        const categoriaPredominante = getCategoriaPredominante(itemsSeleccionadosData)
-        setNombreLista(`Lista de ${categoriaPredominante}`)
-        setDescripcionLista(`Lista técnica de ${categoriaPredominante} para ${proyectoEquipo.nombre}`)
-      }
+      // El nombre permanece editable por el usuario, no se cambia automáticamente
 
       return nuevosSeleccionados
     })
@@ -207,13 +199,7 @@ export default function CrearListaMultipleModal({
     setItemsSeleccionados(prev => {
       const nuevosSeleccionados = [...new Set([...prev, ...idsFiltrados])]
 
-      // Actualizar nombre basado en todos los items seleccionados
-      const itemsSeleccionadosData = itemsDisponibles.filter(item =>
-        nuevosSeleccionados.includes(item.id)
-      )
-      const categoriaPredominante = getCategoriaPredominante(itemsSeleccionadosData)
-      setNombreLista(`Lista de ${categoriaPredominante}`)
-      setDescripcionLista(`Lista técnica de ${categoriaPredominante} para ${proyectoEquipo.nombre}`)
+      // El nombre permanece editable por el usuario
 
       return nuevosSeleccionados
     })
@@ -222,10 +208,7 @@ export default function CrearListaMultipleModal({
   // Deseleccionar todos
   const deseleccionarTodos = () => {
     setItemsSeleccionados([])
-    // Resetear nombre por defecto
-    const categoriaPredominante = getCategoriaPredominante(proyectoEquipo.items || [])
-    setNombreLista(`Lista de ${categoriaPredominante}`)
-    setDescripcionLista(`Lista técnica de ${categoriaPredominante} para ${proyectoEquipo.nombre}`)
+    // El nombre permanece editable por el usuario
   }
 
   // Obtener items filtrados

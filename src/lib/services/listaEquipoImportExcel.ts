@@ -1,0 +1,260 @@
+// ===================================================
+// 📁 Archivo: listaEquipoImportExcel.ts
+// 📌 Ubicación: src/lib/services/
+// 🔧 Descripción: Servicios para importación de Excel en listas de equipos
+// ✍️ Autor: GYS Team
+// 📅 Última actualización: 2025-11-18
+// ===================================================
+
+import { getCatalogoEquipos } from './catalogoEquipo'
+import { getProyectoEquipos } from './proyectoEquipo'
+import { createCatalogoEquipo } from './catalogoEquipo'
+import { createListaEquipoItem } from './listaEquipoItem'
+import { createListaEquipoItemFromProyecto } from './listaEquipoItem'
+import { getCategoriasEquipo, createCategoriaEquipo } from './categoriaEquipo'
+import { getUnidades, createUnidad } from './unidad'
+import type { CatalogoEquipo, CatalogoEquipoPayload, CategoriaEquipo, Unidad } from '@/types'
+
+export interface ItemExcelImportado {
+  codigo: string
+  descripcion: string
+  categoria: string
+  unidad: string
+  marca: string
+  cantidad: number
+  estado: 'en_cotizacion' | 'solo_catalogo' | 'nuevo'
+  catalogoId?: string
+  proyectoEquipoItemId?: string
+}
+
+export interface ResumenImportacionExcel {
+  totalItems: number
+  enCotizacion: number
+  soloCatalogo: number
+  nuevos: number
+  items: ItemExcelImportado[]
+  equiposNuevosParaCatalogo: CatalogoEquipoPayload[]
+}
+
+// ✅ Verificar existencia de equipos en catálogo y cotización
+export async function verificarExistenciaEquipos(
+  excelItems: Array<{
+    codigo: string
+    descripcion: string
+    categoria: string
+    unidad: string
+    marca: string
+    cantidad: number
+  }>,
+  proyectoId: string
+): Promise<ResumenImportacionExcel> {
+  try {
+    // Obtener datos existentes
+    const [catalogoEquipos, proyectoEquipos, categorias, unidades] = await Promise.all([
+      getCatalogoEquipos(),
+      getProyectoEquipos(proyectoId),
+      getCategoriasEquipo(),
+      getUnidades()
+    ])
+
+    // Crear mapas de búsqueda
+    const catalogoPorCodigo = new Map(
+      catalogoEquipos.map(eq => [eq.codigo, eq])
+    )
+
+    const cotizacionPorCodigo = new Map(
+      proyectoEquipos.flatMap(pe =>
+        pe.items?.map(item => [item.codigo, item]) || []
+      ) || []
+    )
+
+    // Crear mapas para categorias y unidades
+    const categoriaPorNombre = new Map<string, CategoriaEquipo>(
+      categorias.map((cat: CategoriaEquipo) => [cat.nombre.toLowerCase(), cat])
+    )
+
+    const unidadPorNombre = new Map<string, Unidad>(
+      unidades.map((un: Unidad) => [un.nombre.toLowerCase(), un])
+    )
+
+    const itemsClasificados: ItemExcelImportado[] = []
+    const equiposParaCatalogo: CatalogoEquipoPayload[] = []
+    let enCotizacion = 0
+    let soloCatalogo = 0
+    let nuevos = 0
+
+    for (const excelItem of excelItems) {
+      const { codigo, descripcion, categoria, unidad, marca, cantidad } = excelItem
+
+      // Convertir codigo a string para comparación consistente
+      const codigoStr = String(codigo)
+
+      const existeEnCatalogo = catalogoPorCodigo.has(codigoStr)
+      const existeEnCotizacion = cotizacionPorCodigo.has(codigoStr)
+
+      let estado: 'en_cotizacion' | 'solo_catalogo' | 'nuevo'
+      let catalogoId: string | undefined
+      let proyectoEquipoItemId: string | undefined
+
+      if (existeEnCatalogo && existeEnCotizacion) {
+        // Existe en ambos
+        estado = 'en_cotizacion'
+        catalogoId = catalogoPorCodigo.get(codigoStr)?.id
+        proyectoEquipoItemId = cotizacionPorCodigo.get(codigoStr)?.id
+        enCotizacion++
+      } else if (existeEnCatalogo) {
+        // Solo en catálogo
+        estado = 'solo_catalogo'
+        catalogoId = catalogoPorCodigo.get(codigoStr)?.id
+        soloCatalogo++
+      } else {
+        // Nuevo
+        estado = 'nuevo'
+        nuevos++
+
+        // Obtener o crear categoria
+        let categoriaId = categoriaPorNombre.get(categoria.toLowerCase())?.id
+        if (!categoriaId) {
+          // Crear nueva categoria
+          const nuevaCategoria = await createCategoriaEquipo({ nombre: categoria })
+          categoriaId = nuevaCategoria.id
+          categoriaPorNombre.set(categoria.toLowerCase(), nuevaCategoria)
+        }
+
+        // Obtener o crear unidad
+        let unidadId = unidadPorNombre.get(unidad.toLowerCase())?.id
+        if (!unidadId) {
+          // Crear nueva unidad
+          const nuevaUnidad = await createUnidad({ nombre: unidad })
+          unidadId = nuevaUnidad.id
+          unidadPorNombre.set(unidad.toLowerCase(), nuevaUnidad)
+        }
+
+        // Verificar que tenemos los IDs
+        if (!categoriaId || !unidadId) {
+          throw new Error(`No se pudieron obtener IDs para categoria "${categoria}" o unidad "${unidad}"`)
+        }
+
+        // Agregar para crear en catálogo
+        equiposParaCatalogo.push({
+          codigo: codigoStr,
+          descripcion,
+          marca,
+          categoriaId,
+          unidadId,
+          precioInterno: 0,
+          margen: 0.25,
+          precioVenta: 0,
+          estado: 'pendiente'
+        })
+      }
+
+      itemsClasificados.push({
+        codigo: codigoStr,
+        descripcion,
+        categoria,
+        unidad,
+        marca,
+        cantidad,
+        estado,
+        catalogoId,
+        proyectoEquipoItemId
+      })
+    }
+
+    return {
+      totalItems: excelItems.length,
+      enCotizacion,
+      soloCatalogo,
+      nuevos,
+      items: itemsClasificados,
+      equiposNuevosParaCatalogo: equiposParaCatalogo
+    }
+  } catch (error) {
+    console.error('Error verificando existencia de equipos:', error)
+    throw new Error('Error al verificar existencia de equipos')
+  }
+}
+
+// ✅ Crear equipos nuevos en el catálogo
+export async function crearEquiposEnCatalogo(
+  equiposNuevos: CatalogoEquipoPayload[]
+): Promise<CatalogoEquipo[]> {
+  try {
+    const equiposCreados: CatalogoEquipo[] = []
+
+    for (const equipoPayload of equiposNuevos) {
+      try {
+        const equipoCreado = await createCatalogoEquipo(equipoPayload)
+        if (equipoCreado) {
+          equiposCreados.push(equipoCreado)
+        }
+      } catch (error) {
+        console.error(`Error creando equipo ${equipoPayload.codigo}:`, error)
+        throw error
+      }
+    }
+
+    return equiposCreados
+  } catch (error) {
+    console.error('Error creando equipos en catálogo:', error)
+    throw new Error('Error al crear equipos en catálogo')
+  }
+}
+
+// ✅ Importar items desde cotización
+export async function importarDesdeCotizacion(
+  listaId: string,
+  proyectoEquipoItemIds: string[]
+): Promise<void> {
+  try {
+    for (const itemId of proyectoEquipoItemIds) {
+      await createListaEquipoItemFromProyecto(listaId, itemId)
+    }
+  } catch (error) {
+    console.error('Error importando desde cotización:', error)
+    throw new Error('Error al importar items desde cotización')
+  }
+}
+
+// ✅ Importar items desde catálogo
+export async function importarDesdeCatalogo(
+  listaId: string,
+  proyectoEquipoId: string,
+  catalogoIds: string[],
+  cantidades: Record<string, number>,
+  responsableId: string
+): Promise<void> {
+  try {
+
+    // Obtener datos del catálogo
+    const catalogoEquipos = await getCatalogoEquipos()
+    const catalogoPorId = new Map(
+      catalogoEquipos.map(eq => [eq.id, eq])
+    )
+
+    for (const catalogoId of catalogoIds) {
+      const equipo = catalogoPorId.get(catalogoId)
+      if (!equipo) continue
+
+      const cantidad = cantidades[catalogoId] || 1
+
+      await createListaEquipoItem({
+        listaId,
+        proyectoEquipoId,
+        responsableId,
+        codigo: equipo.codigo,
+        descripcion: equipo.descripcion,
+        categoria: equipo.categoria?.nombre || 'SIN-CATEGORIA',
+        unidad: equipo.unidad?.nombre || 'UND',
+        cantidad,
+        presupuesto: equipo.precioVenta ?? 0,
+        origen: 'nuevo',
+        estado: 'borrador'
+      })
+    }
+  } catch (error) {
+    console.error('Error importando desde catálogo:', error)
+    throw new Error('Error al importar items desde catálogo')
+  }
+}

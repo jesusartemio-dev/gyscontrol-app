@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
               email: true
             }
           },
-          plantilla: {
+          plantillas: {
             select: {
               id: true,
               nombre: true,
@@ -140,7 +140,39 @@ export async function POST(req: NextRequest) {
     const { nombre, clienteId, comercialId } = data
 
     if (!nombre || !clienteId || !comercialId) {
-      return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+      const missingFields = []
+      if (!nombre) missingFields.push('nombre')
+      if (!clienteId) missingFields.push('clienteId')
+      if (!comercialId) missingFields.push('comercialId')
+      return NextResponse.json({
+        error: `Faltan campos requeridos: ${missingFields.join(', ')}`
+      }, { status: 400 })
+    }
+
+    // ✅ Verificar que el cliente existe en la base de datos
+    const cliente = await prisma.cliente.findUnique({
+      where: { id: clienteId },
+      select: { id: true, nombre: true }
+    })
+
+    if (!cliente) {
+      return NextResponse.json(
+        { error: 'El cliente especificado no existe' },
+        { status: 400 }
+      )
+    }
+
+    // ✅ Verificar que el usuario comercial existe en la base de datos
+    const usuarioComercial = await prisma.user.findUnique({
+      where: { id: comercialId },
+      select: { id: true, name: true, email: true }
+    })
+
+    if (!usuarioComercial) {
+      return NextResponse.json(
+        { error: 'El usuario comercial especificado no existe' },
+        { status: 400 }
+      )
     }
 
     // 📡 Generar código automático con formato GYS-XXXX-YY
@@ -181,9 +213,9 @@ export async function POST(req: NextRequest) {
         session.user.id,
         nueva.nombre,
         {
-          cliente: nueva.cliente?.nombre || 'Cliente desconocido',
+          cliente: nueva.clienteId || 'Cliente desconocido',
           codigo: nueva.codigo,
-          comercial: nueva.comercial?.name || 'Comercial desconocido'
+          comercial: nueva.comercialId || 'Comercial desconocido'
         }
       )
     } catch (auditError) {
@@ -194,6 +226,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(nueva, { status: 201 })
   } catch (error) {
     console.error('❌ Error al crear cotización:', error)
-    return NextResponse.json({ error: 'Error al crear cotización' }, { status: 500 })
+
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json({
+          error: 'Ya existe una cotización con ese código. Intente nuevamente.'
+        }, { status: 409 })
+      }
+      if (error.message.includes('Foreign key constraint')) {
+        return NextResponse.json({
+          error: 'Error de referencia: Verifique que el cliente y usuario comercial existan.'
+        }, { status: 400 })
+      }
+    }
+
+    return NextResponse.json({
+      error: 'Error interno del servidor al crear la cotización'
+    }, { status: 500 })
   }
 }

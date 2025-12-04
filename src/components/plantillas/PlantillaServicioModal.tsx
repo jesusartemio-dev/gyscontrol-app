@@ -12,8 +12,8 @@
 
 import { useState, useEffect } from 'react'
 import { createPlantillaServicio } from '@/lib/services/plantillaServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
-import type { PlantillaServicioPayload, CategoriaServicio } from '@/types'
+import { getEdts } from '@/lib/services/edt'
+import type { PlantillaServicioPayload, Edt } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,7 +39,7 @@ export default function PlantillaServicioModal({
   const [nombre, setNombre] = useState('')
   const [categoria, setCategoria] = useState('')
   const [descripcion, setDescripcion] = useState('')
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingCategorias, setLoadingCategorias] = useState(false)
 
@@ -47,7 +47,7 @@ export default function PlantillaServicioModal({
   useEffect(() => {
     if (isOpen && categorias.length === 0) {
       setLoadingCategorias(true)
-      getCategoriasServicio()
+      getEdts()
         .then((cats) => {
           setCategorias(cats)
           if (cats.length > 0) {

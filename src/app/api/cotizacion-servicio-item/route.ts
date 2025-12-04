@@ -65,7 +65,9 @@ export async function POST(req: Request) {
         factorSeguridad: data.factorSeguridad,
         margen: data.margen,
         costoInterno: data.costoInterno,
-        costoCliente: data.costoCliente
+        costoCliente: data.costoCliente,
+        nivelDificultad: data.nivelDificultad ?? 1,
+        orden: data.orden ?? 0
       }
     })
 

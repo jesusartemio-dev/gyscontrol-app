@@ -57,12 +57,12 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 
 
-import CotizacionServicioForm from '@/components/cotizaciones/CotizacionServicioForm'
 import CotizacionGastoForm from '@/components/cotizaciones/CotizacionGastoForm'
 import CotizacionEquipoAccordion from '@/components/cotizaciones/CotizacionEquipoAccordion'
 import CotizacionServicioAccordion from '@/components/cotizaciones/CotizacionServicioAccordion'
 import CotizacionGastoAccordion from '@/components/cotizaciones/CotizacionGastoAccordion'
 import CotizacionEquipoModal from '@/components/cotizaciones/CotizacionEquipoModal'
+import CotizacionServicioCreateModal from '@/components/cotizaciones/CotizacionServicioCreateModal'
 import ImportarPlantillaModal from '@/components/cotizaciones/ImportarPlantillaModal'
 
 import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
@@ -128,6 +128,7 @@ export default function CotizacionDetallePage() {
   const [updatingData, setUpdatingData] = useState(false)
   const [showForm, setShowForm] = useState({ servicio: false, gasto: false })
   const [showEquipoModal, setShowEquipoModal] = useState(false)
+  const [showServicioModal, setShowServicioModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState<{ tipo: 'equipos' | 'servicios' | 'gastos' | null }>({ tipo: null })
   const [showCrearOportunidad, setShowCrearOportunidad] = useState(false)
   const [showCrmNotification, setShowCrmNotification] = useState(false)
@@ -912,12 +913,12 @@ export default function CotizacionDetallePage() {
               </CardTitle>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
-                  onClick={() => setShowForm(prev => ({ ...prev, servicio: !prev.servicio }))}
+                  onClick={() => setShowServicioModal(true)}
                   size="sm"
-                  className="flex items-center gap-2 justify-start sm:justify-center"
+                  className="flex items-center gap-2 justify-start sm:justify-center bg-indigo-600 hover:bg-indigo-700"
                 >
                   <Plus className="h-4 w-4" />
-                  Agregar Servicio
+                  Nuevo Servicio
                 </Button>
                 <Button
                   onClick={() => setShowImportModal({ tipo: 'servicios' })}
@@ -932,23 +933,6 @@ export default function CotizacionDetallePage() {
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4">
-            {showForm.servicio && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <CotizacionServicioForm
-                  cotizacionId={cotizacion.id}
-                  onCreated={(nuevo) =>
-                    handleDataUpdate(cotizacion ? { ...cotizacion, servicios: [...cotizacion.servicios, { ...nuevo, items: [] }] } : cotizacion)
-                  }
-                />
-                <Separator className="my-4" />
-              </motion.div>
-            )}
-            
             {cotizacion.servicios.length === 0 ? (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
@@ -975,11 +959,11 @@ export default function CotizacionDetallePage() {
                 </p>
                 <div className="space-y-3">
                   <Button
-                    onClick={() => setShowForm(prev => ({ ...prev, servicio: true }))}
+                    onClick={() => setShowServicioModal(true)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Agregar primer servicio
+                    Nuevo Servicio
                   </Button>
                   <p className="text-xs text-muted-foreground">
                     🔧 Tip: Los servicios suelen tener mejores márgenes de rentabilidad
@@ -1012,6 +996,7 @@ export default function CotizacionDetallePage() {
                     <CotizacionServicioAccordion
                       servicio={s}
                       onCreated={i => actualizarServicio(s.id, items => [...items, i])}
+                      onMultipleCreated={newItems => actualizarServicio(s.id, items => [...items, ...newItems])}
                       onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))}
                       onDeleted={id => actualizarServicio(s.id, items => items.filter(i => i.id !== id))}
                       onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)}
@@ -1227,6 +1212,20 @@ export default function CotizacionDetallePage() {
             equipos: [...cotizacion.equipos, { ...nuevoEquipo, items: [] }]
           } : cotizacion)
           setShowEquipoModal(false)
+        }}
+      />
+
+      {/* Modal para crear nueva sección de servicio */}
+      <CotizacionServicioCreateModal
+        cotizacionId={cotizacion.id}
+        isOpen={showServicioModal}
+        onClose={() => setShowServicioModal(false)}
+        onCreated={(servicio) => {
+          handleDataUpdate(cotizacion ? {
+            ...cotizacion,
+            servicios: [...cotizacion.servicios, { ...servicio, items: [] }]
+          } : cotizacion)
+          setShowServicioModal(false)
         }}
       />
 

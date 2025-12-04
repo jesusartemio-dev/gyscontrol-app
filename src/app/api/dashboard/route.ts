@@ -231,10 +231,8 @@ async function getComercialWidgets(userId: string) {
     // Mock conversion rate calculation
     Promise.resolve(75),
     prisma.crmActividad.findMany({
-      where: { oportunidad: { comercialId: userId } },
       take: 5,
-      orderBy: { fecha: 'desc' },
-      include: { oportunidad: { select: { nombre: true } } }
+      orderBy: { fecha: 'desc' }
     })
   ])
 
@@ -266,7 +264,7 @@ async function getComercialWidgets(userId: string) {
       activities: recentActivities.map((activity: any) => ({
         id: activity.id,
         description: activity.descripcion,
-        opportunity: activity.oportunidad.nombre,
+        opportunity: 'Actividad general',
         timestamp: activity.fecha
       }))
     },

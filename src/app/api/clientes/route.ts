@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     
     console.log('🚀 Creating client with code:', data.codigo)
     
-    const nuevo = await prisma.cliente.create({ 
+    const nuevo = await prisma.cliente.create({
       data: {
         ...data,
         numeroSecuencia: 1 // ✅ Start with sequence 1
@@ -107,7 +107,7 @@ export async function DELETE(req: Request) {
           where: { clienteId: id }
         })
       }
-      
+
       // Eliminar el cliente
       await tx.cliente.delete({ where: { id } })
     })

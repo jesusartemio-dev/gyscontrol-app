@@ -18,18 +18,18 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const proyectoId = searchParams.get('proyectoId')
-    
+
     // 🔍 Construir filtros dinámicamente
     const whereClause: any = {}
-    
+
     if (proyectoId) {
       whereClause.lista = {
         proyectoId: proyectoId
       }
     }
-    
+
     console.log('🔍 DEBUG API lista-equipo-item - Filtros aplicados:', whereClause)
-    
+
     const items = await prisma.listaEquipoItem.findMany({
       where: whereClause,
       include: {
@@ -39,12 +39,6 @@ export async function GET(request: Request) {
           include: {
             pedido: true // ✅ Incluir relación al pedido padre para acceder al código
           }
-        },
-        proyectoEquipoItem: {
-          include: {
-            proyectoEquipo: true,
-            listaEquipoSeleccionado: true,
-          },
         },
         proyectoEquipo: true,
         cotizaciones: {
@@ -60,19 +54,6 @@ export async function GET(request: Request) {
             },
           },
           orderBy: { codigo: 'asc' },
-        },
-        cotizacionSeleccionada: {
-          include: {
-            cotizacion: {
-              select: {
-                id: true,
-                codigo: true,
-                proveedor: {
-                  select: { nombre: true },
-                },
-              },
-            },
-          },
         },
       },
       orderBy: { codigo: 'asc' },
@@ -160,7 +141,7 @@ export async function POST(request: Request) {
         unidad: body.unidad,
         cantidad: body.cantidad ?? 0,
         verificado: body.verificado ?? false,
-        comentarioRevision: body.comentarioRevision || null,
+        comentarioRevision: body.categoria ? `CATEGORIA:${body.categoria}` : body.comentarioRevision || null,
         presupuesto: body.presupuesto ?? null,
         precioElegido: body.precioElegido ?? null,
         costoElegido: body.costoElegido ?? null,
@@ -170,7 +151,8 @@ export async function POST(request: Request) {
         cantidadEntregada: body.cantidadEntregada ?? 0,
         origen: body.origen ?? 'nuevo',
         estado: body.estado ?? 'borrador',
-      },
+        // Nota: categoria field will be added after Prisma client regeneration
+      } as any,
       include: {
         lista: true,
         proveedor: true,
@@ -178,11 +160,6 @@ export async function POST(request: Request) {
           include: {
             pedido: true // ✅ Incluir relación al pedido padre para acceder al código
           }
-        },
-        proyectoEquipoItem: {
-          include: {
-            proyectoEquipo: true,
-          },
         },
         proyectoEquipo: true,
         cotizaciones: {
@@ -198,19 +175,6 @@ export async function POST(request: Request) {
             },
           },
           orderBy: { codigo: 'asc' },
-        },
-        cotizacionSeleccionada: {
-          include: {
-            cotizacion: {
-              select: {
-                id: true,
-                codigo: true,
-                proveedor: {
-                  select: { nombre: true },
-                },
-              },
-            },
-          },
         },
       },
     })

@@ -32,11 +32,6 @@ const horasSchema = z.number()
   .min(0, 'Las horas no pueden ser negativas')
   .max(10000, 'Las horas no pueden exceder 10,000')
 
-// ✅ Validador para zona (texto opcional)
-const zonaSchema = z.string()
-  .min(1, 'La zona no puede estar vacía')
-  .max(100, 'La zona no puede exceder 100 caracteres')
-  .optional()
 
 // ===================================================
 // 📋 ESQUEMAS PRINCIPALES EDT
@@ -46,7 +41,6 @@ const zonaSchema = z.string()
 export const crearProyectoEdtSchema = z.object({
   proyectoId: cuidSchema,
   categoriaServicioId: cuidSchema,
-  zona: zonaSchema,
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
   fechaInicioReal: fechaSchema,
@@ -96,7 +90,6 @@ export const crearProyectoEdtSchema = z.object({
 const proyectoEdtBaseSchema = z.object({
   proyectoId: cuidSchema,
   categoriaServicioId: cuidSchema,
-  zona: zonaSchema,
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
   fechaInicioReal: fechaSchema,
@@ -127,7 +120,6 @@ export const edtFiltrosSchema = z.object({
   estado: z.enum(['planificado', 'en_progreso', 'completado', 'detenido', 'cancelado']).optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional(),
   responsableId: z.string().uuid().optional(),
-  zona: z.string().optional(),
   fechaDesde: fechaSchema,
   fechaHasta: fechaSchema,
   porcentajeAvanceMin: z.number().min(0).max(100).optional(),
@@ -208,8 +200,7 @@ export const reporteEdtSchema = z.object({
     prioridad: z.array(z.enum(['baja', 'media', 'alta', 'critica'])).optional(),
     responsableId: z.string().uuid().optional(),
     fechaInicio: fechaSchema,
-    fechaFin: fechaSchema,
-    zona: z.string().optional()
+    fechaFin: fechaSchema
   }),
   formato: z.enum(['pdf', 'excel', 'csv']),
   incluirGraficos: z.boolean().optional().default(true),
@@ -505,7 +496,6 @@ export function validarEstadoEdt(estado: string): boolean {
 // ✅ Esquema base para CotizacionEdt (sin refinaciones)
 const cotizacionEdtBaseSchema = z.object({
   categoriaServicioId: cuidSchema,
-  zona: zonaSchema,
   fechaInicioCom: fechaSchema,
   fechaFinCom: fechaSchema,
   horasCom: horasSchema,
@@ -520,7 +510,6 @@ const cotizacionEdtBaseSchema = z.object({
 export const crearCotizacionEdtSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(255, 'El nombre no puede exceder 255 caracteres'),
   categoriaServicioId: cuidSchema,
-  zona: zonaSchema,
   fechaInicioCom: fechaSchema,
   fechaFinCom: fechaSchema,
   horasCom: horasSchema,
@@ -585,7 +574,6 @@ export const filtrosCotizacionCronogramaSchema = z.object({
   search: z.string().optional(),
   categoriaServicioId: cuidSchema.optional(),
   responsableId: cuidSchema.optional(),
-  zona: z.string().optional(),
   fechaDesde: fechaSchema,
   fechaHasta: fechaSchema,
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional(),

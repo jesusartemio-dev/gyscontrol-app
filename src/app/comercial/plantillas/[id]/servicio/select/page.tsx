@@ -14,9 +14,9 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getCatalogoServiciosByCategoriaId } from '@/lib/services/catalogoServicio'
 import { createPlantillaServicioItem } from '@/lib/services/plantillaServicioItem'
 import { recalcularPlantillaDesdeAPI } from '@/lib/services/plantilla'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { calcularHoras } from '@/lib/utils/formulas'
-import type { CatalogoServicio, CategoriaServicio } from '@/types'
+import type { CatalogoServicio, Edt } from '@/types'
 
 export default function SelectorServiciosPage() {
   const { id } = useParams()
@@ -24,14 +24,14 @@ export default function SelectorServiciosPage() {
   const router = useRouter()
   const plantillaServicioId = searchParams.get('grupo')
 
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('')
   const [catalogo, setCatalogo] = useState<CatalogoServicio[]>([])
   const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({})
   const [cantidades, setCantidades] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    getCategoriasServicio()
+    getEdts()
       .then((cats) => {
         setCategorias(cats)
         if (cats.length > 0) setCategoriaSeleccionada(cats[0].id)

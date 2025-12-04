@@ -15,16 +15,47 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Calendar, BarChart3, Filter, RefreshCw, FolderOpen, Settings } from 'lucide-react'
+import { Plus, Calendar, BarChart3, Filter, RefreshCw, FolderOpen, Settings, MapPin, Wrench, Link, Eye, EyeOff, CheckSquare, TreePine, TrendingUp, Download, Trash2, Clock, CheckCircle, Target, PlayCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ProyectoFasesList } from '@/components/proyectos/fases/ProyectoFasesList'
 import { ProyectoEdtList } from '@/components/proyectos/cronograma/ProyectoEdtList'
+import { ProyectoActividadList } from '@/components/proyectos/cronograma/ProyectoActividadList'
+import { ProyectoDependenciasVisual } from '@/components/proyectos/cronograma/ProyectoDependenciasVisual'
 import { ProyectoCronogramaMetrics } from '@/components/proyectos/cronograma/ProyectoCronogramaMetrics'
 import { ProyectoCronogramaFilters, type FilterState } from '@/components/proyectos/cronograma/ProyectoCronogramaFilters'
 import { ProyectoCronogramaSelector } from '@/components/proyectos/cronograma/ProyectoCronogramaSelector'
-import { ProyectoGanttChart } from '@/components/proyectos/cronograma/ProyectoGanttChart'
-import { ProyectoCronogramaGanttView } from '@/components/proyectos/cronograma/ProyectoCronogramaGanttView'
+import { ProyectoGanttView } from '@/components/proyectos/cronograma/ProyectoGanttView'
+import { ProyectoTareasView } from '@/components/proyectos/cronograma/ProyectoTareasView'
+import { ProyectoCronogramaTreeView } from './ProyectoCronogramaTreeView'
+import { CronogramaGanttViewPro } from '@/components/comercial/cronograma/CronogramaGanttViewPro'
+import { CardDescription } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ProyectoCronograma, ProyectoFase, ProyectoEdt } from '@/types/modelos'
+
+const TIPO_CRONOGRAMA_INFO = {
+  comercial: {
+    label: 'Comercial',
+    description: 'Cronograma basado en la cotización y estimaciones comerciales',
+    icon: Calendar,
+    color: 'bg-blue-100 text-blue-800',
+    bgColor: 'bg-blue-50'
+  },
+  planificacion: {
+    label: 'Planificación',
+    description: 'Cronograma detallado de planificación y preparación',
+    icon: Target,
+    color: 'bg-purple-100 text-purple-800',
+    bgColor: 'bg-purple-50'
+  },
+  ejecucion: {
+    label: 'Ejecución',
+    description: 'Cronograma real de ejecución y seguimiento del proyecto',
+    icon: PlayCircle,
+    color: 'bg-green-100 text-green-800',
+    bgColor: 'bg-green-50'
+  }
+}
 
 interface ProyectoCronogramaTabProps {
   proyectoId: string
@@ -39,21 +70,60 @@ export function ProyectoCronogramaTab({
   cronograma,
   onRefresh
 }: ProyectoCronogramaTabProps) {
-  console.log('🔍 [CRONOGRAMA TAB] Iniciando componente ProyectoCronogramaTab', { proyectoId, proyectoNombre })
-
-  const [activeTab, setActiveTab] = useState('selector')
+  const [activeTab, setActiveTab] = useState('jerarquia')
   const [showEdtForm, setShowEdtForm] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [selectedCronograma, setSelectedCronograma] = useState<ProyectoCronograma | undefined>(cronograma)
+  const [fechaInicio, setFechaInicio] = useState('')
+  const [fechaFin, setFechaFin] = useState('')
+  const [calendarios, setCalendarios] = useState<any[]>([])
+  const [calendarioLaboralId, setCalendarioLaboralId] = useState('')
+  const [proyectoData, setProyectoData] = useState<any>(null)
+  const [showCronogramaSelector, setShowCronogramaSelector] = useState(false)
   const { toast } = useToast()
-
-  console.log('✅ [CRONOGRAMA TAB] Estado inicial configurado')
 
   // Update selected cronograma when prop changes
   useEffect(() => {
     setSelectedCronograma(cronograma)
   }, [cronograma])
+
+  // Cargar datos del proyecto
+  useEffect(() => {
+    const loadProyectoData = async () => {
+      try {
+        const response = await fetch(`/api/proyectos/${proyectoId}`)
+        if (response.ok) {
+          const proyecto = await response.json()
+          if (proyecto) {
+            setProyectoData(proyecto)
+            setFechaInicio(proyecto.fechaInicio ? new Date(proyecto.fechaInicio).toISOString().split('T')[0] : '')
+            setFechaFin(proyecto.fechaFin ? new Date(proyecto.fechaFin).toISOString().split('T')[0] : '')
+            setCalendarioLaboralId(proyecto.calendarioLaboralId || '')
+          }
+        }
+      } catch (error) {
+        console.error('Error loading proyecto data:', error)
+      }
+    }
+    loadProyectoData()
+  }, [proyectoId])
+
+  // Cargar calendarios laborales
+  useEffect(() => {
+    const loadCalendarios = async () => {
+      try {
+        const response = await fetch('/api/configuracion/calendario-laboral')
+        if (response.ok) {
+          const data = await response.json()
+          setCalendarios(data.data || [])
+        }
+      } catch (error) {
+        console.error('Error loading calendars:', error)
+      }
+    }
+    loadCalendarios()
+  }, [])
 
   // Función para refrescar datos
   const handleRefresh = () => {
@@ -63,6 +133,112 @@ export function ProyectoCronogramaTab({
       title: 'Datos actualizados',
       description: 'El cronograma ha sido actualizado correctamente.'
     })
+  }
+
+  // Función para cambiar de cronograma
+  const handleCronogramaChange = (cronograma: ProyectoCronograma) => {
+    setSelectedCronograma(cronograma)
+    setRefreshKey(prev => prev + 1) // Forzar recarga de componentes hijos
+    toast({
+      title: 'Cronograma cambiado',
+      description: `Ahora trabajando con: ${cronograma.nombre}`
+    })
+  }
+
+  // Función para crear nuevo cronograma
+  const handleCronogramaCreate = () => {
+    setRefreshKey(prev => prev + 1)
+    toast({
+      title: 'Cronograma creado',
+      description: 'El nuevo cronograma ha sido creado exitosamente.'
+    })
+  }
+
+  // Función para guardar fecha de inicio de línea base
+  const handleSaveFechas = async () => {
+    try {
+      setIsLoading(true)
+      const requestData = {
+        fechaInicio: fechaInicio ? new Date(fechaInicio).toISOString() : null
+        // fechaFin se calcula automáticamente según los elementos hijos
+      }
+
+      const response = await fetch(`/api/proyectos/${proyectoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al guardar fecha de inicio')
+      }
+
+      toast({
+        title: 'Fecha guardada',
+        description: 'La fecha de inicio del proyecto ha sido actualizada.'
+      })
+
+      // Actualizar datos locales
+      setProyectoData((prev: any) => ({
+        ...prev,
+        fechaInicio: requestData.fechaInicio
+      }))
+
+    } catch (error) {
+      console.error('Error saving fecha:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo guardar la fecha de inicio.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Función para guardar calendario laboral
+  const handleSaveCalendario = async () => {
+    try {
+      setIsLoading(true)
+      const requestData = {
+        calendarioLaboralId: calendarioLaboralId || null
+      }
+
+      const response = await fetch(`/api/proyectos/${proyectoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al guardar calendario')
+      }
+
+      toast({
+        title: 'Calendario guardado',
+        description: 'El calendario laboral ha sido actualizado.'
+      })
+
+      // Actualizar datos locales
+      setProyectoData((prev: any) => ({
+        ...prev,
+        calendarioLaboralId: requestData.calendarioLaboralId
+      }))
+
+    } catch (error) {
+      console.error('Error saving calendario:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudo guardar el calendario laboral.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Función para crear nuevo EDT
@@ -183,12 +359,103 @@ export function ProyectoCronogramaTab({
     }
   }
 
-  console.log('🎨 [CRONOGRAMA TAB] Renderizando componente')
 
   return (
     <div className="space-y-6">
+      {/* Selector de Cronograma */}
+      <ProyectoCronogramaSelector
+        proyectoId={proyectoId}
+        selectedCronograma={selectedCronograma}
+        onCronogramaChange={handleCronogramaChange}
+        onCronogramaCreate={handleCronogramaCreate}
+      />
+
+      {/* Current Cronograma Indicator */}
+      {selectedCronograma && (
+        <Card className={`border-2 ${
+          selectedCronograma.tipo === 'comercial'
+            ? 'border-gray-200 bg-gray-50'
+            : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
+            ? 'border-green-200 bg-green-50'
+            : 'border-blue-200 bg-blue-50'
+        }`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  selectedCronograma.tipo === 'comercial'
+                    ? 'bg-gray-100'
+                    : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
+                    ? 'bg-green-100'
+                    : 'bg-blue-100'
+                }`}>
+                  {React.createElement(TIPO_CRONOGRAMA_INFO[selectedCronograma.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.icon || Calendar, {
+                    className: `h-5 w-5 ${
+                      selectedCronograma.tipo === 'comercial'
+                        ? 'text-gray-600'
+                        : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
+                        ? 'text-green-600'
+                        : 'text-blue-600'
+                    }`
+                  })}
+                </div>
+                <div>
+                  <h3 className={`font-semibold text-lg ${
+                    selectedCronograma.tipo === 'comercial'
+                      ? 'text-gray-900'
+                      : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
+                      ? 'text-green-900'
+                      : 'text-blue-900'
+                  }`}>
+                    Cronograma Actual: {selectedCronograma.nombre}
+                  </h3>
+                  <p className={`text-sm ${
+                    selectedCronograma.tipo === 'comercial'
+                      ? 'text-gray-700'
+                      : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
+                      ? 'text-green-700'
+                      : 'text-blue-700'
+                  }`}>
+                    Tipo: {selectedCronograma.tipo} |
+                    Versión: {selectedCronograma.version}
+                    {selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion' && ' (Línea Base)'}
+                    {selectedCronograma.tipo === 'comercial' && ' (Solo Lectura)'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion' && (
+                  <Badge className="bg-green-100 text-green-800">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Línea Base
+                  </Badge>
+                )}
+                {selectedCronograma.tipo === 'comercial' && (
+                  <Badge className="bg-gray-100 text-gray-800">
+                    Solo Lectura
+                  </Badge>
+                )}
+                <Badge className={TIPO_CRONOGRAMA_INFO[selectedCronograma.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.color}>
+                  {TIPO_CRONOGRAMA_INFO[selectedCronograma.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.label}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header del Tab */}
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Gestión del Cronograma</h2>
+          <p className="text-sm text-gray-600">
+            {selectedCronograma
+              ? `Trabajando con: ${selectedCronograma.nombre}`
+              : 'Selecciona un cronograma para comenzar'
+            }
+          </p>
+        </div>
+
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -199,27 +466,43 @@ export function ProyectoCronogramaTab({
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Actualizar
           </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // TODO: Implementar exportación XML
+              toast({
+                title: 'Función próximamente',
+                description: 'La exportación XML estará disponible en la próxima versión.',
+                variant: 'default'
+              })
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar XML
+          </Button>
         </div>
       </div>
 
       {/* Contenido principal con tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="selector" className="flex items-center gap-2">
+          <TabsTrigger value="configuracion" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Tipos
+            Configuración
           </TabsTrigger>
-          <TabsTrigger value="fases" className="flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" />
-            Fases
-          </TabsTrigger>
-          <TabsTrigger value="lista" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Lista EDTs
+          <TabsTrigger value="jerarquia" className="flex items-center gap-2">
+            <TreePine className="h-4 w-4" />
+            Vista Jerárquica
           </TabsTrigger>
           <TabsTrigger value="gantt" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Vista Gantt
+          </TabsTrigger>
+          <TabsTrigger value="gantt-pro" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Gantt Profesional
           </TabsTrigger>
           <TabsTrigger value="metricas" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -231,85 +514,194 @@ export function ProyectoCronogramaTab({
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab de Selector de Cronogramas */}
-        <TabsContent value="selector" className="space-y-4">
-          <ProyectoCronogramaSelector
+        {/* Tab de Configuración */}
+        <TabsContent value="configuracion" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Línea Base del Cronograma
+              </CardTitle>
+              <CardDescription>
+                Establece las fechas de inicio y fin del proyecto antes de crear fases, EDTs y actividades.
+                Estas fechas servirán como referencia temporal para todo el cronograma de 5 niveles.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="fechaInicio" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Fecha de Inicio del Proyecto *
+                  </Label>
+                  <input
+                    id="fechaInicio"
+                    type="date"
+                    value={fechaInicio}
+                    onChange={(e) => setFechaInicio(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Fecha planificada de inicio del proyecto
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fechaFin" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Fecha de Fin Estimada
+                  </Label>
+                  <input
+                    id="fechaFin"
+                    type="date"
+                    value={fechaFin}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                    placeholder="Se calcula automáticamente"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Se calcula automáticamente según las fases y EDTs agregados
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  {fechaInicio && (
+                    <span>
+                      Fecha de inicio configurada: {new Date(fechaInicio).toLocaleDateString('es-ES')}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  onClick={handleSaveFechas}
+                  disabled={isLoading || !fechaInicio}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isLoading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                  Guardar Fecha de Inicio
+                </Button>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">💡 Importante</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• La fecha de inicio será la línea base para todo el cronograma</li>
+                  <li>• Las fases, EDTs, zonas, actividades y tareas se calcularán desde esta fecha</li>
+                  <li>• La fecha de fin se calcula automáticamente según los elementos agregados</li>
+                  <li>• Se recomienda establecer la fecha de inicio antes de importar fases o crear EDTs</li>
+                  <li>• Puedes modificar la fecha de inicio en cualquier momento</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Calendario Laboral */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Calendario Laboral
+              </CardTitle>
+              <CardDescription>
+                Selecciona el calendario laboral que se utilizará para calcular las fechas del cronograma.
+                Los calendarios definen los días laborables, jornadas y feriados.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="calendarioLaboral" className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Calendario Laboral
+                </Label>
+                <Select
+                  value={calendarioLaboralId}
+                  onValueChange={setCalendarioLaboralId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar calendario laboral" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Sin calendario (usar predeterminado)</SelectItem>
+                    {calendarios.map((calendario) => (
+                      <SelectItem key={calendario.id} value={calendario.id}>
+                        {calendario.nombre}
+                        {calendario.descripcion && ` - ${calendario.descripcion}`}
+                        {!calendario.activo && ' (Inactivo)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Calendario usado para calcular fechas laborables en cronogramas
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  {calendarioLaboralId && calendarioLaboralId !== 'default' ? (
+                    <span>
+                      Calendario seleccionado: {calendarios.find(c => c.id === calendarioLaboralId)?.nombre || 'Cargando...'}
+                    </span>
+                  ) : (
+                    <span>Usando calendario predeterminado del sistema</span>
+                  )}
+                </div>
+                <Button
+                  onClick={handleSaveCalendario}
+                  disabled={isLoading}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isLoading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                  Guardar Calendario
+                </Button>
+              </div>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-900 mb-2">📅 Información del Calendario</h4>
+                <ul className="text-sm text-green-800 space-y-1">
+                  <li>• Los calendarios definen días laborables por semana</li>
+                  <li>• Incluyen jornadas laborales (horarios de mañana y tarde)</li>
+                  <li>• Consideran feriados y excepciones especiales</li>
+                  <li>• Se usan para calcular fechas realistas en cronogramas</li>
+                  <li>• Puedes gestionar calendarios desde Configuración  Calendarios Laborales</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+
+        {/* Tab de Vista Jerárquica */}
+        <TabsContent value="jerarquia" className="space-y-4">
+          <ProyectoCronogramaTreeView
             proyectoId={proyectoId}
+            refreshKey={refreshKey}
+            onRefresh={handleRefresh}
+            fechaInicioProyecto={fechaInicio}
             selectedCronograma={selectedCronograma}
-            onCronogramaChange={(newCronograma) => {
-              console.log('🔄 [CRONOGRAMA TAB] Cambio de cronograma:', newCronograma)
-              setSelectedCronograma(newCronograma)
-              toast({
-                title: 'Cronograma cambiado',
-                description: `Ahora trabajando con: ${newCronograma.nombre}`,
-                variant: 'default'
-              })
-            }}
-            onCronogramaCreate={() => {
-              handleRefresh()
-            }}
-          />
-        </TabsContent>
-
-        {/* Tab de Fases */}
-        <TabsContent value="fases" className="space-y-4">
-          <ProyectoFasesList
-            proyectoId={proyectoId}
-            cronogramaId={selectedCronograma?.id}
-            onFaseSelect={(fase) => {
-              console.log('Fase seleccionada:', fase)
-            }}
-            onFaseCreate={() => {
-              toast({
-                title: 'Funcionalidad pendiente',
-                description: 'La creación de fases estará disponible próximamente.',
-                variant: 'default'
-              })
-            }}
-            onFaseEdit={(fase: ProyectoFase) => {
-              toast({
-                title: 'Funcionalidad pendiente',
-                description: `Edición de fase "${fase.nombre}" estará disponible próximamente.`,
-                variant: 'default'
-              })
-            }}
-            onFaseDelete={(faseId: string) => {
-              handleRefresh()
-            }}
-          />
-        </TabsContent>
-
-        {/* Tab de Lista de EDTs */}
-        <TabsContent value="lista" className="space-y-4">
-          <ProyectoEdtList
-            proyectoId={proyectoId}
-            cronogramaId={selectedCronograma?.id}
-            onEdtCreate={() => {
-              toast({
-                title: 'Funcionalidad pendiente',
-                description: 'La creación de EDTs estará disponible próximamente.',
-                variant: 'default'
-              })
-            }}
-            onEdtEdit={(edt: ProyectoEdt) => {
-              toast({
-                title: 'Funcionalidad pendiente',
-                description: `Edición de EDT "${edt.nombre}" estará disponible próximamente.`,
-                variant: 'default'
-              })
-            }}
-            onEdtDelete={(edtId: string) => {
-              handleRefresh()
-            }}
           />
         </TabsContent>
 
         {/* Tab de Vista Gantt */}
         <TabsContent value="gantt" className="space-y-4">
-          <ProyectoGanttChart
+          <ProyectoGanttView
             proyectoId={proyectoId}
             cronogramaId={selectedCronograma?.id}
-            height={600}
+            onItemClick={(item) => {
+              toast({
+                title: 'Elemento seleccionado',
+                description: `${item.nombre} (${item.tipo})`,
+              });
+            }}
+          />
+        </TabsContent>
+
+        {/* Tab de Gantt Profesional */}
+        <TabsContent value="gantt-pro" className="space-y-4">
+          <CronogramaGanttViewPro
+            cotizacionId={proyectoId}
+            refreshKey={refreshKey}
           />
         </TabsContent>
 
@@ -353,8 +745,16 @@ export function ProyectoCronogramaTab({
                 <span>Estructura de Desglose de Trabajo</span>
               </div>
               <div className="flex items-center gap-2">
+                <Badge variant="outline">⚙️ Actividades</Badge>
+                <span>Agrupaciones de trabajo directamente bajo EDTs</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">🔗 Dependencias</Badge>
+                <span>Relaciones entre tareas del proyecto</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Badge variant="outline">✅ Tareas</Badge>
-                <span>Actividades específicas dentro de EDTs</span>
+                <span>Actividades específicas dentro de actividades</span>
               </div>
             </div>
             <div>

@@ -15,34 +15,34 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
   try {
     const { id } = await context.params // 👈 Previene errores de acceso a params
 
-    const cotizacion = await prisma.cotizacion.findUnique({
+    const cotizacion = await prisma.cotizaciones.findUnique({
       where: { id },
       include: {
-        cliente: true,
-        comercial: true,
-        plantilla: true,
-        equipos: { include: { items: true } },
-        servicios: {
+        clientes: true,
+        users: true,
+        plantillas: true,
+        cotizacion_equipo: { include: { cotizacion_equipo_item: true } },
+        cotizacion_servicio: {
           include: {
-            items: {
+            cotizacion_servicio_item: {
               include: {
-                unidadServicio: true,
-                recurso: true,
-                catalogoServicio: true
+                unidad_servicio: true,
+                recursos: true,
+                catalogo_servicio: true
               }
             }
           }
         },
-        gastos: {
+        cotizacion_gasto: {
           include: {
-            items: true
+            cotizacion_gasto_item: true
           }
         },
         // ✅ Nuevas relaciones para exclusiones y condiciones
-        exclusiones: {
+        cotizacion_exclusion: {
           orderBy: { orden: 'asc' }
         },
-        condiciones: {
+        cotizacion_condicion: {
           orderBy: { orden: 'asc' }
         }
       }
@@ -52,7 +52,29 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
     }
 
-    return NextResponse.json(cotizacion)
+    // Map snake_case relation names to expected PascalCase property names for frontend compatibility
+    const cotizacionFormatted = {
+      ...cotizacion,
+      equipos: cotizacion.cotizacion_equipo?.map(equipo => ({
+        ...equipo,
+        items: equipo.cotizacion_equipo_item || []
+      })) || [],
+      servicios: cotizacion.cotizacion_servicio?.map(servicio => ({
+        ...servicio,
+        items: servicio.cotizacion_servicio_item || []
+      })) || [],
+      gastos: cotizacion.cotizacion_gasto?.map(gasto => ({
+        ...gasto,
+        items: gasto.cotizacion_gasto_item || []
+      })) || [],
+      exclusiones: cotizacion.cotizacion_exclusion || [],
+      condiciones: cotizacion.cotizacion_condicion || [],
+      cliente: cotizacion.clientes,
+      comercial: cotizacion.users,
+      plantilla: cotizacion.plantillas
+    }
+
+    return NextResponse.json(cotizacionFormatted)
   } catch (error) {
     console.error('❌ Error al obtener cotización:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
@@ -69,12 +91,12 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    const existente = await prisma.cotizacion.findUnique({ where: { id } })
+    const existente = await prisma.cotizaciones.findUnique({ where: { id } })
     if (!existente) {
       return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
     }
 
-    const actualizada = await prisma.cotizacion.update({
+    const actualizada = await prisma.cotizaciones.update({
       where: { id },
       data
     })
@@ -91,7 +113,7 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
   try {
     const { id } = await context.params
 
-    await prisma.cotizacion.delete({ where: { id } })
+    await prisma.cotizaciones.delete({ where: { id } })
 
     return NextResponse.json({ status: 'ok' })
   } catch (error) {

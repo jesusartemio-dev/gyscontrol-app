@@ -7,10 +7,10 @@
 
 import { useEffect, useState } from 'react'
 import { createCatalogoServicio } from '@/lib/services/catalogoServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { getRecursos } from '@/lib/services/recurso'
-import { CatalogoServicio, CategoriaServicio, UnidadServicio, Recurso, CatalogoServicioPayload, TipoFormula } from '@/types'
+import { CatalogoServicio, Edt, UnidadServicio, Recurso, CatalogoServicioPayload } from '@/types'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -24,22 +24,21 @@ interface Props {
 export default function CatalogoServicioForm({ onCreated }: Props) {
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
-  const [formula, setFormula] = useState<TipoFormula>('Proporcional')
   const [categoriaId, setCategoriaId] = useState('')
   const [unidadServicioId, setUnidadServicioId] = useState('')
   const [recursoId, setRecursoId] = useState('')
-  const [horaUnidad, setHoraUnidad] = useState(0)
+  const [cantidad, setCantidad] = useState(1)
   const [horaBase, setHoraBase] = useState(0)
   const [horaRepetido, setHoraRepetido] = useState(0)
-  const [horaFijo, setHoraFijo] = useState(0)
+  const [nivelDificultad, setNivelDificultad] = useState(1)
 
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [unidades, setUnidades] = useState<UnidadServicio[]>([])
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    getCategoriasServicio().then(setCategorias)
+    getEdts().then(setCategorias)
     getUnidadesServicio().then(setUnidades)
     getRecursos().then(setRecursos)
   }, [])
@@ -51,14 +50,14 @@ export default function CatalogoServicioForm({ onCreated }: Props) {
     const payload: CatalogoServicioPayload = {
       nombre,
       descripcion,
-      formula,
+      cantidad,
+      horaBase,
+      horaRepetido,
+      orden: 0,
+      nivelDificultad,
       categoriaId,
       unidadServicioId,
       recursoId,
-      horaUnidad,
-      horaBase,
-      horaRepetido,
-      horaFijo,
     }
 
     try {
@@ -68,11 +67,10 @@ export default function CatalogoServicioForm({ onCreated }: Props) {
 
       setNombre('')
       setDescripcion('')
-      setFormula('Proporcional')
-      setHoraUnidad(0)
+      setCantidad(1)
       setHoraBase(0)
       setHoraRepetido(0)
-      setHoraFijo(0)
+      setNivelDificultad(1)
     } catch (error) {
       console.error(error)
       toast.error('Error al crear servicio')
@@ -90,6 +88,10 @@ export default function CatalogoServicioForm({ onCreated }: Props) {
           <Label>Nombre del servicio</Label>
           <Input placeholder="Nombre del servicio" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
         </div>
+        <div className="space-y-1">
+          <Label>Cantidad de referencia</Label>
+          <Input type="number" min="1" placeholder="1" value={cantidad} onChange={(e) => setCantidad(parseInt(e.target.value) || 1)} required />
+        </div>
         <div className="col-span-2 space-y-1">
           <Label>Descripción</Label>
           <textarea className="w-full p-2 border border-gray-300 rounded-md min-h-[80px]" placeholder="Descripción del servicio" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} required />
@@ -98,9 +100,9 @@ export default function CatalogoServicioForm({ onCreated }: Props) {
 
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-1">
-          <Label>Categoría</Label>
+          <Label>EDT</Label>
           <Select value={categoriaId} onValueChange={setCategoriaId}>
-            <SelectTrigger><SelectValue placeholder="Selecciona categoría" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Selecciona EDT" /></SelectTrigger>
             <SelectContent>
               {categorias.map((c) => (<SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>))}
             </SelectContent>
@@ -126,53 +128,36 @@ export default function CatalogoServicioForm({ onCreated }: Props) {
         </div>
       </div>
 
-      {/* Fórmula + Horas compactado */}
+      {/* Horas escalonadas + Dificultad */}
       <div className="grid grid-cols-3 gap-4 items-start">
+        <div className="grid grid-cols-2 gap-4 col-span-2">
+          <div className="space-y-1">
+            <Label>Horas base</Label>
+            <Input type="number" step="any" value={horaBase} onChange={(e) => setHoraBase(parseFloat(e.target.value) || 0)} required />
+          </div>
+          <div className="space-y-1">
+            <Label>Horas por repetido</Label>
+            <Input type="number" step="any" value={horaRepetido} onChange={(e) => setHoraRepetido(parseFloat(e.target.value) || 0)} required />
+          </div>
+        </div>
+
         <div className="space-y-1">
-          <Label>Fórmula</Label>
-          <Select value={formula} onValueChange={(val) => setFormula(val as TipoFormula)}>
-            <SelectTrigger><SelectValue placeholder="Selecciona fórmula" /></SelectTrigger>
+          <Label>Nivel de dificultad</Label>
+          <Select value={nivelDificultad.toString()} onValueChange={(val) => setNivelDificultad(parseInt(val))}>
+            <SelectTrigger><SelectValue placeholder="Selecciona dificultad" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="Proporcional">Proporcional</SelectItem>
-              <SelectItem value="Escalonada">Escalonada</SelectItem>
-              <SelectItem value="Fijo">Fijo</SelectItem>
+              <SelectItem value="1">1 - Básico</SelectItem>
+              <SelectItem value="2">2 - Intermedio</SelectItem>
+              <SelectItem value="3">3 - Avanzado</SelectItem>
+              <SelectItem value="4">4 - Experto</SelectItem>
+              <SelectItem value="5">5 - Maestro</SelectItem>
             </SelectContent>
           </Select>
           {/* Leyenda */}
           <div className="text-xs text-gray-600 mt-1">
-            {formula === 'Proporcional' && (<p><strong>HH =</strong> cantidad × HH_unidad</p>)}
-            {formula === 'Escalonada' && (<p><strong>HH =</strong> HH_base + (cantidad - 1) × HH_repetido</p>)}
-            {formula === 'Fijo' && (<p><strong>HH =</strong> HH_fijo</p>)}
+            <p><strong>HH =</strong> (HH_base + (cantidad - 1) × HH_repetido) × dificultad</p>
           </div>
         </div>
-
-        {/* Campos dinámicos */}
-        {formula === 'Proporcional' && (
-          <div className="space-y-1">
-            <Label>Horas por unidad</Label>
-            <Input type="number" step="any" value={horaUnidad} onChange={(e) => setHoraUnidad(parseFloat(e.target.value))} required />
-          </div>
-        )}
-
-        {formula === 'Escalonada' && (
-          <div className="grid grid-cols-2 gap-4 col-span-2">
-            <div className="space-y-1">
-              <Label>Horas base</Label>
-              <Input type="number" step="any" value={horaBase} onChange={(e) => setHoraBase(parseFloat(e.target.value))} required />
-            </div>
-            <div className="space-y-1">
-              <Label>Horas por repetido</Label>
-              <Input type="number" step="any" value={horaRepetido} onChange={(e) => setHoraRepetido(parseFloat(e.target.value))} required />
-            </div>
-          </div>
-        )}
-
-        {formula === 'Fijo' && (
-          <div className="space-y-1">
-            <Label>Horas fijas</Label>
-            <Input type="number" step="any" value={horaFijo} onChange={(e) => setHoraFijo(parseFloat(e.target.value))} required />
-          </div>
-        )}
       </div>
 
       <Button type="submit" disabled={loading}>

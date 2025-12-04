@@ -4,10 +4,19 @@ import { buildApiUrl } from '@/lib/utils'
 // Obtener todas las cotizaciones
 export async function getCotizaciones(): Promise<Cotizacion[]> {
   try {
-    const res = await fetch(buildApiUrl('/api/cotizacion'), { 
+    const res = await fetch(buildApiUrl('/api/cotizacion'), {
       cache: 'no-store',
       credentials: 'include' // ✅ Incluir cookies de sesión
     })
+
+    if (res.status === 401) {
+      // Redirigir al login si no está autorizado
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+      throw new Error('No autorizado')
+    }
+
     if (!res.ok) throw new Error('Error al obtener cotizaciones')
     const result = await res.json()
     // ✅ La API devuelve un objeto paginado, extraemos solo los datos
@@ -75,7 +84,19 @@ export async function createCotizacion(data: {
       credentials: 'include', // ✅ Incluir cookies de sesión
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Error al crear cotización')
+
+    if (!res.ok) {
+      // Try to get error message from response
+      let errorMessage = 'Error al crear cotización'
+      try {
+        const errorData = await res.json()
+        errorMessage = errorData.error || errorMessage
+      } catch {
+        // If we can't parse JSON, use default message
+      }
+      throw new Error(errorMessage)
+    }
+
     return await res.json()
   } catch (error) {
     console.error('❌ createCotizacion:', error)
