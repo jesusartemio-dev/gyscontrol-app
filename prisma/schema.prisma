@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = "postgresql://postgres:password@localhost:5432/gys_db?sslmode=disable"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -31,25 +32,25 @@ model User {
   registrosHoras              RegistroHoras[]
   sessions                    Session[]
   asignacionesRecurso         AsignacionRecurso[]           @relation("AsignacionRecurso")
-  audit_log                   audit_log[]
+  auditLogs                   AuditLog[]
   cotizacionEdtsResponsable   CotizacionEdt[]               @relation("CotizacionEdtResponsable")
-  cotizacion_plantilla_import cotizacion_plantilla_import[]
+  cotizacionPlantillaImport CotizacionPlantillaImport[]
   cotizacionTareasResponsable CotizacionTarea[]             @relation("CotizacionTareaResponsable")
   versionesCotizacion         CotizacionVersion[]
   actividadesCrm              CrmActividad[]
   metricasComerciales         CrmMetricaComercial[]
   oportunidadesComercial      CrmOportunidad[]              @relation("CrmOportunidadComercial")
   oportunidadesResponsable    CrmOportunidad[]              @relation("CrmOportunidadResponsable")
-  metrica_comercial           metrica_comercial[]
+  metrica_comercial           MetricaComercial[]
   notificaciones              notificaciones[]
-  proyecto_actividad          proyecto_actividad[]
+  proyectoActividad           ProyectoActividad[]
   proyectoEdtsResponsable     ProyectoEdt[]                 @relation("EdtResponsable")
-  proyecto_subtarea           proyecto_subtarea[]
-  proyecto_tarea              proyecto_tarea[]
+  proyectoSubtarea            ProyectoSubtarea[]           @relation("ProyectoSubtareaAsignado")
+  proyectoTarea               ProyectoTarea[]
   registrosProgreso           RegistroProgreso[]            @relation("RegistroProgreso")
   subtareasAsignadas          Subtarea[]                    @relation("SubtareaAsignado")
   tareasResponsable           Tarea[]                       @relation("TareaResponsable")
-  user_permissions            user_permissions[]
+  user_permissions            UserPermissions[]
   entregaItems                EntregaItem[]
   eventosTrazabilidad         EventoTrazabilidad[]
 
@@ -139,7 +140,7 @@ model UnidadServicio {
   servicios                             CatalogoServicio[]
   cotizacionServicioItems               CotizacionServicioItem[]
   plantillaServicioItems                PlantillaServicioItem[]
-  plantilla_servicio_item_independiente plantilla_servicio_item_independiente[]
+  plantilla_servicio_item_independiente PlantillaServicioItemIndependiente[]
 }
 
 model CategoriaEquipo {
@@ -161,7 +162,7 @@ model CategoriaServicio {
   descripcion       String?
   faseDefaultId     String?
   servicios         CatalogoServicio[]
-  fase_default      fase_default?      @relation(fields: [faseDefaultId], references: [id])
+  fase_default      FaseDefault?      @relation(fields: [faseDefaultId], references: [id])
   registrosHorasRef RegistroHoras[]    @relation("RegistroHorasCategoria")
   cotizacionEdts    CotizacionEdt[]
   proyectoEdts      ProyectoEdt[]
@@ -177,7 +178,7 @@ model Recurso {
   cotizacionServicioItems               CotizacionServicioItem[]
   plantillaServicioItems                PlantillaServicioItem[]
   registrosHoras                        RegistroHoras[]
-  plantilla_servicio_item_independiente plantilla_servicio_item_independiente[]
+  plantilla_servicio_item_independiente PlantillaServicioItemIndependiente[]
 }
 
 model CatalogoEquipo {
@@ -200,7 +201,7 @@ model CatalogoEquipo {
   cotizacionEquipoItems               CotizacionEquipoItem[]
   plantillaEquipoItems                PlantillaEquipoItem[]
   ProyectoEquipoCotizadoItem          ProyectoEquipoCotizadoItem[]
-  plantilla_equipo_item_independiente plantilla_equipo_item_independiente[]
+  plantilla_equipo_item_independiente PlantillaEquipoItemIndependiente[]
 
   @@map("CatalogoEquipo")
 }
@@ -226,7 +227,7 @@ model CatalogoServicio {
   cotizacionServicioItems               CotizacionServicioItem[]
   plantillaItems                        PlantillaServicioItem[]
   ProyectoServicioCotizadoItem          ProyectoServicioCotizadoItem[]
-  plantilla_servicio_item_independiente plantilla_servicio_item_independiente[]
+  plantilla_servicio_item_independiente PlantillaServicioItemIndependiente[]
 }
 
 model Plantilla {
@@ -250,7 +251,7 @@ model Plantilla {
   equipos                     PlantillaEquipo[]
   gastos                      PlantillaGasto[]
   servicios                   PlantillaServicio[]
-  cotizacion_plantilla_import cotizacion_plantilla_import[]
+  cotizacionPlantillaImport CotizacionPlantillaImport[]
 
   @@map("Plantilla")
 }
@@ -407,7 +408,7 @@ model Cotizacion {
   fechaFin                    DateTime?
   fechaInicio                 DateTime?
   estado                      EstadoCotizacion              @default(borrador)
-  calendario_laboral          calendario_laboral?           @relation(fields: [calendarioLaboralId], references: [id])
+  calendarioLaboral           CalendarioLaboral?            @relation(fields: [calendarioLaboralId], references: [id])
   cliente                     Cliente?                      @relation(fields: [clienteId], references: [id])
   comercial                   User?                         @relation(fields: [comercialId], references: [id])
   plantilla                   Plantilla?                    @relation(fields: [plantillaId], references: [id])
@@ -418,8 +419,8 @@ model Cotizacion {
   condiciones                 CotizacionCondicion[]
   cronograma                  CotizacionEdt[]
   exclusiones                 CotizacionExclusion[]
-  cotizacion_fase             cotizacion_fase[]
-  cotizacion_plantilla_import cotizacion_plantilla_import[]
+  cotizacionFase            CotizacionFase[]
+  cotizacionPlantillaImport CotizacionPlantillaImport[]
   versiones                   CotizacionVersion[]
   competidoresCrm             CrmCompetidorLicitacion[]
   historialProyectos          CrmHistorialProyecto[]
@@ -557,9 +558,9 @@ model CotizacionEdt {
   cotizacionFaseId     String?
   nombre               String
   orden                Int                    @default(0)
-  cotizacion_actividad cotizacion_actividad[]
+  cotizacionActividad  CotizacionActividad[]
   categoriaServicio    CategoriaServicio?     @relation(fields: [categoriaServicioId], references: [id])
-  cotizacion_fase      cotizacion_fase?       @relation(fields: [cotizacionFaseId], references: [id])
+  cotizacionFase      CotizacionFase?       @relation(fields: [cotizacionFaseId], references: [id])
   cotizacion           Cotizacion             @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
   cotizacionServicio   CotizacionServicio?    @relation(fields: [cotizacionServicioId], references: [id])
   responsable          User?                  @relation("CotizacionEdtResponsable", fields: [responsableId], references: [id])
@@ -590,9 +591,9 @@ model CotizacionTarea {
   duracionHoras                                                                                    Decimal?                        @db.Decimal(10, 2)
   esHito                                                                                           Boolean                         @default(false)
   orden                                                                                            Int                             @default(0)
-  cotizacion_dependencias_tarea_cotizacion_dependencias_tarea_tareaDependienteIdTocotizacion_tarea cotizacion_dependencias_tarea[] @relation("cotizacion_dependencias_tarea_tareaDependienteIdTocotizacion_tarea")
-  cotizacion_dependencias_tarea_cotizacion_dependencias_tarea_tareaOrigenIdTocotizacion_tarea      cotizacion_dependencias_tarea[] @relation("cotizacion_dependencias_tarea_tareaOrigenIdTocotizacion_tarea")
-  cotizacion_actividad                                                                             cotizacion_actividad            @relation(fields: [cotizacionActividadId], references: [id], onDelete: Cascade)
+  cotizacionDependenciasTareaDependiente CotizacionDependenciasTarea[] @relation("CotizacionDependenciasTarea_tareaDependienteIdTocotizacion_tarea")
+  cotizacionDependenciasTareaOrigen      CotizacionDependenciasTarea[] @relation("CotizacionDependenciasTarea_tareaOrigenIdTocotizacion_tarea")
+  cotizacionActividad                                                                               CotizacionActividad            @relation(fields: [cotizacionActividadId], references: [id], onDelete: Cascade)
   cotizacionServicioItem                                                                           CotizacionServicioItem?         @relation(fields: [cotizacionServicioItemId], references: [id])
   dependencia                                                                                      CotizacionTarea?                @relation("CotizacionTareaDependencia", fields: [dependenciaId], references: [id])
   tareasDependientes                                                                               CotizacionTarea[]               @relation("CotizacionTareaDependencia")
@@ -644,9 +645,9 @@ model Proyecto {
   valorizaciones           Valorizacion[]
   historialProyectos       CrmHistorialProyecto[]
   crm_oportunidad          CrmOportunidad[]
-  proyecto_cronograma      proyecto_cronograma[]
+  proyectoCronograma       ProyectoCronograma[]
   proyectoEdts             ProyectoEdt[]
-  proyecto_fase            proyecto_fase[]
+  proyectoFase            ProyectoFase[]
   entregaItems             EntregaItem[]
   eventosTrazabilidad      EventoTrazabilidad[]
 
@@ -661,7 +662,7 @@ model ProyectoEdt {
   id                   String               @id @default(cuid())
   proyectoId           String
   categoriaServicioId  String
-  zona                 String?
+
   fechaInicioPlan      DateTime?
   fechaFinPlan         DateTime?
   horasPlan            Decimal?             @default(0) @db.Decimal(10, 2)
@@ -680,18 +681,18 @@ model ProyectoEdt {
   proyectoCronogramaId String
   proyectoFaseId       String?
   registrosHoras       RegistroHoras[]
-  proyecto_actividad   proyecto_actividad[]
+  proyectoActividad    ProyectoActividad[]
   categoriaServicio    CategoriaServicio    @relation(fields: [categoriaServicioId], references: [id])
-  proyecto_cronograma  proyecto_cronograma  @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  proyecto_fase        proyecto_fase?       @relation(fields: [proyectoFaseId], references: [id])
+  proyectoCronograma   ProyectoCronograma   @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  proyectoFase         ProyectoFase?       @relation(fields: [proyectoFaseId], references: [id])
   proyecto             Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   responsable          User?                @relation("EdtResponsable", fields: [responsableId], references: [id])
-  proyecto_tarea       proyecto_tarea[]
+  proyectoTarea        ProyectoTarea[]
 
-  @@unique([proyectoId, proyectoCronogramaId, categoriaServicioId, zona])
+  @@unique([proyectoId, proyectoCronogramaId, categoriaServicioId])
   @@index([estado, fechaFinPlan])
   @@index([responsableId, estado])
-  @@index([proyectoId, proyectoCronogramaId, categoriaServicioId, zona])
+
   @@index([proyectoId, proyectoCronogramaId, orden])
   @@map("proyecto_edt")
 }
@@ -929,7 +930,7 @@ model RegistroHoras {
   proyectoEdt          ProyectoEdt?             @relation(fields: [proyectoEdtId], references: [id])
   proyecto             Proyecto                 @relation(fields: [proyectoId], references: [id])
   proyectoServicio     ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id])
-  proyecto_tarea       proyecto_tarea?          @relation(fields: [proyectoTareaId], references: [id])
+  proyectoTarea        ProyectoTarea?           @relation(fields: [proyectoTareaId], references: [id])
   recurso              Recurso                  @relation(fields: [recursoId], references: [id])
   usuario              User                     @relation(fields: [usuarioId], references: [id])
 
@@ -1414,7 +1415,7 @@ model ProyectoServicioCotizadoItem {
   ProyectoServicioCotizado ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id])
 }
 
-model analytics_events {
+model AnalyticsEvent {
   id        String   @id
   event     String
   category  String
@@ -1432,9 +1433,10 @@ model analytics_events {
   @@index([sessionId, timestamp(sort: Desc)])
   @@index([timestamp(sort: Desc)])
   @@index([userId, timestamp(sort: Desc)])
+  @@map("analytics_events")
 }
 
-model audit_log {
+model AuditLog {
   id          String   @id
   entidadTipo String
   entidadId   String
@@ -1444,14 +1446,15 @@ model audit_log {
   cambios     String?
   metadata    String?
   createdAt   DateTime @default(now())
-  User        User     @relation(fields: [usuarioId], references: [id])
+  user        User     @relation(fields: [usuarioId], references: [id])
 
   @@index([accion, createdAt(sort: Desc)])
   @@index([entidadTipo, entidadId, createdAt(sort: Desc)])
   @@index([usuarioId, createdAt(sort: Desc)])
+  @@map("audit_log")
 }
 
-model calendario_laboral {
+model CalendarioLaboral {
   id                       String                     @id
   nombre                   String                     @unique
   descripcion              String?
@@ -1466,24 +1469,26 @@ model calendario_laboral {
   horaFinTarde             String                     @default("17:00")
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime
-  Cotizacion               Cotizacion[]
-  configuracion_calendario configuracion_calendario[]
-  dia_calendario           dia_calendario[]
-  excepcion_calendario     excepcion_calendario[]
+  cotizaciones             Cotizacion[]
+  configuracionCalendario  ConfiguracionCalendario[]
+  diaCalendario            DiaCalendario[]
+  excepcionCalendario      ExcepcionCalendario[]
+  @@map("calendario_laboral")
 }
 
-model configuracion_calendario {
+model ConfiguracionCalendario {
   id                       String             @id
   calendarioLaboralId      String
   entidadTipo              String
   entidadId                String
   calendarioPredeterminado Boolean            @default(false)
-  calendario_laboral       calendario_laboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
+  calendarioLaboral        CalendarioLaboral  @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
 
   @@unique([entidadTipo, entidadId])
+  @@map("configuracion_calendario")
 }
 
-model cotizacion_actividad {
+model CotizacionActividad {
   id                   String            @id
   cotizacionEdtId      String
   nombre               String
@@ -1497,13 +1502,14 @@ model cotizacion_actividad {
   prioridad            PrioridadEdt      @default(media)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
-  cotizacion_edt       CotizacionEdt     @relation(fields: [cotizacionEdtId], references: [id], onDelete: Cascade)
-  cotizacion_tarea     CotizacionTarea[]
+  cotizacionEdt        CotizacionEdt     @relation(fields: [cotizacionEdtId], references: [id], onDelete: Cascade)
+  cotizacionTareas     CotizacionTarea[]
 
   @@index([cotizacionEdtId, orden])
+  @@map("cotizacion_actividad")
 }
 
-model cotizacion_dependencias_tarea {
+model CotizacionDependenciasTarea {
   id                                                                                  String          @id
   tareaOrigenId                                                                       String
   tareaDependienteId                                                                  String
@@ -1511,13 +1517,14 @@ model cotizacion_dependencias_tarea {
   lagMinutos                                                                          Int             @default(0)
   createdAt                                                                           DateTime        @default(now())
   updatedAt                                                                           DateTime
-  cotizacion_tarea_cotizacion_dependencias_tarea_tareaDependienteIdTocotizacion_tarea CotizacionTarea @relation("cotizacion_dependencias_tarea_tareaDependienteIdTocotizacion_tarea", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
-  cotizacion_tarea_cotizacion_dependencias_tarea_tareaOrigenIdTocotizacion_tarea      CotizacionTarea @relation("cotizacion_dependencias_tarea_tareaOrigenIdTocotizacion_tarea", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
+  tareaDependiente CotizacionTarea @relation("CotizacionDependenciasTarea_tareaDependienteIdTocotizacion_tarea", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
+  tareaOrigen      CotizacionTarea @relation("CotizacionDependenciasTarea_tareaOrigenIdTocotizacion_tarea", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
 
   @@unique([tareaOrigenId, tareaDependienteId])
+  @@map("cotizacion_dependencias_tarea")
 }
 
-model cotizacion_fase {
+model CotizacionFase {
   id               String          @id
   cotizacionId     String
   nombre           String
@@ -1535,9 +1542,10 @@ model cotizacion_fase {
 
   @@unique([cotizacionId, nombre])
   @@index([cotizacionId, orden])
+  @@map("cotizacion_fase")
 }
 
-model cotizacion_plantilla_import {
+model CotizacionPlantillaImport {
   id               String     @id
   cotizacionId     String
   plantillaId      String
@@ -1550,9 +1558,10 @@ model cotizacion_plantilla_import {
 
   @@index([cotizacionId, fechaImportacion])
   @@index([plantillaId, tipoImportacion])
+  @@map("cotizacion_plantilla_import")
 }
 
-model dia_calendario {
+model DiaCalendario {
   id                  String             @id
   calendarioLaboralId String
   diaSemana           DiaSemana
@@ -1562,12 +1571,13 @@ model dia_calendario {
   horaInicioTarde     String?
   horaFinTarde        String?
   horasTotales        Float?
-  calendario_laboral  calendario_laboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
+  calendarioLaboral   CalendarioLaboral  @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
 
   @@unique([calendarioLaboralId, diaSemana])
+  @@map("dia_calendario")
 }
 
-model excepcion_calendario {
+model ExcepcionCalendario {
   id                  String             @id
   calendarioLaboralId String
   fecha               DateTime
@@ -1577,12 +1587,13 @@ model excepcion_calendario {
   horaInicio          String?
   horaFin             String?
   horasTotales        Float?
-  calendario_laboral  calendario_laboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
+  calendarioLaboral   CalendarioLaboral  @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
 
   @@unique([calendarioLaboralId, fecha])
+  @@map("excepcion_calendario")
 }
 
-model fase_default {
+model FaseDefault {
   id                String              @id
   nombre            String              @unique
   descripcion       String?
@@ -1596,9 +1607,10 @@ model fase_default {
 
   @@index([activo])
   @@index([orden])
+  @@map("fase_default")
 }
 
-model metrica_comercial {
+model MetricaComercial {
   id                    String   @id
   usuarioId             String
   periodo               String
@@ -1626,6 +1638,7 @@ model metrica_comercial {
   @@unique([usuarioId, periodo, tipo])
   @@index([periodo, tipo])
   @@index([usuarioId, tipo])
+  @@map("metrica_comercial")
 }
 
 model notificaciones {
@@ -1658,12 +1671,12 @@ model permissions {
   isSystemPermission Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime
-  user_permissions   user_permissions[]
+  user_permissions   UserPermissions[]
 
   @@index([resource, action])
 }
 
-model plantilla_duracion_cronograma {
+model PlantillaDuracionCronograma {
   id               String   @id
   nivel            String   @unique
   duracionDias     Float
@@ -1672,9 +1685,10 @@ model plantilla_duracion_cronograma {
   activo           Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime
+  @@map("plantilla_duracion_cronograma")
 }
 
-model plantilla_equipo_independiente {
+model PlantillaEquipoIndependiente {
   id                                  String                                @id
   nombre                              String
   descripcion                         String?
@@ -1685,10 +1699,11 @@ model plantilla_equipo_independiente {
   grandTotal                          Float                                 @default(0)
   createdAt                           DateTime                              @default(now())
   updatedAt                           DateTime
-  plantilla_equipo_item_independiente plantilla_equipo_item_independiente[]
+  plantilla_equipo_item_independiente PlantillaEquipoItemIndependiente[]
+  @@map("plantilla_equipo_independiente")
 }
 
-model plantilla_equipo_item_independiente {
+model PlantillaEquipoItemIndependiente {
   id                             String                         @id
   plantillaEquipoId              String
   catalogoEquipoId               String?
@@ -1705,10 +1720,11 @@ model plantilla_equipo_item_independiente {
   createdAt                      DateTime                       @default(now())
   updatedAt                      DateTime
   CatalogoEquipo                 CatalogoEquipo?                @relation(fields: [catalogoEquipoId], references: [id])
-  plantilla_equipo_independiente plantilla_equipo_independiente @relation(fields: [plantillaEquipoId], references: [id], onDelete: Cascade)
+  plantilla_equipo_independiente PlantillaEquipoIndependiente   @relation(fields: [plantillaEquipoId], references: [id], onDelete: Cascade)
+  @@map("plantilla_equipo_item_independiente")
 }
 
-model plantilla_gasto_independiente {
+model PlantillaGastoIndependiente {
   id                                 String                               @id
   nombre                             String
   descripcion                        String?
@@ -1719,10 +1735,11 @@ model plantilla_gasto_independiente {
   grandTotal                         Float                                @default(0)
   createdAt                          DateTime                             @default(now())
   updatedAt                          DateTime
-  plantilla_gasto_item_independiente plantilla_gasto_item_independiente[]
+  plantilla_gasto_item_independiente PlantillaGastoItemIndependiente[]
+  @@map("plantilla_gasto_independiente")
 }
 
-model plantilla_gasto_item_independiente {
+model PlantillaGastoItemIndependiente {
   id                            String                        @id
   plantillaGastoId              String
   nombre                        String
@@ -1735,10 +1752,11 @@ model plantilla_gasto_item_independiente {
   costoCliente                  Float
   createdAt                     DateTime                      @default(now())
   updatedAt                     DateTime
-  plantilla_gasto_independiente plantilla_gasto_independiente @relation(fields: [plantillaGastoId], references: [id], onDelete: Cascade)
+  plantilla_gasto_independiente PlantillaGastoIndependiente   @relation(fields: [plantillaGastoId], references: [id], onDelete: Cascade)
+  @@map("plantilla_gasto_item_independiente")
 }
 
-model plantilla_servicio_independiente {
+model PlantillaServicioIndependiente {
   id                                    String                                  @id
   nombre                                String
   descripcion                           String?
@@ -1750,10 +1768,11 @@ model plantilla_servicio_independiente {
   grandTotal                            Float                                   @default(0)
   createdAt                             DateTime                                @default(now())
   updatedAt                             DateTime
-  plantilla_servicio_item_independiente plantilla_servicio_item_independiente[]
+  plantilla_servicio_item_independiente PlantillaServicioItemIndependiente[]
+  @@map("plantilla_servicio_independiente")
 }
 
-model plantilla_servicio_item_independiente {
+model PlantillaServicioItemIndependiente {
   id                               String                           @id
   plantillaServicioId              String
   catalogoServicioId               String?
@@ -1780,12 +1799,13 @@ model plantilla_servicio_item_independiente {
   createdAt                        DateTime                         @default(now())
   updatedAt                        DateTime
   CatalogoServicio                 CatalogoServicio?                @relation(fields: [catalogoServicioId], references: [id])
-  plantilla_servicio_independiente plantilla_servicio_independiente @relation(fields: [plantillaServicioId], references: [id], onDelete: Cascade)
+  plantilla_servicio_independiente PlantillaServicioIndependiente   @relation(fields: [plantillaServicioId], references: [id], onDelete: Cascade)
   Recurso                          Recurso                          @relation(fields: [recursoId], references: [id])
   UnidadServicio                   UnidadServicio                   @relation(fields: [unidadServicioId], references: [id])
+  @@map("plantilla_servicio_item_independiente")
 }
 
-model proyecto_actividad {
+model ProyectoActividad {
   id                   String              @id
   proyectoEdtId        String
   proyectoCronogramaId String
@@ -1804,16 +1824,17 @@ model proyecto_actividad {
   prioridad            PrioridadEdt        @default(media)
   createdAt            DateTime            @default(now())
   updatedAt            DateTime
-  proyecto_cronograma  proyecto_cronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  proyecto_edt         ProyectoEdt         @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
+  proyectoCronograma   ProyectoCronograma  @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  proyectoEdt          ProyectoEdt         @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
   User                 User?               @relation(fields: [responsableId], references: [id])
-  proyecto_tarea       proyecto_tarea[]
+  proyectoTarea        ProyectoTarea[]
 
   @@index([proyectoEdtId, proyectoCronogramaId])
   @@index([proyectoEdtId, proyectoCronogramaId, orden])
+  @@map("proyecto_actividad")
 }
 
-model proyecto_cronograma {
+model ProyectoCronograma {
   id                       String               @id
   proyectoId               String
   tipo                     String
@@ -1823,29 +1844,31 @@ model proyecto_cronograma {
   version                  Int                  @default(1)
   createdAt                DateTime             @default(now())
   updatedAt                DateTime
-  proyecto_actividad       proyecto_actividad[]
+  proyectoActividad        ProyectoActividad[]
   Proyecto                 Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  proyecto_edt             ProyectoEdt[]
-  proyecto_fase            proyecto_fase[]
-  proyecto_tarea           proyecto_tarea[]
+  proyectoEdt              ProyectoEdt[]
+  proyectoFase         ProyectoFase[]
+  proyectoTarea            ProyectoTarea[]
 
   @@unique([proyectoId, tipo])
   @@index([proyectoId, tipo])
+  @@map("proyecto_cronograma")
 }
 
-model proyecto_dependencias_tarea {
+model ProyectoDependenciasTarea {
   id                                                                            String          @id
   tipo                                                                          TipoDependencia @default(finish_to_start)
   tareaOrigenId                                                                 String
   tareaDependienteId                                                            String
   createdAt                                                                     DateTime        @default(now())
-  proyecto_tarea_proyecto_dependencias_tarea_tareaDependienteIdToproyecto_tarea proyecto_tarea  @relation("proyecto_dependencias_tarea_tareaDependienteIdToproyecto_tarea", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
-  proyecto_tarea_proyecto_dependencias_tarea_tareaOrigenIdToproyecto_tarea      proyecto_tarea  @relation("proyecto_dependencias_tarea_tareaOrigenIdToproyecto_tarea", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
+  proyectoTareaProyectoDependenciasTareaTareaDependienteIdToProyectoTarea       ProyectoTarea  @relation("ProyectoDependenciasTareaTareaDependienteIdToProyectoTarea", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
+  proyectoTareaProyectoDependenciasTareaTareaOrigenIdToProyectoTarea            ProyectoTarea  @relation("ProyectoDependenciasTareaTareaOrigenIdToProyectoTarea", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
 
   @@unique([tareaOrigenId, tareaDependienteId])
+  @@map("proyecto_dependencias_tarea")
 }
 
-model proyecto_fase {
+model ProyectoFase {
   id                   String              @id
   proyectoId           String
   proyectoCronogramaId String
@@ -1860,15 +1883,16 @@ model proyecto_fase {
   porcentajeAvance     Int                 @default(0)
   createdAt            DateTime            @default(now())
   updatedAt            DateTime
-  proyecto_edt         ProyectoEdt[]
-  proyecto_cronograma  proyecto_cronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  proyectoEdt          ProyectoEdt[]
+  proyectoCronograma   ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
   Proyecto             Proyecto            @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
 
   @@unique([proyectoId, proyectoCronogramaId, nombre])
   @@index([proyectoId, proyectoCronogramaId, orden])
+  @@map("proyecto_fase")
 }
 
-model proyecto_subtarea {
+model ProyectoSubtarea {
   id                   String         @id
   nombre               String
   descripcion          String?
@@ -1884,11 +1908,12 @@ model proyecto_subtarea {
   asignadoId           String?
   createdAt            DateTime       @default(now())
   updatedAt            DateTime
-  User                 User?          @relation(fields: [asignadoId], references: [id])
-  proyecto_tarea       proyecto_tarea @relation(fields: [proyectoTareaId], references: [id], onDelete: Cascade)
+  asignado             User?          @relation("ProyectoSubtareaAsignado", fields: [asignadoId], references: [id])
+  proyectoTarea        ProyectoTarea @relation(fields: [proyectoTareaId], references: [id], onDelete: Cascade)
+  @@map("proyecto_subtarea")
 }
 
-model proyecto_tarea {
+model ProyectoTarea {
   id                                                                                         String                        @id
   proyectoEdtId                                                                              String
   proyectoCronogramaId                                                                       String
@@ -1910,13 +1935,13 @@ model proyecto_tarea {
   createdAt                                                                                  DateTime                      @default(now())
   updatedAt                                                                                  DateTime
   RegistroHoras                                                                              RegistroHoras[]
-  proyecto_dependencias_tarea_proyecto_dependencias_tarea_tareaDependienteIdToproyecto_tarea proyecto_dependencias_tarea[] @relation("proyecto_dependencias_tarea_tareaDependienteIdToproyecto_tarea")
-  proyecto_dependencias_tarea_proyecto_dependencias_tarea_tareaOrigenIdToproyecto_tarea      proyecto_dependencias_tarea[] @relation("proyecto_dependencias_tarea_tareaOrigenIdToproyecto_tarea")
-  proyecto_subtarea                                                                          proyecto_subtarea[]
-  proyecto_tarea                                                                             proyecto_tarea?               @relation("proyecto_tareaToproyecto_tarea", fields: [dependenciaId], references: [id])
-  other_proyecto_tarea                                                                       proyecto_tarea[]              @relation("proyecto_tareaToproyecto_tarea")
-  proyecto_actividad                                                                         proyecto_actividad?           @relation(fields: [proyectoActividadId], references: [id])
-  proyecto_cronograma                                                                        proyecto_cronograma           @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  proyectoDependenciasTareaProyectoDependenciasTareaTareaDependienteIdToProyectoTarea ProyectoDependenciasTarea[] @relation("ProyectoDependenciasTareaTareaDependienteIdToProyectoTarea")
+  proyectoDependenciasTareaProyectoDependenciasTareaTareaOrigenIdToProyectoTarea      ProyectoDependenciasTarea[] @relation("ProyectoDependenciasTareaTareaOrigenIdToProyectoTarea")
+  proyectoSubtarea                                                                          ProyectoSubtarea[]
+  proyecto_tarea                                                                             ProyectoTarea?               @relation("proyecto_tareaToproyecto_tarea", fields: [dependenciaId], references: [id])
+  other_proyecto_tarea                                                                       ProyectoTarea[]              @relation("proyecto_tareaToproyecto_tarea")
+  proyecto_actividad                                                                         ProyectoActividad?           @relation(fields: [proyectoActividadId], references: [id])
+  proyecto_cronograma                                                                        ProyectoCronograma           @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
   proyecto_edt                                                                               ProyectoEdt                   @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
   User                                                                                       User?                         @relation(fields: [responsableId], references: [id])
 
@@ -1926,9 +1951,10 @@ model proyecto_tarea {
   @@index([proyectoEdtId, estado])
   @@index([proyectoEdtId, orden])
   @@index([responsableId, fechaFin])
+  @@map("proyecto_tarea")
 }
 
-model user_permissions {
+model UserPermissions {
   id           String      @id
   userId       String
   permissionId String
@@ -1942,6 +1968,7 @@ model user_permissions {
   @@unique([userId, permissionId])
   @@index([permissionId])
   @@index([userId])
+  @@map("user_permissions")
 }
 
 enum EstadoEquipo {

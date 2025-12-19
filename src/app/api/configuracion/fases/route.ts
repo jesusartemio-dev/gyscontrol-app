@@ -11,6 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { randomUUID } from 'crypto'
 
 const createFaseSchema = z.object({
   nombre: z.string().min(1, 'El nombre es obligatorio'),
@@ -72,12 +73,14 @@ export async function POST(request: NextRequest) {
     // Crear nueva fase por defecto
     const nuevaFase = await prisma.faseDefault.create({
       data: {
+        id: randomUUID(),
         nombre: validatedData.nombre,
         descripcion: validatedData.descripcion,
         orden: validatedData.orden,
         duracionDias: validatedData.duracionDias,
         color: validatedData.color,
-        activo: validatedData.activo
+        activo: validatedData.activo,
+        updatedAt: new Date()
       }
     })
 

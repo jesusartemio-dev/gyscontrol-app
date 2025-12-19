@@ -31,7 +31,7 @@ export async function checkUserPermission(
 ): Promise<PermissionCheckResult> {
   try {
     // 1. Buscar permisos directos del usuario
-    const userPermissions = await prisma.userPermission.findMany({
+    const userPermissions = await prisma.userPermissions.findMany({
       where: {
         userId,
         permission: {
@@ -223,7 +223,7 @@ export async function assignPermissionToUser(
     }
 
     // Crear o actualizar el permiso de usuario
-    const userPermission = await prisma.userPermission.upsert({
+    const userPermission = await prisma.userPermissions.upsert({
       where: {
         userId_permissionId: {
           userId: payload.userId,
@@ -270,7 +270,7 @@ export async function revokePermissionFromUser(
   revokedBy?: string
 ): Promise<void> {
   try {
-    const userPermission = await prisma.userPermission.findUnique({
+    const userPermission = await prisma.userPermissions.findUnique({
       where: {
         userId_permissionId: {
           userId,
@@ -283,7 +283,7 @@ export async function revokePermissionFromUser(
       throw new Error('El usuario no tiene este permiso asignado');
     }
 
-    await prisma.userPermission.delete({
+    await prisma.userPermissions.delete({
       where: {
         userId_permissionId: {
           userId,

@@ -517,7 +517,7 @@ model CotizacionEdt {
   cotizacionId         String
   cotizacionServicioId String
   categoriaServicioId  String?
-  zona                 String?
+
   fechaInicioComercial DateTime?
   fechaFinComercial    DateTime?
   horasEstimadas       Decimal?           @default(0) @db.Decimal(10, 2)
@@ -533,10 +533,10 @@ model CotizacionEdt {
   responsable          User?              @relation("CotizacionEdtResponsable", fields: [responsableId], references: [id])
   cotizacion_tarea     CotizacionTarea[]
 
-  @@unique([cotizacionId, cotizacionServicioId, zona])
+
   @@index([estado, fechaFinComercial])
   @@index([responsableId, estado])
-  @@index([cotizacionId, cotizacionServicioId, zona])
+
   @@map("cotizacion_edt")
 }
 
@@ -618,7 +618,7 @@ model ProyectoEdt {
   id                  String            @id @default(cuid())
   proyectoId          String
   categoriaServicioId String
-  zona                String?
+
   fechaInicioPlan     DateTime?
   fechaFinPlan        DateTime?
   horasPlan           Decimal?          @default(0) @db.Decimal(10, 2)
@@ -637,10 +637,10 @@ model ProyectoEdt {
   proyecto            Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   responsable         User?             @relation("EdtResponsable", fields: [responsableId], references: [id])
 
-  @@unique([proyectoId, categoriaServicioId, zona])
+
   @@index([estado, fechaFinPlan])
   @@index([responsableId, estado])
-  @@index([proyectoId, categoriaServicioId, zona])
+
   @@map("proyecto_edt")
 }
 

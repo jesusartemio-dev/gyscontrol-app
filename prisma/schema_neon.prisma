@@ -659,7 +659,6 @@ model ProyectoEdt {
   proyectoCronogramaId String
   nombre               String
   categoriaServicioId  String
-  zona                 String?
   orden                Int                  @default(0)
   proyectoFaseId       String?
   fechaInicioPlan      DateTime?
@@ -684,10 +683,10 @@ model ProyectoEdt {
   responsable          User?                @relation("EdtResponsable", fields: [responsableId], references: [id])
   proyecto_tarea       proyecto_tarea[]
 
-  @@unique([proyectoId, proyectoCronogramaId, categoriaServicioId, zona])
+  @@unique([proyectoId, proyectoCronogramaId, categoriaServicioId])
   @@index([estado, fechaFinPlan])
   @@index([responsableId, estado])
-  @@index([proyectoId, proyectoCronogramaId, categoriaServicioId, zona])
+  @@index([proyectoId, proyectoCronogramaId, categoriaServicioId])
   @@index([proyectoId, proyectoCronogramaId, orden])
   @@map("proyecto_edt")
 }

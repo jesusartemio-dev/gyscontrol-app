@@ -37,7 +37,7 @@ export async function GET(
     // ✅ Obtener EDTs del catálogo con información de fase por defecto
     const edtsCatalogo = await prisma.edt.findMany({
       include: {
-        fase_default: {
+        faseDefault: {
           select: {
             id: true,
             nombre: true,
@@ -54,7 +54,7 @@ export async function GET(
         }
       },
       orderBy: [
-        { fase_default: { orden: 'asc' } },
+        { faseDefault: { orden: 'asc' } },
         { nombre: 'asc' }
       ]
     })
@@ -89,7 +89,7 @@ export async function GET(
       } else {
         // Filtrar por nombre de fase en lugar de ID
         edtsDisponibles = edtsDisponibles.filter(edt => {
-          return edt.fase_default?.nombre === faseProyecto.nombre
+          return edt.faseDefault?.nombre === faseProyecto.nombre
         })
       }
     }
@@ -99,12 +99,12 @@ export async function GET(
       id: edt.id,
       nombre: edt.nombre,
       descripcion: edt.descripcion,
-      faseDefault: edt.fase_default,
+      faseDefault: edt.faseDefault,
       serviciosCount: edt.servicios.length,
       servicios: edt.servicios,
       // Información adicional para el modal de importación
       metadata: {
-        tieneFaseDefault: !!edt.fase_default,
+        tieneFaseDefault: !!edt.faseDefault,
         serviciosDisponibles: edt.servicios.length
       }
     }))
@@ -188,7 +188,7 @@ export async function POST(
     const edtsCatalogo = await prisma.edt.findMany({
       where: { id: { in: edtIds } },
       include: {
-        fase_default: true,
+        faseDefault: true,
         servicios: true
       }
     })
@@ -204,12 +204,12 @@ export async function POST(
         // Determinar la fase del proyecto donde importar
         let proyectoFaseId = faseId ? faseId.replace('fase-', '') : undefined
 
-        if (!proyectoFaseId && edtCatalogo.faseDefaultId && edtCatalogo.fase_default) {
+        if (!proyectoFaseId && edtCatalogo.faseDefaultId && edtCatalogo.faseDefault) {
           // Buscar fase correspondiente en el proyecto por nombre
           const faseProyecto = await prisma.proyectoFase.findFirst({
             where: {
               proyectoId,
-              nombre: edtCatalogo.fase_default.nombre
+              nombre: edtCatalogo.faseDefault.nombre
             }
           })
           proyectoFaseId = faseProyecto?.id

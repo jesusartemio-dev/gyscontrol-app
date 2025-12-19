@@ -133,10 +133,10 @@ export async function POST(
       where: { id },
       include: {
         comercial: true,
-        calendario_laboral: {
+        calendarioLaboral: {
           include: {
-            dia_calendario: true,
-            excepcion_calendario: true
+            diaCalendario: true,
+            excepcionCalendario: true
           }
         }
       }
@@ -167,7 +167,7 @@ export async function POST(
     })
 
     // Obtener todas las categorías con su fase por defecto
-    const categorias = await prisma.edt.findMany({
+    const categorias = await prisma.categoriaServicio.findMany({
       include: { servicios: true }
     })
 
@@ -224,11 +224,13 @@ export async function POST(
           for (const faseDefault of fasesDefault) {
             await prisma.cotizacionFase.create({
               data: {
+                id: crypto.randomUUID(),
                 cotizacionId: id,
                 nombre: faseDefault.nombre,
                 descripcion: faseDefault.descripcion,
                 orden: faseDefault.orden,
-                estado: 'planificado'
+                estado: 'planificado',
+                updatedAt: new Date()
               }
             })
           }
@@ -258,11 +260,13 @@ export async function POST(
           for (const faseData of fasesPorDefecto) {
             await prisma.cotizacionFase.create({
               data: {
+                id: crypto.randomUUID(),
                 cotizacionId: id,
                 nombre: faseData.nombre,
                 descripcion: faseData.descripcion,
                 orden: faseData.orden,
-                estado: 'planificado'
+                estado: 'planificado',
+                updatedAt: new Date()
               }
             })
           }
@@ -301,7 +305,7 @@ export async function POST(
 
     // Si no hay calendario del modal, usar el de la cotización
     if (!calendarioLaboral) {
-      calendarioLaboral = cotizacion.calendarioLaboralId ? cotizacion.calendario_laboral : null
+      calendarioLaboral = cotizacion.calendarioLaboralId ? cotizacion.calendarioLaboral : null
     }
 
     // Si no hay calendario configurado para la cotización, buscar uno activo por defecto
@@ -425,13 +429,15 @@ async function generarCronogramaDesdeServicios({
       } else {
         await prisma.cotizacionFase.create({
           data: {
+            id: crypto.randomUUID(),
             cotizacionId,
             nombre: faseConfig.nombre,
             descripcion: faseConfig.descripcion,
             orden: faseConfig.orden,
             fechaInicioPlan: fechaInicio.toISOString(),
             fechaFinPlan: fechaFin.toISOString(),
-            estado: 'planificado'
+            estado: 'planificado',
+            updatedAt: new Date()
           }
         })
         result.fasesGeneradas++
@@ -712,7 +718,7 @@ async function generarCronogramaDesdeServicios({
     // Obtener actividades existentes con sus fechas actualizadas
     const actividades = await prisma.cotizacionActividad.findMany({
       where: {
-        cotizacion_edt: {
+        cotizacionEdt: {
           cotizacionId
         }
       }
@@ -816,13 +822,13 @@ async function generarCronogramaDesdeServicios({
   // Roll-up EDTs por actividades
   const allEdts = await prisma.cotizacionEdt.findMany({
     where: { cotizacionId },
-    include: { cotizacion_actividad: true }
+    include: { cotizacionActividad: true }
   })
 
   console.log('🔄 GYS-GEN-15: Roll-up EDTs por actividades')
   for (const edt of allEdts) {
-    if (edt.cotizacion_actividad.length > 0) {
-      const fechasActividades = edt.cotizacion_actividad.map(act => ({
+    if (edt.cotizacionActividad.length > 0) {
+      const fechasActividades = edt.cotizacionActividad.map(act => ({
         nombre: act.nombre,
         fin: act.fechaFinComercial ? new Date(act.fechaFinComercial) : null
       })).filter(f => f.fin)
@@ -852,14 +858,14 @@ async function generarCronogramaDesdeServicios({
 
   // Roll-up actividades por tareas
   const allActividades = await prisma.cotizacionActividad.findMany({
-    where: { cotizacion_edt: { cotizacionId } },
-    include: { cotizacion_tarea: true }
+    where: { cotizacionEdt: { cotizacionId } },
+    include: { cotizacionTareas: true }
   })
 
   console.log('🔄 GYS-GEN-15: Roll-up actividades por tareas')
   for (const actividad of allActividades) {
-    if (actividad.cotizacion_tarea.length > 0) {
-      const fechasTareas = actividad.cotizacion_tarea.map(tarea => ({
+    if (actividad.cotizacionTareas.length > 0) {
+      const fechasTareas = actividad.cotizacionTareas.map(tarea => ({
         nombre: tarea.nombre,
         fin: tarea.fechaFin ? new Date(tarea.fechaFin) : null
       })).filter(f => f.fin)
@@ -930,7 +936,7 @@ async function generarCronogramaDesdeServicios({
   const fasesConEdts = await prisma.cotizacionFase.findMany({
     where: { cotizacionId },
     include: {
-      edts: {
+      cotizacion_edt: {
         orderBy: { fechaInicioComercial: 'asc' }
       }
     },
@@ -944,7 +950,7 @@ async function generarCronogramaDesdeServicios({
 
     for (let i = 0; i < fasesConEdts.length; i++) {
       const fase = fasesConEdts[i]
-      const edtsDeFase = fase.edts
+      const edtsDeFase = fase.cotizacion_edt
 
       // ✅ GYS-GEN-01: Calcular nueva fecha de inicio con FS+1
       const nuevaFechaInicioFase = new Date(currentStartDate)
@@ -1133,7 +1139,7 @@ async function generarCronogramaDesdeServicios({
     try {
       // Crear dependencias en BD desde las definidas en React Flow
       for (const dep of options.opciones.dependenciasPersonalizadas) {
-        const existingDep = await prisma.cotizacionDependenciaTarea.findFirst({
+        const existingDep = await prisma.cotizacionDependenciasTarea.findFirst({
           where: {
             tareaOrigenId: dep.tareaOrigenId,
             tareaDependienteId: dep.tareaDependienteId
@@ -1141,7 +1147,7 @@ async function generarCronogramaDesdeServicios({
         })
 
         if (!existingDep) {
-          await prisma.cotizacionDependenciaTarea.create({
+          await prisma.cotizacionDependenciasTarea.create({
             data: {
               id: crypto.randomUUID(),
               tareaOrigenId: dep.tareaOrigenId,
@@ -1166,7 +1172,7 @@ async function generarCronogramaDesdeServicios({
       }
 
       // Verificar que las dependencias se guardaron en BD
-      const dependenciasGuardadas = await prisma.cotizacionDependenciaTarea.findMany({
+      const dependenciasGuardadas = await prisma.cotizacionDependenciasTarea.findMany({
         where: { tareaOrigenId: { in: options.opciones.dependenciasPersonalizadas.map((d: any) => d.tareaOrigenId) } },
         include: {
           tareaOrigen: { select: { nombre: true } },
