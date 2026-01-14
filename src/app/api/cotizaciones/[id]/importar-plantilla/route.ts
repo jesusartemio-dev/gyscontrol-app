@@ -79,9 +79,9 @@ export async function POST(
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
       include: {
-        equipos: { include: { items: true } },
-        servicios: { include: { items: true } },
-        gastos: { include: { items: true } }
+        cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
+        cotizacionServicio: { include: { cotizacionServicioItem: true } },
+        cotizacionGasto: { include: { cotizacionGastoItem: true } }
       }
     })
 
@@ -97,9 +97,9 @@ export async function POST(
     plantilla = await prisma.plantilla.findUnique({
       where: { id: plantillaId },
       include: {
-        equipos: { include: { items: true } },
-        servicios: { include: { items: true } },
-        gastos: { include: { items: true } }
+        plantillaEquipo: { include: { plantillaEquipoItem: true } },
+        plantillaServicio: { include: { plantillaServicioItem: true } },
+        plantillaGasto: { include: { plantillaGastoItem: true } }
       }
     })
 

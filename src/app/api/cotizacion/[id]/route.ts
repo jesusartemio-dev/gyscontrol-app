@@ -25,10 +25,10 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         cliente: true,
         comercial: true,
         plantilla: true,
-        equipos: { include: { items: true } },
-        servicios: {
+        cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
+        cotizacionServicio: {
           include: {
-            items: {
+            cotizacionServicioItem: {
               include: {
                 unidadServicio: true,
                 recurso: true,
@@ -37,16 +37,16 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
             }
           }
         },
-        gastos: {
+        cotizacionGasto: {
           include: {
-            items: true
+            cotizacionGastoItem: true
           }
         },
         // ✅ Nuevas relaciones para exclusiones y condiciones
-        exclusiones: {
+        cotizacionExclusion: {
           orderBy: { orden: 'asc' }
         },
-        condiciones: {
+        cotizacionCondicion: {
           orderBy: { orden: 'asc' }
         }
       }
@@ -59,20 +59,20 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     // Map camelCase relation names for frontend compatibility
     const cotizacionFormatted = {
       ...cotizacion,
-      equipos: cotizacion.equipos?.map(equipo => ({
+      equipos: cotizacion.cotizacionEquipo?.map(equipo => ({
         ...equipo,
-        items: equipo.items || []
+        items: equipo.cotizacionEquipoItem || []
       })) || [],
-      servicios: cotizacion.servicios?.map(servicio => ({
+      servicios: cotizacion.cotizacionServicio?.map(servicio => ({
         ...servicio,
-        items: servicio.items || []
+        items: servicio.cotizacionServicioItem || []
       })) || [],
-      gastos: cotizacion.gastos?.map(gasto => ({
+      gastos: cotizacion.cotizacionGasto?.map(gasto => ({
         ...gasto,
-        items: gasto.items || []
+        items: gasto.cotizacionGastoItem || []
       })) || [],
-      exclusiones: cotizacion.exclusiones || [],
-      condiciones: cotizacion.condiciones || []
+      exclusiones: cotizacion.cotizacionExclusion || [],
+      condiciones: cotizacion.cotizacionCondicion || []
     }
 
     return NextResponse.json(cotizacionFormatted)

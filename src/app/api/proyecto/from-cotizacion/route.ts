@@ -14,9 +14,9 @@ import { randomUUID } from 'crypto'
 type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
   include: {
     cliente: true
-    equipos: { include: { items: true } }
-    servicios: { include: { items: true } }
-    gastos: { include: { items: true } }
+    cotizacionEquipo: { include: { cotizacionEquipoItem: true } }
+    cotizacionServicio: { include: { cotizacionServicioItem: true } }
+    cotizacionGasto: { include: { cotizacionGastoItem: true } }
     fases: true
     cronograma: {
       include: {
@@ -155,13 +155,13 @@ export async function POST(request: NextRequest) {
       where: { id: cotizacionId },
       include: {
         cliente: true,
-        equipos: { include: { items: true } },
-        servicios: { include: { items: true } },
-        gastos: { include: { items: true } },
+        cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
+        cotizacionServicio: { include: { cotizacionServicioItem: true } },
+        cotizacionGasto: { include: { cotizacionGastoItem: true } },
         cotizacionFase: true,
         cronograma: {
           include: {
-            categoriaServicio: true,
+            edt: true,
             responsable: true,
             cotizacionFase: true,
             cotizacionActividad: {
