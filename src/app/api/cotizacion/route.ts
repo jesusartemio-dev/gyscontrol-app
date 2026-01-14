@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
               correo: true
             }
           },
-          comercial: {
+          user: {
             select: {
               id: true,
               name: true,
@@ -92,8 +92,8 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              equipos: true,
-              servicios: true
+              cotizacionEquipo: true,
+              cotizacionServicio: true
             }
           }
         },
@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
             nombre: true
           }
         },
-        comercial: {
+        user: {
           select: {
             id: true,
             name: true
