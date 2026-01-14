@@ -59,6 +59,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     // Map camelCase relation names for frontend compatibility
     const cotizacionFormatted = {
       ...cotizacion,
+      comercial: cotizacion.user, // Alias for frontend compatibility
       equipos: cotizacion.cotizacionEquipo?.map(equipo => ({
         ...equipo,
         items: equipo.cotizacionEquipoItem || []

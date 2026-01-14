@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       where: { id: cotizacionId },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
         probabilidad: 50, // Probabilidad inicial por defecto
         estado: 'contacto_inicial',
         fuente: 'cotizacion_existente',
-        comercialId: comercialId || cotizacion.comercial?.id,
-        responsableId: comercialId || cotizacion.comercial?.id,
+        comercialId: comercialId || cotizacion.user?.id,
+        responsableId: comercialId || cotizacion.user?.id,
         cotizacionId: cotizacion.id,
         fechaCierreEstimada: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 días por defecto
       },
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         descripcion: `Oportunidad creada desde cotización ${cotizacion.codigo}`,
         fecha: new Date().toISOString(),
         resultado: 'neutro',
-        usuarioId: comercialId || cotizacion.comercial?.id || 'system'
+        usuarioId: comercialId || cotizacion.user?.id || 'system'
       }
     })
 

@@ -6,7 +6,8 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: correct relation field names from PascalCase to camelCase\n\nFixed 87 relation fields that were incorrectly using PascalCase instead\nof camelCase according to DATABASE_NAMING_CONVENTIONS.md.\n\nChanges:\n- User → user \\(28 occurrences\\)\n- Cliente → cliente \\(8 occurrences\\)\n- Proyecto → proyecto \\(15 occurrences\\)\n- Cotizacion → cotizacion \\(10 occurrences\\)\n- Plantilla → plantilla \\(7 occurrences\\)\n- Recurso → recurso \\(6 occurrences\\)\n- Proveedor → proveedor \\(3 occurrences\\)\n- And many other composite relations \\(CotizacionEquipo, ProyectoServicioCotizado, etc.\\)\n\nThis fixes the dashboard API error where `user` relation was not found\nin AuditLog model.\n\nValidation:\n- npx prisma validate: ✅ PASSED\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit --no-verify -m \"$\\(cat <<''EOF''\nfix: correct relation field names from PascalCase to camelCase\n\nFixed 87 relation fields that were incorrectly using PascalCase instead\nof camelCase according to DATABASE_NAMING_CONVENTIONS.md.\n\nChanges:\n- User → user \\(28 occurrences\\)\n- Cliente → cliente \\(8 occurrences\\)\n- Proyecto → proyecto \\(15 occurrences\\)\n- Cotizacion → cotizacion \\(10 occurrences\\)\n- Plantilla → plantilla \\(7 occurrences\\)\n- Recurso → recurso \\(6 occurrences\\)\n- Proveedor → proveedor \\(3 occurrences\\)\n- And many other composite relations \\(CotizacionEquipo, ProyectoServicioCotizado, etc.\\)\n\nThis fixes the dashboard API error where `user` relation was not found\nin AuditLog model.\n\nValidation:\n- npx prisma validate: ✅ PASSED\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(echo:*)"
     ]
   }
 }
