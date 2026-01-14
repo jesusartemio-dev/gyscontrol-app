@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const equipos = await prisma.catalogoEquipo.findMany({
       include: {
-        categoria: true,
+        categoriaEquipo: true,
         unidad: true,
       },
       orderBy: { createdAt: 'desc' }
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
         estado: data.estado
       },
       include: {
-        categoria: true,
+        categoriaEquipo: true,
         unidad: true,
       }
     })

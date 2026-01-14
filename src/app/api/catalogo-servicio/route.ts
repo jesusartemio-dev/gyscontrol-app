@@ -18,7 +18,7 @@ export async function GET() {
         { nombre: 'asc' }
       ],
       include: {
-        categoria: true,
+        edt: true,
         unidadServicio: true,
         recurso: true,
       },

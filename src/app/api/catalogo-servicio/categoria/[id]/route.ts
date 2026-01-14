@@ -18,7 +18,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       where: { categoriaId: id },
       orderBy: { nombre: 'asc' },
       include: {
-        categoria: true,
+        edt: true,
         unidadServicio: true,
         recurso: true
       }

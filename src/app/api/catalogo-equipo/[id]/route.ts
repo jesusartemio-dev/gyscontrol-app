@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
     const equipo = await prisma.catalogoEquipo.findUnique({
       where: { id },
       include: {
-        categoria: true,
+        categoriaEquipo: true,
         unidad: true,
       },
     })
@@ -72,7 +72,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       where: { id },
       data: payload,
       include: {
-        categoria: true,
+        categoriaEquipo: true,
         unidad: true,
       },
     })
