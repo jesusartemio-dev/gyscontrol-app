@@ -70,7 +70,7 @@ export async function GET(
       prisma.crmActividad.findMany({
         where,
         include: {
-          usuario: {
+          user: {
             select: {
               id: true,
               name: true,
@@ -175,16 +175,18 @@ export async function POST(
     // ✅ Crear actividad
     const nuevaActividad = await prisma.crmActividad.create({
       data: {
+        id: crypto.randomUUID(),
         oportunidadId,
         tipo,
         descripcion,
         fecha: fecha ? new Date(fecha) : new Date(),
         resultado,
         notas,
-        usuarioId: session.user.id
+        usuarioId: session.user.id,
+        updatedAt: new Date()
       },
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,
