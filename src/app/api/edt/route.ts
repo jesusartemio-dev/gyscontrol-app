@@ -15,24 +15,12 @@ export async function GET() {
     const edts = await prisma.edt.findMany({
       orderBy: { nombre: 'asc' },
       include: {
-        servicios: true, // anidamos relación con servicios
+        catalogoServicio: true,
+        faseDefault: true
       },
     })
 
-    // ✅ Agregar información de faseDefault para todos los EDTs
-    const edtsConFaseDefault = await Promise.all(
-      edts.map(async (edt: any) => {
-        let faseDefault = null
-        if (edt.faseDefaultId) {
-          faseDefault = await prisma.faseDefault.findUnique({
-            where: { id: edt.faseDefaultId }
-          })
-        }
-        return { ...edt, faseDefault }
-      })
-    )
-
-    return NextResponse.json(edtsConFaseDefault)
+    return NextResponse.json(edts)
   } catch (error) {
     console.error('❌ Error al listar EDTs:', error)
     return NextResponse.json({ error: 'Error al listar' }, { status: 500 })

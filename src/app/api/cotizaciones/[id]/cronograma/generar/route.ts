@@ -166,23 +166,13 @@ export async function POST(
       }
     })
 
-    // Obtener todas las categorías con su fase por defecto
-    const categorias = await prisma.categoriaServicio.findMany({
-      include: { servicios: true }
+    // Obtener todas las categorías EDT con su fase por defecto
+    const categorias = await prisma.edt.findMany({
+      include: {
+        catalogoServicio: true,
+        faseDefault: true
+      }
     })
-
-    // Agregar información de faseDefault manualmente
-    const categoriasConFaseDefault = await Promise.all(
-      categorias.map(async (categoria: any) => {
-        let faseDefault = null
-        if (categoria.faseDefaultId) {
-          faseDefault = await prisma.faseDefault.findUnique({
-            where: { id: categoria.faseDefaultId }
-          })
-        }
-        return { ...categoria, faseDefault }
-      })
-    )
     const categoriasMap = new Map(categorias.map(cat => [cat.id, cat.nombre]))
 
     // Crear mapa de nombres de categorías por servicio

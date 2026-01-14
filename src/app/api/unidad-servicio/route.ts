@@ -20,7 +20,8 @@ export async function GET() {
       include: {
         catalogoServicio: true,
         plantillaServicioItem: true,
-        cotizacionServicioItem: true
+        cotizacionServicioItem: true,
+        plantillaServicioItemIndependiente: true
       }
     })
 

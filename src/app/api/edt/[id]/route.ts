@@ -15,16 +15,11 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
   try {
     const edt = await prisma.edt.findUnique({
       where: { id },
-      include: { servicios: true },
+      include: {
+        catalogoServicio: true,
+        faseDefault: true
+      },
     })
-
-    // 🆕 Agregar información de faseDefault manualmente
-    if (edt && (edt as any).faseDefaultId) {
-      const faseDefault = await prisma.faseDefault.findUnique({
-        where: { id: (edt as any).faseDefaultId }
-      })
-      return NextResponse.json({ ...edt, faseDefault })
-    }
 
     return NextResponse.json(edt)
   } catch (error) {
