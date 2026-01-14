@@ -20,11 +20,11 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         cliente: true,
         comercial: true,
         gestor: true,
-        equipos: true, // ✅ Para contar equipos cotizados
-        servicios: true, // ✅ Para contar servicios
-        gastos: true, // ✅ Para contar gastos
-        listaEquipos: true, // ✅ Para mostrar listas y contar items
-        pedidos: true // ✅ Para contar pedidos
+        proyectoEquipoCotizado: true, // ✅ Para contar equipos cotizados
+        proyectoServicioCotizado: true, // ✅ Para contar servicios
+        proyectoGastoCotizado: true, // ✅ Para contar gastos
+        listaEquipo: true, // ✅ Para mostrar listas y contar items
+        pedidoEquipo: true // ✅ Para contar pedidos
       },
     })
 
@@ -66,17 +66,17 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
     const proyecto = await prisma.proyecto.findUnique({
       where: { id },
       include: {
-        listaEquipos: { select: { id: true, estado: true } },
-        pedidos: { select: { id: true, estado: true } },
-        equipos: { select: { id: true } },
-        servicios: { select: { id: true } },
-        gastos: { select: { id: true } },
-        registrosHoras: { select: { id: true } },
-        valorizaciones: { select: { id: true } },
-        proyectoEdts: { select: { id: true } },
-        fases: { select: { id: true } },
-        historialProyectos: { select: { id: true } },
-        cotizacionesProveedor: { select: { id: true } }
+        listaEquipo: { select: { id: true, estado: true } },
+        pedidoEquipo: { select: { id: true, estado: true } },
+        proyectoEquipoCotizado: { select: { id: true } },
+        proyectoServicioCotizado: { select: { id: true } },
+        proyectoGastoCotizado: { select: { id: true } },
+        registroHoras: { select: { id: true } },
+        valorizacion: { select: { id: true } },
+        proyectoEdt: { select: { id: true } },
+        proyectoFase: { select: { id: true } },
+        crmHistorialProyecto: { select: { id: true } },
+        cotizacionProveedor: { select: { id: true } }
       }
     })
 
