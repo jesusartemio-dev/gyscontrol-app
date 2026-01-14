@@ -18,8 +18,8 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       where: { id },
       include: {
         cliente: true,
-        comercial: true,
-        gestor: true,
+        User_Proyecto_comercialIdToUser: true,
+        User_Proyecto_gestorIdToUser: true,
         proyectoEquipoCotizado: true, // ✅ Para contar equipos cotizados
         proyectoServicioCotizado: true, // ✅ Para contar servicios
         proyectoGastoCotizado: true, // ✅ Para contar gastos
@@ -32,7 +32,14 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json(proyecto)
+    // Map relation names for frontend compatibility
+    const proyectoFormatted = {
+      ...proyecto,
+      comercial: proyecto.User_Proyecto_comercialIdToUser,
+      gestor: proyecto.User_Proyecto_gestorIdToUser
+    }
+
+    return NextResponse.json(proyectoFormatted)
   } catch (error) {
     console.error('❌ Error al obtener proyecto:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
@@ -93,14 +100,14 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
     }
 
     // ✅ Verificar si tiene pedidos activos
-    if (proyecto.pedidos.some(p => p.estado !== 'cancelado')) {
+    if (proyecto.pedidoEquipo.some((p: any) => p.estado !== 'cancelado')) {
       return NextResponse.json({
         error: 'No se puede eliminar un proyecto con pedidos activos. Cancele los pedidos primero.'
       }, { status: 400 })
     }
 
     // ✅ Verificar si tiene listas de equipo aprobadas
-    if (proyecto.listaEquipos.some(l => l.estado === 'aprobada')) {
+    if (proyecto.listaEquipo.some((l: any) => l.estado === 'aprobada')) {
       return NextResponse.json({
         error: 'No se puede eliminar un proyecto con listas de equipo aprobadas.'
       }, { status: 400 })
