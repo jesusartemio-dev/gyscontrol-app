@@ -159,16 +159,16 @@ export async function POST(request: NextRequest) {
         cotizacionServicio: { include: { cotizacionServicioItem: true } },
         cotizacionGasto: { include: { cotizacionGastoItem: true } },
         cotizacionFase: true,
-        cronograma: {
+        cotizacionEdt: {
           include: {
             edt: true,
-            responsable: true,
+            user: true,
             cotizacionFase: true,
             cotizacionActividad: {
               include: {
-                cotizacionTareas: {
+                cotizacionTarea: {
                   include: {
-                    responsable: true
+                    user: true
                   }
                 }
               }
@@ -207,9 +207,9 @@ export async function POST(request: NextRequest) {
     })
 
     // 🔁 Calculate totals from request data or cotización data as fallback
-    const finalTotalEquiposInterno = totalEquiposInterno ?? cotizacion.equipos.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
-    const finalTotalServiciosInterno = totalServiciosInterno ?? cotizacion.servicios.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
-    const finalTotalGastosInterno = totalGastosInterno ?? cotizacion.gastos.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
+    const finalTotalEquiposInterno = totalEquiposInterno ?? cotizacion.cotizacionEquipo.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
+    const finalTotalServiciosInterno = totalServiciosInterno ?? cotizacion.cotizacionServicio.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
+    const finalTotalGastosInterno = totalGastosInterno ?? cotizacion.cotizacionGasto.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
     const finalTotalInterno = totalInterno ?? (finalTotalEquiposInterno + finalTotalServiciosInterno + finalTotalGastosInterno)
     
     const finalTotalCliente = totalCliente ?? cotizacion.totalCliente ?? 0
@@ -238,8 +238,8 @@ export async function POST(request: NextRequest) {
         grandTotal: finalGrandTotal,
         updatedAt: new Date(),
 
-        ProyectoEquipoCotizado: {
-          create: cotizacion.equipos.map((grupo: any) => ({
+        proyectoEquipoCotizado: {
+          create: cotizacion.cotizacionEquipo.map((grupo: any) => ({
             id: randomUUID(),
             nombre: grupo.nombre,
             descripcion: grupo.descripcion,
@@ -247,8 +247,8 @@ export async function POST(request: NextRequest) {
             subtotalCliente: grupo.subtotalCliente,
             responsableId: gestorId,
             updatedAt: new Date(),
-            ProyectoEquipoCotizadoItem: {
-              create: grupo.items.map((item: any) => ({
+            proyectoEquipoCotizadoItem: {
+              create: (grupo.cotizacionEquipoItem || []).map((item: any) => ({
                 id: randomUUID(),
                 catalogoEquipoId: item.catalogoEquipoId,
                 codigo: item.codigo,
@@ -267,8 +267,8 @@ export async function POST(request: NextRequest) {
           })),
         },
 
-        ProyectoServicioCotizado: {
-          create: await Promise.all(cotizacion.servicios.map(async (grupo: any) => {
+        proyectoServicioCotizado: {
+          create: await Promise.all(cotizacion.cotizacionServicio.map(async (grupo: any) => {
             // ✅ Obtener o crear EDT basado en la categoría del servicio
             let edtId: string
             try {
@@ -305,8 +305,8 @@ export async function POST(request: NextRequest) {
               subtotalCliente: grupo.subtotalCliente,
               responsableId: gestorId,
               updatedAt: new Date(),
-              ProyectoServicioCotizadoItem: {
-                create: grupo.items.map((item: any) => ({
+              proyectoServicioCotizadoItem: {
+                create: (grupo.cotizacionServicioItem || []).map((item: any) => ({
                   id: randomUUID(),
                   catalogoServicioId: item.catalogoServicioId,
                   categoria: item.categoria,
@@ -323,16 +323,16 @@ export async function POST(request: NextRequest) {
           })),
         },
 
-        ProyectoGastoCotizado: {
-          create: cotizacion.gastos.map((grupo: any) => ({
+        proyectoGastoCotizado: {
+          create: cotizacion.cotizacionGasto.map((grupo: any) => ({
             id: randomUUID(),
             nombre: grupo.nombre,
             descripcion: grupo.descripcion,
             subtotalInterno: grupo.subtotalInterno,
             subtotalCliente: grupo.subtotalCliente,
             updatedAt: new Date(),
-            ProyectoGastoCotizadoItem: {
-              create: grupo.items.map((item: any) => ({
+            proyectoGastoCotizadoItem: {
+              create: (grupo.cotizacionGastoItem || []).map((item: any) => ({
                 id: randomUUID(),
                 nombre: item.nombre,
                 descripcion: item.descripcion,
@@ -354,21 +354,23 @@ export async function POST(request: NextRequest) {
     // ✅ Crear SOLO cronograma comercial (baseline histórica)
     let cronogramaConvertido = 0
     console.log('🔍 [CRONOGRAMA] Verificando si hay cronograma en cotización...')
-    console.log('🔍 [CRONOGRAMA] cotizacion.cronograma:', cotizacion.cronograma)
-    console.log('🔍 [CRONOGRAMA] cotizacion.cronograma.length:', cotizacion.cronograma?.length)
+    console.log('🔍 [CRONOGRAMA] cotizacion.cotizacionEdt:', cotizacion.cotizacionEdt)
+    console.log('🔍 [CRONOGRAMA] cotizacion.cotizacionEdt.length:', cotizacion.cotizacionEdt?.length)
 
-    if (!cotizacion.cronograma || cotizacion.cronograma.length === 0) {
+    if (!cotizacion.cotizacionEdt || cotizacion.cotizacionEdt.length === 0) {
       console.log('⚠️ [CRONOGRAMA] No hay cronograma en la cotización, creando cronograma comercial vacío por defecto')
       // Crear solo cronograma comercial vacío por defecto
       try {
         const cronogramaComercial = await prisma.proyectoCronograma.create({
           data: {
+            id: randomUUID(),
             proyectoId: proyecto.id,
             tipo: 'comercial',
             nombre: 'Cronograma Comercial',
             copiadoDesdeCotizacionId: cotizacion.id,
             esBaseline: false, // NO es baseline, es solo referencia histórica
-            version: 1
+            version: 1,
+            updatedAt: new Date()
           }
         })
         console.log(`✅ [CRONOGRAMA] Cronograma comercial vacío creado con ID: ${cronogramaComercial.id}`)
@@ -381,9 +383,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (cotizacion.cronograma && cotizacion.cronograma.length > 0) {
+    if (cotizacion.cotizacionEdt && cotizacion.cotizacionEdt.length > 0) {
       try {
-        console.log(`📅 [CRONOGRAMA] Iniciando conversión de ${cotizacion.cronograma.length} EDTs comerciales a jerarquía de 5 niveles`)
+        console.log(`📅 [CRONOGRAMA] Iniciando conversión de ${cotizacion.cotizacionEdt.length} EDTs comerciales a jerarquía de 5 niveles`)
 
         // ✅ PASO 1: Calcular offset de fechas para ajuste
         console.log('📅 [CRONOGRAMA] PASO 1: Calculando offset de fechas')
@@ -397,13 +399,13 @@ export async function POST(request: NextRequest) {
             fase.fechaFinPlan
           ].filter((f: any) => f)),
           // Fechas de EDTs, actividades y tareas
-          ...cotizacion.cronograma.flatMap((edt: any) => [
+          ...cotizacion.cotizacionEdt.flatMap((edt: any) => [
             edt.fechaInicioComercial,
             edt.fechaFinComercial,
             ...edt.cotizacionActividad.flatMap((act: any) => [
               act.fechaInicioComercial,
               act.fechaFinComercial,
-              ...act.cotizacionTareas.flatMap((tarea: any) => [
+              ...act.cotizacionTarea.flatMap((tarea: any) => [
                 tarea.fechaInicio,
                 tarea.fechaFin
               ].filter((f: any) => f))
@@ -442,12 +444,14 @@ export async function POST(request: NextRequest) {
         console.log('🏗️ [CRONOGRAMA] PASO 2: Creando cronograma comercial')
         const cronogramaComercial = await prisma.proyectoCronograma.create({
           data: {
+            id: randomUUID(),
             proyectoId: proyecto.id,
             tipo: 'comercial',
             nombre: 'Cronograma Comercial',
             copiadoDesdeCotizacionId: cotizacion.id,
             esBaseline: false, // NO es baseline, es solo referencia histórica
-            version: 1
+            version: 1,
+            updatedAt: new Date()
           }
         })
 
@@ -504,9 +508,9 @@ export async function POST(request: NextRequest) {
         }
 
         // ✅ PASO 4: Crear EDTs para el cronograma comercial
-        console.log(`🔧 [CRONOGRAMA] PASO 4: Creando ${cotizacion.cronograma.length} EDTs para el cronograma comercial`)
+        console.log(`🔧 [CRONOGRAMA] PASO 4: Creando ${cotizacion.cotizacionEdt.length} EDTs para el cronograma comercial`)
 
-        for (const edtComercial of cotizacion.cronograma) {
+        for (const edtComercial of cotizacion.cotizacionEdt) {
           console.log(`🔧 [CRONOGRAMA] Procesando EDT comercial: ${edtComercial.id} - ${edtComercial.nombre}`)
           console.log(`🔧 [CRONOGRAMA] EDT tiene ${edtComercial.cotizacionActividad?.length || 0} actividades`)
 
@@ -531,7 +535,7 @@ export async function POST(request: NextRequest) {
           // Si no hay edtId, intentar obtenerlo del servicio relacionado
           if (!edtId) {
             // Buscar el servicio correspondiente para obtener la EDT
-            const servicioRelacionado = cotizacion.servicios.find((s: any) =>
+            const servicioRelacionado = cotizacion.cotizacionServicio.find((s: any) =>
               s.id === edtComercial.cotizacionServicioId
             )
             if (servicioRelacionado) {
@@ -631,7 +635,7 @@ export async function POST(request: NextRequest) {
               console.log(`✅ [CRONOGRAMA] ProyectoActividad creada: ${actividadComercialProyecto.nombre} (comercial ID: ${actividadComercialProyecto.id})`)
 
               // Process tareas within actividad
-              let tareasComerciales = actividadComercial.cotizacionTareas || []
+              let tareasComerciales = actividadComercial.cotizacionTarea || []
 
               if (tareasComerciales.length === 0) {
                 // Create default tarea for activities without tareas
@@ -662,6 +666,7 @@ export async function POST(request: NextRequest) {
                   // Crear tarea en CRONOGRAMA COMERCIAL (fechas originales)
                   const tareaComercialProyecto = await prisma.proyectoTarea.create({
                     data: {
+                      id: randomUUID(),
                       proyectoEdtId: edtComercialProyecto.id,
                       proyectoActividadId: actividadComercialProyecto.id,
                       proyectoCronogramaId: cronogramaComercial.id,
@@ -698,13 +703,13 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        cronogramaConvertido = cotizacion.cronograma.length
+        cronogramaConvertido = cotizacion.cotizacionEdt.length
         console.log(`✅ [CRONOGRAMA] Conversión completa: ${cronogramaConvertido} EDTs convertidos con jerarquía de 5 niveles`)
         console.log(`📊 [CRONOGRAMA] Resumen final:`)
         console.log(`   - Cronograma creado: 1 (comercial)`)
         console.log(`   - Fases creadas: ${fasesComercialMap.size}`)
-        console.log(`   - EDTs creados: ${cotizacion.cronograma.length}`)
-        console.log(`   - Total elementos jerarquía: ${fasesComercialMap.size + cotizacion.cronograma.length}`)
+        console.log(`   - EDTs creados: ${cotizacion.cotizacionEdt.length}`)
+        console.log(`   - Total elementos jerarquía: ${fasesComercialMap.size + cotizacion.cotizacionEdt.length}`)
       } catch (cronogramaError) {
         console.log('❌ [CRONOGRAMA] Error en conversión de cronograma:', cronogramaError)
         console.log('❌ [CRONOGRAMA] Detalles del error:', cronogramaError instanceof Error ? cronogramaError.message : String(cronogramaError))
