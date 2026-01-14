@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
     // Crear la oportunidad
     const oportunidad = await prisma.crmOportunidad.create({
       data: {
+        id: crypto.randomUUID(),
         clienteId: cotizacion.cliente.id,
         nombre: cotizacion.nombre || `Oportunidad desde cotización ${cotizacion.codigo}`,
         descripcion: descripcion || `Oportunidad creada automáticamente desde la cotización ${cotizacion.codigo}`,
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
     // Crear actividad inicial
     await prisma.crmActividad.create({
       data: {
+        id: crypto.randomUUID(),
         oportunidadId: oportunidad.id,
         tipo: 'seguimiento',
         descripcion: `Oportunidad creada desde cotización ${cotizacion.codigo}`,
