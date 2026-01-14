@@ -62,18 +62,18 @@ export async function POST(req: Request) {
     const plantilla = await prisma.plantilla.findUnique({
       where: { id: plantillaId },
       include: {
-        equipos: { include: { items: true } },
-        servicios: { 
-          include: { 
-            items: {
+        plantillaEquipo: { include: { plantillaEquipoItem: true } },
+        plantillaServicio: {
+          include: {
+            plantillaServicioItem: {
               include: {
                 recurso: true, // ✅ Validar que el recurso existe
                 unidadServicio: true, // ✅ Validar que la unidad de servicio existe
               }
-            } 
-          } 
+            }
+          }
         },
-        gastos: { include: { items: true } },
+        plantillaGasto: { include: { plantillaGastoItem: true } },
       },
     })
 
@@ -114,14 +114,14 @@ export async function POST(req: Request) {
       totalGastosCliente: plantilla.totalGastosCliente,
       descuento: plantilla.descuento,
       grandTotal: plantilla.grandTotal,
-      equipos: {
-        create: plantilla.equipos.map(e => ({
+      cotizacionEquipo: {
+        create: plantilla.plantillaEquipo.map(e => ({
           nombre: e.nombre,
           descripcion: e.descripcion,
           subtotalInterno: e.subtotalInterno,
           subtotalCliente: e.subtotalCliente,
-          items: {
-            create: e.items.map(item => ({
+          cotizacionEquipoItem: {
+            create: e.plantillaEquipoItem.map(item => ({
               catalogoEquipoId: item.catalogoEquipoId,
               codigo: item.codigo,
               descripcion: item.descripcion,
@@ -137,14 +137,14 @@ export async function POST(req: Request) {
           },
         })),
       },
-      servicios: {
-        create: plantilla.servicios.map((s: PlantillaServicioWithItems) => ({
+      cotizacionServicio: {
+        create: plantilla.plantillaServicio.map((s: PlantillaServicioWithItems) => ({
           nombre: s.nombre,
           categoria: s.categoria,
           subtotalInterno: Number(s.subtotalInterno),
           subtotalCliente: Number(s.subtotalCliente),
-          items: {
-            create: s.items.map(item => ({
+          cotizacionServicioItem: {
+            create: s.plantillaServicioItem.map(item => ({
               catalogoServicioId: item.catalogoServicioId,
               categoria: item.categoria,
               unidadServicioId: item.unidadServicioId, // ✅ Campo obligatorio
@@ -170,13 +170,13 @@ export async function POST(req: Request) {
           },
         })),
       },
-      gastos: {
-        create: plantilla.gastos.map(g => ({
+      cotizacionGasto: {
+        create: plantilla.plantillaGasto.map(g => ({
           nombre: g.nombre,
           subtotalInterno: g.subtotalInterno,
           subtotalCliente: g.subtotalCliente,
-          items: {
-            create: g.items.map(item => ({
+          cotizacionGastoItem: {
+            create: g.plantillaGastoItem.map(item => ({
               nombre: item.nombre,
               descripcion: item.descripcion,
               cantidad: item.cantidad,
