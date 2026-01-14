@@ -21,14 +21,14 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     let plantilla = await prisma.plantilla.findUnique({
       where: { id },
       include: {
-        equipos: {
+        plantillaEquipo: {
           include: {
-            items: true,
+            plantillaEquipoItem: true,
           },
         },
-        servicios: {
+        plantillaServicio: {
           include: {
-            items: {
+            plantillaServicioItem: {
               include: {
                 catalogoServicio: true,
                 recurso: true,
@@ -37,9 +37,9 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
             },
           },
         },
-        gastos: {
+        plantillaGasto: {
           include: {
-            items: true,
+            plantillaGastoItem: true,
           },
         },
       },
@@ -54,13 +54,13 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     const plantillaEquipos = await prisma.plantillaEquipoIndependiente.findUnique({
       where: { id },
       include: {
-        items: {
+        plantillaEquipoItemIndependiente: {
           include: {
             catalogoEquipo: true
           }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaEquipoItemIndependiente: true }
         }
       },
     })
@@ -73,7 +73,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     const plantillaServicios = await prisma.plantillaServicioIndependiente.findUnique({
       where: { id },
       include: {
-        items: {
+        plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
             recurso: true,
@@ -81,7 +81,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
           }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       },
     })
@@ -94,9 +94,9 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     const plantillaGastos = await prisma.plantillaGastoIndependiente.findUnique({
       where: { id },
       include: {
-        items: true,
+        plantillaGastoItemIndependiente: true,
         _count: {
-          select: { items: true }
+          select: { plantillaGastoItemIndependiente: true }
         }
       },
     })
