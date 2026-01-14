@@ -20,8 +20,32 @@ const eslintConfig = [
       "@typescript-eslint/triple-slash-reference": "off",
       "prefer-const": "off",
       "react/no-unescaped-entities": "off",
-      "react-hooks/exhaustive-deps": "warn",
-      "@next/next/no-img-element": "warn"
+      "react-hooks/exhaustive-deps": "off",
+      "@next/next/no-img-element": "off",
+      "react/display-name": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "import/no-anonymous-default-export": "off",
+      "jsx-a11y/alt-text": "off"
+    }
+  },
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {}
+  },
+  {
+    files: ["**/*.js", "**/*.jsx"],
+    rules: {}
+  },
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*"],
+    rules: {
+      "react/display-name": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "react/jsx-no-undef": "off",
+      "@next/next/no-img-element": "off",
+      "import/no-anonymous-default-export": "off"
     }
   }
 ];

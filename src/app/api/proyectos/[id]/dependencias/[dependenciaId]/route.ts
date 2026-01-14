@@ -10,11 +10,10 @@ import { logger } from '@/lib/logger';
 // GET /api/proyectos/[proyectoId]/dependencias/[dependenciaId] - Obtener dependencia específica
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; dependenciaId: string } }
+  { params }: { params: Promise<{ id: string; dependenciaId: string }> }
 ) {
   try {
-    const proyectoId = params.id;
-    const dependenciaId = params.dependenciaId;
+    const { id: proyectoId, dependenciaId } = await params;
 
     const dependencia = await prisma.proyectoDependenciaTarea.findFirst({
       where: {
@@ -89,11 +88,10 @@ export async function GET(
 // PUT /api/proyectos/[proyectoId]/dependencias/[dependenciaId] - Actualizar dependencia
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; dependenciaId: string } }
+  { params }: { params: Promise<{ id: string; dependenciaId: string }> }
 ) {
   try {
-    const proyectoId = params.id;
-    const dependenciaId = params.dependenciaId;
+    const { id: proyectoId, dependenciaId } = await params;
     const body = await request.json();
 
     const { tipo } = body;
@@ -182,11 +180,10 @@ export async function PUT(
 // DELETE /api/proyectos/[proyectoId]/dependencias/[dependenciaId] - Eliminar dependencia
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; dependenciaId: string } }
+  { params }: { params: Promise<{ id: string; dependenciaId: string }> }
 ) {
   try {
-    const proyectoId = params.id;
-    const dependenciaId = params.dependenciaId;
+    const { id: proyectoId, dependenciaId } = await params;
 
     // Verificar que la dependencia existe y pertenece al proyecto
     const dependencia = await prisma.proyectoDependenciaTarea.findFirst({

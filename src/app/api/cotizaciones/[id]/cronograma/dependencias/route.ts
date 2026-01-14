@@ -24,13 +24,13 @@ export async function GET(
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     // 🔍 Obtener todas las dependencias de la cotización
-    const dependencias = await prisma.cotizacionDependenciaTarea.findMany({
+    const dependencias = await prisma.cotizacionDependenciasTarea.findMany({
       where: {
         tareaOrigenId: {
           in: await prisma.cotizacionTarea.findMany({
             where: {
-              cotizacion_actividad: {
-                cotizacion_edt: { cotizacionId }
+              cotizacionActividad: {
+                cotizacionEdt: { cotizacionId }
               }
             },
             select: { id: true }
@@ -88,13 +88,13 @@ export async function POST(
       prisma.cotizacionTarea.findFirst({
         where: {
           id: validatedData.tareaOrigenId,
-          cotizacion_actividad: { cotizacion_edt: { cotizacionId } }
+          cotizacionActividad: { cotizacionEdt: { cotizacionId } }
         }
       }),
       prisma.cotizacionTarea.findFirst({
         where: {
           id: validatedData.tareaDependienteId,
-          cotizacion_actividad: { cotizacion_edt: { cotizacionId } }
+          cotizacionActividad: { cotizacionEdt: { cotizacionId } }
         }
       })
     ])
@@ -114,7 +114,7 @@ export async function POST(
     }
 
     // ✅ Crear dependencia
-    const dependencia = await prisma.cotizacionDependenciaTarea.create({
+    const dependencia = await prisma.cotizacionDependenciasTarea.create({
       data: {
         ...validatedData,
         id: `dep-${Date.now()}`,
@@ -161,7 +161,7 @@ export async function POST(
 // 🔄 Función auxiliar para detectar ciclos
 async function verificarCiclo(tareaActualId: string, tareaBuscadaId: string): Promise<boolean> {
   // Obtener todas las dependencias donde la tarea actual es origen
-  const dependencias = await prisma.cotizacionDependenciaTarea.findMany({
+  const dependencias = await prisma.cotizacionDependenciasTarea.findMany({
     where: { tareaOrigenId: tareaActualId }
   })
 

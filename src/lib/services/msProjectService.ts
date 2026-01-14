@@ -118,13 +118,9 @@ export class MSProjectService {
       include: {
         edts: {
           include: {
-            zonas: {
+            actividades: {
               include: {
-                actividades: {
-                  include: {
-                    tareas: true
-                  }
-                }
+                tareas: true
               }
             }
           }
@@ -164,50 +160,35 @@ export class MSProjectService {
 
         const edtTaskId = taskId++;
 
-        // Agregar zonas
-        for (const zona of edt.zonas) {
+        // Agregar actividades directamente bajo EDT (sin zonas)
+        for (const actividad of edt.actividades) {
           tasks.push({
             id: taskId.toString(),
-            name: zona.nombre,
-            start: zona.fechaInicioPlan || zona.fechaFinPlan || edt.fechaInicioPlan,
-            finish: zona.fechaFinPlan || zona.fechaInicioPlan || edt.fechaFinPlan,
-            percentComplete: zona.porcentajeAvance || 0,
-            outlineLevel: 3,
-            notes: undefined
+            name: actividad.nombre,
+            start: actividad.fechaInicioPlan,
+            finish: actividad.fechaFinPlan,
+            percentComplete: actividad.porcentajeAvance || 0,
+            outlineLevel: 3,  // Nivel ajustado para arquitectura de 4 niveles
+            notes: actividad.descripcion || undefined,
+            priority: this.mapPrioridadToMSPriority(actividad.prioridad)
           });
 
-          const zonaTaskId = taskId++;
+          const actividadTaskId = taskId++;
 
-          // Agregar actividades
-          for (const actividad of zona.actividades) {
+          // Agregar tareas
+          for (const tarea of actividad.tareas) {
             tasks.push({
               id: taskId.toString(),
-              name: actividad.nombre,
-              start: actividad.fechaInicioPlan,
-              finish: actividad.fechaFinPlan,
-              percentComplete: actividad.porcentajeAvance || 0,
-              outlineLevel: 4,
-              notes: actividad.descripcion || undefined,
-              priority: this.mapPrioridadToMSPriority(actividad.prioridad)
+              name: tarea.nombre,
+              start: new Date(tarea.fechaInicio),
+              finish: new Date(tarea.fechaFin),
+              percentComplete: tarea.porcentajeCompletado || 0,
+              outlineLevel: 4,  // Nivel ajustado para arquitectura de 4 niveles
+              notes: tarea.descripcion || undefined,
+              priority: this.mapPrioridadToMSPriority(tarea.prioridad)
             });
 
-            const actividadTaskId = taskId++;
-
-            // Agregar tareas
-            for (const tarea of actividad.tareas) {
-              tasks.push({
-                id: taskId.toString(),
-                name: tarea.nombre,
-                start: new Date(tarea.fechaInicio),
-                finish: new Date(tarea.fechaFin),
-                percentComplete: tarea.porcentajeCompletado || 0,
-                outlineLevel: 5,
-                notes: tarea.descripcion || undefined,
-                priority: this.mapPrioridadToMSPriority(tarea.prioridad)
-              });
-
-              taskId++;
-            }
+            taskId++;
           }
         }
       }
@@ -334,7 +315,6 @@ export class MSProjectService {
     // Procesar tareas por nivel
     const fasesMap = new Map<string, any>();
     const edtsMap = new Map<string, any>();
-    const zonasMap = new Map<string, any>();
     const actividadesMap = new Map<string, any>();
 
     for (const task of data.tasks) {
@@ -378,29 +358,12 @@ export class MSProjectService {
             }
             break;
 
-          case 3: // Zona
+          case 3: // Actividad (nivel ajustado para arquitectura de 4 niveles)
             const edtPadre = Array.from(edtsMap.values())[edtsMap.size - 1];
             if (edtPadre) {
-              const zona = await prisma.proyectoZona.create({
-                data: {
-                  proyectoId,
-                  proyectoEdtId: edtPadre.id,
-                  nombre: task.name,
-                  fechaInicioPlan: task.start,
-                  fechaFinPlan: task.finish,
-                  estado: 'planificado'
-                }
-              });
-              zonasMap.set(task.id, zona);
-            }
-            break;
-
-          case 4: // Actividad
-            const zonaPadre = Array.from(zonasMap.values())[zonasMap.size - 1];
-            if (zonaPadre) {
               const actividad = await prisma.proyectoActividad.create({
                 data: {
-                  proyectoZonaId: zonaPadre.id,
+                  proyectoEdtId: edtPadre.id,
                   proyectoCronogramaId: cronograma.id,
                   nombre: task.name,
                   descripcion: task.notes,
@@ -414,12 +377,12 @@ export class MSProjectService {
             }
             break;
 
-          case 5: // Tarea
+          case 4: // Tarea (nivel ajustado para arquitectura de 4 niveles)
             const actividadPadre = Array.from(actividadesMap.values())[actividadesMap.size - 1];
             if (actividadPadre) {
               await prisma.proyectoTarea.create({
                 data: {
-                  proyectoEdtId: actividadPadre.proyectoEdtId, // Necesitaríamos obtener esto
+                  proyectoEdtId: actividadPadre.proyectoEdtId,
                   proyectoCronogramaId: cronograma.id,
                   proyectoActividadId: actividadPadre.id,
                   nombre: task.name,

@@ -42,18 +42,8 @@ interface ProyectoActividad {
   estado: 'pendiente' | 'en_progreso' | 'completado' | 'pausado' | 'cancelado';
   prioridad: 'baja' | 'media' | 'alta' | 'critica';
   porcentajeAvance: number;
-  proyectoZonaId?: string;
   proyectoEdtId?: string;
   proyectoCronogramaId: string;
-  proyectoZona?: {
-    nombre: string;
-    proyectoEdt?: {
-      nombre: string;
-      categoriaServicio?: {
-        nombre: string;
-      };
-    };
-  };
   proyectoEdt?: {
     nombre: string;
     categoriaServicio?: {
@@ -92,9 +82,8 @@ export function ProyectoActividadList({
       setError(null);
 
       const params = new URLSearchParams();
-      if (zonaId) params.append('zonaId', zonaId);
       if (cronogramaId) params.append('cronogramaId', cronogramaId);
-      if (modoVista) params.append('modoVista', modoVista); // ✅ SISTEMA DE ZONAS VIRTUALES
+      if (modoVista) params.append('modoVista', modoVista);
 
       const url = `/api/proyectos/${proyectoId}/actividades${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url);
@@ -116,7 +105,7 @@ export function ProyectoActividadList({
     } finally {
       setLoading(false);
     }
-  }, [proyectoId, zonaId, cronogramaId, modoVista]); // ✅ SISTEMA DE ZONAS VIRTUALES
+  }, [proyectoId, cronogramaId, modoVista]);
 
   useEffect(() => {
     loadActividades();
@@ -238,31 +227,23 @@ export function ProyectoActividadList({
     }
   };
 
-  // ✅ Agrupar actividades por zona o EDT (sistema de zonas virtuales)
-  const actividadesPorZona = actividades.reduce((acc, actividad) => {
+  // Agrupar actividades por EDT
+  const actividadesPorEdt = actividades.reduce((acc, actividad) => {
     let grupoNombre: string;
-    let grupoTipo: 'zona' | 'edt';
 
-    if (actividad.proyectoZona) {
-      // Actividad en zona real
-      grupoNombre = actividad.proyectoZona.nombre;
-      grupoTipo = 'zona';
-    } else if (actividad.proyectoEdt) {
-      // ✅ Actividad directa en EDT (zona virtual)
+    if (actividad.proyectoEdt) {
       grupoNombre = actividad.proyectoEdt.nombre;
-      grupoTipo = 'edt';
     } else {
       // Fallback
       grupoNombre = 'Sin asignación';
-      grupoTipo = 'edt';
     }
 
     if (!acc[grupoNombre]) {
-      acc[grupoNombre] = { actividades: [], tipo: grupoTipo };
+      acc[grupoNombre] = { actividades: [] };
     }
     acc[grupoNombre].actividades.push(actividad);
     return acc;
-  }, {} as Record<string, { actividades: ProyectoActividad[], tipo: 'zona' | 'edt' }>);
+  }, {} as Record<string, { actividades: ProyectoActividad[] }>);
 
   if (loading) {
     return (
@@ -306,7 +287,7 @@ export function ProyectoActividadList({
             Actividades del Proyecto
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Gestiona las agrupaciones de trabajo dentro de las zonas
+            Gestiona las agrupaciones de trabajo por EDT
           </p>
         </div>
         <Button size="sm" onClick={handleNuevaActividad}>
@@ -330,17 +311,14 @@ export function ProyectoActividadList({
           </div>
         ) : (
           <div className="space-y-6">
-            {Object.entries(actividadesPorZona).map(([zonaNombre, zonaData]) => (
-              <div key={zonaNombre}>
+            {Object.entries(actividadesPorEdt).map(([edtNombre, edtData]) => (
+              <div key={edtNombre}>
                 <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  {zonaData.tipo === 'zona' ? 'Zona:' : 'EDT:'} {zonaNombre}
-                  {zonaData.tipo === 'edt' && (
-                    <Badge variant="secondary" className="text-xs">Zona Virtual</Badge>
-                  )}
+                  EDT: {edtNombre}
                 </h3>
                 <div className="space-y-3">
-                  {zonaData.actividades.map((actividad) => (
+                  {edtData.actividades.map((actividad) => (
                     <Card key={actividad.id} className="border-l-4 border-l-green-500">
                       <CardContent className="pt-4">
                         <div className="flex items-start justify-between">
@@ -412,12 +390,12 @@ export function ProyectoActividadList({
                               <Progress value={actividad.porcentajeAvance} className="h-2" />
                             </div>
 
-                            {/* ✅ Mostrar información del EDT (zona real o virtual) */}
-                            {(actividad.proyectoZona?.proyectoEdt || actividad.proyectoEdt) && (
+                            {/* Mostrar información del EDT */}
+                            {actividad.proyectoEdt && (
                               <div className="text-xs text-muted-foreground">
-                                EDT: {(actividad.proyectoZona?.proyectoEdt || actividad.proyectoEdt)?.nombre}
-                                {(actividad.proyectoZona?.proyectoEdt || actividad.proyectoEdt)?.categoriaServicio?.nombre && (
-                                  <> • {(actividad.proyectoZona?.proyectoEdt || actividad.proyectoEdt)?.categoriaServicio?.nombre}</>
+                                EDT: {actividad.proyectoEdt?.nombre}
+                                {actividad.proyectoEdt?.categoriaServicio?.nombre && (
+                                  <> • {actividad.proyectoEdt?.categoriaServicio?.nombre}</>
                                 )}
                               </div>
                             )}
@@ -456,7 +434,6 @@ export function ProyectoActividadList({
         onClose={handleCloseModal}
         proyectoId={proyectoId}
         actividad={actividadEditando}
-        zonaId={zonaId}
         onSuccess={handleFormSuccess}
       />
     </Card>

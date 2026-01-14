@@ -1,13 +1,14 @@
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { ProyectoCronogramaTab } from '@/components/proyectos/cronograma/ProyectoCronogramaTab';
-import { prisma } from '@/lib/prisma';
 import { Calendar, Clock, BarChart3 } from 'lucide-react';
 import type { Proyecto, ProyectoCronograma } from '@/types/modelos';
+import { getProyectoForCronograma } from '@/lib/server/cronograma';
 
 // ✅ Props de la página
 interface CronogramaPageProps {
@@ -20,10 +21,7 @@ interface CronogramaPageProps {
 export async function generateMetadata({ params }: CronogramaPageProps): Promise<Metadata> {
   const { id } = await params;
   try {
-    const proyecto = await prisma.proyecto.findUnique({
-      where: { id },
-      select: { id: true, nombre: true, estado: true, fechaFin: true, totalReal: true, totalInterno: true }
-    }) as Proyecto | null;
+    const proyecto = await getProyectoForCronograma(id);
     
     if (!proyecto) {
       return {
@@ -118,10 +116,7 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
   // ✅ Obtener información básica del proyecto para el breadcrumb
   let proyecto: Proyecto | null = null;
   try {
-    proyecto = await prisma.proyecto.findUnique({
-      where: { id },
-      select: { id: true, nombre: true, estado: true, fechaFin: true, totalReal: true, totalInterno: true }
-    }) as Proyecto | null;
+    proyecto = await getProyectoForCronograma(id);
     if (!proyecto) {
       // Redirect to 404 page instead of using notFound()
       return (
@@ -129,9 +124,9 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
           <div className="text-center py-12">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Proyecto no encontrado</h1>
             <p className="text-gray-600 mb-6">El proyecto solicitado no existe o no tienes permisos para verlo.</p>
-            <a href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
+            <Link href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
               Volver a la lista de proyectos
-            </a>
+            </Link>
           </div>
         </div>
       );
@@ -143,9 +138,9 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
         <div className="text-center py-12">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Error al cargar el proyecto</h1>
           <p className="text-gray-600 mb-6">Ha ocurrido un error al cargar la información del proyecto.</p>
-          <a href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
+          <Link href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
             Volver a la lista de proyectos
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -158,13 +153,17 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/proyectos">Proyectos</BreadcrumbLink>
+            <Link href="/proyectos">
+              <BreadcrumbLink>Proyectos</BreadcrumbLink>
+            </Link>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href={`/proyectos/${id}`}>
-              {proyecto.nombre}
-            </BreadcrumbLink>
+            <Link href={`/proyectos/${id}`}>
+              <BreadcrumbLink>
+                {proyecto.nombre}
+              </BreadcrumbLink>
+            </Link>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

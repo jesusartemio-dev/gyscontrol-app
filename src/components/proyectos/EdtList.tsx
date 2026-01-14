@@ -75,9 +75,8 @@ export function EdtList({
     // Filtro por texto
     if (filtroTexto) {
       const textoLower = filtroTexto.toLowerCase();
-      resultado = resultado.filter(edt => 
+      resultado = resultado.filter(edt =>
         edt.categoriaServicio.nombre.toLowerCase().includes(textoLower) ||
-        edt.zona?.toLowerCase().includes(textoLower) ||
         edt.descripcion?.toLowerCase().includes(textoLower) ||
         edt.responsable?.name?.toLowerCase().includes(textoLower)
       );
@@ -133,7 +132,7 @@ export function EdtList({
       {/* ✅ Filtros */}
       <div className="flex flex-col sm:flex-row gap-4">
         <Input
-          placeholder="Buscar por categoría, zona, descripción o responsable..."
+          placeholder="Buscar por categoría, descripción o responsable..."
           value={filtroTexto}
           onChange={(e) => setFiltroTexto(e.target.value)}
           className="flex-1"
@@ -218,12 +217,6 @@ export function EdtList({
                           <CardTitle className="text-lg flex items-center gap-2">
                             <IconoEstado className="h-5 w-5" />
                             {edt.categoriaServicio.nombre}
-                            {edt.zona && (
-                              <Badge variant="outline" className="ml-2">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                {edt.zona}
-                              </Badge>
-                            )}
                           </CardTitle>
                           {edt.descripcion && (
                             <p className="text-sm text-muted-foreground mt-1">

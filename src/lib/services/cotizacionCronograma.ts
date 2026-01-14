@@ -31,7 +31,6 @@ export class CotizacionCronogramaService {
      cotizacionServicioId: string
      categoriaServicioId: string
      nombre: string
-     zona?: string
      fechaInicioCom?: Date
      fechaFinCom?: Date
      horasCom?: number
@@ -54,7 +53,6 @@ export class CotizacionCronogramaService {
           cotizacionServicioId: data.cotizacionServicioId || '', // ✅ Add required field
           categoriaServicioId: data.categoriaServicioId,
           nombre: data.nombre,
-          zona: data.zona,
           fechaInicioComercial: data.fechaInicioCom,
           fechaFinComercial: data.fechaFinCom,
           horasEstimadas: data.horasCom,
@@ -87,7 +85,11 @@ export class CotizacionCronogramaService {
         include: {
           categoriaServicio: true,
           responsable: true,
-          tareas: true
+          cotizacionActividad: {
+            include: {
+              tareas: true
+            }
+          }
         },
         orderBy: { createdAt: 'asc' }
       })
@@ -106,7 +108,6 @@ export class CotizacionCronogramaService {
   static async actualizarEdtComercial(
     edtId: string,
     data: Partial<{
-      zona: string
       fechaInicioCom: Date
       fechaFinCom: Date
       horasCom: number
@@ -136,7 +137,6 @@ export class CotizacionCronogramaService {
       const edtActualizado = await prisma.cotizacionEdt.update({
         where: { id: edtId },
         data: {
-          ...(data.zona !== undefined && { zona: data.zona }),
           ...(data.fechaInicioCom && { fechaInicioComercial: data.fechaInicioCom }),
           ...(data.fechaFinCom && { fechaFinComercial: data.fechaFinCom }),
           ...(data.horasCom !== undefined && { horasEstimadas: data.horasCom }),
@@ -147,7 +147,11 @@ export class CotizacionCronogramaService {
         include: {
           categoriaServicio: true,
           responsable: true,
-          tareas: true
+          cotizacionActividad: {
+            include: {
+              tareas: true
+            }
+          }
         }
       })
 
@@ -300,7 +304,6 @@ export class CotizacionCronogramaService {
             proyectoCronogramaId,
             categoriaServicioId: edtComercial.categoriaServicioId || '',
             nombre: edtComercial.nombre || `EDT ${edtComercial.categoriaServicio?.nombre || 'Sin nombre'}`,
-            zona: edtComercial.zona,
             fechaInicioPlan: edtComercial.fechaInicioComercial,
             fechaFinPlan: edtComercial.fechaFinComercial,
             horasPlan: edtComercial.horasEstimadas,
@@ -317,7 +320,6 @@ export class CotizacionCronogramaService {
         // Convert null values to undefined for type compatibility
         const edtCompatible: ProyectoEdt = {
           ...edtProyecto,
-          zona: edtProyecto.zona || undefined,
           responsableId: edtProyecto.responsableId || undefined,
           descripcion: edtProyecto.descripcion || undefined,
           fechaInicioReal: edtProyecto.fechaInicioReal?.toISOString() || undefined,
@@ -390,7 +392,8 @@ export class CotizacionCronogramaService {
       let edtsEnRiesgo = 0
 
       for (const edt of edts) {
-        totalTareas += edt.tareas?.length || 0
+        const tareasEdt = edt.cotizacionActividad?.flatMap(act => act.tareas || []) || []
+        totalTareas += tareasEdt.length
         horasTotales += Number(edt.horasEstimadas) || 0
 
         // Verificar si está en riesgo

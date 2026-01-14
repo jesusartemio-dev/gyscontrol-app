@@ -42,53 +42,9 @@ export function ResizableGanttBar({
   const useRealDates = item.fechaInicioReal && item.fechaFinReal
   const startDate = new Date(useRealDates ? item.fechaInicioReal : (item.fechaInicio || item.fechaInicioPlan))
   const endDate = new Date(useRealDates ? item.fechaFinReal : (item.fechaFin || item.fechaFinPlan))
-
-  if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return null
-
-  // Calcular posición y ancho
   const totalDuration = timelineEnd.getTime() - timelineStart.getTime()
-  const itemDuration = endDate.getTime() - startDate.getTime()
-  const startOffset = startDate.getTime() - timelineStart.getTime()
-
-  const x = (startOffset / totalDuration) * chartWidth
-  const width = Math.max(30, (itemDuration / totalDuration) * chartWidth) // Mínimo 30px para handles
-
-  // Calcular progreso
-  const progreso = item.porcentajeAvance || item.porcentajeCompletado || 0
-  const progressWidth = (progreso / 100) * width
-
-  // Colores por nivel
-  const getBarColor = () => {
-    const baseColors: Record<number, { bg: string, progress: string, border: string, hover: string }> = {
-      1: { bg: 'bg-blue-500', progress: 'bg-blue-700', border: 'border-blue-600', hover: 'hover:bg-blue-600' },
-      2: { bg: 'bg-green-500', progress: 'bg-green-700', border: 'border-green-600', hover: 'hover:bg-green-600' },
-      3: { bg: 'bg-purple-500', progress: 'bg-purple-700', border: 'border-purple-600', hover: 'hover:bg-purple-600' },
-      4: { bg: 'bg-orange-500', progress: 'bg-orange-700', border: 'border-orange-600', hover: 'hover:bg-orange-600' }
-    }
-    return baseColors[level] || baseColors[3]
-  }
-
-  const colors = getBarColor()
-  const isCompleted = progreso >= 100
-  const isDelayed = new Date() > endDate && !isCompleted
 
   // Handlers de resize
-  const handleMouseDown = useCallback((e: React.MouseEvent, handle: ResizeHandle) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    setResizeState({
-      isResizing: true,
-      handle,
-      startX: e.clientX,
-      originalStartDate: new Date(startDate),
-      originalEndDate: new Date(endDate)
-    })
-
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-  }, [startDate, endDate])
-
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!resizeState.isResizing || !barRef.current) return
 
@@ -158,6 +114,50 @@ export function ResizableGanttBar({
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
   }, [resizeState, chartWidth, totalDuration, onResizeEnd, item])
+
+  const handleMouseDown = useCallback((e: React.MouseEvent, handle: ResizeHandle) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    setResizeState({
+      isResizing: true,
+      handle,
+      startX: e.clientX,
+      originalStartDate: new Date(startDate),
+      originalEndDate: new Date(endDate)
+    })
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [startDate, endDate])
+
+  if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return null
+
+  // Calcular posición y ancho
+  const itemDuration = endDate.getTime() - startDate.getTime()
+  const startOffset = startDate.getTime() - timelineStart.getTime()
+
+  const x = (startOffset / totalDuration) * chartWidth
+  const width = Math.max(30, (itemDuration / totalDuration) * chartWidth) // Mínimo 30px para handles
+
+  // Calcular progreso
+  const progreso = item.porcentajeAvance || item.porcentajeCompletado || 0
+  const progressWidth = (progreso / 100) * width
+
+  // Colores por nivel
+  const getBarColor = () => {
+    const baseColors: Record<number, { bg: string, progress: string, border: string, hover: string }> = {
+      1: { bg: 'bg-blue-500', progress: 'bg-blue-700', border: 'border-blue-600', hover: 'hover:bg-blue-600' },
+      2: { bg: 'bg-green-500', progress: 'bg-green-700', border: 'border-green-600', hover: 'hover:bg-green-600' },
+      3: { bg: 'bg-purple-500', progress: 'bg-purple-700', border: 'border-purple-600', hover: 'hover:bg-purple-600' },
+      4: { bg: 'bg-orange-500', progress: 'bg-orange-700', border: 'border-orange-600', hover: 'hover:bg-orange-600' }
+    }
+    return baseColors[level] || baseColors[3]
+  }
+
+  const colors = getBarColor()
+  const isCompleted = progreso >= 100
+  const isDelayed = new Date() > endDate && !isCompleted
 
   return (
     <div

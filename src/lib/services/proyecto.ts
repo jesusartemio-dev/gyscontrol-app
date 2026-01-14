@@ -4,10 +4,12 @@ import { buildApiUrl } from '@/lib/utils'
 
 // Obtener todos los proyectos
 export async function getProyectos(): Promise<Proyecto[]> {
-  const url = buildApiUrl('/api/proyecto')
+  const url = buildApiUrl('/api/proyectos')
   const res = await fetch(url)
   if (!res.ok) throw new Error('Error al obtener proyectos')
-  return res.json()
+  const response = await res.json()
+  if (!response.ok) throw new Error(response.error)
+  return response.data
 }
 
 // Crear un nuevo proyecto manual

@@ -32,7 +32,7 @@ async function recalcularPadresPostOperacion(
   switch (nodeType) {
     case 'tarea':
       // Buscar la actividad padre de la tarea
-      const tarea = await prisma.proyectoTarea.findUnique({
+      const tarea = await prisma.proyecto_tarea.findUnique({
         where: { id: nodeId },
         select: { proyectoActividadId: true }
       })

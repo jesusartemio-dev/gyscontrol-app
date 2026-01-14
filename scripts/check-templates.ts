@@ -7,7 +7,7 @@ async function checkTemplates() {
     console.log('🔍 Verificando plantillas en la base de datos...\n');
 
     // Check independent equipment templates
-    const equipmentTemplates = await prisma.plantillaEquipoIndependiente.findMany({
+    const equipmentTemplates = await prisma.plantilla_equipo_independiente.findMany({
       select: { id: true, nombre: true, createdAt: true }
     });
 
@@ -21,7 +21,7 @@ async function checkTemplates() {
     }
 
     // Check independent service templates
-    const serviceTemplates = await prisma.plantillaServicioIndependiente.findMany({
+    const serviceTemplates = await prisma.plantilla_servicio_independiente.findMany({
       select: { id: true, nombre: true, createdAt: true }
     });
 
@@ -35,7 +35,7 @@ async function checkTemplates() {
     }
 
     // Check independent expense templates
-    const expenseTemplates = await prisma.plantillaGastoIndependiente.findMany({
+    const expenseTemplates = await prisma.plantilla_gasto_independiente.findMany({
       select: { id: true, nombre: true, createdAt: true }
     });
 
@@ -49,18 +49,20 @@ async function checkTemplates() {
     }
 
     // Check complete templates
-    const completeTemplates = await prisma.plantilla.findMany({
-      select: { id: true, nombre: true, tipo: true, createdAt: true }
-    });
+    // NOTE: 'plantilla' model does not exist in current schema
+    // const completeTemplates = await prisma.plantilla.findMany({
+    //   select: { id: true, nombre: true, tipo: true, createdAt: true }
+    // });
 
     console.log('\n📋 Plantillas Completas:');
-    if (completeTemplates.length === 0) {
-      console.log('   No hay plantillas completas');
-    } else {
-      completeTemplates.forEach(template => {
-        console.log(`   - ${template.id}: ${template.nombre} (${template.tipo}) (${template.createdAt})`);
-      });
-    }
+    console.log('   Model "plantilla" no existe en el schema actual - omitiendo verificación');
+    // if (completeTemplates.length === 0) {
+    //   console.log('   No hay plantillas completas');
+    // } else {
+    //   completeTemplates.forEach(template => {
+    //     console.log(`   - ${template.id}: ${template.nombre} (${template.tipo}) (${template.createdAt})`);
+    //   });
+    // }
 
   } catch (error) {
     console.error('❌ Error al verificar plantillas:', error);

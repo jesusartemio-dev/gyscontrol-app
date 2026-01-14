@@ -5,6 +5,7 @@
 // ===================================================
 
 import type { AuditLog } from '@/types/modelos';
+import { randomUUID } from 'crypto';
 
 const BASE_URL = '/api/audit';
 
@@ -112,6 +113,7 @@ export async function registrarCreacion(
 
     await prisma.auditLog.create({
       data: {
+        id: randomUUID(),
         entidadTipo,
         entidadId,
         accion: 'CREAR',
@@ -140,6 +142,7 @@ export async function registrarActualizacion(
 
     await prisma.auditLog.create({
       data: {
+        id: randomUUID(),
         entidadTipo,
         entidadId,
         accion: 'ACTUALIZAR',
@@ -168,6 +171,7 @@ export async function registrarEliminacion(
 
     await prisma.auditLog.create({
       data: {
+        id: randomUUID(),
         entidadTipo,
         entidadId,
         accion: 'ELIMINAR',

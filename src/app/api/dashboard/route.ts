@@ -107,7 +107,7 @@ async function getAdminWidgets() {
     prisma.auditLog.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
-      include: { usuario: { select: { name: true } } }
+      include: { user: { select: { name: true } } }
     })
   ])
 
@@ -139,7 +139,7 @@ async function getAdminWidgets() {
       activities: recentActivities.map(activity => ({
         id: activity.id,
         description: activity.descripcion,
-        user: activity.usuario.name,
+        user: activity.user.name,
         timestamp: activity.createdAt
       }))
     },
@@ -346,7 +346,7 @@ async function getProyectosWidgets(userId: string) {
       where: { entidadTipo: 'PROYECTO' },
       take: 5,
       orderBy: { createdAt: 'desc' },
-      include: { usuario: { select: { name: true } } }
+      include: { user: { select: { name: true } } }
     })
   ])
 
@@ -378,7 +378,7 @@ async function getProyectosWidgets(userId: string) {
       activities: recentUpdates.map((update: any) => ({
         id: update.id,
         description: update.descripcion,
-        user: update.usuario.name,
+        user: update.user.name,
         timestamp: update.createdAt
       }))
     },
@@ -581,7 +581,7 @@ async function getColaboradorWidgets() {
     prisma.auditLog.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
-      include: { usuario: { select: { name: true } } }
+      include: { user: { select: { name: true } } }
     })
   ])
 
@@ -613,7 +613,7 @@ async function getColaboradorWidgets() {
       activities: recentActivities.map((activity: any) => ({
         id: activity.id,
         description: activity.descripcion,
-        user: activity.usuario.name,
+        user: activity.user.name,
         timestamp: activity.createdAt
       }))
     },

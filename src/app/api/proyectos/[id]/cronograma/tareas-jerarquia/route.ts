@@ -9,13 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 
-interface Params {
-  params: {
-    id: string
-  }
-}
-
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     // Verificar sesión
     const session = await getServerSession()
@@ -26,7 +20,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       )
     }
 
-    const proyectoId = params.id
+    const { id: proyectoId } = await params
     const { searchParams } = new URL(request.url)
     const cronogramaId = searchParams.get('cronogramaId')
     const modoVista = searchParams.get('modoVista') || 'automatico'
@@ -38,7 +32,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         ...(cronogramaId ? { proyectoCronogramaId: cronogramaId } : {})
       },
       include: {
-        edts: {
+        proyectoEdt: {
           include: {
             responsable: {
               select: { id: true, name: true, email: true }
@@ -65,7 +59,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     // Construir jerarquía completa usando la estructura real del esquema
     const jerarquia = fases.map(fase => {
-      const edts = fase.edts.map(edt => {
+      const edts = fase.proyectoEdt.map(edt => {
         const actividades = edt.proyecto_actividad.map(actividad => {
           const tareas = actividad.proyecto_tarea.map(tarea => ({
             id: tarea.id,

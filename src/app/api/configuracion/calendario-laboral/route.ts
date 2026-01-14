@@ -33,9 +33,9 @@ export async function GET() {
     // Obtener calendarios con sus relaciones usando Prisma
     const calendarios = await prisma.calendarioLaboral.findMany({
       include: {
-        dia_calendario: true,
-        excepcion_calendario: true,
-        configuracion_calendario: true
+        diaCalendario: true,
+        excepcionCalendario: true,
+        configuracionCalendario: true
       },
       orderBy: {
         nombre: 'asc'
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date()
       },
       include: {
-        dia_calendario: true
+        diaCalendario: true
       }
     })
 

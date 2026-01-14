@@ -5,7 +5,7 @@
  * Extiende el sistema de auditoría existente para incluir eventos de permisos.
  */
 
-import { prisma } from '@/lib/prisma';
+import type { PrismaClient } from '@prisma/client'
 
 // ✅ Función para registrar cambios de permisos
 export async function logPermissionChange(data: {
@@ -18,6 +18,7 @@ export async function logPermissionChange(data: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
+    const { prisma } = await import('@/lib/prisma');
     await prisma.auditLog.create({
       data: {
         entidadTipo: data.entityType === 'permission' ? 'PERMISO' : 'PERMISO_USUARIO',
@@ -47,6 +48,7 @@ export async function logPermissionDenied(data: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
+    const { prisma } = await import('@/lib/prisma');
     await prisma.auditLog.create({
       data: {
         entidadTipo: 'PERMISO_ACCESO',
@@ -156,6 +158,7 @@ export async function getPermissionAuditHistory(filters: {
   total: number;
 }> {
   try {
+    const { prisma } = await import('@/lib/prisma');
     const where: any = {};
 
     if (filters.userId) {
@@ -229,6 +232,7 @@ export async function getPermissionAuditStats(period: 'day' | 'week' | 'month' =
   }>;
 }> {
   try {
+    const { prisma } = await import('@/lib/prisma');
     const dateFrom = new Date();
     switch (period) {
       case 'day':
@@ -333,20 +337,14 @@ export async function logStatusChange(data: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
-    await prisma.auditLog.create({
-      data: {
-        entidadTipo: data.entityType.toUpperCase(),
-        entidadId: data.entityId,
-        accion: 'STATUS_CHANGE',
-        usuarioId: data.userId,
-        descripcion: data.description || `Cambio de estado${data.oldStatus ? ` de "${data.oldStatus}"` : ''} a "${data.newStatus}"`,
-        cambios: JSON.stringify({
-          oldStatus: data.oldStatus,
-          newStatus: data.newStatus
-        }),
-        metadata: data.metadata ? JSON.stringify(data.metadata) : null
-      }
+    const res = await fetch('/api/audit/log-status-change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      console.error('Error logging status change:', await res.text());
+    }
   } catch (error) {
     console.error('Error logging status change:', error);
   }

@@ -101,14 +101,17 @@ export default function CotizacionesPage() {
       // ✅ Registrar auditoría del cambio de estado
       if (estadoAnterior && estadoAnterior !== nuevoEstado) {
         try {
-          const { logStatusChange } = await import('@/lib/services/auditLogger');
-          await logStatusChange({
-            userId: (session?.user as any)?.id || '',
-            entityType: 'COTIZACION',
-            entityId: cotizacionId,
-            oldStatus: estadoAnterior,
-            newStatus: nuevoEstado,
-            description: cotizacion?.codigo || `Cotización ${cotizacionId}`
+          await fetch('/api/audit/log-status-change', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: (session?.user as any)?.id || '',
+              entityType: 'COTIZACION',
+              entityId: cotizacionId,
+              oldStatus: estadoAnterior,
+              newStatus: nuevoEstado,
+              description: cotizacion?.codigo || `Cotización ${cotizacionId}`
+            })
           });
         } catch (auditError) {
           console.warn('Error al registrar auditoría:', auditError);

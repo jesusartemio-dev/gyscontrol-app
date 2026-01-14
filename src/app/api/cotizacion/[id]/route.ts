@@ -12,37 +12,41 @@ export const dynamic = 'force-dynamic' // ✅ Previene errores de caché en ruta
 
 // ✅ Obtener cotización por ID
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await context.params // 👈 Previene errores de acceso a params
+   try {
+     const { id } = await context.params // 👈 Previene errores de acceso a params
 
-    const cotizacion = await prisma.cotizaciones.findUnique({
+     if (typeof id !== 'string') {
+       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+     }
+
+    const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
       include: {
-        clientes: true,
-        users: true,
-        plantillas: true,
-        cotizacion_equipo: { include: { cotizacion_equipo_item: true } },
-        cotizacion_servicio: {
+        cliente: true,
+        comercial: true,
+        plantilla: true,
+        equipos: { include: { items: true } },
+        servicios: {
           include: {
-            cotizacion_servicio_item: {
+            items: {
               include: {
-                unidad_servicio: true,
-                recursos: true,
-                catalogo_servicio: true
+                unidadServicio: true,
+                recurso: true,
+                catalogoServicio: true
               }
             }
           }
         },
-        cotizacion_gasto: {
+        gastos: {
           include: {
-            cotizacion_gasto_item: true
+            items: true
           }
         },
         // ✅ Nuevas relaciones para exclusiones y condiciones
-        cotizacion_exclusion: {
+        exclusiones: {
           orderBy: { orden: 'asc' }
         },
-        cotizacion_condicion: {
+        condiciones: {
           orderBy: { orden: 'asc' }
         }
       }
@@ -52,26 +56,23 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
     }
 
-    // Map snake_case relation names to expected PascalCase property names for frontend compatibility
+    // Map camelCase relation names for frontend compatibility
     const cotizacionFormatted = {
       ...cotizacion,
-      equipos: cotizacion.cotizacion_equipo?.map(equipo => ({
+      equipos: cotizacion.equipos?.map(equipo => ({
         ...equipo,
-        items: equipo.cotizacion_equipo_item || []
+        items: equipo.items || []
       })) || [],
-      servicios: cotizacion.cotizacion_servicio?.map(servicio => ({
+      servicios: cotizacion.servicios?.map(servicio => ({
         ...servicio,
-        items: servicio.cotizacion_servicio_item || []
+        items: servicio.items || []
       })) || [],
-      gastos: cotizacion.cotizacion_gasto?.map(gasto => ({
+      gastos: cotizacion.gastos?.map(gasto => ({
         ...gasto,
-        items: gasto.cotizacion_gasto_item || []
+        items: gasto.items || []
       })) || [],
-      exclusiones: cotizacion.cotizacion_exclusion || [],
-      condiciones: cotizacion.cotizacion_condicion || [],
-      cliente: cotizacion.clientes,
-      comercial: cotizacion.users,
-      plantilla: cotizacion.plantillas
+      exclusiones: cotizacion.exclusiones || [],
+      condiciones: cotizacion.condiciones || []
     }
 
     return NextResponse.json(cotizacionFormatted)
@@ -91,12 +92,12 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    const existente = await prisma.cotizaciones.findUnique({ where: { id } })
+    const existente = await prisma.cotizacion.findUnique({ where: { id } })
     if (!existente) {
       return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
     }
 
-    const actualizada = await prisma.cotizaciones.update({
+    const actualizada = await prisma.cotizacion.update({
       where: { id },
       data
     })
@@ -110,10 +111,14 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 
 // ✅ Eliminar cotización
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await context.params
+   try {
+     const { id } = await context.params
 
-    await prisma.cotizaciones.delete({ where: { id } })
+     if (typeof id !== 'string') {
+       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+     }
+
+    await prisma.cotizacion.delete({ where: { id } })
 
     return NextResponse.json({ status: 'ok' })
   } catch (error) {

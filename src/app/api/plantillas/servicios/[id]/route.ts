@@ -21,7 +21,7 @@ export async function GET(
     const plantilla = await prisma.plantillaServicioIndependiente.findUnique({
       where: { id },
       include: {
-        items: {
+        plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
             recurso: true,
@@ -30,7 +30,7 @@ export async function GET(
           orderBy: { orden: 'asc' }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       }
     })
@@ -95,7 +95,7 @@ export async function PUT(
         updatedAt: new Date()
       },
       include: {
-        items: {
+        plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
             recurso: true,
@@ -104,7 +104,7 @@ export async function PUT(
           orderBy: { orden: 'asc' }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       }
     })

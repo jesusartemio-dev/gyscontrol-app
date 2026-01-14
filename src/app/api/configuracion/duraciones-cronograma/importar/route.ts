@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const duracionesExistentes = await prisma.$queryRaw`
       SELECT DISTINCT "nivel" FROM "plantilla_duracion_cronograma"
     `
-    const nivelesExistentes = duracionesExistentes.map((d: any) => d.nivel)
+    const nivelesExistentes = (duracionesExistentes as any[]).map((d: any) => d.nivel)
 
     // Validar datos
     const { nuevas, errores, actualizaciones } = validarDuracionesCronograma(datos, nivelesExistentes)
@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
       try {
         // Verificar si ya existe una duración para este nivel
         const existingDuracion = await prisma.$queryRaw`
-          SELECT * FROM "plantilla_duracion_cronograma" 
+          SELECT * FROM "plantilla_duracion_cronograma"
           WHERE "nivel" = ${duracion.nivel}
           LIMIT 1
-        `
+        ` as any[]
 
         const method = existingDuracion && existingDuracion.length > 0 ? 'PUT' : 'POST'
         const url = existingDuracion && existingDuracion.length > 0

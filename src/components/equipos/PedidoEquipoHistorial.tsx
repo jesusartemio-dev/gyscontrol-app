@@ -26,7 +26,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatAuditDescription, getAuditHistory } from '@/lib/services/audit';
+import { formatAuditDescription, getAuditHistory } from '@/lib/services/audit-client';
 import { formatDate } from '@/lib/utils';
 import type { AuditLog } from '@/types/modelos';
 

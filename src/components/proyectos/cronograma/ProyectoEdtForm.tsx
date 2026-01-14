@@ -32,7 +32,6 @@ import type { CreateProyectoEdtPayload, ProyectoEdtUpdatePayload } from '@/types
 const edtFormSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
   categoriaServicioId: z.string().min(1, 'La categoría de servicio es requerida'),
-  zona: z.string().optional(),
   fechaInicio: z.string().optional(),
   fechaFin: z.string().optional(),
   horasEstimadas: z.number().min(0.1, 'Las horas deben ser mayor a 0'),
@@ -78,7 +77,6 @@ export function ProyectoEdtForm({
     defaultValues: {
       nombre: edt?.nombre || '',
       categoriaServicioId: edt?.categoriaServicioId || '',
-      zona: edt?.zona || '',
       fechaInicio: edt?.fechaInicio || '',
       fechaFin: edt?.fechaFin || '',
       horasEstimadas: edt?.horasPlan || 1,
@@ -133,7 +131,6 @@ export function ProyectoEdtForm({
         proyectoCronogramaId: data.proyectoCronogramaId,
         nombre: data.nombre,
         categoriaServicioId: data.categoriaServicioId,
-        zona: data.zona,
         fechaInicio: data.fechaInicio,
         fechaFin: data.fechaFin,
         horasEstimadas: data.horasEstimadas,
@@ -195,7 +192,7 @@ export function ProyectoEdtForm({
             <Input
               id="nombre"
               {...register('nombre')}
-              placeholder="Ej: Instalación eléctrica sector norte"
+              placeholder="Ej: Instalación eléctrica"
             />
             {errors.nombre && (
               <p className="text-sm text-red-600">{errors.nombre.message}</p>
@@ -225,15 +222,15 @@ export function ProyectoEdtForm({
             )}
           </div>
 
-          {/* Zona */}
-          <div className="space-y-2">
+          {/* Zona - Eliminado según FASE 3 */}
+          {/* <div className="space-y-2">
             <Label htmlFor="zona">Zona/Sector</Label>
             <Input
               id="zona"
               {...register('zona')}
               placeholder="Ej: Sector Norte, Planta Baja, etc."
             />
-          </div>
+          </div> */}
 
           {/* Fechas */}
           <div className="grid grid-cols-2 gap-4">

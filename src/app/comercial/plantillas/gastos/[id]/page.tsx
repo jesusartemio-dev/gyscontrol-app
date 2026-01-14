@@ -97,7 +97,7 @@ interface PlantillaGastoIndependiente {
   grandTotal: number
   createdAt: string
   updatedAt: string
-  items: PlantillaGastoItemIndependiente[]
+  plantillaGastoItemIndependiente: PlantillaGastoItemIndependiente[]
 }
 
 interface PlantillaGastoItemIndependiente {
@@ -275,7 +275,7 @@ export default function PlantillaGastosDetallePage() {
                   Plantilla Especializada
                 </span>
                 <span>Creada: {formatDate(plantilla.createdAt)}</span>
-                <span>{plantilla.items.length} items</span>
+                <span>{plantilla.plantillaGastoItemIndependiente.length} items</span>
                 <span>Total: {formatCurrency(plantilla.grandTotal)}</span>
               </div>
             </div>
@@ -356,7 +356,7 @@ export default function PlantillaGastosDetallePage() {
                     Items de Gastos
                   </CardTitle>
                   <CardDescription>
-                    Gastos incluidos en la plantilla ({plantilla.items.length} items)
+                    Gastos incluidos en la plantilla ({plantilla.plantillaGastoItemIndependiente.length} items)
                   </CardDescription>
                 </div>
                 <Button
@@ -376,7 +376,7 @@ export default function PlantillaGastosDetallePage() {
                 onItemsCreated={handleItemsAdded}
               />
 
-              {plantilla.items.length === 0 ? (
+              {plantilla.plantillaGastoItemIndependiente.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -395,7 +395,7 @@ export default function PlantillaGastosDetallePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {plantilla.items.map((item, index) => (
+                  {plantilla.plantillaGastoItemIndependiente.map((item, index) => (
                     <motion.div
                       key={item.id}
                       variants={itemVariants}

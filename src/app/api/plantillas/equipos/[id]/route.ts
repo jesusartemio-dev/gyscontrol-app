@@ -2,7 +2,7 @@
 // 📁 Archivo: route.ts
 // 📌 Ubicación: /api/plantillas/equipos/[id]
 // 🔧 Descripción: API para gestionar plantilla de equipos independiente específica
-// ✅ GET: Obtener plantilla con sus items
+// ✅ GET: Obtener plantilla con sus plantillaEquipoItemIndependiente
 // ✅ PUT: Actualizar plantilla (nombre, descripción, etc.)
 // ===================================================
 
@@ -21,14 +21,14 @@ export async function GET(
     const plantilla = await prisma.plantillaEquipoIndependiente.findUnique({
       where: { id },
       include: {
-        items: {
+        plantillaEquipoItemIndependiente: {
           include: {
             catalogoEquipo: true
           },
           orderBy: { createdAt: 'asc' }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaEquipoItemIndependiente: true }
         }
       }
     })
@@ -75,14 +75,14 @@ export async function PUT(
         updatedAt: new Date()
       },
       include: {
-        items: {
+        plantillaEquipoItemIndependiente: {
           include: {
             catalogoEquipo: true
           },
           orderBy: { createdAt: 'asc' }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaEquipoItemIndependiente: true }
         }
       }
     })

@@ -22,7 +22,7 @@ export interface NotificacionData {
 // ✅ Crear notificación
 export async function crearNotificacion(data: NotificacionData) {
   try {
-    const notificacion = await prisma.notificacion.create({
+    const notificacion = await prisma.notificaciones.create({
       data: {
         titulo: data.titulo,
         mensaje: data.mensaje,
@@ -45,7 +45,7 @@ export async function crearNotificacion(data: NotificacionData) {
 // ✅ Obtener notificaciones de un usuario
 export async function obtenerNotificacionesUsuario(usuarioId: string, limite: number = 50) {
   try {
-    const notificaciones = await prisma.notificacion.findMany({
+    const notificaciones = await prisma.notificaciones.findMany({
       where: { usuarioId },
       orderBy: { createdAt: 'desc' },
       take: limite
@@ -60,7 +60,7 @@ export async function obtenerNotificacionesUsuario(usuarioId: string, limite: nu
 // ✅ Marcar notificación como leída
 export async function marcarNotificacionLeida(id: string) {
   try {
-    const notificacion = await prisma.notificacion.update({
+    const notificacion = await prisma.notificaciones.update({
       where: { id },
       data: {
         leida: true,
@@ -77,7 +77,7 @@ export async function marcarNotificacionLeida(id: string) {
 // ✅ Obtener notificaciones no leídas
 export async function obtenerNotificacionesNoLeidas(usuarioId: string) {
   try {
-    const count = await prisma.notificacion.count({
+    const count = await prisma.notificaciones.count({
       where: {
         usuarioId,
         leida: false

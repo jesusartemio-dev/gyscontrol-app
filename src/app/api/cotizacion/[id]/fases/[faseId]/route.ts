@@ -50,15 +50,11 @@ export async function DELETE(
         cotizacionId: id
       },
       include: {
-        edts: {
+        cotizacion_edt: {
           include: {
-            zonas: {
+            cotizacionActividad: {
               include: {
-                actividades: {
-                  include: {
-                    tareas: true
-                  }
-                }
+                cotizacionTareas: true
               }
             }
           }
@@ -73,23 +69,17 @@ export async function DELETE(
     }
 
     // Verificar si tiene elementos dependientes
-    const totalEdts = fase.edts.length
-    const totalZonas = fase.edts.reduce((sum, edt) => sum + edt.zonas.length, 0)
-    const totalActividades = fase.edts.reduce((sum, edt) =>
-      sum + edt.zonas.reduce((sumZona, zona) => sumZona + zona.actividades.length, 0), 0
-    )
-    const totalTareas = fase.edts.reduce((sum, edt) =>
-      sum + edt.zonas.reduce((sumZona, zona) =>
-        sumZona + zona.actividades.reduce((sumAct, act) => sumAct + act.tareas.length, 0), 0
-      ), 0
+    const totalEdts = fase.cotizacion_edt.length
+    const totalActividades = fase.cotizacion_edt.reduce((sum, edt) => sum + edt.cotizacionActividad.length, 0)
+    const totalTareas = fase.cotizacion_edt.reduce((sum, edt) =>
+      sum + edt.cotizacionActividad.reduce((sumAct, act) => sumAct + act.cotizacionTareas.length, 0), 0
     )
 
-    if (totalEdts > 0 || totalZonas > 0 || totalActividades > 0 || totalTareas > 0) {
+    if (totalEdts > 0 || totalActividades > 0 || totalTareas > 0) {
       return NextResponse.json({
         error: 'No se puede eliminar la fase porque tiene elementos dependientes',
         details: {
           edts: totalEdts,
-          zonas: totalZonas,
           actividades: totalActividades,
           tareas: totalTareas
         }

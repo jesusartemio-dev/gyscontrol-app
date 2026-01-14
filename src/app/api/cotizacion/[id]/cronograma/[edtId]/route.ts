@@ -42,18 +42,9 @@ export async function GET(
         responsable: {
           select: { id: true, name: true, email: true }
         },
-        zonas: {
+        cotizacionActividad: {
           include: {
-            actividades: {
-              include: {
-                tareas: true
-              }
-            }
-          }
-        },
-        actividadesDirectas: {
-          include: {
-            tareas: true
+            cotizacionTareas: true
           }
         }
       }
@@ -136,18 +127,9 @@ export async function PUT(
       include: {
         categoriaServicio: true,
         responsable: true,
-        zonas: {
+        cotizacionActividad: {
           include: {
-            actividades: {
-              include: {
-                tareas: true
-              }
-            }
-          }
-        },
-        actividadesDirectas: {
-          include: {
-            tareas: true
+            cotizacionTareas: true
           }
         }
       }
@@ -201,20 +183,9 @@ export async function DELETE(
         cotizacionId: id
       },
       include: {
-        zonas: {
+        cotizacionActividad: {
           include: {
-            actividades: {
-              include: {
-                tareas: {
-                  select: { id: true }
-                }
-              }
-            }
-          }
-        },
-        actividadesDirectas: {
-          include: {
-            tareas: {
+            cotizacionTareas: {
               select: { id: true }
             }
           }
@@ -234,14 +205,7 @@ export async function DELETE(
     await prisma.cotizacionTarea.deleteMany({
       where: {
         cotizacionActividad: {
-          OR: [
-            { cotizacionEdtId: edtId }, // Tareas de actividades directas del EDT
-            {
-              cotizacionZona: {
-                cotizacionEdtId: edtId // Tareas de actividades en zonas del EDT
-              }
-            }
-          ]
+          cotizacionEdtId: edtId
         }
       }
     })
@@ -249,20 +213,8 @@ export async function DELETE(
     // 2. Eliminar actividades relacionadas
     await prisma.cotizacionActividad.deleteMany({
       where: {
-        OR: [
-          { cotizacionEdtId: edtId }, // Actividades directas del EDT
-          {
-            cotizacionZona: {
-              cotizacionEdtId: edtId // Actividades en zonas del EDT
-            }
-          }
-        ]
+        cotizacionEdtId: edtId
       }
-    })
-
-    // 3. Eliminar zonas relacionadas
-    await prisma.cotizacionZona.deleteMany({
-      where: { cotizacionEdtId: edtId }
     })
 
     // 4. Finalmente eliminar el EDT
@@ -271,11 +223,7 @@ export async function DELETE(
     })
 
     // Calcular total de tareas eliminadas
-    const tareasZonas = edt.zonas.reduce((total, zona) =>
-      total + zona.actividades.reduce((actTotal, act) => actTotal + act.tareas.length, 0), 0
-    )
-    const tareasDirectas = edt.actividadesDirectas.reduce((total, act) => total + act.tareas.length, 0)
-    const totalTareasEliminadas = tareasZonas + tareasDirectas
+    const totalTareasEliminadas = edt.cotizacionActividad.reduce((total: number, act: any) => total + act.cotizacionTareas.length, 0)
 
     logger.info(`✅ EDT comercial eliminado: ${edtId} - Tareas eliminadas: ${totalTareasEliminadas}`)
 

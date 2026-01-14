@@ -62,7 +62,9 @@ export async function GET(
       include: {
         cotizacionTareas: {
           where: {
-            cotizacionEdtId: edtId
+            cotizacionActividad: {
+              cotizacionEdtId: edtId
+            }
           },
           select: {
             id: true,

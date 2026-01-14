@@ -15,14 +15,14 @@ export async function DELETE(
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     // 🔍 Verificar que la dependencia existe y pertenece a la cotización
-    const dependencia = await prisma.cotizacionDependenciaTarea.findFirst({
+    const dependencia = await prisma.cotizacionDependenciasTarea.findFirst({
       where: {
         id: dependenciaId,
         tareaOrigenId: {
           in: await prisma.cotizacionTarea.findMany({
             where: {
-              cotizacion_actividad: {
-                cotizacion_edt: { cotizacionId }
+              cotizacionActividad: {
+                cotizacionEdt: { cotizacionId }
               }
             },
             select: { id: true }
@@ -38,7 +38,7 @@ export async function DELETE(
     }
 
     // ✅ Eliminar dependencia
-    await prisma.cotizacionDependenciaTarea.delete({
+    await prisma.cotizacionDependenciasTarea.delete({
       where: { id: dependenciaId }
     })
 

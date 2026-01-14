@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
   
   // 📦 Webpack optimizations for code splitting
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // 🔄 Code splitting por funcionalidad
+    //  Code splitting por funcionalidad
     if (!isServer) {
       config.optimization.splitChunks = {
         ...config.optimization.splitChunks,

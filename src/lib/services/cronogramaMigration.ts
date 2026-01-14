@@ -154,7 +154,7 @@ export class CronogramaMigrationService {
     const proyectoId = edt.proyectoId;
 
     // ✅ SISTEMA DE 5 NIVELES: Crear actividad directamente bajo EDT (sin zona intermedia)
-    const actividad = await prisma.proyectoActividad.create({
+    const actividad = await prisma.proyecto_actividad.create({
       data: {
         proyectoEdtId: edt.id, // ✅ Directo al EDT
         proyectoCronogramaId: edt.proyectoCronogramaId,
@@ -241,7 +241,7 @@ export class CronogramaMigrationService {
   private static async verificarProyectoMigrado(proyectoId: string): Promise<boolean> {
     try {
       // ✅ SISTEMA DE 5 NIVELES: Verificar si existen actividades directamente bajo EDTs
-      const actividadesCount = await prisma.proyectoActividad.count({
+      const actividadesCount = await prisma.proyecto_actividad.count({
         where: {
           proyecto_edt: {
             proyectoId,
@@ -420,7 +420,7 @@ export class CronogramaMigrationService {
       // Esta función es experimental y debería usarse con cuidado
       // Eliminaría todas las zonas, actividades y dependencias creadas durante la migración
 
-      const actividadesEliminadas = await prisma.proyectoActividad.deleteMany({
+      const actividadesEliminadas = await prisma.proyecto_actividad.deleteMany({
         where: {
           proyecto_edt: {
             proyectoId,

@@ -13,11 +13,11 @@ import { notFound } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import ListaEquipoDetailView from '@/components/proyectos/ListaEquipoDetailView';
 import DetailErrorBoundary from '@/components/common/DetailErrorBoundary';
-import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { validateRouteParams, RouteValidationError } from '@/lib/validators/routeParams';
 import { ListaEquipoItem } from '@/types/modelos';
+import { getListaEquipoDetail } from '@/lib/server/lista-equipo';
 
 interface ListaEquipoDetailPageProps {
   params: Promise<{
@@ -55,130 +55,8 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
       notFound();
     }
 
-    // 🎯 Server-side data fetching with Prisma directly
-    const [lista, proyecto] = await Promise.all([
-      // Get lista with simplified data to avoid Prisma client cache issues
-      prisma.listaEquipo.findUnique({
-        where: { id: listaId },
-        include: {
-          // 🏢 Basic project information
-          proyecto: {
-            select: {
-              id: true,
-              nombre: true,
-              codigo: true,
-              estado: true,
-              fechaInicio: true,
-              fechaFin: true,
-              cliente: {
-                select: {
-                  id: true,
-                  nombre: true
-                }
-              }
-            }
-          },
-          // 👤 Basic responsible information
-          responsable: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          // 📋 Simplified items with basic relationships
-          items: {
-            include: {
-              // 👤 Basic responsable information
-              responsable: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              },
-              // 🏪 Basic proveedor information
-              proveedor: {
-                select: {
-                  id: true,
-                  nombre: true
-                }
-              },
-              // 💰 Simplified cotizaciones
-              cotizaciones: {
-                include: {
-                  cotizacion: {
-                    select: {
-                      id: true,
-                      codigo: true,
-                      estado: true,
-                      proveedor: {
-                        select: {
-                          id: true,
-                          nombre: true
-                        }
-                      }
-                    }
-                  }
-                },
-                orderBy: {
-                  precioUnitario: 'asc'
-                }
-              },
-              // 📦 Simplified pedidos
-              pedidos: {
-                include: {
-                  pedido: {
-                    select: {
-                      id: true,
-                      codigo: true,
-                      estado: true
-                    }
-                  }
-                }
-              },
-              // 🏗️ Basic proyecto equipo relationship
-              proyectoEquipo: {
-                select: {
-                  id: true,
-                  nombre: true
-                }
-              },
-              // 📋 Basic proyecto equipo item relationship
-              proyectoEquipoItem: {
-                include: {
-                  proyectoEquipo: {
-                    select: {
-                      id: true,
-                      nombre: true
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: {
-              createdAt: 'asc'
-            }
-          }
-        }
-      }).catch((error) => {
-        console.error('Error fetching lista detail:', error);
-        return null;
-      }),
-      // Get proyecto information
-      prisma.proyecto.findUnique({
-        where: { id: proyectoId },
-        include: {
-          cliente: true,
-          comercial: true,
-          gestor: true,
-          cotizacion: true
-        }
-      }).catch((error) => {
-        console.error('Error fetching proyecto:', error);
-        return null;
-      })
-    ]);
+    // 🎯 Server-side data fetching with server-only helper
+    const { lista, proyecto } = await getListaEquipoDetail(proyectoId, listaId);
 
     // Extract items from lista
     const items = lista?.items || [];

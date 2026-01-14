@@ -91,10 +91,10 @@ export async function POST(request: NextRequest) {
 
     // Verificar que no existe una duración activa para el mismo nivel
     const existente = await prisma.$queryRaw`
-      SELECT * FROM "plantilla_duracion_cronograma" 
+      SELECT * FROM "plantilla_duracion_cronograma"
       WHERE "nivel" = ${validatedData.nivel} AND "activo" = true
       LIMIT 1
-    `
+    ` as any[]
 
     if (existente && existente.length > 0) {
       return NextResponse.json({
@@ -104,12 +104,12 @@ export async function POST(request: NextRequest) {
 
     // Crear nueva duración usando consulta directa
     const nuevaDuracion = await prisma.$queryRaw`
-      INSERT INTO "plantilla_duracion_cronograma" 
-      ("id", "tipoProyecto", "nivel", "duracionDias", "horasPorDia", "bufferPorcentaje", "activo", "createdAt", "updatedAt")
-      VALUES 
-      (gen_random_uuid(), 'general', ${validatedData.nivel}, ${validatedData.duracionDias}, ${validatedData.horasPorDia}, ${validatedData.bufferPorcentaje}, true, NOW(), NOW())
+      INSERT INTO "plantilla_duracion_cronograma"
+      ("id", "nivel", "duracionDias", "horasPorDia", "bufferPorcentaje", "activo", "createdAt", "updatedAt")
+      VALUES
+      (gen_random_uuid(), ${validatedData.nivel}, ${validatedData.duracionDias}, ${validatedData.horasPorDia}, ${validatedData.bufferPorcentaje}, true, NOW(), NOW())
       RETURNING *
-    `
+    ` as any[]
 
     return NextResponse.json({
       success: true,
@@ -154,12 +154,12 @@ export async function PUT(request: NextRequest) {
     for (const [nivel, config] of Object.entries(validatedData)) {
       if (config) {
         await prisma.$queryRaw`
-          INSERT INTO "plantilla_duracion_cronograma" 
-          ("id", "tipoProyecto", "nivel", "duracionDias", "horasPorDia", "bufferPorcentaje", "activo", "createdAt", "updatedAt")
-          VALUES 
-          (gen_random_uuid(), 'general', ${nivel}, ${config.duracionDias}, ${config.horasPorDia}, 10.0, true, NOW(), NOW())
-          ON CONFLICT ("tipoProyecto", "nivel") 
-          DO UPDATE SET 
+          INSERT INTO "plantilla_duracion_cronograma"
+          ("id", "nivel", "duracionDias", "horasPorDia", "bufferPorcentaje", "activo", "createdAt", "updatedAt")
+          VALUES
+          (gen_random_uuid(), ${nivel}, ${config.duracionDias}, ${config.horasPorDia}, 10.0, true, NOW(), NOW())
+          ON CONFLICT ("nivel")
+          DO UPDATE SET
             "duracionDias" = EXCLUDED."duracionDias",
             "horasPorDia" = EXCLUDED."horasPorDia",
             "updatedAt" = NOW()

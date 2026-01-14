@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { convertToMSProjectXML, downloadMSProjectXML } from '@/lib/utils/msProjectXmlExport'
-import { validarAntesDeExportar, autoCorregirInconsistencias } from '@/lib/validators/cronogramaRules'
+import { validarAntesDeExportar, autoCorregirInconsistencias } from '@/lib/validators/cronogramaRules-client'
 
 interface CronogramaGanttViewProProps {
   cotizacionId: string

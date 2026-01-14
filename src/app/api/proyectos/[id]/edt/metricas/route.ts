@@ -352,31 +352,9 @@ async function obtenerMetricasRecursos(proyectoId: string) {
     })
   );
 
-  // Distribución de carga por zona
-  const cargaPorZona = await prisma.proyectoEdt.groupBy({
-    by: ['zona'],
-    where: {
-      proyectoId,
-      zona: { not: null }
-    },
-    _sum: {
-      horasPlan: true,
-      horasReales: true
-    },
-    _count: true
-  });
-
-  const zonas = cargaPorZona.map(item => ({
-    zona: item.zona,
-    totalEdts: item._count,
-    horasPlan: Number(item._sum.horasPlan || 0),
-    horasReales: Number(item._sum.horasReales || 0)
-  }));
-
   return {
     data: {
-      recursos: recursos.sort((a, b) => b.horasPendientes - a.horasPendientes),
-      zonas: zonas.sort((a, b) => b.horasPlan - a.horasPlan)
+      recursos: recursos.sort((a, b) => b.horasPendientes - a.horasPendientes)
     }
   };
 }

@@ -4,7 +4,7 @@
  * CotizacionActividadList - Lista de Actividades para Cronograma de Cotizaciones
  *
  * Muestra y gestiona las actividades dentro de una cotización.
- * Las actividades agrupan tareas relacionadas dentro de cada zona.
+ * Las actividades agrupan tareas relacionadas dentro de cada EDT.
  */
 
 import React, { useState, useEffect } from 'react'
@@ -30,7 +30,6 @@ interface CotizacionActividad {
   id: string
   nombre: string
   descripcion?: string
-  cotizacionZonaId?: string // ✅ OPCIONAL: Para modo EDT directo
   cotizacionEdtId?: string  // ✅ NUEVO: Para modo EDT directo
   fechaInicioComercial?: string
   fechaFinComercial?: string
@@ -39,16 +38,6 @@ interface CotizacionActividad {
   createdAt: string
   updatedAt: string
   // ✅ NUEVAS RELACIONES PARA MODO FLEXIBLE
-  cotizacionZona?: {
-    id: string
-    nombre: string
-    cotizacionEdt: {
-      nombre: string
-      categoriaServicio: {
-        nombre: string
-      }
-    }
-  }
   cotizacionEdt?: {
     id: string
     nombre: string
@@ -58,11 +47,6 @@ interface CotizacionActividad {
   }
 }
 
-interface CotizacionZona {
-  id: string
-  nombre: string
-  cotizacionEdtId: string
-}
 
 interface CotizacionEdt {
   id: string
@@ -85,7 +69,6 @@ export function CotizacionActividadList({
   onRefresh
 }: CotizacionActividadListProps) {
   const [actividades, setActividades] = useState<CotizacionActividad[]>([])
-  const [zonas, setZonas] = useState<CotizacionZona[]>([])
   const [edts, setEdts] = useState<CotizacionEdt[]>([]) // ✅ NUEVO: EDTs disponibles
   const [cotizacionServicios, setCotizacionServicios] = useState<any[]>([]) // ✅ Todos los servicios de la cotización
   const [loading, setLoading] = useState(true)
@@ -132,8 +115,6 @@ export function CotizacionActividadList({
     cotizacionServicioId: '',
     // EDT opcional para contexto
     cotizacionEdtId: '',
-    // Zona opcional
-    cotizacionZonaId: '',
     // Sistema de posicionamiento flexible
     posicionamiento: 'despues_ultima' as 'inicio_padre' | 'despues_ultima',
     descripcion: '',
@@ -175,13 +156,6 @@ export function CotizacionActividadList({
         console.error('❌ Error cargando servicios de cotización:', serviciosResponse.status)
       }
 
-      // Cargar zonas disponibles
-      const zonasResponse = await fetch(`/api/cotizaciones/${cotizacionId}/zonas`)
-      if (!zonasResponse.ok) {
-        throw new Error('Error al cargar zonas')
-      }
-      const zonasData = await zonasResponse.json()
-      setZonas(zonasData.data || [])
 
       // Cargar actividades
       const actividadesResponse = await fetch(`/api/cotizaciones/${cotizacionId}/actividades`)
@@ -246,10 +220,6 @@ export function CotizacionActividadList({
     }
   }
 
-  const getZonaNombre = (zonaId: string) => {
-    const zona = zonas.find(z => z.id === zonaId)
-    return zona ? zona.nombre : 'Zona no encontrada'
-  }
 
 
   // ✅ Función para calcular duración automática de un servicio
@@ -261,7 +231,7 @@ export function CotizacionActividadList({
   // ✅ Función para determinar ubicación contextual automática
   const determinarUbicacionContextual = (servicioId: string) => {
     const servicio = cotizacionServicios.find(s => s.id === servicioId)
-    if (!servicio) return { cotizacionEdtId: '', cotizacionZonaId: '' }
+    if (!servicio) return { cotizacionEdtId: '' }
 
     // Buscar EDTs que correspondan a la categoría del servicio
     const edtCompatible = edts.find(edt =>
@@ -269,26 +239,14 @@ export function CotizacionActividadList({
     )
 
     if (edtCompatible) {
-      // Si hay EDT compatible, buscar zonas dentro de ese EDT
-      const zonasDelEdt = zonas.filter(zona => zona.cotizacionEdtId === edtCompatible.id)
-
-      // Si hay zonas, ubicar en la primera zona disponible
-      if (zonasDelEdt.length > 0) {
-        return {
-          cotizacionEdtId: edtCompatible.id,
-          cotizacionZonaId: zonasDelEdt[0].id
-        }
-      }
-
-      // Si no hay zonas, ubicar directamente en el EDT
+      // Ubicar directamente en el EDT
       return {
         cotizacionEdtId: edtCompatible.id,
-        cotizacionZonaId: ''
       }
     }
 
     // Si no hay EDT compatible, dejar sin ubicación específica
-    return { cotizacionEdtId: '', cotizacionZonaId: '' }
+    return { cotizacionEdtId: '' }
   }
 
 
@@ -297,7 +255,6 @@ export function CotizacionActividadList({
       nombre: '',
       cotizacionServicioId: '',
       cotizacionEdtId: '',
-      cotizacionZonaId: '',
       posicionamiento: 'despues_ultima',
       descripcion: '',
       fechaInicioComercial: '',
@@ -333,7 +290,6 @@ export function CotizacionActividadList({
       // Convertir fechas a formato datetime si existen
       const requestData = {
         nombre: formData.nombre,
-        cotizacionZonaId: formData.cotizacionZonaId || undefined,
         cotizacionEdtId: formData.cotizacionEdtId || undefined,
         descripcion: formData.descripcion,
         fechaInicioComercial: formData.fechaInicioComercial
@@ -397,7 +353,6 @@ export function CotizacionActividadList({
 
       const requestData = {
         nombre: formData.nombre,
-        cotizacionZonaId: formData.cotizacionZonaId || undefined,
         cotizacionEdtId: formData.cotizacionEdtId || undefined,
         descripcion: formData.descripcion,
         fechaInicioComercial: formData.fechaInicioComercial
@@ -488,7 +443,6 @@ export function CotizacionActividadList({
       nombre: actividad.nombre,
       cotizacionServicioId: '', // No disponible en edición
       cotizacionEdtId: actividad.cotizacionEdtId || '',
-      cotizacionZonaId: actividad.cotizacionZonaId || '',
       posicionamiento: 'despues_ultima', // Default para edición
       descripcion: actividad.descripcion || '',
       fechaInicioComercial: actividad.fechaInicioComercial
@@ -599,8 +553,7 @@ export function CotizacionActividadList({
                           cotizacionServicioId: value,
                           nombre: servicioSeleccionado?.nombre || '',
                           // ✅ Aplicar ubicación contextual automática
-                          cotizacionEdtId: ubicacionContextual.cotizacionEdtId,
-                          cotizacionZonaId: ubicacionContextual.cotizacionZonaId
+                          cotizacionEdtId: ubicacionContextual.cotizacionEdtId
                         }))
                       }}
                     >
@@ -651,30 +604,6 @@ export function CotizacionActividadList({
                     </Select>
                   </div>
 
-                  {/* ✅ Zona opcional (auto-determinada) */}
-                  <div className="grid gap-2">
-                    <Label htmlFor="zona">
-                      Zona {formData.cotizacionZonaId ? '(Auto-determinada)' : '(Opcional)'}
-                    </Label>
-                    <Select
-                      value={formData.cotizacionZonaId || 'none'}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, cotizacionZonaId: value === 'none' ? '' : value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={formData.cotizacionZonaId ? "Zona determinada automáticamente" : "Selecciona una zona opcional"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin zona específica</SelectItem>
-                        {zonas
-                          .filter(zona => !formData.cotizacionEdtId || zona.cotizacionEdtId === formData.cotizacionEdtId)
-                          .map((zona) => (
-                            <SelectItem key={zona.id} value={zona.id}>
-                              {zona.nombre}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   {/* ✅ Sistema de posicionamiento flexible */}
                   <div className="grid gap-2">
@@ -802,7 +731,7 @@ export function CotizacionActividadList({
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay actividades definidas</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Las actividades agrupan tareas relacionadas dentro de cada zona del proyecto.
+              Las actividades agrupan tareas relacionadas dentro de cada EDT del proyecto.
               Crea tu primera actividad para organizar mejor el trabajo.
             </p>
             <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
@@ -832,10 +761,8 @@ export function CotizacionActividadList({
                       </div>
 
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                        {actividad.cotizacionZona ? (
-                          <span>Zona: {actividad.cotizacionZona.nombre}</span>
-                        ) : actividad.cotizacionEdt ? (
-                          <span>EDT Directo: {actividad.cotizacionEdt.nombre}</span>
+                        {actividad.cotizacionEdt ? (
+                          <span>EDT: {actividad.cotizacionEdt.nombre}</span>
                         ) : (
                           <span>Ubicación no especificada</span>
                         )}
@@ -923,26 +850,6 @@ export function CotizacionActividadList({
               </Select>
             </div>
 
-            {/* ✅ Zona opcional */}
-            <div className="grid gap-2">
-              <Label htmlFor="edit-zona">Zona (Opcional)</Label>
-              <Select
-                value={formData.cotizacionZonaId || 'none'}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, cotizacionZonaId: value === 'none' ? '' : value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una zona opcional" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin zona específica</SelectItem>
-                  {zonas.map((zona) => (
-                    <SelectItem key={zona.id} value={zona.id}>
-                      {zona.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
             <div className="grid gap-2">
               <Label htmlFor="edit-descripcion">Descripción</Label>

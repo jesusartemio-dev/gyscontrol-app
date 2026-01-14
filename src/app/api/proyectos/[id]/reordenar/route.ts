@@ -2,7 +2,7 @@
 // 📁 Archivo: route.ts
 // 📌 Ubicación: src/app/api/proyectos/[id]/reordenar/route.ts
 // 🔧 Descripción: API endpoint para reordenar elementos del cronograma
-// 🎯 Funcionalidades: Actualizar campo orden de EDTs, Zonas, Actividades, Tareas
+// 🎯 Funcionalidades: Actualizar campo orden de EDTs, Actividades, Tareas (5 niveles)
 // ✍️ Autor: Sistema de IA Mejorado
 // 📅 Última actualización: 2025-10-06
 // ===================================================
@@ -84,7 +84,7 @@ export async function POST(
           break
 
         case 'actividad':
-          // Reordenar actividades dentro de una zona
+          // Reordenar actividades dentro de un EDT (5 niveles)
           for (const elemento of elementos) {
             await tx.proyectoActividad.update({
               where: { id: elemento.id },
@@ -173,7 +173,7 @@ export async function GET(
         elementos = await prisma.proyectoActividad.findMany({
           where: {
             ...(cronogramaId && { proyectoCronogramaId: cronogramaId }),
-            ...(parentId && { proyectoZonaId: parentId })
+            ...(parentId && { proyectoEdtId: parentId })
           },
           select: { id: true, nombre: true, orden: true },
           orderBy: { orden: 'asc' }

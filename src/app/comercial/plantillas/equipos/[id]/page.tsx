@@ -36,8 +36,8 @@ interface PlantillaEquipoIndependiente {
   grandTotal: number
   createdAt: string
   updatedAt: string
-  items: PlantillaEquipoItemIndependiente[]
-  _count?: { items: number }
+  plantillaEquipoItemIndependiente: PlantillaEquipoItemIndependiente[]
+  _count?: { plantillaEquipoItemIndependiente: number }
 }
 
 interface PlantillaEquipoItemIndependiente {
@@ -141,7 +141,7 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
       // Update the plantilla state to include new items
       setPlantilla(prev => prev ? {
         ...prev,
-        items: [...(prev.items || []), item],
+        plantillaEquipoItemIndependiente: [...(prev.plantillaEquipoItemIndependiente || []), item],
         totalInterno: (prev.totalInterno || 0) + (item.cantidad * item.precioInterno),
         totalCliente: (prev.totalCliente || 0) + (item.cantidad * item.precioCliente),
         grandTotal: (prev.grandTotal || 0) + (item.cantidad * item.precioCliente)
@@ -161,7 +161,7 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
     setPlantilla(prev => {
       if (!prev) return prev
 
-      const updatedItems = prev.items?.map(item =>
+      const updatedItems = prev.plantillaEquipoItemIndependiente?.map(item =>
         item.id === itemId ? { ...item, ...updates } : item
       ) || []
 
@@ -172,7 +172,7 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
 
       return {
         ...prev,
-        items: updatedItems,
+        plantillaEquipoItemIndependiente: updatedItems,
         totalInterno,
         totalCliente,
         grandTotal
@@ -333,12 +333,12 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
           </CardHeader>
           <CardContent>
             <PlantillaEquiposView
-              items={plantilla.items || []}
+              items={plantilla.plantillaEquipoItemIndependiente || []}
               plantillaId={id}
               onDeleteItem={(itemId) => {
                 setPlantilla(prev => prev ? {
                   ...prev,
-                  items: prev.items?.filter(item => item.id !== itemId) || []
+                  plantillaEquipoItemIndependiente: prev.plantillaEquipoItemIndependiente?.filter(item => item.id !== itemId) || []
                 } : null)
               }}
               onRefresh={loadPlantilla}

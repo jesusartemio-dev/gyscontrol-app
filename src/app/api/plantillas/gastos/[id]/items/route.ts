@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,7 @@ export async function POST(
     // Crear el item
     const nuevoItem = await prisma.plantillaGastoItemIndependiente.create({
       data: {
+        id: randomUUID(),
         plantillaGastoId: id,
         nombre,
         descripcion: descripcion || '',
@@ -57,6 +59,7 @@ export async function POST(
         margen,
         costoInterno,
         costoCliente,
+        updatedAt: new Date(),
       }
     })
 

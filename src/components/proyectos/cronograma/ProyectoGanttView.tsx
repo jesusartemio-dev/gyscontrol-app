@@ -33,7 +33,7 @@ import { es } from 'date-fns/locale';
 interface GanttItem {
   id: string;
   nombre: string;
-  tipo: 'proyecto' | 'fase' | 'edt' | 'zona' | 'actividad' | 'tarea';
+  tipo: 'proyecto' | 'fase' | 'edt' | 'actividad' | 'tarea';
   fechaInicio: Date;
   fechaFin: Date;
   porcentajeAvance: number;
@@ -102,9 +102,9 @@ export function ProyectoGanttView({
       const edtsResponse = await fetch(edtsUrl);
       const edtsData = edtsResponse.ok ? await edtsResponse.json() : { data: [] };
 
-      // Cargar zonas filtradas por cronograma (solo si existen zonas, pero según el usuario ya no hay zonas)
-      console.log('ℹ️ Skipping zonas loading - no longer used in 5-level cronograma')
-      const zonasData = { data: [] };
+      // Cargar zonas filtradas por cronograma (eliminado según FASE 3)
+      // console.log('ℹ️ Skipping zonas loading - no longer used in 5-level cronograma')
+      // const zonasData = { data: [] };
 
       // Cargar actividades filtradas por cronograma
       const actividadesUrl = cronogramaId
@@ -349,7 +349,7 @@ export function ProyectoGanttView({
         case 'proyecto': return 'bg-blue-500';
         case 'fase': return 'bg-green-500';
         case 'edt': return 'bg-yellow-500';
-        case 'zona': return 'bg-purple-500';
+        // case 'zona': return 'bg-purple-500'; // TODO: lógica de zonas eliminada tras migración a cronograma de 5 niveles (sin zonas)
         case 'actividad': return 'bg-red-500';
         case 'tarea': return 'bg-gray-500';
         default: return 'bg-gray-400';
@@ -833,7 +833,7 @@ export function ProyectoGanttView({
                 <SelectItem value="todos">Todos los niveles</SelectItem>
                 <SelectItem value="fase">Solo fases</SelectItem>
                 <SelectItem value="edt">Solo EDTs</SelectItem>
-                <SelectItem value="zona">Solo zonas</SelectItem>
+                {/* <SelectItem value="zona">Solo zonas</SelectItem> */}
                 <SelectItem value="actividad">Solo actividades</SelectItem>
                 <SelectItem value="tarea">Solo tareas</SelectItem>
               </SelectContent>

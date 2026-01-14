@@ -18,9 +18,9 @@ export async function GET() {
     const unidades = await prisma.unidadServicio.findMany({
       orderBy: { nombre: 'asc' },
       include: {
-        servicios: true,
-        plantillaServicioItems: true,
-        cotizacionServicioItems: true 
+        catalogoServicio: true,
+        plantillaServicioItem: true,
+        cotizacionServicioItem: true
       }
     })
 

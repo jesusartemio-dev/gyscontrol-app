@@ -22,13 +22,13 @@ export async function GET(request: NextRequest) {
         // Plantillas independientes de equipos
         prisma.plantillaEquipoIndependiente.findMany({
           include: {
-            items: {
+            plantillaEquipoItemIndependiente: {
               include: {
                 catalogoEquipo: true
               }
             },
             _count: {
-              select: { items: true }
+              select: { plantillaEquipoItemIndependiente: true }
             }
           },
           orderBy: { createdAt: 'desc' },
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         // Plantillas independientes de servicios
         prisma.plantillaServicioIndependiente.findMany({
           include: {
-            items: {
+            plantillaServicioItemIndependiente: {
               include: {
                 catalogoServicio: true,
                 recurso: true,
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
               }
             },
             _count: {
-              select: { items: true }
+              select: { plantillaServicioItemIndependiente: true }
             }
           },
           orderBy: { createdAt: 'desc' },
@@ -124,9 +124,9 @@ export async function GET(request: NextRequest) {
         // Plantillas independientes de gastos
         prisma.plantillaGastoIndependiente.findMany({
           include: {
-            items: true,
+            plantillaGastoItemIndependiente: true,
             _count: {
-              select: { items: true }
+              select: { plantillaGastoItemIndependiente: true }
             }
           },
           orderBy: { createdAt: 'desc' },

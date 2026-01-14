@@ -8,6 +8,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import * as bcrypt from 'bcryptjs'
+import { randomUUID } from 'crypto'
 
 const prisma = new PrismaClient()
 
@@ -91,6 +92,13 @@ async function createSimpleTestData() {
       console.log('✅ Proyecto ya existe:', proyecto.nombre)
     }
 
+    // ============================================================
+    // NOTA: Los EDTs deben crearse MANUALMENTE o importarse desde Excel
+    // NO crear EDTs automáticamente en scripts de prueba
+    // Sistema de importación/exportación ya implementado
+    // ============================================================
+
+    /*
     // 📋 4. Crear/verificar EDTs básicas
     const edtsData = [
       { nombre: 'Ingeniería Mecánica', descripcion: 'Diseño y desarrollo mecánico' },
@@ -100,12 +108,12 @@ async function createSimpleTestData() {
 
     const edtsCreadas = []
     for (const edtData of edtsData) {
-      let edt = await prisma.edt.findFirst({
+      let edt = await prisma.categoriaServicio.findFirst({
         where: { nombre: edtData.nombre }
       })
-      
+
       if (!edt) {
-        edt = await prisma.edt.create({
+        edt = await prisma.categoriaServicio.create({
           data: {
             nombre: edtData.nombre,
             descripcion: edtData.descripcion
@@ -118,6 +126,7 @@ async function createSimpleTestData() {
         edtsCreadas.push(edt)
       }
     }
+    */
 
     // 🏗️ 5. Crear/verificar cronograma
     let cronograma = await prisma.proyectoCronograma.findFirst({
@@ -130,11 +139,13 @@ async function createSimpleTestData() {
     if (!cronograma) {
       cronograma = await prisma.proyectoCronograma.create({
         data: {
+          id: randomUUID(),
           proyectoId: proyecto.id,
           tipo: 'ejecucion',
           nombre: 'Cronograma de Ejecución - Horas-Hombre Test',
           esBaseline: false,
-          version: 1
+          version: 1,
+          updatedAt: new Date()
         }
       })
       console.log('✅ Cronograma creado:', cronograma.nombre)
@@ -142,6 +153,7 @@ async function createSimpleTestData() {
       console.log('✅ Cronograma ya existe:', cronograma.nombre)
     }
 
+    /*
     // 📊 6. Crear EDTs del proyecto (ProyectoEdt)
     const proyectoEdtsData = [
       { edt: edtsCreadas[0], horasPlan: 80, orden: 1 },
@@ -158,7 +170,7 @@ async function createSimpleTestData() {
           categoriaServicioId: data.edt.id
         }
       })
-      
+
       if (!proyectoEdt) {
         proyectoEdt = await prisma.proyectoEdt.create({
           data: {
@@ -184,6 +196,7 @@ async function createSimpleTestData() {
         proyectoEdtsCreados.push(proyectoEdt)
       }
     }
+    */
 
     // 🔧 7. Crear actividades para el primer EDT
     if (proyectoEdtsCreados.length > 0) {
@@ -254,8 +267,8 @@ async function createSimpleTestData() {
     console.log(`- Usuario: ${testUser.email} (contraseña: admin123)`)
     console.log(`- Cliente: ${cliente.nombre}`)
     console.log(`- Proyecto: ${proyecto.nombre} (ID: ${proyecto.id})`)
-    console.log(`- EDTs del proyecto: ${proyectoEdtsCreados.length}`)
-    console.log(`- EDTs base: ${edtsCreadas.length}`)
+    // console.log(`- EDTs del proyecto: ${proyectoEdtsCreados.length}`)
+    // console.log(`- EDTs base: ${edtsCreadas.length}`)
 
     console.log('\n🔗 Para probar el wizard de horas-hombre:')
     console.log(`1. Ir a: http://localhost:3000/horas-hombre/registro`)

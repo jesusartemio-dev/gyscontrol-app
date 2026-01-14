@@ -8,6 +8,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import * as bcrypt from 'bcryptjs'
+import { randomUUID } from 'crypto'
 
 const prisma = new PrismaClient()
 
@@ -125,11 +126,13 @@ async function createHorasHombreTestData() {
     if (!cronograma) {
       cronograma = await prisma.proyectoCronograma.create({
         data: {
+          id: randomUUID(),
           proyectoId: proyecto.id,
           tipo: 'ejecucion',
           nombre: 'Cronograma de Ejecución - Horas-Hombre Test',
           esBaseline: false,
-          version: 1
+          version: 1,
+          updatedAt: new Date()
         }
       })
       console.log('✅ Cronograma creado:', cronograma.nombre)
@@ -189,6 +192,7 @@ async function createHorasHombreTestData() {
         edt = await prisma.proyectoEdt.create({
           data: {
             proyectoId: proyecto.id,
+            proyectoCronogramaId: cronograma.id,
             nombre: edtData.nombre,
             categoriaServicioId: edtData.categoriaServicio.id,
             horasPlan: edtData.horasPlan,
@@ -198,8 +202,8 @@ async function createHorasHombreTestData() {
             porcentajeAvance: 0,
             prioridad: 'media',
             orden: edtData.orden,
-            fechaInicio: new Date('2025-01-15'),
-            fechaFin: new Date('2025-06-15')
+            fechaInicioPlan: new Date('2025-01-15'),
+            fechaFinPlan: new Date('2025-06-15')
           }
         })
         edtsCreados.push(edt)
@@ -240,7 +244,7 @@ async function createHorasHombreTestData() {
         ]
       }
 
-      const actividades = actividadesPorEdt[edt.nombre] || []
+      const actividades = (actividadesPorEdt as any)[edt.nombre] || []
       for (const actData of actividades) {
         let actividad = await prisma.proyectoActividad.findFirst({
           where: {
@@ -252,6 +256,7 @@ async function createHorasHombreTestData() {
         if (!actividad) {
           actividad = await prisma.proyectoActividad.create({
             data: {
+              id: randomUUID(),
               proyectoEdtId: edt.id,
               proyectoCronogramaId: cronograma.id,
               nombre: actData.nombre,
@@ -263,7 +268,8 @@ async function createHorasHombreTestData() {
               horasPlan: actData.horasPlan,
               horasReales: 0,
               prioridad: 'media',
-              orden: actData.orden
+              orden: actData.orden,
+              updatedAt: new Date()
             }
           })
           console.log(`✅ Actividad creada: ${actData.nombre}`)
@@ -332,33 +338,39 @@ async function createHorasHombreTestData() {
             ]
           }
 
-          const tareas = tareasPorActividad[actividad.nombre] || []
+          const tareas = (tareasPorActividad as any)[actividad.nombre] || []
           for (const tareaData of tareas) {
-            await prisma.proyectoTarea.upsert({
+            let tarea = await prisma.proyectoTarea.findFirst({
               where: {
-                proyectoEdtId_proyectoCronogramaId_nombre: {
-                  proyectoEdtId: edt.id,
-                  proyectoCronogramaId: cronograma.id,
-                  nombre: tareaData.nombre
-                }
-              },
-              update: {},
-              create: {
                 proyectoEdtId: edt.id,
                 proyectoCronogramaId: cronograma.id,
-                nombre: tareaData.nombre,
-                fechaInicio: new Date('2025-01-25'),
-                fechaFin: new Date('2025-06-25'),
-                horasEstimadas: tareaData.horasEstimadas,
-                horasReales: 0,
-                estado: 'pendiente',
-                prioridad: 'media',
-                porcentajeCompletado: 0,
-                responsableId: testUser.id,
-                orden: tareaData.orden
+                nombre: tareaData.nombre
               }
             })
-            console.log(`✅ Tarea creada: ${tareaData.nombre}`)
+
+            if (!tarea) {
+              tarea = await prisma.proyectoTarea.create({
+                data: {
+                  id: randomUUID(),
+                  proyectoEdtId: edt.id,
+                  proyectoCronogramaId: cronograma.id,
+                  nombre: tareaData.nombre,
+                  fechaInicio: new Date('2025-01-25'),
+                  fechaFin: new Date('2025-06-25'),
+                  horasEstimadas: tareaData.horasEstimadas,
+                  horasReales: 0,
+                  estado: 'pendiente',
+                  prioridad: 'media',
+                  porcentajeCompletado: 0,
+                  responsableId: testUser.id,
+                  orden: tareaData.orden,
+                  updatedAt: new Date()
+                }
+              })
+              console.log(`✅ Tarea creada: ${tareaData.nombre}`)
+            } else {
+              console.log(`✅ Tarea ya existe: ${tareaData.nombre}`)
+            }
           }
         }
       }

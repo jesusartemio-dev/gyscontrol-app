@@ -70,23 +70,15 @@ export async function GET(
         cotizacionFase: {
           select: { id: true, nombre: true }
         },
-        zonas: {
+        cotizacionActividad: {
           include: {
-            actividades: {
+            cotizacionTareas: {
+              orderBy: { fechaInicio: 'asc' },
               include: {
-                tareas: {
-                  orderBy: { fechaInicio: 'asc' },
-                  include: {
-                    dependencia: {
-                      select: { id: true, nombre: true }
-                    },
-                    responsable: {
-                      select: { id: true, name: true, email: true }
-                    }
-                  }
+                responsable: {
+                  select: { id: true, name: true, email: true }
                 }
-              },
-              orderBy: { fechaInicioComercial: 'asc' }
+              }
             }
           },
           orderBy: { fechaInicioComercial: 'asc' }
@@ -98,9 +90,7 @@ export async function GET(
     // Flatten tasks from the hierarchy for backward compatibility
     const cronogramaConTareas = cronograma.map(edt => ({
       ...edt,
-      tareas: edt.zonas?.flatMap(zona =>
-        zona.actividades?.flatMap(actividad => actividad.tareas || []) || []
-      ) || []
+      tareas: edt.cotizacionActividad?.flatMap(actividad => actividad.cotizacionTareas || []) || []
     }))
 
     logger.info(`📅 Cronograma obtenido: ${cronograma.length} EDTs - Cotización: ${id}`)

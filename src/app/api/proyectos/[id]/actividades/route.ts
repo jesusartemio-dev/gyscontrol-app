@@ -20,9 +20,10 @@ type CreateActividadData = z.infer<typeof createActividadSchema> & {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await request.json()
     const validatedData = createActividadSchema.parse(body)
 
@@ -30,7 +31,7 @@ export async function POST(
     const edt = await prisma.proyectoEdt.findFirst({
       where: {
         id: validatedData.proyectoEdtId,
-        proyectoId: params.id
+        proyectoId: id
       }
     })
 

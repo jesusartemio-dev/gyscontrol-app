@@ -110,7 +110,7 @@ interface PlantillaServicioIndependiente {
   grandTotal: number
   createdAt: string
   updatedAt: string
-  items: PlantillaServicioItemIndependiente[]
+  plantillaServicioItemIndependiente: PlantillaServicioItemIndependiente[]
 }
 
 interface PlantillaServicioItemIndependiente {
@@ -206,7 +206,7 @@ export default function PlantillaServiciosDetallePage() {
       // Update local state by removing the item and recalculate totals
       setPlantilla(prev => {
         if (!prev) return prev
-        const newItems = prev.items.filter(item => item.id !== itemId)
+        const newItems = prev.plantillaServicioItemIndependiente.filter(item => item.id !== itemId)
         const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
         const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
         const newGrandTotal = newTotalCliente - prev.descuento
@@ -260,7 +260,7 @@ export default function PlantillaServiciosDetallePage() {
       const updatedItem = await response.json()
       setPlantilla(prev => {
         if (!prev) return prev
-        const newItems = prev.items.map(item => item.id === itemId ? updatedItem : item)
+        const newItems = prev.plantillaServicioItemIndependiente.map(item => item.id === itemId ? updatedItem : item)
         const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
         const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
         const newGrandTotal = newTotalCliente - prev.descuento
@@ -320,7 +320,7 @@ export default function PlantillaServiciosDetallePage() {
       const updatedItem = await response.json()
       setPlantilla(prev => {
         if (!prev) return prev
-        const newItems = prev.items.map(item => item.id === itemId ? updatedItem : item)
+        const newItems = prev.plantillaServicioItemIndependiente.map(item => item.id === itemId ? updatedItem : item)
         const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
         const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
         const newGrandTotal = newTotalCliente - prev.descuento
@@ -372,7 +372,7 @@ export default function PlantillaServiciosDetallePage() {
       const updatedItem = await response.json()
       setPlantilla(prev => {
         if (!prev) return prev
-        const newItems = prev.items.map(item => item.id === itemId ? updatedItem : item)
+        const newItems = prev.plantillaServicioItemIndependiente.map(item => item.id === itemId ? updatedItem : item)
         const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
         const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
         const newGrandTotal = newTotalCliente - prev.descuento
@@ -977,7 +977,7 @@ export default function PlantillaServiciosDetallePage() {
                   Plantilla Especializada
                 </span>
                 <span>Creada: {formatDate(plantilla.createdAt)}</span>
-                <span>{plantilla.items.length} items</span>
+                <span>{plantilla.plantillaServicioItemIndependiente.length} items</span>
                 <span>Total: {formatCurrency(plantilla.grandTotal)}</span>
               </div>
             </div>
@@ -1048,7 +1048,7 @@ export default function PlantillaServiciosDetallePage() {
                     Items de Servicios
                   </CardTitle>
                   <CardDescription>
-                    Servicios incluidos en la plantilla ({plantilla.items.length} items)
+                    Servicios incluidos en la plantilla ({plantilla.plantillaServicioItemIndependiente.length} items)
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1092,7 +1092,7 @@ export default function PlantillaServiciosDetallePage() {
                 onItemsCreated={handleItemsAdded}
               />
 
-              {plantilla.items.length === 0 ? (
+              {plantilla.plantillaServicioItemIndependiente.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -1162,7 +1162,7 @@ export default function PlantillaServiciosDetallePage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {plantilla.items
+                          {plantilla.plantillaServicioItemIndependiente
                             .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
                             .map((item, index) => (
                             <TableItemRow
@@ -1185,7 +1185,7 @@ export default function PlantillaServiciosDetallePage() {
                   ) : (
                     /* Card View */
                     <div className="space-y-6">
-                      {plantilla.items
+                      {plantilla.plantillaServicioItemIndependiente
                         .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
                         .map((item, index) => (
                         <CardItemRow

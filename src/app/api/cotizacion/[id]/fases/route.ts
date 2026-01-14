@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 
 // ✅ Obtener fases de una cotización
 export async function GET(
@@ -28,22 +29,17 @@ export async function GET(
     const fases = await prisma.cotizacionFase.findMany({
       where: { cotizacionId: id },
       include: {
-        edts: {
+        cotizacion_edt: {
           include: {
             categoriaServicio: true,
             responsable: true,
-            zonas: {
+            cotizacionActividad: {
               include: {
-                actividades: {
+                cotizacionTareas: {
                   include: {
-                    tareas: {
-                      include: {
-                        responsable: true
-                      },
-                      orderBy: { fechaInicio: 'asc' }
-                    }
+                    responsable: true
                   },
-                  orderBy: { fechaInicioComercial: 'asc' }
+                  orderBy: { fechaInicio: 'asc' }
                 }
               },
               orderBy: { fechaInicioComercial: 'asc' }
@@ -60,23 +56,14 @@ export async function GET(
       data: fases,
       meta: {
         totalFases: fases.length,
-        totalEdts: fases.reduce((sum: number, f: any) => sum + f.edts.length, 0),
-        totalZonas: fases.reduce((sum: number, f: any) =>
-          sum + f.edts.reduce((sumEdt: number, edt: any) => sumEdt + (edt.zonas?.length || 0), 0), 0
-        ),
+        totalEdts: fases.reduce((sum: number, f: any) => sum + f.cotizacion_edt.length, 0),
         totalActividades: fases.reduce((sum: number, f: any) =>
-          sum + f.edts.reduce((sumEdt: number, edt: any) =>
-            sumEdt + edt.zonas?.reduce((sumZona: number, zona: any) =>
-              sumZona + (zona.actividades?.length || 0), 0
-            ) || 0, 0
-          ), 0
+          sum + f.cotizacion_edt.reduce((sumEdt: number, edt: any) => sumEdt + (edt.cotizacionActividad?.length || 0), 0), 0
         ),
         totalTareas: fases.reduce((sum: number, f: any) =>
-          sum + f.edts.reduce((sumEdt: number, edt: any) =>
-            sumEdt + edt.zonas?.reduce((sumZona: number, zona: any) =>
-              sumZona + zona.actividades?.reduce((sumAct: number, actividad: any) =>
-                sumAct + (actividad.tareas?.length || 0), 0
-              ) || 0, 0
+          sum + f.cotizacion_edt.reduce((sumEdt: number, edt: any) =>
+            sumEdt + edt.cotizacionActividad?.reduce((sumAct: number, actividad: any) =>
+              sumAct + (actividad.cotizacionTareas?.length || 0), 0
             ) || 0, 0
           ), 0
         )
@@ -130,12 +117,14 @@ export async function POST(
     // ✅ Crear fase
     const nuevaFase = await prisma.cotizacionFase.create({
       data: {
+        id: randomUUID(),
         cotizacionId: id,
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
         orden: orden || 0,
         fechaInicioPlan: fechaInicioPlan ? new Date(fechaInicioPlan) : null,
-        fechaFinPlan: fechaFinPlan ? new Date(fechaFinPlan) : null
+        fechaFinPlan: fechaFinPlan ? new Date(fechaFinPlan) : null,
+        updatedAt: new Date()
       }
     })
 

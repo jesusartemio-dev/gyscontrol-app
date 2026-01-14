@@ -50,7 +50,7 @@ export async function DELETE(
         ...(await getActividadParentCondition(id, actividadId))
       },
       include: {
-        tareas: true
+        cotizacionTareas: true
       }
     })
 

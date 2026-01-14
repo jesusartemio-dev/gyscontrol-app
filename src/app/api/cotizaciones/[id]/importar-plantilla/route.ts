@@ -109,7 +109,7 @@ export async function POST(
         plantilla = await prisma.plantillaEquipoIndependiente.findUnique({
           where: { id: plantillaId },
           include: {
-            items: {
+            plantillaEquipoItemIndependiente: {
               include: {
                 catalogoEquipo: true
               }
@@ -121,7 +121,7 @@ export async function POST(
         plantilla = await prisma.plantillaServicioIndependiente.findUnique({
           where: { id: plantillaId },
           include: {
-            items: {
+            plantillaServicioItemIndependiente: {
               include: {
                 catalogoServicio: true,
                 recurso: true,
@@ -135,7 +135,7 @@ export async function POST(
         plantilla = await prisma.plantillaGastoIndependiente.findUnique({
           where: { id: plantillaId },
           include: {
-            items: true
+            plantillaGastoItemIndependiente: true
           }
         })
         esPlantillaIndependiente = true
@@ -144,6 +144,17 @@ export async function POST(
 
     if (!plantilla) {
       return NextResponse.json({ error: 'Plantilla no encontrada' }, { status: 404 })
+    }
+
+    // Normalizar acceso a items para plantillas independientes
+    if (esPlantillaIndependiente) {
+      if (tipo === 'equipos' && plantilla.plantillaEquipoItemIndependiente) {
+        plantilla.items = plantilla.plantillaEquipoItemIndependiente
+      } else if (tipo === 'servicios' && plantilla.plantillaServicioItemIndependiente) {
+        plantilla.items = plantilla.plantillaServicioItemIndependiente
+      } else if (tipo === 'gastos' && plantilla.plantillaGastoItemIndependiente) {
+        plantilla.items = plantilla.plantillaGastoItemIndependiente
+      }
     }
 
     // Validar que la plantilla tenga contenido para el tipo solicitado

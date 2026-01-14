@@ -10,13 +10,15 @@
 
 import { Proveedor, ProveedorPayload, ProveedorUpdatePayload } from '@/types'
 
-const BASE_URL = '/api/proveedor'
+const BASE_URL = '/api/proveedores'
 
 export async function getProveedores(): Promise<Proveedor[]> {
   try {
     const res = await fetch(BASE_URL)
     if (!res.ok) throw new Error('Error al obtener proveedores')
-    return await res.json()
+    const response = await res.json()
+    if (!response.ok) throw new Error(response.error)
+    return response.data
   } catch {
     return []
   }

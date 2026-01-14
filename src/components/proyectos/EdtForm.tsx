@@ -28,7 +28,6 @@ const edtFormSchema = z.object({
   prioridad: z.enum(['baja', 'media', 'alta', 'critica'], {
     required_error: 'La prioridad es requerida'
   }),
-  zona: z.string().optional(),
   descripcion: z.string().optional(),
   fechaInicioPlan: z.date({
     required_error: 'La fecha de inicio planificada es requerida'
@@ -94,7 +93,6 @@ export function EdtForm({
       nombre: edt?.nombre || '',
       categoriaServicioId: edt?.categoriaServicioId || '',
       prioridad: edt?.prioridad || 'media',
-      zona: edt?.zona || '',
       descripcion: edt?.descripcion || '',
       fechaInicioPlan: edt?.fechaInicio ? new Date(edt.fechaInicio) : new Date(),
       fechaFinPlan: edt?.fechaFin ? new Date(edt.fechaFin) : new Date(),
@@ -113,7 +111,6 @@ export function EdtForm({
         nombre: data.nombre,
         categoriaServicioId: data.categoriaServicioId,
         prioridad: data.prioridad,
-        zona: data.zona || undefined,
         descripcion: data.descripcion || undefined,
         fechaInicio: data.fechaInicioPlan?.toISOString(),
         fechaFin: data.fechaFinPlan?.toISOString(),
@@ -187,7 +184,7 @@ export function EdtForm({
                   <FormLabel>Nombre del EDT *</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Ej: Instalación eléctrica zona A, Montaje de equipos, etc."
+                      placeholder="Ej: Instalación eléctrica, Montaje de equipos, etc."
                       {...field}
                     />
                   </FormControl>
@@ -249,24 +246,9 @@ export function EdtForm({
               />
             </div>
 
-            {/* ✅ Fila 2: Zona y Estado */}
+            {/* ✅ Fila 2: Estado */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="zona"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Zona</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Ej: Zona A, Piso 2, etc."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div></div> {/* Espacio vacío para mantener el layout */}
 
               <FormField
                 control={form.control}

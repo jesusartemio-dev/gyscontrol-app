@@ -587,7 +587,7 @@ export function ProyectoCronogramaTab({
                 <h4 className="font-medium text-blue-900 mb-2">💡 Importante</h4>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• La fecha de inicio será la línea base para todo el cronograma</li>
-                  <li>• Las fases, EDTs, zonas, actividades y tareas se calcularán desde esta fecha</li>
+                  <li>• Las fases, EDTs, actividades y tareas se calcularán desde esta fecha</li>
                   <li>• La fecha de fin se calcula automáticamente según los elementos agregados</li>
                   <li>• Se recomienda establecer la fecha de inicio antes de importar fases o crear EDTs</li>
                   <li>• Puedes modificar la fecha de inicio en cualquier momento</li>

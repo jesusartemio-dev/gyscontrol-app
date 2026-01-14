@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { createProyectoFromCotizacionSchema } from '@/lib/validators/proyecto'
 import { z } from 'zod'
 import { Prisma, EstadoFase, EstadoTarea, EstadoActividad, EstadoEdt } from '@prisma/client'
+import { randomUUID } from 'crypto'
 
 // ✅ Tipo explícito para cotización con includes (5 niveles sin zonas)
 type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
@@ -22,9 +23,9 @@ type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
         edt: true,
         responsable: true,
         cotizacionFase: true,
-        cotizacion_actividad: {
+        cotizacionActividad: {
           include: {
-            cotizacion_tarea: {
+            cotizacionTareas: {
               include: {
                 responsable: true
               }
@@ -157,15 +158,15 @@ export async function POST(request: NextRequest) {
         equipos: { include: { items: true } },
         servicios: { include: { items: true } },
         gastos: { include: { items: true } },
-        fases: true,
+        cotizacionFase: true,
         cronograma: {
           include: {
-            edt: true,
+            categoriaServicio: true,
             responsable: true,
             cotizacionFase: true,
-            cotizacion_actividad: {
+            cotizacionActividad: {
               include: {
-                cotizacion_tarea: {
+                cotizacionTareas: {
                   include: {
                     responsable: true
                   }
@@ -217,6 +218,7 @@ export async function POST(request: NextRequest) {
 
     const proyecto = await prisma.proyecto.create({
       data: {
+        id: randomUUID(),
         clienteId: clienteId ?? cotizacion.clienteId,
         comercialId: comercialId ?? cotizacion.comercialId,
         gestorId,
@@ -234,16 +236,20 @@ export async function POST(request: NextRequest) {
         totalCliente: finalTotalCliente,
         descuento: finalDescuento,
         grandTotal: finalGrandTotal,
+        updatedAt: new Date(),
 
-        equipos: {
+        ProyectoEquipoCotizado: {
           create: cotizacion.equipos.map((grupo: any) => ({
+            id: randomUUID(),
             nombre: grupo.nombre,
             descripcion: grupo.descripcion,
             subtotalInterno: grupo.subtotalInterno,
             subtotalCliente: grupo.subtotalCliente,
             responsableId: gestorId,
-            items: {
+            updatedAt: new Date(),
+            ProyectoEquipoCotizadoItem: {
               create: grupo.items.map((item: any) => ({
+                id: randomUUID(),
                 catalogoEquipoId: item.catalogoEquipoId,
                 codigo: item.codigo,
                 descripcion: item.descripcion,
@@ -255,12 +261,13 @@ export async function POST(request: NextRequest) {
                 precioCliente: item.precioCliente,
                 costoInterno: item.costoInterno,
                 costoCliente: item.costoCliente,
+                updatedAt: new Date(),
               })),
             },
           })),
         },
 
-        servicios: {
+        ProyectoServicioCotizado: {
           create: await Promise.all(cotizacion.servicios.map(async (grupo: any) => {
             // ✅ Obtener o crear EDT basado en la categoría del servicio
             let edtId: string
@@ -291,13 +298,16 @@ export async function POST(request: NextRequest) {
             }
 
             return {
+              id: randomUUID(),
               nombre: grupo.nombre,
+              categoria: grupo.categoria,
               subtotalInterno: grupo.subtotalInterno,
               subtotalCliente: grupo.subtotalCliente,
               responsableId: gestorId,
-              edtId: edtId,
-              items: {
+              updatedAt: new Date(),
+              ProyectoServicioCotizadoItem: {
                 create: grupo.items.map((item: any) => ({
+                  id: randomUUID(),
                   catalogoServicioId: item.catalogoServicioId,
                   categoria: item.categoria,
                   costoHoraInterno: item.costoHora,
@@ -306,6 +316,7 @@ export async function POST(request: NextRequest) {
                   cantidadHoras: item.horaTotal,
                   costoInterno: item.costoInterno,
                   costoCliente: item.costoCliente,
+                  updatedAt: new Date(),
                 })),
               },
             }
@@ -314,12 +325,15 @@ export async function POST(request: NextRequest) {
 
         ProyectoGastoCotizado: {
           create: cotizacion.gastos.map((grupo: any) => ({
+            id: randomUUID(),
             nombre: grupo.nombre,
             descripcion: grupo.descripcion,
             subtotalInterno: grupo.subtotalInterno,
             subtotalCliente: grupo.subtotalCliente,
-            items: {
+            updatedAt: new Date(),
+            ProyectoGastoCotizadoItem: {
               create: grupo.items.map((item: any) => ({
+                id: randomUUID(),
                 nombre: item.nombre,
                 descripcion: item.descripcion,
                 cantidad: item.cantidad,
@@ -328,6 +342,7 @@ export async function POST(request: NextRequest) {
                 margen: item.margen,
                 costoInterno: item.costoInterno,
                 costoCliente: item.costoCliente,
+                updatedAt: new Date(),
               })),
             },
           })),
@@ -377,7 +392,7 @@ export async function POST(request: NextRequest) {
 
         const fechasCotizacion: Date[] = [
           // Fechas de fases
-          ...cotizacion.fases.flatMap((fase: any) => [
+          ...cotizacion.cotizacionFase.flatMap((fase: any) => [
             fase.fechaInicioPlan,
             fase.fechaFinPlan
           ].filter((f: any) => f)),
@@ -385,10 +400,10 @@ export async function POST(request: NextRequest) {
           ...cotizacion.cronograma.flatMap((edt: any) => [
             edt.fechaInicioComercial,
             edt.fechaFinComercial,
-            ...edt.cotizacion_actividad.flatMap((act: any) => [
+            ...edt.cotizacionActividad.flatMap((act: any) => [
               act.fechaInicioComercial,
               act.fechaFinComercial,
-              ...act.cotizacion_tarea.flatMap((tarea: any) => [
+              ...act.cotizacionTareas.flatMap((tarea: any) => [
                 tarea.fechaInicio,
                 tarea.fechaFin
               ].filter((f: any) => f))
@@ -442,13 +457,13 @@ export async function POST(request: NextRequest) {
         console.log('📋 [CRONOGRAMA] PASO 3: Creando fases para el cronograma comercial')
         const fasesComercialMap = new Map<string, string>() // Map<cotizacionFaseId, proyectoFaseId> para comercial
 
-        console.log('📋 [CRONOGRAMA] Fases en cotización:', cotizacion.fases?.length || 0)
-        console.log('📋 [CRONOGRAMA] Detalle de fases:', cotizacion.fases?.map((f: any) => ({ id: f.id, nombre: f.nombre })))
+        console.log('📋 [CRONOGRAMA] Fases en cotización:', cotizacion.cotizacionFase?.length || 0)
+        console.log('📋 [CRONOGRAMA] Detalle de fases:', cotizacion.cotizacionFase?.map((f: any) => ({ id: f.id, nombre: f.nombre })))
 
-        if (cotizacion.fases && cotizacion.fases.length > 0) {
-          console.log(`📋 [CRONOGRAMA] Creando ${cotizacion.fases.length} fases para el cronograma comercial...`)
+        if (cotizacion.cotizacionFase && cotizacion.cotizacionFase.length > 0) {
+          console.log(`📋 [CRONOGRAMA] Creando ${cotizacion.cotizacionFase.length} fases para el cronograma comercial...`)
 
-          for (const faseCotizacion of cotizacion.fases) {
+          for (const faseCotizacion of cotizacion.cotizacionFase) {
             console.log(`📋 [CRONOGRAMA] Procesando fase: ${faseCotizacion.nombre} (ID: ${faseCotizacion.id})`)
 
             // Crear fase en CRONOGRAMA COMERCIAL (fechas originales)
@@ -493,7 +508,7 @@ export async function POST(request: NextRequest) {
 
         for (const edtComercial of cotizacion.cronograma) {
           console.log(`🔧 [CRONOGRAMA] Procesando EDT comercial: ${edtComercial.id} - ${edtComercial.nombre}`)
-          console.log(`🔧 [CRONOGRAMA] EDT tiene ${edtComercial.cotizacion_actividad?.length || 0} actividades`)
+          console.log(`🔧 [CRONOGRAMA] EDT tiene ${edtComercial.cotizacionActividad?.length || 0} actividades`)
 
           // Determinar fase para el EDT en el cronograma comercial
           let faseComercialId: string | undefined
@@ -571,7 +586,7 @@ export async function POST(request: NextRequest) {
 
             // Convertir actividades comerciales a actividades ejecutables (5 niveles sin zonas)
             // Process through actividades -> tareas hierarchy directly under EDT
-            let actividadesComerciales = edtComercial.cotizacion_actividad || []
+            let actividadesComerciales = edtComercial.cotizacionActividad || []
 
             if (actividadesComerciales.length === 0) {
               // Create default actividad for EDTs without activities
@@ -584,7 +599,7 @@ export async function POST(request: NextRequest) {
                 porcentajeAvance: 0,
                 descripcion: 'Actividad principal del EDT',
                 prioridad: 'media',
-                cotizacion_tarea: [] // Will be populated below
+                cotizacionTareas: [] // Will be populated below
               }]
               console.log(`⚙️ Creada actividad por defecto para EDT ${edtComercialProyecto.nombre}`)
             }
@@ -616,7 +631,7 @@ export async function POST(request: NextRequest) {
               console.log(`✅ [CRONOGRAMA] ProyectoActividad creada: ${actividadComercialProyecto.nombre} (comercial ID: ${actividadComercialProyecto.id})`)
 
               // Process tareas within actividad
-              let tareasComerciales = actividadComercial.cotizacion_tarea || []
+              let tareasComerciales = actividadComercial.cotizacionTareas || []
 
               if (tareasComerciales.length === 0) {
                 // Create default tarea for activities without tareas

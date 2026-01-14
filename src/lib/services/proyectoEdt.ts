@@ -44,7 +44,6 @@ export class ProyectoEdtService {
           ...(filtros.categoriaServicioId && { categoriaServicioId: filtros.categoriaServicioId }),
           ...(filtros.estado && { estado: filtros.estado }),
           ...(filtros.responsableId && { responsableId: filtros.responsableId }),
-          ...(filtros.zona && { zona: filtros.zona }),
           ...(filtros.fechaDesde && {
             fechaInicioPlan: {
               gte: filtros.fechaDesde
@@ -65,7 +64,6 @@ export class ProyectoEdtService {
           descripcion: true,
           estado: true,
           prioridad: true,
-          zona: true,
           fechaInicioPlan: true,
           fechaFinPlan: true,
           fechaInicioReal: true,
@@ -142,7 +140,6 @@ export class ProyectoEdtService {
       return edts.map(edt => ({
         ...edt,
         nombre: edt.nombre,
-        zona: edt.zona || undefined,
         fechaInicio: edt.fechaInicioPlan?.toISOString() || undefined,
         fechaFin: edt.fechaFinPlan?.toISOString() || undefined,
         fechaInicioReal: edt.fechaInicioReal?.toISOString() || undefined,
@@ -260,7 +257,6 @@ export class ProyectoEdtService {
       return {
         ...edt,
         nombre: edt.nombre,
-        zona: edt.zona || undefined,
         fechaInicio: edt.fechaInicioPlan?.toISOString() || undefined,
         fechaFin: edt.fechaFinPlan?.toISOString() || undefined,
         fechaInicioReal: edt.fechaInicioReal?.toISOString() || undefined,
@@ -320,20 +316,18 @@ export class ProyectoEdtService {
       const edtExistente = await prisma.proyectoEdt.findFirst({
         where: {
           proyectoId: data.proyectoId,
-          categoriaServicioId: data.categoriaServicioId,
-          zona: data.zona ?? null
+          categoriaServicioId: data.categoriaServicioId
         }
       });
 
       if (edtExistente) {
-        throw new Error('Ya existe un EDT para esta combinación de proyecto, categoría y zona');
+        throw new Error('Ya existe un EDT para esta combinación de proyecto y categoría');
       }
 
       // 🏗️ Crear EDT
       const nuevoEdt = await prisma.proyectoEdt.create({
         data: {
           ...data,
-          zona: data.zona || null,
           nombre: data.nombre,
           proyectoCronogramaId: data.proyectoCronogramaId
         },
@@ -399,7 +393,6 @@ export class ProyectoEdtService {
       return {
         ...nuevoEdt,
         nombre: nuevoEdt.nombre,
-        zona: nuevoEdt.zona || undefined,
         responsableId: nuevoEdt.responsableId || undefined,
         descripcion: nuevoEdt.descripcion || undefined,
         fechaInicio: nuevoEdt.fechaInicioPlan?.toISOString() || undefined,
@@ -575,7 +568,6 @@ export class ProyectoEdtService {
       return {
         ...edtActualizado,
         nombre: edtActualizado.nombre,
-        zona: edtActualizado.zona ?? undefined,
         responsableId: edtActualizado.responsableId ?? undefined,
         descripcion: edtActualizado.descripcion ?? undefined,
         responsable: edtActualizado.responsable ?? undefined,
@@ -827,7 +819,6 @@ export class ProyectoEdtService {
         return {
           categoriaServicioId: edt.categoriaServicioId,
           categoriaServicioNombre: edt.categoriaServicio.nombre,
-          zona: edt.zona,
           horasPlan,
           horasReales,
           porcentajeAvance: edt.porcentajeAvance,
@@ -904,7 +895,6 @@ export class ProyectoEdtService {
         proyectoId: proyectoId, // Referencia al proyecto actual
         nombre: edt.cotizacionServicio?.nombre || 'EDT sin nombre', // Copiar nombre del servicio
         categoriaServicioId: edt.categoriaServicioId,
-        zona: edt.zona,
         fechaInicio: edt.fechaInicioComercial?.toISOString(),
         fechaFin: edt.fechaFinComercial?.toISOString(),
         horasPlan: Number(edt.horasEstimadas || 0),
@@ -1027,7 +1017,6 @@ export class ProyectoEdtService {
       return edts.map(edt => ({
         ...edt,
         nombre: edt.nombre,
-        zona: edt.zona ?? undefined,
         responsableId: edt.responsableId ?? undefined,
         descripcion: edt.descripcion ?? undefined,
         responsable: edt.responsable ?? undefined,

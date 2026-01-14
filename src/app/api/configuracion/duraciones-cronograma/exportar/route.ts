@@ -53,7 +53,7 @@ export async function GET() {
     }
 
     // Agregar datos
-    plantillas.forEach(plantilla => {
+    plantillas.forEach((plantilla: any) => {
       worksheet.addRow({
         nivel: plantilla.nivel,
         duracionDias: plantilla.duracionDias,

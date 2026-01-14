@@ -30,7 +30,6 @@ export class CronogramaAnalyticsService {
         ...(proyectoId && { proyectoId }),
         ...(filtros.categoriaServicioId && { categoriaServicioId: filtros.categoriaServicioId }),
         ...(filtros.responsableId && { responsableId: filtros.responsableId }),
-        ...(filtros.zona && { zona: filtros.zona }),
         ...(filtros.fechaDesde && {
           fechaInicioPlan: {
             gte: filtros.fechaDesde

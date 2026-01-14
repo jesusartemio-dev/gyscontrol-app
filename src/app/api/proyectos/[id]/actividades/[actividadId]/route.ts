@@ -10,11 +10,10 @@ import { logger } from '@/lib/logger';
 // GET /api/proyectos/[proyectoId]/actividades/[actividadId] - Obtener actividad específica
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; actividadId: string } }
+  { params }: { params: Promise<{ id: string; actividadId: string }> }
 ) {
   try {
-    const proyectoId = params.id;
-    const actividadId = params.actividadId;
+    const { id: proyectoId, actividadId } = await params;
 
     const actividad = await prisma.proyectoActividad.findFirst({
       where: {
@@ -93,11 +92,10 @@ export async function GET(
 // PUT /api/proyectos/[proyectoId]/actividades/[actividadId] - Actualizar actividad
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; actividadId: string } }
+  { params }: { params: Promise<{ id: string; actividadId: string }> }
 ) {
   try {
-    const proyectoId = params.id;
-    const actividadId = params.actividadId;
+    const { id: proyectoId, actividadId } = await params;
     const body = await request.json();
 
     const {
@@ -211,11 +209,10 @@ export async function PUT(
 // DELETE /api/proyectos/[proyectoId]/actividades/[actividadId] - Eliminar actividad
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; actividadId: string } }
+  { params }: { params: Promise<{ id: string; actividadId: string }> }
 ) {
   try {
-    const proyectoId = params.id;
-    const actividadId = params.actividadId;
+    const { id: proyectoId, actividadId } = await params;
 
     // Verificar que la actividad existe y pertenece al proyecto
     const actividad = await prisma.proyectoActividad.findFirst({

@@ -1157,7 +1157,6 @@ export interface ProyectoEdtPayload {
   proyectoId: string
   nombre: string
   categoriaServicioId: string
-  zona?: string
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -1183,7 +1182,6 @@ export interface EdtPaginationParams extends PaginationParams {
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
   responsableId?: string
-  zona?: string
   fechaDesde?: string
   fechaHasta?: string
   porcentajeAvanceMin?: number
@@ -1242,7 +1240,6 @@ export interface ReporteEdtPayload {
     responsableId?: string
     fechaInicio?: string
     fechaFin?: string
-    zona?: string
   }
   formato: 'pdf' | 'excel' | 'csv'
   incluirGraficos?: boolean
@@ -1342,7 +1339,6 @@ export interface FiltrosCronogramaPayload {
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
   responsableId?: string
-  zona?: string
   fechaDesde?: string
   fechaHasta?: string
   porcentajeAvanceMin?: number
@@ -1362,7 +1358,6 @@ export interface CreateProyectoEdtPayload {
   proyectoCronogramaId: string
   nombre: string
   categoriaServicioId: string
-  zona?: string
   fechaInicio?: string
   fechaFin?: string
   horasEstimadas: number

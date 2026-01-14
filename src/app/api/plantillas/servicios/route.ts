@@ -9,6 +9,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,7 @@ export async function GET() {
   try {
     const plantillas = await prisma.plantillaServicioIndependiente.findMany({
       include: {
-        items: {
+        plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
             recurso: true,
@@ -26,7 +27,7 @@ export async function GET() {
           orderBy: { orden: 'asc' }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       },
       orderBy: { createdAt: 'desc' },
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
 
     const nueva = await prisma.plantillaServicioIndependiente.create({
       data: {
+        id: randomUUID(),
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
         categoria: categoria || 'General',
@@ -62,11 +64,12 @@ export async function POST(req: NextRequest) {
         totalCliente: 0,
         descuento: 0,
         grandTotal: 0,
+        updatedAt: new Date(),
       },
       include: {
-        items: true,
+        plantillaServicioItemIndependiente: true,
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       }
     })
