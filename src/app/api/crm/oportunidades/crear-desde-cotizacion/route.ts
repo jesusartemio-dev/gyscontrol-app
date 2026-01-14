@@ -72,7 +72,8 @@ export async function POST(req: NextRequest) {
         comercialId: comercialId || cotizacion.user?.id,
         responsableId: comercialId || cotizacion.user?.id,
         cotizacionId: cotizacion.id,
-        fechaCierreEstimada: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 días por defecto
+        fechaCierreEstimada: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días por defecto
+        updatedAt: new Date()
       },
       include: {
         cliente: {
@@ -93,7 +94,8 @@ export async function POST(req: NextRequest) {
         descripcion: `Oportunidad creada desde cotización ${cotizacion.codigo}`,
         fecha: new Date().toISOString(),
         resultado: 'neutro',
-        usuarioId: comercialId || cotizacion.user?.id || 'system'
+        usuarioId: comercialId || cotizacion.user?.id || 'system',
+        updatedAt: new Date()
       }
     })
 
