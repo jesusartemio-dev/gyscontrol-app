@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
               estado: true
             }
           },
-          actividades: {
+          crmActividad: {
             select: {
               id: true,
               tipo: true,
@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              actividades: true
+              crmActividad: true
             }
           }
         },
