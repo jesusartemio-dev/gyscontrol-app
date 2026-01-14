@@ -36,24 +36,24 @@ export async function GET(request: NextRequest) {
         // Plantillas completas que tienen equipos
         prisma.plantilla.findMany({
           where: {
-            equipos: {
+            plantillaEquipo: {
               some: {} // Tiene al menos un equipo
             }
           },
           include: {
-            equipos: {
+            plantillaEquipo: {
               include: {
-                items: true,
+                plantillaEquipoItem: true,
               },
             },
-            servicios: {
+            plantillaServicio: {
               include: {
-                items: true,
+                plantillaServicioItem: true,
               },
             },
-            gastos: {
+            plantillaGasto: {
               include: {
-                items: true,
+                plantillaGastoItem: true,
               },
             },
           },
@@ -88,24 +88,24 @@ export async function GET(request: NextRequest) {
         // Plantillas completas que tienen servicios
         prisma.plantilla.findMany({
           where: {
-            servicios: {
+            plantillaServicio: {
               some: {} // Tiene al menos un servicio
             }
           },
           include: {
-            equipos: {
+            plantillaEquipo: {
               include: {
-                items: true,
+                plantillaEquipoItem: true,
               },
             },
-            servicios: {
+            plantillaServicio: {
               include: {
-                items: true,
+                plantillaServicioItem: true,
               },
             },
-            gastos: {
+            plantillaGasto: {
               include: {
-                items: true,
+                plantillaGastoItem: true,
               },
             },
           },
@@ -134,24 +134,24 @@ export async function GET(request: NextRequest) {
         // Plantillas completas que tienen gastos
         prisma.plantilla.findMany({
           where: {
-            gastos: {
+            plantillaGasto: {
               some: {} // Tiene al menos un gasto
             }
           },
           include: {
-            equipos: {
+            plantillaEquipo: {
               include: {
-                items: true,
+                plantillaEquipoItem: true,
               },
             },
-            servicios: {
+            plantillaServicio: {
               include: {
-                items: true,
+                plantillaServicioItem: true,
               },
             },
-            gastos: {
+            plantillaGasto: {
               include: {
-                items: true,
+                plantillaGastoItem: true,
               },
             },
           },
@@ -172,19 +172,19 @@ export async function GET(request: NextRequest) {
         prisma.plantilla.findMany({
           where: tipo === 'completa' ? { tipo: 'completa' } : {},
           include: {
-            equipos: {
+            plantillaEquipo: {
               include: {
-                items: true,
+                plantillaEquipoItem: true,
               },
             },
-            servicios: {
+            plantillaServicio: {
               include: {
-                items: true,
+                plantillaServicioItem: true,
               },
             },
-            gastos: {
+            plantillaGasto: {
               include: {
-                items: true,
+                plantillaGastoItem: true,
               },
             },
           },
