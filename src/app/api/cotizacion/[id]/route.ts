@@ -23,7 +23,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       where: { id },
       include: {
         cliente: true,
-        comercial: true,
+        user: true,
         plantilla: true,
         cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
         cotizacionServicio: {

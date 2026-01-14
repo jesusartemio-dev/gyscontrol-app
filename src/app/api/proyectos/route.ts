@@ -6,11 +6,11 @@ export async function GET() {
     const proyectos = await prisma.proyecto.findMany({
       include: {
         cliente: true,
-        comercial: true,
-        gestor: true,
-        ProyectoEquipoCotizado: true,
-        ProyectoServicioCotizado: true,
-        ProyectoGastoCotizado: true,
+        User_Proyecto_comercialIdToUser: true,
+        User_Proyecto_gestorIdToUser: true,
+        proyectoEquipoCotizado: true,
+        proyectoServicioCotizado: true,
+        proyectoGastoCotizado: true,
       },
       orderBy: { createdAt: 'desc' },
     })

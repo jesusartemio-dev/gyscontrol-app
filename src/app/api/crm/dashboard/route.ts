@@ -71,10 +71,10 @@ export async function GET(req: NextRequest) {
         take: 10,
         orderBy: { fecha: 'desc' },
         include: {
-          oportunidad: {
+          crmOportunidad: {
             select: { nombre: true, cliente: { select: { nombre: true } } }
           },
-          usuario: {
+          user: {
             select: { name: true }
           }
         }
