@@ -1,7 +1,7 @@
 // ===================================================
 // 📁 Archivo: CotizacionServicioItemTable.tsx
 // 📌 Ubicación: src/components/cotizaciones/
-// 🔧 Tabla editable de ítems de servicio con tooltip elegante
+// 🔧 Tabla compacta de ítems de servicio con columnas agrupadas
 // ===================================================
 
 'use client'
@@ -9,15 +9,20 @@
 import { useEffect, useState } from 'react'
 import {
   CotizacionServicioItem,
-  Recurso,
-  UnidadServicio
+  Recurso
 } from '@/types'
-import { Trash2, Pencil, Save, X, Info } from 'lucide-react'
+import { Trash2, Pencil, Save, X, Loader2 } from 'lucide-react'
 import { getRecursos } from '@/lib/services/recurso'
-import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { updateCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { calcularHoras } from '@/lib/utils/formulas'
-import * as Tooltip from '@radix-ui/react-tooltip'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip'
 
 interface Props {
   items: CotizacionServicioItem[]
@@ -25,18 +30,33 @@ interface Props {
   onDeleted: (id: string) => void
 }
 
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
+
+const dificultadLabels: Record<number, string> = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Crítica' }
+const dificultadColors: Record<number, string> = {
+  1: 'bg-green-100 text-green-700',
+  2: 'bg-yellow-100 text-yellow-700',
+  3: 'bg-orange-100 text-orange-700',
+  4: 'bg-red-100 text-red-700'
+}
+
 export default function CotizacionServicioItemTable({ items, onUpdated, onDeleted }: Props) {
   const [recursos, setRecursos] = useState<Recurso[]>([])
-  const [unidades, setUnidades] = useState<UnidadServicio[]>([])
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editableItem, setEditableItem] = useState<Partial<CotizacionServicioItem>>({})
+  const [saving, setSaving] = useState(false)
 
   // ✅ Ordenar items por campo 'orden' antes de renderizar
   const sortedItems = [...items].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
 
   useEffect(() => {
     getRecursos().then(setRecursos)
-    getUnidadesServicio().then(setUnidades)
   }, [])
 
   const startEditing = (item: CotizacionServicioItem) => {
@@ -110,6 +130,8 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
     const original = items.find(i => i.id === editandoId)
     if (!original) return
 
+    setSaving(true)
+
     const updated: CotizacionServicioItem = {
       ...original,
       ...editableItem,
@@ -170,7 +192,8 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
       cancelEditing()
     } catch (error) {
       console.error('Error saving item:', error)
-      // TODO: Show error toast to user
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -178,7 +201,6 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
   const calculateTotals = () => {
     const allItems = items.map(item => {
       if (editandoId === item.id && editableItem) {
-        // Use edited values for the item being edited
         return {
           ...item,
           horaTotal: editableItem.horaTotal ?? item.horaTotal ?? 0,
@@ -193,8 +215,6 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
 
     return {
       totalHH: allItems.reduce((sum, i) => sum + (i.horaTotal ?? 0), 0),
-      promedioFactor: allItems.length ? allItems.reduce((sum, i) => sum + (i.factorSeguridad ?? 1), 0) / allItems.length : 0,
-      promedioMargen: allItems.length ? allItems.reduce((sum, i) => sum + (i.margen ?? 1), 0) / allItems.length : 0,
       totalCostoInterno: allItems.reduce((sum, i) => sum + (i.costoInterno ?? 0), 0),
       totalCostoCliente: allItems.reduce((sum, i) => sum + (i.costoCliente ?? 0), 0)
     }
@@ -204,158 +224,275 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm border rounded shadow-sm">
-        <thead className="bg-gray-100 text-gray-700">
+      <table className="min-w-full divide-y divide-gray-200 table-fixed">
+        <thead className="bg-gray-50">
           <tr>
-            <th className="p-2">Orden</th>
-            <th className="p-2">Nombre</th>
-            <th className="p-2">Categoría</th>
-            <th className="p-2">Recurso</th>
-            <th className="p-2">Unidad</th>
-            <th className="p-2 text-center">Cantidad</th>
-            <th className="p-2 text-center">Costo/Hora</th>
-            <th className="p-2 text-center">HH Totales</th>
-            <th className="p-2 text-center">Factor</th>
-            <th className="p-2 text-center text-blue-700">Costo Interno</th>
-            <th className="p-2 text-center">Margen</th>
-            <th className="p-2 text-center">Dificultad</th>
-            <th className="p-2 text-right text-green-700">Costo Cliente</th>
-            <th className="p-2 text-center">Acciones</th>
+            <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+              Servicio
+            </th>
+            <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+              Recurso
+            </th>
+            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+              Cant.
+            </th>
+            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+              Horas
+            </th>
+            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+              Factor
+            </th>
+            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+              Dificultad
+            </th>
+            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+              Margen
+            </th>
+            <th className="px-2 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[14%]">
+              Precios
+            </th>
+            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[6%]">
+            </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="bg-white divide-y divide-gray-200">
           {sortedItems.map((item, index) => {
             const editando = editandoId === item.id
             const key = item.id || `temp-${index}`
+            const currentItem = editando ? { ...item, ...editableItem } : item
+
             return (
-              <tr key={key} className="border-t hover:bg-gray-50">
-                <td className="p-2 text-center">
-                  {editando ? (
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-16 text-center"
-                      value={editableItem.orden ?? item.orden ?? 0}
-                      onChange={(e) => handleChange('orden', +e.target.value)}
-                    />
-                  ) : (
-                    item.orden ?? 0
-                  )}
+              <tr key={key} className="border-b hover:bg-gray-50">
+                {/* Servicio - nombre + unidad */}
+                <td className="p-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="cursor-help">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-medium text-gray-900 text-sm truncate max-w-[150px]">
+                              {item.nombre}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] px-1 py-0">
+                              {item.unidadServicioNombre}
+                            </Badge>
+                          </div>
+                          {item.edt?.nombre && (
+                            <div className="text-[10px] text-gray-400">{item.edt.nombre}</div>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      {item.descripcion && (
+                        <TooltipContent side="right" className="max-w-xs">
+                          <p className="text-xs">{item.descripcion}</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 </td>
-                <td className="p-2 flex items-center gap-1">
-                  <span>{item.nombre}</span>
-                  {item.descripcion && (
-                    <Tooltip.Provider>
-                      <Tooltip.Root>
-                        <Tooltip.Trigger asChild>
-                          <button className="text-gray-400 hover:text-blue-600">
-                            <Info className="w-4 h-4" />
-                          </button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Portal>
-                          <Tooltip.Content
-                            side="right"
-                            sideOffset={6}
-                            className="bg-black text-white px-2 py-1 rounded text-xs shadow-md max-w-xs z-50"
-                          >
-                            {item.descripcion}
-                            <Tooltip.Arrow className="fill-black" />
-                          </Tooltip.Content>
-                        </Tooltip.Portal>
-                      </Tooltip.Root>
-                    </Tooltip.Provider>
-                  )}
-                </td>
-                <td className="p-2">{item.categoria}</td>
+
+                {/* Recurso + Costo/Hora */}
                 <td className="p-2">
                   {editando ? (
                     <select
-                      className="border rounded px-2 py-1 text-sm"
-                      value={editableItem.recursoId}
+                      className="border rounded px-1 h-7 text-xs w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={editableItem.recursoId ?? item.recursoId}
                       onChange={(e) => handleChange('recursoId', e.target.value)}
+                      disabled={saving}
                     >
                       {recursos.map(r => (
                         <option key={r.id} value={r.id}>{r.nombre}</option>
                       ))}
                     </select>
                   ) : (
-                    item.recursoNombre
+                    <div>
+                      <div className="text-sm text-gray-700">{item.recursoNombre}</div>
+                      <div className="text-xs text-gray-500">${item.costoHora}/h</div>
+                    </div>
                   )}
                 </td>
-                <td className="p-2">{item.unidadServicioNombre}</td>
+
+                {/* Cantidad - editable con altura fija */}
+                <td className="p-2">
+                  <div className="h-8 flex items-center justify-center">
+                    {editando ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={editableItem.cantidad ?? item.cantidad}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '')
+                          handleChange('cantidad', parseInt(val) || 0)
+                        }}
+                        className="w-14 h-7 text-sm text-center border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={saving}
+                      />
+                    ) : (
+                      <span className="font-semibold">{item.cantidad}</span>
+                    )}
+                  </div>
+                </td>
+
+                {/* Horas con tooltip */}
                 <td className="p-2 text-center">
-                  {editando ? (
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-20"
-                      value={editableItem.cantidad ?? item.cantidad}
-                      onChange={(e) => handleChange('cantidad', +e.target.value)}
-                    />
-                  ) : (
-                    item.cantidad
-                  )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="cursor-help">
+                          <div className="font-medium text-purple-600">
+                            {(currentItem.horaTotal ?? 0).toFixed(1)}h
+                          </div>
+                          <div className="text-[10px] text-gray-400">
+                            {item.horaBase || 0}+{item.horaRepetido || 0}
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <div className="text-xs space-y-1">
+                          <p className="font-semibold">Fórmula: {item.formula || 'Escalonada'}</p>
+                          <p><span className="text-gray-500">Hora Base:</span> {item.horaBase || 0}h</p>
+                          <p><span className="text-gray-500">Hora Repetido:</span> {item.horaRepetido || 0}h</p>
+                          <p className="pt-1 border-t mt-1">
+                            <span className="text-gray-500">Total:</span>{' '}
+                            <span className="font-semibold text-purple-600">
+                              {(currentItem.horaTotal ?? 0).toFixed(2)}h
+                            </span>
+                          </p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </td>
-                <td className="p-2 text-center text-blue-700">${(editando && editableItem.costoHora !== undefined ? editableItem.costoHora : item.costoHora)?.toFixed(2)}</td>
-                <td className="p-2 text-center">{(editando && editableItem.horaTotal !== undefined ? editableItem.horaTotal : item.horaTotal)?.toFixed(2)}</td>
+
+                {/* Factor Seguridad - editable con altura fija */}
                 <td className="p-2 text-center">
-                  {editando ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="border rounded px-2 py-1 w-20"
-                      value={editableItem.factorSeguridad ?? item.factorSeguridad}
-                      onChange={(e) => handleChange('factorSeguridad', +e.target.value)}
-                    />
-                  ) : (
-                    item.factorSeguridad
-                  )}
+                  <div className="h-8 flex items-center justify-center">
+                    {editando ? (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={editableItem.factorSeguridad ?? item.factorSeguridad}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '')
+                          handleChange('factorSeguridad', parseFloat(val) || 1)
+                        }}
+                        className="w-14 h-7 text-sm text-center border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={saving}
+                      />
+                    ) : (
+                      <span className="text-sm font-medium">
+                        {(item.factorSeguridad ?? 1).toFixed(1)}x
+                      </span>
+                    )}
+                  </div>
                 </td>
-                <td className="p-2 text-center text-blue-700">${(editando && editableItem.costoInterno !== undefined ? editableItem.costoInterno : item.costoInterno)?.toFixed(2)}</td>
+
+                {/* Dificultad - editable con altura fija */}
                 <td className="p-2 text-center">
-                  {editando ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="border rounded px-2 py-1 w-20"
-                      value={editableItem.margen ?? item.margen}
-                      onChange={(e) => handleChange('margen', +e.target.value)}
-                    />
-                  ) : (
-                    (item.margen ?? 0).toFixed(2)
-                  )}
+                  <div className="h-8 flex items-center justify-center">
+                    {editando ? (
+                      <select
+                        className="border rounded px-1 h-7 text-xs w-16 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={editableItem.nivelDificultad ?? item.nivelDificultad ?? 1}
+                        onChange={(e) => handleChange('nivelDificultad', parseInt(e.target.value))}
+                        disabled={saving}
+                      >
+                        <option value={1}>Baja</option>
+                        <option value={2}>Media</option>
+                        <option value={3}>Alta</option>
+                        <option value={4}>Crítica</option>
+                      </select>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 ${dificultadColors[item.nivelDificultad || 1]}`}
+                      >
+                        {dificultadLabels[item.nivelDificultad || 1]}
+                      </Badge>
+                    )}
+                  </div>
                 </td>
+
+                {/* Margen - editable con altura fija */}
                 <td className="p-2 text-center">
-                  {editando ? (
-                    <select
-                      className="border rounded px-2 py-1 text-sm"
-                      value={editableItem.nivelDificultad ?? item.nivelDificultad ?? 1}
-                      onChange={(e) => handleChange('nivelDificultad', +e.target.value)}
-                    >
-                      <option value={1}>Baja (1.0x)</option>
-                      <option value={2}>Media (1.2x)</option>
-                      <option value={3}>Alta (1.5x)</option>
-                      <option value={4}>Crítica (2.0x)</option>
-                    </select>
-                  ) : (
-                    (() => {
-                      const dificultad = item.nivelDificultad ?? 1;
-                      const labels = { 1: 'Baja (1.0x)', 2: 'Media (1.2x)', 3: 'Alta (1.5x)', 4: 'Crítica (2.0x)' };
-                      return labels[dificultad as keyof typeof labels] || 'Baja (1.0x)';
-                    })()
-                  )}
+                  <div className="h-8 flex items-center justify-center">
+                    {editando ? (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={editableItem.margen ?? item.margen}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '')
+                          handleChange('margen', parseFloat(val) || 1)
+                        }}
+                        className="w-14 h-7 text-sm text-center border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={saving}
+                      />
+                    ) : (
+                      <span className="text-sm">{(item.margen ?? 1).toFixed(2)}x</span>
+                    )}
+                  </div>
                 </td>
-                <td className="p-2 text-right text-green-700">${(editando && editableItem.costoCliente !== undefined ? editableItem.costoCliente : item.costoCliente)?.toFixed(2)}</td>
-                <td className="p-2 text-center space-x-1">
-                  {editando ? (
-                    <>
-                      <button onClick={handleSave}><Save className="w-5 h-5 text-green-600" /></button>
-                      <button onClick={cancelEditing}><X className="w-5 h-5 text-gray-500" /></button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => startEditing(item)}><Pencil className="w-5 h-5 text-blue-600" /></button>
-                      <button onClick={() => onDeleted(item.id)}><Trash2 className="w-5 h-5 text-red-500" /></button>
-                    </>
-                  )}
+
+                {/* Precios agrupados: Interno / Cliente */}
+                <td className="p-2 text-right">
+                  <div className="text-xs text-blue-600">
+                    {formatCurrency(currentItem.costoInterno ?? 0)}
+                  </div>
+                  <div className="font-semibold text-green-600">
+                    {formatCurrency(currentItem.costoCliente ?? 0)}
+                  </div>
+                </td>
+
+                {/* Acciones */}
+                <td className="p-2 text-center">
+                  <div className="h-8 flex items-center justify-center gap-1">
+                    {editando ? (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={handleSave}
+                          disabled={saving}
+                          className="h-7 w-7 p-0"
+                        >
+                          {saving ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Save className="h-3 w-3" />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={cancelEditing}
+                          disabled={saving}
+                          className="h-7 w-7 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => startEditing(item)}
+                          className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onDeleted(item.id)}
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             )
@@ -363,13 +500,13 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
         </tbody>
         <tfoot className="bg-gray-100 font-semibold text-sm">
           <tr>
-            <td className="p-2" colSpan={6}>Totales</td>
-            <td className="p-2 text-center">{totals.totalHH.toFixed(2)}</td>
-            <td className="p-2 text-center">{totals.promedioFactor.toFixed(2)}</td>
-            <td className="p-2 text-center text-blue-700">${totals.totalCostoInterno.toFixed(2)}</td>
-            <td className="p-2 text-center">{Number(totals.promedioMargen).toFixed(2)}</td>
-            <td className="p-2 text-center">-</td>
-            <td className="p-2 text-right text-green-700">${totals.totalCostoCliente.toFixed(2)}</td>
+            <td className="p-2" colSpan={3}>Totales</td>
+            <td className="p-2 text-center text-purple-600">{totals.totalHH.toFixed(1)}h</td>
+            <td className="p-2 text-center" colSpan={3}></td>
+            <td className="p-2 text-right">
+              <div className="text-xs text-blue-600">{formatCurrency(totals.totalCostoInterno)}</div>
+              <div className="text-green-600">{formatCurrency(totals.totalCostoCliente)}</div>
+            </td>
             <td />
           </tr>
         </tfoot>

@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
       include: {
-        proyectos: {
+        proyecto: {
           where: { id: proyectoId },
           select: { id: true }
         }
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (cotizacion.proyectos.length === 0) {
+    if (cotizacion.proyecto.length === 0) {
       return NextResponse.json(
         { error: 'La cotización no está relacionada con este proyecto' },
         { status: 400 }
@@ -82,20 +82,22 @@ async function convertirCotizacionAProyecto(cotizacionId: string, proyectoId: st
   const edtsComerciales = await prisma.cotizacionEdt.findMany({
     where: { cotizacionId },
     include: {
-      categoriaServicio: true,
-      responsable: true,
-      tareas: true
+      edt: true,
+      user: true,
+      cotizacionActividad: true
     }
   });
 
   // 2. Crear cronograma de ejecución para el proyecto
   const cronogramaEjecucion = await prisma.proyectoCronograma.create({
     data: {
+      id: `proyecto-cronograma-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       proyectoId,
       tipo: 'ejecucion',
       nombre: 'Cronograma de Ejecución',
       esBaseline: false,
-      version: 1
+      version: 1,
+      updatedAt: new Date()
     }
   });
 
@@ -112,19 +114,20 @@ async function convertirCotizacionAProyecto(cotizacionId: string, proyectoId: st
 
     const edtCreado = await prisma.proyectoEdt.create({
       data: {
+        id: `proyecto-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoId,
         proyectoCronogramaId: cronogramaEjecucion.id,
-        nombre: edtComercial.nombre || `EDT ${edtComercial.categoriaServicio?.nombre}`,
-        categoriaServicioId: edtComercial.categoriaServicioId,
+        nombre: edtComercial.nombre || `EDT ${edtComercial.edt?.nombre}`,
+        edtId: edtComercial.edtId || edtComercial.id,
         proyectoFaseId: asignacion.faseId,
-        zona: edtComercial.zona,
         fechaInicioPlan: edtComercial.fechaInicioComercial,
         fechaFinPlan: edtComercial.fechaFinComercial,
         horasPlan: edtComercial.horasEstimadas,
         responsableId: edtComercial.responsableId,
         descripcion: edtComercial.descripcion,
         prioridad: edtComercial.prioridad,
-        estado: 'planificado'
+        estado: 'planificado',
+        updatedAt: new Date()
       }
     });
 
@@ -188,13 +191,15 @@ async function crearFasesEstandar(proyectoId: string, cronogramaId: string) {
   for (const fase of fases) {
     const faseCreada = await prisma.proyectoFase.create({
       data: {
+        id: `proyecto-fase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoId,
         proyectoCronogramaId: cronogramaId,
         nombre: fase.nombre,
         orden: fase.orden,
         fechaInicioPlan: fase.fechaInicio,
         fechaFinPlan: fase.fechaFin,
-        estado: 'planificado'
+        estado: 'planificado',
+        updatedAt: new Date()
       }
     });
     fasesCreadas.push(faseCreada);
@@ -221,7 +226,7 @@ async function distribuirEdtsEnFases(edtsComerciales: any[], fases: any[]) {
 
 // Lógica para determinar fase según categoría
 function determinarFaseParaEdt(edtComercial: any, fases: any[]) {
-  const categoria = edtComercial.categoriaServicio?.nombre?.toLowerCase() || '';
+  const categoria = edtComercial.edt?.nombre?.toLowerCase() || '';
 
   if (categoria.includes('levantamiento') || categoria.includes('diseño') ||
       categoria.includes('planificación')) {

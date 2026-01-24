@@ -18,53 +18,35 @@
 
 import React, { useState, useMemo, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import { motion } from 'framer-motion';
+import {
   pageTransitionVariants,
-  staggerItemVariants,
-  loadingVariants,
-  buttonInteractionVariants
+  staggerItemVariants
 } from '@/lib/animations/masterDetailAnimations';
 import { toast } from 'sonner';
-import type { ListaEquipo, ListaEquipoItem, Proyecto } from '@/types/modelos'
-import type { ListaEquipoUpdatePayload } from '@/types/payloads';
+import type { ListaEquipo, ListaEquipoItem, Proyecto, EstadoListaEquipo } from '@/types/modelos'
 import { useListaEquipoDetail } from '@/hooks/useListaEquipoDetail';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { DetailBreadcrumb } from '@/components/common/DetailBreadcrumb';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ArrowLeft,
   Package,
-  Settings,
-  History,
   Edit,
-  Save,
-  X,
-  RefreshCw,
-  Download,
-  Share,
-  MoreHorizontal,
   CheckCircle,
   Clock,
   AlertCircle,
   TrendingUp,
   DollarSign,
   Calendar,
-  User,
   FileText,
   ShoppingCart,
-  Target
+  Target,
+  User,
+  X
 } from 'lucide-react';
 import ListaEquipoItemList from '@/components/equipos/ListaEquipoItemList';
-import ListaEquipoForm from '@/components/equipos/ListaEquipoForm';
 import ListaEquipoEditModal from '@/components/equipos/ListaEquipoEditModal';
 import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
 import ListaEstadoFlujoBanner from '@/components/equipos/ListaEstadoFlujoBanner';
@@ -72,7 +54,6 @@ import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial';
 import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
-import { exportarListaEquipoAExcel } from '@/lib/utils/listaEquipoExcel';
 
 // ✅ Props interface
 interface ListaEquipoDetailViewProps {
@@ -84,12 +65,18 @@ interface ListaEquipoDetailViewProps {
 }
 
 // ✅ Configuración de estados con iconos y colores (alineado con EstadoListaEquipo)
-const statusConfig = {
+const statusConfig: Record<EstadoListaEquipo, { label: string; color: string; icon: typeof Clock; description: string }> = {
   borrador: {
     label: 'Borrador',
     color: 'bg-gray-100 text-gray-800',
     icon: Clock,
     description: 'Lista en preparación'
+  },
+  enviada: {
+    label: 'Enviada',
+    color: 'bg-indigo-100 text-indigo-800',
+    icon: FileText,
+    description: 'Lista enviada'
   },
   por_revisar: {
     label: 'Por Revisar',
@@ -115,17 +102,23 @@ const statusConfig = {
     icon: User,
     description: 'Pendiente de aprobación'
   },
-  aprobado: {
-    label: 'Aprobado',
+  aprobada: {
+    label: 'Aprobada',
     color: 'bg-green-100 text-green-800',
     icon: CheckCircle,
     description: 'Lista aprobada'
   },
-  rechazado: {
-    label: 'Rechazado',
+  rechazada: {
+    label: 'Rechazada',
     color: 'bg-red-100 text-red-800',
     icon: X,
     description: 'Lista rechazada'
+  },
+  completada: {
+    label: 'Completada',
+    color: 'bg-emerald-100 text-emerald-800',
+    icon: CheckCircle,
+    description: 'Lista completada'
   }
 };
 
@@ -164,9 +157,14 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
   
   // Handle lista updated from modal
   const handleListaUpdated = async (updatedLista: ListaEquipo) => {
-    // Force refresh the data to ensure we have the latest information
-    await refreshItems();
-    toast.success('Lista actualizada correctamente');
+    try {
+      // Force refresh the data to ensure we have the latest information
+      await refreshItems();
+      toast.success('Lista actualizada correctamente');
+    } catch (error) {
+      console.error('Error refreshing after lista update:', error);
+      toast.error('Error al actualizar la lista');
+    }
   };
   
   // 🔁 Handle navigation back to master
@@ -186,22 +184,6 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
     }
   }, [refreshItems]);
 
-  // 📊 Handle Excel export
-  const handleExportExcel = useCallback(() => {
-    try {
-      if (!lista || items.length === 0) {
-        toast.error('No hay datos para exportar');
-        return;
-      }
-
-      exportarListaEquipoAExcel(items, lista.nombre, lista.codigo);
-      toast.success('Lista exportada a Excel correctamente');
-    } catch (error) {
-      console.error('Error exportando a Excel:', error);
-      toast.error('Error al exportar la lista a Excel');
-    }
-  }, [lista, items]);
-  
   // 📊 Calculate statistics
   const stats = useMemo(() => {
     const totalItems = items.length;
@@ -261,123 +243,141 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
         initial="initial"
         animate="animate"
         exit="exit"
-        className="space-y-6"
+        className="space-y-4"
       >
-        {/* 🧭 Enhanced Breadcrumb Navigation */}
+        {/* 🎯 Unified Compact Header */}
         <motion.div variants={staggerItemVariants}>
-          <DetailBreadcrumb
-            proyectoId={proyecto?.id || proyectoId}
-            proyectoNombre={proyecto?.nombre || 'Proyecto'}
-            masterPath={`/proyectos/${proyectoId}/equipos/listas`}
-            masterLabel="Listas de Equipos"
-            detailLabel={lista?.nombre || 'Lista de Equipos'}
-            detailId={lista?.id || listaId}
-            status={lista?.estado}
-            metadata={lista ? `${stats.totalItems} items • Actualizado ${formatDate(lista.updatedAt)}` : 'Cargando...'}
-            showBackButton={true}
-            showHomeLink={true}
-            onBackClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas`)}
-          />
-        </motion.div>
-      
-      {/* 📋 Header Section */}
-      <motion.div variants={staggerItemVariants}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleBackToMaster}
-                  className="mt-1"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Volver
-                </Button>
-                
-                <div className="space-y-2">
-                  <CardTitle className="text-2xl flex items-center gap-3">
-                    <Package className="w-6 h-6 text-blue-600" />
-                    {lista?.nombre || 'Lista de Equipos'}
-                  </CardTitle>
+          <div className="bg-white border rounded-lg shadow-sm">
+            {/* Top Row: Navigation + Title + Actions */}
+            <div className="px-4 py-3 border-b">
+              <div className="flex items-center justify-between">
+                {/* Left: Back + Breadcrumb + Title */}
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBackToMaster}
+                    className="h-8 px-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
 
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      Actualizado {lista ? formatDate(lista.updatedAt) : 'N/A'}
-                    </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span
+                      className="hover:text-blue-600 cursor-pointer"
+                      onClick={() => router.push(`/proyectos/${proyectoId}`)}
+                    >
+                      {proyecto?.nombre || 'Proyecto'}
+                    </span>
+                    <span>/</span>
+                    <span
+                      className="hover:text-blue-600 cursor-pointer"
+                      onClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas`)}
+                    >
+                      Listas
+                    </span>
+                    <span>/</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Package className="w-5 h-5 text-blue-600" />
+                    <h1 className="text-lg font-semibold text-gray-900">
+                      {lista?.nombre || 'Lista de Equipos'}
+                    </h1>
                     {lista?.codigo && (
-                      <div className="flex items-center gap-1">
-                        <FileText className="w-4 h-4" />
-                        Código: {lista.codigo}
-                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        ({lista.codigo})
+                      </span>
                     )}
-                    <div className="flex items-center gap-1">
-                      <Target className="w-4 h-4" />
-                      Fecha Necesaria: {lista?.fechaNecesaria ? formatDate(lista.fechaNecesaria) : 'No definida'}
+                  </div>
+                </div>
+
+                {/* Right: Status + Actions */}
+                <div className="flex items-center gap-2">
+                  <Badge className={cn('flex items-center gap-1', statusInfo.color)}>
+                    <StatusIcon className="w-3 h-3" />
+                    {statusInfo.label}
+                  </Badge>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="h-8"
+                  >
+                    <Edit className="w-3 h-3 mr-1" />
+                    Editar
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Row: Stats + Metadata (inline compact) */}
+            <div className="px-4 py-2 bg-gray-50/50">
+              <div className="flex items-center justify-between">
+                {/* Stats Row */}
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100">
+                      <Package className="w-4 h-4 text-blue-600" />
                     </div>
-                    {/* Responsable info removed - not available in ListaEquipo schema */}
+                    <div>
+                      <span className="text-lg font-bold text-gray-900">{stats.totalItems}</span>
+                      <span className="text-xs text-muted-foreground ml-1">items</span>
+                    </div>
+                  </div>
+
+                  <div className="h-6 w-px bg-gray-200" />
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-100">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div>
+                      <span className="text-lg font-bold text-gray-900">{stats.completedItems}</span>
+                      <span className="text-xs text-muted-foreground ml-1">aprobados</span>
+                    </div>
+                  </div>
+
+                  <div className="h-6 w-px bg-gray-200" />
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-purple-100">
+                      <TrendingUp className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <span className="text-lg font-bold text-gray-900">{stats.progress}%</span>
+                      <span className="text-xs text-muted-foreground ml-1">progreso</span>
+                    </div>
+                  </div>
+
+                  <div className="h-6 w-px bg-gray-200" />
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100">
+                      <DollarSign className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <span className="text-lg font-bold text-emerald-600">{formatCurrency(stats.totalCost)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metadata */}
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Target className="w-3 h-3" />
+                    <span>Necesaria: {lista?.fechaNecesaria ? formatDate(lista.fechaNecesaria) : 'No definida'}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    <span>Actualizado: {lista ? formatDate(lista.updatedAt) : 'N/A'}</span>
                   </div>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <Badge className={cn('flex items-center gap-1', statusInfo.color)}>
-                  <StatusIcon className="w-3 h-3" />
-                  {statusInfo.label}
-                </Badge>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsEditModalOpen(true)}
-                >
-                  <Edit className="w-4 h-4 mr-1" />
-                  Editar Lista
-                </Button>
-              </div>
             </div>
-          </CardHeader>
-          
-          <CardContent>
-            {/* 📊 Statistics Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                <Package className="w-8 h-8 text-blue-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Items</p>
-                  <p className="text-xl font-semibold">{stats.totalItems}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                <CheckCircle className="w-8 h-8 text-green-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Completados</p>
-                  <p className="text-xl font-semibold">{stats.completedItems}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
-                <TrendingUp className="w-8 h-8 text-purple-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Progreso</p>
-                  <p className="text-xl font-semibold">{stats.progress}%</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
-                <DollarSign className="w-8 h-8 text-yellow-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Costo Total</p>
-                  <p className="text-xl font-semibold">{formatCurrency(stats.totalCost)}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          </div>
+        </motion.div>
       
       {/* 🎯 Status Flow Banner - Always Visible */}
       {lista && (
@@ -402,62 +402,42 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
               <h3 className="text-lg font-semibold">Items de la Lista</h3>
             </div>
 
-            <div className="flex gap-2">
-              {lista && (
-                <PedidoDesdeListaModal
-                  lista={lista}
-                  proyectoId={proyectoId}
-                  responsableId={lista.responsableId || 'default-user'}
-                  onCreated={async (payload) => {
-                    try {
-                      const result = await createPedidoDesdeListaContextual(payload);
-                      if (result) {
-                        toast.success('Pedido creado exitosamente');
-                        // Refresh the lista data to update cantidadPedida
-                        await refreshItems();
-                        // Navigate to the pedido detail page
-                        router.push(`/proyectos/${proyectoId}/equipos/pedidos/${result.id}`);
-                        return result;
-                      }
-                      return null;
-                    } catch (error) {
-                      console.error('Error creating pedido:', error);
-                      toast.error('Error al crear el pedido');
-                      return null;
+            {lista && (
+              <PedidoDesdeListaModal
+                lista={{ ...lista, listaEquipoItem: items }}
+                proyectoId={proyectoId}
+                responsableId={lista.responsableId || 'default-user'}
+                onCreated={async (payload) => {
+                  try {
+                    const result = await createPedidoDesdeListaContextual(payload);
+                    if (result) {
+                      toast.success('Pedido creado exitosamente');
+                      // Refresh the lista data to update cantidadPedida
+                      await refreshItems();
+                      // Navigate to the pedido detail page
+                      router.push(`/proyectos/${proyectoId}/equipos/pedidos/${result.id}`);
+                      return result;
                     }
-                  }}
-                  onRefresh={refreshItems}
-                  trigger={
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <ShoppingCart className="w-4 h-4 mr-1" />
-                      Crear Pedido
-                    </Button>
+                    return null;
+                  } catch (error) {
+                    console.error('Error creating pedido:', error);
+                    toast.error('Error al crear el pedido');
+                    return null;
                   }
-                />
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefreshItems}
-                disabled={itemsLoading}
-              >
-                <RefreshCw className={cn('w-4 h-4 mr-1', itemsLoading && 'animate-spin')} />
-                Actualizar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportExcel}
-                disabled={itemsLoading || items.length === 0}
-              >
-                <Download className="w-4 h-4 mr-1" />
-                Exportar Excel
-              </Button>
-            </div>
+                }}
+                onRefresh={refreshItems}
+                trigger={
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <ShoppingCart className="w-4 h-4 mr-1" />
+                    Crear Pedido
+                  </Button>
+                }
+              />
+            )}
           </div>
 
           <Suspense fallback={<Skeleton className="h-96 w-full" />}>
@@ -500,22 +480,6 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
             listaId={listaId}
             className="w-full"
           />
-
-          {/* Settings Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Configuración de Lista
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <Settings className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Configuraciones avanzadas próximamente</p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </motion.div>
 

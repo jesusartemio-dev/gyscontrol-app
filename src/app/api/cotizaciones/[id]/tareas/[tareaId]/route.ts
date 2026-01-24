@@ -28,7 +28,7 @@ export async function DELETE(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {

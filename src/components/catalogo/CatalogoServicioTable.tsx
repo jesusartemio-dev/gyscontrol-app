@@ -461,7 +461,7 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
               const formula = editData.formula ?? item.formula
               const cantidadUsar = editData.cantidad ?? item.cantidad ?? 1
               const horasCalculadas = calcularHoras(cantidadUsar, { ...item, ...editData })
-              const costoHora = recursos.find(r => r.id === recursoId)?.costoHora ?? item.recurso.costoHora
+              const costoHora = recursos.find(r => r.id === recursoId)?.costoHora ?? item.recurso?.costoHora ?? 0
               const costoTotal = horasCalculadas * costoHora
 
               return (

@@ -103,7 +103,7 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
 
   useEffect(() => {
     setEquipos(data)
-    setCategorias([...new Set(data.map(eq => eq.categoria?.nombre).filter(Boolean))])
+    setCategorias([...new Set(data.map(eq => eq.categoriaEquipo?.nombre).filter(Boolean))])
     setUnidades([...new Set(data.map(eq => eq.unidad?.nombre).filter(Boolean))])
   }, [data])
 
@@ -165,7 +165,7 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
   }
 
   const equiposFiltrados = equipos.filter(eq =>
-    (categoriaFiltro !== '__ALL__' ? eq.categoria?.nombre === categoriaFiltro : true) &&
+    (categoriaFiltro !== '__ALL__' ? eq.categoriaEquipo?.nombre === categoriaFiltro : true) &&
     (unidadFiltro !== '__ALL__' ? eq.unidad?.nombre === unidadFiltro : true) &&
     (`${eq.codigo} ${eq.descripcion}`.toLowerCase().includes(textoFiltro.toLowerCase()))
   )
@@ -340,7 +340,7 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
-                          {eq.categoria?.nombre || 'Sin categoría'}
+                          {eq.categoriaEquipo?.nombre || 'Sin categoría'}
                         </Badge>
                       </TableCell>
                       <TableCell>

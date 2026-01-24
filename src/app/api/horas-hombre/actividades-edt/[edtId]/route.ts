@@ -22,12 +22,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const actividades = await prisma.proyectoActividad.findMany({
       where: { proyectoEdtId: edtId },
       include: {
-        User: {
+        user: {
           select: { id: true, name: true }
         },
-        proyecto_tarea: {
+        proyectoTarea: {
           include: {
-            responsable: {
+            user: {
               select: { id: true, name: true }
             }
           },
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       id: actividad.id,
       nombre: actividad.nombre,
       tipo: 'actividad' as const,
-      responsableNombre: actividad.User?.name || 'Sin responsable',
+      responsableNombre: actividad.user?.name || 'Sin responsable',
       horasPlan: Number(actividad.horasPlan || 0),
       horasReales: Number(actividad.horasReales || 0),
       estado: actividad.estado,
@@ -53,11 +53,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       fechaInicio: actividad.fechaInicioPlan,
       fechaFin: actividad.fechaFinPlan,
       // Incluir las tareas de esta actividad
-      tareas: actividad.proyecto_tarea.map((tarea) => ({
+      tareas: actividad.proyectoTarea.map((tarea) => ({
         id: tarea.id,
         nombre: tarea.nombre,
         tipo: 'tarea' as const,
-        responsableNombre: tarea.responsable?.name || 'Sin responsable',
+        responsableNombre: tarea.user?.name || 'Sin responsable',
         horasPlan: Number(tarea.horasEstimadas || 0),
         horasReales: Number(tarea.horasReales || 0),
         estado: tarea.estado,

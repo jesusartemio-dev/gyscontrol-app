@@ -84,12 +84,14 @@ export type OrigenListaItem =
 
 export type EstadoListaEquipo =
   | 'borrador'
+  | 'enviada'
   | 'por_revisar'
   | 'por_cotizar'
   | 'por_validar'
   | 'por_aprobar'
-  | 'aprobado'
-  | 'rechazado'
+  | 'aprobada'
+  | 'rechazada'
+  | 'completada'
 
 export type EstadoFase =
   | 'planificado'
@@ -397,7 +399,7 @@ export interface CatalogoEquipo {
   descripcion: string
   categoriaId: string
   unidadId: string
-  categoria: {
+  categoriaEquipo: {
     id: string
     nombre: string
   }
@@ -438,15 +440,20 @@ export interface CatalogoServicio {
   createdAt: string
   updatedAt: string
   // Relaciones anidadas (incluidas desde API)
-  categoria: {
+  edt?: {
     id: string
     nombre: string
   }
-  unidadServicio: {
+  // Alias para compatibilidad (la API devuelve 'edt', no 'categoria')
+  categoria?: {
     id: string
     nombre: string
   }
-  recurso: {
+  unidadServicio?: {
+    id: string
+    nombre: string
+  }
+  recurso?: {
     id: string
     nombre: string
     costoHora: number
@@ -724,7 +731,8 @@ export interface CotizacionEquipoItem {
 export interface CotizacionServicio {
   id: string
   nombre: string
-  categoria: string
+  edtId: string
+  edt?: Edt
   subtotalInterno: number
   subtotalCliente: number
   createdAt: string
@@ -738,10 +746,11 @@ export interface CotizacionServicioItem {
   catalogoServicioId?: string
   unidadServicioId: string
   recursoId: string
+  edtId: string
+  edt?: Edt
   // 📋 Datos copiados desde catálogo / plantilla
   nombre: string
   descripcion: string
-  categoria: string
   unidadServicioNombre: string
   recursoNombre: string
   formula: TipoFormula // 'Fijo' | 'Proporcional' | 'Escalonada'
@@ -830,7 +839,7 @@ export interface CotizacionCondicion {
 export interface CotizacionEdt {
   id: string
   cotizacionId: string
-  categoriaServicioId: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   zona?: string | null
   fechaInicioCom?: string | null
   fechaFinCom?: string | null
@@ -842,7 +851,7 @@ export interface CotizacionEdt {
   updatedAt: string
 
   // Relaciones
-  categoriaServicio: Edt
+  edt: Edt // Refactored: categoriaServicio → edt
   responsable?: User
   tareas: CotizacionTarea[]
 }
@@ -1000,11 +1009,11 @@ export interface ProyectoServicioCotizado {
   items: ProyectoServicioCotizadoItem[]
 
   // ✅ Relación opcional con EDT (incluida en consultas específicas)
-  edt?: {
+  proyectoEdt?: {
     id: string
     nombre: string
-    categoriaServicioId: string
-    categoriaServicio: {
+    edtId: string // Refactored: categoriaServicioId → edtId
+    edt: { // Refactored: categoriaServicio → edt
       id: string
       nombre: string
     }
@@ -1104,10 +1113,10 @@ export interface ListaEquipo {
   
   // ✅ Prisma count aggregation (opcional, disponible cuando se incluye en queries)
   _count?: {
-    items: number
+    listaEquipoItem: number
   }
   
-  items: ListaEquipoItem[]
+  listaEquipoItem: ListaEquipoItem[]
   proyecto?: Proyecto | null       // ✅ incluye info del proyecto si se hace include en la API
 }
 
@@ -1200,7 +1209,7 @@ export interface CotizacionProveedorItem {
   cotizacionId: string
   listaEquipoItemId?: string  // <- también opcional por si es null
   listaId?: string            // ✅ nuevo campo opcional
-  lista?: ListaEquipo         // ✅ relación opcional
+  listaEquipo?: ListaEquipo   // ✅ relación opcional
   // 📋 Copiados de ListaEquipoItem (para trazabilidad)
   codigo: string
   descripcion: string
@@ -1219,7 +1228,7 @@ export interface CotizacionProveedorItem {
   createdAt: string
   updatedAt: string
   // 🔗 Relaciones
-  cotizacion: CotizacionProveedor
+  cotizacionProveedor: CotizacionProveedor
   listaEquipoItem?: ListaEquipoItem
 }
 
@@ -1607,7 +1616,7 @@ export interface RegistroProgreso {
 // ===================================================
 
 // 🔧 Enums para el sistema EDT
-export type EstadoEdt = 'planificado' | 'en_progreso' | 'detenido' | 'completado' | 'cancelado'
+export type EstadoEdt = 'planificado' | 'en_progreso' | 'detenido' | 'completado' | 'cancelado' | 'pausado'
 export type PrioridadEdt = 'baja' | 'media' | 'alta' | 'critica'
 export type OrigenTrabajo = 'planificado' | 'adicional' | 'correctivo' | 'emergencia'
 export type ProyectoEstado = 'creado' | 'en_planificacion' | 'en_ejecucion' | 'pausado' | 'completado' | 'cancelado' | 'listas_pendientes' | 'listas_aprobadas' | 'pedidos_creados'
@@ -1617,7 +1626,7 @@ export interface ProyectoEdt {
   id: string
   proyectoId: string
   nombre: string // Nombre descriptivo del EDT
-  categoriaServicioId: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -1640,7 +1649,7 @@ export interface ProyectoEdt {
     codigo: string
     estado: ProyectoEstado
   }
-  categoriaServicio: {
+  edt: { // Refactored: categoriaServicio → edt
     id: string
     nombre: string
   }
@@ -1882,10 +1891,10 @@ export interface TendenciaMensual {
   promedioAvance: number
 }
 
-// 🎯 Interface para análisis de rendimiento por categoría
+// 🎯 Interface para análisis de rendimiento por EDT
 export interface AnalisisRendimiento {
-  categoriaServicioId: string
-  categoriaServicioNombre: string
+  edtId: string // Refactored: categoriaServicioId → edtId
+  edtNombre: string // Refactored: categoriaServicioNombre → edtNombre
   totalEdts: number
   horasPlan: number
   horasReales: number
@@ -1937,8 +1946,8 @@ export interface ResumenCronograma {
 
 // 📊 Interface para comparativo plan vs real
 export interface ComparativoPlanReal {
-  categoriaServicioId: string
-  categoriaServicioNombre: string
+  edtId: string // Refactored: categoriaServicioId → edtId
+  edtNombre: string // Refactored: categoriaServicioNombre → edtNombre
   horasPlan: number
   horasReales: number
   porcentajeAvance: number
@@ -1949,7 +1958,7 @@ export interface ComparativoPlanReal {
 // 🔍 Interface para filtros de cronograma
 export interface FiltrosCronogramaData {
   proyectoId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   responsableId?: string
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
@@ -1964,7 +1973,7 @@ export interface CreateProyectoEdtData {
   proyectoId: string
   proyectoCronogramaId: string
   nombre: string
-  categoriaServicioId: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   responsableId?: string
   fechaInicioPlan?: Date | null
   fechaFinPlan?: Date | null
@@ -1995,7 +2004,7 @@ export interface ProyectoEdtConRelaciones {
   id: string
   proyectoId: string
   nombre: string // Nombre descriptivo del EDT
-  categoriaServicioId: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -2018,7 +2027,7 @@ export interface ProyectoEdtConRelaciones {
     codigo: string
     estado: ProyectoEstado
   }
-  categoriaServicio: {
+  edt: { // Refactored: categoriaServicio → edt
     id: string
     nombre: string
   }
@@ -2027,7 +2036,7 @@ export interface ProyectoEdtConRelaciones {
     name: string | null
     email: string
   }
-  registrosHoras: {
+  registroHoras: {
     id: string
     proyectoId: string
     proyectoServicioId: string
@@ -2042,12 +2051,12 @@ export interface ProyectoEdtConRelaciones {
     observaciones?: string
     aprobado: boolean
     proyectoEdtId: string
-    categoriaServicioId: string
+    edtId: string // Refactored: categoriaServicioId → edtId
     origen: string
     ubicacion: string
     createdAt: string
     updatedAt: string
-    usuario: {
+    user: {
       id: string
       name: string | null
       email: string

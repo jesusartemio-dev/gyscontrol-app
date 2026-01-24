@@ -14,6 +14,7 @@ async function main() {
     where: { email: 'admin@gys.com' },
     update: {},
     create: {
+      id: 'user-admin-default',
       email: 'admin@gys.com',
       name: 'Administrador GYS',
       password: hashedPassword,
@@ -33,6 +34,7 @@ async function main() {
     where: { email: 'comercial@gys.com' },
     update: {},
     create: {
+      id: 'user-comercial-default',
       email: 'comercial@gys.com',
       name: 'Usuario Comercial',
       password: hashedPassword,
@@ -45,6 +47,7 @@ async function main() {
     where: { email: 'test@test.com' },
     update: {},
     create: {
+      id: 'user-test-default',
       email: 'test@test.com',
       name: 'Usuario de Prueba',
       password: 'test123', // Contraseña sin hash para testing
@@ -71,6 +74,7 @@ async function main() {
     where: { email: 'logistico@gys.com' },
     update: {},
     create: {
+      id: 'user-logistico-default',
       email: 'logistico@gys.com',
       name: 'Usuario Logístico',
       password: hashedPassword,

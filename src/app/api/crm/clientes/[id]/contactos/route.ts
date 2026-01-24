@@ -95,6 +95,7 @@ export async function POST(
     // Crear el contacto
     const nuevoContacto = await prisma.crmContactoCliente.create({
       data: {
+        id: `crm-cont-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         clienteId: id,
         nombre: nombre.trim(),
         cargo: cargo?.trim(),
@@ -104,7 +105,8 @@ export async function POST(
         esDecisionMaker: esDecisionMaker || false,
         areasInfluencia: areasInfluencia?.trim(),
         relacionComercial: relacionComercial?.trim(),
-        notas: notas?.trim()
+        notas: notas?.trim(),
+        updatedAt: new Date()
       }
     })
 

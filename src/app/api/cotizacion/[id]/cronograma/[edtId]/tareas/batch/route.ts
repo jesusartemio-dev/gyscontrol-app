@@ -149,7 +149,7 @@ export async function POST(
             cotizacionActividadId: '' // TODO: Fix to use proper activity ID
           } as any,
           include: {
-            responsable: {
+            user: {
               select: { id: true, name: true, email: true }
             }
           }

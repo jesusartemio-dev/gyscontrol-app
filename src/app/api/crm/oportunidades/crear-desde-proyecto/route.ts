@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
     // Crear la oportunidad
     const oportunidad = await prisma.crmOportunidad.create({
       data: {
+        id: `crm-opp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         clienteId: proyecto.cliente.id,
         nombre: nombreOportunidad,
         descripcion: descripcion || `Oportunidad creada automáticamente desde el proyecto ${proyecto.nombre}`,
@@ -100,7 +101,8 @@ export async function POST(req: NextRequest) {
         comercialId: comercialId || proyecto.comercial?.id,
         responsableId: comercialId || proyecto.comercial?.id,
         proyectoId: proyecto.id,
-        fechaCierreEstimada: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString() // 60 días por defecto
+        fechaCierreEstimada: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 días por defecto
+        updatedAt: new Date()
       },
       include: {
         cliente: {
@@ -129,12 +131,14 @@ export async function POST(req: NextRequest) {
 
     await prisma.crmActividad.create({
       data: {
+        id: `crm-act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         oportunidadId: oportunidad.id,
         tipo: tipo === 'seguimiento' ? 'seguimiento' : 'llamada',
         descripcion: descripcionActividad,
         fecha: new Date().toISOString(),
         resultado: 'neutro',
-        usuarioId: comercialId || proyecto.comercial?.id || 'system'
+        usuarioId: comercialId || proyecto.comercial?.id || 'system',
+        updatedAt: new Date()
       }
     })
 

@@ -76,7 +76,7 @@ export async function GET(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -149,7 +149,7 @@ export async function POST(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -222,17 +222,17 @@ async function getAvailableEdtsForFase(cotizacionId: string, faseDbId: string) {
   // Obtener categorías de servicios que no tienen EDT en esta fase
   const servicios = await prisma.cotizacionServicio.findMany({
     where: { cotizacionId },
-    include: { items: true }
+    include: { cotizacionServicioItem: true }
   })
 
   // Obtener todas las categorías disponibles
-  const categorias = await prisma.categoriaServicio.findMany({
+  const categorias = await prisma.edt.findMany({
     select: { id: true, nombre: true }
   })
 
   const categoriaNombresMap = new Map(categorias.map(cat => [cat.id, cat.nombre]))
 
-  const categoriasEnServicios = [...new Set(servicios.map(s => s.categoria).filter(Boolean))]
+  const categoriasEnServicios = [...new Set(servicios.map(s => s.edtId).filter(Boolean))]
 
   // Obtener EDTs ya existentes en esta fase
   const edtsExistentes = await prisma.cotizacionEdt.findMany({
@@ -251,9 +251,9 @@ async function getAvailableEdtsForFase(cotizacionId: string, faseDbId: string) {
   // Crear items disponibles
   const availableItems = categoriasDisponibles.map(categoriaId => {
     const categoriaNombre = categoriaNombresMap.get(categoriaId) || categoriaId
-    const serviciosCategoria = servicios.filter(s => s.categoria === categoriaId)
-    const horasTotales = serviciosCategoria.reduce((sum, servicio) =>
-      sum + servicio.items.reduce((itemSum, item) => itemSum + (item.horaTotal || 0), 0), 0
+    const serviciosCategoria = servicios.filter(s => s.edtId === categoriaId)
+    const horasTotales = serviciosCategoria.reduce((sum: number, servicio) =>
+      sum + servicio.cotizacionServicioItem.reduce((itemSum: number, item) => itemSum + (item.horaTotal || 0), 0), 0
     )
 
     return {
@@ -290,20 +290,20 @@ async function getAvailableActividadesForEdt(cotizacionId: string, edtDbId: stri
   if (!edt) return []
 
   // Encontrar la categoría que corresponde al nombre del EDT
-  const categoria = await prisma.categoriaServicio.findFirst({
+  const categoria = await prisma.edt.findFirst({
     where: { nombre: edt.nombre },
     select: { id: true }
   })
 
   if (!categoria) return []
 
-  // Obtener servicios de esta categoría
+  // Obtener servicios de este EDT
   const servicios = await prisma.cotizacionServicio.findMany({
     where: {
       cotizacionId,
-      categoria: categoria.id
+      edtId: categoria.id
     },
-    include: { items: true }
+    include: { cotizacionServicioItem: true }
   })
 
   // Obtener actividades ya existentes en este EDT
@@ -319,7 +319,7 @@ async function getAvailableActividadesForEdt(cotizacionId: string, edtDbId: stri
 
   // Crear items disponibles
   const availableItems = serviciosDisponibles.map(servicio => {
-    const horasTotales = servicio.items.reduce((sum, item) => sum + (item.horaTotal || 0), 0)
+    const horasTotales = servicio.cotizacionServicioItem.reduce((sum: number, item) => sum + (item.horaTotal || 0), 0)
 
     return {
       id: `actividad-${servicio.id}`,
@@ -327,7 +327,7 @@ async function getAvailableActividadesForEdt(cotizacionId: string, edtDbId: stri
       descripcion: (servicio as any).descripcion || `Actividad desde servicio ${servicio.nombre}`,
       servicioNombre: servicio.nombre,
       totalHoras: horasTotales,
-      totalItems: servicio.items.length,
+      totalItems: servicio.cotizacionServicioItem.length,
       alreadyAdded: false
     }
   })
@@ -427,7 +427,7 @@ async function importEdtsToFase(cotizacionId: string, faseDbId: string, selected
   }
 
   // Obtener mapa de nombres de categorías
-  const categorias = await prisma.categoriaServicio.findMany({
+  const categorias = await prisma.edt.findMany({
     select: { id: true, nombre: true }
   })
   const categoriaNombresMap = new Map(categorias.map(cat => [cat.id, cat.nombre]))
@@ -453,20 +453,20 @@ async function importEdtsToFase(cotizacionId: string, faseDbId: string, selected
     const categoriaId = selectedId.replace('edt-', '')
     const categoriaNombre = categoriaNombresMap.get(categoriaId) || categoriaId
 
-    // Obtener servicios de esta categoría
+    // Obtener servicios de este EDT
     const servicios = await prisma.cotizacionServicio.findMany({
       where: {
         cotizacionId,
-        categoria: categoriaId
+        edtId: categoriaId
       },
-      include: { items: true }
+      include: { cotizacionServicioItem: true }
     })
 
     if (servicios.length === 0) continue
 
     // Calcular horas totales
-    const horasTotales = servicios.reduce((sum, servicio) =>
-      sum + servicio.items.reduce((itemSum, item) => itemSum + (item.horaTotal || 0), 0), 0
+    const horasTotales = servicios.reduce((sum: number, servicio) =>
+      sum + servicio.cotizacionServicioItem.reduce((itemSum: number, item) => itemSum + (item.horaTotal || 0), 0), 0
     )
 
     // ✅ GYS-GEN-10: Calcular duración del EDT basada en horas
@@ -491,6 +491,7 @@ async function importEdtsToFase(cotizacionId: string, faseDbId: string, selected
     // Crear EDT con fechas calculadas
     await prisma.cotizacionEdt.create({
       data: {
+        id: `edt-import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionId,
         cotizacionFaseId: faseDbId,
         cotizacionServicioId: servicios[0].id, // Usar el primer servicio como referencia
@@ -500,7 +501,8 @@ async function importEdtsToFase(cotizacionId: string, faseDbId: string, selected
         estado: 'planificado',
         prioridad: 'media',
         fechaInicioComercial: fechaInicioSiguienteEdt.toISOString(),
-        fechaFinComercial: fechaFinEdt.toISOString()
+        fechaFinComercial: fechaFinEdt.toISOString(),
+        updatedAt: new Date()
       }
     })
 
@@ -636,7 +638,7 @@ async function importActividadesToEdt(cotizacionId: string, edtDbId: string, sel
     // Obtener el servicio
     const servicio = await prisma.cotizacionServicio.findUnique({
       where: { id: servicioId },
-      include: { items: true }
+      include: { cotizacionServicioItem: true }
     })
 
     if (!servicio) continue
@@ -650,15 +652,15 @@ async function importActividadesToEdt(cotizacionId: string, edtDbId: string, sel
     if (!edt) continue
 
     // Encontrar la categoría que corresponde al nombre del EDT
-    const categoria = await prisma.categoriaServicio.findFirst({
+    const categoria = await prisma.edt.findFirst({
       where: { nombre: edt.nombre },
       select: { id: true }
     })
 
-    if (!categoria || servicio.categoria !== categoria.id) continue
+    if (!categoria || servicio.edtId !== categoria.id) continue
 
     // Calcular horas totales
-    const horasTotales = servicio.items.reduce((sum, item) => sum + (item.horaTotal || 0), 0)
+    const horasTotales = servicio.cotizacionServicioItem.reduce((sum: number, item) => sum + (item.horaTotal || 0), 0)
 
     // ✅ GYS-GEN-10: Calcular duración basada en horas del servicio
     let duracionActividadDias = 7 // Duración por defecto
@@ -682,6 +684,7 @@ async function importActividadesToEdt(cotizacionId: string, edtDbId: string, sel
     // Crear actividad con fechas calculadas
     await prisma.cotizacionActividad.create({
       data: {
+        id: `act-import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionEdtId: edtDbId,
         nombre: servicio.nombre,
         descripcion: `Actividad generada desde servicio ${servicio.nombre}`,
@@ -689,7 +692,8 @@ async function importActividadesToEdt(cotizacionId: string, edtDbId: string, sel
         estado: 'pendiente',
         prioridad: 'media',
         fechaInicioComercial: fechaInicioSiguienteActividad.toISOString(),
-        fechaFinComercial: fechaFinActividad.toISOString()
+        fechaFinComercial: fechaFinActividad.toISOString(),
+        updatedAt: new Date()
       }
     })
 
@@ -782,6 +786,7 @@ async function importTareasToActividad(cotizacionId: string, actividadDbId: stri
     // Crear tarea con fechas calculadas
     await prisma.cotizacionTarea.create({
       data: {
+        id: `tarea-import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionActividadId: actividadDbId,
         cotizacionServicioItemId: item.id,
         nombre: item.nombre,
@@ -790,7 +795,8 @@ async function importTareasToActividad(cotizacionId: string, actividadDbId: stri
         fechaFin: fechaFinTarea.toISOString(),
         horasEstimadas: item.horaTotal || 1,
         estado: 'pendiente',
-        prioridad: 'media'
+        prioridad: 'media',
+        updatedAt: new Date()
       }
     })
 

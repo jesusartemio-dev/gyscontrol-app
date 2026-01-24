@@ -182,10 +182,10 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
 
                     {/* Lista */}
                     <td className="px-6 py-4 text-center">
-                      {item.lista ? (
+                      {item.listaEquipo ? (
                         <div className="text-xs">
-                          <div className="font-medium text-gray-900">{item.lista.nombre}</div>
-                          <div className="text-gray-500">{item.lista.codigo}</div>
+                          <div className="font-medium text-gray-900">{item.listaEquipo.nombre}</div>
+                          <div className="text-gray-500">{item.listaEquipo.codigo}</div>
                         </div>
                       ) : (
                         <Badge variant="destructive" className="text-xs">Eliminada</Badge>

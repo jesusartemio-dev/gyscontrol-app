@@ -70,7 +70,7 @@ function calcularEstadoProyecto(proyecto: any): 'activo' | 'pausado' | 'completa
 function calcularProgreso(listas: any[], pedidos: any[]): number {
   if (listas.length === 0) return 0
   
-  const listasAprobadas = listas.filter(l => l.estado === 'aprobado').length
+  const listasAprobadas = listas.filter(l => l.estado === 'aprobada').length
   const pedidosEnviados = pedidos.filter(p => p.estado === 'enviado').length
   
   const progresoListas = listas.length > 0 ? (listasAprobadas / listas.length) * 50 : 0
@@ -190,9 +190,9 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        listaEquipos: {
+        listaEquipo: {
           include: {
-            items: {
+            listaEquipoItem: {
               select: {
                 id: true,
                 codigo: true,
@@ -207,9 +207,9 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        pedidos: {
+        pedidoEquipo: {
           include: {
-            items: {
+            pedidoEquipoItem: {
               select: {
                 id: true,
                 codigo: true,
@@ -235,20 +235,20 @@ export async function GET(request: NextRequest) {
     
     // 🔄 Transformar datos a formato consolidado
     let proyectosConsolidados: ProyectoConsolidado[] = proyectos.map(proyecto => {
-      const listas = proyecto.listaEquipos || []
-      const pedidos = proyecto.pedidos || []
-      
+      const listas = proyecto.listaEquipo || []
+      const pedidos = proyecto.pedidoEquipo || []
+
       // 💰 Calcular presupuesto total (suma de costoElegido de todos los items)
       const presupuestoTotal = listas.reduce((total, lista) => {
-        const montoLista = lista.items?.reduce((subtotal, item) => {
+        const montoLista = lista.listaEquipoItem?.reduce((subtotal, item) => {
           return subtotal + (item.costoElegido || 0) * item.cantidad
         }, 0) || 0
         return total + montoLista
       }, 0)
-      
+
       // 💰 Calcular presupuesto ejecutado (suma de costoReal de todos los items)
       const presupuestoEjecutado = listas.reduce((total, lista) => {
-        const montoLista = lista.items?.reduce((subtotal, item) => {
+        const montoLista = lista.listaEquipoItem?.reduce((subtotal, item) => {
           return subtotal + (item.costoReal || 0) * item.cantidad
         }, 0) || 0
         return total + montoLista
@@ -256,22 +256,22 @@ export async function GET(request: NextRequest) {
       
       // 💰 Calcular montos de listas (para mostrar en la sección de listas)
       const montoTotalListas = listas.reduce((total, lista) => {
-        const montoLista = lista.items?.reduce((subtotal, item) => {
+        const montoLista = lista.listaEquipoItem?.reduce((subtotal, item) => {
           return subtotal + (item.precioElegido || 0) * item.cantidad
         }, 0) || 0
         return total + montoLista
       }, 0)
-      
+
       // 💰 Calcular montos de pedidos
       const montoTotalPedidos = pedidos.reduce((total, pedido) => {
-        const montoPedido = pedido.items?.reduce((subtotal, item) => {
+        const montoPedido = pedido.pedidoEquipoItem?.reduce((subtotal, item) => {
           return subtotal + (item.precioUnitario || 0) * item.cantidadPedida
         }, 0) || 0
         return total + montoPedido
       }, 0)
       
       // 📊 Contar estados
-      const listasAprobadas = listas.filter((l: any) => l.estado === 'aprobado').length
+      const listasAprobadas = listas.filter((l: any) => l.estado === 'aprobada').length
       const listasPendientes = listas.filter((l: any) => l.estado === 'borrador' || l.estado === 'por_revisar').length
 
       const pedidosEnviados = pedidos.filter((p: any) => p.estado === 'enviado').length

@@ -29,7 +29,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import type { CategoriaServicio } from '@/types/modelos'
+import type { Edt } from '@/types/modelos'
 
 interface CotizacionEdtFormProps {
   cotizacionId: string
@@ -52,7 +52,7 @@ export function CotizacionEdtForm({
   const [duracionesConfig, setDuracionesConfig] = useState<any[]>([])
   const [formData, setFormData] = useState({
     nombre: '',
-    categoriaServicioId: '',
+    edtId: '',
     fechaInicioCom: '',
     fechaFinCom: '',
     horasCom: '',
@@ -209,7 +209,7 @@ export function CotizacionEdtForm({
     if (edt) {
       setFormData({
         nombre: edt.nombre || '',
-        categoriaServicioId: edt.categoriaServicio?.id || '',
+        edtId: edt.edt?.id || '',
         fechaInicioCom: edt.fechaInicioComercial
           ? new Date(edt.fechaInicioComercial).toISOString().split('T')[0]
           : '',
@@ -258,7 +258,7 @@ export function CotizacionEdtForm({
         return
       }
 
-      if (!formData.categoriaServicioId) {
+      if (!formData.edtId) {
         toast({
           title: 'Error de validación',
           description: 'Debe seleccionar un servicio.',
@@ -268,7 +268,7 @@ export function CotizacionEdtForm({
       }
 
       // Validar que el servicio seleccionado existe
-      const servicioExists = servicios.some(serv => serv.categoriaServicioId === formData.categoriaServicioId)
+      const servicioExists = servicios.some(serv => serv.edtId === formData.edtId)
       if (!servicioExists) {
         toast({
           title: 'Error de validación',
@@ -314,7 +314,7 @@ export function CotizacionEdtForm({
 
       const requestData = {
         nombre: formData.nombre.trim(),
-        categoriaServicioId: formData.categoriaServicioId,
+        edtId: formData.edtId,
         fechaInicioCom: formData.fechaInicioCom ? new Date(formData.fechaInicioCom).toISOString() : undefined,
         fechaFinCom: formData.fechaFinCom ? new Date(formData.fechaFinCom).toISOString() : undefined,
         horasCom: horasValue,
@@ -327,7 +327,7 @@ export function CotizacionEdtForm({
       console.log('Request data:', requestData)
       console.log('Request data types:', {
         nombre: typeof requestData.nombre,
-        categoriaServicioId: typeof requestData.categoriaServicioId,
+        edtId: typeof requestData.edtId,
         fechaInicioCom: typeof requestData.fechaInicioCom,
         fechaFinCom: typeof requestData.fechaFinCom,
         horasCom: typeof requestData.horasCom,
@@ -390,12 +390,12 @@ export function CotizacionEdtForm({
           </div>
 
           <div>
-            <Label htmlFor="categoriaServicioId">Servicio *</Label>
+            <Label htmlFor="edtId">Servicio *</Label>
             <Select
-              value={formData.categoriaServicioId}
+              value={formData.edtId}
               onValueChange={(value) => {
                 // ✅ Auto-cargar horas del servicio seleccionado
-                const servicioSeleccionado = servicios.find(s => s.categoriaServicioId === value)
+                const servicioSeleccionado = servicios.find(s => s.edtId === value)
                 const horasTotalesServicio = servicioSeleccionado ? calcularHorasTotalesServicio(servicioSeleccionado) : 0
 
                 // ✅ Si no hay horas del servicio, usar configuración por defecto
@@ -409,7 +409,7 @@ export function CotizacionEdtForm({
 
                 setFormData(prev => ({
                   ...prev,
-                  categoriaServicioId: value,
+                  edtId: value,
                   // ✅ Auto-fill nombre del EDT con la descripción de la categoría
                   nombre: categoriaNombre,
                   horasCom: horasFinales.toString(),
@@ -432,9 +432,9 @@ export function CotizacionEdtForm({
               </SelectTrigger>
               <SelectContent>
                 {!serviciosLoading && servicios.length > 0 && servicios
-                  .filter(servicio => servicio.categoriaServicioId) // Only show services with categoriaServicioId
+                  .filter(servicio => servicio.edtId) // Only show services with edtId
                   .map((servicio) => (
-                    <SelectItem key={servicio.id} value={servicio.categoriaServicioId!}>
+                    <SelectItem key={servicio.id} value={servicio.edtId!}>
                       {servicio.nombre} - {servicio.items[0]?.catalogoServicio?.categoria?.nombre || servicio.categoria}
                     </SelectItem>
                   ))}
@@ -643,7 +643,7 @@ export function CotizacionEdtForm({
                 serviciosLoading ||
                 fasesLoading ||
                 !formData.nombre?.trim() ||
-                !formData.categoriaServicioId ||
+                !formData.edtId ||
                 !formData.fechaInicioCom ||
                 !formData.horasCom ||
                 parseFloat(formData.horasCom) <= 0

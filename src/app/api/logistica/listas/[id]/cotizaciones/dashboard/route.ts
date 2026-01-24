@@ -12,11 +12,11 @@ export async function GET(
     const lista = await prisma.listaEquipo.findUnique({
       where: { id },
       include: {
-        items: {
+        listaEquipoItem: {
           include: {
-            cotizaciones: {
+            cotizacionProveedorItems: {
               include: {
-                cotizacion: true
+                cotizacionProveedor: true
               }
             },
             cotizacionSeleccionada: true
@@ -38,21 +38,21 @@ export async function GET(
 
     // Calcular estadísticas
     const stats = {
-      totalItems: lista.items.length,
-      withQuotations: lista.items.filter(item => item.cotizaciones.length > 0).length,
-      receivedQuotations: lista.items.reduce((sum, item) =>
-        sum + item.cotizaciones.filter(cot => cot.estado === 'cotizado').length, 0
+      totalItems: lista.listaEquipoItem.length,
+      withQuotations: lista.listaEquipoItem.filter(item => item.cotizacionProveedorItems.length > 0).length,
+      receivedQuotations: lista.listaEquipoItem.reduce((sum, item) =>
+        sum + item.cotizacionProveedorItems.filter(cot => cot.estado === 'cotizado').length, 0
       ),
-      selectedCount: lista.items.filter(item => item.cotizacionSeleccionadaId).length,
-      completionPercentage: lista.items.length > 0
-        ? (lista.items.filter(item => item.cotizacionSeleccionadaId).length / lista.items.length) * 100
+      selectedCount: lista.listaEquipoItem.filter(item => item.cotizacionSeleccionadaId).length,
+      completionPercentage: lista.listaEquipoItem.length > 0
+        ? (lista.listaEquipoItem.filter(item => item.cotizacionSeleccionadaId).length / lista.listaEquipoItem.length) * 100
         : 0
     }
 
     return NextResponse.json({
       lista,
       stats,
-      items: lista.items
+      items: lista.listaEquipoItem
     })
 
   } catch (error) {

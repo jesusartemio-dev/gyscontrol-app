@@ -63,12 +63,14 @@ interface LogisticaListasTableProps {
 
 const ESTADOS_CONFIG: Record<EstadoListaEquipo, { label: string; color: string; bgColor: string }> = {
   borrador: { label: 'Borrador', color: 'text-gray-700', bgColor: 'bg-gray-100' },
+  enviada: { label: 'Enviada', color: 'text-indigo-700', bgColor: 'bg-indigo-100' },
   por_revisar: { label: 'Por Revisar', color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
   por_cotizar: { label: 'Por Cotizar', color: 'text-blue-700', bgColor: 'bg-blue-100' },
   por_validar: { label: 'Por Validar', color: 'text-orange-700', bgColor: 'bg-orange-100' },
   por_aprobar: { label: 'Por Aprobar', color: 'text-purple-700', bgColor: 'bg-purple-100' },
-  aprobado: { label: 'Aprobado', color: 'text-green-700', bgColor: 'bg-green-100' },
-  rechazado: { label: 'Rechazado', color: 'text-red-700', bgColor: 'bg-red-100' },
+  aprobada: { label: 'Aprobada', color: 'text-green-700', bgColor: 'bg-green-100' },
+  rechazada: { label: 'Rechazada', color: 'text-red-700', bgColor: 'bg-red-100' },
+  completada: { label: 'Completada', color: 'text-emerald-700', bgColor: 'bg-emerald-100' },
 }
 
 const ITEMS_PER_PAGE = 10
@@ -111,8 +113,8 @@ export default function LogisticaListasTable({ listas, proyectos, loading = fals
           bValue = new Date(b.createdAt)
           break
         case 'itemsCount':
-          aValue = a.items?.length || 0
-          bValue = b.items?.length || 0
+          aValue = a.listaEquipoItem?.length || 0
+          bValue = b.listaEquipoItem?.length || 0
           break
         case 'cotizacionesCount':
           const aStats = calcularStatsCotizacionLista(a)
@@ -283,7 +285,7 @@ export default function LogisticaListasTable({ listas, proyectos, loading = fals
             <TableBody>
               {currentListas.map((lista) => {
                 const estadoConfig = ESTADOS_CONFIG[lista.estado]
-                const itemsCount = lista.items?.length || 0
+                const itemsCount = lista.listaEquipoItem?.length || 0
                 const cotizacionStats = calcularStatsCotizacionLista(lista)
 
                 return (

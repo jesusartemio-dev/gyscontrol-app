@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { PedidoEquipoTable } from './PedidoEquipoTable';
 import type { PedidoEquipo, EstadoPedido } from '@/types/modelos';
 
@@ -27,10 +28,25 @@ export const PedidoEquipoTableWrapper: React.FC<PedidoEquipoTableWrapperProps> =
   pagination,
   sorting
 }) => {
+  const router = useRouter();
+
   // 🔁 Event handlers
+  const handlePedidoClick = (pedido: PedidoEquipo) => {
+    // Navegar al detalle del pedido dentro del proyecto
+    if (pedido.proyectoId) {
+      router.push(`/proyectos/${pedido.proyectoId}/equipos/pedidos/${pedido.id}`);
+    } else {
+      // Fallback si no hay proyectoId
+      router.push(`/finanzas/aprovisionamiento/pedidos/${pedido.id}`);
+    }
+  };
+
   const handleEdit = (pedido: PedidoEquipo) => {
     console.log('Edit pedido:', pedido.id);
-    // TODO: Implement edit functionality
+    // Navegar a edición
+    if (pedido.proyectoId) {
+      router.push(`/proyectos/${pedido.proyectoId}/equipos/pedidos/${pedido.id}?edit=true`);
+    }
   };
 
   const handleDelete = (pedido: PedidoEquipo) => {
@@ -44,7 +60,11 @@ export const PedidoEquipoTableWrapper: React.FC<PedidoEquipoTableWrapperProps> =
   };
 
   const handleViewTracking = (pedido: PedidoEquipo) => {
-    window.location.href = `/finanzas/aprovisionamiento/pedidos/${pedido.id}/tracking`;
+    if (pedido.proyectoId) {
+      router.push(`/proyectos/${pedido.proyectoId}/equipos/pedidos/${pedido.id}#tracking`);
+    } else {
+      router.push(`/finanzas/aprovisionamiento/pedidos/${pedido.id}/tracking`);
+    }
   };
 
   const handleContactSupplier = (pedido: PedidoEquipo) => {
@@ -53,10 +73,11 @@ export const PedidoEquipoTableWrapper: React.FC<PedidoEquipoTableWrapperProps> =
   };
 
   return (
-    <PedidoEquipoTable 
+    <PedidoEquipoTable
       data={data}
       pagination={pagination}
       sorting={sorting}
+      onPedidoClick={handlePedidoClick}
       onEdit={handleEdit}
       onDelete={handleDelete}
       onUpdateStatus={handleUpdateStatus}

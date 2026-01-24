@@ -85,14 +85,10 @@ export default function CotizacionServicioCreateModal({
       return
     }
 
-    // Find the EDT name from the selected EDT ID
-    const selectedEdt = edts.find(c => c.id === edt)
-    const edtNombre = selectedEdt?.nombre || ''
-
     const payload: CotizacionServicioPayload = {
       cotizacionId,
       nombre: nombre.trim(),
-      categoria: edtNombre, // Save EDT name, not ID
+      edtId: edt,
       subtotalInterno: 0,
       subtotalCliente: 0
     }

@@ -18,14 +18,14 @@ export class ProgresoService {
       const tarea = await prisma.proyectoTarea.findUnique({
         where: { id: tareaId },
         include: {
-          registrosHoras: true
+          registroHoras: true
         }
       })
 
       if (!tarea) return
 
       // Calcular horas reales totales
-      const horasReales = tarea.registrosHoras.reduce((sum, registro) => sum + registro.horasTrabajadas, 0)
+      const horasReales = tarea.registroHoras.reduce((sum, registro) => sum + registro.horasTrabajadas, 0)
 
       // Calcular progreso basado en horas
       let porcentajeAvance = 0
@@ -62,21 +62,21 @@ export class ProgresoService {
       const actividad = await prisma.proyectoActividad.findUnique({
         where: { id: actividadId },
         include: {
-          tareas: true
+          proyectoTarea: true
         }
       })
 
-      if (!actividad || actividad.tareas.length === 0) return
+      if (!actividad || actividad.proyectoTarea.length === 0) return
 
       // Calcular progreso promedio de tareas
-      const totalTareas = actividad.tareas.length
-      const tareasCompletadas = actividad.tareas.filter(t => t.estado === 'completada').length
+      const totalTareas = actividad.proyectoTarea.length
+      const tareasCompletadas = actividad.proyectoTarea.filter(t => t.estado === 'completada').length
       const progresoPromedio = Math.round(
-        actividad.tareas.reduce((sum, tarea) => sum + tarea.porcentajeCompletado, 0) / totalTareas
+        actividad.proyectoTarea.reduce((sum, tarea) => sum + tarea.porcentajeCompletado, 0) / totalTareas
       )
 
       // Calcular horas reales totales
-      const horasReales = actividad.tareas.reduce((sum, tarea) => sum + Number(tarea.horasReales), 0)
+      const horasReales = actividad.proyectoTarea.reduce((sum, tarea) => sum + Number(tarea.horasReales), 0)
 
       // Actualizar actividad
       await prisma.proyectoActividad.update({
@@ -153,15 +153,15 @@ export class ProgresoService {
       const fase = await prisma.proyectoFase.findUnique({
         where: { id: faseId },
         include: {
-          edts: true
+          proyectoEdt: true
         }
       })
 
-      if (!fase || fase.edts.length === 0) return
+      if (!fase || fase.proyectoEdt.length === 0) return
 
       // Calcular progreso promedio de EDTs
       const progresoPromedio = Math.round(
-        fase.edts.reduce((sum, edt) => sum + edt.porcentajeAvance, 0) / fase.edts.length
+        fase.proyectoEdt.reduce((sum, edt) => sum + edt.porcentajeAvance, 0) / fase.proyectoEdt.length
       )
 
       // Actualizar fase
@@ -190,15 +190,15 @@ export class ProgresoService {
       const proyecto = await prisma.proyecto.findUnique({
         where: { id: proyectoId },
         include: {
-          fases: true
+          proyectoFase: true
         }
       })
 
-      if (!proyecto || proyecto.fases.length === 0) return
+      if (!proyecto || proyecto.proyectoFase.length === 0) return
 
       // Calcular progreso promedio de fases
       const progresoGeneral = Math.round(
-        proyecto.fases.reduce((sum, fase) => sum + fase.porcentajeAvance, 0) / proyecto.fases.length
+        proyecto.proyectoFase.reduce((sum, fase) => sum + fase.porcentajeAvance, 0) / proyecto.proyectoFase.length
       )
 
       // Actualizar proyecto
@@ -230,26 +230,28 @@ export class ProgresoService {
       const proyectoId = await this.obtenerProyectoIdDesdeElemento(nivel, elementoId)
       const recursoId = await this.obtenerRecursoIdDesdeUsuario(usuarioId)
       const recurso = await prisma.recurso.findUnique({ where: { id: recursoId } })
-      const categoriaServicioId = await this.obtenerCategoriaServicioIdDesdeElemento(nivel, elementoId)
-      const categoriaServicio = categoriaServicioId ? await prisma.categoriaServicio.findUnique({ where: { id: categoriaServicioId } }) : null
+      const edtId = await this.obtenerCategoriaServicioIdDesdeElemento(nivel, elementoId)
+      const edtCatalogo = edtId ? await prisma.edt.findUnique({ where: { id: edtId } }) : null
 
       // Crear registro de horas
       const registro = await prisma.registroHoras.create({
         data: {
+          id: crypto.randomUUID(),
           proyectoId,
           proyectoServicioId: await this.obtenerProyectoServicioIdDesdeElemento(nivel, elementoId),
-          categoria: categoriaServicio?.nombre || 'General',
+          categoria: edtCatalogo?.nombre || 'General',
           nombreServicio: 'Trabajo en Cronograma',
           recursoId,
           recursoNombre: recurso?.nombre || 'Recurso Genérico',
-          categoriaServicioId,
+          edtId,
           proyectoEdtId: nivel === 'edt' ? elementoId : await this.obtenerEdtIdDesdeElemento(nivel, elementoId),
           proyectoTareaId: nivel === 'tarea' ? elementoId : undefined,
           usuarioId,
           fechaTrabajo: fecha,
           horasTrabajadas: horas,
           descripcion,
-          aprobado: false // Requiere aprobación
+          aprobado: false, // Requiere aprobación
+          updatedAt: new Date()
         }
       })
 
@@ -315,11 +317,11 @@ export class ProgresoService {
   private static async obtenerCategoriaServicioIdDesdeElemento(nivel: string, elementoId: string): Promise<string | undefined> {
     switch (nivel) {
       case 'edt':
-        const edt = await prisma.proyectoEdt.findUnique({
+        const edtRecord = await prisma.proyectoEdt.findUnique({
           where: { id: elementoId },
-          include: { categoriaServicio: true }
+          include: { edt: true } // Prisma relation name
         })
-        return edt?.categoriaServicio?.id
+        return edtRecord?.edt?.id
 
       default:
         return undefined

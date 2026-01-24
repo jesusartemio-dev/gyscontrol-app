@@ -46,7 +46,7 @@ interface ProyectoActividad {
   proyectoCronogramaId: string;
   proyectoEdt?: {
     nombre: string;
-    categoriaServicio?: {
+    edt?: {
       nombre: string;
     };
   };
@@ -394,8 +394,8 @@ export function ProyectoActividadList({
                             {actividad.proyectoEdt && (
                               <div className="text-xs text-muted-foreground">
                                 EDT: {actividad.proyectoEdt?.nombre}
-                                {actividad.proyectoEdt?.categoriaServicio?.nombre && (
-                                  <> • {actividad.proyectoEdt?.categoriaServicio?.nombre}</>
+                                {actividad.proyectoEdt?.edt?.nombre && (
+                                  <> • {actividad.proyectoEdt?.edt?.nombre}</>
                                 )}
                               </div>
                             )}

@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
           id: true,
           proyectoId: true,
           nombre: true,
-          categoriaServicioId: true,
+          edtId: true,
           horasPlan: true,
           horasReales: true,
           estado: true
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
           proyectoId: true,
           horasTrabajadas: true,
           fechaTrabajo: true,
-          categoriaServicioId: true
+          edtId: true
         }
       }),
       
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
       proyectoEdts: {
         total: proyectoEdts.length,
         conHoras: proyectoEdts.filter(edt => Number(edt.horasReales) > 0).length,
-        categorias: [...new Set(proyectoEdts.map(edt => edt.categoriaServicioId))].length,
+        categorias: [...new Set(proyectoEdts.map(edt => edt.edtId))].length,
         ejemplos: proyectoEdts.slice(0, 5)
       },
       
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
         ).length,
         
         edtsSinMaestro: proyectoEdts.filter(edt =>
-          !edtsMaestros.some(m => m.id === edt.categoriaServicioId)
+          !edtsMaestros.some(m => m.id === edt.edtId)
         ).length
       }
     }

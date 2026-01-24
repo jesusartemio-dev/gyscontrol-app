@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             nombre: true
           }
         },
-        categoriaServicioRef: {
+        edt: {
           select: {
             nombre: true
           }
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         horas: registro.horasTrabajadas,
         descripcion: registro.descripcion || registro.observaciones || 'Sin descripción',
         proyectoNombre: registro.proyecto.nombre,
-        tareaNombre: registro.categoriaServicioRef?.nombre || 'Sin EDT',
+        tareaNombre: registro.edt?.nombre || 'Sin EDT',
         tareaTipo: 'registro',
         aprobado: registro.aprobado,
         fecha: registro.fechaTrabajo,

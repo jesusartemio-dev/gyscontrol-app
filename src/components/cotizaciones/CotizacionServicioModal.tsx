@@ -13,8 +13,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Loader2, AlertCircle, Settings } from 'lucide-react'
 import { createCotizacionServicio } from '@/lib/services/cotizacionServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
-import type { CotizacionServicio, CategoriaServicio } from '@/types'
+import { getEdts } from '@/lib/services/edt'
+import type { CotizacionServicio, Edt } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -49,7 +49,7 @@ export default function CotizacionServicioModal({
   const [internalOpen, setInternalOpen] = useState(false)
   const [nombre, setNombre] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingCategorias, setLoadingCategorias] = useState(false)
@@ -69,11 +69,11 @@ export default function CotizacionServicioModal({
   const loadCategorias = async () => {
     setLoadingCategorias(true)
     try {
-      const data = await getCategoriasServicio()
+      const data = await getEdts()
       setCategorias(data)
     } catch (error) {
-      console.error('Error loading categorias:', error)
-      toast.error('Error al cargar categorías')
+      console.error('Error loading EDTs:', error)
+      toast.error('Error al cargar EDTs')
     } finally {
       setLoadingCategorias(false)
     }
@@ -122,7 +122,7 @@ export default function CotizacionServicioModal({
     const payload = {
       cotizacionId,
       nombre: nombre.trim(),
-      categoria: categorias.find(c => c.id === categoriaId)?.nombre || '',
+      edtId: categoriaId,
       subtotalInterno: 0,
       subtotalCliente: 0
     }

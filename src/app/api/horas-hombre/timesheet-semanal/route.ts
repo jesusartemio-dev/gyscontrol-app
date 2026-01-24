@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
             nombre: true
           }
         },
-        categoriaServicioRef: {
+        edt: {
           select: {
             id: true,
             nombre: true
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             nombre: true,
-            categoriaServicio: {
+            edt: {
               select: {
                 id: true,
                 nombre: true
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             nombre: true,
-            proyecto_actividad: {
+            proyectoActividad: {
               select: {
                 id: true,
                 nombre: true
@@ -164,8 +164,8 @@ export async function GET(request: NextRequest) {
         descripcion: registro.descripcion || registro.observaciones || 'Sin descripción',
         // Formato jerárquico: Código Proyecto-EDT-Actividad:Tarea
         proyectoNombre: registro.proyecto ? `${registro.proyecto.codigo} - ${registro.proyecto.nombre}` : 'Sin proyecto',
-        edtNombre: registro.categoriaServicioRef?.nombre || 'Sin EDT',
-        actividadNombre: registro.proyectoTarea?.proyecto_actividad?.nombre || null,
+        edtNombre: registro.edt?.nombre || 'Sin EDT',
+        actividadNombre: registro.proyectoTarea?.proyectoActividad?.nombre || null,
         tareaNombre: registro.proyectoTarea?.nombre || null,
         tareaTipo: 'registro',
         aprobado: registro.aprobado,

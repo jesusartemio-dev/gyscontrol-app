@@ -176,7 +176,7 @@ export const useListaEquipoDetail = ({
   
   // 🔄 Extract data from response
   const lista = useMemo(() => detailData || null, [detailData]);
-  const items = useMemo(() => detailData?.items || [], [detailData]);
+  const items = useMemo(() => detailData?.listaEquipoItem || [], [detailData]);
   const proyecto = useMemo(() => detailData?.proyecto || null, [detailData]);
   
   // 📊 Calculate statistics

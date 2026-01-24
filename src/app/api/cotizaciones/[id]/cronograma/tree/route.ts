@@ -33,7 +33,7 @@ export async function GET(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -52,11 +52,11 @@ export async function GET(
     const fases = await prisma.cotizacionFase.findMany({
       where: { cotizacionId: id },
       include: {
-        edts: {
+        cotizacionEdt: {
           include: {
-            cotizacion_actividad: {
+            cotizacionActividad: {
               include: {
-                cotizacion_tarea: true
+                cotizacionTarea: true
               }
             }
           }
@@ -67,11 +67,11 @@ export async function GET(
 
     console.log(`🌳 API Tree - Fases encontradas: ${fases.length}`)
     fases.forEach(fase => {
-      console.log(`  - ${fase.nombre}: ${fase.edts.length} EDTs`)
-      fase.edts.forEach(edt => {
-        console.log(`    - ${edt.nombre}: ${edt.cotizacion_actividad?.length || 0} actividades`)
-        edt.cotizacion_actividad?.forEach(actividad => {
-          console.log(`      - ${actividad.nombre}: ${actividad.cotizacion_tarea?.length || 0} tareas`)
+      console.log(`  - ${fase.nombre}: ${fase.cotizacionEdt.length} EDTs`)
+      fase.cotizacionEdt.forEach(edt => {
+        console.log(`    - ${edt.nombre}: ${edt.cotizacionActividad?.length || 0} actividades`)
+        edt.cotizacionActividad?.forEach(actividad => {
+          console.log(`      - ${actividad.nombre}: ${actividad.cotizacionTarea?.length || 0} tareas`)
         })
       })
     })
@@ -83,9 +83,9 @@ export async function GET(
         cotizacionFaseId: null
       },
       include: {
-        cotizacion_actividad: {
+        cotizacionActividad: {
           include: {
-            cotizacion_tarea: true
+            cotizacionTarea: true
           }
         }
       },
@@ -110,9 +110,9 @@ export async function GET(
        nombre: fase.nombre,
        level: 1,
        expanded: expandedNodes.includes(`fase-${fase.id}`),
-       hasChildren: fase.edts?.length > 0,
-       totalChildren: fase.edts?.length || 0,
-       progressPercentage: calculateProgress(fase.edts || []),
+       hasChildren: fase.cotizacionEdt?.length > 0,
+       totalChildren: fase.cotizacionEdt?.length || 0,
+       progressPercentage: calculateProgress(fase.cotizacionEdt || []),
        status: fase.estado || 'planificado',
        data: {
          descripcion: fase.descripcion,
@@ -125,16 +125,16 @@ export async function GET(
      }
 
       // Agregar EDTs de esta fase
-    for (const edt of fase.edts || []) {
+    for (const edt of fase.cotizacionEdt || []) {
       const edtNode = {
         id: `edt-${edt.id}`,
         type: 'edt',
         nombre: edt.nombre,
         level: 2,
         expanded: expandedNodes.includes(`edt-${edt.id}`),
-        hasChildren: (edt.cotizacion_actividad?.length || 0) > 0,
-        totalChildren: (edt.cotizacion_actividad?.length || 0),
-        progressPercentage: calculateProgress(edt.cotizacion_actividad || []),
+        hasChildren: (edt.cotizacionActividad?.length || 0) > 0,
+        totalChildren: (edt.cotizacionActividad?.length || 0),
+        progressPercentage: calculateProgress(edt.cotizacionActividad || []),
         status: edt.estado || 'planificado',
         data: {
           descripcion: edt.descripcion,
@@ -146,19 +146,17 @@ export async function GET(
         children: [] as any[]
       }
 
-       // Agregar actividades directas del EDT (ahora a nivel 3)
-
        // Agregar actividades directas del EDT (nivel 3)
-        for (const actividad of edt.cotizacion_actividad || []) {
+        for (const actividad of edt.cotizacionActividad || []) {
            const actividadNode = {
              id: `actividad-${actividad.id}`,
              type: 'actividad',
              nombre: actividad.nombre,
              level: 3,
              expanded: expandedNodes.includes(`actividad-${actividad.id}`),
-             hasChildren: actividad.cotizacion_tarea?.length > 0,
-             totalChildren: actividad.cotizacion_tarea?.length || 0,
-             progressPercentage: calculateProgress(actividad.cotizacion_tarea || []),
+             hasChildren: actividad.cotizacionTarea?.length > 0,
+             totalChildren: actividad.cotizacionTarea?.length || 0,
+             progressPercentage: calculateProgress(actividad.cotizacionTarea || []),
              status: actividad.estado || 'pendiente',
              data: {
                descripcion: actividad.descripcion,
@@ -167,7 +165,7 @@ export async function GET(
                fechaFinComercial: actividad.fechaFinComercial?.toISOString().split('T')[0],
                horasEstimadas: actividad.horasEstimadas
              },
-             children: actividad.cotizacion_tarea?.map((tarea: any) => ({
+             children: actividad.cotizacionTarea?.map((tarea: any) => ({
                id: `tarea-${tarea.id}`,
                type: 'tarea',
                nombre: tarea.nombre,
@@ -204,9 +202,9 @@ export async function GET(
           nombre: edt.nombre,
           level: 1,
           expanded: expandedNodes.includes(`edt-${edt.id}`),
-          hasChildren: (edt.cotizacion_actividad?.length || 0) > 0,
-          totalChildren: (edt.cotizacion_actividad?.length || 0),
-          progressPercentage: calculateProgress(edt.cotizacion_actividad || []),
+          hasChildren: (edt.cotizacionActividad?.length || 0) > 0,
+          totalChildren: (edt.cotizacionActividad?.length || 0),
+          progressPercentage: calculateProgress(edt.cotizacionActividad || []),
           status: edt.estado || 'planificado',
           data: {
             descripcion: edt.descripcion,
@@ -219,16 +217,16 @@ export async function GET(
         }
 
         // Agregar actividades directas del EDT (nivel 2)
-        for (const actividad of edt.cotizacion_actividad || []) {
+        for (const actividad of edt.cotizacionActividad || []) {
          const actividadNode = {
            id: `actividad-${actividad.id}`,
            type: 'actividad',
            nombre: actividad.nombre,
            level: 2,
            expanded: expandedNodes.includes(`actividad-${actividad.id}`),
-           hasChildren: actividad.cotizacion_tarea?.length > 0,
-           totalChildren: actividad.cotizacion_tarea?.length || 0,
-           progressPercentage: calculateProgress(actividad.cotizacion_tarea || []),
+           hasChildren: actividad.cotizacionTarea?.length > 0,
+           totalChildren: actividad.cotizacionTarea?.length || 0,
+           progressPercentage: calculateProgress(actividad.cotizacionTarea || []),
            status: actividad.estado || 'pendiente',
            data: {
              descripcion: actividad.descripcion,
@@ -237,7 +235,7 @@ export async function GET(
              fechaFinComercial: actividad.fechaFinComercial?.toISOString().split('T')[0],
              horasEstimadas: actividad.horasEstimadas
            },
-           children: actividad.cotizacion_tarea?.map((tarea: any) => ({
+           children: actividad.cotizacionTarea?.map((tarea: any) => ({
              id: `tarea-${tarea.id}`,
              type: 'tarea',
              nombre: tarea.nombre,

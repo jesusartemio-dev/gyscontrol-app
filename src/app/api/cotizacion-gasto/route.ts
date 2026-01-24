@@ -16,10 +16,10 @@ export async function GET(req: Request) {
     const data = cotizacionId
       ? await prisma.cotizacionGasto.findMany({
           where: { cotizacionId },
-          include: { items: true, cotizacion: true },
+          include: { cotizacionGastoItem: true, cotizacion: true },
         })
       : await prisma.cotizacionGasto.findMany({
-          include: { items: true, cotizacion: true },
+          include: { cotizacionGastoItem: true, cotizacion: true },
         })
 
     return NextResponse.json(data)
@@ -47,11 +47,13 @@ export async function POST(req: Request) {
 
     const data = await prisma.cotizacionGasto.create({
       data: {
+        id: `cot-gasto-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionId: payload.cotizacionId,
         nombre: payload.nombre,
         descripcion: payload.descripcion,
         subtotalInterno: payload.subtotalInterno,
         subtotalCliente: payload.subtotalCliente,
+        updatedAt: new Date()
       },
     })
 

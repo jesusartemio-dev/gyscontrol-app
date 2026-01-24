@@ -21,6 +21,7 @@ export async function logPermissionChange(data: {
     const { prisma } = await import('@/lib/prisma');
     await prisma.auditLog.create({
       data: {
+        id: crypto.randomUUID(),
         entidadTipo: data.entityType === 'permission' ? 'PERMISO' : 'PERMISO_USUARIO',
         entidadId: data.entityId,
         accion: data.action.toUpperCase(),
@@ -51,6 +52,7 @@ export async function logPermissionDenied(data: {
     const { prisma } = await import('@/lib/prisma');
     await prisma.auditLog.create({
       data: {
+        id: crypto.randomUUID(),
         entidadTipo: 'PERMISO_ACCESO',
         entidadId: data.userId,
         accion: 'ACCESO_DENEGADO',
@@ -183,7 +185,7 @@ export async function getPermissionAuditHistory(filters: {
       prisma.auditLog.findMany({
         where,
         include: {
-          usuario: {
+          user: {
             select: {
               id: true,
               name: true,
@@ -204,7 +206,7 @@ export async function getPermissionAuditHistory(filters: {
       logs: logs.map((log: any) => ({
         id: log.id,
         fecha: log.createdAt,
-        usuario: log.usuario,
+        usuario: log.user,
         accion: log.accion,
         descripcion: log.descripcion,
         cambios: log.cambios ? JSON.parse(log.cambios) : undefined,
@@ -288,7 +290,7 @@ export async function getPermissionAuditStats(period: 'day' | 'week' | 'month' =
           createdAt: { gte: dateFrom }
         },
         include: {
-          usuario: {
+          user: {
             select: { name: true }
           }
         },
@@ -315,7 +317,7 @@ export async function getPermissionAuditStats(period: 'day' | 'week' | 'month' =
       recentCriticalChanges: recentCriticalChanges.map((change: any) => ({
         id: change.id,
         fecha: change.createdAt,
-        usuario: change.usuario.name || 'Sin nombre',
+        usuario: change.user.name || 'Sin nombre',
         descripcion: change.descripcion
       }))
     };
@@ -337,14 +339,26 @@ export async function logStatusChange(data: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
-    const res = await fetch('/api/audit/log-status-change', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+    const { prisma } = await import('@/lib/prisma');
+    const { randomUUID } = await import('crypto');
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        entidadTipo: data.entityType,
+        entidadId: data.entityId,
+        accion: 'CAMBIAR_ESTADO',
+        usuarioId: data.userId,
+        descripcion: data.description || `Estado cambiado de ${data.oldStatus || 'N/A'} a ${data.newStatus}`,
+        cambios: JSON.stringify({
+          estado: {
+            anterior: data.oldStatus || null,
+            nuevo: data.newStatus
+          }
+        }),
+        metadata: data.metadata ? JSON.stringify(data.metadata) : null
+      }
     });
-    if (!res.ok) {
-      console.error('Error logging status change:', await res.text());
-    }
   } catch (error) {
     console.error('Error logging status change:', error);
   }

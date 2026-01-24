@@ -244,26 +244,52 @@ export default function ImportarPlantillaModal({
               let totalItems = 0
               let totalValue = 0
 
-              // Check if it's an independent template (has items directly)
-              const plantillaConItems = plantilla as any
-              if (plantillaConItems.items && Array.isArray(plantillaConItems.items)) {
-                // Independent template
-                totalItems = plantillaConItems.items.length
-                totalValue = plantillaConItems.items.reduce((sum: number, item: any) =>
-                  sum + (item.costoCliente || item.precioCliente || 0), 0
-                )
-              } else {
-                // Main template with sections
-                if (tipo === 'equipos' && plantilla.equipos) {
-                  totalItems = plantilla.equipos.reduce((acc, e) => acc + (e.items?.length || 0), 0)
-                  totalValue = plantilla.totalEquiposCliente || 0
-                } else if (tipo === 'servicios' && plantilla.servicios) {
-                  totalItems = plantilla.servicios.reduce((acc, s) => acc + (s.items?.length || 0), 0)
-                  totalValue = plantilla.totalServiciosCliente || 0
-                } else if (tipo === 'gastos' && plantilla.gastos) {
-                  totalItems = plantilla.gastos.reduce((acc, g) => acc + (g.items?.length || 0), 0)
-                  totalValue = plantilla.totalGastosCliente || 0
+              const p = plantilla as any
+
+              // Check for independent templates first (they have specific item arrays)
+              if (tipo === 'equipos') {
+                if (p.plantillaEquipoItemIndependiente && Array.isArray(p.plantillaEquipoItemIndependiente)) {
+                  // Independent equipment template
+                  totalItems = p.plantillaEquipoItemIndependiente.length
+                  totalValue = p.totalCliente || p.grandTotal || p.plantillaEquipoItemIndependiente.reduce((sum: number, item: any) =>
+                    sum + (item.costoCliente || item.precioCliente || 0), 0
+                  )
+                } else if (p.plantillaEquipo && Array.isArray(p.plantillaEquipo)) {
+                  // Complete template with equipment sections
+                  totalItems = p.plantillaEquipo.reduce((acc: number, e: any) => acc + (e.plantillaEquipoItem?.length || 0), 0)
+                  totalValue = p.totalEquiposCliente || 0
                 }
+              } else if (tipo === 'servicios') {
+                if (p.plantillaServicioItemIndependiente && Array.isArray(p.plantillaServicioItemIndependiente)) {
+                  // Independent service template
+                  totalItems = p.plantillaServicioItemIndependiente.length
+                  totalValue = p.totalCliente || p.grandTotal || p.plantillaServicioItemIndependiente.reduce((sum: number, item: any) =>
+                    sum + (item.costoCliente || item.precioCliente || 0), 0
+                  )
+                } else if (p.plantillaServicio && Array.isArray(p.plantillaServicio)) {
+                  // Complete template with service sections
+                  totalItems = p.plantillaServicio.reduce((acc: number, s: any) => acc + (s.plantillaServicioItem?.length || 0), 0)
+                  totalValue = p.totalServiciosCliente || 0
+                }
+              } else if (tipo === 'gastos') {
+                if (p.plantillaGastoItemIndependiente && Array.isArray(p.plantillaGastoItemIndependiente)) {
+                  // Independent expense template
+                  totalItems = p.plantillaGastoItemIndependiente.length
+                  totalValue = p.totalCliente || p.grandTotal || p.plantillaGastoItemIndependiente.reduce((sum: number, item: any) =>
+                    sum + (item.costoCliente || item.precioCliente || 0), 0
+                  )
+                } else if (p.plantillaGasto && Array.isArray(p.plantillaGasto)) {
+                  // Complete template with expense sections
+                  totalItems = p.plantillaGasto.reduce((acc: number, g: any) => acc + (g.plantillaGastoItem?.length || 0), 0)
+                  totalValue = p.totalGastosCliente || 0
+                }
+              }
+
+              // Fallback: use _count if available
+              if (totalItems === 0 && p._count) {
+                totalItems = p._count.plantillaServicioItemIndependiente ||
+                             p._count.plantillaEquipoItemIndependiente ||
+                             p._count.plantillaGastoItemIndependiente || 0
               }
 
               return (

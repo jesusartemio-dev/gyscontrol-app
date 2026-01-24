@@ -64,8 +64,8 @@ export default function Sidebar() {
     comercial: false,
     crm: false,
     proyectos: false,
-    horasHombre: false,
-    misTareas: false,
+    'mi-trabajo': false,
+    supervision: false,
     logistica: false,
     finanzas: false,
     gestion: false,
@@ -163,56 +163,33 @@ export default function Sidebar() {
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart },
-        {
-          href: '/proyectos/tareas',
-          label: 'Gestión de Tareas',
-          icon: CheckSquare,
-          submenu: [
-            { href: '/proyectos/tareas', label: 'Lista de Tareas', icon: CheckSquare },
-            { href: '/proyectos/tareas/gantt', label: 'Cronograma Gantt', icon: Calendar },
-            { href: '/proyectos/tareas/dependencias', label: 'Dependencias', icon: GitBranch }
-          ]
-        },
       ],
     },
-    // 2.1. Horas Hombre - Registro y gestión personal de horas
+    // 2.1. Mi Trabajo - Registro personal de horas y tareas (para todos)
     {
-      key: 'horas-hombre',
-      title: 'Horas Hombre',
+      key: 'mi-trabajo',
+      title: 'Mi Trabajo',
       icon: Clock,
       color: 'text-emerald-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador'],
       links: [
-        { href: '/horas-hombre/timesheet', label: 'Mi Timesheet', icon: Calendar },
-        { href: '/horas-hombre/registro', label: 'Registrar Horas', icon: Clock },
-        { href: '/horas-hombre/historial', label: 'Historial', icon: History },
-        { href: '/horas-hombre/analisis-transversal', label: 'Análisis Transversal EDT', icon: BarChart3 },
+        { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
+        { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
+        { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
       ]
     },
-    // 2.2. Supervisión de Horas - Para administradores/gestores
+    // 2.2. Supervisión - Vista de equipo y análisis (solo supervisores)
     {
-      key: 'supervision-horas',
+      key: 'supervision',
       title: 'Supervisión',
       icon: Users,
       color: 'text-red-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'],
       links: [
-        { href: '/horas-hombre/supervision', label: 'Horas del Proyecto', icon: Users },
-        { href: '/horas-hombre/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
-        { href: '/horas-hombre/analisis-edt', label: 'Análisis EDT Detallado', icon: Target },
-      ]
-    },
-    // 2.2. Mis Tareas - Gestión personal de tareas asignadas
-    {
-      key: 'mis-tareas',
-      title: 'Mis Tareas',
-      icon: CheckSquare,
-      color: 'text-blue-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador'],
-      links: [
-        { href: '/tareas/asignadas', label: 'Tareas Asignadas', icon: UserCheck },
-        { href: '/tareas/progreso', label: 'Mi Progreso', icon: TrendingUp },
-        { href: '/tareas/equipo', label: 'Equipo', icon: Users },
+        { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
+        { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
+        { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
+        { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
       ]
     },
     // 3. Logística - Gestión completa de la cadena logística

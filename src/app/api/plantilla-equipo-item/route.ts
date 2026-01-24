@@ -60,7 +60,11 @@ export async function POST(req: NextRequest) {
     }
 
     const nuevo = await prisma.plantillaEquipoItem.create({
-      data,
+      data: {
+        ...data,
+        id: `plantilla-equipo-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        updatedAt: new Date()
+      },
       select: {
         id: true,
         codigo: true,

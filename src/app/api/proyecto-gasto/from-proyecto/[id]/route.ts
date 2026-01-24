@@ -16,13 +16,19 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const gastos = await prisma.proyectoGastoCotizado.findMany({
       where: { proyectoId: id },
       include: {
-        items: true,
+        proyectoGastoCotizadoItem: true,
       },
       orderBy: {
         nombre: 'asc',
       },
     })
-    return NextResponse.json(gastos)
+
+    // Map relation names for frontend compatibility
+    const gastosFormatted = gastos.map((gasto: any) => ({
+      ...gasto,
+      items: gasto.proyectoGastoCotizadoItem
+    }))
+    return NextResponse.json(gastosFormatted)
   } catch (error) {
     console.error('❌ Error al obtener gastos del proyecto:', error)
     return NextResponse.json({ error: 'Error al obtener gastos' }, { status: 500 })

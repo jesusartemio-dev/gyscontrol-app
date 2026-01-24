@@ -237,10 +237,10 @@ export async function obtenerHistorialEntidad(
     const total = await prisma.auditLog.count({ where });
 
     // Obtener registros con usuario
-    const data = await prisma.auditLog.findMany({
+    const rawData = await prisma.auditLog.findMany({
       where,
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -254,6 +254,12 @@ export async function obtenerHistorialEntidad(
       skip,
       take: limite
     });
+
+    // 🔄 Frontend compatibility mapping
+    const data = rawData.map((log: any) => ({
+      ...log,
+      usuario: log.user
+    })) as AuditLog[];
 
     const totalPaginas = Math.ceil(total / limite);
 
@@ -281,10 +287,10 @@ export async function obtenerActividadReciente(
     const where: any = {};
     if (usuarioId) where.usuarioId = usuarioId;
 
-    const actividad = await prisma.auditLog.findMany({
+    const rawActividad = await prisma.auditLog.findMany({
       where,
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -297,6 +303,12 @@ export async function obtenerActividadReciente(
       },
       take: limite
     });
+
+    // 🔄 Frontend compatibility mapping
+    const actividad = rawActividad.map((log: any) => ({
+      ...log,
+      usuario: log.user
+    })) as AuditLog[];
 
     return actividad;
   } catch (error) {

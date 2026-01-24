@@ -132,7 +132,7 @@ export async function POST(
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
       include: {
-        comercial: true,
+        user: true,
         calendarioLaboral: {
           include: {
             diaCalendario: true,
@@ -158,11 +158,12 @@ export async function POST(
     const body = await request.json()
     const validatedData = generateSchema.parse(body)
 
-    // Obtener servicios de la cotización
+    // Obtener servicios de la cotización con su EDT relacionado
     const servicios = await prisma.cotizacionServicio.findMany({
       where: { cotizacionId: id },
       include: {
-        items: true
+        cotizacionServicioItem: true,
+        edt: true
       }
     })
 
@@ -175,13 +176,13 @@ export async function POST(
     })
     const categoriasMap = new Map(categorias.map(cat => [cat.id, cat.nombre]))
 
-    // Crear mapa de nombres de categorías por servicio
+    // Crear mapa de nombres de EDTs por servicio
     const categoriaNombresMap = new Map()
     servicios.forEach(servicio => {
-      if (servicio.categoria && !categoriaNombresMap.has(servicio.categoria)) {
-        categoriaNombresMap.set(servicio.categoria, {
-          id: servicio.categoria,
-          nombre: categoriasMap.get(servicio.categoria) || servicio.categoria
+      if (servicio.edtId && !categoriaNombresMap.has(servicio.edtId)) {
+        categoriaNombresMap.set(servicio.edtId, {
+          id: servicio.edtId,
+          nombre: servicio.edt?.nombre || categoriasMap.get(servicio.edtId) || 'Sin EDT'
         })
       }
     })
@@ -330,7 +331,7 @@ export async function POST(
       fasesConfigConDuraciones,
       fechaInicioProyecto,
       categoriaNombresMap,
-      categorias: categoriasConFaseDefault,
+      categorias: categorias,
       calendarioLaboral,
       options: opcionesGeneracion
     })
@@ -450,14 +451,14 @@ async function generarCronogramaDesdeServicios({
   if (options.generarEdts) {
     console.log('🏗️ GENERACIÓN EDTS - FS+0 entre EDTs hermanos, roll-up de horas desde hijos')
 
-    // Agrupar servicios por categoría
+    // Agrupar servicios por EDT
     const serviciosPorCategoria = new Map()
     servicios.forEach(servicio => {
-      const categoria = servicio.categoria || 'Sin Categoría'
-      if (!serviciosPorCategoria.has(categoria)) {
-        serviciosPorCategoria.set(categoria, [])
+      const edtId = servicio.edtId || 'Sin EDT'
+      if (!serviciosPorCategoria.has(edtId)) {
+        serviciosPorCategoria.set(edtId, [])
       }
-      serviciosPorCategoria.get(categoria).push(servicio)
+      serviciosPorCategoria.get(edtId).push(servicio)
     })
 
     // Determinar fase por categoría
@@ -487,7 +488,7 @@ async function generarCronogramaDesdeServicios({
 
       // Calcular horas totales
       const horasTotales = serviciosCategoria.reduce((sum: number, servicio: any) =>
-        sum + servicio.items.reduce((itemSum: number, item: any) => itemSum + (item.horaTotal || 0), 0), 0
+        sum + servicio.cotizacionServicioItem.reduce((itemSum: number, item: any) => itemSum + (item.horaTotal || 0), 0), 0
       )
 
       // ✅ Determinar fase usando faseDefault pre-configurada
@@ -566,6 +567,7 @@ async function generarCronogramaDesdeServicios({
         } else {
           await prisma.cotizacionEdt.create({
             data: {
+              id: crypto.randomUUID(),
               cotizacionId,
               cotizacionServicioId: servicioReferencia.id,
               cotizacionFaseId: fase.id,
@@ -575,7 +577,8 @@ async function generarCronogramaDesdeServicios({
               fechaInicioComercial: fechaInicioEdt.toISOString(),
               fechaFinComercial: fechaFinLimitada.toISOString(),
               estado: 'planificado',
-              prioridad: 'media'
+              prioridad: 'media',
+              updatedAt: new Date()
             }
           })
           result.edtsGenerados++
@@ -602,12 +605,12 @@ async function generarCronogramaDesdeServicios({
     for (const edt of edts) {
       console.log(`⚙️ Generando actividades para EDT: ${edt.nombre}`)
 
-      // Obtener servicios que pertenecen a este EDT (por categoría)
+      // Obtener servicios que pertenecen a este EDT
       const serviciosDeEdt = servicios.filter(servicio => {
-        const categoriaId = servicio.categoria || 'Sin Categoría'
-        const categoriaInfo = categoriaNombresMap.get(categoriaId)
-        const categoriaNombre = categoriaInfo?.nombre || categoriaId
-        return categoriaNombre === edt.nombre
+        const edtId = servicio.edtId
+        const edtInfo = categoriaNombresMap.get(edtId)
+        const edtNombre = edtInfo?.nombre || servicio.edt?.nombre
+        return edtNombre === edt.nombre
       })
 
       if (serviciosDeEdt.length === 0) continue
@@ -626,7 +629,7 @@ async function generarCronogramaDesdeServicios({
       })
 
       for (const servicio of serviciosOrdenados) {
-        const horasServicio = servicio.items.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
+        const horasServicio = servicio.cotizacionServicioItem.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
 
         // Calcular duración basada en horas del servicio
         const duracionDias = horasServicio > 0
@@ -719,7 +722,7 @@ async function generarCronogramaDesdeServicios({
 
       // Obtener items del servicio correspondiente a esta actividad
       const servicioCorrespondiente = servicios.find(s => s.nombre === actividad.nombre)
-      if (!servicioCorrespondiente || !servicioCorrespondiente.items) continue
+      if (!servicioCorrespondiente || !servicioCorrespondiente.cotizacionServicioItem) continue
 
       // ✅ GYS-GEN-02: Las tareas deben iniciar cuando inicia la actividad padre
       const actividadInicio = new Date(actividad.fechaInicioComercial || fechaInicioProyecto)
@@ -728,7 +731,7 @@ async function generarCronogramaDesdeServicios({
       console.log(`🔧 Actividad ${actividad.nombre} inicia: ${actividadInicio.toISOString().split('T')[0]}, tareas iniciarán: ${currentTareaStart.toISOString().split('T')[0]}`)
 
       // ✅ Ordenar items por el campo 'orden' antes de generar tareas
-      const itemsOrdenados = servicioCorrespondiente.items.sort((a: any, b: any) => {
+      const itemsOrdenados = servicioCorrespondiente.cotizacionServicioItem.sort((a: any, b: any) => {
         const ordenA = a.orden ?? 0
         const ordenB = b.orden ?? 0
         return ordenA - ordenB
@@ -767,6 +770,7 @@ async function generarCronogramaDesdeServicios({
         } else {
           await prisma.cotizacionTarea.create({
             data: {
+              id: crypto.randomUUID(),
               cotizacionActividadId: actividad.id,
               cotizacionServicioItemId: item.id,
               nombre: item.nombre,
@@ -775,7 +779,8 @@ async function generarCronogramaDesdeServicios({
               fechaFin: fechaFinLimitada.toISOString(),
               horasEstimadas: item.horaTotal,
               estado: 'pendiente',
-              prioridad: 'media'
+              prioridad: 'media',
+              updatedAt: new Date()
             }
           })
           result.tareasGeneradas++
@@ -849,13 +854,13 @@ async function generarCronogramaDesdeServicios({
   // Roll-up actividades por tareas
   const allActividades = await prisma.cotizacionActividad.findMany({
     where: { cotizacionEdt: { cotizacionId } },
-    include: { cotizacionTareas: true }
+    include: { cotizacionTarea: true }
   })
 
   console.log('🔄 GYS-GEN-15: Roll-up actividades por tareas')
   for (const actividad of allActividades) {
-    if (actividad.cotizacionTareas.length > 0) {
-      const fechasTareas = actividad.cotizacionTareas.map(tarea => ({
+    if (actividad.cotizacionTarea.length > 0) {
+      const fechasTareas = actividad.cotizacionTarea.map(tarea => ({
         nombre: tarea.nombre,
         fin: tarea.fechaFin ? new Date(tarea.fechaFin) : null
       })).filter(f => f.fin)
@@ -926,7 +931,7 @@ async function generarCronogramaDesdeServicios({
   const fasesConEdts = await prisma.cotizacionFase.findMany({
     where: { cotizacionId },
     include: {
-      cotizacion_edt: {
+      cotizacionEdt: {
         orderBy: { fechaInicioComercial: 'asc' }
       }
     },
@@ -940,7 +945,7 @@ async function generarCronogramaDesdeServicios({
 
     for (let i = 0; i < fasesConEdts.length; i++) {
       const fase = fasesConEdts[i]
-      const edtsDeFase = fase.cotizacion_edt
+      const edtsDeFase = fase.cotizacionEdt
 
       // ✅ GYS-GEN-01: Calcular nueva fecha de inicio con FS+1
       const nuevaFechaInicioFase = new Date(currentStartDate)

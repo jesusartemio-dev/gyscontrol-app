@@ -40,7 +40,7 @@ export async function PATCH(
       const pedidosAfectados = await prisma.pedidoEquipoItem.findMany({
         where: { listaEquipoItemId: id },
         include: {
-          pedido: {
+          pedidoEquipo: {
             select: { id: true, codigo: true, proyecto: { select: { nombre: true } } }
           }
         }
@@ -60,9 +60,9 @@ export async function PATCH(
         })
   
         pedidosActualizados.push({
-          pedidoId: pedidoItem.pedido.id,
-          pedidoCodigo: pedidoItem.pedido.codigo,
-          proyectoNombre: pedidoItem.pedido.proyecto.nombre,
+          pedidoId: pedidoItem.pedidoEquipo.id,
+          pedidoCodigo: pedidoItem.pedidoEquipo.codigo,
+          proyectoNombre: pedidoItem.pedidoEquipo.proyecto.nombre,
           itemId: pedidoItem.id,
           precioAnterior: pedidoItem.precioUnitario,
           precioNuevo: 0,
@@ -72,7 +72,7 @@ export async function PATCH(
       }
   
       // 📊 Paso 4: recalcular totales de pedidos afectados
-      const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoId))]
+      const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoEquipo.id))]
       for (const pedidoId of pedidosIds) {
         // Recalcular presupuestoTotal del pedido basado en sus items
         const itemsPedido = await prisma.pedidoEquipoItem.findMany({
@@ -145,7 +145,7 @@ export async function PATCH(
     const pedidosAfectados = await prisma.pedidoEquipoItem.findMany({
       where: { listaEquipoItemId: id },
       include: {
-        pedido: {
+        pedidoEquipo: {
           select: { id: true, codigo: true, proyecto: { select: { nombre: true } } }
         }
       }
@@ -167,9 +167,9 @@ export async function PATCH(
       })
 
       pedidosActualizados.push({
-        pedidoId: pedidoItem.pedido.id,
-        pedidoCodigo: pedidoItem.pedido.codigo,
-        proyectoNombre: pedidoItem.pedido.proyecto.nombre,
+        pedidoId: pedidoItem.pedidoEquipo.id,
+        pedidoCodigo: pedidoItem.pedidoEquipo.codigo,
+        proyectoNombre: pedidoItem.pedidoEquipo.proyecto.nombre,
         itemId: pedidoItem.id,
         precioAnterior: pedidoItem.precioUnitario,
         precioNuevo: precioUnitario,
@@ -178,7 +178,7 @@ export async function PATCH(
     }
 
     // 📊 Paso 7: recalcular totales de pedidos afectados
-    const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoId))]
+    const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoEquipo.id))]
     for (const pedidoId of pedidosIds) {
       // Recalcular presupuestoTotal del pedido basado en sus items
       const itemsPedido = await prisma.pedidoEquipoItem.findMany({

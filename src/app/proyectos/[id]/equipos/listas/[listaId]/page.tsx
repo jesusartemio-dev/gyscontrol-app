@@ -85,7 +85,7 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
     const transformedItems = items.map(item => {
       // ✅ Compute cotizacionSeleccionada from cotizaciones array and cotizacionSeleccionadaId
       const cotizacionSeleccionada = item.cotizacionSeleccionadaId
-        ? item.cotizaciones.find(cot => cot.id === item.cotizacionSeleccionadaId) || null
+        ? item.cotizaciones.find((cot: { id: string }) => cot.id === item.cotizacionSeleccionadaId) || null
         : null;
 
       const transformedItem = {
@@ -109,20 +109,20 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
         cantidadEntregada: item.cantidadEntregada ?? undefined,
         tiempoEntrega: item.tiempoEntrega ?? undefined,
         tiempoEntregaDias: item.tiempoEntregaDias ?? undefined,
-        cotizaciones: item.cotizaciones.map(cot => ({
+        cotizaciones: item.cotizaciones.map((cot: any) => ({
           ...cot,
           createdAt: cot.createdAt.toISOString(),
           updatedAt: cot.updatedAt.toISOString(),
-          cotizacion: {
-            ...cot.cotizacion
+          cotizacionProveedor: {
+            ...cot.cotizacionProveedor
           }
         })),
-        pedidos: item.pedidos.map(ped => ({
+        pedidos: item.pedidos.map((ped: any) => ({
           ...ped,
           createdAt: ped.createdAt.toISOString(),
           updatedAt: ped.updatedAt.toISOString(),
-          pedido: {
-            ...ped.pedido
+          pedidoEquipo: {
+            ...ped.pedidoEquipo
           }
         }))
       };

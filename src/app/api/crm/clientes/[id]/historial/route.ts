@@ -64,7 +64,7 @@ export async function GET(
         totalCliente: true,
         fechaEnvio: true,
         createdAt: true,
-        comercial: {
+        user: {
           select: { name: true }
         }
       },
@@ -118,7 +118,7 @@ export async function GET(
       fechaInicio: cotizacion.fechaEnvio,
       fechaFin: null,
       valor: cotizacion.totalCliente,
-      responsable: cotizacion.comercial?.name,
+      responsable: cotizacion.user?.name,
       createdAt: cotizacion.createdAt
     }))
 

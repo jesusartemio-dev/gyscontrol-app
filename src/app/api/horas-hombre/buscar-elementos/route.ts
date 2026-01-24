@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         }
       },
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         },
         proyecto: {
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         proyectoId: edt.proyectoId,
         proyectoNombre: edt.proyecto.nombre,
         responsableId: edt.responsableId,
-        responsableNombre: edt.responsable?.name,
+        responsableNombre: edt.user?.name,
         horasPlan: edt.horasPlan || 0,
         horasReales: edt.horasReales || 0,
         progreso: edt.porcentajeAvance || 0,
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         }
       },
       include: {
-        proyecto_edt: {
+        proyectoEdt: {
           include: {
             proyecto: {
               select: { id: true, nombre: true }
@@ -93,15 +93,15 @@ export async function GET(request: NextRequest) {
     })
 
     actividades.forEach(actividad => {
-      // Skip if proyecto_edt is null (shouldn't happen with proper includes, but TypeScript safety)
-      if (!actividad.proyecto_edt?.proyecto) return
+      // Skip if proyectoEdt is null (shouldn't happen with proper includes, but TypeScript safety)
+      if (!actividad.proyectoEdt?.proyecto) return
 
       elementos.push({
         id: actividad.id,
         nombre: actividad.nombre,
         tipo: 'actividad',
-        proyectoId: actividad.proyecto_edt.proyecto.id,
-        proyectoNombre: actividad.proyecto_edt.proyecto.nombre,
+        proyectoId: actividad.proyectoEdt.proyecto.id,
+        proyectoNombre: actividad.proyectoEdt.proyecto.nombre,
         responsableId: null, // Actividades no tienen responsables en el schema actual
         responsableNombre: null,
         horasPlan: actividad.horasPlan || 0,
@@ -120,12 +120,12 @@ export async function GET(request: NextRequest) {
         }
       },
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         },
-        proyecto_actividad: {
+        proyectoActividad: {
           include: {
-            proyecto_edt: {
+            proyectoEdt: {
               include: {
                 proyecto: {
                   select: { id: true, nombre: true }
@@ -139,17 +139,17 @@ export async function GET(request: NextRequest) {
     })
 
     tareas.forEach(tarea => {
-      // Skip if proyecto_actividad or proyecto_edt is null (shouldn't happen with proper includes, but TypeScript safety)
-      if (!tarea.proyecto_actividad?.proyecto_edt?.proyecto) return
+      // Skip if proyectoActividad or proyectoEdt is null (shouldn't happen with proper includes, but TypeScript safety)
+      if (!tarea.proyectoActividad?.proyectoEdt?.proyecto) return
 
       elementos.push({
         id: tarea.id,
         nombre: tarea.nombre,
         tipo: 'tarea',
-        proyectoId: tarea.proyecto_actividad.proyecto_edt.proyecto.id,
-        proyectoNombre: tarea.proyecto_actividad.proyecto_edt.proyecto.nombre,
+        proyectoId: tarea.proyectoActividad.proyectoEdt.proyecto.id,
+        proyectoNombre: tarea.proyectoActividad.proyectoEdt.proyecto.nombre,
         responsableId: tarea.responsableId,
-        responsableNombre: tarea.responsable?.name,
+        responsableNombre: tarea.user?.name,
         horasPlan: tarea.horasEstimadas || 0,
         horasReales: tarea.horasReales || 0,
         progreso: tarea.porcentajeCompletado || 0,

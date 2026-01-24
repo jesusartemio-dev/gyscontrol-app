@@ -24,10 +24,10 @@ export async function GET(
         proyectoCronogramaId: cronogramaId
       },
       include: {
-        edts: {
+        proyectoEdt: {
           include: {
-            categoriaServicio: true,
-            ProyectoTarea: {
+            edt: true,
+            proyectoTarea: {
               orderBy: {
                 fechaInicio: 'asc'
               }

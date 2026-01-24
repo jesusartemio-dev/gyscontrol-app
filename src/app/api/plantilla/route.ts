@@ -237,10 +237,12 @@ export async function POST(req: NextRequest) {
     if (tipo === 'equipos') {
       const nueva = await prisma.plantillaEquipoIndependiente.create({
         data: {
+          id: `plantilla-equipo-ind-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre,
           estado: 'borrador',
           totalInterno: 0,
           totalCliente: 0,
+          updatedAt: new Date()
         },
       })
       return NextResponse.json(nueva, { status: 201 })
@@ -249,11 +251,13 @@ export async function POST(req: NextRequest) {
     if (tipo === 'servicios') {
       const nueva = await prisma.plantillaServicioIndependiente.create({
         data: {
+          id: `plantilla-servicio-ind-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre,
           categoria: 'General', // Default category
           estado: 'borrador',
           totalInterno: 0,
           totalCliente: 0,
+          updatedAt: new Date()
         },
       })
       return NextResponse.json(nueva, { status: 201 })
@@ -262,10 +266,12 @@ export async function POST(req: NextRequest) {
     if (tipo === 'gastos') {
       const nueva = await prisma.plantillaGastoIndependiente.create({
         data: {
+          id: `plantilla-gasto-ind-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre,
           estado: 'borrador',
           totalInterno: 0,
           totalCliente: 0,
+          updatedAt: new Date()
         },
       })
       return NextResponse.json(nueva, { status: 201 })
@@ -274,11 +280,13 @@ export async function POST(req: NextRequest) {
     // ✅ Para tipo 'completa', crear en la tabla Plantilla
     const nueva = await prisma.plantilla.create({
       data: {
+        id: `plantilla-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nombre,
         tipo: tipo as any,
         estado: 'borrador',
         totalInterno: 0,
         totalCliente: 0,
+        updatedAt: new Date()
       },
     })
 

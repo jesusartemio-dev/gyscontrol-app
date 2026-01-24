@@ -107,20 +107,20 @@ async function generarReporteResumen(filtros: any) {
           }
         }
       },
-      categoriaServicio: {
+      edt: {
         select: { nombre: true }
       },
-      responsable: {
+      user: {
         select: { name: true, email: true }
       },
-      registrosHoras: fechaDesde || fechaHasta ? {
+      registroHoras: fechaDesde || fechaHasta ? {
         where: {
           fechaTrabajo: fechaFiltro
         },
         select: {
           horasTrabajadas: true,
           fechaTrabajo: true,
-          usuario: {
+          user: {
             select: { name: true }
           }
         }
@@ -128,12 +128,12 @@ async function generarReporteResumen(filtros: any) {
         select: {
           horasTrabajadas: true,
           fechaTrabajo: true,
-          usuario: {
+          user: {
             select: { name: true }
           }
         }
       },
-      proyecto_actividad: {
+      proyectoActividad: {
         select: {
           id: true,
           nombre: true,
@@ -142,7 +142,7 @@ async function generarReporteResumen(filtros: any) {
           porcentajeAvance: true
         }
       },
-      ProyectoTarea: {
+      proyectoTarea: {
         select: {
           id: true,
           nombre: true
@@ -158,21 +158,21 @@ async function generarReporteResumen(filtros: any) {
   const resumenEdts = edts.map((edt: any) => {
     const horasPlan = Number(edt.horasPlan || 0)
     const horasReales = Number(edt.horasReales)
-    const horasRegistradas = edt.registrosHoras.reduce((sum: number, reg: any) => sum + Number(reg.horasTrabajadas), 0)
+    const horasRegistradas = edt.registroHoras.reduce((sum: number, reg: any) => sum + Number(reg.horasTrabajadas), 0)
     const eficiencia = horasPlan > 0 ? (horasReales / horasPlan) * 100 : 0
     const avance = edt.porcentajeAvance || 0
     
     // Calcular total de elementos (actividades + tareas)
-    const totalElementos = edt.proyecto_actividad.length + edt.ProyectoTarea.length
-    const elementosCompletados = edt.proyecto_actividad.filter((a: any) => a.porcentajeAvance >= 100).length
+    const totalElementos = edt.proyectoActividad.length + edt.proyectoTarea.length
+    const elementosCompletados = edt.proyectoActividad.filter((a: any) => a.porcentajeAvance >= 100).length
     const avanceElementos = totalElementos > 0 ? (elementosCompletados / totalElementos) * 100 : 0
 
     return {
       id: edt.id,
       nombre: edt.nombre,
       proyecto: edt.proyecto,
-      categoriaServicio: edt.categoriaServicio,
-      responsable: edt.responsable,
+      edt: edt.edt,
+      user: edt.user,
       horasPlan,
       horasReales,
       horasRegistradas,
@@ -184,8 +184,8 @@ async function generarReporteResumen(filtros: any) {
       elementosCompletados,
       fechaInicioPlan: edt.fechaInicioPlan,
       fechaFinPlan: edt.fechaFinPlan,
-      actividades: edt.proyecto_actividad,
-      tareas: edt.ProyectoTarea
+      actividades: edt.proyectoActividad,
+      tareas: edt.proyectoTarea
     }
   })
 
@@ -233,19 +233,19 @@ async function generarReporteDetalleEdt(filtros: any) {
           cliente: { select: { nombre: true } }
         }
       },
-      categoriaServicio: { select: { nombre: true } },
-      responsable: { select: { name: true, email: true } },
-      registrosHoras: {
+      edt: { select: { nombre: true } },
+      user: { select: { name: true, email: true } },
+      registroHoras: {
         where: {
           fechaTrabajo: fechaFiltro
         },
         include: {
-          usuario: { select: { name: true, email: true } },
+          user: { select: { name: true, email: true } },
           recurso: { select: { nombre: true } }
         },
         orderBy: { fechaTrabajo: 'desc' }
       },
-      proyecto_actividad: {
+      proyectoActividad: {
         select: {
           id: true,
           nombre: true,
@@ -256,7 +256,7 @@ async function generarReporteDetalleEdt(filtros: any) {
         },
         orderBy: { orden: 'asc' }
       },
-      ProyectoTarea: {
+      proyectoTarea: {
         select: {
           id: true,
           nombre: true,
@@ -273,8 +273,8 @@ async function generarReporteDetalleEdt(filtros: any) {
 
   // Obtener información de responsables
   const responsableIds = [
-    ...edt.proyecto_actividad.map((a: any) => a.responsableId).filter(Boolean),
-    ...edt.ProyectoTarea.map((t: any) => t.responsableId).filter(Boolean)
+    ...edt.proyectoActividad.map((a: any) => a.userId).filter(Boolean),
+    ...edt.proyectoTarea.map((t: any) => t.userId).filter(Boolean)
   ]
 
   const usuarios = await prisma.user.findMany({
@@ -285,20 +285,20 @@ async function generarReporteDetalleEdt(filtros: any) {
   const responsableMap = new Map(usuarios.map(u => [u.id, u.name]))
 
   // Calcular horas por elemento
-  const actividadesConHoras = edt.proyecto_actividad.map((actividad: any) => {
+  const actividadesConHoras = edt.proyectoActividad.map((actividad: any) => {
     const horasRegistradas = 0 // Los registros de horas están a nivel de EDT, no de actividad individual
     return {
       ...actividad,
       horasRegistradas,
       eficiencia: Number(actividad.horasPlan || 0) > 0 ? (Number(actividad.horasReales) / Number(actividad.horasPlan)) * 100 : 0,
-      responsableNombre: responsableMap.get(actividad.responsableId || '') || 'Sin responsable'
+      responsableNombre: responsableMap.get(actividad.userId || '') || 'Sin responsable'
     }
   })
 
-  const tareasConHoras = edt.ProyectoTarea.map((tarea: any) => ({
+  const tareasConHoras = edt.proyectoTarea.map((tarea: any) => ({
     ...tarea,
     horasRegistradas: 0,
-    responsableNombre: responsableMap.get(tarea.responsableId || '') || 'Sin responsable'
+    responsableNombre: responsableMap.get(tarea.userId || '') || 'Sin responsable'
   }))
 
   return {
@@ -311,8 +311,8 @@ async function generarReporteDetalleEdt(filtros: any) {
       resumen: {
         horasPlan: Number(edt.horasPlan || 0),
         horasReales: Number(edt.horasReales),
-        totalRegistros: edt.registrosHoras.length,
-        usuariosActivos: [...new Set(edt.registrosHoras.map((reg: any) => reg.usuario.name).filter(Boolean))].length
+        totalRegistros: edt.registroHoras.length,
+        usuariosActivos: [...new Set(edt.registroHoras.map((reg: any) => reg.user.name).filter(Boolean))].length
       }
     }
   }
@@ -334,7 +334,7 @@ async function generarReporteProgreso(filtros: any) {
     where: whereClause,
     include: {
       proyecto: { select: { nombre: true, codigo: true } },
-      proyecto_actividad: {
+      proyectoActividad: {
         select: {
           id: true,
           nombre: true,
@@ -343,7 +343,7 @@ async function generarReporteProgreso(filtros: any) {
           horasReales: true
         }
       },
-      ProyectoTarea: {
+      proyectoTarea: {
         select: {
           id: true,
           nombre: true,
@@ -354,10 +354,10 @@ async function generarReporteProgreso(filtros: any) {
   })
 
   const datosProgreso = progreso.map((edt: any) => {
-    const totalActividades = edt.proyecto_actividad.length
-    const totalTareas = edt.ProyectoTarea.length
-    const actividadesCompletadas = edt.proyecto_actividad.filter((a: any) => a.porcentajeAvance >= 100).length
-    const tareasCompletadas = edt.ProyectoTarea.filter((t: any) => t.porcentajeCompletado >= 100).length
+    const totalActividades = edt.proyectoActividad.length
+    const totalTareas = edt.proyectoTarea.length
+    const actividadesCompletadas = edt.proyectoActividad.filter((a: any) => a.porcentajeAvance >= 100).length
+    const tareasCompletadas = edt.proyectoTarea.filter((t: any) => t.porcentajeCompletado >= 100).length
     
     const progresoActividades = totalActividades > 0 ? (actividadesCompletadas / totalActividades) * 100 : 0
     const progresoTareas = totalTareas > 0 ? (tareasCompletadas / totalTareas) * 100 : 0
@@ -413,7 +413,7 @@ async function generarReporteEficiencia(filtros: any) {
     },
     include: {
       proyecto: { select: { nombre: true, codigo: true } },
-      responsable: { select: { name: true } }
+      user: { select: { name: true } }
     }
   })
 
@@ -430,7 +430,7 @@ async function generarReporteEficiencia(filtros: any) {
       id: edt.id,
       nombre: edt.nombre,
       proyecto: edt.proyecto,
-      responsable: edt.responsable,
+      user: edt.user,
       horasPlan,
       horasReales,
       variacion,
@@ -472,14 +472,14 @@ async function generarReporteTimeline(filtros: any) {
     where: whereClause,
     include: {
       proyecto: { select: { nombre: true, codigo: true } },
-      registrosHoras: {
+      registroHoras: {
         where: {
           fechaTrabajo: fechaFiltro
         },
         select: {
           fechaTrabajo: true,
           horasTrabajadas: true,
-          usuario: { select: { name: true } }
+          user: { select: { name: true } }
         },
         orderBy: { fechaTrabajo: 'asc' }
       }
@@ -488,11 +488,11 @@ async function generarReporteTimeline(filtros: any) {
   })
 
   const timeline = edts.map((edt: any) => {
-    const registrosPorFecha = edt.registrosHoras.reduce((acc: Record<string, { total: number, usuarios: string[] }>, reg: any) => {
+    const registrosPorFecha = edt.registroHoras.reduce((acc: Record<string, { total: number, usuarios: string[] }>, reg: any) => {
       const fecha = reg.fechaTrabajo.toISOString().split('T')[0]
       if (!acc[fecha]) acc[fecha] = { total: 0, usuarios: [] }
       acc[fecha].total += Number(reg.horasTrabajadas)
-      const userName = reg.usuario.name || 'Usuario sin nombre'
+      const userName = reg.user.name || 'Usuario sin nombre'
       if (!acc[fecha].usuarios.includes(userName)) {
         acc[fecha].usuarios.push(userName)
       }

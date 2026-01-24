@@ -263,9 +263,24 @@ export default function OportunidadDetailPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{oportunidad.nombre}</h1>
-            <p className="text-muted-foreground">
-              Detalles completos de la oportunidad comercial
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-muted-foreground">
+                Oportunidad comercial
+              </p>
+              {oportunidad.cotizacion && (
+                <>
+                  <span className="text-muted-foreground">•</span>
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-blue-50 text-blue-700 border-blue-200 cursor-pointer hover:bg-blue-100"
+                    onClick={() => router.push(`/comercial/cotizaciones/${oportunidad.cotizacion?.id}`)}
+                  >
+                    <FileText className="h-3 w-3 mr-1" />
+                    Cotización: {oportunidad.cotizacion.codigo}
+                  </Badge>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -481,17 +496,10 @@ export default function OportunidadDetailPage() {
                 <div className="flex gap-2">
                   <Button
                     className="flex-1"
-                    onClick={() => window.open(`/comercial/cotizaciones/${oportunidad.cotizacion!.id}`, '_blank')}
+                    onClick={() => router.push(`/comercial/cotizaciones/${oportunidad.cotizacion!.id}`)}
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Ver Cotización Completa
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => window.open(`/comercial/cotizaciones/${oportunidad.cotizacion!.id}/editar`, '_blank')}
-                  >
-                    <Edit3 className="h-4 w-4 mr-2" />
-                    Editar Cotización
                   </Button>
                 </div>
               </CardContent>
@@ -563,10 +571,10 @@ export default function OportunidadDetailPage() {
                 <Button
                   className="w-full"
                   variant="default"
-                  onClick={() => window.open(`/comercial/cotizaciones/${oportunidad.cotizacion!.id}`, '_blank')}
+                  onClick={() => router.push(`/comercial/cotizaciones/${oportunidad.cotizacion!.id}`)}
                 >
                   <FileText className="h-4 w-4 mr-2" />
-                  Ver Cotización ({oportunidad.cotizacion!.codigo})
+                  Ver Cotización ({oportunidad.cotizacion.codigo})
                 </Button>
               ) : (
                 <Button

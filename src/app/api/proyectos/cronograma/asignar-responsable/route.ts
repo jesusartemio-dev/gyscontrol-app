@@ -49,7 +49,7 @@ export async function PUT(request: NextRequest) {
         elemento = await prisma.proyectoTarea.findUnique({
           where: { id },
           include: {
-            responsable: {
+            user: {
               select: { id: true, name: true }
             },
             proyectoActividad: {
@@ -99,7 +99,7 @@ export async function PUT(request: NextRequest) {
           where: { id },
           data: { responsableId },
           include: {
-            responsable: {
+            user: {
               select: { id: true, name: true, email: true }
             }
           }
@@ -111,7 +111,7 @@ export async function PUT(request: NextRequest) {
           where: { id },
           data: { responsableId },
           include: {
-            responsable: {
+            user: {
               select: { id: true, name: true, email: true }
             }
           }
@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
         break
 
       case 'zona':
-        const zona = await prisma.proyectoZona.findUnique({
+        const zona = await prisma.proyectoEdt.findUnique({
           where: { id },
           select: { proyectoId: true }
         })

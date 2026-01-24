@@ -193,7 +193,7 @@ async function recalcularFasePadre(faseId: string): Promise<void> {
 // ✅ Schema de validación para crear EDT
 const createEdtSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
-  categoriaServicioId: z.string().min(1, 'La categoría de servicio es requerida'),
+  edtId: z.string().min(1, 'La categoría de servicio es requerida'),
   proyectoFaseId: z.string().optional(),
   zona: z.string().optional(),
   fechaInicioPlan: z.string().optional(),
@@ -207,7 +207,7 @@ const createEdtSchema = z.object({
 // ✅ Schema de validación para actualizar EDT
 const updateEdtSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').optional(),
-  categoriaServicioId: z.string().min(1, 'La categoría de servicio es requerida').optional(),
+  edtId: z.string().min(1, 'La categoría de servicio es requerida').optional(),
   proyectoFaseId: z.string().optional(),
   zona: z.string().optional(),
   fechaInicioPlan: z.string().optional(),
@@ -258,10 +258,10 @@ export async function GET(
         proyecto: {
           select: { id: true, nombre: true, codigo: true, estado: true }
         },
-        categoriaServicio: {
+        edt: {
           select: { id: true, nombre: true }
         },
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         },
         proyectoFase: {
@@ -271,7 +271,7 @@ export async function GET(
           select: { id: true, tipo: true, nombre: true }
         },
         _count: {
-          select: { ProyectoTarea: true }
+          select: { proyectoTarea: true }
         }
       },
       orderBy: [
@@ -322,7 +322,7 @@ export async function POST(
 
     // ✅ Validar que el EDT existe (cambio de categoriaServicio a edt según refactoring)
     const edtValidation = await (prisma as any).edt.findUnique({
-      where: { id: validatedData.categoriaServicioId }
+      where: { id: validatedData.edtId }
     })
 
     if (!edtValidation) {
@@ -366,7 +366,7 @@ export async function POST(
         proyectoCronogramaId: cronogramaId,
         proyectoFaseId: validatedData.proyectoFaseId,
         nombre: validatedData.nombre,
-        categoriaServicioId: validatedData.categoriaServicioId,
+        edtId: validatedData.edtId,
         zona: validatedData.zona,
         fechaInicioPlan: validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null,
         fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null,
@@ -381,10 +381,10 @@ export async function POST(
         proyecto: {
           select: { id: true, nombre: true, codigo: true, estado: true }
         },
-        categoriaServicio: {
+        edt: {
           select: { id: true, nombre: true }
         },
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         },
         proyectoFase: {

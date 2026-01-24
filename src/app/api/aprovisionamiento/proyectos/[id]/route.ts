@@ -69,9 +69,9 @@ export async function GET(
             email: true
           }
         },
-        listaEquipos: {
+        listaEquipo: {
           include: {
-            items: {
+            listaEquipoItem: {
               select: {
                 id: true,
                 codigo: true,
@@ -82,7 +82,7 @@ export async function GET(
                 unidad: true
               }
             },
-            pedidoEquipos: {
+            pedidoEquipo: {
               select: {
                 id: true,
                 estado: true,
@@ -92,9 +92,9 @@ export async function GET(
             }
           }
         },
-        pedidos: {
+        pedidoEquipo: {
           include: {
-            items: {
+            pedidoEquipoItem: {
               select: {
                 id: true,
                 codigo: true,
@@ -105,7 +105,7 @@ export async function GET(
                 listaEquipoItemId: true
               }
             },
-            lista: {
+            listaEquipo: {
               select: {
                 id: true,
                 nombre: true,
@@ -126,32 +126,32 @@ export async function GET(
 
     // 🔁 Función para calcular KPIs del proyecto
     function calcularKPIsProyecto(proyecto: any) {
-      const listas = proyecto.listas || []
-      const pedidos = proyecto.pedidos || []
-      
+      const listas = proyecto.listaEquipo || []
+      const pedidos = proyecto.pedidoEquipo || []
+
       // 💰 Calcular montos de listas
       const montoListas = listas.reduce((total: number, lista: any) => {
-        const montoLista = lista.items?.reduce((subtotal: number, item: any) => {
+        const montoLista = lista.listaEquipoItem?.reduce((subtotal: number, item: any) => {
           return subtotal + (item.cantidad * (item.equipo?.precio || 0))
         }, 0) || 0
         return total + montoLista
       }, 0)
-      
+
       // 💰 Calcular montos de pedidos
       const montoPedidos = pedidos.reduce((total: number, pedido: any) => {
         return total + (pedido.montoTotal || 0)
       }, 0)
-      
+
       // 📊 Calcular porcentajes y desviaciones
       const porcentajeEjecutado = montoListas > 0 ? (montoPedidos / montoListas) * 100 : 0
-      const porcentajeDesviacion = proyecto.presupuesto > 0 ? 
+      const porcentajeDesviacion = proyecto.presupuesto > 0 ?
         ((montoListas - proyecto.presupuesto) / proyecto.presupuesto) * 100 : 0
-      
+
       // 🚨 Calcular alertas
       const fechaActual = new Date()
       const listasPendientes = listas.filter((lista: any) => {
         const fechaNecesaria = new Date(lista.fechaNecesaria)
-        const tienePedidos = lista.pedidos && lista.pedidos.length > 0
+        const tienePedidos = lista.pedidoEquipo && lista.pedidoEquipo.length > 0
         return fechaNecesaria <= fechaActual && !tienePedidos
       }).length
       
@@ -192,8 +192,8 @@ export async function GET(
 
     // 🔁 Función para calcular datos de Gantt
     function calcularDatosGantt(proyecto: any) {
-      const listas = proyecto.listas || []
-      const pedidos = proyecto.pedidos || []
+      const listas = proyecto.listaEquipo || []
+      const pedidos = proyecto.pedidoEquipo || []
       
       if (listas.length === 0) {
         return {
@@ -377,15 +377,15 @@ export async function PUT(
             email: true
           }
         },
-        listaEquipos: {
+        listaEquipo: {
           include: {
-            items: true,
-            pedidoEquipos: true
+            listaEquipoItem: true,
+            pedidoEquipo: true
           }
         },
-        pedidos: {
+        pedidoEquipo: {
           include: {
-            items: true
+            pedidoEquipoItem: true
           }
         }
       }
@@ -452,12 +452,12 @@ export async function DELETE(
     const proyecto = await prisma.proyecto.findUnique({
       where: { id: proyectoId },
       include: {
-        listaEquipos: {
+        listaEquipo: {
           include: {
-            pedidoEquipos: true
+            pedidoEquipo: true
           }
         },
-        pedidos: true
+        pedidoEquipo: true
       }
     })
 
@@ -469,11 +469,11 @@ export async function DELETE(
     }
 
     // 🔁 Validar dependencias antes de eliminar
-    const listasConPedidos = proyecto.listaEquipos.filter((lista: any) => 
-      lista.pedidoEquipos && lista.pedidoEquipos.length > 0
+    const listasConPedidos = proyecto.listaEquipo.filter((lista: any) =>
+      lista.pedidoEquipo && lista.pedidoEquipo.length > 0
     )
-    
-    const pedidosActivos = proyecto.pedidos.filter(pedido => 
+
+    const pedidosActivos = proyecto.pedidoEquipo.filter((pedido: any) =>
       pedido.estado !== 'cancelado'
     )
 

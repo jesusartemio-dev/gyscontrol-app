@@ -110,7 +110,7 @@ export async function GET(
         ...dateFilters
       },
       include: {
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -119,7 +119,7 @@ export async function GET(
         },
         subtareas: {
           include: {
-            asignado: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -128,7 +128,7 @@ export async function GET(
             }
           }
         },
-        dependenciasOrigen: {
+        dependenciasComoOrigen: {
           include: {
             tareaDependiente: {
               select: {
@@ -139,7 +139,7 @@ export async function GET(
             }
           }
         },
-        dependenciasDependiente: {
+        dependenciasComoDependiente: {
           include: {
             tareaOrigen: {
               select: {
@@ -150,9 +150,9 @@ export async function GET(
             }
           }
         },
-        asignaciones: {
+        asignacionesRecurso: {
           include: {
-            usuario: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -195,10 +195,10 @@ export async function GET(
       horasReales: Number(tarea.horasReales || 0),
       tipo: 'tarea' as const,
       nivel: 0,
-      responsable: tarea.responsable ? {
-        id: tarea.responsable.id,
-        nombre: tarea.responsable.name || '',
-        email: tarea.responsable.email
+      responsable: tarea.user ? {
+        id: tarea.user.id,
+        nombre: tarea.user.name || '',
+        email: tarea.user.email
       } : {
         id: '',
         nombre: 'Sin asignar',
@@ -215,10 +215,10 @@ export async function GET(
         progreso: Number(subtarea.porcentajeCompletado || 0),
         estado: 'pendiente' as const,
         prioridad: 'media' as const,
-        responsable: subtarea.asignado ? {
-          id: subtarea.asignado.id,
-          nombre: subtarea.asignado.name || '',
-          email: subtarea.asignado.email
+        responsable: subtarea.user ? {
+          id: subtarea.user.id,
+          nombre: subtarea.user.name || '',
+          email: subtarea.user.email
         } : {
           id: '',
           nombre: 'Sin asignar',
@@ -232,12 +232,12 @@ export async function GET(
         nivel: 1
       })),
       dependencias: [
-        ...tarea.dependenciasDependiente.map(dep => dep.tareaOrigen.id),
-        ...tarea.dependenciasOrigen.map(dep => dep.tareaDependiente.id)
+        ...tarea.dependenciasComoDependiente.map(dep => dep.tareaOrigen.id),
+        ...tarea.dependenciasComoOrigen.map(dep => dep.tareaDependiente.id)
       ],
-      recursos: tarea.asignaciones.map(asignacion => ({
-        id: asignacion.usuario.id,
-        nombre: asignacion.usuario.name || '',
+      recursos: tarea.asignacionesRecurso.map(asignacion => ({
+        id: asignacion.user.id,
+        nombre: asignacion.user.name || '',
         tipo: asignacion.rol,
         horasAsignadas: Number(asignacion.horasAsignadas || 0)
       })),

@@ -57,7 +57,7 @@ export async function GET(
           }
         },
         // 👤 Basic responsible information
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -65,10 +65,10 @@ export async function GET(
           }
         },
         // 📋 Simplified items with basic relationships
-        items: {
+        listaEquipoItem: {
           include: {
             // 👤 Basic responsable information
-            responsable: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -83,7 +83,7 @@ export async function GET(
               }
             },
             // 💰 Simplified cotizaciones
-            cotizaciones: {
+            cotizacionProveedorItems: {
               select: {
                 id: true,
                 precioUnitario: true,
@@ -91,7 +91,7 @@ export async function GET(
                 estado: true,
                 esSeleccionada: true,
                 createdAt: true,
-                cotizacion: {
+                cotizacionProveedor: {
                   select: {
                     id: true,
                     codigo: true,
@@ -110,13 +110,13 @@ export async function GET(
               }
             },
             // 📦 Simplified pedidos
-            pedidos: {
+            pedidoEquipoItem: {
               select: {
                 id: true,
                 cantidadPedida: true,
                 estado: true,
                 createdAt: true,
-                pedido: {
+                pedidoEquipo: {
                   select: {
                     id: true,
                     codigo: true,
@@ -127,7 +127,7 @@ export async function GET(
             },
 
             // 🏗️ Basic proyecto equipo relationship
-            proyectoEquipo: {
+            proyectoEquipoCotizado: {
               select: {
                 id: true,
                 nombre: true
@@ -136,7 +136,22 @@ export async function GET(
             // 📋 Basic proyecto equipo item relationship
             proyectoEquipoItem: {
               include: {
-                proyectoEquipo: {
+                proyectoEquipoCotizado: {
+                  select: {
+                    id: true,
+                    nombre: true
+                  }
+                }
+              }
+            },
+            // 📦 Catálogo de equipo con categoría (para exportación Excel)
+            catalogoEquipo: {
+              select: {
+                id: true,
+                codigo: true,
+                descripcion: true,
+                marca: true,
+                categoriaEquipo: {
                   select: {
                     id: true,
                     nombre: true
@@ -160,36 +175,50 @@ export async function GET(
     }
 
     // 🧮 Calculate detailed statistics and enrich data
-    const itemsEnriquecidos = lista.items.map(item => {
+    const rawItems = lista.listaEquipoItem || []
+    const itemsEnriquecidos = rawItems.map((item: any) => {
       // 💰 Calculate best prices and totals
-      const mejorCotizacion = item.cotizaciones.length > 0 
-        ? item.cotizaciones[0] // Already ordered by price ASC
+      const cotizaciones = item.cotizacionProveedorItems || []
+      const mejorCotizacion = cotizaciones.length > 0
+        ? cotizaciones[0] // Already ordered by price ASC
         : null
-      
-      const precioUnitarioFinal = mejorCotizacion?.precioUnitario 
-        || item.precioElegido 
-        || item.presupuesto 
+
+      const precioUnitarioFinal = mejorCotizacion?.precioUnitario
+        || item.precioElegido
+        || item.presupuesto
         || 0
-      
+
       const subtotal = precioUnitarioFinal * (item.cantidad || 0)
-      
+
       // 📦 Calculate pedidos statistics
-      const cantidadPedida = item.pedidos.reduce((total, pedidoItem) => {
+      const pedidos = item.pedidoEquipoItem || []
+      const cantidadPedida = pedidos.reduce((total: number, pedidoItem: any) => {
         return total + (pedidoItem.cantidadPedida || 0)
       }, 0)
-      
+
       const cantidadPendiente = (item.cantidad || 0) - cantidadPedida
-      const progresoPedidos = item.cantidad > 0 
-        ? Math.round((cantidadPedida / item.cantidad) * 100) 
+      const progresoPedidos = item.cantidad > 0
+        ? Math.round((cantidadPedida / item.cantidad) * 100)
         : 0
-      
+
       // 💵 Calculate savings if cotización is better than budget
       const ahorro = item.presupuesto && mejorCotizacion?.precioUnitario
         ? (item.presupuesto - mejorCotizacion.precioUnitario) * (item.cantidad || 0)
         : 0
-      
+
       return {
         ...item,
+        // 🔄 Frontend compatibility mapping
+        responsable: item.user,
+        cotizaciones: cotizaciones.map((cot: any) => ({
+          ...cot,
+          cotizacion: cot.cotizacionProveedor
+        })),
+        pedidos: pedidos.map((ped: any) => ({
+          ...ped,
+          pedido: ped.pedidoEquipo
+        })),
+        proyectoEquipo: item.proyectoEquipoCotizado,
         // 💰 Calculated fields
         precioUnitarioFinal,
         subtotal,
@@ -198,44 +227,44 @@ export async function GET(
         progresoPedidos,
         ahorro,
         // 🎯 Status indicators
-        tieneCotizaciones: item.cotizaciones.length > 0,
-        tienePedidos: item.pedidos.length > 0,
+        tieneCotizaciones: cotizaciones.length > 0,
+        tienePedidos: pedidos.length > 0,
         estaCompletamentePedido: cantidadPendiente <= 0,
-        necesitaCotizacion: item.cotizaciones.length === 0 && !item.precioElegido
+        necesitaCotizacion: cotizaciones.length === 0 && !item.precioElegido
       }
     })
 
     // 📊 Calculate lista-level statistics
     const estadisticas = {
-      totalItems: lista.items.length,
-      itemsConCotizacion: itemsEnriquecidos.filter(item => item.tieneCotizaciones).length,
-      itemsConPedidos: itemsEnriquecidos.filter(item => item.tienePedidos).length,
-      itemsCompletos: itemsEnriquecidos.filter(item => item.estaCompletamentePedido).length,
-      
+      totalItems: rawItems.length,
+      itemsConCotizacion: itemsEnriquecidos.filter((item: any) => item.tieneCotizaciones).length,
+      itemsConPedidos: itemsEnriquecidos.filter((item: any) => item.tienePedidos).length,
+      itemsCompletos: itemsEnriquecidos.filter((item: any) => item.estaCompletamentePedido).length,
+
       // 💰 Financial totals
-      montoPresupuestado: itemsEnriquecidos.reduce((total, item) => 
+      montoPresupuestado: itemsEnriquecidos.reduce((total: number, item: any) =>
         total + ((item.presupuesto || 0) * (item.cantidad || 0)), 0),
-      montoEstimado: itemsEnriquecidos.reduce((total, item) => 
+      montoEstimado: itemsEnriquecidos.reduce((total: number, item: any) =>
         total + item.subtotal, 0),
-      ahorroTotal: itemsEnriquecidos.reduce((total, item) => 
+      ahorroTotal: itemsEnriquecidos.reduce((total: number, item: any) =>
         total + item.ahorro, 0),
-      
+
       // 📈 Progress percentages
-      progresoCotizacion: lista.items.length > 0 
-        ? Math.round((itemsEnriquecidos.filter(item => item.tieneCotizaciones).length / lista.items.length) * 100)
+      progresoCotizacion: rawItems.length > 0
+        ? Math.round((itemsEnriquecidos.filter((item: any) => item.tieneCotizaciones).length / rawItems.length) * 100)
         : 0,
-      progresoPedidos: lista.items.length > 0 
-        ? Math.round((itemsEnriquecidos.filter(item => item.tienePedidos).length / lista.items.length) * 100)
+      progresoPedidos: rawItems.length > 0
+        ? Math.round((itemsEnriquecidos.filter((item: any) => item.tienePedidos).length / rawItems.length) * 100)
         : 0,
-      progresoCompletado: lista.items.length > 0 
-        ? Math.round((itemsEnriquecidos.filter(item => item.estaCompletamentePedido).length / lista.items.length) * 100)
+      progresoCompletado: rawItems.length > 0
+        ? Math.round((itemsEnriquecidos.filter((item: any) => item.estaCompletamentePedido).length / rawItems.length) * 100)
         : 0
     }
 
     // 🎯 Return enriched lista with complete data
     const listaCompleta = {
       ...lista,
-      items: itemsEnriquecidos,
+      listaEquipoItem: itemsEnriquecidos,
       estadisticas,
       // 🎯 Lista-level status indicators
       estaCompleta: estadisticas.progresoCotizacion === 100,

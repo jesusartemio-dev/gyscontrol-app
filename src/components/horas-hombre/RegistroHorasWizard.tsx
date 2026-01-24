@@ -406,7 +406,11 @@ export function RegistroHorasWizard({
         })
       })
 
-      if (!response.ok) throw new Error('Error creando tarea')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        console.error('❌ WIZARD: Respuesta de error:', response.status, response.statusText, errorData)
+        throw new Error(errorData?.error || `Error ${response.status}: ${response.statusText}`)
+      }
 
       const data = await response.json()
       console.log('✅ WIZARD: Nueva tarea creada:', data)
@@ -432,10 +436,16 @@ export function RegistroHorasWizard({
       })
 
     } catch (error) {
-      console.error('❌ WIZARD: Error creando tarea:', error)
+      console.error('❌ WIZARD: Error creando tarea completo:', error)
+      let errorMessage = 'No se pudo crear la nueva tarea'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: 'Error',
-        description: 'No se pudo crear la nueva tarea',
+        description: errorMessage,
         variant: 'destructive'
       })
     } finally {

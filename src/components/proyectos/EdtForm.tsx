@@ -18,13 +18,13 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import type { ProyectoEdtConRelaciones, EstadoEdt, CategoriaServicio, User } from '@/types/modelos';
+import type { ProyectoEdtConRelaciones, EstadoEdt, Edt, User } from '@/types/modelos';
 import type { ProyectoEdtPayload } from '@/types/payloads';
 
 // ✅ Schema de validación Zod
 const edtFormSchema = z.object({
   nombre: z.string().min(1, 'El nombre del EDT es requerido'),
-  categoriaServicioId: z.string().min(1, 'La categoría de servicio es requerida'),
+  edtId: z.string().min(1, 'El EDT es requerido'),
   prioridad: z.enum(['baja', 'media', 'alta', 'critica'], {
     required_error: 'La prioridad es requerida'
   }),
@@ -37,7 +37,7 @@ const edtFormSchema = z.object({
   }),
   horasPlan: z.number().min(0.1, 'Las horas planificadas deben ser mayor a 0'),
   responsableId: z.string().optional(),
-  estado: z.enum(['planificado', 'en_progreso', 'detenido', 'completado', 'cancelado']).optional()
+  estado: z.enum(['planificado', 'en_progreso', 'detenido', 'completado', 'cancelado', 'pausado']).optional()
 }).refine((data) => data.fechaFinPlan > data.fechaInicioPlan, {
   message: 'La fecha de fin debe ser posterior a la fecha de inicio',
   path: ['fechaFinPlan']
@@ -49,7 +49,7 @@ type EdtFormData = z.infer<typeof edtFormSchema>;
 interface EdtFormProps {
   proyectoId: string;
   edt?: ProyectoEdtConRelaciones;
-  categoriasServicios: CategoriaServicio[];
+  edtsCatalogo: Edt[];
   usuarios?: User[];
   onSubmit: (data: ProyectoEdtPayload) => Promise<void>;
   onCancel: () => void;
@@ -77,7 +77,7 @@ const estadoOptions = [
 export function EdtForm({ 
   proyectoId, 
   edt, 
-  categoriasServicios, 
+  edtsCatalogo,
   usuarios = [], 
   onSubmit, 
   onCancel, 
@@ -91,7 +91,7 @@ export function EdtForm({
     resolver: zodResolver(edtFormSchema),
     defaultValues: {
       nombre: edt?.nombre || '',
-      categoriaServicioId: edt?.categoriaServicioId || '',
+      edtId: edt?.edtId || '',
       prioridad: edt?.prioridad || 'media',
       descripcion: edt?.descripcion || '',
       fechaInicioPlan: edt?.fechaInicio ? new Date(edt.fechaInicio) : new Date(),
@@ -109,7 +109,7 @@ export function EdtForm({
       const payload: ProyectoEdtPayload = {
         proyectoId,
         nombre: data.nombre,
-        categoriaServicioId: data.categoriaServicioId,
+        edtId: data.edtId,
         prioridad: data.prioridad,
         descripcion: data.descripcion || undefined,
         fechaInicio: data.fechaInicioPlan?.toISOString(),
@@ -139,7 +139,7 @@ export function EdtForm({
 
   // ✅ Validar fechas en tiempo real
   const fechaInicio = form.watch('fechaInicioPlan');
-  const categoriaServicioId = form.watch('categoriaServicioId');
+  const edtIdValue = form.watch('edtId');
 
   useEffect(() => {
     const fechaFin = form.getValues('fechaFinPlan');
@@ -150,18 +150,18 @@ export function EdtForm({
     }
   }, [fechaInicio, form]);
 
-  // ✅ Auto-fill nombre when categoriaServicio changes
+  // ✅ Auto-fill nombre when EDT changes
   useEffect(() => {
-    if (categoriaServicioId && !isEditing) {
-      const categoria = categoriasServicios.find(c => c.id === categoriaServicioId);
-      if (categoria) {
+    if (edtIdValue && !isEditing) {
+      const edtItem = edtsCatalogo.find((e: Edt) => e.id === edtIdValue);
+      if (edtItem) {
         const currentNombre = form.getValues('nombre');
         if (!currentNombre || currentNombre === '') {
-          form.setValue('nombre', categoria.nombre);
+          form.setValue('nombre', edtItem.nombre);
         }
       }
     }
-  }, [categoriaServicioId, categoriasServicios, form, isEditing]);
+  }, [edtIdValue, edtsCatalogo, form, isEditing]);
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
@@ -193,24 +193,24 @@ export function EdtForm({
               )}
             />
 
-            {/* ✅ Fila 1: Categoría y Prioridad */}
+            {/* ✅ Fila 1: EDT y Prioridad */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
-                name="categoriaServicioId"
+                name="edtId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Categoría de Servicio *</FormLabel>
+                    <FormLabel>EDT *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar categoría" />
+                          <SelectValue placeholder="Seleccionar EDT" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {categoriasServicios.map((categoria) => (
-                          <SelectItem key={categoria.id} value={categoria.id}>
-                            {categoria.nombre}
+                        {edtsCatalogo.map((edtItem: Edt) => (
+                          <SelectItem key={edtItem.id} value={edtItem.id}>
+                            {edtItem.nombre}
                           </SelectItem>
                         ))}
                       </SelectContent>

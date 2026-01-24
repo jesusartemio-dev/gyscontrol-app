@@ -184,7 +184,7 @@ async function generarTimelineEntregas(filtros: z.infer<typeof FiltrosTrazabilid
   const items = await prisma.pedidoEquipoItem.findMany({
     where: whereConditions,
     include: {
-      pedido: {
+      pedidoEquipo: {
         include: {
           proyecto: {
             select: {
@@ -221,7 +221,7 @@ async function generarTimelineEntregas(filtros: z.infer<typeof FiltrosTrazabilid
       estadoNuevo: EstadoEntregaItem.PENDIENTE,
       metadata: {
         itemId: item.id,
-        proyecto: item.pedido.proyecto?.nombre,
+        proyecto: item.pedidoEquipo?.proyecto?.nombre,
         cantidad: item.cantidadPedida
       }
     });
@@ -419,7 +419,7 @@ async function generarComparativasProyecto(filtros: z.infer<typeof FiltrosTrazab
     where: filtros.proyectoId ? { proyectoId: filtros.proyectoId } : {},
     include: {
       proyecto: { select: { id: true, nombre: true, codigo: true } },
-      items: {
+      pedidoEquipoItem: {
         select: {
           estado: true,
           cantidadPedida: true,
@@ -432,7 +432,7 @@ async function generarComparativasProyecto(filtros: z.infer<typeof FiltrosTrazab
 
   // 📊 Calcular métricas por proyecto
   const comparativas = proyectosConDetalles.map(pedido => {
-    const items = pedido.items;
+    const items = pedido.pedidoEquipoItem;
     const totalItems = items.length;
     const totalCantidad = items.reduce((acc, item) => acc + item.cantidadPedida, 0);
     const totalAtendida = items.reduce((acc, item) => acc + (item.cantidadAtendida || 0), 0);

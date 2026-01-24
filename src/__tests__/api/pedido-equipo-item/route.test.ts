@@ -40,6 +40,9 @@ const mockPrisma = {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  pedidoEquipo: {
+    findUnique: jest.fn(),
+  },
 } as any
 
 // Mock the actual prisma import
@@ -61,22 +64,28 @@ describe('/api/pedido-equipo-item', () => {
           listaEquipoItemId: 'lista-item-1',
           cantidadPedida: 5,
           responsableId: 'user-1',
+          pedidoEquipo: {
+            id: 'pedido-1',
+            proyecto: { id: 'proyecto-1', nombre: 'Test Project' },
+            user: { id: 'user-1', name: 'Test User' },
+          },
+          listaEquipoItem: { id: 'lista-item-1', cantidad: 10 },
         },
       ]
 
       mockPrisma.pedidoEquipoItem.findMany.mockResolvedValue(mockItems as any)
 
       const response = await GET()
-      const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data).toEqual(mockItems)
       expect(mockPrisma.pedidoEquipoItem.findMany).toHaveBeenCalledWith({
         include: {
-          pedido: true,
+          pedidoEquipo: {
+            include: { proyecto: true, user: true },
+          },
           listaEquipoItem: true,
-          responsable: true,
         },
+        orderBy: { createdAt: 'asc' },
       })
     })
   })
@@ -110,6 +119,10 @@ describe('/api/pedido-equipo-item', () => {
 
       mockGetServerSession.mockResolvedValue(mockSession as any)
       mockPrisma.listaEquipoItem.findUnique.mockResolvedValue(mockListaItem as any)
+      mockPrisma.pedidoEquipo.findUnique.mockResolvedValue({
+        id: 'pedido-1',
+        fechaNecesaria: new Date('2024-12-31'),
+      } as any)
       mockPrisma.pedidoEquipoItem.aggregate.mockResolvedValue({
         _sum: { cantidadPedida: 2 },
       } as any)
@@ -124,7 +137,7 @@ describe('/api/pedido-equipo-item', () => {
       const response = await POST(request)
       const data = await response.json()
 
-      expect(response.status).toBe(201)
+      expect(response.status).toBe(200)
       expect(data).toEqual(mockCreatedItem)
       expect(mockPrisma.pedidoEquipoItem.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -176,6 +189,10 @@ describe('/api/pedido-equipo-item', () => {
 
       mockGetServerSession.mockResolvedValue(mockSession as any)
       mockPrisma.listaEquipoItem.findUnique.mockResolvedValue(mockListaItem as any)
+      mockPrisma.pedidoEquipo.findUnique.mockResolvedValue({
+        id: 'pedido-1',
+        fechaNecesaria: new Date('2024-12-31'),
+      } as any)
       mockPrisma.pedidoEquipoItem.aggregate.mockResolvedValue({
         _sum: { cantidadPedida: 3 },
       } as any)

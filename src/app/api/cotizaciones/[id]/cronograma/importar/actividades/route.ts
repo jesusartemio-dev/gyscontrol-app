@@ -1,7 +1,7 @@
 // ===================================================
 // 📁 Archivo: route.ts
 // 📌 Ubicación: /api/cotizaciones/[id]/cronograma/importar/actividades
-// 🔧 Descripción: Importar actividades desde servicios a EDTs o zonas
+// 🔧 Descripción: Importar actividades desde servicios a EDTs
 // ✅ POST: Importar actividades seleccionadas
 // ===================================================
 
@@ -14,10 +14,7 @@ import { z } from 'zod'
 export const dynamic = 'force-dynamic'
 
 const importActividadesSchema = z.object({
-  parentType: z.enum(['edt', 'zona'], {
-    errorMap: () => ({ message: 'El tipo de padre debe ser "edt" o "zona"' })
-  }),
-  parentId: z.string().min(1, 'El ID del padre es requerido'),
+  parentId: z.string().min(1, 'El ID del EDT es requerido'),
   servicioIds: z.array(z.string()).min(1, 'Debe seleccionar al menos un servicio')
 })
 
@@ -37,7 +34,7 @@ export async function POST(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -56,32 +53,17 @@ export async function POST(
     const body = await request.json()
     const validatedData = importActividadesSchema.parse(body)
 
-    // Verificar que el padre existe y pertenece a la cotización
-    let parentData
-    if (validatedData.parentType === 'edt') {
-      parentData = await prisma.cotizacionEdt.findFirst({
-        where: {
-          id: validatedData.parentId,
-          cotizacionId: id
-        }
-      })
-      if (!parentData) {
-        return NextResponse.json({
-          error: 'EDT no encontrado o no pertenece a esta cotización'
-        }, { status: 400 })
+    // Verificar que el EDT existe y pertenece a la cotización
+    const parentData = await prisma.cotizacionEdt.findFirst({
+      where: {
+        id: validatedData.parentId,
+        cotizacionId: id
       }
-    } else {
-      parentData = await prisma.cotizacionZona.findFirst({
-        where: {
-          id: validatedData.parentId,
-          cotizacionId: id
-        }
-      })
-      if (!parentData) {
-        return NextResponse.json({
-          error: 'Zona no encontrada o no pertenece a esta cotización'
-        }, { status: 400 })
-      }
+    })
+    if (!parentData) {
+      return NextResponse.json({
+        error: 'EDT no encontrado o no pertenece a esta cotización'
+      }, { status: 400 })
     }
 
     // Obtener servicios seleccionados que pertenecen a la cotización
@@ -91,7 +73,7 @@ export async function POST(
         cotizacionId: id
       },
       include: {
-        items: true
+        cotizacionServicioItem: true
       }
     })
 
@@ -103,9 +85,7 @@ export async function POST(
 
     // Verificar que no existan actividades con nombres duplicados
     const actividadesExistentes = await prisma.cotizacionActividad.findMany({
-      where: validatedData.parentType === 'edt'
-        ? { cotizacionEdtId: validatedData.parentId }
-        : { cotizacionZonaId: validatedData.parentId },
+      where: { cotizacionEdtId: validatedData.parentId },
       select: { nombre: true }
     })
 
@@ -119,26 +99,25 @@ export async function POST(
         continue // Saltar este servicio
       }
 
-      const horasServicio = servicio.items.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
+      const horasServicio = servicio.cotizacionServicioItem.reduce((sum: number, item: any) => sum + (Number(item.horaTotal) || 0), 0)
 
       const nuevaActividad = await prisma.cotizacionActividad.create({
         data: {
-          ...(validatedData.parentType === 'edt'
-            ? { cotizacionEdtId: validatedData.parentId }
-            : { cotizacionZonaId: validatedData.parentId }
-          ),
+          id: `cot-act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          cotizacionEdtId: validatedData.parentId,
           nombre: servicio.nombre,
           descripcion: `Actividad importada desde servicio ${servicio.nombre}`,
           horasEstimadas: horasServicio,
           estado: 'pendiente',
-          prioridad: 'media'
+          prioridad: 'media',
+          updatedAt: new Date()
         }
       })
 
       actividadesCreadas.push({
         ...nuevaActividad,
         servicioId: servicio.id,
-        totalItems: servicio.items.length,
+        totalItems: servicio.cotizacionServicioItem.length,
         totalHoras: horasServicio
       })
     }
@@ -175,7 +154,6 @@ export async function GET(
     const { id } = await params
     const session = await getServerSession(authOptions)
     const { searchParams } = new URL(request.url)
-    const parentType = searchParams.get('parentType') as 'edt' | 'zona'
     const parentId = searchParams.get('parentId')
 
     if (!session) {
@@ -185,7 +163,7 @@ export async function GET(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -200,42 +178,31 @@ export async function GET(
       return NextResponse.json({ error: 'No tiene permisos para ver el cronograma' }, { status: 403 })
     }
 
-    if (!parentType || !parentId || !['edt', 'zona'].includes(parentType)) {
+    if (!parentId) {
       return NextResponse.json({
-        error: 'Parámetros parentType y parentId son requeridos. parentType debe ser "edt" o "zona"'
+        error: 'Parámetro parentId es requerido'
       }, { status: 400 })
     }
 
-    // Verificar que el padre existe
-    if (parentType === 'edt') {
-      const edt = await prisma.cotizacionEdt.findFirst({
-        where: { id: parentId, cotizacionId: id }
-      })
-      if (!edt) {
-        return NextResponse.json({ error: 'EDT no encontrado' }, { status: 404 })
-      }
-    } else {
-      const zona = await prisma.cotizacionZona.findFirst({
-        where: { id: parentId, cotizacionId: id }
-      })
-      if (!zona) {
-        return NextResponse.json({ error: 'Zona no encontrada' }, { status: 404 })
-      }
+    // Verificar que el EDT existe
+    const edt = await prisma.cotizacionEdt.findFirst({
+      where: { id: parentId, cotizacionId: id }
+    })
+    if (!edt) {
+      return NextResponse.json({ error: 'EDT no encontrado' }, { status: 404 })
     }
 
     // Obtener todos los servicios de la cotización
     const servicios = await prisma.cotizacionServicio.findMany({
       where: { cotizacionId: id },
       include: {
-        items: true
+        cotizacionServicioItem: true
       }
     })
 
-    // Obtener actividades existentes en el padre para filtrar duplicados
+    // Obtener actividades existentes en el EDT para filtrar duplicados
     const actividadesExistentes = await prisma.cotizacionActividad.findMany({
-      where: parentType === 'edt'
-        ? { cotizacionEdtId: parentId }
-        : { cotizacionZonaId: parentId },
+      where: { cotizacionEdtId: parentId },
       select: { nombre: true }
     })
 
@@ -247,9 +214,9 @@ export async function GET(
       .map(servicio => ({
         id: servicio.id,
         nombre: servicio.nombre,
-        categoria: servicio.categoria,
-        totalItems: servicio.items.length,
-        totalHoras: servicio.items.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
+        edtId: servicio.edtId,
+        totalItems: servicio.cotizacionServicioItem.length,
+        totalHoras: servicio.cotizacionServicioItem.reduce((sum: number, item: any) => sum + (Number(item.horaTotal) || 0), 0)
       }))
 
     return NextResponse.json({

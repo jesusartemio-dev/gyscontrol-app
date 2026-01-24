@@ -368,17 +368,7 @@ export function ProyectoCronogramaTreeView({
               <Filter className="h-4 w-4 mr-2" />
               Filtros
             </Button>
-            {selectedCronograma && selectedCronograma.tipo !== 'comercial' && !selectedCronograma.esBaseline && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDeleteCronograma}
-                className="ml-4"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Eliminar Cronograma
-              </Button>
-            )}
+{/* Botón de eliminar cronograma movido al header de ProyectoCronogramaTab */}
           </div>
         </div>
       </CardHeader>
@@ -386,25 +376,27 @@ export function ProyectoCronogramaTreeView({
       <CardContent>
         {/* Toolbar de acciones globales */}
         <div className="mb-4 flex flex-wrap gap-2">
-          {/* Generación automática */}
-          <div className="flex gap-2 border-r pr-4 mr-4">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={async () => {
-                try {
-                  await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
-                  onRefresh?.()
-                } catch (error) {
-                  console.error('Error generating cronograma:', error)
-                }
-              }}
-              disabled={state.loadingNodes.has('root')}
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
-            </Button>
-          </div>
+          {/* Generación automática - Solo para cronograma comercial (planificación y ejecución tienen el botón en el header) */}
+          {selectedCronograma?.tipo === 'comercial' && (
+            <div className="flex gap-2 border-r pr-4 mr-4">
+              <Button
+                size="sm"
+                variant="default"
+                onClick={async () => {
+                  try {
+                    await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
+                    onRefresh?.()
+                  } catch (error) {
+                    console.error('Error generating cronograma:', error)
+                  }
+                }}
+                disabled={state.loadingNodes.has('root')}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
+              </Button>
+            </div>
+          )}
 
           {/* Creación manual */}
           <Button

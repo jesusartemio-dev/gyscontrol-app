@@ -19,7 +19,11 @@ export async function POST(req: Request) {
   }
 
   const nueva = await prisma.plantilla.create({
-    data: validacion.data,
+    data: {
+      ...validacion.data,
+      id: `plantilla-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      updatedAt: new Date()
+    },
   })
 
   return NextResponse.json(nueva, { status: 201 })

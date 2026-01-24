@@ -32,7 +32,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const itemExistente = await prisma.pedidoEquipoItem.findUnique({
       where: { id },
       include: {
-        pedido: {
+        pedidoEquipo: {
           select: {
             id: true,
             codigo: true,
@@ -63,7 +63,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         updatedAt: new Date()
       },
       include: {
-        pedido: {
+        pedidoEquipo: {
           select: {
             codigo: true,
             proyecto: {
@@ -152,7 +152,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       where: { id },
       data: datosActualizacion,
       include: {
-        pedido: {
+        pedidoEquipo: {
           select: {
             codigo: true,
             proyecto: {
@@ -212,7 +212,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
         codigo: true,
         descripcion: true,
         unidad: true,
-        pedido: {
+        pedidoEquipo: {
           select: {
             codigo: true,
             proyecto: {

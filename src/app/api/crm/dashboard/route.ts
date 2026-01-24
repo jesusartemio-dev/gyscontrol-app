@@ -132,8 +132,8 @@ export async function GET(req: NextRequest) {
         descripcion: actividad.descripcion,
         fecha: actividad.fecha,
         resultado: actividad.resultado,
-        oportunidad: actividad.oportunidad,
-        usuario: actividad.usuario
+        oportunidad: actividad.crmOportunidad,
+        usuario: actividad.user
       })),
       metricasUsuario,
       fechaActualizacion: new Date().toISOString()

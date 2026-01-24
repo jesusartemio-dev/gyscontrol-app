@@ -37,7 +37,7 @@ export async function POST(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -115,11 +115,13 @@ export async function POST(
       console.log('➕ Creando fase:', faseConfig.nombre)
       const nuevaFase = await prisma.cotizacionFase.create({
         data: {
+          id: `cot-fase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           cotizacionId: id,
           nombre: faseConfig.nombre,
           descripcion: faseConfig.descripcion,
           orden: faseConfig.orden,
-          estado: 'planificado'
+          estado: 'planificado',
+          updatedAt: new Date()
         }
       })
       console.log('✅ Fase creada:', nuevaFase.id)

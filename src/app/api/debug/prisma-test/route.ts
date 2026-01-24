@@ -19,10 +19,10 @@ export async function GET() {
     try {
       const result = await prisma.$queryRaw`
         SELECT COUNT(*) as count FROM "plantilla_duracion_cronograma"
-      `
+      ` as Array<{ count: number }>
       console.log('✅ Table exists, count:', result[0]?.count || 0)
     } catch (tableError) {
-      console.log('❌ Table error:', tableError.message)
+      console.log('❌ Table error:', tableError instanceof Error ? tableError.message : 'Unknown error')
     }
     
     await prisma.$disconnect()
@@ -37,8 +37,8 @@ export async function GET() {
     console.error('❌ Prisma connection test failed:', error)
     return NextResponse.json({
       success: false,
-      error: error.message,
-      stack: error.stack,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
       databaseUrl: process.env.DATABASE_URL ? 'SET' : 'NOT SET'
     }, { status: 500 })
   }

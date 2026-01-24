@@ -13,29 +13,28 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   try {
     const { id } = await context.params
 
-    const item = await prisma.ListaEquipoItem.findUnique({
+    const item = await prisma.listaEquipoItem.findUnique({
       where: { id },
       include: {
-        lista: true,
+        listaEquipo: true,
         proveedor: true,
-        cotizacionSeleccionada: true,
         cotizacionSeleccionada: {
           include: {
-            cotizacion: {
+            cotizacionProveedor: {
               include: {
                 proveedor: true,
               },
             },
           },
         },
-        pedidos: {
+        pedidoEquipoItem: {
           include: {
-            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+            pedidoEquipo: true
           }
         },
-        ProyectoEquipoCotizadoItem_ProyectoEquipoCotizadoItem_listaEquipoSeleccionadoIdToListaEquipoItem: {
+        listaEquipoItemSeleccionados: {
           include: {
-            ProyectoEquipoCotizado: true,
+            proyectoEquipoCotizado: true,
           },
         },
       },
@@ -84,7 +83,7 @@ export async function PUT(
 
     // 🧠 Si hay cotización seleccionada, copiar tiempoEntrega y tiempoEntregaDias
     if (payload.cotizacionSeleccionadaId) {
-      const cotizacion = await prisma.CotizacionProveedorItem.findUnique({
+      const cotizacion = await prisma.cotizacionProveedorItem.findUnique({
         where: { id: payload.cotizacionSeleccionadaId },
         select: {
           tiempoEntrega: true,
@@ -98,7 +97,7 @@ export async function PUT(
       }
     }
 
-    const actualizado = await prisma.ListaEquipoItem.update({
+    const actualizado = await prisma.listaEquipoItem.update({
       where: { id },
       data: dataToUpdate,
     })
@@ -122,7 +121,7 @@ export async function PATCH(
     const { cotizacionSeleccionadaId } = await request.json()
 
     // 🔍 Verificar que el item existe
-    const item = await prisma.ListaEquipoItem.findUnique({
+    const item = await prisma.listaEquipoItem.findUnique({
       where: { id },
       select: { id: true }
     })
@@ -133,7 +132,7 @@ export async function PATCH(
 
     // 🔍 Si se proporciona cotizacionSeleccionadaId, verificar que existe y pertenece al item
     if (cotizacionSeleccionadaId) {
-      const cotizacion = await prisma.CotizacionProveedorItem.findFirst({
+      const cotizacion = await prisma.cotizacionProveedorItem.findFirst({
         where: {
           id: cotizacionSeleccionadaId,
           listaEquipoItemId: id
@@ -153,7 +152,7 @@ export async function PATCH(
       }
 
       // 🔄 Actualizar el item con la nueva cotización seleccionada
-      const actualizado = await prisma.ListaEquipoItem.update({
+      const actualizado = await prisma.listaEquipoItem.update({
         where: { id },
         data: {
           cotizacionSeleccionadaId,
@@ -161,11 +160,11 @@ export async function PATCH(
           tiempoEntregaDias: cotizacion.tiempoEntregaDias
         },
         include: {
-          cotizacion_proveedor_item_cotizacion_proveedor_item_listaEquipoItemIdTolista_equipo_item: {
+          cotizacionProveedorItems: {
             include: {
-              cotizacion_proveedor: {
+              cotizacionProveedor: {
                 include: {
-                  proveedores: true
+                  proveedor: true
                 }
               }
             }
@@ -177,7 +176,7 @@ export async function PATCH(
     }
 
     // 🚫 Si no se proporciona cotizacionSeleccionadaId, limpiar la selección
-    const actualizado = await prisma.ListaEquipoItem.update({
+    const actualizado = await prisma.listaEquipoItem.update({
       where: { id },
       data: {
         cotizacionSeleccionadaId: null,
@@ -200,9 +199,9 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   try {
     const { id } = await context.params
 
-    const item = await prisma.ListaEquipoItem.findUnique({
+    const item = await prisma.listaEquipoItem.findUnique({
       where: { id },
-      include: { proyecto_equipo_cotizado_item_lista_equipo_item_proyectoEquipoItemIdToproyecto_equipo_cotizado_item: true },
+      include: { proyectoEquipoItem: true },
     })
 
     if (!item) {
@@ -210,14 +209,14 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     }
 
     // 🧯 Desmarcar todas las cotizaciones como seleccionadas
-    await prisma.CotizacionProveedorItem.updateMany({
+    await prisma.cotizacionProveedorItem.updateMany({
       where: { listaEquipoItemId: id },
       data: { esSeleccionada: false },
     })
 
     // 🧹 Si el ítem proviene de ProyectoEquipoItem, hacer rollback completo
     if (item.proyectoEquipoItemId) {
-      await prisma.ProyectoEquipoCotizadoItem.update({
+      await prisma.proyectoEquipoCotizadoItem.update({
         where: { id: item.proyectoEquipoItemId },
         data: {
           listaEquipoSeleccionadoId: null,
@@ -231,7 +230,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       })
     }
 
-    const eliminado = await prisma.ListaEquipoItem.delete({
+    const eliminado = await prisma.listaEquipoItem.delete({
       where: { id },
     })
 

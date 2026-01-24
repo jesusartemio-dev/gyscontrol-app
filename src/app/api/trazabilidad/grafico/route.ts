@@ -390,9 +390,9 @@ async function obtenerComparativoEntidades(filtros: any) {
     // 🔍 TODO: Crear modelo EntregaItem en Prisma schema
     const proyectos = await prisma.proyecto.findMany({
       include: {
-        pedidos: {
+        pedidoEquipo: {
           include: {
-            items: {
+            pedidoEquipoItem: {
               // include: {
               //   entregaItems: true
               // }

@@ -55,7 +55,7 @@ export async function GET(
     const tarea = await prisma.tarea.findUnique({
       where: { id },
       include: {
-        proyectoServicio: {
+        proyectoServicioCotizado: {
           select: {
             id: true,
             categoria: true,
@@ -74,7 +74,7 @@ export async function GET(
             }
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -84,7 +84,7 @@ export async function GET(
         },
         subtareas: {
           include: {
-            asignado: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -94,7 +94,7 @@ export async function GET(
           },
           orderBy: { createdAt: 'asc' }
         },
-        dependenciasOrigen: {
+        dependenciasComoOrigen: {
           include: {
             tareaDependiente: {
               select: {
@@ -105,7 +105,7 @@ export async function GET(
             }
           }
         },
-        dependenciasDependiente: {
+        dependenciasComoDependiente: {
           include: {
             tareaOrigen: {
               select: {
@@ -116,9 +116,9 @@ export async function GET(
             }
           }
         },
-        asignaciones: {
+        asignacionesRecurso: {
           include: {
-            usuario: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -129,7 +129,7 @@ export async function GET(
         },
         registrosProgreso: {
           include: {
-            usuario: {
+            user: {
               select: {
                 id: true,
                 name: true
@@ -142,9 +142,9 @@ export async function GET(
         _count: {
           select: {
             subtareas: true,
-            dependenciasOrigen: true,
-            dependenciasDependiente: true,
-            asignaciones: true,
+            dependenciasComoOrigen: true,
+            dependenciasComoDependiente: true,
+            asignacionesRecurso: true,
             registrosProgreso: true
           }
         }
@@ -294,7 +294,7 @@ export async function PUT(
       where: { id },
       data: updateData,
       include: {
-        proyectoServicio: {
+        proyectoServicioCotizado: {
           select: {
             id: true,
             categoria: true,
@@ -307,7 +307,7 @@ export async function PUT(
             }
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -317,8 +317,8 @@ export async function PUT(
         _count: {
           select: {
             subtareas: true,
-            dependenciasOrigen: true,
-            dependenciasDependiente: true
+            dependenciasComoOrigen: true,
+            dependenciasComoDependiente: true
           }
         }
       }
@@ -363,8 +363,8 @@ export async function DELETE(
         _count: {
           select: {
             subtareas: true,
-            dependenciasOrigen: true,
-            dependenciasDependiente: true
+            dependenciasComoOrigen: true,
+            dependenciasComoDependiente: true
           }
         }
       }
@@ -388,11 +388,11 @@ export async function DELETE(
       )
     }
     
-    if (tareaExistente._count.dependenciasOrigen > 0 || tareaExistente._count.dependenciasDependiente > 0) {
+    if (tareaExistente._count.dependenciasComoOrigen > 0 || tareaExistente._count.dependenciasComoDependiente > 0) {
       return NextResponse.json(
-        { 
+        {
           error: 'No se puede eliminar la tarea porque tiene dependencias',
-          details: `La tarea tiene ${tareaExistente._count.dependenciasOrigen + tareaExistente._count.dependenciasDependiente} dependencias`
+          details: `La tarea tiene ${tareaExistente._count.dependenciasComoOrigen + tareaExistente._count.dependenciasComoDependiente} dependencias`
         },
         { status: 409 }
       )

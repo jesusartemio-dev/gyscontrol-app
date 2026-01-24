@@ -18,23 +18,17 @@ export async function GET(
     const actividad = await prisma.proyectoActividad.findFirst({
       where: {
         id: actividadId,
-        proyectoZona: {
+        proyectoEdt: {
           proyectoId
         }
       },
       include: {
-        proyectoZona: {
+        proyectoEdt: {
           select: {
             id: true,
             nombre: true,
-            proyectoEdt: {
-              select: {
-                id: true,
-                nombre: true,
-                categoriaServicio: {
-                  select: { nombre: true }
-                }
-              }
+            edt: {
+              select: { nombre: true }
             }
           }
         },
@@ -45,9 +39,9 @@ export async function GET(
             nombre: true
           }
         },
-        tareas: {
+        proyectoTarea: {
           include: {
-            responsable: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -57,7 +51,7 @@ export async function GET(
           }
         },
         _count: {
-          select: { tareas: true }
+          select: { proyectoTarea: true }
         }
       }
     });
@@ -112,12 +106,12 @@ export async function PUT(
     const actividadExistente = await prisma.proyectoActividad.findFirst({
       where: {
         id: actividadId,
-        proyectoZona: {
+        proyectoEdt: {
           proyectoId
         }
       },
       include: {
-        proyectoZona: true
+        proyectoEdt: true
       }
     });
 
@@ -132,8 +126,8 @@ export async function PUT(
     }
 
     // Validar fechas dentro del rango de la zona si se actualizan
-    if (fechaInicioPlan && actividadExistente.proyectoZona.fechaInicioPlan &&
-        new Date(fechaInicioPlan) < actividadExistente.proyectoZona.fechaInicioPlan) {
+    if (fechaInicioPlan && actividadExistente.proyectoEdt.fechaInicioPlan &&
+        new Date(fechaInicioPlan) < actividadExistente.proyectoEdt.fechaInicioPlan) {
       return NextResponse.json(
         {
           success: false,
@@ -143,8 +137,8 @@ export async function PUT(
       );
     }
 
-    if (fechaFinPlan && actividadExistente.proyectoZona.fechaFinPlan &&
-        new Date(fechaFinPlan) > actividadExistente.proyectoZona.fechaFinPlan) {
+    if (fechaFinPlan && actividadExistente.proyectoEdt.fechaFinPlan &&
+        new Date(fechaFinPlan) > actividadExistente.proyectoEdt.fechaFinPlan) {
       return NextResponse.json(
         {
           success: false,
@@ -171,7 +165,7 @@ export async function PUT(
         ...(estado !== undefined && { estado })
       },
       include: {
-        proyectoZona: {
+        proyectoEdt: {
           select: {
             id: true,
             nombre: true
@@ -218,13 +212,13 @@ export async function DELETE(
     const actividad = await prisma.proyectoActividad.findFirst({
       where: {
         id: actividadId,
-        proyectoZona: {
+        proyectoEdt: {
           proyectoId
         }
       },
       include: {
         _count: {
-          select: { tareas: true }
+          select: { proyectoTarea: true }
         }
       }
     });
@@ -240,7 +234,7 @@ export async function DELETE(
     }
 
     // Verificar que no tenga tareas activas
-    if (actividad._count.tareas > 0) {
+    if (actividad._count.proyectoTarea > 0) {
       return NextResponse.json(
         {
           success: false,

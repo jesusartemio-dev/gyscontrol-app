@@ -61,14 +61,14 @@ export async function GET(
             prioridad: true,
             fechaInicio: true,
             fechaFin: true,
-            responsable: {
+            user: {
               select: {
                 id: true,
                 name: true,
                 email: true
               }
             },
-            proyectoServicio: {
+            proyectoServicioCotizado: {
               select: {
                 id: true,
                 categoria: true,
@@ -89,7 +89,7 @@ export async function GET(
             }
           }
         },
-        asignado: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -271,7 +271,7 @@ export async function PUT(
             id: true,
             nombre: true,
             estado: true,
-            proyectoServicio: {
+            proyectoServicioCotizado: {
               select: {
                 id: true,
                 categoria: true,
@@ -286,7 +286,7 @@ export async function PUT(
             }
           }
         },
-        asignado: {
+        user: {
           select: {
             id: true,
             name: true,

@@ -168,7 +168,7 @@ export async function PATCH(
       where: { id: taskId },
       data: updateData,
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true }
         }
       }

@@ -79,7 +79,7 @@ export class CronogramaMigrationService {
           nombre: true,
           _count: {
             select: {
-              proyectoEdts: true,
+              proyectoEdt: true,
             },
           },
         },
@@ -103,12 +103,12 @@ export class CronogramaMigrationService {
       const edts = await prisma.proyectoEdt.findMany({
         where: { proyectoId },
         include: {
-          ProyectoTarea: {
+          proyectoTarea: {
             include: {
-              dependencia: true,
+              tareaPadre: true,
             },
           },
-          categoriaServicio: true,
+          edt: true,
         },
         orderBy: { createdAt: 'asc' },
       });
@@ -154,7 +154,7 @@ export class CronogramaMigrationService {
     const proyectoId = edt.proyectoId;
 
     // ✅ SISTEMA DE 5 NIVELES: Crear actividad directamente bajo EDT (sin zona intermedia)
-    const actividad = await prisma.proyecto_actividad.create({
+    const actividad = await prisma.proyectoActividad.create({
       data: {
         proyectoEdtId: edt.id, // ✅ Directo al EDT
         proyectoCronogramaId: edt.proyectoCronogramaId,
@@ -180,7 +180,7 @@ export class CronogramaMigrationService {
     logger.info(`⚙️ Actividad creada: ${actividad.nombre} directamente bajo EDT ${edt.nombre}`);
 
     // 3. Migrar tareas existentes a la nueva actividad
-    for (const tarea of edt.ProyectoTarea || []) {
+    for (const tarea of edt.proyectoTarea || []) {
       try {
         await prisma.proyectoTarea.update({
           where: { id: tarea.id },
@@ -195,8 +195,8 @@ export class CronogramaMigrationService {
     }
 
     // 4. Crear dependencias si existen
-    if (edt.ProyectoTarea && edt.ProyectoTarea.length > 0) {
-      await this.migrarDependenciasTareas(edt.ProyectoTarea, resultado);
+    if (edt.proyectoTarea && edt.proyectoTarea.length > 0) {
+      await this.migrarDependenciasTareas(edt.proyectoTarea, resultado);
     }
   }
 
@@ -220,8 +220,9 @@ export class CronogramaMigrationService {
         }
 
         // Crear dependencia en el nuevo sistema
-        await prisma.proyectoDependenciaTarea.create({
+        await prisma.proyectoDependenciasTarea.create({
           data: {
+            id: crypto.randomUUID(),
             tareaOrigenId: tareaOrigen.id,
             tareaDependienteId: tarea.id,
             tipo: 'finish_to_start', // Por defecto
@@ -241,9 +242,9 @@ export class CronogramaMigrationService {
   private static async verificarProyectoMigrado(proyectoId: string): Promise<boolean> {
     try {
       // ✅ SISTEMA DE 5 NIVELES: Verificar si existen actividades directamente bajo EDTs
-      const actividadesCount = await prisma.proyecto_actividad.count({
+      const actividadesCount = await prisma.proyectoActividad.count({
         where: {
-          proyecto_edt: {
+          proyectoEdt: {
             proyectoId,
           },
         },
@@ -301,7 +302,7 @@ export class CronogramaMigrationService {
           nombre: true,
           _count: {
             select: {
-              proyectoEdts: true,
+              proyectoEdt: true,
             },
           },
         },
@@ -312,16 +313,16 @@ export class CronogramaMigrationService {
       }
 
       preview.proyectoNombre = proyecto.nombre;
-      preview.analisis.totalEdts = proyecto._count.proyectoEdts;
+      preview.analisis.totalEdts = proyecto._count.proyectoEdt;
 
       // Analizar EDTs y tareas
       const edts = await prisma.proyectoEdt.findMany({
         where: { proyectoId },
         include: {
-          ProyectoTarea: true,
+          proyectoTarea: true,
           _count: {
             select: {
-              ProyectoTarea: true,
+              proyectoTarea: true,
             },
           },
         },
@@ -331,8 +332,8 @@ export class CronogramaMigrationService {
       let totalDependencias = 0;
 
       for (const edt of edts) {
-        totalTareas += edt._count.ProyectoTarea;
-        totalDependencias += edt.ProyectoTarea.filter((t: any) => t.dependenciaId).length;
+        totalTareas += edt._count.proyectoTarea;
+        totalDependencias += edt.proyectoTarea.filter((t: any) => t.dependenciaId).length;
       }
 
       preview.analisis.totalTareas = totalTareas;
@@ -420,15 +421,15 @@ export class CronogramaMigrationService {
       // Esta función es experimental y debería usarse con cuidado
       // Eliminaría todas las zonas, actividades y dependencias creadas durante la migración
 
-      const actividadesEliminadas = await prisma.proyecto_actividad.deleteMany({
+      const actividadesEliminadas = await prisma.proyectoActividad.deleteMany({
         where: {
-          proyecto_edt: {
+          proyectoEdt: {
             proyectoId,
           },
         },
       });
 
-      // Resetear ProyectoTarea.proyectoActividadId a null
+      // Resetear proyectoTarea.proyectoActividadId a null
       await prisma.proyectoTarea.updateMany({
         where: {
           proyectoEdt: {
@@ -441,7 +442,7 @@ export class CronogramaMigrationService {
       });
 
       // Eliminar dependencias
-      await prisma.proyectoDependenciaTarea.deleteMany({
+      await prisma.proyectoDependenciasTarea.deleteMany({
         where: {
           tareaOrigen: {
             proyectoEdt: {

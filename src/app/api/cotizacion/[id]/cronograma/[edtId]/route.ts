@@ -36,15 +36,15 @@ export async function GET(
         cotizacionId: id // Verificar que pertenece a la cotización
       },
       include: {
-        categoriaServicio: {
+        edt: {
           select: { id: true, nombre: true }
         },
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         },
         cotizacionActividad: {
           include: {
-            cotizacionTareas: true
+            cotizacionTarea: true
           }
         }
       }
@@ -108,7 +108,7 @@ export async function PUT(
     }
 
     // Si se está cambiando la categoría, verificar unicidad de nombre por cotización
-    if (validData.categoriaServicioId) {
+    if (validData.edtId) {
       // La unicidad se basa en nombre único por cotización (ya definido en el schema)
       // No necesitamos verificación adicional aquí
     }
@@ -116,7 +116,7 @@ export async function PUT(
     const edtActualizado = await prisma.cotizacionEdt.update({
       where: { id: edtId },
       data: {
-        ...(validData.categoriaServicioId && { categoriaServicioId: validData.categoriaServicioId }),
+        ...(validData.edtId && { edtId: validData.edtId }),
         ...(validData.fechaInicioCom && { fechaInicioComercial: new Date(validData.fechaInicioCom) }),
         ...(validData.fechaFinCom && { fechaFinComercial: new Date(validData.fechaFinCom) }),
         ...(validData.horasCom !== undefined && { horasEstimadas: validData.horasCom }),
@@ -125,11 +125,11 @@ export async function PUT(
         ...(validData.prioridad && { prioridad: validData.prioridad })
       },
       include: {
-        categoriaServicio: true,
-        responsable: true,
+        edt: true,
+        user: true,
         cotizacionActividad: {
           include: {
-            cotizacionTareas: true
+            cotizacionTarea: true
           }
         }
       }
@@ -185,7 +185,7 @@ export async function DELETE(
       include: {
         cotizacionActividad: {
           include: {
-            cotizacionTareas: {
+            cotizacionTarea: {
               select: { id: true }
             }
           }
@@ -223,7 +223,7 @@ export async function DELETE(
     })
 
     // Calcular total de tareas eliminadas
-    const totalTareasEliminadas = edt.cotizacionActividad.reduce((total: number, act: any) => total + act.cotizacionTareas.length, 0)
+    const totalTareasEliminadas = edt.cotizacionActividad.reduce((total: number, act: any) => total + act.cotizacionTarea.length, 0)
 
     logger.info(`✅ EDT comercial eliminado: ${edtId} - Tareas eliminadas: ${totalTareasEliminadas}`)
 

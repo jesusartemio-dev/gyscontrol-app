@@ -43,17 +43,17 @@ export async function GET(
           id: cleanActividadId
         },
         include: {
-          proyecto_edt: {
-            select: { id: true, nombre: true, categoriaServicioId: true }
+          proyectoEdt: {
+            select: { id: true, nombre: true, edtId: true }
           },
-          proyecto_cronograma: {
+          proyectoCronograma: {
             select: { proyectoId: true }
           }
         }
       })
 
       // Validar que la actividad pertenece al proyecto
-      if (actividad?.proyecto_cronograma?.proyectoId !== id) {
+      if (actividad?.proyectoCronograma?.proyectoId !== id) {
         return NextResponse.json(
           { error: 'Actividad no pertenece al proyecto' },
           { status: 404 }
@@ -77,21 +77,21 @@ export async function GET(
       actividad = await (prisma as any).proyectoActividad.findUnique({
         where: { id: cleanActividadId },
         include: {
-          proyecto_edt: {
-            select: { categoriaServicioId: true }
+          proyectoEdt: {
+            select: { edtId: true }
           }
         }
       })
 
-      if (actividad?.proyecto_edt?.categoriaServicioId) {
-        serviciosQuery.categoriaId = actividad.proyecto_edt.categoriaServicioId
+      if (actividad?.proyectoEdt?.edtId) {
+        serviciosQuery.categoriaId = actividad.proyectoEdt.edtId
       }
     }
 
     const servicios = await prisma.catalogoServicio.findMany({
       where: serviciosQuery,
       include: {
-        categoria: {
+        edt: {
           select: { id: true, nombre: true }
         },
         recurso: {
@@ -102,7 +102,7 @@ export async function GET(
         }
       },
       orderBy: [
-        { categoria: { nombre: 'asc' } },
+        { edt: { nombre: 'asc' } },
         { orden: 'asc' },
         { nombre: 'asc' }
       ]
@@ -115,7 +115,7 @@ export async function GET(
       id: servicio.id,
       nombre: servicio.nombre,
       descripcion: servicio.descripcion,
-      categoria: servicio.categoria.nombre,
+      categoria: servicio.edt.nombre,
       recurso: servicio.recurso.nombre,
       unidadServicio: servicio.unidadServicio.nombre,
       cantidad: servicio.cantidad,
@@ -125,7 +125,7 @@ export async function GET(
       orden: servicio.orden,
       nivelDificultad: servicio.nivelDificultad,
       // Calcular horas totales estimadas
-      horasEstimadas: servicio.cantidad * (servicio.horaBase || 0),
+      horasEstimadas: (servicio.cantidad || 0) * (servicio.horaBase || 0),
       // Información adicional para el modal
       metadata: {
         tipo: 'servicio',
@@ -189,15 +189,15 @@ export async function POST(
         id: cleanActividadId
       },
       include: {
-        proyecto_edt: true,
-        proyecto_cronograma: {
+        proyectoEdt: true,
+        proyectoCronograma: {
           select: { proyectoId: true }
         }
       }
     })
 
     // Validar que la actividad pertenece al proyecto
-    if (actividad?.proyecto_cronograma?.proyectoId !== id) {
+    if (actividad?.proyectoCronograma?.proyectoId !== id) {
       return NextResponse.json(
         { error: 'Actividad no pertenece al proyecto' },
         { status: 404 }
@@ -217,7 +217,7 @@ export async function POST(
         id: { in: selectedIds }
       },
       include: {
-        categoria: true,
+        edt: true,
         recurso: true,
         unidadServicio: true
       }
@@ -231,7 +231,7 @@ export async function POST(
 
         // Calcular fechas para la tarea (usar fechas de la actividad como base)
         const fechaInicio = actividad.fechaInicioPlan || new Date()
-        const horasEstimadas = servicio.cantidad * (servicio.horaBase || 0)
+        const horasEstimadas = (servicio.cantidad || 0) * (servicio.horaBase || 0)
         const diasEstimados = Math.ceil(horasEstimadas / 8) // 8 horas por día
         const fechaFin = new Date(fechaInicio)
         fechaFin.setDate(fechaFin.getDate() + diasEstimados - 1)
@@ -239,7 +239,7 @@ export async function POST(
         // Crear tarea dentro de la actividad
         const tarea = await (prisma as any).proyectoTarea.create({
           data: {
-            proyectoEdtId: actividad.proyecto_edt.id,
+            proyectoEdtId: actividad.proyectoEdt.id,
             proyectoCronogramaId: actividad.proyectoCronogramaId,
             proyectoActividadId: cleanActividadId,
             nombre: servicio.nombre,
@@ -300,7 +300,7 @@ export async function POST(
 
         // ✅ Actualizar horas en el EDT padre
         const edtActual = await (prisma as any).proyectoEdt.findUnique({
-          where: { id: actividad.proyecto_edt.id },
+          where: { id: actividad.proyectoEdt.id },
           select: { horasPlan: true, proyectoFaseId: true }
         })
 
@@ -308,12 +308,12 @@ export async function POST(
         const nuevasHorasEdtTotales = horasEdtActuales + totalHorasTareas
 
         await (prisma as any).proyectoEdt.update({
-          where: { id: actividad.proyecto_edt.id },
+          where: { id: actividad.proyectoEdt.id },
           data: { horasPlan: nuevasHorasEdtTotales }
         })
 
         console.log('✅ Horas actualizadas en EDT:', {
-          edtId: actividad.proyecto_edt.id,
+          edtId: actividad.proyectoEdt.id,
           horasAnteriores: horasEdtActuales,
           horasAgregadas: totalHorasTareas,
           horasTotales: nuevasHorasEdtTotales

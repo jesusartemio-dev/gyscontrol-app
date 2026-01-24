@@ -204,7 +204,7 @@ async function obtenerMetricasRendimiento(proyectoId: string, periodo: number) {
 
   // Rendimiento por categoría de servicio
   const rendimientoPorCategoria = await prisma.proyectoEdt.groupBy({
-    by: ['categoriaServicioId'],
+    by: ['edtId'],
     where: {
       proyectoId,
       updatedAt: { gte: fechaDesde }
@@ -219,11 +219,11 @@ async function obtenerMetricasRendimiento(proyectoId: string, periodo: number) {
     _count: true
   });
 
-  // Enriquecer con datos de categoría
+  // Enriquecer con datos de EDT
   const categorias = await Promise.all(
     rendimientoPorCategoria.map(async (item) => {
-      const categoria = await prisma.categoriaServicio.findUnique({
-        where: { id: item.categoriaServicioId },
+      const edtCatalogo = await prisma.edt.findUnique({
+        where: { id: item.edtId },
         select: { nombre: true }
       });
       
@@ -232,7 +232,7 @@ async function obtenerMetricasRendimiento(proyectoId: string, periodo: number) {
       const eficiencia = horasPlan > 0 ? (horasReales / horasPlan) * 100 : 0;
       
       return {
-        categoria,
+        categoria: edtCatalogo,
         horasPlan,
         horasReales,
         eficiencia,

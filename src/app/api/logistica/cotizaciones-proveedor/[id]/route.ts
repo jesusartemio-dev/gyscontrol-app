@@ -10,14 +10,14 @@ export async function GET(
   try {
     const { id } = await context.params
 
-    const data = await prisma.cotizacionProveedor.findUnique({
+    const rawData = await prisma.cotizacionProveedor.findUnique({
       where: { id },
       include: {
         proveedor: true,
         proyecto: true,
-        items: {
+        cotizacionProveedorItem: {
           include: {
-            lista: true,
+            listaEquipo: true,
             listaEquipoItem: true,
           },
           orderBy: {
@@ -27,11 +27,20 @@ export async function GET(
       },
     })
 
-    if (!data) {
+    if (!rawData) {
       return NextResponse.json(
         { ok: false, error: 'Cotización no encontrada' },
         { status: 404 }
       )
+    }
+
+    // 🔄 Frontend compatibility mapping
+    const data = {
+      ...rawData,
+      items: rawData.cotizacionProveedorItem?.map((item: any) => ({
+        ...item,
+        lista: item.listaEquipo
+      }))
     }
 
     return NextResponse.json({ ok: true, data })

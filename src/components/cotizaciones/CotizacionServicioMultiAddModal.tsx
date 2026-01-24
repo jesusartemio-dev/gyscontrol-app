@@ -20,14 +20,14 @@ import { Plus, Trash2, Package, Loader2, AlertCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { getCatalogoServicios } from '@/lib/services/catalogoServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { getRecursos } from '@/lib/services/recurso'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { createCotizacionServicio } from '@/lib/services/cotizacionServicio'
 import { createCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { formatCurrency } from '@/lib/utils/plantilla-utils'
 import { calcularHoras } from '@/lib/utils/formulas'
-import type { CatalogoServicio, CategoriaServicio, Recurso, UnidadServicio } from '@/types'
+import type { CatalogoServicio, Edt, Recurso, UnidadServicio } from '@/types'
 
 interface Props {
   isOpen: boolean
@@ -52,7 +52,7 @@ export default function CotizacionServicioMultiAddModal({
   onServicioCreated
 }: Props) {
   const [servicios, setServicios] = useState<CatalogoServicio[]>([])
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [unidadesServicio, setUnidadesServicio] = useState<UnidadServicio[]>([])
   const [filteredServicios, setFilteredServicios] = useState<CatalogoServicio[]>([])
@@ -92,7 +92,7 @@ export default function CotizacionServicioMultiAddModal({
     try {
       const [serviciosData, categoriasData, recursosData, unidadesData] = await Promise.all([
         getCatalogoServicios(),
-        getCategoriasServicio(),
+        getEdts(),
         getRecursos(),
         getUnidadesServicio()
       ])
@@ -135,7 +135,7 @@ export default function CotizacionServicioMultiAddModal({
         horaFijo: servicio.horaFijo
       })
 
-      const costoHora = servicio.recurso.costoHora
+      const costoHora = servicio.recurso?.costoHora || 0
       const factorSeguridad = 1.0
       const margen = 1.35
       const calculatedCostoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
@@ -246,7 +246,7 @@ export default function CotizacionServicioMultiAddModal({
       const servicioPayload = {
         cotizacionId,
         nombre: nombreSeccion.trim(),
-        categoria: categoriaSeccion.trim(),
+        edtId: categoriaValida.id,
         subtotalInterno: 0,
         subtotalCliente: 0
       }
@@ -273,7 +273,7 @@ export default function CotizacionServicioMultiAddModal({
           recursoId: selectedServicio.recursoId,
           nombre: selectedServicio.servicio.nombre,
           descripcion: selectedServicio.servicio.descripcion,
-          categoria: selectedServicio.servicio.categoria.nombre,
+          edtId: selectedServicio.servicio.edt?.id || selectedServicio.servicio.categoriaId,
           unidadServicioNombre: unidadesServicio.find(u => u.id === selectedServicio.unidadServicioId)?.nombre || '',
           recursoNombre: recursos.find(r => r.id === selectedServicio.recursoId)?.nombre || '',
           formula: selectedServicio.servicio.formula,
@@ -281,7 +281,7 @@ export default function CotizacionServicioMultiAddModal({
           horaRepetido: selectedServicio.servicio.horaRepetido,
           horaUnidad: selectedServicio.servicio.horaUnidad,
           horaFijo: selectedServicio.servicio.horaFijo,
-          costoHora: selectedServicio.servicio.recurso.costoHora,
+          costoHora: selectedServicio.servicio.recurso?.costoHora || 0,
           cantidad: selectedServicio.cantidad,
           horaTotal,
           factorSeguridad: 1.0,
@@ -415,7 +415,7 @@ export default function CotizacionServicioMultiAddModal({
                             <h4 className="font-medium text-sm">{servicio.nombre}</h4>
                             <p className="text-xs text-gray-600 line-clamp-2">{servicio.descripcion}</p>
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-500">{servicio.categoria.nombre}</span>
+                              <span className="text-gray-500">{servicio.edt?.nombre || 'Sin EDT'}</span>
                               <span className="text-gray-500">{servicio.formula}</span>
                             </div>
                             {isSelected && (

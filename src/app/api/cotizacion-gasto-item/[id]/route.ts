@@ -15,7 +15,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
     const data = await prisma.cotizacionGastoItem.findUnique({
       where: { id },
-      include: { gasto: true },
+      include: { cotizacionGasto: true },
     })
 
     if (!data) {
@@ -37,7 +37,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
     const existing = await prisma.cotizacionGastoItem.findUnique({
       where: { id },
-      include: { gasto: { select: { cotizacionId: true } } },
+      include: { cotizacionGasto: { select: { cotizacionId: true } } },
     })
 
     if (!existing) {
@@ -46,10 +46,13 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
     const data = await prisma.cotizacionGastoItem.update({
       where: { id },
-      data: payload,
+      data: {
+        ...payload,
+        updatedAt: new Date(),
+      },
     })
 
-    await recalcularTotalesCotizacion(existing.gasto.cotizacionId)
+    await recalcularTotalesCotizacion(existing.cotizacionGasto.cotizacionId)
 
     return NextResponse.json(data)
   } catch (error) {
@@ -65,7 +68,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
 
     const existing = await prisma.cotizacionGastoItem.findUnique({
       where: { id },
-      include: { gasto: { select: { cotizacionId: true } } },
+      include: { cotizacionGasto: { select: { cotizacionId: true } } },
     })
 
     if (!existing) {
@@ -76,7 +79,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       where: { id },
     })
 
-    await recalcularTotalesCotizacion(existing.gasto.cotizacionId)
+    await recalcularTotalesCotizacion(existing.cotizacionGasto.cotizacionId)
 
     return NextResponse.json({ status: 'ok', deletedId: id })
   } catch (error) {

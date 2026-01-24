@@ -48,6 +48,13 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         },
         cotizacionCondicion: {
           orderBy: { orden: 'asc' }
+        },
+        // ✅ Relación con CRM Oportunidad
+        crmOportunidad: {
+          include: {
+            cliente: true,
+            comercial: true
+          }
         }
       }
     })
@@ -73,7 +80,9 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         items: gasto.cotizacionGastoItem || []
       })) || [],
       exclusiones: cotizacion.cotizacionExclusion || [],
-      condiciones: cotizacion.cotizacionCondicion || []
+      condiciones: cotizacion.cotizacionCondicion || [],
+      // ✅ Mapeamos crmOportunidad a oportunidadCrm para compatibilidad con frontend
+      oportunidadCrm: cotizacion.crmOportunidad || null
     }
 
     return NextResponse.json(cotizacionFormatted)

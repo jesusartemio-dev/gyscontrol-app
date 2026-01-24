@@ -99,7 +99,7 @@ export default function SelectorMultiListaModal({
         
         // 🎯 Auto-seleccionar todas las listas por defecto
         if (data && data.length > 0) {
-          setSelectedListas(new Set(data.map(l => l.id)))
+          setSelectedListas(new Set(data.map((l: ListaEquipo) => l.id)))
         }
       } catch (error) {
         console.error('❌ Error al cargar listas:', error)

@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
             codigo: true
           }
         },
-        items: {
+        listaEquipoItem: {
           select: {
             id: true,
             codigo: true,
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
         },
         _count: {
           select: {
-            items: true
+            listaEquipoItem: true
           }
         }
       },
@@ -112,9 +112,9 @@ export async function GET(request: NextRequest) {
     // 🧮 Calcular métricas agregadas
     const metricas = {
       totalListas: listas.length,
-      totalItems: listas.reduce((sum, lista) => sum + lista._count.items, 0),
-      costoTotalEstimado: listas.reduce((sum, lista) => 
-        sum + lista.items.reduce((itemSum, item) => 
+      totalItems: listas.reduce((sum, lista) => sum + lista._count.listaEquipoItem, 0),
+      costoTotalEstimado: listas.reduce((sum, lista) =>
+        sum + lista.listaEquipoItem.reduce((itemSum, item) =>
           itemSum + (item.presupuesto || 0) * item.cantidad, 0
         ), 0
       ),
@@ -196,34 +196,38 @@ export async function POST(request: NextRequest) {
       // Crear la lista principal
       const lista = await tx.listaEquipo.create({
         data: {
+          id: `lista-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre: datosValidados.nombre,
           codigo: codigo,
           numeroSecuencia: numeroSecuencia,
           proyectoId: datosValidados.proyectoId,
           responsableId: 'temp-user-id', // TODO: Obtener del contexto de autenticación
-          estado: 'borrador'
+          estado: 'borrador',
+          updatedAt: new Date()
         }
       });
 
       // Crear los items asociados
-      const items = await Promise.all(
-        datosValidados.items.map((item, index) => 
+      const listaEquipoItem = await Promise.all(
+        datosValidados.items.map((item, index) =>
           tx.listaEquipoItem.create({
             data: {
-              listaId: lista.id, // ✅ Corregido: usar 'listaId' en lugar de 'listaEquipoId'
+              id: `lista-item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+              listaId: lista.id,
               responsableId: 'temp-user-id', // TODO: Obtener del contexto de autenticación
               codigo: `${lista.codigo}-ITEM-${String(index + 1).padStart(3, '0')}`,
-              descripcion: item.descripcion || item.nombre, // ✅ Usar nombre si descripcion es undefined
+              descripcion: item.descripcion || item.nombre,
               cantidad: item.cantidad,
               unidad: item.unidad,
               presupuesto: item.costoEstimado,
-              estado: 'borrador' // ✅ Usar valor válido del enum EstadoListaItem
+              estado: 'borrador',
+              updatedAt: new Date()
             }
           })
         )
       );
 
-      return { ...lista, items };
+      return { ...lista, listaEquipoItem };
     });
 
     console.log('✅ Lista de proyección creada:', {

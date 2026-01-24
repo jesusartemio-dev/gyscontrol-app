@@ -48,7 +48,7 @@ export async function PUT(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -222,7 +222,7 @@ export async function DELETE(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -252,11 +252,11 @@ export async function DELETE(
         const faseToDelete = await prisma.cotizacionFase.findFirst({
           where: { id: realId, cotizacionId: id },
           include: {
-            edts: {
+            cotizacionEdt: {
               include: {
-                cotizacion_actividad: {
+                cotizacionActividad: {
                   include: {
-                    cotizacion_tarea: true
+                    cotizacionTarea: true
                   }
                 }
               }
@@ -271,8 +271,8 @@ export async function DELETE(
         }
 
         // 2. Eliminar tareas de todas las actividades de todos los EDTs de la fase
-        for (const edt of faseToDelete.edts) {
-          for (const actividad of edt.cotizacion_actividad) {
+        for (const edt of faseToDelete.cotizacionEdt) {
+          for (const actividad of edt.cotizacionActividad) {
             await prisma.cotizacionTarea.deleteMany({
               where: { cotizacionActividadId: actividad.id }
             })
@@ -280,7 +280,7 @@ export async function DELETE(
         }
 
         // 3. Eliminar actividades de todos los EDTs de la fase
-        for (const edt of faseToDelete.edts) {
+        for (const edt of faseToDelete.cotizacionEdt) {
           await prisma.cotizacionActividad.deleteMany({
             where: { cotizacionEdtId: edt.id }
           })
@@ -347,19 +347,19 @@ async function recalcularFechasPostActualizacion(
     // Si se actualizó una fase, recalcular fechas de sus EDTs
     const fase = await prisma.cotizacionFase.findUnique({
       where: { id: nodeId },
-      include: { edts: true }
+      include: { cotizacionEdt: true }
     })
 
-    if (fase && fase.edts.length > 0 && fase.fechaInicioPlan && fase.fechaFinPlan) {
+    if (fase && fase.cotizacionEdt.length > 0 && fase.fechaInicioPlan && fase.fechaFinPlan) {
       // Redistribuir EDTs dentro de la nueva duración de la fase
       const faseInicio = new Date(fase.fechaInicioPlan)
       const faseFin = new Date(fase.fechaFinPlan)
-      const numEdts = fase.edts.length
+      const numEdts = fase.cotizacionEdt.length
       const diasPorEdt = Math.max(1, Math.floor((faseFin.getTime() - faseInicio.getTime()) / (24 * 60 * 60 * 1000) / numEdts))
 
       let fechaActual = new Date(faseInicio)
 
-      for (const edt of fase.edts) {
+      for (const edt of fase.cotizacionEdt) {
         const fechaInicioEdt = ajustarFechaADiaLaborable(new Date(fechaActual), calendarioLaboral)
         const fechaFinEdt = calcularFechaFinConCalendario(fechaInicioEdt, diasPorEdt * calendarioLaboral.horasPorDia, calendarioLaboral)
 
@@ -378,19 +378,19 @@ async function recalcularFechasPostActualizacion(
     // Si se actualizó un EDT, recalcular fechas de sus actividades
     const edt = await prisma.cotizacionEdt.findUnique({
       where: { id: nodeId },
-      include: { cotizacion_actividad: true }
+      include: { cotizacionActividad: true }
     })
 
-    if (edt && edt.cotizacion_actividad.length > 0 && edt.fechaInicioComercial && edt.fechaFinComercial) {
+    if (edt && edt.cotizacionActividad.length > 0 && edt.fechaInicioComercial && edt.fechaFinComercial) {
       // Redistribuir actividades dentro de la nueva duración del EDT
       const edtInicio = new Date(edt.fechaInicioComercial)
       const edtFin = new Date(edt.fechaFinComercial)
-      const numActividades = edt.cotizacion_actividad.length
+      const numActividades = edt.cotizacionActividad.length
       const diasPorActividad = Math.max(1, Math.floor((edtFin.getTime() - edtInicio.getTime()) / (24 * 60 * 60 * 1000) / numActividades))
 
       let fechaActual = new Date(edtInicio)
 
-      for (const actividad of edt.cotizacion_actividad) {
+      for (const actividad of edt.cotizacionActividad) {
         const fechaInicioActividad = ajustarFechaADiaLaborable(new Date(fechaActual), calendarioLaboral)
         const fechaFinActividad = calcularFechaFinConCalendario(fechaInicioActividad, diasPorActividad * calendarioLaboral.horasPorDia, calendarioLaboral)
 
@@ -409,19 +409,19 @@ async function recalcularFechasPostActualizacion(
     // Si se actualizó una actividad, recalcular fechas de sus tareas
     const actividad = await prisma.cotizacionActividad.findUnique({
       where: { id: nodeId },
-      include: { cotizacion_tarea: true }
+      include: { cotizacionTarea: true }
     })
 
-    if (actividad && actividad.cotizacion_tarea.length > 0 && actividad.fechaInicioComercial && actividad.fechaFinComercial) {
+    if (actividad && actividad.cotizacionTarea.length > 0 && actividad.fechaInicioComercial && actividad.fechaFinComercial) {
       // Redistribuir tareas dentro de la nueva duración de la actividad
       const actividadInicio = new Date(actividad.fechaInicioComercial)
       const actividadFin = new Date(actividad.fechaFinComercial)
-      const numTareas = actividad.cotizacion_tarea.length
+      const numTareas = actividad.cotizacionTarea.length
       const diasPorTarea = Math.max(1, Math.floor((actividadFin.getTime() - actividadInicio.getTime()) / (24 * 60 * 60 * 1000) / numTareas))
 
       let fechaActual = new Date(actividadInicio)
 
-      for (const tarea of actividad.cotizacion_tarea) {
+      for (const tarea of actividad.cotizacionTarea) {
         const fechaInicioTarea = ajustarFechaADiaLaborable(new Date(fechaActual), calendarioLaboral)
         const fechaFinTarea = calcularFechaFinConCalendario(fechaInicioTarea, diasPorTarea * calendarioLaboral.horasPorDia, calendarioLaboral)
 

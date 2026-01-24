@@ -105,7 +105,7 @@ export async function PUT(
         // cotizacionServicioItemId: validData.cotizacionServicioItemId // ✅ Nueva relación - pendiente regenerar Prisma
       },
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         }
       }

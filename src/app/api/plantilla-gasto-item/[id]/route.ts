@@ -17,7 +17,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const data = await prisma.plantillaGastoItem.findUnique({
       where: { id },
       include: {
-        gasto: true,
+        plantillaGasto: true,
       },
     })
     return NextResponse.json(data)

@@ -97,14 +97,14 @@ export async function POST(
     const cotizacion = await prisma.cotizacion.findFirst({
       where: {
         id: validatedData.cotizacionId,
-        proyectos: {
+        proyecto: {
           some: { id: proyectoId }
         }
       },
       include: {
-        servicios: {
+        cotizacionServicio: {
           include: {
-            items: true
+            cotizacionServicioItem: true
           }
         }
       }
@@ -213,7 +213,7 @@ async function ejecutarImportacion(
         proyectoCronogramaId: cronograma.id,
         proyectoFaseId: faseAsignada.id,
         nombre: servicioInfo.nombre,
-        categoriaServicioId: servicioInfo.categoriaId,
+        edtId: servicioInfo.categoriaId,
         estado: 'planificado',
         porcentajeAvance: 0,
         descripcion: `EDT generado automáticamente desde ${servicioInfo.nombre}`

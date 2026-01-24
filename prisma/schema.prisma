@@ -25,6 +25,7 @@ model Account {
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@map("account")
 }
 
 model CatalogoEquipo {
@@ -48,6 +49,9 @@ model CatalogoEquipo {
   plantillaEquipoItem                 PlantillaEquipoItem[]
   proyectoEquipoCotizadoItem          ProyectoEquipoCotizadoItem[]
   plantillaEquipoItemIndependiente PlantillaEquipoItemIndependiente[]
+  listaEquipoItem                     ListaEquipoItem[]
+
+  @@map("catalogo_equipo")
 }
 
 model CatalogoServicio {
@@ -71,6 +75,8 @@ model CatalogoServicio {
   plantillaServicioItem                 PlantillaServicioItem[]
   proyectoServicioCotizadoItem          ProyectoServicioCotizadoItem[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
+
+  @@map("catalogo_servicio")
 }
 
 model CategoriaEquipo {
@@ -80,6 +86,8 @@ model CategoriaEquipo {
   updatedAt      DateTime
   descripcion    String?
   catalogoEquipo CatalogoEquipo[]
+
+  @@map("categoria_equipo")
 }
 
 model Cliente {
@@ -109,6 +117,8 @@ model Cliente {
   crmContactoCliente       CrmContactoCliente[]
   crmHistorialProyecto     CrmHistorialProyecto[]
   crmOportunidad           CrmOportunidad[]
+
+  @@map("cliente")
 }
 
 model Cotizacion {
@@ -156,7 +166,7 @@ model Cotizacion {
   fechaFin                    DateTime?
   fechaInicio                 DateTime?
   estado                      EstadoCotizacion              @default(borrador)
-  calendario_laboral          CalendarioLaboral?           @relation(fields: [calendarioLaboralId], references: [id])
+  calendarioLaboral           CalendarioLaboral?           @relation(fields: [calendarioLaboralId], references: [id])
   cliente                     Cliente?                      @relation(fields: [clienteId], references: [id])
   user                        User?                         @relation(fields: [comercialId], references: [id])
   plantilla                   Plantilla?                    @relation(fields: [plantillaId], references: [id])
@@ -173,6 +183,8 @@ model Cotizacion {
   crmCompetidorLicitacion     CrmCompetidorLicitacion[]
   crmHistorialProyecto        CrmHistorialProyecto[]
   crmOportunidad              CrmOportunidad?
+
+  @@map("cotizacion")
 }
 
 model CotizacionEquipo {
@@ -187,6 +199,8 @@ model CotizacionEquipo {
   plazoEntregaSemanas  Int?
   cotizacion           Cotizacion             @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
   cotizacionEquipoItem                CotizacionEquipoItem[]
+
+  @@map("cotizacion_equipo")
 }
 
 model CotizacionEquipoItem {
@@ -207,6 +221,8 @@ model CotizacionEquipoItem {
   updatedAt          DateTime
   catalogoEquipo     CatalogoEquipo?  @relation(fields: [catalogoEquipoId], references: [id])
   cotizacionEquipo   CotizacionEquipo @relation(fields: [cotizacionEquipoId], references: [id], onDelete: Cascade)
+
+  @@map("cotizacion_equipo_item")
 }
 
 model CotizacionGasto {
@@ -221,6 +237,8 @@ model CotizacionGasto {
   plazoEntregaSemanas Int?
   cotizacion          Cotizacion            @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
   cotizacionGastoItem CotizacionGastoItem[]
+
+  @@map("cotizacion_gasto")
 }
 
 model CotizacionGastoItem {
@@ -237,6 +255,8 @@ model CotizacionGastoItem {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime
   cotizacionGasto CotizacionGasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+
+  @@map("cotizacion_gasto_item")
 }
 
 model CotizacionProveedor {
@@ -251,6 +271,8 @@ model CotizacionProveedor {
   proveedor               Proveedor                 @relation(fields: [proveedorId], references: [id])
   proyecto                Proyecto                  @relation(fields: [proyectoId], references: [id])
   cotizacionProveedorItem    CotizacionProveedorItem[]
+
+  @@map("cotizacion_proveedor")
 }
 
 model CotizacionProveedorItem {
@@ -271,25 +293,30 @@ model CotizacionProveedorItem {
   createdAt                                                                         DateTime                  @default(now())
   updatedAt                                                                         DateTime
   listaId                                                                           String?
-  cotizacionProveedor                                                               CotizacionProveedor       @relation(fields: [cotizacionId], references: [id])
-  ListaEquipoItem_CotizacionProveedorItem_listaEquipoItemIdToListaEquipoItem        ListaEquipoItem?          @relation("CotizacionProveedorItem_listaEquipoItemIdToListaEquipoItem", fields: [listaEquipoItemId], references: [id])
-  listaEquipo                                                                       ListaEquipo?              @relation(fields: [listaId], references: [id])
-  ListaEquipoItem_ListaEquipoItem_cotizacionSeleccionadaIdToCotizacionProveedorItem ListaEquipoItem?          @relation("ListaEquipoItem_cotizacionSeleccionadaIdToCotizacionProveedorItem")
+  cotizacionProveedor            CotizacionProveedor  @relation(fields: [cotizacionId], references: [id])
+  listaEquipoItem                ListaEquipoItem?     @relation("cotizacionProveedorItemListaEquipoItem", fields: [listaEquipoItemId], references: [id])
+  listaEquipo                    ListaEquipo?         @relation(fields: [listaId], references: [id])
+  cotizacionSeleccionadaItems    ListaEquipoItem?     @relation("listaEquipoItemCotizacionSeleccionada")
+
+  @@map("cotizacion_proveedor_item")
 }
 
 model CotizacionServicio {
   id                     String                   @id
   cotizacionId           String
   nombre                 String
-  categoria              String
+  edtId                  String
   subtotalInterno        Float
   subtotalCliente        Float
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime
   plazoEntregaSemanas    Int?
-  cotizacion                  Cotizacion               @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacion             Cotizacion               @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  edt                    Edt                      @relation("CotizacionServicioEdt", fields: [edtId], references: [id])
   cotizacionServicioItem CotizacionServicioItem[]
-  cotizacionEdt         CotizacionEdt[]
+  cotizacionEdt          CotizacionEdt[]
+
+  @@map("cotizacion_servicio")
 }
 
 model CotizacionServicioItem {
@@ -300,7 +327,7 @@ model CotizacionServicioItem {
   recursoId            String
   nombre               String
   descripcion          String
-  categoria            String
+  edtId                String
   unidadServicioNombre String
   recursoNombre        String
   formula              String
@@ -318,11 +345,15 @@ model CotizacionServicioItem {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime
   orden                Int?               @default(0)
+  nivelDificultad      Int?               @default(1)
   catalogoServicio     CatalogoServicio?  @relation(fields: [catalogoServicioId], references: [id])
   cotizacionServicio   CotizacionServicio @relation(fields: [cotizacionServicioId], references: [id], onDelete: Cascade)
-  recurso                     Recurso            @relation(fields: [recursoId], references: [id])
+  edt                  Edt                @relation("CotizacionServicioItemEdt", fields: [edtId], references: [id])
+  recurso              Recurso            @relation(fields: [recursoId], references: [id])
   unidadServicio       UnidadServicio     @relation(fields: [unidadServicioId], references: [id])
-  cotizacionTarea     CotizacionTarea[]
+  cotizacionTarea      CotizacionTarea[]
+
+  @@map("cotizacion_servicio_item")
 }
 
 model EntregaItem {
@@ -348,6 +379,7 @@ model EntregaItem {
   @@index([fechaEntrega])
   @@index([pedidoEquipoItemId])
   @@index([proyectoId, estado])
+  @@map("entrega_item")
 }
 
 model EventoTrazabilidad {
@@ -371,6 +403,7 @@ model EventoTrazabilidad {
   @@index([fechaEvento])
   @@index([proyectoId])
   @@index([tipo, fechaEvento])
+  @@map("evento_trazabilidad")
 }
 
 model ListaEquipo {
@@ -402,15 +435,17 @@ model ListaEquipo {
   @@index([estado, fechaNecesaria, createdAt(sort: Desc)], map: "idx_lista_estado_necesaria_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_lista_proyecto_estado_fecha")
   @@index([responsableId, estado, fechaAprobacionFinal], map: "idx_lista_responsable_estado_aprobacion")
+  @@map("lista_equipo")
 }
 
 model ListaEquipoItem {
-  id                                                                                                           String                       @id
+  id                                                                                                           String                       @id @default(cuid())
   listaId                                                                                                      String
   proyectoEquipoId                                                                                             String?
   proyectoEquipoItemId                                                                                         String?
   proveedorId                                                                                                  String?
   cotizacionSeleccionadaId                                                                                     String?                      @unique
+  catalogoEquipoId                                                                                             String?
   codigo                                                                                                       String
   descripcion                                                                                                  String
   unidad                                                                                                       String
@@ -432,21 +467,23 @@ model ListaEquipoItem {
   tiempoEntregaDias                                                                                            Int?
   responsableId                                                                                                String
   reemplazaProyectoEquipoCotizadoItemId                                                                        String?
-  CotizacionProveedorItem_CotizacionProveedorItem_listaEquipoItemIdToListaEquipoItem                           CotizacionProveedorItem[]    @relation("CotizacionProveedorItem_listaEquipoItemIdToListaEquipoItem")
-  entregaItem                                                                                                  EntregaItem[]
-  CotizacionProveedorItem_ListaEquipoItem_cotizacionSeleccionadaIdToCotizacionProveedorItem                    CotizacionProveedorItem?     @relation("ListaEquipoItem_cotizacionSeleccionadaIdToCotizacionProveedorItem", fields: [cotizacionSeleccionadaId], references: [id])
-  listaEquipo                                                                                                  ListaEquipo                  @relation(fields: [listaId], references: [id], onDelete: Cascade)
-  proveedor                   Proveedor?                   @relation(fields: [proveedorId], references: [id])
-  proyectoEquipoCotizado                                                                                       ProyectoEquipoCotizado?      @relation(fields: [proyectoEquipoId], references: [id])
-  ProyectoEquipoCotizadoItem_ListaEquipoItem_proyectoEquipoItemIdToProyectoEquipoCotizadoItem                  ProyectoEquipoCotizadoItem?  @relation("ListaEquipoItem_proyectoEquipoItemIdToProyectoEquipoCotizadoItem", fields: [proyectoEquipoItemId], references: [id])
-  ProyectoEquipoCotizadoItem_ListaEquipoItem_reemplazaProyectoEquipoCotizadoItemIdToProyectoEquipoCotizadoItem ProyectoEquipoCotizadoItem?  @relation("ListaEquipoItem_reemplazaProyectoEquipoCotizadoItemIdToProyectoEquipoCotizadoItem", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
-  user                        User                         @relation(fields: [responsableId], references: [id])
-  pedidoEquipoItem                                                                                             PedidoEquipoItem[]
-  ProyectoEquipoCotizadoItem_ProyectoEquipoCotizadoItem_listaEquipoSeleccionadoIdToListaEquipoItem             ProyectoEquipoCotizadoItem[] @relation("ProyectoEquipoCotizadoItem_listaEquipoSeleccionadoIdToListaEquipoItem")
+  cotizacionProveedorItems                 CotizacionProveedorItem[]    @relation("cotizacionProveedorItemListaEquipoItem")
+  entregaItem                              EntregaItem[]
+  cotizacionSeleccionada                   CotizacionProveedorItem?     @relation("listaEquipoItemCotizacionSeleccionada", fields: [cotizacionSeleccionadaId], references: [id])
+  listaEquipo                              ListaEquipo                  @relation(fields: [listaId], references: [id], onDelete: Cascade)
+  proveedor                                Proveedor?                   @relation(fields: [proveedorId], references: [id])
+  proyectoEquipoCotizado                   ProyectoEquipoCotizado?      @relation(fields: [proyectoEquipoId], references: [id])
+  proyectoEquipoItem                       ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemProyectoEquipoItem", fields: [proyectoEquipoItemId], references: [id])
+  reemplazaProyectoEquipoCotizadoItem      ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemReemplazaProyectoEquipoItem", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
+  user                                     User                         @relation(fields: [responsableId], references: [id])
+  pedidoEquipoItem                         PedidoEquipoItem[]
+  listaEquipoItemSeleccionados             ProyectoEquipoCotizadoItem[] @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado")
+  catalogoEquipo                           CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
 
   @@index([listaId, estado, createdAt(sort: Desc)], map: "idx_lista_item_lista_estado_fecha")
   @@index([proveedorId, estado, precioElegido], map: "idx_lista_item_proveedor_estado_precio")
   @@index([responsableId, estado, verificado], map: "idx_lista_item_responsable_estado_verificado")
+  @@map("lista_equipo_item")
 }
 
 model PedidoEquipo {
@@ -477,6 +514,7 @@ model PedidoEquipo {
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_pedido_proyecto_estado_fecha")
   @@index([proyectoId, responsableId, estado], map: "idx_pedido_proyecto_responsable_estado")
   @@index([responsableId, estado, fechaNecesaria], map: "idx_pedido_responsable_estado_fecha")
+  @@map("pedido_equipo")
 }
 
 model PedidoEquipoItem {
@@ -508,6 +546,8 @@ model PedidoEquipoItem {
   listaEquipo                 ListaEquipo?      @relation(fields: [listaId], references: [id])
   pedidoEquipo                PedidoEquipo      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   user                        User              @relation(fields: [responsableId], references: [id])
+
+  @@map("pedido_equipo_item")
 }
 
 model Plantilla {
@@ -532,6 +572,8 @@ model Plantilla {
   plantillaGasto              PlantillaGasto[]
   plantillaServicio           PlantillaServicio[]
   cotizacionPlantillaImport CotizacionPlantillaImport[]
+
+  @@map("plantilla")
 }
 
 model PlantillaEquipo {
@@ -545,6 +587,8 @@ model PlantillaEquipo {
   updatedAt           DateTime
   plantilla                   Plantilla             @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
   plantillaEquipoItem                 PlantillaEquipoItem[]
+
+  @@map("plantilla_equipo")
 }
 
 model PlantillaEquipoItem {
@@ -565,6 +609,8 @@ model PlantillaEquipoItem {
   updatedAt         DateTime
   catalogoEquipo    CatalogoEquipo? @relation(fields: [catalogoEquipoId], references: [id])
   plantillaEquipo   PlantillaEquipo @relation(fields: [plantillaEquipoId], references: [id], onDelete: Cascade)
+
+  @@map("plantilla_equipo_item")
 }
 
 model PlantillaGasto {
@@ -578,6 +624,8 @@ model PlantillaGasto {
   updatedAt          DateTime
   plantilla                   Plantilla            @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
   plantillaGastoItem PlantillaGastoItem[]
+
+  @@map("plantilla_gasto")
 }
 
 model PlantillaGastoItem {
@@ -594,6 +642,8 @@ model PlantillaGastoItem {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime
   plantillaGasto  PlantillaGasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+
+  @@map("plantilla_gasto_item")
 }
 
 model PlantillaServicio {
@@ -608,6 +658,8 @@ model PlantillaServicio {
   updatedAt             DateTime
   plantilla                   Plantilla               @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
   plantillaServicioItem                 PlantillaServicioItem[]
+
+  @@map("plantilla_servicio")
 }
 
 model PlantillaServicioItem {
@@ -639,6 +691,8 @@ model PlantillaServicioItem {
   plantillaServicio    PlantillaServicio @relation(fields: [plantillaServicioId], references: [id], onDelete: Cascade)
   recurso                     Recurso           @relation(fields: [recursoId], references: [id])
   unidadServicio       UnidadServicio    @relation(fields: [unidadServicioId], references: [id])
+
+  @@map("plantilla_servicio_item")
 }
 
 model Proveedor {
@@ -652,6 +706,8 @@ model Proveedor {
   updatedAt           DateTime
   cotizacionProveedor CotizacionProveedor[]
   listaEquipoItem     ListaEquipoItem[]
+
+  @@map("proveedor")
 }
 
 model Proyecto {
@@ -685,9 +741,9 @@ model Proyecto {
   listaEquipo                     ListaEquipo[]
   pedidoEquipo                    PedidoEquipo[]
   cliente                     Cliente                    @relation(fields: [clienteId], references: [id])
-  User_Proyecto_comercialIdToUser User                       @relation("Proyecto_comercialIdToUser", fields: [comercialId], references: [id])
+  comercial                   User                       @relation("ProyectoComercial", fields: [comercialId], references: [id])
   cotizacion                  Cotizacion?                @relation(fields: [cotizacionId], references: [id])
-  User_Proyecto_gestorIdToUser    User                       @relation("Proyecto_gestorIdToUser", fields: [gestorId], references: [id])
+  gestor                      User                       @relation("ProyectoGestor", fields: [gestorId], references: [id])
   proyectoEquipoCotizado          ProyectoEquipoCotizado[]
   proyectoGastoCotizado           ProyectoGastoCotizado[]
   proyectoServicioCotizado        ProyectoServicioCotizado[]
@@ -703,6 +759,7 @@ model Proyecto {
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
   @@index([estado, fechaInicio, createdAt(sort: Desc)], map: "idx_proyecto_estado_inicio_fecha")
   @@index([gestorId, estado, fechaFin], map: "idx_proyecto_gestor_estado_fin")
+  @@map("proyecto")
 }
 
 model ProyectoEquipoCotizado {
@@ -720,6 +777,8 @@ model ProyectoEquipoCotizado {
   proyecto                    Proyecto                     @relation(fields: [proyectoId], references: [id])
   user                        User                         @relation(fields: [responsableId], references: [id])
   proyectoEquipoCotizadoItem          ProyectoEquipoCotizadoItem[]
+
+  @@map("proyecto_equipo_cotizado")
 }
 
 model ProyectoEquipoCotizadoItem {
@@ -747,12 +806,14 @@ model ProyectoEquipoCotizadoItem {
   createdAt                                                                                         DateTime               @default(now())
   updatedAt                                                                                         DateTime
   listaEquipoSeleccionadoId                                                                         String?
-  ListaEquipoItem_ListaEquipoItem_proyectoEquipoItemIdToProyectoEquipoCotizadoItem                  ListaEquipoItem[]      @relation("ListaEquipoItem_proyectoEquipoItemIdToProyectoEquipoCotizadoItem")
-  ListaEquipoItem_ListaEquipoItem_reemplazaProyectoEquipoCotizadoItemIdToProyectoEquipoCotizadoItem ListaEquipoItem[]      @relation("ListaEquipoItem_reemplazaProyectoEquipoCotizadoItemIdToProyectoEquipoCotizadoItem")
-  catalogoEquipo                                                                                    CatalogoEquipo?        @relation(fields: [catalogoEquipoId], references: [id])
-  ListaEquipoItem_ProyectoEquipoCotizadoItem_listaEquipoSeleccionadoIdToListaEquipoItem             ListaEquipoItem?       @relation("ProyectoEquipoCotizadoItem_listaEquipoSeleccionadoIdToListaEquipoItem", fields: [listaEquipoSeleccionadoId], references: [id])
-  listaEquipo                                                                                       ListaEquipo?           @relation(fields: [listaId], references: [id])
-  proyectoEquipoCotizado                                                                            ProyectoEquipoCotizado @relation(fields: [proyectoEquipoId], references: [id], onDelete: Cascade)
+  listaEquipoItemsAsociados      ListaEquipoItem[]      @relation("listaEquipoItemProyectoEquipoItem")
+  listaEquipoItemsReemplazo      ListaEquipoItem[]      @relation("listaEquipoItemReemplazaProyectoEquipoItem")
+  catalogoEquipo                 CatalogoEquipo?        @relation(fields: [catalogoEquipoId], references: [id])
+  listaEquipoSeleccionado        ListaEquipoItem?       @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado", fields: [listaEquipoSeleccionadoId], references: [id])
+  listaEquipo                    ListaEquipo?           @relation(fields: [listaId], references: [id])
+  proyectoEquipoCotizado         ProyectoEquipoCotizado @relation(fields: [proyectoEquipoId], references: [id], onDelete: Cascade)
+
+  @@map("proyecto_equipo_cotizado_item")
 }
 
 model ProyectoGastoCotizado {
@@ -767,6 +828,8 @@ model ProyectoGastoCotizado {
   updatedAt                 DateTime
   proyecto                    Proyecto                    @relation(fields: [proyectoId], references: [id])
   proyectoGastoCotizadoItem ProyectoGastoCotizadoItem[]
+
+  @@map("proyecto_gasto_cotizado")
 }
 
 model ProyectoGastoCotizadoItem {
@@ -784,6 +847,8 @@ model ProyectoGastoCotizadoItem {
   createdAt             DateTime              @default(now())
   updatedAt             DateTime
   proyectoGastoCotizado ProyectoGastoCotizado @relation(fields: [gastoId], references: [id])
+
+  @@map("proyecto_gasto_cotizado_item")
 }
 
 model ProyectoServicioCotizado {
@@ -802,6 +867,8 @@ model ProyectoServicioCotizado {
   proyectoServicioCotizadoItem          ProyectoServicioCotizadoItem[]
   registroHoras                   RegistroHoras[]
   tareas                       Tarea[]
+
+  @@map("proyecto_servicio_cotizado")
 }
 
 model ProyectoServicioCotizadoItem {
@@ -823,6 +890,8 @@ model ProyectoServicioCotizadoItem {
   updatedAt                DateTime
   catalogoServicio         CatalogoServicio?        @relation(fields: [catalogoServicioId], references: [id])
   proyectoServicioCotizado ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id])
+
+  @@map("proyecto_servicio_cotizado_item")
 }
 
 model Recurso {
@@ -836,6 +905,8 @@ model Recurso {
   plantillaServicioItem                 PlantillaServicioItem[]
   registroHoras                   RegistroHoras[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
+
+  @@map("recurso")
 }
 
 model RegistroHoras {
@@ -853,13 +924,13 @@ model RegistroHoras {
   observaciones            String?
   aprobado                 Boolean                  @default(false)
   proyectoEdtId            String?
-  categoriaServicioId      String?
+  edtId                    String?
   origen                   OrigenTrabajo?
   ubicacion                String?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime
   proyectoTareaId          String?
-  edt                      Edt?                     @relation(fields: [categoriaServicioId], references: [id])
+  edt                      Edt?                     @relation(fields: [edtId], references: [id])
   proyectoEdt             ProyectoEdt?            @relation(fields: [proyectoEdtId], references: [id])
   proyecto                 Proyecto                 @relation(fields: [proyectoId], references: [id])
   proyectoServicioCotizado ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id])
@@ -867,10 +938,11 @@ model RegistroHoras {
   recurso                     Recurso                  @relation(fields: [recursoId], references: [id])
   user                        User                     @relation(fields: [usuarioId], references: [id])
 
-  @@index([categoriaServicioId, fechaTrabajo])
+  @@index([edtId, fechaTrabajo])
   @@index([origen, fechaTrabajo])
   @@index([proyectoEdtId, proyectoTareaId, fechaTrabajo])
   @@index([proyectoTareaId, fechaTrabajo])
+  @@map("registro_horas")
 }
 
 model Session {
@@ -879,6 +951,8 @@ model Session {
   userId       String
   expires      DateTime
   user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
 }
 
 model Unidad {
@@ -887,6 +961,8 @@ model Unidad {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime
   catalogoEquipo CatalogoEquipo[]
+
+  @@map("unidad")
 }
 
 model UnidadServicio {
@@ -898,6 +974,8 @@ model UnidadServicio {
   cotizacionServicioItem                 CotizacionServicioItem[]
   plantillaServicioItem                  PlantillaServicioItem[]
   plantillaServicioItemIndependiente     PlantillaServicioItemIndependiente[]
+
+  @@map("unidad_servicio")
 }
 
 model User {
@@ -918,8 +996,8 @@ model User {
   listaEquipoItem                                     ListaEquipoItem[]
   pedidoEquipo                                        PedidoEquipo[]
   pedidoEquipoItem                                    PedidoEquipoItem[]
-  Proyecto_Proyecto_comercialIdToUser                 Proyecto[]                    @relation("Proyecto_comercialIdToUser")
-  Proyecto_Proyecto_gestorIdToUser                    Proyecto[]                    @relation("Proyecto_gestorIdToUser")
+  proyectosComoComercial                              Proyecto[]                    @relation("ProyectoComercial")
+  proyectosComoGestor                                 Proyecto[]                    @relation("ProyectoGestor")
   proyectoEquipoCotizado                              ProyectoEquipoCotizado[]
   proyectoServicioCotizado                            ProyectoServicioCotizado[]
   registroHoras                   RegistroHoras[]
@@ -932,8 +1010,8 @@ model User {
   cotizacionVersion                                  CotizacionVersion[]
   crmActividad                                        CrmActividad[]
   crmMetricaComercial                                 CrmMetricaComercial[]
-  crmOportunidadComercial                             CrmOportunidad[]             @relation("crm_oportunidad_comercialIdToUser")
-  crmOportunidadResponsable                           CrmOportunidad[]             @relation("crm_oportunidad_responsableIdToUser")
+  crmOportunidadComercial                             CrmOportunidad[]             @relation("CrmOportunidadComercial")
+  crmOportunidadResponsable                           CrmOportunidad[]             @relation("CrmOportunidadResponsable")
   metricaComercial                                   MetricaComercial[]
   notificaciones                                      Notificacion[]
   proyectoActividad                                  ProyectoActividad[]
@@ -944,6 +1022,8 @@ model User {
   subtareas                                           Subtarea[]
   tareas                                              Tarea[]
   userPermissions                                    UserPermission[]
+
+  @@map("user")
 }
 
 model Valorizacion {
@@ -958,6 +1038,8 @@ model Valorizacion {
   createdAt     DateTime @default(now())
   updatedAt     DateTime
   proyecto                    Proyecto @relation(fields: [proyectoId], references: [id])
+
+  @@map("valorizacion")
 }
 
 model VerificationToken {
@@ -966,6 +1048,7 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+  @@map("verification_token")
 }
 
 model AnalyticsEvent {
@@ -1093,15 +1176,15 @@ model CotizacionCondicion {
 }
 
 model CotizacionDependenciasTarea {
-  id                                                                                  String           @id
-  tareaOrigenId                                                                       String
-  tareaDependienteId                                                                  String
-  tipo                                                                                TipoDependencia  @default(finish_to_start)
-  lagMinutos                                                                          Int              @default(0)
-  createdAt                                                                           DateTime         @default(now())
-  updatedAt                                                                           DateTime
-  cotizacionTarea_cotizacion_dependencias_tarea_tareaDependienteIdTocotizacion_tarea CotizacionTarea @relation("cotizacion_dependencias_tarea_tareaDependienteIdTocotizacion_tarea", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
-  cotizacionTarea_cotizacion_dependencias_tarea_tareaOrigenIdTocotizacion_tarea      CotizacionTarea @relation("cotizacion_dependencias_tarea_tareaOrigenIdTocotizacion_tarea", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
+  id                 String           @id
+  tareaOrigenId      String
+  tareaDependienteId String
+  tipo               TipoDependencia  @default(finish_to_start)
+  lagMinutos         Int              @default(0)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime
+  tareaDependiente   CotizacionTarea  @relation("dependenciasCotizacionTareaDependiente", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
+  tareaOrigen        CotizacionTarea  @relation("dependenciasCotizacionTareaOrigen", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
 
   @@unique([tareaOrigenId, tareaDependienteId])
   @@map("cotizacion_dependencias_tarea")
@@ -1111,7 +1194,7 @@ model CotizacionEdt {
   id                   String                  @id
   cotizacionId         String
   cotizacionServicioId String?
-  categoriaServicioId  String?
+  edtId                String?
   fechaInicioComercial DateTime?
   fechaFinComercial    DateTime?
   horasEstimadas       Decimal?                @default(0) @db.Decimal(10, 2)
@@ -1125,7 +1208,7 @@ model CotizacionEdt {
   nombre               String
   orden                Int                     @default(0)
   cotizacionActividad  CotizacionActividad[]
-  edt                  Edt?                    @relation(fields: [categoriaServicioId], references: [id])
+  edt                  Edt?                    @relation(fields: [edtId], references: [id])
   cotizacionFase       CotizacionFase?         @relation(fields: [cotizacionFaseId], references: [id])
   cotizacion           Cotizacion              @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
   cotizacionServicio   CotizacionServicio?     @relation(fields: [cotizacionServicioId], references: [id])
@@ -1190,30 +1273,30 @@ model CotizacionPlantillaImport {
 }
 
 model CotizacionTarea {
-  id                                                                                               String                           @id
-  nombre                                                                                           String
-  descripcion                                                                                      String?
-  fechaInicio                                                                                      DateTime
-  fechaFin                                                                                         DateTime
-  horasEstimadas                                                                                   Decimal?                         @db.Decimal(10, 2)
-  estado                                                                                           EstadoTarea                      @default(pendiente)
-  prioridad                                                                                        PrioridadTarea                   @default(media)
-  dependenciaId                                                                                    String?
-  responsableId                                                                                    String?
-  createdAt                                                                                        DateTime                         @default(now())
-  updatedAt                                                                                        DateTime
-  cotizacionServicioItemId                                                                         String?
-  cotizacionActividadId                                                                            String
-  duracionHoras                                                                                    Decimal?                         @db.Decimal(10, 2)
-  esHito                                                                                           Boolean                          @default(false)
-  orden                                                                                            Int                              @default(0)
-  cotizacion_dependencias_tarea_cotizacion_dependencias_tarea_tareaDependienteIdTocotizacion_tarea CotizacionDependenciasTarea[] @relation("cotizacion_dependencias_tarea_tareaDependienteIdTocotizacion_tarea")
-  cotizacion_dependencias_tarea_cotizacion_dependencias_tarea_tareaOrigenIdTocotizacion_tarea      CotizacionDependenciasTarea[] @relation("cotizacion_dependencias_tarea_tareaOrigenIdTocotizacion_tarea")
-  cotizacionActividad                                                                              CotizacionActividad              @relation(fields: [cotizacionActividadId], references: [id], onDelete: Cascade)
-  cotizacionServicioItem                                                                           CotizacionServicioItem?          @relation(fields: [cotizacionServicioItemId], references: [id])
-  cotizacionTarea                                                                                  CotizacionTarea?                 @relation("cotizacion_tareaTocotizacion_tarea", fields: [dependenciaId], references: [id])
-  other_cotizacionTarea                                                                            CotizacionTarea[]                @relation("cotizacion_tareaTocotizacion_tarea")
-  user                        User?                            @relation(fields: [responsableId], references: [id])
+  id                           String                        @id
+  nombre                       String
+  descripcion                  String?
+  fechaInicio                  DateTime
+  fechaFin                     DateTime
+  horasEstimadas               Decimal?                      @db.Decimal(10, 2)
+  estado                       EstadoTarea                   @default(pendiente)
+  prioridad                    PrioridadTarea                @default(media)
+  dependenciaId                String?
+  responsableId                String?
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime
+  cotizacionServicioItemId     String?
+  cotizacionActividadId        String
+  duracionHoras                Decimal?                      @db.Decimal(10, 2)
+  esHito                       Boolean                       @default(false)
+  orden                        Int                           @default(0)
+  dependenciasComoDependiente  CotizacionDependenciasTarea[] @relation("dependenciasCotizacionTareaDependiente")
+  dependenciasComoOrigen       CotizacionDependenciasTarea[] @relation("dependenciasCotizacionTareaOrigen")
+  cotizacionActividad          CotizacionActividad           @relation(fields: [cotizacionActividadId], references: [id], onDelete: Cascade)
+  cotizacionServicioItem       CotizacionServicioItem?       @relation(fields: [cotizacionServicioItemId], references: [id])
+  tareaPadre                   CotizacionTarea?              @relation("cotizacionTareaHijas", fields: [dependenciaId], references: [id])
+  tareasHijas                  CotizacionTarea[]             @relation("cotizacionTareaHijas")
+  user                         User?                         @relation(fields: [responsableId], references: [id])
 
   @@index([cotizacionActividadId, estado])
   @@index([cotizacionServicioItemId])
@@ -1383,10 +1466,10 @@ model CrmOportunidad {
   estado                                   EstadoOportunidad  @default(prospecto)
   crmActividad                             CrmActividad[]
   cliente                     Cliente            @relation(fields: [clienteId], references: [id])
-  comercial                                User?              @relation("crm_oportunidad_comercialIdToUser", fields: [comercialId], references: [id])
+  comercial                                User?              @relation("CrmOportunidadComercial", fields: [comercialId], references: [id])
   cotizacion                  Cotizacion?        @relation(fields: [cotizacionId], references: [id])
   proyecto                    Proyecto?          @relation(fields: [proyectoId], references: [id])
-  responsable                              User?              @relation("crm_oportunidad_responsableIdToUser", fields: [responsableId], references: [id])
+  responsable                              User?              @relation("CrmOportunidadResponsable", fields: [responsableId], references: [id])
 
   @@index([clienteId, estado])
   @@index([comercialId, fechaCierreEstimada])
@@ -1394,13 +1477,13 @@ model CrmOportunidad {
 }
 
 model DependenciasTarea {
-  id                                                   String          @id
-  tipo                                                 TipoDependencia @default(finish_to_start)
-  tareaOrigenId                                        String
-  tareaDependienteId                                   String
-  createdAt                                            DateTime        @default(now())
-  tareas_dependencias_tarea_tareaDependienteIdTotareas Tarea          @relation("dependencias_tarea_tareaDependienteIdTotareas", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
-  tareas_dependencias_tarea_tareaOrigenIdTotareas      Tarea          @relation("dependencias_tarea_tareaOrigenIdTotareas", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
+  id                 String          @id
+  tipo               TipoDependencia @default(finish_to_start)
+  tareaOrigenId      String
+  tareaDependienteId String
+  createdAt          DateTime        @default(now())
+  tareaDependiente   Tarea           @relation("dependenciasTareaDependiente", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
+  tareaOrigen        Tarea           @relation("dependenciasTareaOrigen", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
 
   @@unique([tareaOrigenId, tareaDependienteId])
   @@map("dependencias_tarea")
@@ -1423,17 +1506,19 @@ model DiaCalendario {
 }
 
 model Edt {
-  id               String             @id(map: "CategoriaServicio_pkey")
-  nombre           String             @unique(map: "CategoriaServicio_nombre_key")
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime
-  descripcion      String?
-  faseDefaultId    String?
-  catalogoServicio CatalogoServicio[]
-  registroHoras                   RegistroHoras[]
-  cotizacionEdt    CotizacionEdt[]
-  faseDefault      FaseDefault?      @relation(fields: [faseDefaultId], references: [id], map: "CategoriaServicio_faseDefaultId_fkey")
-  proyectoEdt      ProyectoEdt[]
+  id                      String                   @id(map: "CategoriaServicio_pkey")
+  nombre                  String                   @unique(map: "CategoriaServicio_nombre_key")
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime
+  descripcion             String?
+  faseDefaultId           String?
+  catalogoServicio        CatalogoServicio[]
+  cotizacionServicio      CotizacionServicio[]     @relation("CotizacionServicioEdt")
+  cotizacionServicioItem  CotizacionServicioItem[] @relation("CotizacionServicioItemEdt")
+  registroHoras           RegistroHoras[]
+  cotizacionEdt           CotizacionEdt[]
+  faseDefault             FaseDefault?             @relation(fields: [faseDefaultId], references: [id], map: "CategoriaServicio_faseDefaultId_fkey")
+  proyectoEdt             ProyectoEdt[]
 
   @@map("edt")
 }
@@ -1786,13 +1871,13 @@ model ProyectoCronograma {
 }
 
 model ProyectoDependenciasTarea {
-  id                                                                            String          @id
-  tipo                                                                          TipoDependencia @default(finish_to_start)
-  tareaOrigenId                                                                 String
-  tareaDependienteId                                                            String
-  createdAt                                                                     DateTime        @default(now())
-  proyectoTarea_proyecto_dependencias_tarea_tareaDependienteIdToproyecto_tarea ProyectoTarea  @relation("proyecto_dependencias_tarea_tareaDependienteIdToproyecto_tarea", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
-  proyectoTarea_proyecto_dependencias_tarea_tareaOrigenIdToproyecto_tarea      ProyectoTarea  @relation("proyecto_dependencias_tarea_tareaOrigenIdToproyecto_tarea", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
+  id                 String          @id
+  tipo               TipoDependencia @default(finish_to_start)
+  tareaOrigenId      String
+  tareaDependienteId String
+  createdAt          DateTime        @default(now())
+  tareaDependiente   ProyectoTarea   @relation("dependenciasTareaDependiente", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
+  tareaOrigen        ProyectoTarea   @relation("dependenciasTareaOrigen", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
 
   @@unique([tareaOrigenId, tareaDependienteId])
   @@map("proyecto_dependencias_tarea")
@@ -1801,7 +1886,7 @@ model ProyectoDependenciasTarea {
 model ProyectoEdt {
   id                   String               @id
   proyectoId           String
-  categoriaServicioId  String
+  edtId                String
   fechaInicioPlan      DateTime?
   fechaFinPlan         DateTime?
   horasPlan            Decimal?             @default(0) @db.Decimal(10, 2)
@@ -1821,14 +1906,14 @@ model ProyectoEdt {
   proyectoFaseId       String?
   registroHoras                   RegistroHoras[]
   proyectoActividad    ProyectoActividad[]
-  edt                  Edt                  @relation(fields: [categoriaServicioId], references: [id])
+  edt                  Edt                  @relation(fields: [edtId], references: [id])
   proyectoCronograma   ProyectoCronograma  @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
   proyectoFase         ProyectoFase?       @relation(fields: [proyectoFaseId], references: [id])
   proyecto                    Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   user                        User?                @relation(fields: [responsableId], references: [id])
   proyectoTarea        ProyectoTarea[]
 
-  @@unique([proyectoId, proyectoCronogramaId, categoriaServicioId])
+  @@unique([proyectoId, proyectoCronogramaId, edtId])
   @@index([estado, fechaFinPlan])
   @@index([proyectoId, proyectoCronogramaId, orden])
   @@index([responsableId, estado])
@@ -1902,16 +1987,16 @@ model ProyectoTarea {
   proyectoActividadId                                                                        String?
   createdAt                                                                                  DateTime                      @default(now())
   updatedAt                                                                                  DateTime
-  registroHoras                   RegistroHoras[]
-  proyectoDependenciasTarea_proyecto_dependencias_tarea_tareaDependienteIdToproyecto_tarea ProyectoDependenciasTarea[] @relation("proyecto_dependencias_tarea_tareaDependienteIdToproyecto_tarea")
-  proyectoDependenciasTarea_proyecto_dependencias_tarea_tareaOrigenIdToproyecto_tarea      ProyectoDependenciasTarea[] @relation("proyecto_dependencias_tarea_tareaOrigenIdToproyecto_tarea")
-  proyectoSubtarea                                                                          ProyectoSubtarea[]
-  proyectoTarea                                                                             ProyectoTarea?               @relation("proyecto_tareaToproyecto_tarea", fields: [dependenciaId], references: [id])
-  other_proyectoTarea                                                                       ProyectoTarea[]              @relation("proyecto_tareaToproyecto_tarea")
-  proyectoActividad                                                                         ProyectoActividad?           @relation(fields: [proyectoActividadId], references: [id])
-  proyectoCronograma                                                                        ProyectoCronograma           @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  proyectoEdt                                                                               ProyectoEdt                  @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
-  user                        User?                         @relation(fields: [responsableId], references: [id])
+  registroHoras                RegistroHoras[]
+  dependenciasComoDependiente  ProyectoDependenciasTarea[]  @relation("dependenciasTareaDependiente")
+  dependenciasComoOrigen       ProyectoDependenciasTarea[]  @relation("dependenciasTareaOrigen")
+  proyectoSubtarea             ProyectoSubtarea[]
+  tareaPadre                   ProyectoTarea?               @relation("proyectoTareaHijas", fields: [dependenciaId], references: [id])
+  tareasHijas                  ProyectoTarea[]              @relation("proyectoTareaHijas")
+  proyectoActividad            ProyectoActividad?           @relation(fields: [proyectoActividadId], references: [id])
+  proyectoCronograma           ProyectoCronograma           @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  proyectoEdt                  ProyectoEdt                  @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
+  user                         User?                        @relation(fields: [responsableId], references: [id])
 
   @@index([dependenciaId])
   @@index([proyectoActividadId])
@@ -1963,28 +2048,28 @@ model Subtarea {
 }
 
 model Tarea {
-  id                                                               String                   @id
-  nombre                                                           String
-  descripcion                                                      String?
-  fechaInicio                                                      DateTime
-  fechaFin                                                         DateTime
-  fechaInicioReal                                                  DateTime?
-  fechaFinReal                                                     DateTime?
-  estado                                                           EstadoTarea              @default(pendiente)
-  prioridad                                                        PrioridadTarea           @default(media)
-  porcentajeCompletado                                             Int                      @default(0)
-  horasEstimadas                                                   Decimal?                 @db.Decimal(10, 2)
-  horasReales                                                      Decimal?                 @default(0) @db.Decimal(10, 2)
-  proyectoServicioId                                               String
-  responsableId                                                    String?
-  createdAt                                                        DateTime                 @default(now())
-  updatedAt                                                        DateTime
-  asignacionesRecurso                                             AsignacionRecurso[]
-  dependenciasTarea_dependencias_tarea_tareaDependienteIdTotareas DependenciasTarea[]     @relation("dependencias_tarea_tareaDependienteIdTotareas")
-  dependenciasTarea_dependencias_tarea_tareaOrigenIdTotareas      DependenciasTarea[]     @relation("dependencias_tarea_tareaOrigenIdTotareas")
-  registrosProgreso                                               RegistroProgreso[]
-  subtareas                                                        Subtarea[]
-  proyectoServicioCotizado                                         ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id], onDelete: Cascade)
+  id                          String                   @id
+  nombre                      String
+  descripcion                 String?
+  fechaInicio                 DateTime
+  fechaFin                    DateTime
+  fechaInicioReal             DateTime?
+  fechaFinReal                DateTime?
+  estado                      EstadoTarea              @default(pendiente)
+  prioridad                   PrioridadTarea           @default(media)
+  porcentajeCompletado        Int                      @default(0)
+  horasEstimadas              Decimal?                 @db.Decimal(10, 2)
+  horasReales                 Decimal?                 @default(0) @db.Decimal(10, 2)
+  proyectoServicioId          String
+  responsableId               String?
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime
+  asignacionesRecurso         AsignacionRecurso[]
+  dependenciasComoDependiente DependenciasTarea[]      @relation("dependenciasTareaDependiente")
+  dependenciasComoOrigen      DependenciasTarea[]      @relation("dependenciasTareaOrigen")
+  registrosProgreso           RegistroProgreso[]
+  subtareas                   Subtarea[]
+  proyectoServicioCotizado    ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id], onDelete: Cascade)
   user                        User?                    @relation(fields: [responsableId], references: [id])
 
   @@map("tareas")
@@ -1998,7 +2083,7 @@ model UserPermission {
   createdBy    String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime
-  permissions  Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permission  Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   user                        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, permissionId])

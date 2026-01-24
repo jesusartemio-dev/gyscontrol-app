@@ -116,11 +116,11 @@ export class MSProjectService {
       where: { proyectoId },
       orderBy: { orden: 'asc' },
       include: {
-        edts: {
+        proyectoEdt: {
           include: {
-            actividades: {
+            proyectoActividad: {
               include: {
-                tareas: true
+                proyectoTarea: true
               }
             }
           }
@@ -145,7 +145,7 @@ export class MSProjectService {
       const faseTaskId = taskId++;
 
       // Agregar EDTs
-      for (const edt of fase.edts) {
+      for (const edt of fase.proyectoEdt) {
         if (!edt.fechaInicioPlan || !edt.fechaFinPlan) continue;
 
         tasks.push({
@@ -161,7 +161,7 @@ export class MSProjectService {
         const edtTaskId = taskId++;
 
         // Agregar actividades directamente bajo EDT (sin zonas)
-        for (const actividad of edt.actividades) {
+        for (const actividad of edt.proyectoActividad) {
           tasks.push({
             id: taskId.toString(),
             name: actividad.nombre,
@@ -176,7 +176,7 @@ export class MSProjectService {
           const actividadTaskId = taskId++;
 
           // Agregar tareas
-          for (const tarea of actividad.tareas) {
+          for (const tarea of actividad.proyectoTarea) {
             tasks.push({
               id: taskId.toString(),
               name: tarea.nombre,
@@ -304,11 +304,13 @@ export class MSProjectService {
     // Crear cronograma de importación
     const cronograma = await prisma.proyectoCronograma.create({
       data: {
+        id: crypto.randomUUID(),
         proyectoId,
         tipo: 'planificacion',
         nombre: `Importado desde MS Project - ${data.name}`,
         esBaseline: false,
-        version: 1
+        version: 1,
+        updatedAt: new Date()
       }
     });
 
@@ -323,6 +325,7 @@ export class MSProjectService {
           case 1: // Fase
             const fase = await prisma.proyectoFase.create({
               data: {
+                id: crypto.randomUUID(),
                 proyectoId,
                 proyectoCronogramaId: cronograma.id,
                 nombre: task.name,
@@ -330,7 +333,8 @@ export class MSProjectService {
                 fechaInicioPlan: task.start,
                 fechaFinPlan: task.finish,
                 estado: 'planificado',
-                orden: fasesMap.size + 1
+                orden: fasesMap.size + 1,
+                updatedAt: new Date()
               }
             });
             fasesMap.set(task.id, fase);
@@ -342,16 +346,18 @@ export class MSProjectService {
             if (fasePadre) {
               const edt = await prisma.proyectoEdt.create({
                 data: {
+                  id: crypto.randomUUID(),
                   proyectoId,
                   proyectoCronogramaId: cronograma.id,
                   proyectoFaseId: fasePadre.id,
-                  categoriaServicioId: '', // Valor por defecto
+                  edtId: '', // Valor por defecto
                   nombre: task.name,
                   descripcion: task.notes,
                   fechaInicioPlan: task.start,
                   fechaFinPlan: task.finish,
                   estado: 'planificado',
-                  prioridad: this.mapMSPriorityToPrioridad(task.priority)
+                  prioridad: this.mapMSPriorityToPrioridad(task.priority),
+                  updatedAt: new Date()
                 }
               });
               edtsMap.set(task.id, edt);
@@ -363,6 +369,7 @@ export class MSProjectService {
             if (edtPadre) {
               const actividad = await prisma.proyectoActividad.create({
                 data: {
+                  id: crypto.randomUUID(),
                   proyectoEdtId: edtPadre.id,
                   proyectoCronogramaId: cronograma.id,
                   nombre: task.name,
@@ -370,7 +377,8 @@ export class MSProjectService {
                   fechaInicioPlan: task.start,
                   fechaFinPlan: task.finish,
                   estado: 'pendiente',
-                  prioridad: this.mapMSPriorityToPrioridad(task.priority)
+                  prioridad: this.mapMSPriorityToPrioridad(task.priority),
+                  updatedAt: new Date()
                 }
               });
               actividadesMap.set(task.id, actividad);
@@ -382,6 +390,7 @@ export class MSProjectService {
             if (actividadPadre) {
               await prisma.proyectoTarea.create({
                 data: {
+                  id: crypto.randomUUID(),
                   proyectoEdtId: actividadPadre.proyectoEdtId,
                   proyectoCronogramaId: cronograma.id,
                   proyectoActividadId: actividadPadre.id,
@@ -391,7 +400,8 @@ export class MSProjectService {
                   fechaFin: task.finish,
                   estado: 'pendiente',
                   prioridad: this.mapMSPriorityToPrioridad(task.priority),
-                  porcentajeCompletado: task.percentComplete
+                  porcentajeCompletado: task.percentComplete,
+                  updatedAt: new Date()
                 }
               });
             }

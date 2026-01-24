@@ -16,11 +16,11 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const secciones = await prisma.proyectoEquipoCotizado.findMany({
       where: { proyectoId: id },
       include: {
-        responsable: true,
-        items: {
+        user: true,
+        proyectoEquipoCotizadoItem: {
           include: {
             catalogoEquipo: true,
-            lista: true,
+            listaEquipo: true,
             listaEquipoSeleccionado: true,
           },
         },
@@ -29,7 +29,14 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
         nombre: 'asc',
       },
     })
-    return NextResponse.json(secciones)
+
+    // Map relation names for frontend compatibility
+    const seccionesFormatted = secciones.map((seccion: any) => ({
+      ...seccion,
+      responsable: seccion.user,
+      items: seccion.proyectoEquipoCotizadoItem
+    }))
+    return NextResponse.json(seccionesFormatted)
   } catch (error) {
     console.error('❌ Error al obtener secciones del proyecto:', error)
     return NextResponse.json({ error: 'Error al obtener secciones' }, { status: 500 })

@@ -18,13 +18,33 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       where: { id },
       include: {
         cliente: true,
-        User_Proyecto_comercialIdToUser: true,
-        User_Proyecto_gestorIdToUser: true,
-        proyectoEquipoCotizado: true, // ✅ Para contar equipos cotizados
-        proyectoServicioCotizado: true, // ✅ Para contar servicios
-        proyectoGastoCotizado: true, // ✅ Para contar gastos
-        listaEquipo: true, // ✅ Para mostrar listas y contar items
-        pedidoEquipo: true // ✅ Para contar pedidos
+        comercial: true,
+        gestor: true,
+        proyectoEquipoCotizado: {
+          include: {
+            proyectoEquipoCotizadoItem: true
+          }
+        },
+        proyectoServicioCotizado: {
+          include: {
+            proyectoServicioCotizadoItem: true
+          }
+        },
+        proyectoGastoCotizado: {
+          include: {
+            proyectoGastoCotizadoItem: true
+          }
+        },
+        listaEquipo: {
+          include: {
+            listaEquipoItem: true
+          }
+        },
+        pedidoEquipo: {
+          include: {
+            pedidoEquipoItem: true
+          }
+        }
       },
     })
 
@@ -35,13 +55,33 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     // Map relation names for frontend compatibility
     const proyectoFormatted = {
       ...proyecto,
-      comercial: proyecto.User_Proyecto_comercialIdToUser,
-      gestor: proyecto.User_Proyecto_gestorIdToUser
+      // Map equipos, servicios, gastos for frontend
+      equipos: proyecto.proyectoEquipoCotizado.map((eq: any) => ({
+        ...eq,
+        items: eq.proyectoEquipoCotizadoItem || []
+      })),
+      servicios: proyecto.proyectoServicioCotizado.map((sv: any) => ({
+        ...sv,
+        items: sv.proyectoServicioCotizadoItem || []
+      })),
+      gastos: proyecto.proyectoGastoCotizado.map((ga: any) => ({
+        ...ga,
+        items: ga.proyectoGastoCotizadoItem || []
+      })),
+      listaEquipos: proyecto.listaEquipo.map((lista: any) => ({
+        ...lista,
+        items: lista.listaEquipoItem || []
+      })),
+      pedidos: proyecto.pedidoEquipo.map((pedido: any) => ({
+        ...pedido,
+        items: pedido.pedidoEquipoItem || []
+      }))
     }
 
     return NextResponse.json(proyectoFormatted)
-  } catch (error) {
-    console.error('❌ Error al obtener proyecto:', error)
+  } catch (error: any) {
+    console.error('❌ Error al obtener proyecto:', error?.message || error)
+    console.error('❌ Error detallado:', JSON.stringify(error, null, 2))
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

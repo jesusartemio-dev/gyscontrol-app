@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
           { comercialId: session.user.id },
           { gestorId: session.user.id },
           { 
-            proyectoEdts: { 
+            proyectoEdt: { 
               some: { 
                 id: proyectoEdtId,
                 responsableId: session.user.id 
@@ -72,16 +72,11 @@ export async function POST(request: NextRequest) {
         id: true,
         nombre: true,
         codigo: true,
-        servicios: {
+        proyectoServicioCotizado: {
           select: {
             id: true,
             nombre: true,
-            edt: {
-              select: {
-                id: true,
-                nombre: true
-              }
-            }
+            categoria: true
           }
         }
       }
@@ -103,8 +98,8 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         nombre: true,
-        categoriaServicioId: true,
-        categoriaServicio: {
+        edtId: true,
+        edt: {
           select: {
             id: true,
             nombre: true
@@ -139,13 +134,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar servicio relacionado con el EDT
-    const servicioRelacionado = proyecto.servicios.find(servicio =>
-      servicio.edt?.nombre === proyectoEdt.categoriaServicio?.nombre
+    const servicioRelacionado = proyecto.proyectoServicioCotizado.find(servicio =>
+      servicio.categoria === proyectoEdt.edt?.nombre
     )
 
     if (!servicioRelacionado) {
       return NextResponse.json(
-        { error: `No se encontró servicio relacionado con el EDT ${proyectoEdt.categoriaServicio?.nombre}` },
+        { error: `No se encontró servicio relacionado con el EDT ${proyectoEdt.edt?.nombre}` },
         { status: 400 }
       )
     }
@@ -173,9 +168,10 @@ export async function POST(request: NextRequest) {
     // Crear registro de horas estructurado
     const registroHoras = await prisma.registroHoras.create({
       data: {
+        id: crypto.randomUUID(),
         proyectoId,
         proyectoServicioId: servicioRelacionado.id, // Vincular con servicio real
-        categoria: proyectoEdt.categoriaServicio?.nombre || 'general',
+        categoria: proyectoEdt.edt?.nombre || 'general',
         nombreServicio: servicioRelacionado.nombre,
         recursoId: recursoSeleccionado.id,
         recursoNombre: recursoSeleccionado.nombre,
@@ -186,9 +182,10 @@ export async function POST(request: NextRequest) {
         observaciones: observaciones || null,
         proyectoEdtId: proyectoEdtId, // Vincular con EDT específico
         proyectoTareaId: proyectoTareaId || null,
-        categoriaServicioId: proyectoEdt.categoriaServicioId, // Para análisis transversal
+        edtId: proyectoEdt.edtId, // Para análisis transversal
         origen: 'oficina',
-        aprobado: false
+        aprobado: false,
+        updatedAt: new Date()
       },
       include: {
         proyecto: {
@@ -198,7 +195,7 @@ export async function POST(request: NextRequest) {
             codigo: true
           }
         },
-        categoriaServicioRef: {
+        edt: {
           select: {
             id: true,
             nombre: true
@@ -229,7 +226,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Se registraron ${horas}h en ${proyectoEdt.categoriaServicio?.nombre} - ${proyecto.codigo}`,
+      message: `Se registraron ${horas}h en ${proyectoEdt.edt?.nombre} - ${proyecto.codigo}`,
       data: {
         id: registroHoras.id,
         horasRegistradas: horas,
@@ -241,7 +238,7 @@ export async function POST(request: NextRequest) {
         },
         edt: {
           id: proyectoEdt.id,
-          categoria: proyectoEdt.categoriaServicio?.nombre,
+          categoria: proyectoEdt.edt?.nombre,
           nombre: proyectoEdt.nombre
         },
         servicio: {
@@ -323,7 +320,7 @@ export async function GET(request: NextRequest) {
                 codigo: true
               }
             },
-            categoriaServicioRef: {
+            edt: {
               select: {
                 id: true,
                 nombre: true
@@ -344,7 +341,7 @@ export async function GET(request: NextRequest) {
 
         // Calcular resumen por EDT
         const resumenPorEdt = registros.reduce((acc, registro) => {
-          const categoria = registro.categoriaServicioRef?.nombre || 'Sin categoría'
+          const categoria = registro.edt?.nombre || 'Sin categoría'
           if (!acc[categoria]) {
             acc[categoria] = {
               categoria: categoria,
@@ -375,7 +372,7 @@ export async function GET(request: NextRequest) {
               observaciones: r.observaciones,
               costo: r.horasTrabajadas * (r.recurso?.costoHora || 0),
               proyecto: r.proyecto,
-              categoria: r.categoriaServicioRef?.nombre,
+              categoria: r.edt?.nombre,
               recurso: r.recurso
             })),
             resumen: Object.values(resumenPorEdt)

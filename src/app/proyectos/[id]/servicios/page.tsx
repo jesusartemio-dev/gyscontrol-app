@@ -101,7 +101,7 @@ export default function ServiciosProyectoPage() {
 
   // Obtener categorías únicas (ahora EDTs)
   const categoriasUnicas = [...new Set(
-    proyecto?.servicios?.map(s => s.edt?.nombre).filter((nombre): nombre is string => nombre !== undefined) || []
+    proyecto?.servicios?.map(s => s.categoria || (s as any).edt?.nombre).filter((nombre): nombre is string => nombre !== undefined) || []
   )]
 
   // Loading state

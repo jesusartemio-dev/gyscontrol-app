@@ -57,7 +57,7 @@ interface CotizacionFase {
   edts: {
     id: string
     nombre: string
-    categoriaServicio: {
+    edt: {
       nombre: string
     }
     estado: string
@@ -342,7 +342,7 @@ export function CotizacionFasesList({
                       <div key={edt.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <Badge variant="outline" className="text-xs">
-                            {edt.categoriaServicio.nombre}
+                            {edt.edt.nombre}
                           </Badge>
                           <span className="text-sm font-medium">{edt.nombre}</span>
                           <Badge variant={getEstadoColor(edt.estado)} className="text-xs">

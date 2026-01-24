@@ -60,7 +60,7 @@ export async function GET(
         cotizacionServicioId: edt.cotizacionServicioId
       },
       include: {
-        cotizacionTareas: {
+        cotizacionTarea: {
           where: {
             cotizacionActividad: {
               cotizacionEdtId: edtId
@@ -80,9 +80,9 @@ export async function GET(
     // Marcar ítems que ya tienen tareas asociadas
     const itemsConEstado = itemsDisponibles.map(item => ({
       ...item,
-      yaImportado: (item as any).cotizacionTareas?.length > 0,
-      tareaExistente: (item as any).cotizacionTareas?.length > 0 ? (item as any).cotizacionTareas[0] : null,
-      cotizacionTareas: undefined // Remover del response
+      yaImportado: (item as any).cotizacionTarea?.length > 0,
+      tareaExistente: (item as any).cotizacionTarea?.length > 0 ? (item as any).cotizacionTarea[0] : null,
+      cotizacionTarea: undefined // Remover del response
     }))
 
     return NextResponse.json({

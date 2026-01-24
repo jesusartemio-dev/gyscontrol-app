@@ -76,16 +76,16 @@ export default function CotizacionServicioAccordion({
   onUpdatedNombre
 }: Props) {
   const [editando, setEditando] = useState(false)
-  const [nuevoNombre, setNuevoNombre] = useState(servicio.nombre || servicio.categoria)
+  const [nuevoNombre, setNuevoNombre] = useState(servicio.nombre)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
   useEffect(() => {
-    setNuevoNombre(servicio.nombre || servicio.categoria)
-  }, [servicio.nombre, servicio.categoria])
+    setNuevoNombre(servicio.nombre)
+  }, [servicio.nombre])
 
   const handleBlur = () => {
-    if (nuevoNombre.trim() && nuevoNombre !== (servicio.nombre || servicio.categoria)) {
+    if (nuevoNombre.trim() && nuevoNombre !== (servicio.nombre)) {
       onUpdatedNombre(nuevoNombre.trim())
     }
     setEditando(false)
@@ -96,7 +96,7 @@ export default function CotizacionServicioAccordion({
       handleBlur()
     }
     if (e.key === 'Escape') {
-      setNuevoNombre(servicio.nombre || servicio.categoria)
+      setNuevoNombre(servicio.nombre)
       setEditando(false)
     }
   }

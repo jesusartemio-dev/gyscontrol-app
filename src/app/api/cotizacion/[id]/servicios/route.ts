@@ -45,11 +45,11 @@ export async function GET(
     const servicios = await prisma.cotizacionServicio.findMany({
       where: { cotizacionId: id },
       include: {
-        items: {
+        cotizacionServicioItem: {
           include: {
             catalogoServicio: {
               include: {
-                categoria: true
+                edt: true
               }
             }
           }
@@ -58,10 +58,11 @@ export async function GET(
       orderBy: { createdAt: 'asc' }
     })
 
-    // Agregar categoriaServicioId a cada servicio
-    const serviciosConCategoriaId = servicios.map(servicio => ({
+    // Agregar edtId a cada servicio y mapear items para compatibilidad
+    const serviciosConCategoriaId = servicios.map((servicio: any) => ({
       ...servicio,
-      categoriaServicioId: servicio.items[0]?.catalogoServicio?.categoria?.id || null
+      items: servicio.cotizacionServicioItem, // Alias for frontend compatibility
+      edtId: servicio.cotizacionServicioItem[0]?.catalogoServicio?.edt?.id || null
     }))
 
     return NextResponse.json({

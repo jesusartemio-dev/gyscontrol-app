@@ -25,13 +25,13 @@ import { CalendarIcon, Save, X, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
-import type { ProyectoEdt, CategoriaServicio, User } from '@/types/modelos'
+import type { ProyectoEdt, Edt, User } from '@/types/modelos'
 import type { CreateProyectoEdtPayload, ProyectoEdtUpdatePayload } from '@/types/payloads'
 
 // Schema de validación
 const edtFormSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
-  categoriaServicioId: z.string().min(1, 'La categoría de servicio es requerida'),
+  edtId: z.string().min(1, 'El EDT es requerido'),
   fechaInicio: z.string().optional(),
   fechaFin: z.string().optional(),
   horasEstimadas: z.number().min(0.1, 'Las horas deben ser mayor a 0'),
@@ -59,7 +59,7 @@ export function ProyectoEdtForm({
   onCancel
 }: ProyectoEdtFormProps) {
   const [loading, setLoading] = useState(false)
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [edts, setEdts] = useState<Edt[]>([])
   const [usuarios, setUsuarios] = useState<User[]>([])
   const [fechaInicio, setFechaInicio] = useState<Date>()
   const [fechaFin, setFechaFin] = useState<Date>()
@@ -76,7 +76,7 @@ export function ProyectoEdtForm({
     resolver: zodResolver(edtFormSchema),
     defaultValues: {
       nombre: edt?.nombre || '',
-      categoriaServicioId: edt?.categoriaServicioId || '',
+      edtId: edt?.edtId || '',
       fechaInicio: edt?.fechaInicio || '',
       fechaFin: edt?.fechaFin || '',
       horasEstimadas: edt?.horasPlan || 1,
@@ -103,11 +103,11 @@ export function ProyectoEdtForm({
 
   const loadInitialData = async () => {
     try {
-      // Cargar categorías de servicio
-      const categoriasResponse = await fetch('/api/categoria-servicio')
-      if (categoriasResponse.ok) {
-        const categoriasData = await categoriasResponse.json()
-        setCategorias(categoriasData.data || [])
+      // Cargar EDTs del catálogo
+      const edtsResponse = await fetch('/api/edt')
+      if (edtsResponse.ok) {
+        const edtsData = await edtsResponse.json()
+        setEdts(edtsData.data || [])
       }
 
       // Cargar usuarios (para responsables)
@@ -130,7 +130,7 @@ export function ProyectoEdtForm({
         proyectoId,
         proyectoCronogramaId: data.proyectoCronogramaId,
         nombre: data.nombre,
-        categoriaServicioId: data.categoriaServicioId,
+        edtId: data.edtId,
         fechaInicio: data.fechaInicio,
         fechaFin: data.fechaFin,
         horasEstimadas: data.horasEstimadas,
@@ -199,26 +199,26 @@ export function ProyectoEdtForm({
             )}
           </div>
 
-          {/* Categoría de Servicio */}
+          {/* EDT del Catálogo */}
           <div className="space-y-2">
-            <Label htmlFor="categoriaServicioId">Categoría de Servicio *</Label>
+            <Label htmlFor="edtId">EDT *</Label>
             <Select
-              value={watch('categoriaServicioId')}
-              onValueChange={(value) => setValue('categoriaServicioId', value)}
+              value={watch('edtId')}
+              onValueChange={(value) => setValue('edtId', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona una categoría" />
+                <SelectValue placeholder="Selecciona un EDT" />
               </SelectTrigger>
               <SelectContent>
-                {categorias.map((categoria) => (
-                  <SelectItem key={categoria.id} value={categoria.id}>
-                    {categoria.nombre}
+                {edts.map((edtItem) => (
+                  <SelectItem key={edtItem.id} value={edtItem.id}>
+                    {edtItem.nombre}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.categoriaServicioId && (
-              <p className="text-sm text-red-600">{errors.categoriaServicioId.message}</p>
+            {errors.edtId && (
+              <p className="text-sm text-red-600">{errors.edtId.message}</p>
             )}
           </div>
 

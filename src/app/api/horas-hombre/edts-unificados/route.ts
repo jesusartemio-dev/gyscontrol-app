@@ -1,22 +1,37 @@
 /**
  * API para EDTs Unificados - Análisis Transversal por EDT
- * 
+ *
  * Unifica las EDTs del servicio y del cronograma para análisis transversal
  * Permite ver todas las horas por EDT (PLC, HMI, ING) a través de múltiples proyectos
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    // Verificar sesión del usuario
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      console.log('❌ EDTS-UNIFICADOS: No hay sesión válida')
+      return NextResponse.json(
+        { success: false, error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
+    console.log('✅ EDTS-UNIFICADOS: Usuario autenticado:', session.user.id)
+
     const { searchParams } = new URL(request.url)
     const soloActivos = searchParams.get('soloActivos') === 'true'
     const incluirHoras = searchParams.get('incluirHoras') === 'true'
     const fechaInicio = searchParams.get('fechaInicio')
     const fechaFin = searchParams.get('fechaFin')
 
-    // Base query para EDTs unificados (sin autenticación)
+    // Base query para EDTs unificados
     const whereClause: any = {}
 
     if (soloActivos) {
@@ -40,8 +55,8 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         nombre: true,
-        categoriaServicioId: true,
-        categoriaServicio: {
+        edtId: true,
+        edt: {
           select: {
             id: true,
             nombre: true,
@@ -58,7 +73,7 @@ export async function GET(request: NextRequest) {
             fechaFin: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -74,7 +89,7 @@ export async function GET(request: NextRequest) {
         descripcion: true,
         orden: true,
         // Horas registradas
-        registrosHoras: incluirHoras ? {
+        registroHoras: incluirHoras ? {
           select: {
             id: true,
             horasTrabajadas: true,
@@ -82,7 +97,7 @@ export async function GET(request: NextRequest) {
             descripcion: true,
             recursoNombre: true,
             recursoId: true,
-            usuario: {
+            user: {
               select: {
                 name: true
               }
@@ -105,8 +120,8 @@ export async function GET(request: NextRequest) {
       let horasPorRecurso: any[] = []
       let costoTotalCalculado = 0
       
-      if (incluirHoras && edt.registrosHoras) {
-        const resumenHoras = edt.registrosHoras.reduce((acc, registro) => {
+      if (incluirHoras && edt.registroHoras) {
+        const resumenHoras = edt.registroHoras.reduce((acc, registro) => {
           const recursoNombre = registro.recursoNombre || 'Sin recurso'
           const horas = Number(registro.horasTrabajadas) || 0
           
@@ -132,9 +147,9 @@ export async function GET(request: NextRequest) {
       return {
         id: edt.id,
         nombre: edt.nombre,
-        categoriaId: edt.categoriaServicioId,
-        categoriaNombre: edt.categoriaServicio?.nombre || 'Sin categoría',
-        categoriaDescripcion: edt.categoriaServicio?.descripcion,
+        categoriaId: edt.edtId,
+        categoriaNombre: edt.edt?.nombre || 'Sin categoría',
+        categoriaDescripcion: edt.edt?.descripcion,
         proyecto: {
           id: edt.proyecto.id,
           nombre: edt.proyecto.nombre,
@@ -144,8 +159,8 @@ export async function GET(request: NextRequest) {
           fechaFin: edt.proyecto.fechaFin
         },
         responsable: {
-          id: edt.responsable?.id,
-          nombre: edt.responsable?.name || 'Sin responsable'
+          id: edt.user?.id,
+          nombre: edt.user?.name || 'Sin responsable'
         },
         horas: {
           planificadas: horasPlanificadas,
@@ -197,9 +212,13 @@ export async function GET(request: NextRequest) {
         ? (variacion / acc[categoria].totalHorasPlanificadas) * 100 
         : 0
       
-      // Agregar proyecto si no existe ya
+      // Agregar o actualizar proyecto - acumular horas si ya existe
       const proyectoCodigo = edt.proyecto.codigo
-      if (!acc[categoria].proyectos.find((p: any) => p.codigo === proyectoCodigo)) {
+      const proyectoExistente = acc[categoria].proyectos.find((p: any) => p.codigo === proyectoCodigo)
+      if (proyectoExistente) {
+        // Acumular horas del mismo proyecto con múltiples EDTs de la misma categoría
+        proyectoExistente.horasReales += edt.horas.reales
+      } else {
         acc[categoria].proyectos.push({
           codigo: proyectoCodigo,
           nombre: edt.proyecto.nombre,

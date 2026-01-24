@@ -115,7 +115,7 @@ export async function GET(
     const tareas = await prisma.tarea.findMany({
       where: tareaWhere,
       include: {
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -124,7 +124,7 @@ export async function GET(
         },
         subtareas: {
           include: {
-            asignado: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -134,7 +134,7 @@ export async function GET(
           },
           orderBy: { createdAt: 'asc' }
         },
-        dependenciasOrigen: {
+        dependenciasComoOrigen: {
           include: {
             tareaDependiente: {
               select: {
@@ -145,7 +145,7 @@ export async function GET(
             }
           }
         },
-        dependenciasDependiente: {
+        dependenciasComoDependiente: {
           include: {
             tareaOrigen: {
               select: {
@@ -185,7 +185,7 @@ export async function GET(
       : proyectoServicio.proyecto.fechaFin
     
     // 🔍 Obtener todas las dependencias del proyecto
-    const dependencias = await prisma.dependenciaTarea.findMany({
+    const dependencias = await prisma.dependenciasTarea.findMany({
       where: {
         OR: [
           {
@@ -234,9 +234,9 @@ export async function GET(
         horasEstimadas: Number(tarea.horasEstimadas || 0),
         horasReales: Number(tarea.horasReales || 0),
         responsable: {
-          id: tarea.responsable?.id || '',
-          nombre: tarea.responsable?.name || '',
-          email: tarea.responsable?.email || ''
+          id: tarea.user?.id || '',
+          nombre: tarea.user?.name || '',
+          email: tarea.user?.email || ''
         },
         tipo: 'tarea' as const,
         nivel: 0,
@@ -254,19 +254,19 @@ export async function GET(
           horasReales: Number(subtarea.horasReales || 0),
           progreso: subtarea.porcentajeCompletado,
           responsable: {
-            id: subtarea.asignado?.id || '',
-            nombre: subtarea.asignado?.name || '',
-            email: subtarea.asignado?.email || ''
+            id: subtarea.user?.id || '',
+            nombre: subtarea.user?.name || '',
+            email: subtarea.user?.email || ''
           },
           tipo: 'subtarea' as const,
           nivel: 1
         })),
-        dependenciasOrigen: tarea.dependenciasOrigen.map(dep => ({
+        dependenciasOrigen: tarea.dependenciasComoOrigen.map(dep => ({
           id: dep.id,
           tipo: dep.tipo,
           tareaDependiente: dep.tareaDependiente
         })),
-        dependenciasDependiente: tarea.dependenciasDependiente.map(dep => ({
+        dependenciasDependiente: tarea.dependenciasComoDependiente.map(dep => ({
           id: dep.id,
           tipo: dep.tipo,
           tareaOrigen: dep.tareaOrigen

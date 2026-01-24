@@ -10,25 +10,27 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import type { CotizacionProveedorItemPayload } from '@/types'
 
 export async function GET() {
   try {
     const data = await prisma.cotizacionProveedorItem.findMany({
       include: {
-        cotizacion: {
+        cotizacionProveedor: {
           include: {
             proveedor: true,
             proyecto: true,
           },
         },
         listaEquipoItem: true,
-        lista: true,
+        listaEquipo: true,
       },
       orderBy: {
         codigo: 'asc', // ✅ Ordena los ítems por código ascendente
       },
     })
+
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error al obtener ítems de cotización:', error)
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
     // 📦 Crear nuevo ítem de cotización con copia de datos técnicos
     const creado = await prisma.cotizacionProveedorItem.create({
       data: {
+        id: randomUUID(),
         cotizacionId: body.cotizacionId,
         listaEquipoItemId: body.listaEquipoItemId,
         listaId: body.listaId ?? item.listaId,
@@ -77,6 +80,7 @@ export async function POST(request: Request) {
 
         estado: body.estado ?? 'pendiente',
         esSeleccionada: body.esSeleccionada ?? false,
+        updatedAt: new Date(),
       },
     })
 
@@ -84,14 +88,14 @@ export async function POST(request: Request) {
     const nuevoItem = await prisma.cotizacionProveedorItem.findUnique({
       where: { id: creado.id },
       include: {
-        cotizacion: {
+        cotizacionProveedor: {
           include: {
             proveedor: true,
             proyecto: true,
           },
         },
         listaEquipoItem: true,
-        lista: true,
+        listaEquipo: true,
       },
     })
 

@@ -23,7 +23,7 @@ import { es } from 'date-fns/locale';
 interface ProyectoEdt {
   id: string;
   nombre: string;
-  categoriaServicio?: {
+  edt?: {
     nombre: string;
   };
 }
@@ -41,9 +41,11 @@ interface ProyectoActividad {
   fechaInicioPlan: string;
   fechaFinPlan: string;
   horasPlan: number;
+  horasReales?: number;
   estado: 'pendiente' | 'en_progreso' | 'completado' | 'pausado' | 'cancelado';
   prioridad: 'baja' | 'media' | 'alta' | 'critica';
-  proyectoEdtId: string; // ✅ OBLIGATORIO (sin zonaId)
+  porcentajeAvance?: number;
+  proyectoEdtId?: string;
   proyectoCronogramaId: string;
 }
 
@@ -101,7 +103,7 @@ export function ProyectoActividadForm({
         setFormData({
           nombre: actividad.nombre,
           descripcion: actividad.descripcion || '',
-          proyectoEdtId: actividad.proyectoEdtId, // ✅ Siempre EDT
+          proyectoEdtId: actividad.proyectoEdtId || '', // ✅ Siempre EDT
           proyectoCronogramaId: actividad.proyectoCronogramaId,
           fechaInicioPlan: format(new Date(actividad.fechaInicioPlan), 'yyyy-MM-dd'),
           fechaFinPlan: format(new Date(actividad.fechaFinPlan), 'yyyy-MM-dd'),
@@ -313,8 +315,8 @@ export function ProyectoActividadForm({
                 {edts.map((edt) => (
                   <SelectItem key={edt.id} value={edt.id}>
                     {edt.nombre}
-                    {edt.categoriaServicio && (
-                      <> • {edt.categoriaServicio.nombre}</>
+                    {edt.edt && (
+                      <> • {edt.edt.nombre}</>
                     )}
                   </SelectItem>
                 ))}

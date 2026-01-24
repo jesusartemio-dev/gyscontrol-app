@@ -180,6 +180,7 @@ export async function POST(req: NextRequest) {
 
     const nueva = await prisma.cotizacion.create({
       data: {
+        id: `cot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nombre,
         clienteId,
         comercialId,
@@ -187,7 +188,8 @@ export async function POST(req: NextRequest) {
         numeroSecuencia,
         estado: 'borrador',
         totalInterno: 0,
-        totalCliente: 0
+        totalCliente: 0,
+        updatedAt: new Date()
       },
       include: {
         cliente: {

@@ -18,19 +18,19 @@ const ActualizarPedidoSchema = z.object({
 
 // 🔁 Función para recalcular datos de Gantt
 function calcularDatosGantt(pedido: any) {
-  const items = pedido.items || []
+  const items = pedido.pedidoEquipoItem || []
   const fechaPedido = pedido.fechaPedido || pedido.createdAt
   const fechaEntrega = pedido.fechaEntregaEstimada || new Date()
-  
+
   const montoReal = items.reduce((total: number, item: any) => {
     return total + (item.cantidadPedida * item.precioUnitario)
   }, 0)
-  
+
   const msPerDay = 1000 * 60 * 60 * 24
   const duracionDias = Math.ceil(
     (new Date(fechaEntrega).getTime() - new Date(fechaPedido).getTime()) / msPerDay
   )
-  
+
   return {
     fechaInicio: new Date(fechaPedido).toISOString(),
     fechaFin: new Date(fechaEntrega).toISOString(),
@@ -42,9 +42,9 @@ function calcularDatosGantt(pedido: any) {
 
 // 🔁 Función para validar coherencia detallada
 function validarCoherencia(pedido: any) {
-  const lista = pedido.lista
-  const itemsPedido = pedido.items || []
-  
+  const lista = pedido.listaEquipo
+  const itemsPedido = pedido.pedidoEquipoItem || []
+
   if (!lista) {
     return {
       esValido: false,
@@ -60,8 +60,8 @@ function validarCoherencia(pedido: any) {
       }
     }
   }
-  
-  const itemsLista = lista.items || []
+
+  const itemsLista = lista.listaEquipoItem || []
   
   // Validar fecha de entrega vs fecha necesaria
   const fechaEntrega = new Date(pedido.fechaEntregaEstimada)
@@ -145,7 +145,7 @@ export async function GET(
     const pedido = await prisma.pedidoEquipo.findUnique({
       where: { id },
       include: {
-        lista: {
+        listaEquipo: {
           select: {
             id: true,
             codigo: true,
@@ -173,7 +173,7 @@ export async function GET(
                 }
               }
             },
-            items: {
+            listaEquipoItem: {
               select: {
                 id: true,
                 cantidad: true,
@@ -184,7 +184,7 @@ export async function GET(
           }
         },
 
-        items: {
+        pedidoEquipoItem: {
           select: {
             id: true,
             cantidadPedida: true,
@@ -208,7 +208,7 @@ export async function GET(
 
     // 📡 Estadísticas detalladas
     const estadisticas = {
-      totalItems: pedido.items.length,
+      totalItems: pedido.pedidoEquipoItem.length,
       montoTotal: datosGantt.montoReal,
       diasEntrega: datosGantt.duracionDias,
       diasRestantes: pedido.fechaEntregaEstimada ? Math.ceil(
@@ -300,13 +300,13 @@ export async function PUT(
         updatedAt: new Date()
       },
       include: {
-        lista: {
+        listaEquipo: {
           select: {
             id: true,
             codigo: true,
             nombre: true,
             fechaNecesaria: true,
-            items: {
+            listaEquipoItem: {
               select: {
                 id: true,
                 cantidad: true,
@@ -315,7 +315,7 @@ export async function PUT(
             }
           }
         },
-        items: {
+        pedidoEquipoItem: {
           select: {
             id: true,
             cantidadPedida: true,

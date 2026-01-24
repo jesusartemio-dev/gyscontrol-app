@@ -34,17 +34,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       include: {
         proyectoEdt: {
           include: {
-            responsable: {
+            user: {
               select: { id: true, name: true, email: true }
             },
-            proyecto_actividad: {
+            proyectoActividad: {
               include: {
-                User: {
+                user: {
                   select: { id: true, name: true, email: true }
                 },
-                proyecto_tarea: {
+                proyectoTarea: {
                   include: {
-                    responsable: {
+                    user: {
                       select: { id: true, name: true, email: true }
                     }
                   }
@@ -60,14 +60,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Construir jerarquía completa usando la estructura real del esquema
     const jerarquia = fases.map(fase => {
       const edts = fase.proyectoEdt.map(edt => {
-        const actividades = edt.proyecto_actividad.map(actividad => {
-          const tareas = actividad.proyecto_tarea.map(tarea => ({
+        const actividades = edt.proyectoActividad.map(actividad => {
+          const tareas = actividad.proyectoTarea.map(tarea => ({
             id: tarea.id,
             nombre: tarea.nombre,
             tipo: 'tarea' as const,
             nivel: 4,
             responsableId: tarea.responsableId,
-            responsableNombre: tarea.responsable?.name || 'Sin asignar',
+            responsableNombre: tarea.user?.name || 'Sin asignar',
             fechaInicio: tarea.fechaInicio,
             fechaFin: tarea.fechaFin,
             porcentajeAvance: tarea.porcentajeCompletado || 0,
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             tipo: 'actividad' as const,
             nivel: 3,
             responsableId: actividad.responsableId,
-            responsableNombre: actividad.User?.name || 'Sin asignar',
+            responsableNombre: actividad.user?.name || 'Sin asignar',
             fechaInicio: actividad.fechaInicioPlan,
             fechaFin: actividad.fechaFinPlan,
             porcentajeAvance: actividad.porcentajeAvance || 0,
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           tipo: 'edt' as const,
           nivel: 2,
           responsableId: edt.responsableId,
-          responsableNombre: edt.responsable?.name || 'Sin asignar',
+          responsableNombre: edt.user?.name || 'Sin asignar',
           fechaInicio: edt.fechaInicioPlan,
           fechaFin: edt.fechaFinPlan,
           porcentajeAvance: edt.porcentajeAvance || 0,

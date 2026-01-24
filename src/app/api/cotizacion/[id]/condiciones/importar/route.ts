@@ -74,10 +74,12 @@ export async function POST(
 
     // Crear nuevas condiciones desde la plantilla
     const nuevasCondiciones = itemsAFiltrar.map((item, index) => ({
+      id: `cot-cond-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       cotizacionId: id,
       descripcion: item.descripcion,
       tipo: item.tipo,
-      orden: nextOrden + index
+      orden: nextOrden + index,
+      updatedAt: new Date()
     }))
 
     const condicionesCreadas = await prisma.cotizacionCondicion.createMany({

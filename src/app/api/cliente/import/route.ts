@@ -63,13 +63,15 @@ export async function POST(request: NextRequest) {
         console.log('Client data:', JSON.stringify(clienteData, null, 2))
         
         const clientData = {
+          id: `cli-import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           codigo: clienteData.codigo,
           numeroSecuencia: 1, // ✅ Inicializar en 1
           nombre: clienteData.nombre,
           ruc: clienteData.ruc || null,
           direccion: clienteData.direccion || null,
           telefono: clienteData.telefono || null,
-          correo: clienteData.correo || null
+          correo: clienteData.correo || null,
+          updatedAt: new Date()
         }
         
         console.log('Prisma create data:', JSON.stringify(clientData, null, 2))

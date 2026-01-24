@@ -120,6 +120,7 @@ export async function POST(
     // ✅ Crear competidor
     const nuevoCompetidor = await prisma.crmCompetidorLicitacion.create({
       data: {
+        id: `crm-comp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionId: oportunidadId,
         nombreEmpresa,
         contacto,
@@ -131,7 +132,8 @@ export async function POST(
         debilidades,
         precioVsNuestro,
         resultado,
-        razonPerdida
+        razonPerdida,
+        updatedAt: new Date()
       }
     })
 

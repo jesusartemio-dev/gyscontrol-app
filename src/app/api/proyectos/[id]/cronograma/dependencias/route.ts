@@ -40,7 +40,7 @@ export async function GET(
     }
 
     // ✅ Obtener todas las dependencias del proyecto
-    const dependencias = await (prisma as any).proyectoDependenciaTarea.findMany({
+    const dependencias = await prisma.proyectoDependenciasTarea.findMany({
       where: {
         tareaOrigen: {
           proyectoEdt: {
@@ -53,7 +53,7 @@ export async function GET(
           include: {
             proyectoEdt: {
               include: {
-                categoriaServicio: true
+                edt: true
               }
             }
           }
@@ -62,7 +62,7 @@ export async function GET(
           include: {
             proyectoEdt: {
               include: {
-                categoriaServicio: true
+                edt: true
               }
             }
           }
@@ -111,7 +111,7 @@ export async function POST(
     }
 
     // ✅ Validar que ambas tareas existen y pertenecen al proyecto
-    const tareaOrigen = await (prisma as any).proyectoTarea.findFirst({
+    const tareaOrigenData = await prisma.proyectoTarea.findFirst({
       where: {
         id: validatedData.tareaOrigenId,
         proyectoEdt: {
@@ -120,7 +120,7 @@ export async function POST(
       }
     })
 
-    const tareaDependiente = await (prisma as any).proyectoTarea.findFirst({
+    const tareaDependienteData = await prisma.proyectoTarea.findFirst({
       where: {
         id: validatedData.tareaDependienteId,
         proyectoEdt: {
@@ -129,7 +129,7 @@ export async function POST(
       }
     })
 
-    if (!tareaOrigen || !tareaDependiente) {
+    if (!tareaOrigenData || !tareaDependienteData) {
       return NextResponse.json(
         { error: 'Una o ambas tareas no existen o no pertenecen al proyecto' },
         { status: 404 }
@@ -145,7 +145,7 @@ export async function POST(
     }
 
     // ✅ Verificar que no existe ya esta dependencia
-    const existingDependencia = await (prisma as any).proyectoDependenciaTarea.findFirst({
+    const existingDependencia = await prisma.proyectoDependenciasTarea.findFirst({
       where: {
         tareaOrigenId: validatedData.tareaOrigenId,
         tareaDependienteId: validatedData.tareaDependienteId
@@ -160,8 +160,9 @@ export async function POST(
     }
 
     // ✅ Crear la dependencia
-    const dependencia = await (prisma as any).proyectoDependenciaTarea.create({
+    const dependencia = await prisma.proyectoDependenciasTarea.create({
       data: {
+        id: crypto.randomUUID(),
         tareaOrigenId: validatedData.tareaOrigenId,
         tareaDependienteId: validatedData.tareaDependienteId,
         tipo: validatedData.tipo
@@ -171,7 +172,7 @@ export async function POST(
           include: {
             proyectoEdt: {
               include: {
-                categoriaServicio: true
+                edt: true
               }
             }
           }
@@ -180,7 +181,7 @@ export async function POST(
           include: {
             proyectoEdt: {
               include: {
-                categoriaServicio: true
+                edt: true
               }
             }
           }

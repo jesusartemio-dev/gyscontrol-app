@@ -1,411 +1,377 @@
-# ANÁLISIS DE ARQUITECTURA: PLANTILLAS INDEPENDIENTES
+# ANÁLISIS: PLANTILLAS INDEPENDIENTES (6 MODELOS)
 
 ## RESUMEN EJECUTIVO
-- Total de archivos afectados: 12 (principalmente APIs y servicios)
-- Archivos críticos: 5 (APIs de configuración y cronograma)
-- Nivel de riesgo: MEDIO (solo algunos modelos están implementados)
-- Tiempo estimado de migración: 2-3 días
-
-## ANÁLISIS POR MODELO
-
-### 1. fase_default → FaseDefault
-
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1596
-- **Relaciones**: CategoriaServicio[]
-- **Dependencias**: Referenciado por CategoriaServicio.fase_default
-
-#### APIs (5 archivos encontrados)
-1. `src/app/api/proyectos/[id]/cronograma/import-edts/route.ts` - Línea 40
-   - Operación: include en findMany
-   - Include: fase_default con select
-   - Propósito: Importar EDTs con fases
-
-2. `src/app/api/cotizaciones/[id]/cronograma/generar/route.ts` - Líneas 86,179,209
-   - Operación: findMany, findUnique
-   - Propósito: Generar cronograma con fases por defecto
-
-3. `src/app/api/configuracion/fases/route.ts` - Líneas 32,63,74
-   - Operación: findMany, findFirst, create
-   - Propósito: CRUD de fases por defecto
-
-4. `src/app/api/configuracion/fases/[id]/route.ts` - Líneas 29,78,90,152
-   - Operación: findUnique, findUnique, update, update
-   - Propósito: CRUD individual de fases
-
-5. `src/app/api/configuracion/fases-default/route.ts` - Línea 35
-   - Operación: findMany
-   - Propósito: Obtener fases activas
-
-#### Servicios (0 archivos encontrados)
-
-#### Componentes (0 archivos encontrados)
-
-#### Hooks (0 archivos encontrados)
-
-#### Tests (0 archivos encontrados)
-
-#### RESUMEN MODELO
-- **Archivos afectados**: 5
-- **Complejidad**: MEDIA
-- **Riesgo**: MEDIO
-- **Funcionalidades**: Configuración de fases, generación de cronogramas
+- Total de modelos analizados: 6
+- Modelos que requieren corrección en schema: 0
+- Modelos que requieren corrección en código: 0
+- Total de archivos afectados: 14
+- Total de líneas a modificar: 0
 
 ---
 
-### 2. metrica_comercial → MetricaComercial
+## MODELO 1: plantilla_equipo_independiente
 
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1612
-- **Relaciones**: User
-- **Dependencias**: Referenciado por User.metrica_comercial[]
+### Estado en Schema (prisma/schema.prisma)
+- **Línea:** 1586
+- **Nombre actual:** PascalCase (`PlantillaEquipoIndependiente`)
+- **Tiene @@map:** Sí (`@@map("plantilla_equipo_independiente")`)
+- **Estado:** ✅ Correcto
 
-#### APIs (0 archivos encontrados)
+### Relaciones Identificadas
+- **Relaciones salientes:** PlantillaEquipoItemIndependiente[]
+- **Relaciones entrantes:** Ninguna
 
-#### Servicios (0 archivos encontrados)
+### Referencias en Código
+**Total de archivos:** 7
+**Total de ocurrencias:** 16
 
-#### Componentes (0 archivos encontrados)
+#### Archivos Afectados:
+1. **src/app/api/cotizaciones/[id]/importar-plantilla/route.ts**
+   - Línea 109: Acceso a modelo - `prisma.plantillaEquipoIndependiente.findUnique`
+   - Línea 151: Acceso a propiedad - `plantilla.plantillaEquipoItemIndependiente`
 
-#### Hooks (0 archivos encontrados)
+2. **src/app/api/plantillas/equipos/[id]/route.ts**
+   - Línea 21: Acceso a modelo - `prisma.plantillaEquipoIndependiente.findUnique`
+   - Línea 70: Acceso a modelo - `prisma.plantillaEquipoIndependiente.update`
 
-#### Tests (0 archivos encontrados)
+3. **src/app/api/plantillas/equipos/route.ts**
+   - Línea 19: Acceso a modelo - `prisma.plantillaEquipoIndependiente.findMany`
+   - Línea 54: Acceso a modelo - `prisma.plantillaEquipoIndependiente.create`
 
-#### RESUMEN MODELO
-- **Archivos afectados**: 0
-- **Complejidad**: BAJA
-- **Riesgo**: BAJO
-- **Funcionalidades**: Ninguna implementada aún
+4. **src/app/api/plantillas/equipos/[id]/items/route.ts**
+   - Línea 32: Acceso a modelo - `prisma.plantillaEquipoIndependiente.findUnique`
+   - Línea 89: Acceso a modelo - `prisma.plantillaEquipoIndependiente.update`
 
----
+5. **src/app/api/plantillas/equipos/[id]/items/[itemId]/route.ts**
+   - Línea 60: Acceso a modelo - `prisma.plantillaEquipoIndependiente.findUnique`
+   - Línea 73: Acceso a modelo - `prisma.plantillaEquipoIndependiente.update`
+   - Línea 121: Acceso a modelo - `prisma.plantillaEquipoIndependiente.findUnique`
+   - Línea 134: Acceso a modelo - `prisma.plantillaEquipoIndependiente.update`
 
-### 3. plantilla_duracion_cronograma → PlantillaDuracionCronograma
+6. **src/app/api/plantilla/route.ts**
+   - Línea 23: Acceso a modelo - `prisma.plantillaEquipoIndependiente.findMany`
+   - Línea 238: Acceso a modelo - `prisma.plantillaEquipoIndependiente.create`
 
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1677
-- **Relaciones**: Ninguna
-- **Dependencias**: Ninguna
+7. **src/app/api/plantilla/[id]/route.ts**
+   - Línea 54: Acceso a modelo - `prisma.plantillaEquipoIndependiente.findUnique`
+   - Línea 139: Acceso a modelo - `prisma.plantillaEquipoIndependiente.update`
+   - Línea 193: Acceso a modelo - `prisma.plantillaEquipoIndependiente.delete`
 
-#### APIs (5 archivos encontrados)
-1. `src/app/api/debug/specific-model-test/route.ts` - Líneas 13,23
-   - Operación: Raw queries COUNT
-   - Propósito: Testing de tabla
-
-2. `src/app/api/debug/prisma-test/route.ts` - Línea 20
-   - Operación: Raw query COUNT
-   - Propósito: Testing Prisma
-
-3. `src/app/api/debug/populate-database/route.ts` - Líneas 11,17,41
-   - Operación: Raw queries
-   - Propósito: Poblar datos de prueba
-
-4. `src/app/api/debug/clean-test-data/route.ts` - Líneas 10,15
-   - Operación: Raw queries DELETE, COUNT
-   - Propósito: Limpiar datos de prueba
-
-5. `src/app/api/cotizaciones/[id]/cronograma/generar/route.ts` - Línea 48
-   - Operación: findMany
-   - Propósito: Obtener duraciones para cronograma
-
-6. `src/app/api/configuracion/duraciones-cronograma/route.ts` - Líneas 56,93,106,156
-   - Operación: Raw queries SELECT, INSERT
-   - Propósito: CRUD de duraciones
-
-7. `src/app/api/configuracion/duraciones-cronograma/importar/route.ts` - Líneas 56,80
-   - Operación: Raw queries SELECT
-   - Propósito: Importar duraciones
-
-#### Servicios (0 archivos encontrados)
-
-#### Componentes (0 archivos encontrados)
-
-#### Hooks (0 archivos encontrados)
-
-#### Tests (0 archivos encontrados)
-
-#### RESUMEN MODELO
-- **Archivos afectados**: 7
-- **Complejidad**: MEDIA
-- **Riesgo**: MEDIO
-- **Funcionalidades**: Configuración de duraciones de cronograma
+### Tipos de Inconsistencias Encontradas:
+- [ ] Queries SQL con nombre incorrecto de tabla
+- [ ] Acceso dinámico con `(prisma as any)`
+- [ ] Nombre de modelo en snake_case en schema
+- [ ] Falta `@@map` en schema
+- [ ] Imports incorrectos
+- [x] Otros: Ninguna
 
 ---
 
-### 4. plantilla_equipo_independiente → PlantillaEquipoIndependiente
+## MODELO 2: plantilla_equipo_item_independiente
 
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1688
-- **Relaciones**: plantilla_equipo_item_independiente[]
-- **Dependencias**: Ninguna directa
+### Estado en Schema (prisma/schema.prisma)
+- **Línea:** 1602
+- **Nombre actual:** PascalCase (`PlantillaEquipoItemIndependiente`)
+- **Tiene @@map:** Sí (`@@map("plantilla_equipo_item_independiente")`)
+- **Estado:** ✅ Correcto
 
-#### APIs (0 archivos encontrados)
+### Relaciones Identificadas
+- **Relaciones salientes:** CatalogoEquipo (opcional), PlantillaEquipoIndependiente
+- **Relaciones entrantes:** Ninguna
 
-#### Servicios (0 archivos encontrados)
+### Referencias en Código
+**Total de archivos:** 6
+**Total de ocurrencias:** 22
 
-#### Componentes (0 archivos encontrados)
+#### Archivos Afectados:
+1. **src/app/api/plantillas/equipos/[id]/route.ts**
+   - Línea 24: Inclusión en query - `plantillaEquipoItemIndependiente: {`
+   - Línea 78: Inclusión en query - `plantillaEquipoItemIndependiente: {`
 
-#### Hooks (0 archivos encontrados)
+2. **src/app/api/plantillas/equipos/[id]/items/route.ts**
+   - Línea 61: Acceso a modelo - `prisma.plantillaEquipoItemIndependiente.create`
+   - Línea 81: Acceso a modelo - `prisma.plantillaEquipoItemIndependiente.findMany`
 
-#### Tests (0 archivos encontrados)
+3. **src/app/api/plantillas/equipos/[id]/items/[itemId]/route.ts**
+   - Línea 31: Acceso a modelo - `prisma.plantillaEquipoItemIndependiente.findFirst`
+   - Línea 49: Acceso a modelo - `prisma.plantillaEquipoItemIndependiente.update`
+   - Línea 65: Acceso a modelo - `prisma.plantillaEquipoItemIndependiente.findMany`
+   - Línea 101: Acceso a modelo - `prisma.plantillaEquipoItemIndependiente.findFirst`
+   - Línea 116: Acceso a modelo - `prisma.plantillaEquipoItemIndependiente.delete`
+   - Línea 126: Acceso a modelo - `prisma.plantillaEquipoItemIndependiente.findMany`
 
-#### RESUMEN MODELO
-- **Archivos afectados**: 0
-- **Complejidad**: BAJA
-- **Riesgo**: BAJO
-- **Funcionalidades**: Ninguna implementada aún
+4. **src/app/api/plantillas/equipos/route.ts**
+   - Línea 21: Inclusión en query - `plantillaEquipoItemIndependiente: {`
+   - Línea 67: Inclusión en query - `plantillaEquipoItemIndependiente: true`
 
----
+5. **src/app/api/plantilla/route.ts**
+   - Línea 25: Inclusión en query - `plantillaEquipoItemIndependiente: {`
 
-### 5. plantilla_equipo_item_independiente → PlantillaEquipoItemIndependiente
+6. **src/app/api/plantilla/[id]/route.ts**
+   - Línea 57: Inclusión en query - `plantillaEquipoItemIndependiente: {`
 
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1702
-- **Relaciones**: CatalogoEquipo?, plantilla_equipo_independiente
-- **Dependencias**: Referenciado por CatalogoEquipo.plantilla_equipo_item_independiente[]
+7. **src/app/api/cotizaciones/[id]/importar-plantilla/route.ts**
+   - Línea 112: Inclusión en query - `plantillaEquipoItemIndependiente: {`
+   - Línea 151: Acceso a propiedad - `plantilla.plantillaEquipoItemIndependiente`
 
-#### APIs (0 archivos encontrados)
-
-#### Servicios (0 archivos encontrados)
-
-#### Componentes (0 archivos encontrados)
-
-#### Hooks (0 archivos encontrados)
-
-#### Tests (0 archivos encontrados)
-
-#### RESUMEN MODELO
-- **Archivos afectados**: 0
-- **Complejidad**: BAJA
-- **Riesgo**: BAJO
-- **Funcionalidades**: Ninguna implementada aún
-
----
-
-### 6. plantilla_gasto_independiente → PlantillaGastoIndependiente
-
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1722
-- **Relaciones**: plantilla_gasto_item_independiente[]
-- **Dependencias**: Ninguna directa
-
-#### APIs (0 archivos encontrados)
-
-#### Servicios (0 archivos encontrados)
-
-#### Componentes (0 archivos encontrados)
-
-#### Hooks (0 archivos encontrados)
-
-#### Tests (0 archivos encontrados)
-
-#### RESUMEN MODELO
-- **Archivos afectados**: 0
-- **Complejidad**: BAJA
-- **Riesgo**: BAJO
-- **Funcionalidades**: Ninguna implementada aún
+### Tipos de Inconsistencias Encontradas:
+- [ ] Queries SQL con nombre incorrecto de tabla
+- [ ] Acceso dinámico con `(prisma as any)`
+- [ ] Nombre de modelo en snake_case en schema
+- [ ] Falta `@@map` en schema
+- [ ] Imports incorrectos
+- [x] Otros: Ninguna
 
 ---
 
-### 7. plantilla_gasto_item_independiente → PlantillaGastoItemIndependiente
+## MODELO 3: plantilla_servicio_independiente
 
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1736
-- **Relaciones**: plantilla_gasto_independiente
-- **Dependencias**: Ninguna directa
+### Estado en Schema (prisma/schema.prisma)
+- **Línea:** 1687
+- **Nombre actual:** PascalCase (`PlantillaServicioIndependiente`)
+- **Tiene @@map:** Sí (`@@map("plantilla_servicio_independiente")`)
+- **Estado:** ✅ Correcto
 
-#### APIs (0 archivos encontrados)
+### Relaciones Identificadas
+- **Relaciones salientes:** PlantillaServicioItemIndependiente[]
+- **Relaciones entrantes:** Ninguna
 
-#### Servicios (0 archivos encontrados)
+### Referencias en Código
+**Total de archivos:** 7
+**Total de ocurrencias:** 16
 
-#### Componentes (0 archivos encontrados)
+#### Archivos Afectados:
+1. **src/app/api/plantillas/servicios/route.ts**
+   - Línea 19: Acceso a modelo - `prisma.plantillaServicioIndependiente.findMany`
+   - Línea 56: Acceso a modelo - `prisma.plantillaServicioIndependiente.create`
 
-#### Hooks (0 archivos encontrados)
+2. **src/app/api/plantillas/servicios/[id]/route.ts**
+   - Línea 21: Acceso a modelo - `prisma.plantillaServicioIndependiente.findUnique`
+   - Línea 90: Acceso a modelo - `prisma.plantillaServicioIndependiente.update`
 
-#### Tests (0 archivos encontrados)
+3. **src/app/api/plantillas/servicios/[id]/items/route.ts**
+   - Línea 32: Acceso a modelo - `prisma.plantillaServicioIndependiente.findUnique`
+   - Línea 109: Acceso a modelo - `prisma.plantillaServicioIndependiente.update`
 
-#### RESUMEN MODELO
-- **Archivos afectados**: 0
-- **Complejidad**: BAJA
-- **Riesgo**: BAJO
-- **Funcionalidades**: Ninguna implementada aún
+4. **src/app/api/plantillas/servicios/[id]/items/[itemId]/route.ts**
+   - Línea 91: Acceso a modelo - `prisma.plantillaServicioIndependiente.findUnique`
+   - Línea 104: Acceso a modelo - `prisma.plantillaServicioIndependiente.update`
+   - Línea 155: Acceso a modelo - `prisma.plantillaServicioIndependiente.findUnique`
+   - Línea 168: Acceso a modelo - `prisma.plantillaServicioIndependiente.update`
 
----
+5. **src/app/api/plantilla/route.ts**
+   - Línea 73: Acceso a modelo - `prisma.plantillaServicioIndependiente.findMany`
+   - Línea 250: Acceso a modelo - `prisma.plantillaServicioIndependiente.create`
 
-### 8. plantilla_servicio_independiente → PlantillaServicioIndependiente
+6. **src/app/api/plantilla/[id]/route.ts**
+   - Línea 73: Acceso a modelo - `prisma.plantillaServicioIndependiente.findUnique`
+   - Línea 150: Acceso a modelo - `prisma.plantillaServicioIndependiente.update`
+   - Línea 201: Acceso a modelo - `prisma.plantillaServicioIndependiente.delete`
 
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1752
-- **Relaciones**: plantilla_servicio_item_independiente[]
-- **Dependencias**: Ninguna directa
+7. **src/app/api/cotizaciones/[id]/importar-plantilla/route.ts**
+   - Línea 121: Acceso a modelo - `prisma.plantillaServicioIndependiente.findUnique`
 
-#### APIs (0 archivos encontrados)
-
-#### Servicios (0 archivos encontrados)
-
-#### Componentes (0 archivos encontrados)
-
-#### Hooks (0 archivos encontrados)
-
-#### Tests (0 archivos encontrados)
-
-#### RESUMEN MODELO
-- **Archivos afectados**: 0
-- **Complejidad**: BAJA
-- **Riesgo**: BAJO
-- **Funcionalidades**: Ninguna implementada aún
-
----
-
-### 9. plantilla_servicio_item_independiente → PlantillaServicioItemIndependiente
-
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1767
-- **Relaciones**: CatalogoServicio?, plantilla_servicio_independiente, Recurso, UnidadServicio
-- **Dependencias**: Referenciado por UnidadServicio.plantilla_servicio_item_independiente[], Recurso.plantilla_servicio_item_independiente[], CatalogoServicio.plantilla_servicio_item_independiente[]
-
-#### APIs (0 archivos encontrados)
-
-#### Servicios (0 archivos encontrados)
-
-#### Componentes (0 archivos encontrados)
-
-#### Hooks (0 archivos encontrados)
-
-#### Tests (0 archivos encontrados)
-
-#### RESUMEN MODELO
-- **Archivos afectados**: 0
-- **Complejidad**: BAJA
-- **Riesgo**: BAJO
-- **Funcionalidades**: Ninguna implementada aún
+### Tipos de Inconsistencias Encontradas:
+- [ ] Queries SQL con nombre incorrecto de tabla
+- [ ] Acceso dinámico con `(prisma as any)`
+- [ ] Nombre de modelo en snake_case en schema
+- [ ] Falta `@@map` en schema
+- [ ] Imports incorrectos
+- [x] Otros: Ninguna
 
 ---
 
-### 10. user_permissions → UserPermissions
+## MODELO 4: plantilla_servicio_item_independiente
 
-#### Base de Datos
-- **Ubicación**: prisma/schema.prisma línea 1948
-- **Relaciones**: permissions, User
-- **Dependencias**: Referenciado por User.user_permissions[]
+### Estado en Schema (prisma/schema.prisma)
+- **Línea:** 1704
+- **Nombre actual:** PascalCase (`PlantillaServicioItemIndependiente`)
+- **Tiene @@map:** Sí (`@@map("plantilla_servicio_item_independiente")`)
+- **Estado:** ✅ Correcto
 
-#### APIs (0 archivos encontrados)
+### Relaciones Identificadas
+- **Relaciones salientes:** CatalogoServicio (opcional), PlantillaServicioIndependiente, Recurso, UnidadServicio
+- **Relaciones entrantes:** Ninguna
 
-#### Servicios (1 archivo encontrado)
-1. `src/lib/services/permissions.ts` - Líneas 34,226,273,286
-   - Operación: findMany, upsert, findUnique, delete
-   - Propósito: Gestión de permisos de usuario
+### Referencias en Código
+**Total de archivos:** 8
+**Total de ocurrencias:** 22
 
-#### Componentes (0 archivos encontrados)
+#### Archivos Afectados:
+1. **src/app/api/unidad-servicio/route.ts**
+   - Línea 24: Inclusión en query - `plantillaServicioItemIndependiente: true`
 
-#### Hooks (0 archivos encontrados)
+2. **src/app/api/plantillas/servicios/route.ts**
+   - Línea 21: Inclusión en query - `plantillaServicioItemIndependiente: {`
+   - Línea 70: Inclusión en query - `plantillaServicioItemIndependiente: true`
 
-#### Tests (0 archivos encontrados)
+3. **src/app/api/plantillas/servicios/[id]/route.ts**
+   - Línea 24: Inclusión en query - `plantillaServicioItemIndependiente: {`
+   - Línea 98: Inclusión en query - `plantillaServicioItemIndependiente: {`
 
-#### RESUMEN MODELO
-- **Archivos afectados**: 1
-- **Complejidad**: BAJA
-- **Riesgo**: BAJO
-- **Funcionalidades**: Gestión de permisos
+4. **src/app/api/plantillas/servicios/[id]/items/route.ts**
+   - Línea 71: Acceso a modelo - `prisma.plantillaServicioItemIndependiente.create`
+   - Línea 101: Acceso a modelo - `prisma.plantillaServicioItemIndependiente.findMany`
 
-## ANÁLISIS DE DEPENDENCIAS
+5. **src/app/api/plantillas/servicios/[id]/items/[itemId]/route.ts**
+   - Línea 32: Acceso a modelo - `prisma.plantillaServicioItemIndependiente.findFirst`
+   - Línea 85: Acceso a modelo - `prisma.plantillaServicioItemIndependiente.update`
+   - Línea 96: Acceso a modelo - `prisma.plantillaServicioItemIndependiente.findMany`
+   - Línea 132: Acceso a modelo - `prisma.plantillaServicioItemIndependiente.findFirst`
+   - Línea 150: Acceso a modelo - `prisma.plantillaServicioItemIndependiente.delete`
+   - Línea 160: Acceso a modelo - `prisma.plantillaServicioItemIndependiente.findMany`
 
-### Mapa de Dependencias
-```
-User → metrica_comercial[]
-User → user_permissions[]
-CategoriaServicio → fase_default
-UnidadServicio → plantilla_servicio_item_independiente[]
-Recurso → plantilla_servicio_item_independiente[]
-CatalogoServicio → plantilla_servicio_item_independiente[]
-CatalogoEquipo → plantilla_equipo_item_independiente[]
-plantilla_equipo_independiente → plantilla_equipo_item_independiente[]
-plantilla_gasto_independiente → plantilla_gasto_item_independiente[]
-plantilla_servicio_independiente → plantilla_servicio_item_independiente[]
-```
+6. **src/app/api/plantilla/route.ts**
+   - Línea 75: Inclusión en query - `plantillaServicioItemIndependiente: {`
 
-### Orden de Migración Sugerido
-1. metrica_comercial - Sin dependencias críticas
-2. user_permissions - Solo dependencias con User y permissions
-3. fase_default - Dependencia con CategoriaServicio
-4. plantilla_duracion_cronograma - Sin dependencias
-5. plantilla_equipo_independiente - Dependencia con items
-6. plantilla_equipo_item_independiente - Dependencia con plantilla y CatalogoEquipo
-7. plantilla_gasto_independiente - Dependencia con items
-8. plantilla_gasto_item_independiente - Dependencia con plantilla
-9. plantilla_servicio_independiente - Dependencia con items
-10. plantilla_servicio_item_independiente - Múltiples dependencias
+7. **src/app/api/plantilla/[id]/route.ts**
+   - Línea 76: Inclusión en query - `plantillaServicioItemIndependiente: {`
 
-## PATRONES DE CÓDIGO ENCONTRADOS
+8. **src/app/api/cotizaciones/[id]/importar-plantilla/route.ts**
+   - Línea 124: Inclusión en query - `plantillaServicioItemIndependiente: {`
+   - Línea 153: Acceso a propiedad - `plantilla.plantillaServicioItemIndependiente`
 
-### Patrón 1: Queries con Include
-```typescript
-include: {
-  fase_default: {
-    select: { nombre: true, orden: true }
-  }
-}
-```
+### Tipos de Inconsistencias Encontradas:
+- [ ] Queries SQL con nombre incorrecto de tabla
+- [ ] Acceso dinámico con `(prisma as any)`
+- [ ] Nombre de modelo en snake_case en schema
+- [ ] Falta `@@map` en schema
+- [ ] Imports incorrectos
+- [x] Otros: Ninguna
 
-### Patrón 2: Raw Queries para Configuración
-```sql
-SELECT * FROM "plantilla_duracion_cronograma" ORDER BY "nivel" ASC
-```
+---
 
-### Patrón 3: CRUD Básico en Servicios
-```typescript
-await prisma.user_permissions.findMany({
-  where: { userId }
-})
-```
+## MODELO 5: plantilla_gasto_independiente
 
-## RIESGOS IDENTIFICADOS
+### Estado en Schema (prisma/schema.prisma)
+- **Línea:** 1653
+- **Nombre actual:** PascalCase (`PlantillaGastoIndependiente`)
+- **Tiene @@map:** Sí (`@@map("plantilla_gasto_independiente")`)
+- **Estado:** ✅ Correcto
 
-### MEDIOS
-1. **fase_default en cronogramas**
-   - Archivos: 2 APIs de cronograma
-   - Mitigación: Actualizar queries de Prisma y tipos generados
+### Relaciones Identificadas
+- **Relaciones salientes:** PlantillaGastoItemIndependiente[]
+- **Relaciones entrantes:** Ninguna
 
-2. **plantilla_duracion_cronograma en configuración**
-   - Archivos: 2 APIs de configuración
-   - Mitigación: Cambiar nombres en raw queries
+### Referencias en Código
+**Total de archivos:** 7
+**Total de ocurrencias:** 14
 
-### BAJOS
-1. **user_permissions en permisos**
-   - Archivos: 1 servicio
-   - Mitigación: Actualizar llamadas a Prisma
+#### Archivos Afectados:
+1. **src/app/api/cotizaciones/[id]/importar-plantilla/route.ts**
+   - Línea 135: Acceso a modelo - `prisma.plantillaGastoIndependiente.findUnique`
 
-## RECOMENDACIONES
+2. **src/app/api/plantillas/gastos/route.ts**
+   - Línea 19: Acceso a modelo - `prisma.plantillaGastoIndependiente.findMany`
+   - Línea 51: Acceso a modelo - `prisma.plantillaGastoIndependiente.create`
 
-### Estrategia de Migración Recomendada
-1. **Fase 1**: Actualizar schema.prisma con nuevos nombres
-2. **Fase 2**: Ejecutar migración de base de datos
-3. **Fase 3**: Actualizar código que usa los modelos (APIs y servicios)
-4. **Fase 4**: Regenerar tipos de Prisma
-5. **Fase 5**: Testing y validación
+3. **src/app/api/plantillas/gastos/[id]/route.ts**
+   - Línea 21: Acceso a modelo - `prisma.plantillaGastoIndependiente.findUnique`
+   - Línea 65: Acceso a modelo - `prisma.plantillaGastoIndependiente.update`
 
-### Plan de Testing
-1. Verificar que las APIs de fases sigan funcionando
-2. Probar configuración de duraciones de cronograma
-3. Validar permisos de usuario
-4. Ejecutar tests existentes
+4. **src/app/api/plantillas/gastos/[id]/items/route.ts**
+   - Línea 32: Acceso a modelo - `prisma.plantillaGastoIndependiente.findUnique`
+   - Línea 75: Acceso a modelo - `prisma.plantillaGastoIndependiente.update`
 
-### Consideraciones Especiales
-- Los modelos de plantillas independientes no están implementados aún en el código
-- Solo fase_default y plantilla_duracion_cronograma tienen uso real
-- user_permissions tiene uso mínimo en servicios
+5. **src/app/api/plantillas/gastos/[id]/items/[itemId]/route.ts**
+   - Línea 41: Acceso a modelo - `prisma.plantillaGastoIndependiente.findUnique`
+   - Línea 54: Acceso a modelo - `prisma.plantillaGastoIndependiente.update`
 
-## ESTIMACIÓN DE ESFUERZO
+6. **src/app/api/plantilla/route.ts**
+   - Línea 125: Acceso a modelo - `prisma.plantillaGastoIndependiente.findMany`
+   - Línea 263: Acceso a modelo - `prisma.plantillaGastoIndependiente.create`
 
-| Fase | Tiempo | Complejidad |
-|------|--------|-------------|
-| Análisis adicional | 2 horas | baja |
-| Cambios en schema | 1 hora | baja |
-| Migración BD | 2 horas | media |
-| Actualización APIs | 4 horas | media |
-| Actualización servicios | 1 hora | baja |
-| Regenerar tipos | 30 min | baja |
-| Testing | 2 horas | baja |
-| **TOTAL** | **12.5 horas** | **media** |
+7. **src/app/api/plantilla/[id]/route.ts**
+   - Línea 94: Acceso a modelo - `prisma.plantillaGastoIndependiente.findUnique`
+   - Línea 161: Acceso a modelo - `prisma.plantillaGastoIndependiente.update`
+   - Línea 209: Acceso a modelo - `prisma.plantillaGastoIndependiente.delete`
+
+### Tipos de Inconsistencias Encontradas:
+- [ ] Queries SQL con nombre incorrecto de tabla
+- [ ] Acceso dinámico con `(prisma as any)`
+- [ ] Nombre de modelo en snake_case en schema
+- [ ] Falta `@@map` en schema
+- [ ] Imports incorrectos
+- [x] Otros: Ninguna
+
+---
+
+## MODELO 6: plantilla_gasto_item_independiente
+
+### Estado en Schema (prisma/schema.prisma)
+- **Línea:** 1669
+- **Nombre actual:** PascalCase (`PlantillaGastoItemIndependiente`)
+- **Tiene @@map:** Sí (`@@map("plantilla_gasto_item_independiente")`)
+- **Estado:** ✅ Correcto
+
+### Relaciones Identificadas
+- **Relaciones salientes:** PlantillaGastoIndependiente
+- **Relaciones entrantes:** Ninguna
+
+### Referencias en Código
+**Total de archivos:** 7
+**Total de ocurrencias:** 14
+
+#### Archivos Afectados:
+1. **src/app/api/plantillas/gastos/route.ts**
+   - Línea 21: Inclusión en query - `plantillaGastoItemIndependiente: {`
+   - Línea 64: Inclusión en query - `plantillaGastoItemIndependiente: true`
+
+2. **src/app/api/plantillas/gastos/[id]/route.ts**
+   - Línea 24: Inclusión en query - `plantillaGastoItemIndependiente: true`
+   - Línea 73: Inclusión en query - `plantillaGastoItemIndependiente: true`
+
+3. **src/app/api/plantillas/gastos/[id]/items/route.ts**
+   - Línea 50: Acceso a modelo - `prisma.plantillaGastoItemIndependiente.create`
+   - Línea 67: Acceso a modelo - `prisma.plantillaGastoItemIndependiente.findMany`
+
+4. **src/app/api/plantillas/gastos/[id]/items/[itemId]/route.ts**
+   - Línea 21: Acceso a modelo - `prisma.plantillaGastoItemIndependiente.findFirst`
+   - Línea 36: Acceso a modelo - `prisma.plantillaGastoItemIndependiente.delete`
+   - Línea 46: Acceso a modelo - `prisma.plantillaGastoItemIndependiente.findMany`
+
+5. **src/app/api/plantilla/route.ts**
+   - Línea 127: Inclusión en query - `plantillaGastoItemIndependiente: true`
+
+6. **src/app/api/plantilla/[id]/route.ts**
+   - Línea 97: Inclusión en query - `plantillaGastoItemIndependiente: true`
+
+7. **src/app/api/cotizaciones/[id]/importar-plantilla/route.ts**
+   - Línea 138: Inclusión en query - `plantillaGastoItemIndependiente: true`
+   - Línea 155: Acceso a propiedad - `plantilla.plantillaGastoItemIndependiente`
+
+### Tipos de Inconsistencias Encontradas:
+- [ ] Queries SQL con nombre incorrecto de tabla
+- [ ] Acceso dinámico con `(prisma as any)`
+- [ ] Nombre de modelo en snake_case en schema
+- [ ] Falta `@@map` en schema
+- [ ] Imports incorrectos
+- [x] Otros: Ninguna
+
+---
+
+## PLAN DE CORRECCIÓN CONSOLIDADO
+
+### Modelos que requieren cambio en Schema:
+Ninguno
+
+### Modelos que solo requieren cambios en código:
+Ninguno
+
+### Total estimado de cambios:
+- Cambios en schema: 0 líneas
+- Cambios en código: 0 líneas
+- Archivos únicos afectados: 14
+
+---
 
 ## CONCLUSIONES
 
-El impacto de la migración es relativamente bajo ya que la mayoría de los modelos (plantillas independientes) no están implementados en el código aún. Los modelos críticos son fase_default (usado en cronogramas) y plantilla_duracion_cronograma (usado en configuración). Se recomienda proceder con la migración siguiendo el orden sugerido para minimizar riesgos.
+Todos los modelos analizados ya están correctamente configurados en el schema de Prisma:
+
+1. **Nomenclatura correcta:** Todos los modelos usan PascalCase en la definición
+2. **Mapeo adecuado:** Todos tienen `@@map("nombre_en_snake_case")` que coincide con el nombre de la tabla en la base de datos
+3. **Relaciones consistentes:** Las relaciones están correctamente definidas
+4. **Uso en código:** Todas las referencias en el código usan el nombre PascalCase correcto (`prisma.NombreModelo`)
+
+No se requieren correcciones ya que el esquema y el código ya siguen las convenciones establecidas. El trabajo previo con `PlantillaDuracionCronograma` ya se aplicó correctamente a estos 6 modelos de plantillas independientes.

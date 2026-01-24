@@ -22,9 +22,9 @@ import { EdtList } from '../EdtList'
 import { EdtForm } from '../EdtForm'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from '@/hooks/use-toast'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { getUsers } from '@/lib/services/user'
-import type { ProyectoEdtConRelaciones, CategoriaServicio, User } from '@/types/modelos'
+import type { ProyectoEdtConRelaciones, Edt, User } from '@/types/modelos'
 
 // ✅ Tipos locales
 interface ProyectoFase {
@@ -63,17 +63,17 @@ export function EdtsPorFase({ fases, proyectoId, onRefresh }: EdtsPorFaseProps) 
   const [modalActivo, setModalActivo] = useState<ModalActivo>(null)
   const [edtSeleccionado, setEdtSeleccionado] = useState<ProyectoEdtConRelaciones | null>(null)
   const [loading, setLoading] = useState(false)
-  const [categoriasServicios, setCategoriasServicios] = useState<CategoriaServicio[]>([])
+  const [edtsCatalogo, setEdtsCatalogo] = useState<Edt[]>([])
   const [usuarios, setUsuarios] = useState<User[]>([])
 
   // ✅ Cargar datos adicionales
   const cargarDatosAdicionales = async () => {
     try {
       const [categoriasData, usuariosData] = await Promise.all([
-        getCategoriasServicio(),
+        getEdts(),
         getUsers()
       ])
-      setCategoriasServicios(categoriasData || [])
+      setEdtsCatalogo(categoriasData || [])
       setUsuarios(usuariosData || [])
     } catch (error) {
       console.error('Error al cargar datos adicionales:', error)
@@ -321,7 +321,7 @@ export function EdtsPorFase({ fases, proyectoId, onRefresh }: EdtsPorFaseProps) 
                         </Badge>
                       </div>
                       <div className="text-sm text-muted-foreground mb-2">
-                        {edt.categoriaServicio?.nombre}
+                        {edt.edt?.nombre}
                       </div>
                       <div className="flex items-center gap-4 text-sm">
                         <span>Horas: {edt.horasPlan}h plan / {edt.horasReales}h real</span>
@@ -362,7 +362,7 @@ export function EdtsPorFase({ fases, proyectoId, onRefresh }: EdtsPorFaseProps) 
           </DialogHeader>
           <EdtForm
             proyectoId={proyectoId}
-            categoriasServicios={categoriasServicios}
+            edtsCatalogo={edtsCatalogo}
             usuarios={usuarios}
             onSubmit={handleSubmitEdt}
             onCancel={() => setModalActivo(null)}
@@ -382,7 +382,7 @@ export function EdtsPorFase({ fases, proyectoId, onRefresh }: EdtsPorFaseProps) 
             <EdtForm
               proyectoId={proyectoId}
               edt={edtSeleccionado}
-              categoriasServicios={categoriasServicios}
+              edtsCatalogo={edtsCatalogo}
               usuarios={usuarios}
               onSubmit={handleSubmitEdt}
               onCancel={() => {

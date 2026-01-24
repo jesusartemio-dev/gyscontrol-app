@@ -24,7 +24,7 @@ export async function GET() {
     }
 
     // Obtener todas las plantillas activas
-    const plantillas = await (prisma as any).plantillaDuracionCronograma.findMany({
+    const plantillas = await prisma.plantillaDuracionCronograma.findMany({
       where: { activo: true },
       orderBy: { nivel: 'asc' }
     })

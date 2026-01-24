@@ -34,7 +34,9 @@ interface Props {
   onClose: () => void
   servicio: {
     id: string
-    categoria: string
+    nombre: string
+    edtId?: string
+    edt?: { id: string; nombre: string }
   }
   onItemsCreated: (items: CotizacionServicioItem[]) => void
 }
@@ -70,28 +72,29 @@ export default function CotizacionServicioItemMultiAddModal({
     }
   }, [isOpen])
 
-  // ✅ Filter servicios based on search term and service's category
+  // ✅ Filter servicios based on search term and service's EDT
   useEffect(() => {
     let filtered = servicios
 
-    // Filter by service's category
-    if (servicio.categoria) {
-      const categoriaEncontrada = categorias.find(c => c.nombre === servicio.categoria)
-      if (categoriaEncontrada) {
-        filtered = filtered.filter(servicio => servicio.categoriaId === categoriaEncontrada.id)
+    // Filter by service's EDT
+    const edtNombre = servicio.edt?.nombre || servicio.nombre
+    if (edtNombre) {
+      const edtEncontrado = categorias.find(c => c.nombre === edtNombre)
+      if (edtEncontrado) {
+        filtered = filtered.filter(s => s.categoriaId === edtEncontrado.id)
       }
     }
 
     // Filter by search term
     if (searchTerm.trim()) {
-      filtered = filtered.filter(servicio =>
-        servicio.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        servicio.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(s =>
+        s.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
     setFilteredServicios(filtered)
-  }, [searchTerm, servicios, categorias, servicio.categoria])
+  }, [searchTerm, servicios, categorias, servicio.edt?.nombre, servicio.nombre])
 
   const loadData = async () => {
     setLoading(true)
@@ -127,8 +130,10 @@ export default function CotizacionServicioItemMultiAddModal({
       setSelectedServicios(updated)
     } else {
       // Add new selection with default values
-      const defaultRecurso = recursos.find(r => r.nombre === 'Ingeniero Senior') || recursos[0]
-      const defaultUnidad = unidadesServicio.find(u => u.nombre === 'hora') || unidadesServicio[0]
+      const validRecursos = recursos.filter(r => r && r.id)
+      const validUnidades = unidadesServicio.filter(u => u && u.id)
+      const defaultRecurso = validRecursos.find(r => r.nombre === 'Ingeniero Senior') || validRecursos[0]
+      const defaultUnidad = validUnidades.find(u => u.nombre === 'hora') || validUnidades[0]
 
       // Calculate default prices using the same logic
       const cantidad = 1
@@ -141,7 +146,9 @@ export default function CotizacionServicioItemMultiAddModal({
         horaFijo: servicio.horaFijo
       })
 
-      const costoHora = servicio.recurso.costoHora
+      // Get costoHora from servicio.recurso OR look it up from recursos array
+      const servicioRecurso = servicio.recurso || validRecursos.find(r => r.id === servicio.recursoId)
+      const costoHora = servicioRecurso?.costoHora || defaultRecurso?.costoHora || 0
       const factorSeguridad = 1.0
       const margen = 1.35
       const calculatedCostoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
@@ -246,17 +253,17 @@ export default function CotizacionServicioItemMultiAddModal({
           catalogoServicioId: selectedServicio.servicio.id,
           nombre: selectedServicio.servicio.nombre,
           descripcion: selectedServicio.servicio.descripcion,
-          categoria: selectedServicio.servicio.categoria.nombre,
+          edtId: selectedServicio.servicio.edt?.id || selectedServicio.servicio.categoriaId,
           unidadServicioId: selectedServicio.unidadServicioId,
           unidadServicioNombre: unidadesServicio.find(u => u.id === selectedServicio.unidadServicioId)?.nombre || '',
           recursoId: selectedServicio.recursoId,
           recursoNombre: recursos.find(r => r.id === selectedServicio.recursoId)?.nombre || '',
-          formula: selectedServicio.servicio.formula,
+          formula: 'Escalonada',
           horaBase: selectedServicio.servicio.horaBase,
           horaRepetido: selectedServicio.servicio.horaRepetido,
-          horaUnidad: selectedServicio.servicio.horaUnidad,
-          horaFijo: selectedServicio.servicio.horaFijo,
-          costoHora: selectedServicio.servicio.recurso.costoHora,
+          horaUnidad: undefined,
+          horaFijo: undefined,
+          costoHora: selectedServicio.servicio.recurso?.costoHora || 0,
           cantidad: selectedServicio.cantidad,
           horaTotal,
           factorSeguridad: 1.0,
@@ -293,7 +300,7 @@ export default function CotizacionServicioItemMultiAddModal({
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-600" />
-            Agregar Servicios - {servicio.categoria}
+            Agregar Servicios - {servicio.edt?.nombre || servicio.nombre}
           </DialogTitle>
         </DialogHeader>
 
@@ -310,7 +317,7 @@ export default function CotizacionServicioItemMultiAddModal({
           <div className="w-48">
             <div className="flex items-center justify-center h-10 px-3 bg-blue-50 border border-blue-200 rounded-md">
               <span className="text-sm text-blue-700 font-medium">
-                {servicio.categoria}
+                {servicio.edt?.nombre || servicio.nombre}
               </span>
             </div>
           </div>
@@ -357,7 +364,7 @@ export default function CotizacionServicioItemMultiAddModal({
                             <h4 className="font-medium text-sm">{servicio.nombre}</h4>
                             <p className="text-xs text-gray-600 line-clamp-2">{servicio.descripcion}</p>
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-500">{servicio.categoria.nombre}</span>
+                              <span className="text-gray-500">{servicio.edt?.nombre || 'Sin EDT'}</span>
                               <span className="text-gray-500">{servicio.formula}</span>
                             </div>
                             {isSelected && (
@@ -454,7 +461,7 @@ export default function CotizacionServicioItemMultiAddModal({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {recursos.map(recurso => (
+                                {recursos.filter(r => r && r.id).map(recurso => (
                                   <SelectItem key={recurso.id} value={recurso.id!}>
                                     {recurso.nombre}
                                   </SelectItem>
@@ -472,7 +479,7 @@ export default function CotizacionServicioItemMultiAddModal({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {unidadesServicio.map(unidad => (
+                                {unidadesServicio.filter(u => u && u.id).map(unidad => (
                                   <SelectItem key={unidad.id} value={unidad.id!}>
                                     {unidad.nombre}
                                   </SelectItem>

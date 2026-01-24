@@ -93,7 +93,7 @@ export default function Page() {
     try {
       const datos = await leerEdtsDesdeExcel(file)
       const nombresExistentes = edts.map(c => c.nombre)
-      const { nuevas, errores: erroresImport } = validarEdts(datos, nombresExistentes)
+      const { nuevos, errores: erroresImport } = validarEdts(datos, nombresExistentes)
 
       if (erroresImport.length > 0) {
         setErrores(erroresImport)
@@ -117,7 +117,7 @@ export default function Page() {
         return undefined
       }
 
-      await Promise.all(nuevas.map(async (c) => {
+      await Promise.all(nuevos.map(async (c) => {
         const faseDefaultId = c.fasePorDefecto ? await encontrarFasePorNombre(c.fasePorDefecto) : undefined
         return createEdt({
           nombre: c.nombre,
@@ -125,7 +125,7 @@ export default function Page() {
           faseDefaultId
         })
       }))
-      toast.success(`${nuevas.length} EDTs importados correctamente`)
+      toast.success(`${nuevos.length} EDTs importados correctamente`)
       cargarEdts()
     } catch (err) {
       console.error('Error al importar categorías:', err)

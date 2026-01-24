@@ -37,7 +37,7 @@ describe('CotizacionCronogramaService', () => {
       const mockEdt = {
         id: 'test-edt-id',
         cotizacionId: 'test-cotizacion-id',
-        categoriaServicioId: 'test-categoria-id',
+        edtId: 'test-categoria-id',
         zona: 'Zona de prueba',
         fechaInicioComercial: new Date('2025-01-01'),
         fechaFinComercial: new Date('2025-01-31'),
@@ -56,7 +56,7 @@ describe('CotizacionCronogramaService', () => {
 
       const result = await CotizacionCronogramaService.crearEdtComercial({
         cotizacionId: 'test-cotizacion-id',
-        categoriaServicioId: 'test-categoria-id',
+        edtId: 'test-categoria-id',
         zona: 'Zona de prueba',
         fechaInicioCom: new Date('2025-01-01'),
         fechaFinCom: new Date('2025-01-31'),
@@ -67,7 +67,7 @@ describe('CotizacionCronogramaService', () => {
       expect(prisma.cotizacionEdt.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           cotizacionId: 'test-cotizacion-id',
-          categoriaServicioId: 'test-categoria-id',
+          edtId: 'test-categoria-id',
           zona: 'Zona de prueba',
           fechaInicioComercial: new Date('2025-01-01'),
           fechaFinComercial: new Date('2025-01-31'),
@@ -83,7 +83,7 @@ describe('CotizacionCronogramaService', () => {
       await expect(
         CotizacionCronogramaService.crearEdtComercial({
           cotizacionId: 'test-cotizacion-id',
-          categoriaServicioId: 'test-categoria-id',
+          edtId: 'test-categoria-id',
           fechaInicioCom: new Date('2025-01-31'), // Fecha fin antes que inicio
           fechaFinCom: new Date('2025-01-01'),
           horasCom: 40

@@ -86,7 +86,7 @@ export async function GET(
         gestor: {
           select: { id: true, name: true, email: true }
         },
-        listaEquipos: {
+        listaEquipo: {
           select: { id: true, nombre: true, estado: true, createdAt: true }
         },
         cotizacion: {
@@ -94,7 +94,7 @@ export async function GET(
         },
         // 📊 Incluir métricas EDT si se solicita
         ...(incluirMetricas && {
-          proyectoEdts: {
+          proyectoEdt: {
             select: {
               id: true,
               nombre: true,
@@ -104,27 +104,27 @@ export async function GET(
               horasReales: true,
               fechaInicioPlan: true,
               fechaFinPlan: true,
-              categoriaServicio: {
+              edt: {
                 select: { id: true, nombre: true }
               }
             }
           }
         }),
         // 📊 Incluir información básica del cronograma para la card
-        cronogramas: {
+        proyectoCronograma: {
           select: {
             id: true,
             tipo: true,
             nombre: true,
             esBaseline: true,
-            fases: {
+            proyectoFase: {
               select: {
                 id: true,
                 nombre: true,
                 estado: true
               }
             },
-            edts: {
+            proyectoEdt: {
               select: {
                 id: true,
                 nombre: true,
@@ -145,9 +145,9 @@ export async function GET(
     }
 
     // 📊 Calcular métricas EDT si se incluyen
-    let proyectoConMetricas = proyecto;
-    if (incluirMetricas && (proyecto as any).proyectoEdts) {
-      const edts = (proyecto as any).proyectoEdts;
+    let proyectoConMetricas: any = proyecto;
+    if (incluirMetricas && (proyecto as any).proyectoEdt) {
+      const edts = (proyecto as any).proyectoEdt;
       const metricas = {
         totalEdts: edts.length,
         edtsCompletados: edts.filter((e: any) => e.estado === 'completado').length,
@@ -157,18 +157,25 @@ export async function GET(
         horasRealesTotal: edts.reduce((sum: number, e: any) => sum + Number(e.horasReales || 0), 0)
       };
 
-      const { proyectoEdts, ...proyectoSinEdts } = proyecto as any;
+      const { proyectoEdt, ...proyectoSinEdts } = proyecto as any;
       proyectoConMetricas = {
         ...proyectoSinEdts,
         metricas
-      } as any;
+      };
     }
+
+    // Mapear nombres de relaciones para compatibilidad frontend
+    const proyectoFormateado = {
+      ...proyectoConMetricas,
+      listaEquipos: proyectoConMetricas.listaEquipo,
+      cronogramas: proyectoConMetricas.proyectoCronograma
+    };
 
     logger.info(`📋 Proyecto obtenido: ${proyecto.nombre} (${proyectoId}) - Usuario: ${session.user.email}`);
 
     return NextResponse.json({
       success: true,
-      data: proyectoConMetricas
+      data: proyectoFormateado
     });
 
   } catch (error) {

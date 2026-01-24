@@ -67,6 +67,7 @@ export async function PATCH(
     // 4. Crear nuevo ítem de reemplazo
     const nuevoItem = await prisma.listaEquipoItem.create({
       data: {
+        id: `lista-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         codigo: nuevo.codigo,
         descripcion: nuevo.descripcion,
         unidad: nuevo.unidad,
@@ -80,6 +81,7 @@ export async function PATCH(
         cotizacionSeleccionadaId: nuevo.cotizacionSeleccionadaId || undefined,
         proyectoEquipoItemId: nuevo.proyectoEquipoItemId,
         reemplazaProyectoEquipoCotizadoItemId: original.proyectoEquipoItemId || undefined, // ✅ nuevo campo correcto
+        updatedAt: new Date()
       },
     })
 

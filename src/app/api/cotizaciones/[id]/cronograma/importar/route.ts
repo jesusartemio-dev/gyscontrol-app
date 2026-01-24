@@ -85,10 +85,10 @@ export async function POST(
       where: { id: cotizacionId },
       include: {
         cliente: true,
-        comercial: true,
-        servicios: {
+        user: true,
+        cotizacionServicio: {
           include: {
-            items: true
+            cotizacionServicioItem: true
           }
         }
       }
@@ -270,9 +270,9 @@ async function ejecutarImportacion(
       orden: ordenEdt
     }
 
-    // Incluir categoriaServicioId si existe
+    // Incluir edtId si existe
     if (categoriaInfo.categoriaId) {
-      edtData.categoriaServicioId = categoriaInfo.categoriaId
+      edtData.edtId = categoriaInfo.categoriaId
     }
 
     const edt = await tx.cotizacionEdt.create({
@@ -348,7 +348,7 @@ function prepararServiciosPorCategoria(servicios: any[]): CategoriaInfo[] {
     return {
       categoria,
       nombreEdt: categoriaDescripcion, // ✅ Nombre del EDT = descripción de la categoría
-      categoriaId: serviciosCategoria.find(s => s.categoriaServicioId)?.categoriaServicioId || undefined,
+      categoriaId: serviciosCategoria.find(s => s.edtId)?.edtId || undefined,
       servicios: serviciosCategoria, // ✅ Servicios para crear actividades
       horasTotales: serviciosCategoria.reduce((sum, s) =>
         sum + s.items.reduce((sum2: number, item: any) => sum2 + (item.horaTotal || 0), 0), 0

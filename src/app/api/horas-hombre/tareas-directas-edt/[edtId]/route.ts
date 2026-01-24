@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         proyectoActividadId: null // Tareas que no pertenecen a una actividad específica
       },
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true }
         }
       },
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       id: tarea.id,
       nombre: tarea.nombre,
       tipo: 'tarea' as const,
-      responsableNombre: tarea.responsable?.name || 'Sin responsable',
+      responsableNombre: tarea.user?.name || 'Sin responsable',
       horasPlan: Number(tarea.horasEstimadas || 0),
       horasReales: Number(tarea.horasReales || 0),
       estado: tarea.estado,

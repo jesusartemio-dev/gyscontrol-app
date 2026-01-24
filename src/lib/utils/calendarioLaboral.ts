@@ -35,8 +35,8 @@ export async function obtenerCalendarioLaboral(entidadTipo: string, entidadId: s
         activo: true
       },
       include: {
-        dia_calendario: true,
-        excepcion_calendario: true
+        diaCalendario: true,
+        excepcionCalendario: true
       }
     })
 
@@ -55,9 +55,9 @@ export async function obtenerCalendarioLaboralPorId(calendarioId: string): Promi
     const calendario = await prisma.calendarioLaboral.findUnique({
       where: { id: calendarioId },
       include: {
-        dia_calendario: true,
-        excepcion_calendario: true,
-        configuracion_calendario: true
+        diaCalendario: true,
+        excepcionCalendario: true,
+        configuracionCalendario: true
       }
     })
 
@@ -78,7 +78,7 @@ export function obtenerInfoDiaCalendario(
   const diaSemana = obtenerDiaSemana(fecha)
 
   // Verificar excepciones primero
-  const excepcion = calendario.excepcion_calendario.find((exc: any) =>
+  const excepcion = calendario.excepcionCalendario.find((exc: any) =>
     exc.fecha.toDateString() === fecha.toDateString()
   )
 
@@ -87,7 +87,7 @@ export function obtenerInfoDiaCalendario(
   }
 
   // Verificar configuración específica del día
-  const diaConfig = calendario.dia_calendario.find((dia: any) =>
+  const diaConfig = calendario.diaCalendario.find((dia: any) =>
     dia.diaSemana === diaSemana
   )
 
@@ -306,7 +306,7 @@ export async function crearCalendarioColombia(): Promise<any> {
         horaFinTarde: '17:00'
       } as any,
       include: {
-        dia_calendario: true
+        diaCalendario: true
       }
     })
 

@@ -15,9 +15,9 @@ export async function GET() {
       console.log('📝 No existing data, inserting test records...')
       
       await prisma.$queryRaw`
-        INSERT INTO "plantilla_duracion_cronograma" 
-        ("id", "tipoProyecto", "nivel", "duracionDias", "horasPorDia", "bufferPorcentaje", "activo", "createdAt", "updatedAt") 
-        VALUES 
+        INSERT INTO "plantilla_duracion_cronograma"
+        ("id", "tipoProyecto", "nivel", "duracionDias", "horasPorDia", "bufferPorcentaje", "activo", "createdAt", "updatedAt")
+        VALUES
         (gen_random_uuid(), 'construccion', 'fase', 30, 8, 15, true, NOW(), NOW()),
         (gen_random_uuid(), 'construccion', 'edt', 15, 8, 10, true, NOW(), NOW()),
         (gen_random_uuid(), 'construccion', 'actividad', 3, 8, 5, true, NOW(), NOW()),
@@ -39,7 +39,7 @@ export async function GET() {
     
     // Test the main API query
     const testQuery = await prisma.$queryRaw`
-      SELECT * FROM "plantilla_duracion_cronograma" 
+      SELECT * FROM "plantilla_duracion_cronograma"
       ORDER BY "nivel" ASC
     `
     
@@ -56,8 +56,8 @@ export async function GET() {
     console.error('❌ Database population failed:', error)
     return NextResponse.json({
       success: false,
-      error: error.message,
-      details: error.stack
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
 }

@@ -86,21 +86,37 @@ const estados: {
     bgColor: 'bg-purple-50 border-purple-200',
     description: 'Pendiente aprobación'
   },
-  { 
-    key: 'aprobado', 
-    label: 'Aprobado', 
-    icon: CheckCircle, 
-    color: 'text-green-600', 
+  {
+    key: 'aprobada',
+    label: 'Aprobada',
+    icon: CheckCircle,
+    color: 'text-green-600',
     bgColor: 'bg-green-50 border-green-200',
     description: 'Lista aprobada'
   },
-  { 
-    key: 'rechazado', 
-    label: 'Rechazado', 
-    icon: Ban, 
-    color: 'text-red-600', 
+  {
+    key: 'rechazada',
+    label: 'Rechazada',
+    icon: Ban,
+    color: 'text-red-600',
     bgColor: 'bg-red-50 border-red-200',
     description: 'Requiere correcciones'
+  },
+  {
+    key: 'enviada',
+    label: 'Enviada',
+    icon: ArrowRight,
+    color: 'text-cyan-600',
+    bgColor: 'bg-cyan-50 border-cyan-200',
+    description: 'Lista enviada'
+  },
+  {
+    key: 'completada',
+    label: 'Completada',
+    icon: CheckCircle,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50 border-emerald-200',
+    description: 'Lista completada'
   },
 ]
 
@@ -114,12 +130,14 @@ const flujoEstados: Record<
   }
 > = {
   borrador: { siguiente: 'por_revisar', roles: ['proyectos', 'admin'] },
-  por_revisar: { siguiente: 'por_cotizar', rechazar: 'rechazado', roles: ['coordinador', 'admin'] },
-  por_cotizar: { siguiente: 'por_validar', rechazar: 'rechazado', roles: ['logistico', 'admin'] },
-  por_validar: { siguiente: 'por_aprobar', rechazar: 'rechazado', roles: ['gestor', 'admin'] },
-  por_aprobar: { siguiente: 'aprobado', rechazar: 'rechazado', roles: ['gerente', 'admin'] },
-  aprobado: { rechazar: 'rechazado', roles: ['gerente', 'admin'] },
-  rechazado: { reset: 'borrador', roles: ['proyectos', 'admin'] },
+  enviada: { siguiente: 'por_revisar', roles: ['coordinador', 'admin'] },
+  por_revisar: { siguiente: 'por_cotizar', rechazar: 'rechazada', roles: ['coordinador', 'admin'] },
+  por_cotizar: { siguiente: 'por_validar', rechazar: 'rechazada', roles: ['logistico', 'admin'] },
+  por_validar: { siguiente: 'por_aprobar', rechazar: 'rechazada', roles: ['gestor', 'admin'] },
+  por_aprobar: { siguiente: 'aprobada', rechazar: 'rechazada', roles: ['gerente', 'admin'] },
+  aprobada: { siguiente: 'completada', rechazar: 'rechazada', roles: ['gerente', 'admin'] },
+  rechazada: { reset: 'borrador', roles: ['proyectos', 'admin'] },
+  completada: { roles: ['gerente', 'admin'] },
 }
 
 interface Props {

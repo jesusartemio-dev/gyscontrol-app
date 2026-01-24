@@ -43,7 +43,7 @@ export async function POST(
     // Obtener datos del catálogo
     const catalogoEquipo = await prisma.catalogoEquipo.findUnique({
       where: { id: catalogoEquipoId },
-      include: { categoria: true, unidad: true }
+      include: { categoriaEquipo: true, unidad: true }
     })
 
     if (!catalogoEquipo) {
@@ -65,7 +65,7 @@ export async function POST(
         catalogoEquipoId,
         codigo: catalogoEquipo.codigo,
         descripcion: catalogoEquipo.descripcion,
-        categoria: catalogoEquipo.categoria.nombre,
+        categoria: catalogoEquipo.categoriaEquipo.nombre,
         unidad: catalogoEquipo.unidad.nombre,
         marca: catalogoEquipo.marca,
         precioInterno,

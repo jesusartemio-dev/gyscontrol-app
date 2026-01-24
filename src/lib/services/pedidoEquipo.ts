@@ -34,8 +34,14 @@ export interface PedidoEquipoFilters {
 export async function getPedidoEquipos(proyectoId: string): Promise<PedidoEquipo[] | null> {
   try {
     const res = await fetch(`${BASE_URL}?proyectoId=${proyectoId}`)
-    if (!res.ok) throw new Error('Error al obtener pedidos')
-    return await res.json()
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      console.error('❌ getPedidoEquipos - Error response:', res.status, errorData)
+      throw new Error(errorData.error || 'Error al obtener pedidos')
+    }
+    const data = await res.json()
+    console.log(`✅ getPedidoEquipos - Proyecto ${proyectoId}: ${data?.length || 0} pedidos encontrados`)
+    return data
   } catch (error) {
     console.error('❌ getPedidoEquipos:', error)
     return null

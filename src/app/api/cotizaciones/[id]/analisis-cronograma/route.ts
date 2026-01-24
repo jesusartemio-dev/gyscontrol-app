@@ -98,9 +98,9 @@ export async function GET(
         cliente: {
           select: { nombre: true }
         },
-        servicios: {
+        cotizacionServicio: {
           include: {
-            items: true
+            cotizacionServicioItem: true
           }
         }
       }
@@ -115,7 +115,7 @@ export async function GET(
 
     // Análisis de categorías
     const categoriasMap = new Map<string, ServicioAnalisis[]>()
-    const servicios = (cotizacion as any).servicios || []
+    const servicios = (cotizacion as any).cotizacionServicio || []
 
     servicios.forEach((servicio: any) => {
       const categoriaNombre = servicio.categoria || 'Sin Categoría'

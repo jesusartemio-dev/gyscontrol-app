@@ -3,9 +3,9 @@ import type { TipoDependencia } from '@prisma/client'
 
 // 📊 Obtener dependencias de una cotización
 export const getDependenciasCotizacion = async (cotizacionId: string) => {
-  return await prisma.cotizacionDependenciaTarea.findMany({
+  return await prisma.cotizacionDependenciasTarea.findMany({
     where: {
-      tareaOrigen: { cotizacion_actividad: { cotizacion_edt: { cotizacionId } } }
+      tareaOrigen: { cotizacionActividad: { cotizacionEdt: { cotizacionId } } }
     },
     include: {
       tareaOrigen: { select: { id: true, nombre: true, fechaInicio: true, fechaFin: true, horasEstimadas: true } },
@@ -17,13 +17,13 @@ export const getDependenciasCotizacion = async (cotizacionId: string) => {
 // 📊 Obtener dependencias de una tarea específica
 export const getDependenciasByTarea = async (tareaId: string) => {
   const [dependenciasOrigen, dependenciasDestino] = await Promise.all([
-    prisma.cotizacionDependenciaTarea.findMany({
+    prisma.cotizacionDependenciasTarea.findMany({
       where: { tareaOrigenId: tareaId },
       include: {
         tareaDependiente: { select: { id: true, nombre: true } }
       }
     }),
-    prisma.cotizacionDependenciaTarea.findMany({
+    prisma.cotizacionDependenciasTarea.findMany({
       where: { tareaDependienteId: tareaId },
       include: {
         tareaOrigen: { select: { id: true, nombre: true } }
@@ -181,7 +181,7 @@ export const detectarCiclos = async (cotizacionId: string): Promise<string[]> =>
 // 🎯 Identificar hitos automáticamente
 export const identificarHitosAutomaticamente = async (cotizacionId: string) => {
   const tareas = await prisma.cotizacionTarea.findMany({
-    where: { cotizacion_actividad: { cotizacion_edt: { cotizacionId } } }
+    where: { cotizacionActividad: { cotizacionEdt: { cotizacionId } } }
   })
 
   const hitosIdentificados: string[] = []
@@ -212,9 +212,9 @@ async function propagarCambioArriba(tareaId: string, nuevaFechaInicio: Date, cal
     const tarea = await prisma.cotizacionTarea.findUnique({
       where: { id: tareaId },
       include: {
-        cotizacion_actividad: {
+        cotizacionActividad: {
           include: {
-            cotizacion_edt: {
+            cotizacionEdt: {
               include: {
                 cotizacionFase: true
               }
@@ -224,10 +224,10 @@ async function propagarCambioArriba(tareaId: string, nuevaFechaInicio: Date, cal
       }
     })
 
-    if (!tarea || !tarea.cotizacion_actividad) return correcciones
+    if (!tarea || !tarea.cotizacionActividad) return correcciones
 
-    const actividad = tarea.cotizacion_actividad
-    const edt = actividad.cotizacion_edt
+    const actividad = tarea.cotizacionActividad
+    const edt = actividad.cotizacionEdt
     const fase = edt?.cotizacionFase
 
     // 1. Actualizar actividad padre si la tarea cambió su fecha de inicio
@@ -344,16 +344,16 @@ async function propagarCambioAbajo(tareaId: string, nuevaFechaInicio: Date, cale
     const tarea = await prisma.cotizacionTarea.findUnique({
       where: { id: tareaId },
       include: {
-        cotizacion_actividad: true
+        cotizacionActividad: true
       }
     })
 
-    if (!tarea || !tarea.cotizacion_actividad) return correcciones
+    if (!tarea || !tarea.cotizacionActividad) return correcciones
 
     // Obtener todas las tareas hermanas (mismo padre)
     const tareasHermanas = await prisma.cotizacionTarea.findMany({
       where: {
-        cotizacionActividadId: tarea.cotizacion_actividad.id,
+        cotizacionActividadId: tarea.cotizacionActividad.id,
         id: { not: tareaId } // Excluir la tarea actual
       },
       orderBy: { fechaInicio: 'asc' }
@@ -412,7 +412,7 @@ async function propagarCambioTransversal(cotizacionId: string, tareaId: string, 
 
   try {
     // Obtener todas las dependencias donde otras tareas dependen de esta
-    const dependenciasSalientes = await prisma.cotizacionDependenciaTarea.findMany({
+    const dependenciasSalientes = await prisma.cotizacionDependenciasTarea.findMany({
       where: { tareaOrigenId: tareaId },
       include: {
         tareaDependiente: true

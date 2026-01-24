@@ -80,7 +80,7 @@ export default function CompararCotizacionesPorItem() {
             <tbody>
               {cotizaciones.map((c) => (
                 <tr key={c.id} className="border-t">
-                  <td className="p-2">{c.cotizacion.proveedor.nombre}</td>
+                  <td className="p-2">{c.cotizacionProveedor?.proveedor?.nombre || 'Desconocido'}</td>
                   <td className="p-2 text-right">$ {c.precioUnitario?.toFixed(2)}</td>
                   <td className="p-2 text-right">{c.cantidad}</td>
                   <td className="p-2 text-right">{c.tiempoEntrega}</td>

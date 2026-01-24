@@ -115,7 +115,7 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
     const matchesSearch = !equipoSearch || 
       item.codigo?.toLowerCase().includes(equipoSearch.toLowerCase()) ||
       item.descripcion?.toLowerCase().includes(equipoSearch.toLowerCase())
-    const matchesCategoria = equipoCategoria === 'all' || item.catalogoEquipo?.categoria?.nombre === equipoCategoria
+    const matchesCategoria = equipoCategoria === 'all' || item.catalogoEquipo?.categoriaEquipo?.nombre === equipoCategoria
     return matchesSearch && matchesCategoria
   })
   
@@ -145,7 +145,7 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
     totalEquipos,
     equiposValidados: equiposData.items?.filter(item => item.verificado).length || 0,
     montoTotal: equiposData.items?.reduce((sum, item) => sum + ((item.precioElegido || 0) * item.cantidad), 0) || 0,
-    categorias: [...new Set(equiposData.items?.map(item => item.catalogoEquipo?.categoria?.nombre || 'Sin categoría') || [])].length,
+    categorias: [...new Set(equiposData.items?.map(item => item.catalogoEquipo?.categoriaEquipo?.nombre || 'Sin categoría') || [])].length,
     alertasCoherencia: equiposData.items?.filter(item => item.estado === 'por_revisar').length || 0,
     progresoValidacion: totalEquipos > 0 ? 
       Math.round(((equiposData.items?.filter(item => item.verificado).length || 0) / totalEquipos) * 100) : 0
@@ -196,7 +196,7 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
             <div>
               <div className="flex items-center space-x-3">
                 <h1 className="text-3xl font-bold tracking-tight">{lista.nombre}</h1>
-                <Badge variant={lista.estado === 'aprobado' ? 'default' : 
+                <Badge variant={lista.estado === 'aprobada' ? 'default' :
                               lista.estado === 'borrador' ? 'secondary' : 'outline'}>
                   {lista.estado}
                 </Badge>
@@ -288,7 +288,7 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              <Badge variant={lista.estado === 'aprobado' ? 'default' : 'secondary'}>
+              <Badge variant={lista.estado === 'aprobada' ? 'default' : 'secondary'}>
                 {lista.estado}
               </Badge>
             </div>
@@ -497,7 +497,7 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
                    <div>
                      <label className="text-sm font-medium text-muted-foreground">Estado</label>
                      <p className="text-sm">
-                       <Badge variant={lista.estado === 'aprobado' ? 'default' : 'secondary'}>
+                       <Badge variant={lista.estado === 'aprobada' ? 'default' : 'secondary'}>
                          {lista.estado}
                        </Badge>
                      </p>

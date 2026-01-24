@@ -61,17 +61,18 @@ export default function CotizacionServicioSelect({ grupoId, onCreated }: Props) 
             catalogoId={item.id}
             nombre={item.nombre}
             descripcion={item.descripcion}
-            categoria={item.categoria.nombre}
+            edtId={item.edt?.id || item.categoriaId || ''}
+            edtNombre={item.edt?.nombre}
             formula={item.formula}
             horaBase={item.horaBase}
             horaRepetido={item.horaRepetido}
             horaUnidad={item.horaUnidad}
             horaFijo={item.horaFijo}
-            unidadServicioNombre={item.unidadServicio.nombre}
-            recursoNombre={item.recurso.nombre}
-            unidadServicioId={item.unidadServicio.id}
-            recursoId={item.recurso.id}
-            costoHora={item.recurso.costoHora}
+            unidadServicioNombre={item.unidadServicio?.nombre || ''}
+            recursoNombre={item.recurso?.nombre || ''}
+            unidadServicioId={item.unidadServicio?.id || ''}
+            recursoId={item.recurso?.id || ''}
+            costoHora={item.recurso?.costoHora || 0}
             onCreated={onCreated}
           />
         ))}

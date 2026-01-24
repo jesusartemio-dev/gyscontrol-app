@@ -27,13 +27,13 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         nombre: true,
-        categoriaServicio: {
+        edt: {
           select: {
             id: true,
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -59,8 +59,8 @@ export async function GET(request: NextRequest) {
       data: edts.map(edt => ({
         id: edt.id,
         nombre: edt.nombre,
-        categoriaNombre: edt.categoriaServicio?.nombre || 'Sin categoría',
-        responsableNombre: edt.responsable?.name || 'Sin responsable',
+        categoriaNombre: edt.edt?.nombre || 'Sin categoría',
+        responsableNombre: edt.user?.name || 'Sin responsable',
         horasPlan: Number(edt.horasPlan) || 0,
         horasReales: Number(edt.horasReales) || 0,
         estado: edt.estado,

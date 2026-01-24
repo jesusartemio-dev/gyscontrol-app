@@ -152,14 +152,14 @@ export default function DashboardFinanciero({
   const calcularMetricasFinancieras = (listas: any[], pedidos: any[], proyectos: any[]): MetricaFinanciera[] => {
     // 💰 Presupuesto total estimado (basado en listas)
     const presupuestoEstimado = listas.reduce((sum, lista) => {
-      return sum + (lista.items?.reduce((itemSum: number, item: any) => {
+      return sum + (lista.listaEquipoItem?.reduce((itemSum: number, item: any) => {
         return itemSum + ((item.catalogoEquipo?.precioVenta || 0) * item.cantidad)
       }, 0) || 0)
     }, 0)
     
     // 💸 Gasto real (basado en pedidos)
     const gastoReal = pedidos.reduce((sum, pedido) => {
-      return sum + (pedido.items?.reduce((itemSum: number, item: any) => {
+      return sum + (pedido.pedidoEquipoItem?.reduce((itemSum: number, item: any) => {
         return itemSum + ((item.catalogoEquipo?.precioVenta || 0) * item.cantidad)
       }, 0) || 0)
     }, 0)
@@ -243,7 +243,7 @@ export default function DashboardFinanciero({
     ]
     
     const montoTotal = listas.reduce((sum, lista) => {
-      return sum + (lista.items?.reduce((itemSum: number, item: any) => {
+      return sum + (lista.listaEquipoItem?.reduce((itemSum: number, item: any) => {
         return itemSum + ((item.catalogoEquipo?.precioVenta || 0) * item.cantidad)
       }, 0) || 0)
     }, 0)

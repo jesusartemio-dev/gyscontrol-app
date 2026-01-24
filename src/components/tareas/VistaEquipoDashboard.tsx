@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,13 +14,13 @@ import {
   CheckCircle,
   AlertTriangle,
   Target,
-  BarChart3,
-  UserCheck
+  RefreshCw
 } from 'lucide-react'
 
 interface MiembroEquipo {
   id: string
   nombre: string
+  email?: string
   rol: string
   avatar?: string
   horasRegistradas: number
@@ -29,25 +29,51 @@ interface MiembroEquipo {
   tareasAsignadas: number
   eficiencia: number
   estado: 'activo' | 'inactivo' | 'vacaciones'
-  ultimoRegistro: Date
+  ultimoRegistro: Date | null
+  proyectosActivos?: number
 }
 
 interface ProyectoEquipo {
+  id?: string
   nombre: string
+  codigo?: string
   miembros: MiembroEquipo[]
   horasTotales: number
   tareasTotales: number
+  tareasCompletadas?: number
   progresoGeneral: number
+}
+
+interface MetricasEquipo {
+  totalMiembros: number
+  miembrosActivos: number
+  horasTotalesEquipo: number
+  tareasTotalesEquipo: number
+  tareasCompletadasEquipo: number
+  eficienciaPromedio: number
+  progresoPromedioProyectos: number
+  proyectosActivos: number
+}
+
+interface AlertasEquipo {
+  bajoRendimiento: number
+  sinRegistroReciente: number
 }
 
 interface VistaEquipoDashboardProps {
   proyectos?: ProyectoEquipo[]
+  metricas?: MetricasEquipo | null
+  alertas?: AlertasEquipo | null
   loading?: boolean
+  onRecargar?: () => void
 }
 
-export function VistaEquipoDashboard({ 
+export function VistaEquipoDashboard({
   proyectos = [],
-  loading = false
+  metricas = null,
+  alertas = null,
+  loading = false,
+  onRecargar
 }: VistaEquipoDashboardProps) {
   const [vistaActiva, setVistaActiva] = useState('general')
 
@@ -65,17 +91,6 @@ export function VistaEquipoDashboard({
     if (eficiencia >= 75) return 'text-yellow-600'
     return 'text-red-600'
   }
-
-  const miembrosBajoRendimiento = proyectos.flatMap(p =>
-    p.miembros.filter(m => m.eficiencia < 70)
-  )
-
-  const miembrosSinRegistro = proyectos.flatMap(p =>
-    p.miembros.filter(m => {
-      const diasSinRegistro = Math.floor((Date.now() - m.ultimoRegistro.getTime()) / (1000 * 60 * 60 * 24))
-      return diasSinRegistro > 3
-    })
-  )
 
   if (loading) {
     return (
@@ -97,19 +112,49 @@ export function VistaEquipoDashboard({
     )
   }
 
+  // Si no hay proyectos, mostrar mensaje
+  if (proyectos.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-lg text-gray-600 mb-4">No hay miembros de equipo con tareas asignadas</p>
+            {onRecargar && (
+              <Button variant="outline" onClick={onRecargar}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Actualizar
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {/* Boton actualizar */}
+      {onRecargar && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={onRecargar}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Actualizar
+          </Button>
+        </div>
+      )}
+
       {/* Alertas */}
-      {(miembrosBajoRendimiento.length > 0 || miembrosSinRegistro.length > 0) && (
+      {(alertas?.bajoRendimiento || 0) > 0 || (alertas?.sinRegistroReciente || 0) > 0 ? (
         <div className="space-y-3">
-          {miembrosBajoRendimiento.length > 0 && (
+          {(alertas?.bajoRendimiento || 0) > 0 && (
             <Card className="border-orange-200 bg-orange-50">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="h-5 w-5 text-orange-600" />
                   <div>
                     <p className="font-medium text-orange-900">
-                      {miembrosBajoRendimiento.length} miembro{miembrosBajoRendimiento.length > 1 ? 's' : ''} con rendimiento bajo
+                      {alertas?.bajoRendimiento} miembro{(alertas?.bajoRendimiento || 0) > 1 ? 's' : ''} con rendimiento bajo
                     </p>
                     <p className="text-sm text-orange-700">
                       Eficiencia por debajo del 70%
@@ -120,17 +165,17 @@ export function VistaEquipoDashboard({
             </Card>
           )}
 
-          {miembrosSinRegistro.length > 0 && (
+          {(alertas?.sinRegistroReciente || 0) > 0 && (
             <Card className="border-red-200 bg-red-50">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-red-600" />
                   <div>
                     <p className="font-medium text-red-900">
-                      {miembrosSinRegistro.length} miembro{miembrosSinRegistro.length > 1 ? 's' : ''} sin registro reciente
+                      {alertas?.sinRegistroReciente} miembro{(alertas?.sinRegistroReciente || 0) > 1 ? 's' : ''} sin registro reciente
                     </p>
                     <p className="text-sm text-red-700">
-                      Más de 3 días sin registrar horas
+                      Mas de 3 dias sin registrar horas
                     </p>
                   </div>
                 </div>
@@ -138,7 +183,7 @@ export function VistaEquipoDashboard({
             </Card>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Vista por proyectos */}
       <Tabs value={vistaActiva} onValueChange={setVistaActiva}>
@@ -149,7 +194,7 @@ export function VistaEquipoDashboard({
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
-          {/* Estadísticas generales */}
+          {/* Estadisticas generales */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-4">
@@ -157,7 +202,7 @@ export function VistaEquipoDashboard({
                   <Users className="h-8 w-8 text-blue-500" />
                   <div>
                     <p className="text-2xl font-bold">
-                      {proyectos.reduce((sum, p) => sum + p.miembros.length, 0)}
+                      {metricas?.totalMiembros || proyectos.reduce((sum, p) => sum + p.miembros.length, 0)}
                     </p>
                     <p className="text-sm text-gray-600">Miembros Totales</p>
                   </div>
@@ -171,7 +216,7 @@ export function VistaEquipoDashboard({
                   <Clock className="h-8 w-8 text-green-500" />
                   <div>
                     <p className="text-2xl font-bold">
-                      {proyectos.reduce((sum, p) => sum + p.horasTotales, 0)}h
+                      {metricas?.horasTotalesEquipo || proyectos.reduce((sum, p) => sum + p.horasTotales, 0)}h
                     </p>
                     <p className="text-sm text-gray-600">Horas Totales</p>
                   </div>
@@ -185,7 +230,7 @@ export function VistaEquipoDashboard({
                   <CheckCircle className="h-8 w-8 text-purple-500" />
                   <div>
                     <p className="text-2xl font-bold">
-                      {proyectos.reduce((sum, p) => sum + p.tareasTotales, 0)}
+                      {metricas?.tareasTotalesEquipo || proyectos.reduce((sum, p) => sum + p.tareasTotales, 0)}
                     </p>
                     <p className="text-sm text-gray-600">Tareas Totales</p>
                   </div>
@@ -199,7 +244,7 @@ export function VistaEquipoDashboard({
                   <TrendingUp className="h-8 w-8 text-orange-500" />
                   <div>
                     <p className="text-2xl font-bold">
-                      {Math.round(proyectos.reduce((sum, p) => sum + p.progresoGeneral, 0) / proyectos.length)}%
+                      {metricas?.progresoPromedioProyectos || (proyectos.length > 0 ? Math.round(proyectos.reduce((sum, p) => sum + p.progresoGeneral, 0) / proyectos.length) : 0)}%
                     </p>
                     <p className="text-sm text-gray-600">Progreso Promedio</p>
                   </div>
@@ -211,10 +256,12 @@ export function VistaEquipoDashboard({
           {/* Proyectos overview */}
           <div className="space-y-4">
             {proyectos.map((proyecto, index) => (
-              <Card key={index}>
+              <Card key={proyecto.id || index}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{proyecto.nombre}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {proyecto.codigo ? `${proyecto.codigo} - ` : ''}{proyecto.nombre}
+                    </CardTitle>
                     <Badge variant="outline">
                       {proyecto.progresoGeneral}% completado
                     </Badge>
@@ -232,7 +279,9 @@ export function VistaEquipoDashboard({
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Tareas</p>
-                      <p className="font-medium">{proyecto.tareasTotales}</p>
+                      <p className="font-medium">
+                        {proyecto.tareasCompletadas || 0} / {proyecto.tareasTotales}
+                      </p>
                     </div>
                   </div>
                   <Progress value={proyecto.progresoGeneral} className="h-2" />
@@ -244,130 +293,156 @@ export function VistaEquipoDashboard({
 
         <TabsContent value="proyectos" className="space-y-6">
           {proyectos.map((proyecto, index) => (
-            <Card key={index}>
+            <Card key={proyecto.id || index}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Target className="h-5 w-5" />
-                  {proyecto.nombre}
+                  {proyecto.codigo ? `${proyecto.codigo} - ` : ''}{proyecto.nombre}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {proyecto.miembros.map((miembro) => (
-                  <div key={miembro.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={miembro.avatar} />
-                          <AvatarFallback>
-                            {miembro.nombre.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{miembro.nombre}</p>
-                          <p className="text-sm text-gray-600">{miembro.rol}</p>
+                {proyecto.miembros.length > 0 ? (
+                  proyecto.miembros.map((miembro) => (
+                    <div key={miembro.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={miembro.avatar} />
+                            <AvatarFallback>
+                              {miembro.nombre.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{miembro.nombre}</p>
+                            <p className="text-sm text-gray-600">{miembro.rol}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getEstadoColor(miembro.estado)}>
+                            {miembro.estado}
+                          </Badge>
+                          <Badge variant="outline" className={getEficienciaColor(miembro.eficiencia)}>
+                            {miembro.eficiencia}% eficiencia
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getEstadoColor(miembro.estado)}>
-                          {miembro.estado}
-                        </Badge>
-                        <Badge variant="outline" className={getEficienciaColor(miembro.eficiencia)}>
-                          {miembro.eficiencia}% eficiencia
-                        </Badge>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
-                      <div>
-                        <p className="text-sm text-gray-600">Horas</p>
-                        <p className="font-medium">
-                          {miembro.horasRegistradas}h / {miembro.horasObjetivo}h
-                        </p>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
+                        <div>
+                          <p className="text-sm text-gray-600">Horas</p>
+                          <p className="font-medium">
+                            {miembro.horasRegistradas}h / {miembro.horasObjetivo}h
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Tareas</p>
+                          <p className="font-medium">
+                            {miembro.tareasCompletadas} / {miembro.tareasAsignadas}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Ultimo Registro</p>
+                          <p className="font-medium">
+                            {miembro.ultimoRegistro
+                              ? new Date(miembro.ultimoRegistro).toLocaleDateString()
+                              : 'Sin registro'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Eficiencia</p>
+                          <p className={`font-medium ${getEficienciaColor(miembro.eficiencia)}`}>
+                            {miembro.eficiencia}%
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Tareas</p>
-                        <p className="font-medium">
-                          {miembro.tareasCompletadas} / {miembro.tareasAsignadas}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Último Registro</p>
-                        <p className="font-medium">
-                          {new Date(miembro.ultimoRegistro).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Eficiencia</p>
-                        <p className={`font-medium ${getEficienciaColor(miembro.eficiencia)}`}>
-                          {miembro.eficiencia}%
-                        </p>
-                      </div>
-                    </div>
 
-                    <Progress value={miembro.eficiencia} className="h-2" />
+                      <Progress value={miembro.eficiencia} className="h-2" />
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No hay miembros asignados a este proyecto
                   </div>
-                ))}
+                )}
               </CardContent>
             </Card>
           ))}
         </TabsContent>
 
         <TabsContent value="miembros" className="space-y-4">
-          {proyectos.flatMap(p => p.miembros).map((miembro) => (
-            <Card key={miembro.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={miembro.avatar} />
-                      <AvatarFallback>
-                        {miembro.nombre.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
+          {proyectos.flatMap(p => p.miembros).length > 0 ? (
+            // Eliminar duplicados por id
+            Array.from(
+              new Map(
+                proyectos.flatMap(p => p.miembros).map(m => [m.id, m])
+              ).values()
+            ).map((miembro) => (
+              <Card key={miembro.id}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={miembro.avatar} />
+                        <AvatarFallback>
+                          {miembro.nombre.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-semibold">{miembro.nombre}</h3>
+                        <p className="text-sm text-gray-600">{miembro.rol}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-2xl font-bold">{miembro.eficiencia}%</p>
+                        <p className="text-sm text-gray-600">Eficiencia</p>
+                      </div>
+                      <Badge className={getEstadoColor(miembro.estado)}>
+                        {miembro.estado}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <div>
-                      <h3 className="font-semibold">{miembro.nombre}</h3>
-                      <p className="text-sm text-gray-600">{miembro.rol}</p>
+                      <p className="text-sm text-gray-600">Horas Registradas</p>
+                      <p className="font-medium">{miembro.horasRegistradas}h</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Tareas Completadas</p>
+                      <p className="font-medium">{miembro.tareasCompletadas}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Ultimo Registro</p>
+                      <p className="font-medium">
+                        {miembro.ultimoRegistro
+                          ? new Date(miembro.ultimoRegistro).toLocaleDateString()
+                          : 'Sin registro'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Proyectos Activos</p>
+                      <p className="font-medium">
+                        {miembro.proyectosActivos || proyectos.filter(p => p.miembros.some(m => m.id === miembro.id)).length}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-2xl font-bold">{miembro.eficiencia}%</p>
-                      <p className="text-sm text-gray-600">Eficiencia</p>
-                    </div>
-                    <Badge className={getEstadoColor(miembro.estado)}>
-                      {miembro.estado}
-                    </Badge>
-                  </div>
+                  <Progress value={miembro.eficiencia} className="h-2 mt-4" />
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <div className="text-center text-gray-500">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p>No hay miembros para mostrar</p>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Horas Registradas</p>
-                    <p className="font-medium">{miembro.horasRegistradas}h</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Tareas Completadas</p>
-                    <p className="font-medium">{miembro.tareasCompletadas}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Último Registro</p>
-                    <p className="font-medium">
-                      {new Date(miembro.ultimoRegistro).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Proyecto</p>
-                    <p className="font-medium">
-                      {proyectos.find(p => p.miembros.some(m => m.id === miembro.id))?.nombre}
-                    </p>
-                  </div>
-                </div>
-
-                <Progress value={miembro.eficiencia} className="h-2 mt-4" />
               </CardContent>
             </Card>
-          ))}
+          )}
         </TabsContent>
       </Tabs>
     </div>

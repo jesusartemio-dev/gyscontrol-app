@@ -89,8 +89,8 @@ export async function POST(
       }
 
       // ✅ Validar que todos los servicios tienen recursos y unidades válidos
-      for (const servicio of plantilla.servicios) {
-        for (const item of servicio.items) {
+      for (const servicio of plantilla.plantillaServicio) {
+        for (const item of servicio.plantillaServicioItem) {
           if (!item.recursoId || !item.unidadServicioId) {
             return NextResponse.json({
               error: `El servicio '${item.nombre}' tiene referencias inválidas. Recurso: ${item.recursoId}, Unidad: ${item.unidadServicioId}`
@@ -99,124 +99,141 @@ export async function POST(
         }
       }
 
+      const createData = {
+        id: `cot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        clienteId: oportunidad.clienteId,
+        comercialId: oportunidad.comercialId,
+        plantillaId: plantillaId,
+        codigo: codigo,
+        numeroSecuencia: nextSequence,
+        nombre: nombre || oportunidad.nombre,
+        totalEquiposInterno: plantilla.totalEquiposInterno,
+        totalEquiposCliente: plantilla.totalEquiposCliente,
+        totalServiciosInterno: plantilla.totalServiciosInterno,
+        totalServiciosCliente: plantilla.totalServiciosCliente,
+        totalGastosInterno: plantilla.totalGastosInterno,
+        totalGastosCliente: plantilla.totalGastosCliente,
+        totalInterno: plantilla.totalInterno,
+        totalCliente: plantilla.totalCliente,
+        descuento: plantilla.descuento,
+        grandTotal: plantilla.grandTotal,
+        updatedAt: new Date(),
+        // Campos CRM
+        prioridadCrm: oportunidad.prioridad,
+        probabilidadCierre: oportunidad.probabilidad,
+        competencia: oportunidad.competencia,
+        fechaUltimoContacto: oportunidad.fechaUltimoContacto,
+        retroalimentacionCliente: oportunidad.notas,
+        // ✅ Copiar equipos con sus items
+        cotizacionEquipo: {
+          create: plantilla.plantillaEquipo.map(e => ({
+            id: `cot-eq-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            nombre: e.nombre,
+            descripcion: e.descripcion,
+            subtotalInterno: e.subtotalInterno,
+            subtotalCliente: e.subtotalCliente,
+            updatedAt: new Date(),
+            cotizacionEquipoItem: {
+              create: e.plantillaEquipoItem.map(item => ({
+                id: `cot-eq-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                catalogoEquipoId: item.catalogoEquipoId,
+                codigo: item.codigo,
+                descripcion: item.descripcion,
+                categoria: item.categoria,
+                unidad: item.unidad,
+                marca: item.marca,
+                cantidad: item.cantidad,
+                precioInterno: item.precioInterno,
+                precioCliente: item.precioCliente,
+                costoInterno: item.costoInterno,
+                costoCliente: item.costoCliente,
+                updatedAt: new Date(),
+              })),
+            },
+          })),
+        },
+        // ✅ Copiar servicios con sus items
+        cotizacionServicio: {
+          create: plantilla.plantillaServicio.map((s) => ({
+            id: `cot-srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            nombre: s.nombre,
+            categoria: s.categoria,
+            subtotalInterno: Number(s.subtotalInterno),
+            subtotalCliente: Number(s.subtotalCliente),
+            updatedAt: new Date(),
+            cotizacionServicioItem: {
+              create: s.plantillaServicioItem.map(item => ({
+                id: `cot-srv-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                catalogoServicioId: item.catalogoServicioId,
+                categoria: item.categoria,
+                unidadServicioId: item.unidadServicioId, // ✅ Campo obligatorio
+                recursoId: item.recursoId, // ✅ Campo obligatorio
+                unidadServicioNombre: item.unidadServicioNombre,
+                recursoNombre: item.recursoNombre,
+                formula: item.formula,
+                horaBase: item.horaBase,
+                horaRepetido: item.horaRepetido,
+                horaUnidad: item.horaUnidad,
+                horaFijo: item.horaFijo,
+                costoHora: item.costoHora,
+                nombre: item.nombre,
+                descripcion: item.descripcion,
+                cantidad: item.cantidad,
+                horaTotal: item.horaTotal,
+                factorSeguridad: item.factorSeguridad || 1.0, // ✅ Valor por defecto
+                margen: item.margen,
+                costoInterno: item.costoInterno,
+                costoCliente: item.costoCliente,
+                updatedAt: new Date(),
+              })),
+            },
+          })),
+        },
+        // ✅ Copiar gastos con sus items
+        cotizacionGasto: {
+          create: plantilla.plantillaGasto.map(g => ({
+            id: `cot-gasto-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            nombre: g.nombre,
+            subtotalInterno: g.subtotalInterno,
+            subtotalCliente: g.subtotalCliente,
+            updatedAt: new Date(),
+            cotizacionGastoItem: {
+              create: g.plantillaGastoItem.map(item => ({
+                id: `cot-gasto-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                nombre: item.nombre,
+                descripcion: item.descripcion,
+                cantidad: item.cantidad,
+                precioUnitario: item.precioUnitario,
+                factorSeguridad: item.factorSeguridad,
+                margen: item.margen,
+                costoInterno: item.costoInterno,
+                costoCliente: item.costoCliente,
+                updatedAt: new Date(),
+              })),
+            },
+          })),
+        },
+      }
+      nuevaCotizacion = await prisma.cotizacion.create({
+        data: createData as any
+      })
+    } else {
+      // Crear cotización básica
       nuevaCotizacion = await prisma.cotizacion.create({
         data: {
+          id: `cot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           clienteId: oportunidad.clienteId,
           comercialId: oportunidad.comercialId,
-          plantillaId: plantillaId,
           codigo: codigo,
           numeroSecuencia: nextSequence,
           nombre: nombre || oportunidad.nombre,
-          totalEquiposInterno: plantilla.totalEquiposInterno,
-          totalEquiposCliente: plantilla.totalEquiposCliente,
-          totalServiciosInterno: plantilla.totalServiciosInterno,
-          totalServiciosCliente: plantilla.totalServiciosCliente,
-          totalGastosInterno: plantilla.totalGastosInterno,
-          totalGastosCliente: plantilla.totalGastosCliente,
-          totalInterno: plantilla.totalInterno,
-          totalCliente: plantilla.totalCliente,
-          descuento: plantilla.descuento,
-          grandTotal: plantilla.grandTotal,
           // Campos CRM
           prioridadCrm: oportunidad.prioridad,
           probabilidadCierre: oportunidad.probabilidad,
           competencia: oportunidad.competencia,
           fechaUltimoContacto: oportunidad.fechaUltimoContacto,
           retroalimentacionCliente: oportunidad.notas,
-          // ✅ Copiar equipos con sus items
-          cotizacionEquipo: {
-            create: plantilla.plantillaEquipo.map(e => ({
-              nombre: e.nombre,
-              descripcion: e.descripcion,
-              subtotalInterno: e.subtotalInterno,
-              subtotalCliente: e.subtotalCliente,
-              cotizacionEquipoItem: {
-                create: e.plantillaEquipoItem.map(item => ({
-                  catalogoEquipoId: item.catalogoEquipoId,
-                  codigo: item.codigo,
-                  descripcion: item.descripcion,
-                  categoria: item.categoria,
-                  unidad: item.unidad,
-                  marca: item.marca,
-                  cantidad: item.cantidad,
-                  precioInterno: item.precioInterno,
-                  precioCliente: item.precioCliente,
-                  costoInterno: item.costoInterno,
-                  costoCliente: item.costoCliente,
-                })),
-              },
-            })),
-          },
-          // ✅ Copiar servicios con sus items
-          cotizacionServicio: {
-            create: plantilla.plantillaServicio.map((s) => ({
-              nombre: s.nombre,
-              categoria: s.categoria,
-              subtotalInterno: Number(s.subtotalInterno),
-              subtotalCliente: Number(s.subtotalCliente),
-              cotizacionServicioItem: {
-                create: s.plantillaServicioItem.map(item => ({
-                  catalogoServicioId: item.catalogoServicioId,
-                  categoria: item.categoria,
-                  unidadServicioId: item.unidadServicioId, // ✅ Campo obligatorio
-                  recursoId: item.recursoId, // ✅ Campo obligatorio
-                  unidadServicioNombre: item.unidadServicioNombre,
-                  recursoNombre: item.recursoNombre,
-                  formula: item.formula,
-                  horaBase: item.horaBase,
-                  horaRepetido: item.horaRepetido,
-                  horaUnidad: item.horaUnidad,
-                  horaFijo: item.horaFijo,
-                  costoHora: item.costoHora,
-                  nombre: item.nombre,
-                  descripcion: item.descripcion,
-                  cantidad: item.cantidad,
-                  horaTotal: item.horaTotal,
-                  factorSeguridad: item.factorSeguridad || 1.0, // ✅ Valor por defecto
-                  margen: item.margen,
-                  costoInterno: item.costoInterno,
-                  costoCliente: item.costoCliente,
-                })),
-              },
-            })),
-          },
-          // ✅ Copiar gastos con sus items
-          cotizacionGasto: {
-            create: plantilla.plantillaGasto.map(g => ({
-              nombre: g.nombre,
-              subtotalInterno: g.subtotalInterno,
-              subtotalCliente: g.subtotalCliente,
-              cotizacionGastoItem: {
-                create: g.plantillaGastoItem.map(item => ({
-                  nombre: item.nombre,
-                  descripcion: item.descripcion,
-                  cantidad: item.cantidad,
-                  precioUnitario: item.precioUnitario,
-                  factorSeguridad: item.factorSeguridad,
-                  margen: item.margen,
-                  costoInterno: item.costoInterno,
-                  costoCliente: item.costoCliente,
-                })),
-              },
-            })),
-          },
-        }
-      })
-    } else {
-      // Crear cotización básica
-      nuevaCotizacion = await prisma.cotizacion.create({
-        data: {
-          clienteId: oportunidad.clienteId,
-          comercialId: oportunidad.comercialId,
-          codigo: codigo,
-          numeroSecuencia: nextSequence,
-          nombre: nombre || oportunidad.nombre,
-          // Campos CRM
-          prioridadCrm: oportunidad.prioridad,
-          probabilidadCierre: oportunidad.probabilidad,
-          competencia: oportunidad.competencia,
-          fechaUltimoContacto: oportunidad.fechaUltimoContacto,
-          retroalimentacionCliente: oportunidad.notas
+          updatedAt: new Date()
         }
       })
     }

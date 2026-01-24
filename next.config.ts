@@ -175,6 +175,77 @@ const nextConfig: NextConfig = {
         destination: '/proyectos',
         permanent: true,
       },
+
+      // 🔄 Redirects para reorganizacion de menus (Mi Trabajo + Supervision)
+      // Horas Hombre -> Mi Trabajo
+      {
+        source: '/horas-hombre/timesheet',
+        destination: '/mi-trabajo/timesheet',
+        permanent: true,
+      },
+      {
+        source: '/horas-hombre/historial',
+        destination: '/mi-trabajo/progreso',
+        permanent: true,
+      },
+      {
+        source: '/horas-hombre/registro',
+        destination: '/mi-trabajo/timesheet',
+        permanent: true,
+      },
+      {
+        source: '/horas-hombre/:path*',
+        destination: '/mi-trabajo/timesheet',
+        permanent: true,
+      },
+      // Horas Hombre -> Supervision
+      {
+        source: '/horas-hombre/supervision',
+        destination: '/supervision/equipo',
+        permanent: true,
+      },
+      {
+        source: '/horas-hombre/resumen',
+        destination: '/supervision/resumen',
+        permanent: true,
+      },
+      {
+        source: '/horas-hombre/analisis-transversal',
+        destination: '/supervision/analisis-edt',
+        permanent: true,
+      },
+      {
+        source: '/horas-hombre/analisis-edt',
+        destination: '/supervision/analisis-edt',
+        permanent: true,
+      },
+      // Tareas -> Mi Trabajo / Supervision
+      {
+        source: '/tareas/asignadas',
+        destination: '/mi-trabajo/tareas',
+        permanent: true,
+      },
+      {
+        source: '/tareas/progreso',
+        destination: '/mi-trabajo/progreso',
+        permanent: true,
+      },
+      {
+        source: '/tareas/equipo',
+        destination: '/supervision/equipo',
+        permanent: true,
+      },
+      // Proyectos/Tareas -> Supervision/Tareas
+      {
+        source: '/proyectos/tareas',
+        destination: '/supervision/tareas',
+        permanent: true,
+      },
+      {
+        source: '/proyectos/tareas/:path*',
+        destination: '/supervision/tareas',
+        permanent: true,
+      },
     ];
   },
   

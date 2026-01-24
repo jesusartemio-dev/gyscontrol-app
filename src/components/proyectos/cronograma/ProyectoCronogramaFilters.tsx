@@ -38,7 +38,7 @@ export interface FilterState {
   estado: string[]
   prioridad: string[]
   responsableId: string
-  categoriaServicioId: string
+  edtId: string
   // zona: string // TODO: lógica de zonas eliminada tras migración a cronograma de 5 niveles (sin zonas)
   fechaDesde: string
   fechaHasta: string
@@ -72,7 +72,7 @@ export function ProyectoCronogramaFilters({
     estado: [],
     prioridad: [],
     responsableId: '',
-    categoriaServicioId: '',
+    edtId: '',
     // zona: '', // TODO: lógica de zonas eliminada tras migración a cronograma de 5 niveles (sin zonas)
     fechaDesde: '',
     fechaHasta: '',
@@ -110,7 +110,7 @@ export function ProyectoCronogramaFilters({
       estado: [],
       prioridad: [],
       responsableId: '',
-      categoriaServicioId: '',
+      edtId: '',
       // zona: '', // TODO: lógica de zonas eliminada tras migración a cronograma de 5 niveles (sin zonas)
       fechaDesde: '',
       fechaHasta: '',
@@ -128,7 +128,7 @@ export function ProyectoCronogramaFilters({
     if (filters.estado.length > 0) count++
     if (filters.prioridad.length > 0) count++
     if (filters.responsableId) count++
-    if (filters.categoriaServicioId) count++
+    if (filters.edtId) count++
     // if (filters.zona) count++ // TODO: lógica de zonas eliminada tras migración a cronograma de 5 niveles (sin zonas)
     if (filters.fechaDesde) count++
     if (filters.fechaHasta) count++
@@ -266,8 +266,8 @@ export function ProyectoCronogramaFilters({
             <div className="space-y-2">
               <Label htmlFor="categoria">Categoría de Servicio</Label>
               <Select
-                value={filters.categoriaServicioId}
-                onValueChange={(value) => handleFilterChange('categoriaServicioId', value)}
+                value={filters.edtId}
+                onValueChange={(value) => handleFilterChange('edtId', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar categoría" />

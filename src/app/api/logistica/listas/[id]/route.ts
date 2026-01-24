@@ -16,16 +16,18 @@ export async function GET(
   try {
     const { id } = await context.params
 
-    const lista = await prisma.listaEquipo.findUnique({
+    const listaRaw = await prisma.listaEquipo.findUnique({
       where: { id },
       include: {
         proyecto: true,
-        items: {
+        user: true,
+        listaEquipoItem: {
           include: {
+            user: true,
             proveedor: true,
-            cotizaciones: {
+            cotizacionProveedorItems: {
               include: {
-                cotizacion: {
+                cotizacionProveedor: {
                   select: {
                     id: true,
                     codigo: true,
@@ -35,27 +37,47 @@ export async function GET(
                   },
                 },
               },
-              orderBy: { codigo: 'asc' },
+              orderBy: { precioUnitario: 'asc' },
             },
-            pedidos: {
+            pedidoEquipoItem: {
               include: {
-                pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+                pedidoEquipo: true // ✅ Incluir relación al pedido padre para acceder al código
               }
             },
             proyectoEquipoItem: {
-              include: { proyectoEquipo: true },
+              include: { proyectoEquipoCotizado: true },
             },
+            proyectoEquipoCotizado: true,
           },
           orderBy: { codigo: 'asc' },
         },
       },
     })
 
-    if (!lista) {
+    if (!listaRaw) {
       return NextResponse.json(
         { error: 'Lista no encontrada' },
         { status: 404 }
       )
+    }
+
+    // 🔄 Frontend compatibility mapping
+    const lista = {
+      ...listaRaw,
+      responsable: listaRaw.user,
+      items: listaRaw.listaEquipoItem?.map((item: any) => ({
+        ...item,
+        responsable: item.user,
+        cotizaciones: item.cotizacionProveedorItems?.map((cot: any) => ({
+          ...cot,
+          cotizacion: cot.cotizacionProveedor
+        })),
+        pedidos: item.pedidoEquipoItem?.map((ped: any) => ({
+          ...ped,
+          pedido: ped.pedidoEquipo
+        })),
+        proyectoEquipo: item.proyectoEquipoCotizado
+      }))
     }
 
     return NextResponse.json(lista)

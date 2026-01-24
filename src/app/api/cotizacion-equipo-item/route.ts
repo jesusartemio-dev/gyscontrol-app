@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { CotizacionEquipoItemPayload } from '@/types'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
+import { randomUUID } from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,7 +39,11 @@ export async function POST(req: NextRequest) {
 
     // ✅ Crear el ítem
     const nuevo = await prisma.cotizacionEquipoItem.create({
-      data,
+      data: {
+        id: randomUUID(),
+        ...data,
+        updatedAt: new Date(),
+      },
       select: {
         id: true,
         codigo: true,
@@ -70,6 +75,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(nuevo, { status: 201 })
   } catch (error) {
     console.error('❌ Error al crear ítem de cotización equipo:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+    return NextResponse.json({
+      error: 'Error interno del servidor',
+      details: errorMessage,
+      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : null
+    }, { status: 500 })
   }
 }

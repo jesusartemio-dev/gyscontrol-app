@@ -32,7 +32,7 @@ async function recalcularPadresPostOperacion(
   switch (nodeType) {
     case 'tarea':
       // Buscar la actividad padre de la tarea
-      const tarea = await prisma.proyecto_tarea.findUnique({
+      const tarea = await prisma.proyectoTarea.findUnique({
         where: { id: nodeId },
         select: { proyectoActividadId: true }
       })
@@ -282,7 +282,7 @@ export async function GET(
       }
     } else {
       // Si no hay EDT específico, filtrar por proyecto a través de EDTs
-      where.proyecto_edt = {
+      where.proyectoEdt = {
         proyectoId: id
       }
     }
@@ -291,17 +291,17 @@ export async function GET(
     const actividades = await prisma.proyectoActividad.findMany({
       where,
       include: {
-        proyecto_edt: {
+        proyectoEdt: {
           select: {
             id: true,
             nombre: true,
-            categoriaServicio: { select: { id: true, nombre: true } }
+            edt: { select: { id: true, nombre: true } }
           }
         },
-        proyecto_cronograma: {
+        proyectoCronograma: {
           select: { id: true, tipo: true, nombre: true }
         },
-        proyecto_tarea: {
+        proyectoTarea: {
           select: {
             id: true,
             nombre: true,
@@ -310,11 +310,11 @@ export async function GET(
           }
         },
         _count: {
-          select: { proyecto_tarea: true }
+          select: { proyectoTarea: true }
         }
       },
       orderBy: [
-        { proyecto_edt: { nombre: 'asc' } },
+        { proyectoEdt: { nombre: 'asc' } },
         { fechaInicioPlan: 'asc' }
       ]
     })
@@ -527,14 +527,14 @@ export async function POST(
         updatedAt: new Date()
       },
       include: {
-        proyecto_edt: {
+        proyectoEdt: {
           select: {
             id: true,
             nombre: true,
-            categoriaServicio: { select: { id: true, nombre: true } }
+            edt: { select: { id: true, nombre: true } }
           }
         },
-        proyecto_cronograma: {
+        proyectoCronograma: {
           select: { id: true, tipo: true, nombre: true }
         }
       }

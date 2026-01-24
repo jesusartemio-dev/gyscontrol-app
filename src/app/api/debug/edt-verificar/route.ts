@@ -50,8 +50,8 @@ export async function GET(request: NextRequest) {
     let proyectoEdts: Array<{
       id: string
       nombre: string
-      categoriaServicioId: string
-      categoriaServicio: { id: string; nombre: string }
+      edtId: string
+      edt: { id: string; nombre: string } | null
     }> = []
     if (cronogramaEjecucion) {
       proyectoEdts = await prisma.proyectoEdt.findMany({
@@ -62,8 +62,8 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           nombre: true,
-          categoriaServicioId: true,
-          categoriaServicio: {
+          edtId: true,
+          edt: {
             select: { id: true, nombre: true }
           }
         }
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
           nombre: true,
           proyectoId: true,
           proyectoCronogramaId: true,
-          categoriaServicio: {
+          edt: {
             select: { id: true, nombre: true }
           }
         }
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         nombre: true,
-        edtId: true
+        categoria: true
       }
     })
 

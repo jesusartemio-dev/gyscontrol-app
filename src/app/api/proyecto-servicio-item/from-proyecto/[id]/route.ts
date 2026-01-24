@@ -14,16 +14,16 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const { id } = await context.params
 
     const items = await prisma.proyectoServicioCotizadoItem.findMany({
-      where: { proyectoServicio: { proyectoId: id } },
+      where: { proyectoServicioCotizado: { proyectoId: id } },
       include: {
-        proyectoServicio: {
+        proyectoServicioCotizado: {
           include: {
-            responsable: true,
+            user: true,
           },
         },
         catalogoServicio: {
           include: {
-            categoria: true,
+            edt: true,
           },
         },
       },

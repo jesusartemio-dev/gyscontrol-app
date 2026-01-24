@@ -28,7 +28,7 @@ export async function DELETE(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -89,8 +89,8 @@ async function eliminarCronogramaCompleto(tx: any, cotizacionId: string): Promis
     // Obtener IDs de tareas de la cotización
     const tareaIds = await tx.cotizacionTarea.findMany({
       where: {
-        cotizacion_actividad: {
-          cotizacion_edt: { cotizacionId }
+        cotizacionActividad: {
+          cotizacionEdt: { cotizacionId }
         }
       },
       select: { id: true }
@@ -115,8 +115,8 @@ async function eliminarCronogramaCompleto(tx: any, cotizacionId: string): Promis
   try {
     await tx.cotizacionTarea.updateMany({
       where: {
-        cotizacion_actividad: {
-          cotizacion_edt: { cotizacionId }
+        cotizacionActividad: {
+          cotizacionEdt: { cotizacionId }
         }
       },
       data: { dependenciaId: null }
@@ -130,8 +130,8 @@ async function eliminarCronogramaCompleto(tx: any, cotizacionId: string): Promis
   console.log('🗑️ ELIMINACIÓN - Eliminando tareas')
   const tareas = await tx.cotizacionTarea.deleteMany({
     where: {
-      cotizacion_actividad: {
-        cotizacion_edt: { cotizacionId }
+      cotizacionActividad: {
+        cotizacionEdt: { cotizacionId }
       }
     }
   })
@@ -142,7 +142,7 @@ async function eliminarCronogramaCompleto(tx: any, cotizacionId: string): Promis
   console.log('🗑️ ELIMINACIÓN - Eliminando actividades')
   const actividades = await tx.cotizacionActividad.deleteMany({
     where: {
-      cotizacion_edt: { cotizacionId }
+      cotizacionEdt: { cotizacionId }
     }
   })
   actividadesEliminadas = actividades.count

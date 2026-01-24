@@ -115,13 +115,13 @@ export const VistaListas: React.FC<VistaListasProps> = ({
   // 📊 Calculate stats
   const stats: ListasStats = useMemo(() => {
     const total = filteredListas.length;
-    const aprobadas = filteredListas.filter(l => l.estado === 'aprobado').length;
+    const aprobadas = filteredListas.filter(l => l.estado === 'aprobada').length;
     const pendientes = filteredListas.filter(l => l.estado === 'por_revisar' || l.estado === 'por_cotizar' || l.estado === 'por_validar' || l.estado === 'por_aprobar').length;
-    const rechazadas = filteredListas.filter(l => l.estado === 'rechazado').length;
+    const rechazadas = filteredListas.filter(l => l.estado === 'rechazada').length;
     
     // ✅ Calcular montoTotal desde los items de cada lista usando calcularCostoItem
     const montoTotal = filteredListas.reduce((sum, lista) => {
-      const costoLista = lista.items?.reduce((itemSum, item) => {
+      const costoLista = lista.listaEquipoItem?.reduce((itemSum, item) => {
         return itemSum + calcularCostoItem(item);
       }, 0) || 0;
       return sum + costoLista;

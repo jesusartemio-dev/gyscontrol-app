@@ -28,7 +28,7 @@ export async function GET(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -86,7 +86,7 @@ export async function GET(
             progressPercentage: 0,
             status: edt.estado,
             data: {
-              categoriaServicio: edt.nombre,
+              edtNombre: edt.nombre,
               horasEstimadas: edt.horasEstimadas
             },
             metadata: {

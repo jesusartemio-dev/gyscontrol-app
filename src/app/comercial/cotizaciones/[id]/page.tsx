@@ -4,28 +4,21 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
-  ChevronRight,
-  Share2,
-  Download,
-  Edit,
   Package,
-  Wrench,
   DollarSign,
   Calendar,
   User,
   Building,
   FileText,
-  Loader2,
   AlertCircle,
-  Plus,
   Settings,
-  Home,
   CheckCircle,
-  Calculator,
   Truck,
   AlertTriangle,
-  Target
+  Target,
+  Eye
 } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   getCotizacionById,
   updateCotizacion
@@ -42,18 +35,12 @@ import {
   deleteCotizacionGasto,
   updateCotizacionGasto
 } from '@/lib/services/cotizacionGasto'
-import {
-  deleteCotizacionGastoItem,
-  updateCotizacionGastoItem
-} from '@/lib/services/cotizacionGastoItem'
-import { deleteCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { updateCotizacionEquipoItem } from '@/lib/services/cotizacionEquipoItem'
 
 // UI Components
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 
 
@@ -71,7 +58,6 @@ import CrmIntegrationNotification from '@/components/crm/CrmIntegrationNotificat
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
 import EstadoCotizacionToolbar from '@/components/cotizaciones/EstadoCotizacionToolbar'
 import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
-import { Eye } from 'lucide-react'
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
 
 // ✅ Nuevo componente para cronograma comercial
@@ -87,8 +73,7 @@ import type {
   CotizacionEquipoItem,
   CotizacionServicioItem,
   CotizacionGastoItem,
-  EstadoCotizacion,
-  EstadoOportunidad
+  EstadoCotizacion
 } from '@/types'
 
 // Utility functions
@@ -98,14 +83,6 @@ const formatCurrency = (amount: number): string => {
     currency: 'USD',
     minimumFractionDigits: 2
   }).format(amount)
-}
-
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('es-ES', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
 }
 
 const getStatusVariant = (estado: string): "default" | "secondary" | "outline" => {
@@ -132,9 +109,6 @@ export default function CotizacionDetallePage() {
   const [showImportModal, setShowImportModal] = useState<{ tipo: 'equipos' | 'servicios' | 'gastos' | null }>({ tipo: null })
   const [showCrearOportunidad, setShowCrearOportunidad] = useState(false)
   const [showCrmNotification, setShowCrmNotification] = useState(false)
-
-  const [selectedEquipoId, setSelectedEquipoId] = useState<string | null>(null)
-  const [creandoProyecto, setCreandoProyecto] = useState(false)
 
   // ✅ Estado para controlar la vista activa (Equipos, Servicios, Gastos, Cronograma, Cabecera, Exclusiones, Condiciones)
   const [activeSection, setActiveSection] = useState<'equipos' | 'servicios' | 'gastos' | 'cronograma' | 'cabecera' | 'exclusiones' | 'condiciones'>('equipos')
@@ -229,62 +203,98 @@ export default function CotizacionDetallePage() {
 
   const handleEliminarGrupoEquipo = async (id: string) => {
     if (!cotizacion) return
-    setRenderPDF(false)
-    await deleteCotizacionEquipo(id)
-    const equipos = cotizacion.equipos.filter(e => e.id !== id)
-    const nuevosTotales = actualizarTotalesParciales(equipos, cotizacion.servicios, cotizacion.gastos)
-    handleDataUpdate({ ...cotizacion, equipos, ...nuevosTotales })
-    await updateCotizacion(cotizacion.id, nuevosTotales)
-    setTimeout(() => setRenderPDF(true), 100)
+    try {
+      setRenderPDF(false)
+      await deleteCotizacionEquipo(id)
+      const equipos = cotizacion.equipos.filter(e => e.id !== id)
+      const nuevosTotales = actualizarTotalesParciales(equipos, cotizacion.servicios, cotizacion.gastos)
+      handleDataUpdate({ ...cotizacion, equipos, ...nuevosTotales })
+      await updateCotizacion(cotizacion.id, nuevosTotales)
+      toast.success('Sección de equipos eliminada')
+    } catch (error) {
+      console.error('Error al eliminar grupo de equipos:', error)
+      toast.error('Error al eliminar la sección')
+    } finally {
+      setTimeout(() => setRenderPDF(true), 100)
+    }
   }
 
   const handleEliminarGrupoServicio = async (id: string) => {
     if (!cotizacion) return
-    setRenderPDF(false)
-    await deleteCotizacionServicio(id)
-    const servicios = cotizacion.servicios.filter(s => s.id !== id)
-    const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, servicios, cotizacion.gastos)
-    handleDataUpdate({ ...cotizacion, servicios, ...nuevosTotales })
-    await updateCotizacion(cotizacion.id, nuevosTotales)
-    setTimeout(() => setRenderPDF(true), 100)
+    try {
+      setRenderPDF(false)
+      await deleteCotizacionServicio(id)
+      const servicios = cotizacion.servicios.filter(s => s.id !== id)
+      const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, servicios, cotizacion.gastos)
+      handleDataUpdate({ ...cotizacion, servicios, ...nuevosTotales })
+      await updateCotizacion(cotizacion.id, nuevosTotales)
+      toast.success('Sección de servicios eliminada')
+    } catch (error) {
+      console.error('Error al eliminar grupo de servicios:', error)
+      toast.error('Error al eliminar la sección')
+    } finally {
+      setTimeout(() => setRenderPDF(true), 100)
+    }
   }
 
   const handleEliminarGrupoGasto = async (id: string) => {
     if (!cotizacion) return
-    setRenderPDF(false)
-    await deleteCotizacionGasto(id)
-    const gastos = cotizacion.gastos.filter(g => g.id !== id)
-    const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, cotizacion.servicios, gastos)
-    handleDataUpdate({ ...cotizacion, gastos, ...nuevosTotales })
-    await updateCotizacion(cotizacion.id, nuevosTotales)
-    setTimeout(() => setRenderPDF(true), 100)
+    try {
+      setRenderPDF(false)
+      await deleteCotizacionGasto(id)
+      const gastos = cotizacion.gastos.filter(g => g.id !== id)
+      const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, cotizacion.servicios, gastos)
+      handleDataUpdate({ ...cotizacion, gastos, ...nuevosTotales })
+      await updateCotizacion(cotizacion.id, nuevosTotales)
+      toast.success('Sección de gastos eliminada')
+    } catch (error) {
+      console.error('Error al eliminar grupo de gastos:', error)
+      toast.error('Error al eliminar la sección')
+    } finally {
+      setTimeout(() => setRenderPDF(true), 100)
+    }
   }
 
   const handleActualizarNombreEquipo = async (id: string, nuevo: string) => {
     if (!cotizacion) return
-    await updateCotizacionEquipo(id, { nombre: nuevo })
-    handleDataUpdate({
-      ...cotizacion,
-      equipos: cotizacion.equipos.map(e => e.id === id ? { ...e, nombre: nuevo } : e)
-    })
+    try {
+      await updateCotizacionEquipo(id, { nombre: nuevo })
+      handleDataUpdate({
+        ...cotizacion,
+        equipos: cotizacion.equipos.map(e => e.id === id ? { ...e, nombre: nuevo } : e)
+      })
+    } catch (error) {
+      console.error('Error al actualizar nombre de equipo:', error)
+      toast.error('Error al actualizar el nombre')
+    }
   }
 
   const handleActualizarNombreServicio = async (id: string, nuevo: string) => {
     if (!cotizacion) return
-    await updateCotizacionServicio(id, { categoria: nuevo })
-    handleDataUpdate({
-      ...cotizacion,
-      servicios: cotizacion.servicios.map(s => s.id === id ? { ...s, categoria: nuevo } : s)
-    })
+    try {
+      await updateCotizacionServicio(id, { nombre: nuevo })
+      handleDataUpdate({
+        ...cotizacion,
+        servicios: cotizacion.servicios.map(s => s.id === id ? { ...s, nombre: nuevo } : s)
+      })
+    } catch (error) {
+      console.error('Error al actualizar nombre de servicio:', error)
+      toast.error('Error al actualizar el nombre')
+    }
   }
 
   const handleActualizarNombreGasto = async (id: string, nuevo: string) => {
     if (!cotizacion) return
-    await updateCotizacionGasto(id, { nombre: nuevo })
-    handleDataUpdate({
-      ...cotizacion,
-      gastos: cotizacion.gastos.map(g => g.id === id ? { ...g, nombre: nuevo } : g)
-    })
+    try {
+      await updateCotizacionGasto(id, { nombre: nuevo })
+      handleDataUpdate({
+        ...cotizacion,
+        gastos: cotizacion.gastos.map(g => g.id === id ? { ...g, nombre: nuevo } : g)
+      })
+    } catch (error) {
+      console.error('Error al actualizar nombre de gasto:', error)
+      toast.error('Error al actualizar el nombre')
+    }
   }
 
   // Loading state with skeleton
@@ -451,261 +461,137 @@ export default function CotizacionDetallePage() {
   const totalEquipos = cotizacion.equipos?.length || 0
   const totalServicios = cotizacion.servicios?.length || 0
   const totalGastos = cotizacion.gastos?.length || 0
-  const totalItems = 
-    (cotizacion.equipos?.reduce((acc, e) => acc + (e.items?.length || 0), 0) || 0) +
-    (cotizacion.servicios?.reduce((acc, s) => acc + (s.items?.length || 0), 0) || 0) +
-    (cotizacion.gastos?.reduce((acc, g) => acc + (g.items?.length || 0), 0) || 0)
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0, 0, 0.2, 1] as const }}
-      className="container mx-auto p-6 space-y-6"
+      className="container mx-auto p-4 sm:p-6"
     >
-      {/* Breadcrumb Navigation */}
-      <motion.nav 
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5, delay: 0.1, ease: [0, 0, 0.2, 1] as const }}
-        className="flex items-center space-x-2 text-sm text-muted-foreground mb-6"
-      >
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => router.push('/comercial/cotizaciones')}
-          className="p-0 h-auto font-normal"
-        >
-          Cotizaciones
-        </Button>
-        <ChevronRight className="h-4 w-4" />
-        <span className="font-medium text-foreground">{cotizacion.nombre}</span>
-      </motion.nav>
-
-      {/* Header Section with Quick Stats */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+      {/* Header Compacto */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
-        className="mb-8"
+        transition={{ duration: 0.4 }}
+        className="mb-4"
       >
-        <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 sm:gap-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 leading-tight">{cotizacion.nombre}</h1>
-                  
-                  {/* 🏷️ Quote Code */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-mono text-sm bg-muted px-3 py-1 rounded-md border">
-                      {cotizacion.codigo || 'Sin código'}
-                    </span>
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <Badge variant={getStatusVariant(cotizacion.estado)} className="text-sm font-medium w-fit">
-                      {cotizacion.estado}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground hidden sm:inline">•</span>
-                    <span className="text-sm text-muted-foreground">{formatDate(cotizacion.createdAt)}</span>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                      <Building className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{cotizacion.cliente?.nombre || 'Cliente no especificado'}</p>
-                      <p className="text-xs text-muted-foreground">Cliente</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
-                      <User className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{cotizacion.comercial?.nombre || 'Comercial no asignado'}</p>
-                      <p className="text-xs text-muted-foreground">Comercial</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 sm:col-span-2 lg:col-span-1">
-                    <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
-                      <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900">{formatCurrency(cotizacion.grandTotal || 0)}</p>
-                      <p className="text-xs text-muted-foreground">Total</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex flex-wrap gap-2 items-center">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="bg-white hover:bg-gray-50 flex-shrink-0 h-8 min-w-[120px] justify-center"
-                >
-                  <Share2 className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Compartir</span>
-                  <span className="sm:hidden">Share</span>
-                </Button>
-                {renderPDF && puedeRenderizarPDF && !updatingData && (
-                  <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/comercial/cotizaciones/${id}/preview`)}
-                      className="bg-white hover:bg-gray-50 flex-shrink-0 h-8 min-w-[120px] justify-center"
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      <span className="hidden sm:inline">Vista Previa</span>
-                      <span className="sm:hidden">Vista</span>
-                    </Button>
-                    <DescargarPDFButton cotizacion={cotizacion} />
-                  </div>
-                )}
-                {/* Botón para crear oportunidad CRM */}
+        {/* Breadcrumb + Info Principal */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/comercial/cotizaciones')}
+              className="p-0 h-auto text-sm text-muted-foreground hover:text-foreground"
+            >
+              ← Cotizaciones
+            </Button>
+            <span className="text-muted-foreground">/</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded border">
+                {cotizacion.codigo || 'Sin código'}
+              </span>
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate max-w-[300px]">
+                {cotizacion.nombre}
+              </h1>
+            </div>
+          </div>
+
+          {/* Acciones Principales */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {renderPDF && puedeRenderizarPDF && !updatingData && (
+              <>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowCrearOportunidad(true)}
-                  className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 flex-shrink-0 h-8 min-w-[120px] justify-center"
+                  onClick={() => router.push(`/comercial/cotizaciones/${id}/preview`)}
+                  className="h-8"
                 >
-                  <Target className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Crear Oportunidad</span>
-                  <span className="sm:hidden">CRM</span>
+                  <Eye className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Vista Previa</span>
                 </Button>
-
-                {cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada') && (
-                  <div className="flex-shrink-0">
-                    <CrearProyectoDesdeCotizacionModal
-                      cotizacion={cotizacion}
-                      buttonVariant="outline"
-                      buttonSize="sm"
-                      buttonClassName="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 h-8 min-w-[120px] justify-center"
-                    />
-                  </div>
-                )}
-                <Button 
-                  size="sm" 
-                  className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 h-8 min-w-[120px] justify-center"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Editar</span>
-                  <span className="sm:hidden">Edit</span>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Estado y Gestión - Sección Superior */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.3 }}
-        className="mb-8"
-      >
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Settings className="h-5 w-5 text-primary" />
-                Estado y Gestión
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <span className="text-sm font-medium text-muted-foreground">Estado Actual</span>
-                <Badge variant={getStatusVariant(cotizacion.estado)} className="text-sm w-fit">
-                  {cotizacion.estado}
-                </Badge>
-              </div>
-              <EstadoCotizacionToolbar
+                <DescargarPDFButton cotizacion={cotizacion} />
+              </>
+            )}
+            {cotizacion.oportunidadCrm ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/crm/${cotizacion.oportunidadCrm?.id}`)}
+                className="h-8 text-green-700 border-green-300 hover:bg-green-50"
+              >
+                <Target className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Oportunidad</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCrearOportunidad(true)}
+                className="h-8 text-blue-700 border-blue-300 hover:bg-blue-50"
+              >
+                <Target className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">+ CRM</span>
+              </Button>
+            )}
+            {cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada') && (
+              <CrearProyectoDesdeCotizacionModal
                 cotizacion={cotizacion}
-                onUpdated={(nuevoEstado) =>
-                  handleDataUpdate(cotizacion ? { ...cotizacion, estado: nuevoEstado as EstadoCotizacion } : cotizacion)
-                }
+                buttonVariant="outline"
+                buttonSize="sm"
+                buttonClassName="h-8 text-purple-700 border-purple-300 hover:bg-purple-50"
               />
-            </CardContent>
-          </Card>
-        </motion.div>
-      </motion.div>
-
-      {/* Estadísticas y Resumen Financiero - Mismo Nivel */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.4 }}
-        className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
-      >
-        {/* Estadísticas Rápidas */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-        >
-          <Card className="h-full">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Calculator className="h-5 w-5 text-primary" />
-                Estadísticas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="text-center p-3 bg-blue-50 rounded-lg">
-                  <div className="flex items-center justify-center mb-2">
-                    <Package className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
-                  </div>
-                  <p className="text-xl sm:text-2xl font-bold text-blue-600">{totalItems}</p>
-                  <p className="text-xs text-muted-foreground">Total Items</p>
-                </div>
-                <div className="text-center p-3 bg-green-50 rounded-lg">
-                  <div className="flex items-center justify-center mb-2">
-                    <Wrench className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
-                  </div>
-                  <p className="text-xl sm:text-2xl font-bold text-green-600">{totalEquipos + totalServicios + totalGastos}</p>
-                  <p className="text-xs text-muted-foreground">Secciones</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Resumen Financiero */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-        >
-          <div className="h-full">
-            <ResumenTotalesCotizacion cotizacion={cotizacion} />
+            )}
           </div>
-        </motion.div>
+        </div>
+
+        {/* Metadata compacta */}
+        <div className="flex items-center gap-3 flex-wrap text-sm">
+          <Badge variant={getStatusVariant(cotizacion.estado)} className="font-medium">
+            {cotizacion.estado}
+          </Badge>
+          <span className="text-muted-foreground">•</span>
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <Building className="h-3.5 w-3.5" />
+            {cotizacion.cliente?.nombre || 'Sin cliente'}
+          </span>
+          <span className="text-muted-foreground">•</span>
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <User className="h-3.5 w-3.5" />
+            {cotizacion.comercial?.nombre || 'Sin comercial'}
+          </span>
+          <span className="text-muted-foreground">•</span>
+          <span className="font-semibold text-gray-900">
+            {formatCurrency(cotizacion.grandTotal || 0)}
+          </span>
+          {cotizacion.oportunidadCrm && (
+            <>
+              <span className="text-muted-foreground">•</span>
+              <Badge
+                variant="outline"
+                className="text-xs bg-green-50 text-green-700 border-green-200 cursor-pointer hover:bg-green-100"
+                onClick={() => router.push(`/crm/${cotizacion.oportunidadCrm?.id}`)}
+              >
+                <Target className="h-3 w-3 mr-1" />
+                {cotizacion.oportunidadCrm.nombre}
+              </Badge>
+            </>
+          )}
+        </div>
       </motion.div>
 
-      {/* Navegación por Tabs */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.5 }}
-        className="mb-8"
-      >
-        <Card>
-          <CardContent className="pt-6">
+      {/* Layout de 2 Columnas: Contenido Principal + Sidebar */}
+      <div className="flex flex-col xl:flex-row gap-4">
+        {/* Columna Principal */}
+        <div className="flex-1 min-w-0">
+          {/* Navegación por Tabs - Sticky */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 mb-4 border-b"
+          >
             <div className="flex flex-wrap gap-2">
               <Button
                 variant={activeSection === 'equipos' ? 'default' : 'outline'}
@@ -771,375 +657,201 @@ export default function CotizacionDetallePage() {
                 Condiciones ({cotizacion.condiciones?.length || 0})
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          </motion.div>
 
-      {/* Secciones de Contenido */}
+          {/* Secciones de Contenido */}
       <div className="space-y-8">
         {/* Equipos */}
         {activeSection === 'equipos' && (
           <motion.section
             key={`equipos-${refreshKey}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.7 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-3"
           >
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Package className="h-5 w-5 text-primary" />
-                Secciones de Equipos
-                <Badge variant="secondary">{totalEquipos}</Badge>
-              </CardTitle>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <Button
-                  onClick={() => setShowEquipoModal(true)}
-                  size="sm"
-                  className="flex items-center gap-2 justify-start sm:justify-center bg-blue-600 hover:bg-blue-700"
-                >
-                  <Package className="h-4 w-4" />
-                  Nuevo Equipo
-                </Button>
-                <Button
-                  onClick={() => setShowImportModal({ tipo: 'equipos' })}
-                  size="sm"
-                  variant="outline"
-                  className="flex items-center gap-2 justify-start sm:justify-center"
-                >
-                  <Wrench className="h-4 w-4" />
-                  Importar Plantilla
-                </Button>
-              </div>
+            {/* Header inline compacto */}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowEquipoModal(true)}
+                size="sm"
+                variant="outline"
+                className="h-8"
+              >
+                <Package className="h-4 w-4 mr-1" />
+                Agregar Equipo
+              </Button>
+              <Button
+                onClick={() => setShowImportModal({ tipo: 'equipos' })}
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground h-8"
+              >
+                Importar Plantilla
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-4">
 
-            
+            {/* Contenido */}
             {cotizacion.equipos.length === 0 ? (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="text-center py-16"
-              >
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center">
-                      <Package className="h-12 w-12 text-blue-400" />
-                    </div>
-                  </div>
-                  <div className="relative w-24 h-24 mx-auto">
-                    <div className="absolute top-0 right-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Plus className="h-3 w-3 text-blue-600" />
-                    </div>
-                  </div>
+              <div className="flex items-center justify-center py-12 border-2 border-dashed rounded-lg bg-muted/30">
+                <div className="text-center">
+                  <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No hay equipos. Usa "Agregar Equipo" o "Importar Plantilla".</p>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">¡Comienza con tu primer equipo!</h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Los equipos son el corazón de tu cotización. Agrega especificaciones técnicas, 
-                  cantidades y precios para crear una propuesta profesional.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  💡 Tip: Usa el botón "Nuevo Equipo" arriba para agregar tu primera sección de equipos
-                </p>
-              </motion.div>
+              </div>
             ) : (
-              <motion.div 
-                className="space-y-4"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: { opacity: 0 },
-                  visible: {
-                    opacity: 1,
-                    transition: {
-                      staggerChildren: 0.1
-                    }
-                  }
-                }}
-              >
-                {cotizacion.equipos.map((e, index) => (
-                  <motion.div
-                    key={e.id}
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
-                  >
-                    <CotizacionEquipoAccordion
-                      key={`${e.id}-${e.items?.length || 0}`}
-                      equipo={e}
-                      onCreated={i => actualizarEquipo(e.id, items => [...items, i])}
-                      onMultipleCreated={newItems => actualizarEquipo(e.id, items => [...items, ...newItems])}
-                      onUpdated={async (item) => {
-                        // Update the item in the database
+              <div className="space-y-3">
+                {cotizacion.equipos.map((e) => (
+                  <CotizacionEquipoAccordion
+                    key={`${e.id}-${e.items?.length || 0}`}
+                    equipo={e}
+                    onCreated={i => actualizarEquipo(e.id, items => [...items, i])}
+                    onMultipleCreated={newItems => actualizarEquipo(e.id, items => [...items, ...newItems])}
+                    onUpdated={async (item) => {
+                      try {
                         await updateCotizacionEquipoItem(item.id, {
                           cantidad: item.cantidad,
                           costoInterno: item.costoInterno,
                           costoCliente: item.costoCliente
                         })
-                        // Update local state
                         actualizarEquipo(e.id, items => items.map(i => i.id === item.id ? item : i))
-                      }}
-                      onDeleted={id => actualizarEquipo(e.id, items => items.filter(i => i.id !== id))}
-                      onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)}
-                      onUpdatedNombre={nuevo => handleActualizarNombreEquipo(e.id, nuevo)}
-                    />
-                  </motion.div>
+                      } catch (error) {
+                        console.error('Error al actualizar item de equipo:', error)
+                        toast.error('Error al actualizar el item')
+                      }
+                    }}
+                    onDeleted={id => actualizarEquipo(e.id, items => items.filter(i => i.id !== id))}
+                    onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)}
+                    onUpdatedNombre={nuevo => handleActualizarNombreEquipo(e.id, nuevo)}
+                  />
                 ))}
-              </motion.div>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      </motion.section>
+          </motion.section>
         )}
 
         {/* Servicios */}
         {activeSection === 'servicios' && (
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-        >
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Settings className="h-5 w-5 text-primary" />
-                Secciones de Servicios
-                <Badge variant="secondary">{totalServicios}</Badge>
-              </CardTitle>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <Button
-                  onClick={() => setShowServicioModal(true)}
-                  size="sm"
-                  className="flex items-center gap-2 justify-start sm:justify-center bg-indigo-600 hover:bg-indigo-700"
-                >
-                  <Plus className="h-4 w-4" />
-                  Nuevo Servicio
-                </Button>
-                <Button
-                  onClick={() => setShowImportModal({ tipo: 'servicios' })}
-                  size="sm"
-                  variant="outline"
-                  className="flex items-center gap-2 justify-start sm:justify-center"
-                >
-                  <Truck className="h-4 w-4" />
-                  Importar Plantilla
-                </Button>
-              </div>
+          <motion.section
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-3"
+          >
+            {/* Header inline compacto */}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowServicioModal(true)}
+                size="sm"
+                variant="outline"
+                className="h-8"
+              >
+                <Settings className="h-4 w-4 mr-1" />
+                Agregar Servicio
+              </Button>
+              <Button
+                onClick={() => setShowImportModal({ tipo: 'servicios' })}
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground h-8"
+              >
+                Importar Plantilla
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-4">
+
+            {/* Contenido */}
             {cotizacion.servicios.length === 0 ? (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="text-center py-16"
-              >
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center">
-                      <Wrench className="h-12 w-12 text-indigo-400" />
-                    </div>
-                  </div>
-                  <div className="relative w-24 h-24 mx-auto">
-                    <div className="absolute top-0 right-0 w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <Plus className="h-3 w-3 text-indigo-600" />
-                    </div>
-                  </div>
+              <div className="flex items-center justify-center py-12 border-2 border-dashed rounded-lg bg-muted/30">
+                <div className="text-center">
+                  <Settings className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No hay servicios. Usa "Agregar Servicio" o "Importar Plantilla".</p>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Potencia tu cotización con servicios</h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Los servicios profesionales añaden valor a tu propuesta. Incluye instalación, 
-                  mantenimiento, consultoría y más para una oferta completa.
-                </p>
-                <div className="space-y-3">
-                  <Button
-                    onClick={() => setShowServicioModal(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Servicio
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    🔧 Tip: Los servicios suelen tener mejores márgenes de rentabilidad
-                  </p>
-                </div>
-              </motion.div>
+              </div>
             ) : (
-              <motion.div 
-                className="space-y-4"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: { opacity: 0 },
-                  visible: {
-                    opacity: 1,
-                    transition: {
-                      staggerChildren: 0.1
-                    }
-                  }
-                }}
-              >
-                {cotizacion.servicios.map((s, index) => (
-                  <motion.div
+              <div className="space-y-3">
+                {cotizacion.servicios.map((s) => (
+                  <CotizacionServicioAccordion
                     key={s.id}
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
-                  >
-                    <CotizacionServicioAccordion
-                      servicio={s}
-                      onCreated={i => actualizarServicio(s.id, items => [...items, i])}
-                      onMultipleCreated={newItems => actualizarServicio(s.id, items => [...items, ...newItems])}
-                      onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))}
-                      onDeleted={id => actualizarServicio(s.id, items => items.filter(i => i.id !== id))}
-                      onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)}
-                      onUpdatedNombre={nuevo => handleActualizarNombreServicio(s.id, nuevo)}
-                    />
-                  </motion.div>
+                    servicio={s}
+                    onCreated={i => actualizarServicio(s.id, items => [...items, i])}
+                    onMultipleCreated={newItems => actualizarServicio(s.id, items => [...items, ...newItems])}
+                    onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))}
+                    onDeleted={id => actualizarServicio(s.id, items => items.filter(i => i.id !== id))}
+                    onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)}
+                    onUpdatedNombre={nuevo => handleActualizarNombreServicio(s.id, nuevo)}
+                  />
                 ))}
-              </motion.div>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      </motion.section>
+          </motion.section>
         )}
 
         {/* Gastos */}
         {activeSection === 'gastos' && (
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.9 }}
-        >
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <DollarSign className="h-5 w-5 text-primary" />
-                Secciones de Gastos
-                <Badge variant="secondary">{totalGastos}</Badge>
-              </CardTitle>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <Button
-                  onClick={() => setShowForm(prev => ({ ...prev, gasto: !prev.gasto }))}
-                  size="sm"
-                  className="flex items-center gap-2 justify-start sm:justify-center"
-                >
-                  <Plus className="h-4 w-4" />
-                  Agregar Gasto
-                </Button>
-                <Button
-                  onClick={() => setShowImportModal({ tipo: 'gastos' })}
-                  size="sm"
-                  variant="outline"
-                  className="flex items-center gap-2 justify-start sm:justify-center"
-                >
-                  <DollarSign className="h-4 w-4" />
-                  Importar Plantilla
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-4">
-            {showForm.gasto && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
+          <motion.section
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-3"
+          >
+            {/* Header inline compacto */}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowForm(prev => ({ ...prev, gasto: !prev.gasto }))}
+                size="sm"
+                variant={showForm.gasto ? "default" : "outline"}
+                className="h-8"
               >
+                <DollarSign className="h-4 w-4 mr-1" />
+                {showForm.gasto ? 'Cancelar' : 'Agregar Gasto'}
+              </Button>
+              <Button
+                onClick={() => setShowImportModal({ tipo: 'gastos' })}
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground h-8"
+              >
+                Importar Plantilla
+              </Button>
+            </div>
+
+            {/* Formulario inline cuando está activo */}
+            {showForm.gasto && (
+              <div className="border rounded-lg p-4 bg-muted/30">
                 <CotizacionGastoForm
                   cotizacionId={cotizacion.id}
-                  onCreated={(nuevo) =>
+                  onCreated={(nuevo) => {
                     handleDataUpdate(cotizacion ? { ...cotizacion, gastos: [...cotizacion.gastos, { ...nuevo, items: [] }] } : cotizacion)
-                  }
+                    setShowForm(prev => ({ ...prev, gasto: false }))
+                  }}
                 />
-                <Separator className="my-4" />
-              </motion.div>
+              </div>
             )}
-            
-            {cotizacion.gastos.length === 0 ? (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="text-center py-16"
-              >
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center">
-                      <Truck className="h-12 w-12 text-orange-400" />
-                    </div>
-                  </div>
-                  <div className="relative w-24 h-24 mx-auto">
-                    <div className="absolute top-0 right-0 w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center">
-                      <Plus className="h-3 w-3 text-orange-600" />
-                    </div>
-                  </div>
+
+            {/* Contenido */}
+            {cotizacion.gastos.length === 0 && !showForm.gasto ? (
+              <div className="flex items-center justify-center py-12 border-2 border-dashed rounded-lg bg-muted/30">
+                <div className="text-center">
+                  <DollarSign className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No hay gastos. Usa "Agregar Gasto" para crear uno nuevo.</p>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Completa con gastos adicionales</h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  No olvides incluir gastos como transporte, logística, materiales auxiliares 
-                  y otros costos que aseguren la transparencia de tu propuesta.
-                </p>
-                <div className="space-y-3">
-                  <Button
-                    onClick={() => setShowForm(prev => ({ ...prev, gasto: true }))}
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar primer gasto
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    📦 Tip: Los gastos transparentes generan mayor confianza con el cliente
-                  </p>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div 
-                className="space-y-4"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: { opacity: 0 },
-                  visible: {
-                    opacity: 1,
-                    transition: {
-                      staggerChildren: 0.1
-                    }
-                  }
-                }}
-              >
-                {cotizacion.gastos.map((g, index) => (
-                  <motion.div
+              </div>
+            ) : cotizacion.gastos.length > 0 && (
+              <div className="space-y-3">
+                {cotizacion.gastos.map((g) => (
+                  <CotizacionGastoAccordion
                     key={g.id}
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
-                  >
-                    <CotizacionGastoAccordion
-                      gasto={g}
-                      onCreated={i => actualizarGasto(g.id, items => [...items, i])}
-                      onUpdated={item => actualizarGasto(g.id, items => items.map(i => i.id === item.id ? item : i))}
-                      onDeleted={id => actualizarGasto(g.id, items => items.filter(i => i.id !== id))}
-                      onDeletedGrupo={() => handleEliminarGrupoGasto(g.id)}
-                      onUpdatedNombre={nuevo => handleActualizarNombreGasto(g.id, nuevo)}
-                    />
-                  </motion.div>
+                    gasto={g}
+                    onCreated={i => actualizarGasto(g.id, items => [...items, i])}
+                    onUpdated={item => actualizarGasto(g.id, items => items.map(i => i.id === item.id ? item : i))}
+                    onDeleted={id => actualizarGasto(g.id, items => items.filter(i => i.id !== id))}
+                    onDeletedGrupo={() => handleEliminarGrupoGasto(g.id)}
+                    onUpdatedNombre={nuevo => handleActualizarNombreGasto(g.id, nuevo)}
+                  />
                 ))}
-              </motion.div>
+              </div>
             )}
-          </CardContent>
-        </Card>
-        </motion.section>
+          </motion.section>
         )}
 
         {/* Cronograma Comercial */}
@@ -1197,9 +909,43 @@ export default function CotizacionDetallePage() {
             />
           </motion.section>
         )}
+        </div>
+        </div>
+        {/* Fin Columna Principal */}
+
+        {/* Sidebar - Resumen Financiero y Estado (Sticky en desktop) */}
+        <motion.aside
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="xl:w-80 xl:flex-shrink-0"
+        >
+          <div className="xl:sticky xl:top-4 space-y-4">
+            {/* Resumen Financiero */}
+            <ResumenTotalesCotizacion cotizacion={cotizacion} />
+
+            {/* Estado y Gestión */}
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Estado</span>
+                  <Badge variant={getStatusVariant(cotizacion.estado)} className="text-sm">
+                    {cotizacion.estado}
+                  </Badge>
+                </div>
+                <EstadoCotizacionToolbar
+                  cotizacion={cotizacion}
+                  onUpdated={(nuevoEstado) =>
+                    handleDataUpdate(cotizacion ? { ...cotizacion, estado: nuevoEstado as EstadoCotizacion } : cotizacion)
+                  }
+                />
+              </CardContent>
+            </Card>
+
+          </div>
+        </motion.aside>
       </div>
-
-
+      {/* Fin Layout 2 Columnas */}
 
       {/* Modal para crear nueva sección de equipo */}
       <CotizacionEquipoModal

@@ -15,42 +15,51 @@ export async function recalcularTotalesCotizacion(id: string) {
   const cotizacion = await prisma.cotizacion.findUnique({
     where: { id },
     include: {
-      equipos: { include: { items: true } },
-      servicios: { include: { items: true } },
-      gastos: { include: { items: true } },
+      cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
+      cotizacionServicio: { include: { cotizacionServicioItem: true } },
+      cotizacionGasto: { include: { cotizacionGastoItem: true } },
     },
   })
 
   if (!cotizacion) throw new Error('Cotización no encontrada')
 
   const equiposActualizados = await Promise.all(
-    cotizacion.equipos.map(async (grupo) => {
-      const subtotales = calcularSubtotal(grupo.items)
+    cotizacion.cotizacionEquipo.map(async (grupo) => {
+      const subtotales = calcularSubtotal(grupo.cotizacionEquipoItem)
       await prisma.cotizacionEquipo.update({
         where: { id: grupo.id },
-        data: subtotales,
+        data: {
+          ...subtotales,
+          updatedAt: new Date(),
+        },
       })
       return subtotales
     })
   )
 
   const serviciosActualizados = await Promise.all(
-    cotizacion.servicios.map(async (grupo) => {
-      const subtotales = calcularSubtotal(grupo.items)
+    cotizacion.cotizacionServicio.map(async (grupo) => {
+      const subtotales = calcularSubtotal(grupo.cotizacionServicioItem)
       await prisma.cotizacionServicio.update({
         where: { id: grupo.id },
-        data: subtotales,
+        data: {
+          ...subtotales,
+          updatedAt: new Date(),
+        },
       })
       return subtotales
     })
   )
 
   const gastosActualizados = await Promise.all(
-    cotizacion.gastos.map(async (grupo) => {
-      const subtotales = calcularSubtotal(grupo.items)
+    cotizacion.cotizacionGasto.map(async (grupo) => {
+      const subtotales = calcularSubtotal(grupo.cotizacionGastoItem)
       await prisma.cotizacionGasto.update({
         where: { id: grupo.id },
-        data: subtotales,
+        data: {
+          ...subtotales,
+          updatedAt: new Date(),
+        },
       })
       return subtotales
     })
@@ -78,7 +87,8 @@ export async function recalcularTotalesCotizacion(id: string) {
       totalGastosCliente,
       totalInterno,
       totalCliente,
-      grandTotal
+      grandTotal,
+      updatedAt: new Date(),
     },
   })
 

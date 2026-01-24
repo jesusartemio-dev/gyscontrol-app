@@ -86,7 +86,25 @@ export async function POST(
       )
     }
 
-    // ✅ Validar límites por tipo de cronograma
+    // ✅ Validar límites por tipo de cronograma: MÁXIMO 1 POR TIPO
+
+    // Validar comercial: máximo 1
+    if (validatedData.tipo === 'comercial') {
+      const existingComercial = await prisma.proyectoCronograma.count({
+        where: {
+          proyectoId: id,
+          tipo: 'comercial'
+        }
+      })
+      if (existingComercial > 0) {
+        return NextResponse.json(
+          { error: 'Ya existe un cronograma comercial para este proyecto. Solo se permite uno.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validar planificación: máximo 1
     if (validatedData.tipo === 'planificacion') {
       const existingPlanificacion = await prisma.proyectoCronograma.count({
         where: {
@@ -96,12 +114,13 @@ export async function POST(
       })
       if (existingPlanificacion > 0) {
         return NextResponse.json(
-          { error: 'Ya existe un cronograma de planificación para este proyecto' },
+          { error: 'Ya existe un cronograma de planificación para este proyecto. Solo se permite uno.' },
           { status: 400 }
         )
       }
     }
 
+    // Validar ejecución: máximo 1 y requiere baseline
     if (validatedData.tipo === 'ejecucion') {
       // Verificar que existe un baseline antes de crear ejecución
       const baselineExists = await prisma.proyectoCronograma.findFirst({
@@ -138,13 +157,13 @@ export async function POST(
       const cronogramaOrigen = await prisma.proyectoCronograma.findUnique({
         where: { id: validatedData.copiarDesdeId },
         include: {
-          fases: {
+          proyectoFase: {
             include: {
-              edts: {
+              proyectoEdt: {
                 include: {
-                  proyecto_actividad: {
+                  proyectoActividad: {
                     include: {
-                      proyecto_tarea: true
+                      proyectoTarea: true
                     }
                   }
                 }
@@ -161,25 +180,27 @@ export async function POST(
         )
       }
 
-      console.log('Copiando cronograma desde:', cronogramaOrigen.nombre, 'con', cronogramaOrigen.fases.length, 'fases')
+      console.log('Copiando cronograma desde:', cronogramaOrigen.nombre, 'con', cronogramaOrigen.proyectoFase.length, 'fases')
 
       // Log detallado de la estructura
       console.log('Estructura del cronograma origen:', {
-        fases: cronogramaOrigen.fases.length,
-        edts: cronogramaOrigen.fases.reduce((acc, f) => acc + f.edts.length, 0),
-        actividades: cronogramaOrigen.fases.reduce((acc, f) => acc + f.edts.reduce((acc2, e) => acc2 + e.proyecto_actividad.length, 0), 0),
-        tareas: cronogramaOrigen.fases.reduce((acc, f) => acc + f.edts.reduce((acc2, e) => acc2 + e.proyecto_actividad.reduce((acc3, a) => acc3 + a.proyecto_tarea.length, 0), 0), 0)
+        fases: cronogramaOrigen.proyectoFase.length,
+        edts: cronogramaOrigen.proyectoFase.reduce((acc: number, f: any) => acc + f.proyectoEdt.length, 0),
+        actividades: cronogramaOrigen.proyectoFase.reduce((acc: number, f: any) => acc + f.proyectoEdt.reduce((acc2: number, e: any) => acc2 + e.proyectoActividad.length, 0), 0),
+        tareas: cronogramaOrigen.proyectoFase.reduce((acc: number, f: any) => acc + f.proyectoEdt.reduce((acc2: number, e: any) => acc2 + e.proyectoActividad.reduce((acc3: number, a: any) => acc3 + a.proyectoTarea.length, 0), 0), 0)
       })
 
       // Crear el nuevo cronograma
       const nuevoCronograma = await prisma.proyectoCronograma.create({
         data: {
+          id: crypto.randomUUID(),
           proyectoId: id,
           tipo: validatedData.tipo,
           nombre: validatedData.nombre,
           copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId,
           esBaseline: false,
-          version: 1
+          version: 1,
+          updatedAt: new Date()
         }
       })
 
@@ -190,11 +211,12 @@ export async function POST(
       let tareasCopiadas = 0
 
       try {
-        for (const faseOrigen of cronogramaOrigen.fases) {
+        for (const faseOrigen of cronogramaOrigen.proyectoFase) {
           console.log('Creando fase:', faseOrigen.nombre)
 
           const nuevaFase = await prisma.proyectoFase.create({
             data: {
+              id: crypto.randomUUID(),
               proyectoId: id,
               proyectoCronogramaId: nuevoCronograma.id,
               nombre: faseOrigen.nombre,
@@ -202,39 +224,42 @@ export async function POST(
               orden: faseOrigen.orden,
               fechaInicioPlan: faseOrigen.fechaInicioPlan,
               fechaFinPlan: faseOrigen.fechaFinPlan,
-              estado: faseOrigen.estado
+              estado: faseOrigen.estado,
+              updatedAt: new Date()
             }
           })
           fasesCopiadas++
           console.log('Fase creada:', nuevaFase.id)
 
-          for (const edtOrigen of faseOrigen.edts) {
+          for (const edtOrigen of faseOrigen.proyectoEdt) {
             console.log('Creando EDT:', edtOrigen.nombre)
 
             const nuevoEdt = await prisma.proyectoEdt.create({
               data: {
+                id: crypto.randomUUID(),
                 proyectoId: id,
                 proyectoFaseId: nuevaFase.id,
                 proyectoCronogramaId: nuevoCronograma.id,
                 nombre: edtOrigen.nombre,
                 descripcion: edtOrigen.descripcion,
-                categoriaServicioId: edtOrigen.categoriaServicioId,
+                edtId: (edtOrigen as any).edtId || null,
                 fechaInicioPlan: edtOrigen.fechaInicioPlan,
                 fechaFinPlan: edtOrigen.fechaFinPlan,
                 horasPlan: edtOrigen.horasPlan,
                 prioridad: edtOrigen.prioridad,
                 orden: edtOrigen.orden,
-                estado: edtOrigen.estado
+                estado: edtOrigen.estado,
+                updatedAt: new Date()
               }
             })
             edtsCopiados++
             console.log('EDT creado:', nuevoEdt.id)
 
-            for (const actividadOrigen of edtOrigen.proyecto_actividad) {
+            for (const actividadOrigen of edtOrigen.proyectoActividad) {
               console.log('Creando actividad:', actividadOrigen.nombre)
 
               const nuevaActividad = await prisma.$queryRaw`
-                INSERT INTO "proyecto_actividad" (
+                INSERT INTO "proyectoActividad" (
                   "id",
                   "proyectoEdtId",
                   "proyectoCronogramaId",
@@ -270,7 +295,7 @@ export async function POST(
               actividadesCopiadas++
               console.log('Actividad creada:', nuevaActividad.id)
 
-              for (const tareaOrigen of actividadOrigen.proyecto_tarea) {
+              for (const tareaOrigen of actividadOrigen.proyectoTarea) {
                 console.log('Creando tarea:', tareaOrigen.nombre)
 
                 await prisma.$queryRaw`
@@ -344,15 +369,21 @@ export async function POST(
     }
 
     // ✅ Crear el cronograma
+    const createData = {
+      id: crypto.randomUUID(),
+      proyectoId: id,
+      tipo: validatedData.tipo,
+      nombre: validatedData.nombre,
+      // Solo incluir copiadoDesdeCotizacionId si tiene valor (evitar undefined)
+      ...(validatedData.copiadoDesdeCotizacionId ? { copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId } : {}),
+      esBaseline: esBaseline,
+      version: 1,
+      updatedAt: new Date()
+    }
+    console.log('📝 Creando cronograma con datos:', JSON.stringify(createData, null, 2))
+
     const cronograma = await prisma.proyectoCronograma.create({
-      data: {
-        proyectoId: id,
-        tipo: validatedData.tipo,
-        nombre: validatedData.nombre,
-        copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId,
-        esBaseline: esBaseline,
-        version: 1
-      }
+      data: createData
     })
 
     return NextResponse.json({
@@ -368,13 +399,26 @@ export async function POST(
       )
     }
 
-    console.error('Error al crear cronograma:', error)
-    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
+    console.error('❌ Error al crear cronograma:', error)
+    console.error('❌ Error type:', typeof error)
+    console.error('❌ Error name:', error instanceof Error ? error.name : 'Unknown')
+    console.error('❌ Error message:', error instanceof Error ? error.message : String(error))
+    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
+
+    // Extraer mensaje de error más específico
+    let errorMessage = 'Error desconocido'
+    if (error instanceof Error) {
+      errorMessage = error.message
+      // Si es un error de Prisma, extraer más detalles
+      if ('code' in error) {
+        errorMessage = `${error.message} (code: ${(error as any).code})`
+      }
+    }
 
     return NextResponse.json(
       {
         error: 'Error interno del servidor',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        details: errorMessage
       },
       { status: 500 }
     )

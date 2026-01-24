@@ -1,26 +1,24 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   TrendingUp,
   Target,
   Clock,
   CheckCircle,
   AlertTriangle,
-  Calendar,
-  BarChart3,
-  Award
+  Award,
+  RefreshCw
 } from 'lucide-react'
-import { format, subDays, subWeeks, subMonths } from 'date-fns'
-import { es } from 'date-fns/locale'
 
 interface MetricaProgreso {
   periodo: string
+  periodoKey?: string
   horasRegistradas: number
   horasObjetivo: number
   tareasCompletadas: number
@@ -30,7 +28,9 @@ interface MetricaProgreso {
 }
 
 interface ProyectoProgreso {
+  id?: string
   nombre: string
+  codigo?: string
   horasRegistradas: number
   horasObjetivo: number
   progreso: number
@@ -38,39 +38,67 @@ interface ProyectoProgreso {
   tareasTotal: number
 }
 
+interface Logro {
+  tipo: string
+  titulo: string
+  descripcion: string
+}
+
+interface Objetivo {
+  tipo: string
+  titulo: string
+  descripcion: string
+}
+
 interface ProgresoPersonalDashboardProps {
   metricas?: MetricaProgreso[]
   proyectos?: ProyectoProgreso[]
+  logros?: Logro[]
+  objetivos?: Objetivo[]
   loading?: boolean
+  onRecargar?: () => void
 }
 
-export function ProgresoPersonalDashboard({ 
-  metricas = [], 
+export function ProgresoPersonalDashboard({
+  metricas = [],
   proyectos = [],
-  loading = false
+  logros = [],
+  objetivos = [],
+  loading = false,
+  onRecargar
 }: ProgresoPersonalDashboardProps) {
   const [periodoActivo, setPeriodoActivo] = useState('semana')
 
   const metricaActual = metricas.find(m => {
     switch (periodoActivo) {
-      case 'semana': return m.periodo === 'Esta semana'
-      case 'mes': return m.periodo === 'Este mes'
+      case 'semana': return m.periodo === 'Esta semana' || m.periodoKey === 'semana'
+      case 'mes': return m.periodo === 'Este mes' || m.periodoKey === 'mes'
       default: return m.periodo === 'Esta semana'
     }
   }) || metricas[0]
-
-  const getTendenciaIcon = (tendencia: string) => {
-    switch (tendencia) {
-      case 'up': return <TrendingUp className="h-4 w-4 text-green-500" />
-      case 'down': return <TrendingUp className="h-4 w-4 text-red-500 rotate-180" />
-      default: return <div className="h-4 w-4 rounded-full bg-gray-400"></div>
-    }
-  }
 
   const getEficienciaColor = (eficiencia: number) => {
     if (eficiencia >= 90) return 'text-green-600'
     if (eficiencia >= 75) return 'text-yellow-600'
     return 'text-red-600'
+  }
+
+  const getLogroIcon = (tipo: string) => {
+    switch (tipo) {
+      case 'tareas': return <CheckCircle className="h-5 w-5 text-green-500" />
+      case 'eficiencia': return <TrendingUp className="h-5 w-5 text-blue-500" />
+      case 'horas': return <Clock className="h-5 w-5 text-purple-500" />
+      default: return <Award className="h-5 w-5 text-yellow-500" />
+    }
+  }
+
+  const getObjetivoIcon = (tipo: string) => {
+    switch (tipo) {
+      case 'tareas': return <Target className="h-5 w-5 text-orange-500" />
+      case 'horas': return <Clock className="h-5 w-5 text-blue-500" />
+      case 'eficiencia': return <TrendingUp className="h-5 w-5 text-green-500" />
+      default: return <AlertTriangle className="h-5 w-5 text-yellow-500" />
+    }
   }
 
   if (loading) {
@@ -95,26 +123,34 @@ export function ProgresoPersonalDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Selector de período */}
-      <Tabs value={periodoActivo} onValueChange={setPeriodoActivo}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="semana">Esta Semana</TabsTrigger>
-          <TabsTrigger value="mes">Este Mes</TabsTrigger>
-          <TabsTrigger value="comparativa">Comparativa</TabsTrigger>
-        </TabsList>
+      {/* Selector de periodo con boton actualizar */}
+      <div className="flex items-center justify-between">
+        <Tabs value={periodoActivo} onValueChange={setPeriodoActivo} className="flex-1">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="semana">Esta Semana</TabsTrigger>
+            <TabsTrigger value="mes">Este Mes</TabsTrigger>
+            <TabsTrigger value="comparativa">Comparativa</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {onRecargar && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRecargar}
+            className="ml-4"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Actualizar
+          </Button>
+        )}
+      </div>
 
-        <TabsContent value="semana" className="space-y-6">
-          <MetricaCard metrica={metricaActual} />
-        </TabsContent>
-
-        <TabsContent value="mes" className="space-y-6">
-          <MetricaCard metrica={metricas.find(m => m.periodo === 'Este mes') || metricaActual} />
-        </TabsContent>
-
-        <TabsContent value="comparativa" className="space-y-6">
-          <ComparativaMetricas metricas={metricas} />
-        </TabsContent>
-      </Tabs>
+      {/* Contenido segun tab */}
+      {periodoActivo === 'comparativa' ? (
+        <ComparativaMetricas metricas={metricas} />
+      ) : (
+        metricaActual && <MetricaCard metrica={metricaActual} />
+      )}
 
       {/* Proyectos activos */}
       <Card>
@@ -125,43 +161,52 @@ export function ProgresoPersonalDashboard({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {proyectos.map((proyecto, index) => (
-            <div key={index} className="border rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">{proyecto.nombre}</h3>
-                <Badge variant="outline">
-                  {proyecto.progreso}% completado
-                </Badge>
-              </div>
+          {proyectos.length > 0 ? (
+            proyectos.map((proyecto, index) => (
+              <div key={proyecto.id || index} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold">
+                    {proyecto.codigo ? `${proyecto.codigo} - ` : ''}{proyecto.nombre}
+                  </h3>
+                  <Badge variant="outline">
+                    {proyecto.progreso}% completado
+                  </Badge>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                <div>
-                  <p className="text-sm text-gray-600">Horas</p>
-                  <p className="font-medium">
-                    {proyecto.horasRegistradas}h / {proyecto.horasObjetivo}h
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                  <div>
+                    <p className="text-sm text-gray-600">Horas</p>
+                    <p className="font-medium">
+                      {proyecto.horasRegistradas}h / {proyecto.horasObjetivo}h
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Tareas</p>
+                    <p className="font-medium">
+                      {proyecto.tareasCompletadas} / {proyecto.tareasTotal}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Eficiencia</p>
+                    <p className={`font-medium ${getEficienciaColor(proyecto.progreso)}`}>
+                      {proyecto.progreso}%
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Tareas</p>
-                  <p className="font-medium">
-                    {proyecto.tareasCompletadas} / {proyecto.tareasTotal}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Eficiencia</p>
-                  <p className={`font-medium ${getEficienciaColor(proyecto.progreso)}`}>
-                    {proyecto.progreso}%
-                  </p>
-                </div>
-              </div>
 
-              <Progress value={proyecto.progreso} className="h-2" />
+                <Progress value={proyecto.progreso} className="h-2" />
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Target className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p>No tienes proyectos con tareas asignadas</p>
             </div>
-          ))}
+          )}
         </CardContent>
       </Card>
 
-      {/* Objetivos y logros */}
+      {/* Logros y objetivos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -171,27 +216,22 @@ export function ProgresoPersonalDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="font-medium">5 tareas completadas esta semana</p>
-                <p className="text-sm text-gray-600">¡Excelente rendimiento!</p>
+            {logros.length > 0 ? (
+              logros.map((logro, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  {getLogroIcon(logro.tipo)}
+                  <div>
+                    <p className="font-medium">{logro.titulo}</p>
+                    <p className="text-sm text-gray-600">{logro.descripcion}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <Award className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm">Completa tareas para desbloquear logros</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <TrendingUp className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="font-medium">Eficiencia por encima del 80%</p>
-                <p className="text-sm text-gray-600">Meta cumplida</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-purple-500" />
-              <div>
-                <p className="font-medium">120 horas registradas este mes</p>
-                <p className="text-sm text-gray-600">Próximo objetivo: 160h</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -199,31 +239,26 @@ export function ProgresoPersonalDashboard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
-              Próximos Objetivos
+              Proximos Objetivos
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Target className="h-5 w-5 text-orange-500" />
-              <div>
-                <p className="font-medium">Completar 3 tareas pendientes</p>
-                <p className="text-sm text-gray-600">Vencimiento: {format(new Date(), 'dd/MM/yyyy', { locale: es })}</p>
+            {objetivos.length > 0 ? (
+              objetivos.map((objetivo, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  {getObjetivoIcon(objetivo.tipo)}
+                  <div>
+                    <p className="font-medium">{objetivo.titulo}</p>
+                    <p className="text-sm text-gray-600">{objetivo.descripcion}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-400" />
+                <p className="text-sm">Todos los objetivos completados!</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="font-medium">Registrar 8 horas esta semana</p>
-                <p className="text-sm text-gray-600">Faltan 3 horas para la meta</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <TrendingUp className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="font-medium">Mantener eficiencia: 75%</p>
-                <p className="text-sm text-gray-600">Actual: 80%</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -281,6 +316,23 @@ function MetricaCard({ metrica }: { metrica: MetricaProgreso }) {
             </div>
             <TrendingUp className="h-8 w-8 text-purple-500" />
           </div>
+          <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+            {metrica.tendencia === 'up' && (
+              <>
+                <TrendingUp className="h-3 w-3 text-green-500" />
+                <span className="text-green-600">Mejorando</span>
+              </>
+            )}
+            {metrica.tendencia === 'down' && (
+              <>
+                <TrendingUp className="h-3 w-3 text-red-500 rotate-180" />
+                <span className="text-red-600">Decreciendo</span>
+              </>
+            )}
+            {metrica.tendencia === 'stable' && (
+              <span className="text-gray-600">Estable</span>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -305,49 +357,56 @@ function ComparativaMetricas({ metricas }: { metricas: MetricaProgreso[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Comparativa de Períodos</CardTitle>
+        <CardTitle>Comparativa de Periodos</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {metricas.map((metrica, index) => (
-            <div key={index} className="border rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">{metrica.periodo}</h3>
-                <div className="flex items-center gap-2">
-                  {metrica.tendencia === 'up' ? (
-                    <TrendingUp className="h-4 w-4 text-green-500" />
-                  ) : metrica.tendencia === 'down' ? (
-                    <TrendingUp className="h-4 w-4 text-red-500 rotate-180" />
-                  ) : (
-                    <div className="h-4 w-4 rounded-full bg-gray-400"></div>
-                  )}
-                  <span className="text-sm text-gray-600">
-                    Eficiencia: {metrica.eficiencia}%
-                  </span>
+        {metricas.length > 0 ? (
+          <div className="space-y-4">
+            {metricas.map((metrica, index) => (
+              <div key={index} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold">{metrica.periodo}</h3>
+                  <div className="flex items-center gap-2">
+                    {metrica.tendencia === 'up' ? (
+                      <TrendingUp className="h-4 w-4 text-green-500" />
+                    ) : metrica.tendencia === 'down' ? (
+                      <TrendingUp className="h-4 w-4 text-red-500 rotate-180" />
+                    ) : (
+                      <div className="h-4 w-4 rounded-full bg-gray-400"></div>
+                    )}
+                    <span className="text-sm text-gray-600">
+                      Eficiencia: {metrica.eficiencia}%
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Horas:</span>
-                  <span className="font-medium ml-2">
-                    {metrica.horasRegistradas}h / {metrica.horasObjetivo}h
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Tareas:</span>
-                  <span className="font-medium ml-2">
-                    {metrica.tareasCompletadas} / {metrica.tareasAsignadas}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Progreso:</span>
-                  <Progress value={metrica.eficiencia} className="h-2 mt-1" />
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Horas:</span>
+                    <span className="font-medium ml-2">
+                      {metrica.horasRegistradas}h / {metrica.horasObjetivo}h
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Tareas:</span>
+                    <span className="font-medium ml-2">
+                      {metrica.tareasCompletadas} / {metrica.tareasAsignadas}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Progreso:</span>
+                    <Progress value={metrica.eficiencia} className="h-2 mt-1" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <TrendingUp className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+            <p>No hay datos para comparar</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

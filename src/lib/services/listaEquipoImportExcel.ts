@@ -83,6 +83,21 @@ export async function verificarExistenciaEquipos(
     let soloCatalogo = 0
     let nuevos = 0
 
+    // Obtener o crear categoría por defecto
+    const CATEGORIA_DEFAULT = 'SIN-CATEGORIA'
+    let categoriaDefaultId = categoriaPorNombre.get(CATEGORIA_DEFAULT.toLowerCase())?.id
+
+    if (!categoriaDefaultId) {
+      console.log('🔹 Creando categoría por defecto:', CATEGORIA_DEFAULT)
+      const categoriaDefault = await createCategoriaEquipo({ 
+        nombre: CATEGORIA_DEFAULT,
+        descripcion: 'Categoría por defecto para equipos sin clasificar'
+      })
+      categoriaDefaultId = categoriaDefault.id
+      categoriaPorNombre.set(CATEGORIA_DEFAULT.toLowerCase(), categoriaDefault)
+      console.log('✅ Categoría por defecto creada:', categoriaDefault)
+    }
+
     for (const excelItem of excelItems) {
       const { codigo, descripcion, categoria, unidad, marca, cantidad } = excelItem
 
@@ -113,12 +128,26 @@ export async function verificarExistenciaEquipos(
         nuevos++
 
         // Obtener o crear categoria
-        let categoriaId = categoriaPorNombre.get(categoria.toLowerCase())?.id
-        if (!categoriaId) {
-          // Crear nueva categoria
-          const nuevaCategoria = await createCategoriaEquipo({ nombre: categoria })
-          categoriaId = nuevaCategoria.id
-          categoriaPorNombre.set(categoria.toLowerCase(), nuevaCategoria)
+        let categoriaId: string
+
+        if (!categoria || categoria.trim().length === 0) {
+          // Usar categoría por defecto si está vacía
+          console.log(`⚠️ Item ${codigo}: Categoría vacía, usando categoría por defecto`)
+          categoriaId = categoriaDefaultId!
+        } else {
+          // Buscar categoría existente
+          categoriaId = categoriaPorNombre.get(categoria.toLowerCase())?.id as string
+          
+          if (!categoriaId) {
+            // Crear nueva categoría
+            console.log(`🔹 Creando nueva categoría: ${categoria}`)
+            const nuevaCategoria = await createCategoriaEquipo({ 
+              nombre: categoria.trim() 
+            })
+            categoriaId = nuevaCategoria.id
+            categoriaPorNombre.set(categoria.toLowerCase(), nuevaCategoria)
+            console.log(`✅ Categoría creada: ${nuevaCategoria.nombre}`)
+          }
         }
 
         // Obtener o crear unidad
@@ -243,9 +272,10 @@ export async function importarDesdeCatalogo(
         listaId,
         proyectoEquipoId,
         responsableId,
+        catalogoEquipoId: equipo.id,
         codigo: equipo.codigo,
         descripcion: equipo.descripcion,
-        categoria: equipo.categoria?.nombre || 'SIN-CATEGORIA',
+        categoria: equipo.categoriaEquipo?.nombre || 'SIN-CATEGORIA',
         unidad: equipo.unidad?.nombre || 'UND',
         cantidad,
         presupuesto: equipo.precioVenta ?? 0,

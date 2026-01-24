@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import type { ListaEquipoItemPayload } from '@/types/payloads'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { createId } from '@paralleldrive/cuid2'
 
 // ✅ Obtener todos los ítems
 export async function GET(request: Request) {
@@ -33,17 +34,22 @@ export async function GET(request: Request) {
     const items = await prisma.listaEquipoItem.findMany({
       where: whereClause,
       include: {
-        lista: true,
+        listaEquipo: true,
         proveedor: true,
-        pedidos: {
+        catalogoEquipo: {
           include: {
-            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+            categoriaEquipo: true
           }
         },
-        proyectoEquipo: true,
-        cotizaciones: {
+        pedidoEquipoItem: {
           include: {
-            cotizacion: {
+            pedidoEquipo: true
+          }
+        },
+        proyectoEquipoCotizado: true,
+        cotizacionProveedorItems: {
+          include: {
+            cotizacionProveedor: {
               select: {
                 id: true,
                 codigo: true,
@@ -129,12 +135,14 @@ export async function POST(request: Request) {
     // ✅ Crear nuevo ítem
     const nuevo = await prisma.listaEquipoItem.create({
       data: {
+        id: createId(), // ✅ Generar ID manualmente ya que el schema no tiene @default(cuid())
         listaId: body.listaId,
         proyectoEquipoItemId: body.proyectoEquipoItemId || null,
         proyectoEquipoId: body.proyectoEquipoId || null,
         reemplazaProyectoEquipoCotizadoItemId: body.reemplazaProyectoEquipoCotizadoItemId || null, // ✅ actualizado
         proveedorId: body.proveedorId || null,
         cotizacionSeleccionadaId: body.cotizacionSeleccionadaId || null,
+        catalogoEquipoId: body.catalogoEquipoId || null,
         responsableId: session.user.id,
         codigo: body.codigo,
         descripcion: body.descripcion,
@@ -151,20 +159,25 @@ export async function POST(request: Request) {
         cantidadEntregada: body.cantidadEntregada ?? 0,
         origen: body.origen ?? 'nuevo',
         estado: body.estado ?? 'borrador',
-        // Nota: categoria field will be added after Prisma client regeneration
+        updatedAt: new Date(),
       } as any,
       include: {
-        lista: true,
+        listaEquipo: true,
         proveedor: true,
-        pedidos: {
+        catalogoEquipo: {
           include: {
-            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+            categoriaEquipo: true
           }
         },
-        proyectoEquipo: true,
-        cotizaciones: {
+        pedidoEquipoItem: {
           include: {
-            cotizacion: {
+            pedidoEquipo: true
+          }
+        },
+        proyectoEquipoCotizado: true,
+        cotizacionProveedorItems: {
+          include: {
+            cotizacionProveedor: {
               select: {
                 id: true,
                 codigo: true,

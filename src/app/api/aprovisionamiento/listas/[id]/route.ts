@@ -122,7 +122,7 @@ export async function GET(
             }
           }
         },
-        items: {
+        listaEquipoItem: {
           select: {
             id: true,
             codigo: true,
@@ -138,12 +138,12 @@ export async function GET(
             costoElegido: true,
             cantidadPedida: true,
             cantidadEntregada: true,
-            cotizaciones: true
+            cotizacionProveedorItems: true
           }
         },
-        pedidoEquipos: {
+        pedidoEquipo: {
           include: {
-            items: {
+            pedidoEquipoItem: {
               select: {
                 cantidadPedida: true,
                 precioUnitario: true,
@@ -171,13 +171,13 @@ export async function GET(
 
     // 📡 Estadísticas detalladas
     const estadisticas = {
-      totalItems: lista.items.length,
-      itemsConPrecio: lista.items.filter(item => item.precioElegido && item.precioElegido > 0).length,
-      itemsConCotizaciones: lista.items.filter(item => item.cotizaciones && item.cotizaciones.length > 0).length,
-      totalPedidos: lista.pedidoEquipos.length,
+      totalItems: lista.listaEquipoItem.length,
+      itemsConPrecio: lista.listaEquipoItem.filter(item => item.precioElegido && item.precioElegido > 0).length,
+      itemsConCotizaciones: lista.listaEquipoItem.filter(item => item.cotizacionProveedorItems && item.cotizacionProveedorItems.length > 0).length,
+      totalPedidos: lista.pedidoEquipo.length,
       montoTotal: datosGantt.montoProyectado,
-      montoEjecutado: lista.pedidoEquipos.reduce((total, pedido) => {
-        return total + (pedido.items?.reduce((subtotal, item) => {
+      montoEjecutado: lista.pedidoEquipo.reduce((total, pedido) => {
+        return total + (pedido.pedidoEquipoItem?.reduce((subtotal, item) => {
           return subtotal + (item.cantidadPedida * (item.precioUnitario || 0))
         }, 0) || 0)
       }, 0)
@@ -271,7 +271,7 @@ export async function PUT(
             codigo: true
           }
         },
-        items: {
+        listaEquipoItem: {
           select: {
             id: true,
             cantidad: true,
@@ -347,7 +347,7 @@ export async function DELETE(
         id: true, 
         estado: true, 
         codigo: true,
-        pedidoEquipos: { select: { id: true } }
+        pedidoEquipo: { select: { id: true } }
       }
     })
 
@@ -366,7 +366,7 @@ export async function DELETE(
       )
     }
 
-    if (lista.pedidoEquipos.length > 0) {
+    if (lista.pedidoEquipo.length > 0) {
       return NextResponse.json(
         { error: 'No se puede eliminar una lista que tiene pedidos asociados' },
         { status: 403 }

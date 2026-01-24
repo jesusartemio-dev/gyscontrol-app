@@ -106,12 +106,12 @@ export default function PedidoDesdeListaModal({
   useEffect(() => {
     const selections: Record<string, ItemSelection> = {}
     // ✅ Validate lista and items exist before processing
-    if (!lista || !lista.items || !Array.isArray(lista.items)) {
+    if (!lista || !lista.listaEquipoItem || !Array.isArray(lista.listaEquipoItem)) {
       setItemSelections({})
       return
     }
     
-    lista.items.forEach((item) => {
+    lista.listaEquipoItem.forEach((item) => {
       // ✅ Opción 1: Considera tanto cantidadPedida como cantidadEntregada
       const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
       if (cantidadDisponible > 0) {
@@ -132,7 +132,7 @@ export default function PedidoDesdeListaModal({
     setItemSelections(selections)
     
     // 🔍 Debug: Log current cantidadPedida values
-    console.log('🔍 Modal Debug - Lista items cantidadPedida:', lista.items?.map(item => ({
+    console.log('🔍 Modal Debug - Lista items cantidadPedida:', lista.listaEquipoItem?.map(item => ({
       id: item.id,
       codigo: item.codigo,
       cantidad: item.cantidad,
@@ -141,19 +141,19 @@ export default function PedidoDesdeListaModal({
       // ✅ Opción 1: Considera tanto cantidadPedida como cantidadEntregada
       disponible: item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
     })))
-  }, [lista.items, lista.id]) // Re-run when lista.items or lista.id changes
+  }, [lista.listaEquipoItem, lista.id]) // Re-run when lista.listaEquipoItem or lista.id changes
 
   // ✅ Calculate available items and totals
   const itemsDisponibles = useMemo(() => {
-    if (!lista || !lista.items || !Array.isArray(lista.items)) {
+    if (!lista || !lista.listaEquipoItem || !Array.isArray(lista.listaEquipoItem)) {
       return []
     }
-    return lista.items.filter((item) => {
+    return lista.listaEquipoItem.filter((item) => {
       // ✅ Opción 1: Considera tanto cantidadPedida como cantidadEntregada
       const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
       return cantidadDisponible > 0
     })
-  }, [lista.items])
+  }, [lista.listaEquipoItem])
 
   const itemsSeleccionados = useMemo(() => {
     return Object.values(itemSelections).filter((selection) => selection.selected)
@@ -161,11 +161,11 @@ export default function PedidoDesdeListaModal({
 
   const costoTotalEstimado = useMemo(() => {
     return itemsSeleccionados.reduce((total, selection) => {
-      const item = lista?.items?.find((i) => i.id === selection.itemId)
+      const item = lista?.listaEquipoItem?.find((i) => i.id === selection.itemId)
       const precio = item?.precioElegido || 0
       return total + (precio * selection.cantidadPedida)
     }, 0)
-  }, [itemsSeleccionados, lista.items])
+  }, [itemsSeleccionados, lista.listaEquipoItem])
 
   // ✅ Handle item selection changes
   const handleItemSelectionChange = (itemId: string, field: keyof ItemSelection, value: any) => {
@@ -273,8 +273,8 @@ export default function PedidoDesdeListaModal({
     setEsUrgente(false)
     // Reset selections - recalculate available quantities
     const selections: Record<string, ItemSelection> = {}
-    if (lista?.items && Array.isArray(lista.items)) {
-      lista.items.forEach((item) => {
+    if (lista?.listaEquipoItem && Array.isArray(lista.listaEquipoItem)) {
+      lista.listaEquipoItem.forEach((item) => {
         // ✅ Opción 1: Considera tanto cantidadPedida como cantidadEntregada
         const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
         if (cantidadDisponible > 0) {
@@ -354,7 +354,7 @@ export default function PedidoDesdeListaModal({
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center space-x-4">
                   <span className="text-green-800 font-medium">Estado: <Badge variant="outline" className="ml-1">{lista.estado}</Badge></span>
-                  <span className="text-green-700">Total: {lista.items?.length || 0} items</span>
+                  <span className="text-green-700">Total: {lista.listaEquipoItem?.length || 0} items</span>
                 </div>
                 {itemsSeleccionados.length > 0 && (
                   <div className="text-green-800 font-medium">

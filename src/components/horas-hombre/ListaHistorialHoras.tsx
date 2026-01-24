@@ -38,7 +38,9 @@ export function ListaHistorialHoras({
 
   // Filtrar registros
   const registrosFiltrados = registros.filter(registro => {
-    const cumpleFecha = !filtroFecha || format(registro.fecha, 'yyyy-MM') === filtroFecha
+    // Convertir fecha a Date si viene como string
+    const fechaRegistro = registro.fecha instanceof Date ? registro.fecha : new Date(registro.fecha)
+    const cumpleFecha = !filtroFecha || format(fechaRegistro, 'yyyy-MM') === filtroFecha
     const cumpleProyecto = !filtroProyecto || registro.proyectoNombre.toLowerCase().includes(filtroProyecto.toLowerCase())
     const cumpleNivel = !filtroNivel || filtroNivel === 'todos' || registro.nivel === filtroNivel
     return cumpleFecha && cumpleProyecto && cumpleNivel
@@ -51,19 +53,24 @@ export function ListaHistorialHoras({
 
   const exportarCSV = () => {
     const csvContent = [
-      ['Fecha', 'Proyecto', 'Elemento', 'Nivel', 'Horas', 'Descripción', 'Estado'].join(','),
-      ...registrosFiltrados.map(reg => [
-        format(reg.fecha, 'dd/MM/yyyy'),
-        `"${reg.proyectoNombre}"`,
-        `"${reg.elementoNombre}"`,
-        reg.nivel,
-        reg.horas,
-        `"${reg.descripcion}"`,
-        reg.aprobado ? 'Aprobado' : 'Pendiente'
-      ].join(','))
+      ['Fecha', 'Proyecto', 'Elemento', 'Nivel', 'Horas', 'Descripcion', 'Estado'].join(','),
+      ...registrosFiltrados.map(reg => {
+        const fechaReg = reg.fecha instanceof Date ? reg.fecha : new Date(reg.fecha)
+        return [
+          format(fechaReg, 'dd/MM/yyyy'),
+          `"${reg.proyectoNombre}"`,
+          `"${reg.elementoNombre}"`,
+          reg.nivel,
+          reg.horas,
+          `"${reg.descripcion.replace(/"/g, '""')}"`,
+          reg.aprobado ? 'Aprobado' : 'Pendiente'
+        ].join(',')
+      })
     ].join('\n')
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    // Agregar BOM UTF-8 para que Excel reconozca correctamente los caracteres
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `historial-horas-${format(new Date(), 'yyyy-MM-dd')}.csv`
@@ -219,10 +226,12 @@ export function ListaHistorialHoras({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {registrosFiltrados.map((registro) => (
+                {registrosFiltrados.map((registro) => {
+                  const fechaRegistro = registro.fecha instanceof Date ? registro.fecha : new Date(registro.fecha)
+                  return (
                   <tr key={registro.id} className="hover:bg-gray-50">
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {format(registro.fecha, 'dd/MM/yyyy', { locale: es })}
+                      {format(fechaRegistro, 'dd/MM/yyyy', { locale: es })}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {registro.proyectoNombre}
@@ -250,7 +259,8 @@ export function ListaHistorialHoras({
                       </Badge>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

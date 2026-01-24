@@ -15,7 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Calendar, BarChart3, Filter, RefreshCw, FolderOpen, Settings, MapPin, Wrench, Link, Eye, EyeOff, CheckSquare, TreePine, TrendingUp, Download, Trash2, Clock, CheckCircle, Target, PlayCircle } from 'lucide-react'
+import { Plus, Calendar, BarChart3, Filter, RefreshCw, FolderOpen, Settings, MapPin, Wrench, Link, Eye, EyeOff, CheckSquare, TreePine, TrendingUp, Download, Trash2, Clock, CheckCircle, Target, PlayCircle, Wand2 } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { ProyectoFasesList } from '@/components/proyectos/fases/ProyectoFasesList'
 import { ProyectoEdtList } from '@/components/proyectos/cronograma/ProyectoEdtList'
@@ -28,9 +29,11 @@ import { ProyectoGanttView } from '@/components/proyectos/cronograma/ProyectoGan
 import { ProyectoTareasView } from '@/components/proyectos/cronograma/ProyectoTareasView'
 import { ProyectoCronogramaTreeView } from './ProyectoCronogramaTreeView'
 import { CronogramaGanttViewPro } from '@/components/comercial/cronograma/CronogramaGanttViewPro'
+import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { convertToMSProjectXML, downloadMSProjectXML } from '@/lib/utils/msProjectXmlExport'
 import type { ProyectoCronograma, ProyectoFase, ProyectoEdt } from '@/types/modelos'
 
 const TIPO_CRONOGRAMA_INFO = {
@@ -81,6 +84,9 @@ export function ProyectoCronogramaTab({
   const [calendarioLaboralId, setCalendarioLaboralId] = useState('')
   const [proyectoData, setProyectoData] = useState<any>(null)
   const [showCronogramaSelector, setShowCronogramaSelector] = useState(false)
+  const [showDeleteCronogramaModal, setShowDeleteCronogramaModal] = useState(false)
+  const [showGenerarCronogramaModal, setShowGenerarCronogramaModal] = useState(false)
+  const [cronogramaTareas, setCronogramaTareas] = useState<any[]>([])
   const { toast } = useToast()
 
   // Update selected cronograma when prop changes
@@ -135,6 +141,137 @@ export function ProyectoCronogramaTab({
     })
   }
 
+  // Función para exportar cronograma a XML (MS Project)
+  const handleExportXML = async () => {
+    try {
+      setIsLoading(true)
+      toast({
+        title: 'Generando XML...',
+        description: 'Obteniendo datos del cronograma para exportación.'
+      })
+
+      // Obtener datos jerárquicos del cronograma
+      const cronogramaId = selectedCronograma?.id
+      const treeUrl = cronogramaId
+        ? `/api/proyectos/${proyectoId}/cronograma/tree?cronogramaId=${cronogramaId}`
+        : `/api/proyectos/${proyectoId}/cronograma/tree`
+
+      const treeResponse = await fetch(treeUrl)
+      if (!treeResponse.ok) {
+        throw new Error('Error al obtener estructura del cronograma')
+      }
+      const treeData = await treeResponse.json()
+
+      // Obtener calendario laboral si está configurado
+      let calendarioLaboral = null
+      if (proyectoData?.calendarioLaboralId) {
+        try {
+          const calResponse = await fetch(`/api/configuracion/calendarios/${proyectoData.calendarioLaboralId}`)
+          if (calResponse.ok) {
+            calendarioLaboral = await calResponse.json()
+          }
+        } catch (e) {
+          console.warn('No se pudo cargar calendario laboral, usando valores por defecto')
+        }
+      }
+
+      // Transformar datos al formato GanttTask esperado por msProjectXmlExport
+      interface GanttTask {
+        id: string
+        nombre: string
+        tipo: 'fase' | 'edt' | 'actividad' | 'tarea'
+        fechaInicio: Date | null
+        fechaFin: Date | null
+        progreso: number
+        estado: string
+        nivel: number
+        parentId?: string
+        children?: GanttTask[]
+        horasEstimadas?: number
+        responsable?: string
+        descripcion?: string
+        dependenciaId?: string
+      }
+
+      const transformToGanttTasks = (items: any[], parentId?: string): GanttTask[] => {
+        if (!items || !Array.isArray(items)) return []
+
+        return items.map((item: any) => {
+          // La API devuelve estructura con 'type', 'data', 'children', 'level'
+          const itemData = item.data || {}
+          const tipo = (item.type || 'tarea') as 'fase' | 'edt' | 'actividad' | 'tarea'
+          const nivel = item.level || 0
+
+          // Obtener fechas - pueden estar en data.fechaInicio o data.fechaInicioComercial
+          const fechaInicio = itemData.fechaInicio || itemData.fechaInicioComercial
+          const fechaFin = itemData.fechaFin || itemData.fechaFinComercial
+
+          const task: GanttTask = {
+            id: item.id?.replace(/^(fase|edt|actividad|tarea)-/, '') || item.id,
+            nombre: item.nombre || 'Sin nombre',
+            tipo: tipo,
+            fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
+            fechaFin: fechaFin ? new Date(fechaFin) : null,
+            progreso: itemData.progreso || 0,
+            estado: itemData.estado || 'pendiente',
+            nivel: nivel,
+            parentId: parentId,
+            horasEstimadas: itemData.horasEstimadas ? Number(itemData.horasEstimadas) : undefined,
+            responsable: itemData.responsable?.name || itemData.responsable?.nombre,
+            descripcion: itemData.descripcion,
+            dependenciaId: itemData.dependenciaId
+          }
+
+          // Procesar hijos recursivamente
+          if (item.children && Array.isArray(item.children) && item.children.length > 0) {
+            task.children = transformToGanttTasks(item.children, item.id)
+          }
+
+          return task
+        })
+      }
+
+      // La API devuelve { success: true, data: { tree: [...] } }
+      const treeArray = treeData?.data?.tree || treeData?.tree || treeData?.data || []
+      const ganttTasks = transformToGanttTasks(Array.isArray(treeArray) ? treeArray : [])
+
+      if (ganttTasks.length === 0) {
+        toast({
+          title: 'Sin datos',
+          description: 'No hay elementos en el cronograma para exportar.',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      // Generar XML usando la utilidad
+      const xmlContent = convertToMSProjectXML(
+        ganttTasks,
+        `Cronograma - ${proyectoNombre}`,
+        calendarioLaboral
+      )
+
+      // Descargar archivo
+      const filename = `cronograma-${proyectoNombre.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xml`
+      downloadMSProjectXML(xmlContent, filename)
+
+      toast({
+        title: 'Exportación completada',
+        description: `Archivo ${filename} descargado correctamente. Compatible con MS Project.`
+      })
+
+    } catch (error) {
+      console.error('Error exportando XML:', error)
+      toast({
+        title: 'Error en exportación',
+        description: error instanceof Error ? error.message : 'No se pudo generar el archivo XML.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Función para cambiar de cronograma
   const handleCronogramaChange = (cronograma: ProyectoCronograma) => {
     setSelectedCronograma(cronograma)
@@ -152,6 +289,109 @@ export function ProyectoCronogramaTab({
       title: 'Cronograma creado',
       description: 'El nuevo cronograma ha sido creado exitosamente.'
     })
+  }
+
+  // Función para generar cronograma automáticamente
+  const handleGenerarCronograma = async () => {
+    if (!selectedCronograma) {
+      toast({
+        title: 'Error',
+        description: 'Debe seleccionar un cronograma primero.',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/generar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          cronogramaId: selectedCronograma.id,
+          generarFases: true,
+          generarEdts: true,
+          generarActividades: true,
+          generarTareas: true,
+          fechaInicioProyecto: fechaInicio || undefined
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error generando cronograma')
+      }
+
+      const result = await response.json()
+
+      setShowGenerarCronogramaModal(false)
+      handleRefresh()
+      toast({
+        title: 'Cronograma generado exitosamente',
+        description: result.data?.message || `Se generaron ${result.data?.totalElements || 0} elementos del cronograma.`
+      })
+
+    } catch (error) {
+      console.error('Error generando cronograma:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo generar el cronograma.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Función para eliminar todo el cronograma
+  const handleDeleteCronograma = async () => {
+    if (!selectedCronograma) {
+      toast({
+        title: 'Error',
+        description: 'Debe seleccionar un cronograma primero.',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/eliminar?cronogramaId=${selectedCronograma.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error eliminando cronograma')
+      }
+
+      const result = await response.json()
+
+      setShowDeleteCronogramaModal(false)
+      handleRefresh()
+      toast({
+        title: 'Cronograma eliminado',
+        description: `Se eliminaron ${result.data?.totalEliminados || 0} elementos del cronograma.`,
+        variant: 'destructive'
+      })
+
+    } catch (error) {
+      console.error('Error eliminando cronograma:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar el cronograma.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Función para guardar fecha de inicio de línea base
@@ -370,80 +610,6 @@ export function ProyectoCronogramaTab({
         onCronogramaCreate={handleCronogramaCreate}
       />
 
-      {/* Current Cronograma Indicator */}
-      {selectedCronograma && (
-        <Card className={`border-2 ${
-          selectedCronograma.tipo === 'comercial'
-            ? 'border-gray-200 bg-gray-50'
-            : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
-            ? 'border-green-200 bg-green-50'
-            : 'border-blue-200 bg-blue-50'
-        }`}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${
-                  selectedCronograma.tipo === 'comercial'
-                    ? 'bg-gray-100'
-                    : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
-                    ? 'bg-green-100'
-                    : 'bg-blue-100'
-                }`}>
-                  {React.createElement(TIPO_CRONOGRAMA_INFO[selectedCronograma.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.icon || Calendar, {
-                    className: `h-5 w-5 ${
-                      selectedCronograma.tipo === 'comercial'
-                        ? 'text-gray-600'
-                        : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
-                        ? 'text-green-600'
-                        : 'text-blue-600'
-                    }`
-                  })}
-                </div>
-                <div>
-                  <h3 className={`font-semibold text-lg ${
-                    selectedCronograma.tipo === 'comercial'
-                      ? 'text-gray-900'
-                      : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
-                      ? 'text-green-900'
-                      : 'text-blue-900'
-                  }`}>
-                    Cronograma Actual: {selectedCronograma.nombre}
-                  </h3>
-                  <p className={`text-sm ${
-                    selectedCronograma.tipo === 'comercial'
-                      ? 'text-gray-700'
-                      : selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion'
-                      ? 'text-green-700'
-                      : 'text-blue-700'
-                  }`}>
-                    Tipo: {selectedCronograma.tipo} |
-                    Versión: {selectedCronograma.version}
-                    {selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion' && ' (Línea Base)'}
-                    {selectedCronograma.tipo === 'comercial' && ' (Solo Lectura)'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion' && (
-                  <Badge className="bg-green-100 text-green-800">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Línea Base
-                  </Badge>
-                )}
-                {selectedCronograma.tipo === 'comercial' && (
-                  <Badge className="bg-gray-100 text-gray-800">
-                    Solo Lectura
-                  </Badge>
-                )}
-                <Badge className={TIPO_CRONOGRAMA_INFO[selectedCronograma.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.color}>
-                  {TIPO_CRONOGRAMA_INFO[selectedCronograma.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.label}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Header del Tab */}
       <div className="flex items-center justify-between">
         <div>
@@ -467,23 +633,169 @@ export function ProyectoCronogramaTab({
             Actualizar
           </Button>
 
+          {selectedCronograma && selectedCronograma.tipo !== 'comercial' && (
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setShowGenerarCronogramaModal(true)}
+                disabled={isLoading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Wand2 className="h-4 w-4 mr-2" />
+                Generar Cronograma
+              </Button>
+
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteCronogramaModal(true)}
+                disabled={isLoading}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar Cronograma
+              </Button>
+
+              <ProyectoDependencyManager
+                proyectoId={proyectoId}
+                cronogramaId={selectedCronograma?.id}
+                onDependenciaChange={handleRefresh}
+              />
+            </>
+          )}
+
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              // TODO: Implementar exportación XML
-              toast({
-                title: 'Función próximamente',
-                description: 'La exportación XML estará disponible en la próxima versión.',
-                variant: 'default'
-              })
-            }}
+            onClick={handleExportXML}
+            disabled={isLoading}
           >
             <Download className="h-4 w-4 mr-2" />
             Exportar XML
           </Button>
         </div>
       </div>
+
+      {/* Modal de confirmación para generar cronograma */}
+      <Dialog open={showGenerarCronogramaModal} onOpenChange={setShowGenerarCronogramaModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Wand2 className="h-5 w-5" />
+              Generar Cronograma Automático
+            </DialogTitle>
+            <DialogDescription>
+              Se generará la estructura del cronograma basándose en los servicios del proyecto y la cotización.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-3">🏗️ Elementos que se generarán:</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Fases del proyecto (Ingeniería, Procura, Construcción, Pruebas)</li>
+                <li>• EDTs agrupados por categoría de servicio</li>
+                <li>• Actividades desde los servicios cotizados</li>
+                <li>• Tareas desde los items de cada servicio</li>
+              </ul>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <h4 className="font-medium text-yellow-900 mb-2">⚠️ Importante</h4>
+              <p className="text-sm text-yellow-800">
+                Si ya existen elementos en el cronograma, no se duplicarán.
+                Solo se crearán los elementos faltantes.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              Cronograma: {selectedCronograma?.nombre}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowGenerarCronogramaModal(false)}
+                disabled={isLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleGenerarCronograma}
+                disabled={isLoading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isLoading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                <Wand2 className="h-4 w-4 mr-2" />
+                Generar Cronograma
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación para eliminar cronograma */}
+      <Dialog open={showDeleteCronogramaModal} onOpenChange={setShowDeleteCronogramaModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Eliminar Todo el Cronograma
+            </DialogTitle>
+            <DialogDescription className="text-red-700">
+              Esta acción es <strong>irreversible</strong> y eliminará permanentemente todos los elementos del cronograma actual.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h4 className="font-medium text-red-900 mb-3">🗑️ Elementos que serán eliminados:</h4>
+              <ul className="text-sm text-red-800 space-y-1">
+                <li>• Todas las fases del cronograma</li>
+                <li>• Todos los EDTs (Elementos de Trabajo)</li>
+                <li>• Todas las actividades</li>
+                <li>• Todas las tareas</li>
+                <li>• Todas las dependencias entre tareas</li>
+              </ul>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <h4 className="font-medium text-yellow-900 mb-2">⚠️ Importante</h4>
+              <p className="text-sm text-yellow-800">
+                Una vez eliminados, estos elementos no podrán recuperarse. Si necesitas mantener alguna información,
+                considera exportar el cronograma a XML antes de eliminarlo.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              Cronograma: {selectedCronograma?.nombre}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteCronogramaModal(false)}
+                disabled={isLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteCronograma}
+                disabled={isLoading}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isLoading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar Todo
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Contenido principal con tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -701,6 +1013,7 @@ export function ProyectoCronogramaTab({
         <TabsContent value="gantt-pro" className="space-y-4">
           <CronogramaGanttViewPro
             cotizacionId={proyectoId}
+            cronogramaId={selectedCronograma?.id}
             refreshKey={refreshKey}
           />
         </TabsContent>

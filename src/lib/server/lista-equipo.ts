@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from '@/lib/prisma';
 
 export async function getListaEquipoDetail(proyectoId: string, listaId: string) {
-  const [lista, proyecto] = await Promise.all([
+  const [listaRaw, proyecto] = await Promise.all([
     // Get lista with simplified data to avoid Prisma client cache issues
     prisma.listaEquipo.findUnique({
       where: { id: listaId },
@@ -25,7 +25,7 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
           }
         },
         // 👤 Basic responsible information
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -33,10 +33,10 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
           }
         },
         // 📋 Simplified items with basic relationships
-        items: {
+        listaEquipoItem: {
           include: {
             // 👤 Basic responsable information
-            responsable: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -51,9 +51,9 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
               }
             },
             // 💰 Simplified cotizaciones
-            cotizaciones: {
+            cotizacionProveedorItems: {
               include: {
-                cotizacion: {
+                cotizacionProveedor: {
                   select: {
                     id: true,
                     codigo: true,
@@ -72,9 +72,9 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
               }
             },
             // 📦 Simplified pedidos
-            pedidos: {
+            pedidoEquipoItem: {
               include: {
-                pedido: {
+                pedidoEquipo: {
                   select: {
                     id: true,
                     codigo: true,
@@ -84,7 +84,7 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
               }
             },
             // 🏗️ Basic proyecto equipo relationship
-            proyectoEquipo: {
+            proyectoEquipoCotizado: {
               select: {
                 id: true,
                 nombre: true
@@ -93,7 +93,7 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
             // 📋 Basic proyecto equipo item relationship
             proyectoEquipoItem: {
               include: {
-                proyectoEquipo: {
+                proyectoEquipoCotizado: {
                   select: {
                     id: true,
                     nombre: true
@@ -125,6 +125,25 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
       return null;
     })
   ]);
+
+  // Map for frontend compatibility
+  const lista = listaRaw ? {
+    ...listaRaw,
+    responsable: listaRaw.user,
+    items: listaRaw.listaEquipoItem?.map((item: any) => ({
+      ...item,
+      responsable: item.user,
+      cotizaciones: item.cotizacionProveedorItems?.map((cot: any) => ({
+        ...cot,
+        cotizacionProveedor: cot.cotizacionProveedor
+      })),
+      pedidos: item.pedidoEquipoItem?.map((ped: any) => ({
+        ...ped,
+        pedidoEquipo: ped.pedidoEquipo
+      })),
+      proyectoEquipo: item.proyectoEquipoCotizado
+    }))
+  } : null;
 
   return { lista, proyecto };
 }

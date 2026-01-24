@@ -1,13 +1,29 @@
 // API para cargar historial de horas desde la base de datos
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 HISTORIAL: Consultando registros de horas...');
+    // Verificar sesión del usuario
+    const session = await getServerSession(authOptions);
 
-    // Obtener todos los registros de horas con información de proyectos
+    if (!session?.user?.id) {
+      console.log('❌ HISTORIAL: No hay sesión válida');
+      return NextResponse.json(
+        { success: false, error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+
+    console.log('🔍 HISTORIAL: Consultando registros de horas para usuario:', session.user.id);
+
+    // Obtener registros de horas del usuario actual con información de proyectos y EDT
     const registros = await prisma.registroHoras.findMany({
+      where: {
+        usuarioId: session.user.id  // ✅ Filtrar por usuario actual
+      },
       orderBy: {
         fechaTrabajo: 'desc'
       },
@@ -19,24 +35,44 @@ export async function GET(request: NextRequest) {
             nombre: true,
             codigo: true
           }
+        },
+        proyectoEdt: {
+          select: {
+            id: true,
+            nombre: true,
+            edt: {
+              select: {
+                nombre: true
+              }
+            }
+          }
+        },
+        proyectoTarea: {
+          select: {
+            id: true,
+            nombre: true
+          }
         }
       }
     });
 
     console.log(`✅ HISTORIAL: Encontrados ${registros.length} registros`);
 
-    // Mapear a formato esperado por el frontend usando información de proyectos
+    // Mapear a formato esperado por el frontend con información completa
     const registrosFormateados = registros.map(registro => {
-      // Determinar el nivel basado en qué existe
+      // Determinar el nivel y nombre del elemento basado en las relaciones
       let nivel: 'proyecto' | 'fase' | 'edt' | 'actividad' | 'tarea' = 'edt';
-      let elementoNombre = registro.nombreServicio || 'Sin elemento';
+      let elementoNombre = '';
 
-      if (registro.proyectoTareaId) {
+      if (registro.proyectoTarea) {
         nivel = 'tarea';
-        elementoNombre = `Tarea: ${elementoNombre}`;
+        elementoNombre = registro.proyectoTarea.nombre;
+      } else if (registro.proyectoEdt) {
+        nivel = 'edt';
+        elementoNombre = registro.proyectoEdt.nombre || registro.proyectoEdt.edt?.nombre || 'Sin nombre';
       } else {
         nivel = 'edt';
-        elementoNombre = `EDT: ${elementoNombre}`;
+        elementoNombre = registro.nombreServicio || registro.categoria || 'Sin elemento';
       }
 
       // Formatear nombre del proyecto

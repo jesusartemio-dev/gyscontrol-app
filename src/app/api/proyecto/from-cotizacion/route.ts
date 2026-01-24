@@ -25,7 +25,7 @@ type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
         cotizacionFase: true,
         cotizacionActividad: {
           include: {
-            cotizacionTareas: {
+            cotizacionTarea: {
               include: {
                 responsable: true
               }
@@ -474,6 +474,7 @@ export async function POST(request: NextRequest) {
             console.log('📋 [CRONOGRAMA] Creando fase comercial...')
             const nuevaFaseComercial = await (prisma as any).proyectoFase.create({
               data: {
+                id: crypto.randomUUID(),
                 proyectoId: proyecto.id,
                 proyectoCronogramaId: cronogramaComercial.id,
                 nombre: faseCotizacion.nombre,
@@ -482,7 +483,8 @@ export async function POST(request: NextRequest) {
                 estado: EstadoFase.planificado,
                 porcentajeAvance: 0,
                 fechaInicioPlan: faseCotizacion.fechaInicioPlan ? new Date(faseCotizacion.fechaInicioPlan) : undefined,
-                fechaFinPlan: faseCotizacion.fechaFinPlan ? new Date(faseCotizacion.fechaFinPlan) : undefined
+                fechaFinPlan: faseCotizacion.fechaFinPlan ? new Date(faseCotizacion.fechaFinPlan) : undefined,
+                updatedAt: new Date()
               }
             })
             fasesComercialMap.set(faseCotizacion.id, nuevaFaseComercial.id)
@@ -494,13 +496,15 @@ export async function POST(request: NextRequest) {
           // Crear fase por defecto si no hay fases en la cotización
           const fasePorDefectoComercial = await (prisma as any).proyectoFase.create({
             data: {
+              id: crypto.randomUUID(),
               proyectoId: proyecto.id,
               proyectoCronogramaId: cronogramaComercial.id,
               nombre: 'Fase Principal',
               descripcion: 'Fase principal del proyecto',
               orden: 1,
               estado: EstadoTarea.pendiente,
-              porcentajeAvance: 0
+              porcentajeAvance: 0,
+              updatedAt: new Date()
             }
           })
           fasesComercialMap.set('default', fasePorDefectoComercial.id)
@@ -569,11 +573,12 @@ export async function POST(request: NextRequest) {
             // Crear EDT en CRONOGRAMA COMERCIAL (fechas originales)
             const edtComercialProyecto = await (prisma as any).proyectoEdt.create({
               data: {
+                id: crypto.randomUUID(),
                 proyectoId: proyecto.id,
                 proyectoCronogramaId: cronogramaComercial.id,
                 proyectoFaseId: faseComercialId,
                 nombre: edtComercial.nombre || `EDT ${edtComercial.id}`,
-                categoriaServicioId: edtId,
+                edtId: edtId,
                 zona: undefined,
                 fechaInicioPlan: edtComercial.fechaInicioComercial,
                 fechaFinPlan: edtComercial.fechaFinComercial,
@@ -582,7 +587,8 @@ export async function POST(request: NextRequest) {
                 descripcion: edtComercial.descripcion,
                 prioridad: edtComercial.prioridad || 'media',
                 estado: EstadoEdt.planificado,
-                porcentajeAvance: 0
+                porcentajeAvance: 0,
+                updatedAt: new Date()
               }
             })
             console.log(`✅ [CRONOGRAMA] EDT comercial creado: ${edtComercialProyecto.nombre} (ID: ${edtComercialProyecto.id})`)
@@ -603,7 +609,7 @@ export async function POST(request: NextRequest) {
                 porcentajeAvance: 0,
                 descripcion: 'Actividad principal del EDT',
                 prioridad: 'media',
-                cotizacionTareas: [] // Will be populated below
+                cotizacionTarea: [] // Will be populated below
               }]
               console.log(`⚙️ Creada actividad por defecto para EDT ${edtComercialProyecto.nombre}`)
             }

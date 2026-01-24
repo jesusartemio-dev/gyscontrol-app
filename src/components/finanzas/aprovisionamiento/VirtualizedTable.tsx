@@ -148,15 +148,17 @@ const VIRTUALIZED_COLUMNS: ColumnConfig[] = [
 const TOTAL_TABLE_WIDTH = VIRTUALIZED_COLUMNS.reduce((sum, col) => sum + col.width, 0) + 50; // +50 for checkbox
 
 // 🎯 Status variants
-const STATUS_VARIANTS = {
-  borrador: { variant: 'secondary' as const, label: 'Borrador' },
-  por_revisar: { variant: 'outline' as const, label: 'Por Revisar' },
-  por_cotizar: { variant: 'outline' as const, label: 'Por Cotizar' },
-  por_validar: { variant: 'outline' as const, label: 'Por Validar' },
-  por_aprobar: { variant: 'outline' as const, label: 'Por Aprobar' },
-  aprobado: { variant: 'default' as const, label: 'Aprobado' },
-  rechazado: { variant: 'destructive' as const, label: 'Rechazado' },
-} as const;
+const STATUS_VARIANTS: Record<EstadoListaEquipo, { variant: 'default' | 'secondary' | 'outline' | 'destructive', label: string }> = {
+  borrador: { variant: 'secondary', label: 'Borrador' },
+  enviada: { variant: 'outline', label: 'Enviada' },
+  por_revisar: { variant: 'outline', label: 'Por Revisar' },
+  por_cotizar: { variant: 'outline', label: 'Por Cotizar' },
+  por_validar: { variant: 'outline', label: 'Por Validar' },
+  por_aprobar: { variant: 'outline', label: 'Por Aprobar' },
+  aprobada: { variant: 'default', label: 'Aprobada' },
+  rechazada: { variant: 'destructive', label: 'Rechazada' },
+  completada: { variant: 'default', label: 'Completada' },
+};
 
 // 🚀 OPTIMIZED: Status badge component
 const StatusBadge = memo<{ estado: EstadoListaEquipo }>(({ estado }) => {

@@ -40,6 +40,7 @@ interface FaseDefault {
   activo: boolean
   createdAt: string
   updatedAt: string
+  Edt: any[]
 }
 
 export default function FasesConfiguracionPage() {

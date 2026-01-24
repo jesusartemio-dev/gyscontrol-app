@@ -36,7 +36,7 @@ export default function CotizacionServicioForm({ cotizacionId, onCreated }: Prop
       const nuevo = await createCotizacionServicio({
         cotizacionId,
         nombre: nombre.trim(),
-        categoria: nombre.trim(),
+        edtId: '', // TODO: Add EDT selector to this form
         subtotalInterno: 0,
         subtotalCliente: 0
       })

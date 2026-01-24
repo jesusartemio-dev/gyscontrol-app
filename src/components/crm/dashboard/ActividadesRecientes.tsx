@@ -12,11 +12,11 @@ interface Actividad {
   descripcion: string
   fecha: string
   resultado?: string
-  oportunidad: {
+  crmOportunidad?: {
     nombre: string
     cliente?: { nombre: string }
   }
-  usuario: { name?: string }
+  user?: { name?: string }
 }
 
 interface ActividadesRecientesProps {
@@ -110,7 +110,7 @@ export default function ActividadesRecientes({ actividades }: ActividadesRecient
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-medium text-sm truncate">
-                        {actividad.oportunidad.nombre}
+                        {actividad.crmOportunidad?.nombre || 'Sin oportunidad'}
                       </h4>
                       {actividad.resultado && (
                         <Badge
@@ -132,21 +132,21 @@ export default function ActividadesRecientes({ actividades }: ActividadesRecient
                         {formatFecha(actividad.fecha)}
                       </div>
 
-                      {actividad.oportunidad.cliente && (
+                      {actividad.crmOportunidad?.cliente?.nombre && (
                         <div className="flex items-center gap-1">
                           <User className="h-3 w-3" />
-                          {actividad.oportunidad.cliente.nombre}
+                          {actividad.crmOportunidad.cliente.nombre}
                         </div>
                       )}
 
-                      {actividad.usuario.name && (
+                      {actividad.user?.name && (
                         <div className="flex items-center gap-1">
                           <Avatar className="h-4 w-4">
                             <AvatarFallback className="text-xs">
-                              {actividad.usuario.name.substring(0, 2).toUpperCase()}
+                              {actividad.user.name.substring(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          {actividad.usuario.name}
+                          {actividad.user.name}
                         </div>
                       )}
                     </div>

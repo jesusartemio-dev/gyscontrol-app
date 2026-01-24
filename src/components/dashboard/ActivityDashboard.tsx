@@ -116,13 +116,14 @@ const getActionIcon = (accion: string) => {
 // 📅 FORMATEADORES DE FECHA
 // ===================================================
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
+const formatDate = (dateInput: string | Date) => {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
   return format(date, 'dd/MM/yyyy HH:mm')
 }
 
-const formatRelativeTime = (dateString: string) => {
-  return formatDistanceToNow(new Date(dateString), {
+const formatRelativeTime = (dateInput: string | Date) => {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
+  return formatDistanceToNow(date, {
     addSuffix: true
   })
 }
@@ -422,8 +423,8 @@ export default function ActivityDashboard({
 
                         <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                           <Clock className="w-3 h-3" />
-                          <span title={formatDate(evento.createdAt.toISOString())}>
-                            {formatRelativeTime(evento.createdAt.toISOString())}
+                          <span title={formatDate(evento.createdAt)}>
+                            {formatRelativeTime(evento.createdAt)}
                           </span>
                         </div>
                       </div>

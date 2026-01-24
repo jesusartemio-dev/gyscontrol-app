@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
 import type { Proyecto, ProyectoCronograma } from '@/types'
@@ -22,7 +22,6 @@ import {
   Settings,
   Receipt,
   DollarSign,
-  TrendingUp,
   Eye,
   AlertCircle,
   ArrowRight,
@@ -35,7 +34,6 @@ import {
   XCircle,
   PauseCircle,
   Truck,
-  Calendar,
   ArrowLeft
 } from 'lucide-react'
 import Link from 'next/link'
@@ -70,10 +68,13 @@ export default function ProyectoDetallePage() {
         // Fetch cronograma data
         try {
           const cronogramaResponse = await fetch(`/api/proyectos/${id}/cronograma`)
+          let cronogramasList: ProyectoCronograma[] = []
+
           if (cronogramaResponse.ok) {
             const cronogramaData = await cronogramaResponse.json()
             if (cronogramaData.success) {
-              setCronogramas(cronogramaData.data)
+              cronogramasList = cronogramaData.data
+              setCronogramas(cronogramasList)
             }
           }
 
@@ -110,7 +111,7 @@ export default function ProyectoDetallePage() {
           }
 
           // ✅ Si no hay cronograma comercial, crear uno automáticamente con EDTs y actividades
-          if (cronogramas.length === 0) {
+          if (cronogramasList.length === 0) {
             console.log('🔄 [PROYECTO PAGE] No hay cronogramas, creando cronograma comercial por defecto')
             try {
               const createResponse = await fetch(`/api/proyectos/${id}/cronograma/generar-desde-cotizacion`, {
@@ -133,7 +134,8 @@ export default function ProyectoDetallePage() {
                 if (updatedCronogramaResponse.ok) {
                   const updatedData = await updatedCronogramaResponse.json()
                   if (updatedData.success) {
-                    setCronogramas(updatedData.data)
+                    cronogramasList = updatedData.data
+                    setCronogramas(cronogramasList)
                   }
                 }
               } else {
@@ -145,10 +147,10 @@ export default function ProyectoDetallePage() {
           }
 
           // Find active/baseline cronograma
-          const activeCronograma = cronogramas.find(c => c.esBaseline) || cronogramas[0] || null
+          const activeCronograma = cronogramasList.find(c => c.esBaseline) || cronogramasList[0] || null
 
           setCronogramaStats({
-            cronogramas: cronogramas.length,
+            cronogramas: cronogramasList.length,
             fases: fasesCount,
             edts: edtsCount,
             tareas: tareasCount,
@@ -231,38 +233,12 @@ export default function ProyectoDetallePage() {
     return statusMap[estado] || statusMap.creado
   }
 
-  const getNextAction = (estado: string) => {
-    const actions: Record<string, any> = {
-      'creado': { text: 'Crear Listas', url: `/proyectos/${id}/listas`, icon: <Package className="h-4 w-4" /> },
-      'listas_pendientes': { text: 'Aprobar Listas', url: `/proyectos/${id}/listas`, icon: <CheckCircle className="h-4 w-4" /> },
-      'listas_aprobadas': { text: 'Crear Pedidos', url: `/proyectos/${id}/pedidos`, icon: <Truck className="h-4 w-4" /> },
-      'pedidos_creados': { text: 'Monitorear', url: `/proyectos/${id}/cronograma`, icon: <Target className="h-4 w-4" /> },
-      'en_ejecucion': { text: 'Ver Cronograma', url: `/proyectos/${id}/cronograma`, icon: <Calendar className="h-4 w-4" /> },
-      'completado': { text: 'Finalizado', url: null, icon: <CheckCircle className="h-4 w-4" /> },
-      'pausado': { text: 'Reanudar', url: null, icon: <PlayCircle className="h-4 w-4" /> },
-      'cancelado': { text: 'Cancelado', url: null, icon: <XCircle className="h-4 w-4" /> }
-    }
-    return actions[estado] || actions.creado
-  }
-
-  // Legacy functions for backward compatibility
-  const getStatusIcon = (estado: string) => getStatusInfo(estado).icon
-  const getStatusVariant = (estado: string) => getStatusInfo(estado).variant
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2
     }).format(amount)
-  }
-
-  const formatDate = (date: string) => {
-    return new Intl.DateTimeFormat('es-PE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }).format(new Date(date))
   }
 
   // Loading state
@@ -506,11 +482,9 @@ export default function ProyectoDetallePage() {
         </div>
 
         {/* Project Timeline Card */}
-        <div
-          onClick={() => router.push(`/proyectos/${id}/cronograma`)}
-          className="cursor-pointer"
-        >
-          <Card className="hover:shadow-lg transition-all duration-200 border-slate-200 hover:border-slate-300 bg-gradient-to-br from-slate-50 to-slate-100">
+        <div>
+          <Link href={`/proyectos/${id}/cronograma`}>
+            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer border-slate-200 hover:border-slate-300 bg-gradient-to-br from-slate-50 to-slate-100">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-lg">
                 <div className="flex items-center gap-2">
@@ -572,6 +546,7 @@ export default function ProyectoDetallePage() {
               </div>
             </CardContent>
           </Card>
+          </Link>
         </div>
 
         {/* Listas Card */}

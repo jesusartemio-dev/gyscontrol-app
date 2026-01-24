@@ -36,13 +36,13 @@ export async function GET(request: NextRequest) {
         id: edtId,
         OR: [
           { responsableId: session.user.id },
-          { 
-            proyecto_actividad: {
+          {
+            proyectoActividad: {
               some: { responsableId: session.user.id }
             }
           },
-          { 
-            ProyectoTarea: {
+          {
+            proyectoTarea: {
               some: { responsableId: session.user.id }
             }
           },

@@ -33,7 +33,8 @@ interface Props {
   catalogoId: string
   nombre: string
   descripcion: string
-  categoria: string
+  edtId: string
+  edtNombre?: string
   formula: TipoFormula
   horaBase?: number
   horaRepetido?: number
@@ -52,7 +53,8 @@ export default function CotizacionServicioItemForm({
   catalogoId,
   nombre,
   descripcion,
-  categoria,
+  edtId,
+  edtNombre,
   formula,
   horaBase,
   horaRepetido,
@@ -109,7 +111,7 @@ export default function CotizacionServicioItemForm({
         recursoId,
         nombre,
         descripcion,
-        categoria,
+        edtId,
         unidadServicioNombre,
         recursoNombre,
         formula,
@@ -183,7 +185,7 @@ export default function CotizacionServicioItemForm({
               <div className="flex flex-wrap gap-2 mt-3">
                 <Badge variant="outline" className="text-xs">
                   <Settings className="h-3 w-3 mr-1" />
-                  {categoria}
+                  {edtNombre || 'EDT'}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
                   <Clock className="h-3 w-3 mr-1" />

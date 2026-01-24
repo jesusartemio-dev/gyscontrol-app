@@ -49,16 +49,9 @@ export async function GET(
 
     console.log(`📊 DEPENDENCIAS ENCONTRADAS PARA COTIZACIÓN ${cotizacionId}: ${dependencias.length}`)
 
-    // Transformar la respuesta para mantener compatibilidad
-    const dependenciasFormateadas = dependencias.map(dep => ({
-      ...dep,
-      tareaOrigen: dep.tareaOrigen,
-      tareaDependiente: dep.tareaDependiente
-    }))
-
     return NextResponse.json({
       success: true,
-      data: dependenciasFormateadas
+      data: dependencias
     })
 
   } catch (error) {
@@ -130,16 +123,9 @@ export async function POST(
       }
     })
 
-    // Transformar la respuesta para mantener compatibilidad
-    const dependenciaFormateada = {
-      ...dependencia,
-      tareaOrigen: dependencia.tareaOrigen,
-      tareaDependiente: dependencia.tareaDependiente
-    }
-
     return NextResponse.json({
       success: true,
-      data: dependenciaFormateada
+      data: dependencia
     }, { status: 201 })
 
   } catch (error) {

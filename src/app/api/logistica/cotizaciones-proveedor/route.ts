@@ -10,18 +10,19 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import type { CotizacionProveedorPayload } from '@/types'
 
 export async function GET() {
   try {
-    const data = await prisma.cotizacionProveedor.findMany({
+    const rawData = await prisma.cotizacionProveedor.findMany({
       include: {
         proveedor: true,
         proyecto: true,
-        items: {
+        cotizacionProveedorItem: {
           include: {
             listaEquipoItem: true,
-            lista: true,
+            listaEquipo: true,
           },
         },
       },
@@ -29,6 +30,16 @@ export async function GET() {
         codigo: 'asc',
       },
     })
+
+    // 🔄 Frontend compatibility mapping
+    const data = rawData.map((cotizacion: any) => ({
+      ...cotizacion,
+      items: cotizacion.cotizacionProveedorItem?.map((item: any) => ({
+        ...item,
+        lista: item.listaEquipo
+      }))
+    }))
+
     return NextResponse.json({ ok: true, data })
   } catch (error) {
     console.error('❌ Error al obtener cotizaciones:', error)
@@ -73,10 +84,12 @@ export async function POST(request: Request) {
 
     const nuevaCotizacion = await prisma.cotizacionProveedor.create({
       data: {
+        id: randomUUID(),
         proveedorId: body.proveedorId,
         proyectoId: body.proyectoId,
         codigo: codigoGenerado,
         numeroSecuencia: nuevoNumero,
+        updatedAt: new Date(),
       },
     })
 

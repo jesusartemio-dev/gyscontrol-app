@@ -39,7 +39,7 @@ export async function PUT(
     }
 
     // Verificar que la plantilla existe
-    const plantillaExistente = await (prisma as any).plantillaDuracionCronograma.findUnique({
+    const plantillaExistente = await prisma.plantillaDuracionCronograma.findUnique({
       where: { id }
     })
 
@@ -57,7 +57,7 @@ export async function PUT(
         // Desactivar - permitido
       } else {
         // Activar - verificar que no haya otra activa con misma combinación
-        const conflicto = await (prisma as any).plantillaDuracionCronograma.findFirst({
+        const conflicto = await prisma.plantillaDuracionCronograma.findFirst({
           where: {
             nivel: plantillaExistente.nivel,
             activo: true,
@@ -74,7 +74,7 @@ export async function PUT(
     }
 
     // Actualizar plantilla
-    const plantillaActualizada = await (prisma as any).plantillaDuracionCronograma.update({
+    const plantillaActualizada = await prisma.plantillaDuracionCronograma.update({
       where: { id },
       data: validatedData
     })
@@ -121,7 +121,7 @@ export async function DELETE(
     }
 
     // Verificar que la plantilla existe
-    const plantillaExistente = await (prisma as any).plantillaDuracionCronograma.findUnique({
+    const plantillaExistente = await prisma.plantillaDuracionCronograma.findUnique({
       where: { id }
     })
 
@@ -130,7 +130,7 @@ export async function DELETE(
     }
 
     // Desactivar plantilla (soft delete)
-    const plantillaDesactivada = await (prisma as any).plantillaDuracionCronograma.update({
+    const plantillaDesactivada = await prisma.plantillaDuracionCronograma.update({
       where: { id },
       data: { activo: false }
     })

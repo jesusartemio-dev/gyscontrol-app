@@ -124,14 +124,14 @@ export async function GET(request: NextRequest) {
     const tareas = await prisma.tarea.findMany({
       where: whereClause,
       include: {
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
             email: true
           }
         },
-        proyectoServicio: {
+        proyectoServicioCotizado: {
           select: {
             id: true,
             categoria: true
@@ -208,13 +208,13 @@ export async function GET(request: NextRequest) {
     const responsablesMap = new Map()
     
     tareas.forEach(tarea => {
-      if (!tarea.responsable) return // Skip tasks without responsible
-      
-      const responsableId = tarea.responsable.id
+      if (!tarea.user) return // Skip tasks without responsible
+
+      const responsableId = tarea.user.id
       if (!responsablesMap.has(responsableId)) {
         responsablesMap.set(responsableId, {
           responsableId,
-          nombreResponsable: tarea.responsable.name || 'Sin nombre',
+          nombreResponsable: tarea.user.name || 'Sin nombre',
           totalTareas: 0,
           tareasCompletadas: 0,
           progresoTotal: 0,

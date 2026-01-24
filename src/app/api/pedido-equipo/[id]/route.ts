@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server'
 import type { PedidoEquipoUpdatePayload } from '@/types'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { randomUUID } from 'crypto'
 
 // ✅ Obtener pedido por ID
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -22,11 +23,11 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const data = await prisma.pedidoEquipo.findUnique({
       where: { id },
       include: {
-        responsable: true,
+        user: true,
         proyecto: true,
-        lista: {
+        listaEquipo: {
           include: {
-            items: {
+            listaEquipoItem: {
               select: {
                 id: true,
                 cantidad: true,
@@ -41,7 +42,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
             },
           },
         },
-        items: {
+        pedidoEquipoItem: {
           include: {
             listaEquipoItem: {
               include: {
@@ -53,7 +54,18 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       },
     })
 
-    return NextResponse.json(data)
+    // Transformar para compatibilidad con frontend
+    const response = data ? {
+      ...data,
+      responsable: data.user,
+      lista: data.listaEquipo ? {
+        ...data.listaEquipo,
+        items: data.listaEquipo.listaEquipoItem
+      } : null,
+      items: data.pedidoEquipoItem
+    } : null
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('❌ Error al obtener pedido:', error)
     return NextResponse.json(
@@ -111,16 +123,24 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : null,
       },
       include: {
-        responsable: true,
+        user: true,
         proyecto: true,
-        lista: true,
-        items: {
+        listaEquipo: true,
+        pedidoEquipoItem: {
           include: {
             listaEquipoItem: true,
           },
         },
       },
     })
+
+    // Transformar para compatibilidad con frontend
+    const response = {
+      ...data,
+      responsable: data.user,
+      lista: data.listaEquipo,
+      items: data.pedidoEquipoItem
+    }
 
     // ✅ Registrar en auditoría
     try {
@@ -146,6 +166,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       if (Object.keys(cambios).length > 0) {
         await prisma.auditLog.create({
           data: {
+            id: randomUUID(),
             entidadTipo: 'PEDIDO_EQUIPO',
             entidadId: id,
             accion: 'ACTUALIZAR',
@@ -164,7 +185,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       // No fallar la actualización por error de auditoría
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(response)
   } catch (error) {
     console.error('❌ Error al actualizar pedido:', error)
     return NextResponse.json(

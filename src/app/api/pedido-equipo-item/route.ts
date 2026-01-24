@@ -14,8 +14,8 @@ export async function GET() {
   try {
     const data = await prisma.pedidoEquipoItem.findMany({
       include: {
-        pedido: {
-          include: { proyecto: true, responsable: true },
+        pedidoEquipo: {
+          include: { proyecto: true, user: true },
         },
         listaEquipoItem: true,
       },
@@ -107,8 +107,10 @@ export async function POST(request: Request) {
     // ✅ Crear el nuevo ítem de pedido
     const nuevoItem = await prisma.pedidoEquipoItem.create({
       data: {
+        id: `pedido-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         pedidoId: body.pedidoId,
         responsableId: userId,
+        updatedAt: new Date(),
         listaId: body.listaId ?? null,
         listaEquipoItemId: body.listaEquipoItemId,
         cantidadPedida: body.cantidadPedida,

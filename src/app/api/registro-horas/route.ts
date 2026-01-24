@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       proyectoId: searchParams.get('proyectoId') || undefined,
       proyectoEdtId: searchParams.get('proyectoEdtId') || undefined,
       proyectoTareaId: searchParams.get('proyectoTareaId') || undefined,
-      categoriaServicioId: searchParams.get('categoriaServicioId') || undefined,
+      edtId: searchParams.get('edtId') || undefined,
       usuarioId: searchParams.get('usuarioId') || undefined,
       recursoId: searchParams.get('recursoId') || undefined,
       origen: searchParams.get('origen') || undefined,
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     if (filtros.proyectoId) whereClause.proyectoId = filtros.proyectoId;
     if (filtros.proyectoEdtId) whereClause.proyectoEdtId = filtros.proyectoEdtId;
     if (filtros.proyectoTareaId) whereClause.proyectoTareaId = filtros.proyectoTareaId;
-    if (filtros.categoriaServicioId) whereClause.categoriaServicioId = filtros.categoriaServicioId;
+    if (filtros.edtId) whereClause.edtId = filtros.edtId;
     if (filtros.usuarioId) whereClause.usuarioId = filtros.usuarioId;
     if (filtros.recursoId) whereClause.recursoId = filtros.recursoId;
     if (filtros.origen) whereClause.origen = filtros.origen;
@@ -67,16 +67,9 @@ export async function GET(request: NextRequest) {
               codigo: true
             }
           },
-          proyectoServicio: {
-            select: {
-              id: true,
-              categoria: true
-            }
-          },
           proyectoEdt: {
             select: {
               id: true,
-              zona: true,
               estado: true,
               porcentajeAvance: true
             }
@@ -89,17 +82,10 @@ export async function GET(request: NextRequest) {
               porcentajeCompletado: true
             }
           },
-          categoriaServicioRef: {
+          edt: {
             select: {
               id: true,
               nombre: true
-            }
-          },
-          usuario: {
-            select: {
-              id: true,
-              name: true,
-              email: true
             }
           },
           recurso: {
@@ -227,7 +213,7 @@ export async function POST(request: NextRequest) {
         where: { id: data.proyectoEdtId },
         include: {
           proyecto: true,
-          categoriaServicio: true
+          edt: true
         }
       });
 
@@ -246,7 +232,7 @@ export async function POST(request: NextRequest) {
           proyectoEdt: {
             include: {
               proyecto: true,
-              categoriaServicio: true
+              edt: true
             }
           }
         }
@@ -317,13 +303,14 @@ export async function POST(request: NextRequest) {
     // 🏗️ Crear registro de horas
     const nuevoRegistro = await prisma.registroHoras.create({
       data: {
+        id: crypto.randomUUID(),
         proyectoId: proyecto.id,
         proyectoServicioId: 'default-service',
         proyectoEdtId: data.proyectoEdtId,
         proyectoTareaId: data.proyectoTareaId,
-        categoriaServicioId: edt.categoriaServicioId,
-        categoria: edt.categoriaServicio?.nombre || 'General',
-        nombreServicio: edt.categoriaServicio?.nombre || 'Servicio General',
+        edtId: edt.edtId,
+        categoria: edt.edt?.nombre || 'General',
+        nombreServicio: edt.edt?.nombre || 'Servicio General',
         recursoId: recurso.id,
         recursoNombre: recurso.nombre,
         usuarioId: data.usuarioId,
@@ -332,7 +319,8 @@ export async function POST(request: NextRequest) {
         descripcion: data.descripcion,
         observaciones: data.observaciones,
         origen: 'oficina',
-        ubicacion: 'Oficina'
+        ubicacion: 'Oficina',
+        updatedAt: new Date()
       },
       include: {
         proyecto: {
@@ -345,15 +333,7 @@ export async function POST(request: NextRequest) {
         proyectoEdt: {
           select: {
             id: true,
-            zona: true,
             estado: true
-          }
-        },
-        usuario: {
-          select: {
-            id: true,
-            name: true,
-            email: true
           }
         },
         recurso: {
@@ -402,9 +382,9 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    if (error instanceof Error && error.name === 'ZodError') {
+    if (error instanceof Error && 'name' in error && error.name === 'ZodError') {
       return NextResponse.json(
-        { error: 'Datos inválidos', detalles: error.message },
+        { error: 'Datos inválidos', detalles: (error as any).message },
         { status: 400 }
       );
     }
@@ -456,7 +436,7 @@ export async function PUT(request: NextRequest) {
 
     // 🔄 Recalcular horas de EDT afectados si aplica
     if (updates.proyectoEdtId || updates.horasTrabajadas) {
-      const edtsAfectados = await prisma.registroHoras.findMany({
+      const edtsAfectadosList = await prisma.registroHoras.findMany({
         where: {
           id: { in: registroIds },
           proyectoEdtId: { not: null }
@@ -465,7 +445,7 @@ export async function PUT(request: NextRequest) {
         distinct: ['proyectoEdtId']
       });
 
-      for (const registro of edtsAfectados) {
+      for (const registro of edtsAfectadosList) {
         if (registro.proyectoEdtId) {
           const totalHoras = await prisma.registroHoras.aggregate({
             where: { proyectoEdtId: registro.proyectoEdtId },
@@ -506,83 +486,75 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const registroIds = searchParams.get('ids')?.split(',') || [];
+    const registroId = searchParams.get('id');
 
-    if (registroIds.length === 0) {
+    if (!registroId) {
       return NextResponse.json(
-        { error: 'Se requiere al menos un ID de registro' },
+        { error: 'Se requiere ID de registro' },
         { status: 400 }
       );
     }
 
-    // 🔐 Verificar permisos
-    const whereClause: any = { id: { in: registroIds } };
-    
-    // Los usuarios solo pueden eliminar sus propios registros
-    if (!['admin', 'gerente'].includes(session.user.role)) {
-      whereClause.usuarioId = session.user.id;
-    }
-
-    // 📊 Obtener EDT afectados antes de eliminar
-    const registrosAEliminar = await prisma.registroHoras.findMany({
-      where: whereClause,
+    // 🔍 Obtener registro para actualizar EDT
+    const registro = await prisma.registroHoras.findUnique({
+      where: { id: registroId },
       select: {
         id: true,
-        proyectoEdtId: true,
-        horasTrabajadas: true
+        proyectoEdtId: true
       }
     });
 
-    const edtsAfectados = new Set(
-      registrosAEliminar
-        .filter(r => r.proyectoEdtId)
-        .map(r => r.proyectoEdtId!)
-    );
+    if (!registro) {
+      return NextResponse.json(
+        { error: 'Registro de horas no encontrado' },
+        { status: 404 }
+      );
+    }
 
-    // 🗑️ Eliminar registros
-    const resultado = await prisma.registroHoras.deleteMany({
-      where: whereClause
+    // 🗑️ Eliminar registro
+    await prisma.registroHoras.delete({
+      where: { id: registroId }
     });
 
-    // 🔄 Recalcular horas de EDT afectados
-    for (const edtId of edtsAfectados) {
+    // 🔄 Recalcular horas reales del EDT
+    if (registro.proyectoEdtId) {
       const totalHoras = await prisma.registroHoras.aggregate({
-        where: { proyectoEdtId: edtId },
+        where: { proyectoEdtId: registro.proyectoEdtId },
         _sum: { horasTrabajadas: true }
       });
 
       const horasReales = Number(totalHoras._sum.horasTrabajadas || 0);
       
-      // Recalcular porcentaje de avance
-      const edt = await prisma.proyectoEdt.findUnique({
-        where: { id: edtId },
-        select: { horasPlan: true }
+      // Obtener EDT para calcular porcentaje de avance
+      const proyectoEdt = await prisma.proyectoEdt.findUnique({
+        where: { id: registro.proyectoEdtId }
       });
 
       let porcentajeAvance = 0;
-      if (edt?.horasPlan && Number(edt.horasPlan) > 0) {
-        porcentajeAvance = Math.min(100, Math.round((horasReales / Number(edt.horasPlan)) * 100));
+      if (proyectoEdt?.horasPlan && Number(proyectoEdt.horasPlan) > 0) {
+        porcentajeAvance = Math.min(100, Math.round((horasReales / Number(proyectoEdt.horasPlan)) * 100));
       }
 
       await prisma.proyectoEdt.update({
-        where: { id: edtId },
+        where: { id: registro.proyectoEdtId },
         data: {
           horasReales,
           porcentajeAvance
         }
       });
+
+      logger.info(`🔄 EDT actualizado: ${registro.proyectoEdtId} - ${horasReales}h (${porcentajeAvance}%)`);
     }
 
-    logger.info(`🗑️ Registros eliminados: ${resultado.count} elementos`);
+    logger.info(`✅ Registro de horas eliminado: ${registroId}`);
 
     return NextResponse.json({
       success: true,
-      data: { eliminados: resultado.count },
-      message: `${resultado.count} registros eliminados exitosamente`
+      message: 'Registro de horas eliminado exitosamente'
     });
 
   } catch (error) {
-    logger.error('❌ Error al eliminar registros:', error);
+    logger.error('❌ Error al eliminar registro de horas:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

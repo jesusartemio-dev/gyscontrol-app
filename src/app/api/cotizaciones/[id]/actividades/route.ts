@@ -44,7 +44,7 @@ export async function GET(
       where: { id },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -71,7 +71,7 @@ export async function GET(
       include: {
         cotizacionEdt: {
           include: {
-            categoriaServicio: true
+            edt: true
           }
         },
         tareas: {
@@ -141,7 +141,7 @@ export async function POST(
       where: { id },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -206,7 +206,7 @@ export async function POST(
         // ✅ EDT directo en lugar de zona
         cotizacionEdt: {
           include: {
-            categoriaServicio: true
+            edt: true
           }
         },
         tareas: {

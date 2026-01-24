@@ -68,13 +68,13 @@ export async function GET(
           proyectoCronogramaId: cronogramaId
         },
         include: {
-          edts: {
+          proyectoEdt: {
             include: {
-              proyecto_actividad: {
+              proyectoActividad: {
                 include: {
-                  proyecto_tarea: {
+                  proyectoTarea: {
                     include: {
-                      responsable: {
+                      user: {
                         select: { id: true, name: true, email: true }
                       }
                     },
@@ -110,13 +110,13 @@ export async function GET(
             proyectoCronogramaId: cronogramaPlanificacion.id
           },
           include: {
-            edts: {
+            proyectoEdt: {
               include: {
-                proyecto_actividad: {
+                proyectoActividad: {
                   include: {
-                    proyecto_tarea: {
+                    proyectoTarea: {
                       include: {
-                        responsable: {
+                        user: {
                           select: { id: true, name: true, email: true }
                         }
                       },
@@ -137,13 +137,13 @@ export async function GET(
         fases = await prisma.proyectoFase.findMany({
           where: { proyectoId: id },
           include: {
-            edts: {
+            proyectoEdt: {
               include: {
-                proyecto_actividad: {
+                proyectoActividad: {
                   include: {
-                    proyecto_tarea: {
+                    proyectoTarea: {
                       include: {
-                        responsable: {
+                        user: {
                           select: { id: true, name: true, email: true }
                         }
                       },
@@ -163,7 +163,7 @@ export async function GET(
 
     // ✅ Construir árbol jerárquico de 5 niveles
     const tree = fases.map(fase => {
-      const faseEdts = fase.edts || []
+      const faseEdts = fase.proyectoEdt || []
 
       // Calcular horas totales de la fase (suma de horas de todos los EDTs)
       const faseHorasTotales = faseEdts.reduce((sum: number, edt: any) => sum + Number(edt.horasPlan || 0), 0)
@@ -194,7 +194,7 @@ export async function GET(
         children: faseEdts
           .sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0))
           .map((edt: any) => {
-            const edtActividades = edt.proyecto_actividad || []
+            const edtActividades = edt.proyectoActividad || []
 
           return {
             id: `edt-${edt.id}`,
@@ -204,7 +204,7 @@ export async function GET(
             expanded: expandedNodes.includes(`edt-${edt.id}`),
             data: {
               descripcion: edt.descripcion,
-              categoriaServicio: edt.categoriaServicioId,
+              edtId: edt.edtId,
               fechaInicioComercial: edt.fechaInicioPlan,
               fechaFinComercial: edt.fechaFinPlan,
               fechaInicioReal: edt.fechaInicioReal,
@@ -223,7 +223,7 @@ export async function GET(
             children: edtActividades
               .sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0))
               .map((actividad: any) => {
-                const actividadTareas = actividad.proyecto_tarea || []
+                const actividadTareas = actividad.proyectoTarea || []
 
               return {
                 id: `actividad-${actividad.id}`,
@@ -270,7 +270,7 @@ export async function GET(
                       horasReales: tarea.horasReales,
                       prioridad: tarea.prioridad,
                       orden: tarea.orden,
-                      responsable: tarea.responsable
+                      responsable: tarea.user
                     },
                     metadata: {
                       hasChildren: false,

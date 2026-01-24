@@ -749,7 +749,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                 <View key={`servicio-${servicio.id || index}`} style={[styles.summaryRow, ...(rowIndex % 2 === 1 ? [styles.summaryRowAlt] : [])]}>
                   <Text style={[styles.summaryCell, { flex: 1 }]}>{rowIndex + 1}</Text>
                   <Text style={[styles.summaryCell, styles.summaryDescCell]}>
-                    {safeText(servicio.categoria).toUpperCase()}
+                    {safeText(servicio.edt?.nombre || servicio.nombre).toUpperCase()}
                   </Text>
                   <Text style={[styles.summaryCell, styles.summaryQtyCell]}>1</Text>
                   <Text style={[styles.summaryCell, styles.summaryPriceCell]}>
@@ -1153,7 +1153,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                   {cotizacion.cronograma.map((edt, index) => (
                     <View key={edt.id || index} style={{ marginBottom: 15 }}>
                       <Text style={[styles.contentText, { fontWeight: 600, marginBottom: 8 }]}>
-                        {edt.categoriaServicio?.nombre || 'Sin categoría'} - {edt.zona || 'Sin zona'}
+                        {edt.edt?.nombre || 'Sin categoría'} - {edt.zona || 'Sin zona'}
                       </Text>
                       <Text style={styles.contentText}>
                         • Fecha Inicio: {edt.fechaInicioCom ? formatDate(edt.fechaInicioCom) : 'No definida'}

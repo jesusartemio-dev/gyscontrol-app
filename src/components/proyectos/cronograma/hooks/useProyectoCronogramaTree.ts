@@ -291,7 +291,7 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
           apiEndpoint = `/api/proyectos/${proyectoId}/cronograma/edts`
           requestBody = {
             nombre: data.nombre,
-            categoriaServicioId: servicioDefault.categoriaId,
+            edtId: servicioDefault.categoriaId,
             proyectoFaseId: parentId !== 'root' ? parentId.replace('fase-', '') : undefined,
             fechaInicioPlan: data.fechaInicioComercial,
             fechaFinPlan: data.fechaFinComercial,

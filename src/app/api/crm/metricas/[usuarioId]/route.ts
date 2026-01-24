@@ -134,7 +134,7 @@ export async function GET(
         }
       },
       include: {
-        oportunidad: {
+        crmOportunidad: {
           select: { nombre: true, cliente: { select: { nombre: true } } }
         }
       },
@@ -184,7 +184,7 @@ export async function GET(
         descripcion: act.descripcion,
         fecha: act.fecha,
         resultado: act.resultado,
-        oportunidad: act.oportunidad
+        oportunidad: act.crmOportunidad
       })),
       historialMetricas: metricasComerciales.map(m => ({
         periodo: m.periodo,

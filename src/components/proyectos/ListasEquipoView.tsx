@@ -63,22 +63,26 @@ async function fetchProyectos() {
 // ✅ Estado badge mapping - aligned with EstadoListaEquipo enum
 const estadoBadgeVariant: Record<EstadoListaEquipo, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   borrador: 'secondary',
+  enviada: 'outline',
   por_revisar: 'default',
   por_cotizar: 'default',
   por_validar: 'default',
   por_aprobar: 'default',
-  aprobado: 'default',
-  rechazado: 'destructive'
+  aprobada: 'default',
+  rechazada: 'destructive',
+  completada: 'default'
 }
 
 const estadoColors: Record<EstadoListaEquipo, string> = {
   borrador: 'bg-gray-100 text-gray-800',
+  enviada: 'bg-indigo-100 text-indigo-800',
   por_revisar: 'bg-yellow-100 text-yellow-800',
   por_cotizar: 'bg-blue-100 text-blue-800',
   por_validar: 'bg-orange-100 text-orange-800',
   por_aprobar: 'bg-purple-100 text-purple-800',
-  aprobado: 'bg-green-100 text-green-800',
-  rechazado: 'bg-red-100 text-red-800'
+  aprobada: 'bg-green-100 text-green-800',
+  rechazada: 'bg-red-100 text-red-800',
+  completada: 'bg-emerald-100 text-emerald-800'
 }
 
 export function ListasEquipoView() {
@@ -247,7 +251,7 @@ export function ListasEquipoView() {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Package className="h-4 w-4" />
-                        <span>{lista._count?.items || 0} ítems</span>
+                        <span>{lista._count?.listaEquipoItem || 0} ítems</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
@@ -267,7 +271,7 @@ export function ListasEquipoView() {
                     
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/proyectos/${lista.proyectoId}/equipos/listas/${lista.id}`}>
+                        <Link href={`/proyectos/${lista.proyecto?.id}/equipos/listas/${lista.id}`}>
                           <Eye className="h-4 w-4 mr-1" />
                           Ver Detalles
                         </Link>

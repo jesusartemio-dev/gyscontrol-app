@@ -67,8 +67,8 @@ export async function POST(
     const actividad = await prisma.proyectoActividad.create({
       data: actividadData,
       include: {
-        proyecto_edt: true,
-        proyecto_tarea: true // ✅ Corregido: es 'proyecto_tarea' según Prisma
+        proyectoEdt: true,
+        proyectoTarea: true // ✅ Corregido: es 'proyectoTarea' según Prisma
       }
     })
 
@@ -95,19 +95,19 @@ export async function GET(
     const actividades = await prisma.proyectoActividad.findMany({
       where: {
         // ✅ Filtrar por proyecto a través de la relación EDT
-        proyecto_edt: {
+        proyectoEdt: {
           proyectoId: id
         },
         ...(edtId && { proyectoEdtId: edtId }),
         ...(cronogramaId && { proyectoCronogramaId: cronogramaId })
       },
       include: {
-        proyecto_edt: true, // ✅ EDT padre directo
-        proyecto_tarea: true,
-        User: true
+        proyectoEdt: true, // ✅ EDT padre directo
+        proyectoTarea: true,
+        user: true
       },
       orderBy: [
-        { proyecto_edt: { orden: 'asc' } },
+        { proyectoEdt: { orden: 'asc' } },
         { orden: 'asc' }
       ]
     })

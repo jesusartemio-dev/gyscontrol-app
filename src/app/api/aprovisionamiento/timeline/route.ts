@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          items: {
+          listaEquipoItem: {
             select: {
               id: true,
               cantidad: true,
@@ -255,13 +255,13 @@ export async function GET(request: NextRequest) {
         if (!lista.fechaNecesaria) continue
 
         // 🧮 Calcular monto total de la lista
-        const monto = lista.items.reduce((total, item) => {
+        const monto = lista.listaEquipoItem.reduce((total, item) => {
           return total + (item.cantidad * (item.precioElegido || 0))
         }, 0)
 
         // 🧮 Calcular fechas basado en tiempoEntregaDias según documentación
         // fechaInicio = fechaNecesaria - MAX(ListaEquipoItem.tiempoEntregaDias)
-        const tiemposEntrega = lista.items
+        const tiemposEntrega = lista.listaEquipoItem
           .map(item => item.tiempoEntregaDias || 0)
           .filter(tiempo => tiempo > 0)
         const tiempoEntrega = tiemposEntrega.length > 0 ? Math.max(...tiemposEntrega) : 30
@@ -318,7 +318,7 @@ export async function GET(request: NextRequest) {
           diasRetraso: diasRetraso > 0 ? diasRetraso : undefined,
           metadatos: {
             tiempoEntregaDias: tiempoEntrega,
-            totalItems: lista.items.length
+            totalItems: lista.listaEquipoItem.length
           }
         }
 
@@ -354,13 +354,13 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          lista: {
+          listaEquipo: {
             select: {
               id: true,
               fechaNecesaria: true
             }
           },
-          items: {
+          pedidoEquipoItem: {
             select: {
               id: true,
               cantidadPedida: true,
@@ -377,7 +377,7 @@ export async function GET(request: NextRequest) {
       // 🔄 Procesar pedidos y calcular fechas/montos
       for (const pedido of pedidos) {
         // 🧮 Calcular monto total del pedido
-        const monto = pedido.items.reduce((total, item) => {
+        const monto = pedido.pedidoEquipoItem.reduce((total, item) => {
           return total + (item.cantidadPedida * (item.precioUnitario || 0))
         }, 0)
 
@@ -387,19 +387,19 @@ export async function GET(request: NextRequest) {
         let dependencias: string[] = []
 
         // 🧮 Calcular tiempoEntrega basado en MAX(PedidoEquipoItem.tiempoEntregaDias)
-        const tiemposEntregaPedido = pedido.items
+        const tiemposEntregaPedido = pedido.pedidoEquipoItem
           .map(item => item.tiempoEntregaDias || 0)
           .filter(tiempo => tiempo > 0)
         const tiempoEntregaPedido = tiemposEntregaPedido.length > 0 ? Math.max(...tiemposEntregaPedido) : 20
 
-        if (pedido.lista && pedido.lista.fechaNecesaria) {
+        if (pedido.listaEquipo && pedido.listaEquipo.fechaNecesaria) {
           // Calcular basado en la lista relacionada
-          const fechasLista = calcularFechasLista(pedido.lista.fechaNecesaria, tiempoEntregaPedido)
+          const fechasLista = calcularFechasLista(pedido.listaEquipo.fechaNecesaria, tiempoEntregaPedido)
           const fechasPedido = calcularFechasPedido(fechasLista.fechaInicio, fechasLista.fechaFin, tiempoEntregaPedido)
-          
+
           fechaInicio = fechasPedido.fechaInicio
           fechaFin = pedido.fechaEntregaEstimada || fechasPedido.fechaFin
-          dependencias = [pedido.lista.id]
+          dependencias = [pedido.listaEquipo.id]
         } else {
           // Usar fechas del pedido directamente
           fechaFin = pedido.fechaEntregaEstimada || new Date()
@@ -460,7 +460,7 @@ export async function GET(request: NextRequest) {
           diasRetraso: diasRetrasoPedido > 0 ? diasRetrasoPedido : undefined,
           metadatos: {
             tiempoEntregaDias: tiempoEntregaPedido,
-            totalItems: pedido.items.length,
+            totalItems: pedido.pedidoEquipoItem.length,
             listaRelacionadaId: pedido.listaId
           }
         }
@@ -638,13 +638,13 @@ export async function POST(request: NextRequest) {
     const proyectos = await prisma.proyecto.findMany({
       where: whereConditions,
       include: {
-        listaEquipos: {
+        listaEquipo: {
           include: {
-            items: {
+            listaEquipoItem: {
               include: {
                 proveedor: true,
                 cotizacionSeleccionada: true,
-                responsable: {
+                user: {
                   select: {
                     id: true,
                     name: true
@@ -652,17 +652,17 @@ export async function POST(request: NextRequest) {
                 }
               }
             },
-            pedidoEquipos: {
+            pedidoEquipo: {
               include: {
-                items: true
+                pedidoEquipoItem: true
               }
             }
           }
         },
-        pedidos: {
+        pedidoEquipo: {
           include: {
-            items: true,
-            lista: {
+            pedidoEquipoItem: true,
+            listaEquipo: {
               select: {
                 id: true,
                 nombre: true,
@@ -793,7 +793,7 @@ export async function POST(request: NextRequest) {
         // 💡 Sugerencias de optimización
         if (listas.length > 0) {
           const montoTotalListas = listas.reduce((total: number, lista: any) => {
-            return total + (lista.items?.reduce((subtotal: number, item: any) => {
+            return total + (lista.listaEquipoItem?.reduce((subtotal: number, item: any) => {
               return subtotal + (item.cantidad * (item.equipo?.precio || 0))
             }, 0) || 0)
           }, 0)

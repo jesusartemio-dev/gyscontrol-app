@@ -21,13 +21,14 @@ export function exportarListaEquipoAExcel(
       // Extraer categoría del comentarioRevision si tiene el prefijo CATEGORIA:
       let categoria = ''
       if (item.comentarioRevision && item.comentarioRevision.startsWith('CATEGORIA:')) {
-        categoria = item.comentarioRevision.replace('CATEGORIA:', '')
-        console.log(`📊 Exportando item ${item.codigo}: categoria encontrada en comentarioRevision: "${categoria}"`)
-      } else if (item.catalogoEquipo?.categoria?.nombre) {
-        categoria = item.catalogoEquipo.categoria.nombre
-        console.log(`📊 Exportando item ${item.codigo}: categoria encontrada en catalogoEquipo: "${categoria}"`)
+        categoria = item.comentarioRevision.replace('CATEGORIA:', '').trim()
+        console.log(`📊 Exportando item ${item.codigo}: categoria de comentarioRevision: "${categoria}"`)
+      } else if (item.catalogoEquipo?.categoriaEquipo?.nombre) {
+        categoria = item.catalogoEquipo.categoriaEquipo.nombre
+        console.log(`📊 Exportando item ${item.codigo}: categoria de catalogoEquipo: "${categoria}"`)
       } else {
-        console.log(`📊 Exportando item ${item.codigo}: categoria NO encontrada, comentarioRevision: "${item.comentarioRevision}", catalogoEquipo:`, item.catalogoEquipo)
+        categoria = 'SIN-CATEGORIA' // En vez de vacío, exportar con la categoría por defecto
+        console.log(`📊 Exportando item ${item.codigo}: sin categoria, usando SIN-CATEGORIA`)
       }
 
       return {

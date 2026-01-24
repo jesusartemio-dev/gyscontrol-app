@@ -15,7 +15,7 @@ export async function GET(
   try {
     const { id: proyectoId, dependenciaId } = await params;
 
-    const dependencia = await prisma.proyectoDependenciaTarea.findFirst({
+    const dependencia = await prisma.proyectoDependenciasTarea.findFirst({
       where: {
         id: dependenciaId,
         tareaOrigen: {
@@ -97,7 +97,7 @@ export async function PUT(
     const { tipo } = body;
 
     // Verificar que la dependencia existe y pertenece al proyecto
-    const dependenciaExistente = await prisma.proyectoDependenciaTarea.findFirst({
+    const dependenciaExistente = await prisma.proyectoDependenciasTarea.findFirst({
       where: {
         id: dependenciaId,
         tareaOrigen: {
@@ -137,7 +137,7 @@ export async function PUT(
     }
 
     // Actualizar dependencia
-    const dependenciaActualizada = await prisma.proyectoDependenciaTarea.update({
+    const dependenciaActualizada = await prisma.proyectoDependenciasTarea.update({
       where: { id: dependenciaId },
       data: {
         ...(tipo !== undefined && { tipo })
@@ -186,7 +186,7 @@ export async function DELETE(
     const { id: proyectoId, dependenciaId } = await params;
 
     // Verificar que la dependencia existe y pertenece al proyecto
-    const dependencia = await prisma.proyectoDependenciaTarea.findFirst({
+    const dependencia = await prisma.proyectoDependenciasTarea.findFirst({
       where: {
         id: dependenciaId,
         tareaOrigen: {
@@ -208,7 +208,7 @@ export async function DELETE(
     }
 
     // Eliminar dependencia
-    await prisma.proyectoDependenciaTarea.delete({
+    await prisma.proyectoDependenciasTarea.delete({
       where: { id: dependenciaId }
     });
 
@@ -234,7 +234,7 @@ export async function DELETE(
 // Función auxiliar para verificar ciclos en dependencias
 async function verificarCiclo(tareaActualId: string, tareaBuscadaId: string): Promise<boolean> {
   // Obtener todas las dependencias donde la tarea actual es origen
-  const dependencias = await prisma.proyectoDependenciaTarea.findMany({
+  const dependencias = await prisma.proyectoDependenciasTarea.findMany({
     where: { tareaOrigenId: tareaActualId },
     select: { tareaDependienteId: true }
   });

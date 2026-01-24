@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -167,19 +168,19 @@ export async function POST(
       }
     } else {
       // Para plantillas completas, verificar las secciones correspondientes
-      if (tipo === 'equipos' && (!plantilla.equipos || plantilla.equipos.length === 0)) {
+      if (tipo === 'equipos' && (!plantilla.plantillaEquipo || plantilla.plantillaEquipo.length === 0)) {
         return NextResponse.json({
           error: 'La plantilla no contiene equipos para importar'
         }, { status: 400 })
       }
 
-      if (tipo === 'servicios' && (!plantilla.servicios || plantilla.servicios.length === 0)) {
+      if (tipo === 'servicios' && (!plantilla.plantillaServicio || plantilla.plantillaServicio.length === 0)) {
         return NextResponse.json({
           error: 'La plantilla no contiene servicios para importar'
         }, { status: 400 })
       }
 
-      if (tipo === 'gastos' && (!plantilla.gastos || plantilla.gastos.length === 0)) {
+      if (tipo === 'gastos' && (!plantilla.plantillaGasto || plantilla.plantillaGasto.length === 0)) {
         return NextResponse.json({
           error: 'La plantilla no contiene gastos para importar'
         }, { status: 400 })
@@ -212,7 +213,7 @@ export async function POST(
           if (!opciones.mantenerNombres) {
             nombreFinal = resolverNombreConflicto(
               nombreFinal,
-              cotizacion.equipos?.map(e => e.nombre) || [],
+              cotizacion.cotizacionEquipo?.map(e => e.nombre) || [],
               opciones.prefijoNombre
             )
           }
@@ -223,66 +224,74 @@ export async function POST(
 
           const nuevoEquipo = await tx.cotizacionEquipo.create({
             data: {
+              id: randomUUID(),
               cotizacionId: id,
               nombre: nombreFinal,
               descripcion: plantilla.descripcion,
               subtotalInterno,
               subtotalCliente,
-              items: {
+              updatedAt: new Date(),
+              cotizacionEquipoItem: {
                 create: plantilla.items.map((item: any) => ({
+                  id: randomUUID(),
                   ...(item.catalogoEquipoId && {
                     catalogoEquipo: { connect: { id: item.catalogoEquipoId } }
                   }),
-                  codigo: item.codigo,
-                  descripcion: item.descripcion,
-                  categoria: item.categoria,
-                  unidad: item.unidad,
-                  marca: item.marca,
-                  cantidad: item.cantidad,
-                  precioInterno: item.precioInterno,
-                  precioCliente: item.precioCliente,
-                  costoInterno: item.costoInterno,
-                  costoCliente: item.costoCliente,
+                  codigo: item.codigo || '',
+                  descripcion: item.descripcion || '',
+                  categoria: item.categoria || '',
+                  unidad: item.unidad || '',
+                  marca: item.marca || '',
+                  cantidad: item.cantidad || 0,
+                  precioInterno: item.precioInterno || 0,
+                  precioCliente: item.precioCliente || 0,
+                  costoInterno: item.costoInterno || 0,
+                  costoCliente: item.costoCliente || 0,
+                  updatedAt: new Date(),
                 }))
               }
             }
           })
           equiposImportados++
-        } else if (plantilla.equipos) {
+        } else if (plantilla.plantillaEquipo) {
           // Para plantillas completas, importar cada grupo de equipos
-          for (const equipoGrupo of plantilla.equipos) {
+          for (const equipoGrupo of plantilla.plantillaEquipo) {
             // Resolver nombre si hay conflicto
             let nombreFinal = equipoGrupo.nombre
             if (!opciones.mantenerNombres) {
               nombreFinal = resolverNombreConflicto(
                 nombreFinal,
-                cotizacion.equipos?.map(e => e.nombre) || [],
+                cotizacion.cotizacionEquipo?.map(e => e.nombre) || [],
                 opciones.prefijoNombre
               )
             }
 
             const nuevoEquipo = await tx.cotizacionEquipo.create({
               data: {
+                id: randomUUID(),
                 cotizacionId: id,
                 nombre: nombreFinal,
                 descripcion: equipoGrupo.descripcion,
-                subtotalInterno: equipoGrupo.subtotalInterno,
-                subtotalCliente: equipoGrupo.subtotalCliente,
-                items: {
-                  create: equipoGrupo.items.map((item: any) => ({
+                subtotalInterno: equipoGrupo.subtotalInterno || 0,
+                subtotalCliente: equipoGrupo.subtotalCliente || 0,
+                updatedAt: new Date(),
+                cotizacionEquipoItem: {
+                  create: (equipoGrupo.plantillaEquipoItem || []).map((item: any) => ({
+                    id: randomUUID(),
                     ...(item.catalogoEquipoId && {
                       catalogoEquipo: { connect: { id: item.catalogoEquipoId } }
                     }),
-                    codigo: item.codigo,
-                    descripcion: item.descripcion,
-                    categoria: item.categoria,
-                    unidad: item.unidad,
-                    marca: item.marca,
-                    cantidad: item.cantidad,
-                    precioInterno: item.precioInterno,
-                    precioCliente: item.precioCliente,
-                    costoInterno: item.costoInterno,
-                    costoCliente: item.costoCliente,
+                    codigo: item.codigo || '',
+                    descripcion: item.descripcion || '',
+                    edtId: item.edtId || null,
+                    unidad: item.unidad || '',
+                    marca: item.marca || '',
+                    cantidad: item.cantidad || 0,
+                    precioInterno: item.precioInterno || 0,
+                    precioCliente: item.precioCliente || 0,
+                    costoInterno: item.costoInterno || 0,
+                    costoCliente: item.costoCliente || 0,
+                    updatedAt: new Date(),
                   }))
                 }
               }
@@ -300,7 +309,7 @@ export async function POST(
           if (!opciones.mantenerNombres) {
             nombreFinal = resolverNombreConflicto(
               nombreFinal,
-              cotizacion.servicios?.map(s => s.nombre) || [],
+              cotizacion.cotizacionServicio?.map(s => s.nombre) || [],
               opciones.prefijoNombre
             )
           }
@@ -311,83 +320,91 @@ export async function POST(
 
           const nuevoServicio = await tx.cotizacionServicio.create({
             data: {
+              id: randomUUID(),
               cotizacionId: id,
               nombre: nombreFinal,
               categoria: plantilla.categoria || 'General',
               subtotalInterno,
               subtotalCliente,
+              updatedAt: new Date(),
               ...(plantilla.items && plantilla.items.length > 0 && {
-                items: {
+                cotizacionServicioItem: {
                   create: plantilla.items.map((item: any) => ({
-                    catalogoServicioId: item.catalogoServicioId,
-                    categoria: item.categoria,
+                    id: randomUUID(),
+                    catalogoServicioId: item.catalogoServicioId || null,
+                    edtId: item.edtId || null,
                     unidadServicioId: item.unidadServicioId,
                     recursoId: item.recursoId,
-                    unidadServicioNombre: item.unidadServicioNombre,
-                    recursoNombre: item.recursoNombre,
-                    formula: item.formula,
-                    horaBase: item.horaBase,
-                    horaRepetido: item.horaRepetido,
-                    horaUnidad: item.horaUnidad,
-                    horaFijo: item.horaFijo,
-                    costoHora: item.costoHora,
-                    nombre: item.catalogoServicio?.nombre || item.nombre,
-                    descripcion: item.descripcion,
-                    cantidad: item.cantidad,
-                    horaTotal: item.horaTotal,
+                    unidadServicioNombre: item.unidadServicioNombre || '',
+                    recursoNombre: item.recursoNombre || '',
+                    formula: item.formula || '',
+                    horaBase: item.horaBase || null,
+                    horaRepetido: item.horaRepetido || null,
+                    horaUnidad: item.horaUnidad || null,
+                    horaFijo: item.horaFijo || null,
+                    costoHora: item.costoHora || 0,
+                    nombre: item.catalogoServicio?.nombre || item.nombre || '',
+                    descripcion: item.descripcion || '',
+                    cantidad: item.cantidad || 0,
+                    horaTotal: item.horaTotal || 0,
                     factorSeguridad: item.factorSeguridad || 1.0,
-                    margen: item.margen,
-                    costoInterno: item.costoInterno,
-                    costoCliente: item.costoCliente,
+                    margen: item.margen || 1.0,
+                    costoInterno: item.costoInterno || 0,
+                    costoCliente: item.costoCliente || 0,
                     orden: item.orden || 0,
+                    updatedAt: new Date(),
                   }))
                 }
               })
             }
           })
           serviciosImportados++
-        } else if (plantilla.servicios) {
+        } else if (plantilla.plantillaServicio) {
           // Para plantillas completas, importar cada grupo de servicios
-          for (const servicioGrupo of plantilla.servicios) {
+          for (const servicioGrupo of plantilla.plantillaServicio) {
             let nombreFinal = servicioGrupo.nombre
             if (!opciones.mantenerNombres) {
               nombreFinal = resolverNombreConflicto(
                 nombreFinal,
-                cotizacion.servicios?.map(s => s.nombre) || [],
+                cotizacion.cotizacionServicio?.map(s => s.nombre) || [],
                 opciones.prefijoNombre
               )
             }
 
             const nuevoServicio = await tx.cotizacionServicio.create({
               data: {
+                id: randomUUID(),
                 cotizacionId: id,
                 nombre: nombreFinal,
-                categoria: servicioGrupo.categoria,
-                subtotalInterno: servicioGrupo.subtotalInterno,
-                subtotalCliente: servicioGrupo.subtotalCliente,
-                items: {
-                  create: servicioGrupo.items.map((item: any) => ({
-                    catalogoServicioId: item.catalogoServicioId,
-                    categoria: item.categoria,
+                edtId: servicioGrupo.edtId || null,
+                subtotalInterno: servicioGrupo.subtotalInterno || 0,
+                subtotalCliente: servicioGrupo.subtotalCliente || 0,
+                updatedAt: new Date(),
+                cotizacionServicioItem: {
+                  create: (servicioGrupo.plantillaServicioItem || []).map((item: any) => ({
+                    id: randomUUID(),
+                    catalogoServicioId: item.catalogoServicioId || null,
+                    edtId: item.edtId || null,
                     unidadServicioId: item.unidadServicioId,
                     recursoId: item.recursoId,
-                    unidadServicioNombre: item.unidadServicioNombre,
-                    recursoNombre: item.recursoNombre,
-                    formula: item.formula,
-                    horaBase: item.horaBase,
-                    horaRepetido: item.horaRepetido,
-                    horaUnidad: item.horaUnidad,
-                    horaFijo: item.horaFijo,
-                    costoHora: item.costoHora,
-                    nombre: item.catalogoServicio?.nombre || item.nombre,
-                    descripcion: item.descripcion,
-                    cantidad: item.cantidad,
-                    horaTotal: item.horaTotal,
+                    unidadServicioNombre: item.unidadServicioNombre || '',
+                    recursoNombre: item.recursoNombre || '',
+                    formula: item.formula || '',
+                    horaBase: item.horaBase || null,
+                    horaRepetido: item.horaRepetido || null,
+                    horaUnidad: item.horaUnidad || null,
+                    horaFijo: item.horaFijo || null,
+                    costoHora: item.costoHora || 0,
+                    nombre: item.catalogoServicio?.nombre || item.nombre || '',
+                    descripcion: item.descripcion || '',
+                    cantidad: item.cantidad || 0,
+                    horaTotal: item.horaTotal || 0,
                     factorSeguridad: item.factorSeguridad || 1.0,
-                    margen: item.margen,
-                    costoInterno: item.costoInterno,
-                    costoCliente: item.costoCliente,
+                    margen: item.margen || 1.0,
+                    costoInterno: item.costoInterno || 0,
+                    costoCliente: item.costoCliente || 0,
                     orden: item.orden || 0,
+                    updatedAt: new Date(),
                   }))
                 }
               }
@@ -405,7 +422,7 @@ export async function POST(
           if (!opciones.mantenerNombres) {
             nombreFinal = resolverNombreConflicto(
               nombreFinal,
-              cotizacion.gastos?.map(g => g.nombre) || [],
+              cotizacion.cotizacionGasto?.map(g => g.nombre) || [],
               opciones.prefijoNombre
             )
           }
@@ -416,57 +433,63 @@ export async function POST(
 
           const nuevoGasto = await tx.cotizacionGasto.create({
             data: {
+              id: randomUUID(),
               cotizacionId: id,
               nombre: nombreFinal,
               descripcion: plantilla.descripcion,
               subtotalInterno,
               subtotalCliente,
-              items: {
+              updatedAt: new Date(),
+              cotizacionGastoItem: {
                 create: plantilla.items.map((item: any) => ({
-                  nombre: item.nombre,
-                  descripcion: item.descripcion,
-                  cantidad: item.cantidad,
-                  precioUnitario: item.precioUnitario,
-                  factorSeguridad: item.factorSeguridad,
-                  margen: item.margen,
-                  costoInterno: item.costoInterno,
-                  costoCliente: item.costoCliente,
-                  responsableId: session.user.id,
+                  id: randomUUID(),
+                  nombre: item.nombre || '',
+                  descripcion: item.descripcion || null,
+                  cantidad: item.cantidad || 0,
+                  precioUnitario: item.precioUnitario || 0,
+                  factorSeguridad: item.factorSeguridad || 1.0,
+                  margen: item.margen || 1.0,
+                  costoInterno: item.costoInterno || 0,
+                  costoCliente: item.costoCliente || 0,
+                  updatedAt: new Date(),
                 }))
               }
             }
           })
           gastosImportados++
-        } else if (plantilla.gastos) {
+        } else if (plantilla.plantillaGasto) {
           // Para plantillas completas, importar cada grupo de gastos
-          for (const gastoGrupo of plantilla.gastos) {
+          for (const gastoGrupo of plantilla.plantillaGasto) {
             let nombreFinal = gastoGrupo.nombre
             if (!opciones.mantenerNombres) {
               nombreFinal = resolverNombreConflicto(
                 nombreFinal,
-                cotizacion.gastos?.map(g => g.nombre) || [],
+                cotizacion.cotizacionGasto?.map(g => g.nombre) || [],
                 opciones.prefijoNombre
               )
             }
 
             const nuevoGasto = await tx.cotizacionGasto.create({
               data: {
+                id: randomUUID(),
                 cotizacionId: id,
                 nombre: nombreFinal,
                 descripcion: gastoGrupo.descripcion,
-                subtotalInterno: gastoGrupo.subtotalInterno,
-                subtotalCliente: gastoGrupo.subtotalCliente,
-                items: {
-                  create: gastoGrupo.items.map((item: any) => ({
-                    nombre: item.nombre,
-                    descripcion: item.descripcion,
-                    cantidad: item.cantidad,
-                    precioUnitario: item.precioUnitario,
-                    factorSeguridad: item.factorSeguridad,
-                    margen: item.margen,
-                    costoInterno: item.costoInterno,
-                    costoCliente: item.costoCliente,
-                    responsableId: session.user.id,
+                subtotalInterno: gastoGrupo.subtotalInterno || 0,
+                subtotalCliente: gastoGrupo.subtotalCliente || 0,
+                updatedAt: new Date(),
+                cotizacionGastoItem: {
+                  create: (gastoGrupo.plantillaGastoItem || []).map((item: any) => ({
+                    id: randomUUID(),
+                    nombre: item.nombre || '',
+                    descripcion: item.descripcion || null,
+                    cantidad: item.cantidad || 0,
+                    precioUnitario: item.precioUnitario || 0,
+                    factorSeguridad: item.factorSeguridad || 1.0,
+                    margen: item.margen || 1.0,
+                    costoInterno: item.costoInterno || 0,
+                    costoCliente: item.costoCliente || 0,
+                    updatedAt: new Date(),
                   }))
                 }
               }
@@ -480,6 +503,7 @@ export async function POST(
       if (!esPlantillaIndependiente) {
         await tx.cotizacionPlantillaImport.create({
           data: {
+            id: randomUUID(),
             cotizacionId: id,
             plantillaId: plantillaId,
             tipoImportacion: tipo,
@@ -534,7 +558,7 @@ function detectarConflictos(
   const conflictos: ConflictInfo[] = []
 
   if (tipo === 'equipos') {
-    const nombresExistentes = cotizacion.equipos?.map((e: any) => e.nombre) || []
+    const nombresExistentes = cotizacion.cotizacionEquipo?.map((e: any) => e.nombre) || []
     if (esPlantillaIndependiente) {
       // Para plantillas independientes, verificar conflicto con el nombre de la plantilla
       if (nombresExistentes.includes(plantilla.nombre)) {
@@ -545,9 +569,9 @@ function detectarConflictos(
           accionRecomendada: opciones.sobreescribirDuplicados ? 'reemplazar' : 'mantener_ambos'
         })
       }
-    } else if (plantilla.equipos) {
+    } else if (plantilla.plantillaEquipo) {
       // Para plantillas completas, verificar cada grupo
-      plantilla.equipos.forEach((equipo: any) => {
+      plantilla.plantillaEquipo.forEach((equipo: any) => {
         if (nombresExistentes.includes(equipo.nombre)) {
           conflictos.push({
             tipo: 'equipo',
@@ -561,7 +585,7 @@ function detectarConflictos(
   }
 
   if (tipo === 'servicios') {
-    const nombresExistentes = cotizacion.servicios?.map((s: any) => s.nombre) || []
+    const nombresExistentes = cotizacion.cotizacionServicio?.map((s: any) => s.nombre) || []
     if (esPlantillaIndependiente) {
       // Para plantillas independientes, verificar conflicto con el nombre de la plantilla
       if (nombresExistentes.includes(plantilla.nombre)) {
@@ -572,9 +596,9 @@ function detectarConflictos(
           accionRecomendada: opciones.sobreescribirDuplicados ? 'reemplazar' : 'mantener_ambos'
         })
       }
-    } else if (plantilla.servicios) {
+    } else if (plantilla.plantillaServicio) {
       // Para plantillas completas, verificar cada grupo
-      plantilla.servicios.forEach((servicio: any) => {
+      plantilla.plantillaServicio.forEach((servicio: any) => {
         if (nombresExistentes.includes(servicio.nombre)) {
           conflictos.push({
             tipo: 'servicio',
@@ -588,7 +612,7 @@ function detectarConflictos(
   }
 
   if (tipo === 'gastos') {
-    const nombresExistentes = cotizacion.gastos?.map((g: any) => g.nombre) || []
+    const nombresExistentes = cotizacion.cotizacionGasto?.map((g: any) => g.nombre) || []
     if (esPlantillaIndependiente) {
       // Para plantillas independientes, verificar conflicto con el nombre de la plantilla
       if (nombresExistentes.includes(plantilla.nombre)) {
@@ -599,9 +623,9 @@ function detectarConflictos(
           accionRecomendada: opciones.sobreescribirDuplicados ? 'reemplazar' : 'mantener_ambos'
         })
       }
-    } else if (plantilla.gastos) {
+    } else if (plantilla.plantillaGasto) {
       // Para plantillas completas, verificar cada grupo
-      plantilla.gastos.forEach((gasto: any) => {
+      plantilla.plantillaGasto.forEach((gasto: any) => {
         if (nombresExistentes.includes(gasto.nombre)) {
           conflictos.push({
             tipo: 'gasto',

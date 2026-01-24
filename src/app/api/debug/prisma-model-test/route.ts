@@ -9,12 +9,12 @@ export async function GET() {
     console.log('Prisma keys:', Object.keys(prisma || {}))
     
     // Check if the specific model exists
-    const hasModel = (prisma as any).plantillaDuracionCronograma !== undefined
+    const hasModel = prisma.plantillaDuracionCronograma !== undefined
     console.log('Has plantillaDuracionCronograma model:', hasModel)
     
     if (hasModel) {
       console.log('✅ Model exists, attempting query...')
-      const duraciones = await (prisma as any).plantillaDuracionCronograma.findMany({
+      const duraciones = await prisma.plantillaDuracionCronograma.findMany({
         orderBy: { nivel: 'asc' }
       })
       console.log('✅ Query successful, count:', duraciones.length)
@@ -40,9 +40,9 @@ export async function GET() {
     console.error('❌ Prisma model test failed:', error)
     return NextResponse.json({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
       modelExists: false,
-      stack: error.stack
+      stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
 }

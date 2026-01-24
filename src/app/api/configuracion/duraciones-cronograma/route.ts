@@ -54,7 +54,7 @@ export async function GET() {
 
     // Obtener duraciones de BD usando consulta directa
     const duraciones = await prisma.$queryRaw`
-      SELECT * FROM "plantilla_duracion_cronograma" 
+      SELECT * FROM "plantilla_duracion_cronograma"
       ORDER BY "nivel" ASC
     `
 

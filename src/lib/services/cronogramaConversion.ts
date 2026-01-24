@@ -50,7 +50,7 @@ export class CronogramaConversionService {
         where: { id: cotizacionId },
         include: {
           // ✅ Proyecto asociado (relación directa)
-          proyectos: {
+          proyecto: {
             select: {
               id: true,
               nombre: true,
@@ -69,10 +69,10 @@ export class CronogramaConversionService {
             select: {
               id: true,
               nombre: true,
-              categoria: true
+              edtId: true
             }
           },
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
@@ -85,20 +85,22 @@ export class CronogramaConversionService {
         throw new Error('Cotización no encontrada');
       }
 
-      if (!cotizacion.proyectos || cotizacion.proyectos.length === 0) {
+      if (!cotizacion.proyecto || cotizacion.proyecto.length === 0) {
         throw new Error('La cotización no tiene un proyecto asociado');
       }
 
-      const proyectoAsociado = cotizacion.proyectos[0];
+      const proyectoAsociado = cotizacion.proyecto[0];
 
       // 2. Crear cronograma de ejecución para el proyecto
       const cronogramaEjecucion = await prisma.proyectoCronograma.create({
         data: {
+          id: crypto.randomUUID(),
           proyectoId,
           tipo: 'ejecucion',
           nombre: 'Plan de Ejecución',
           esBaseline: false,
-          version: 1
+          version: 1,
+          updatedAt: new Date()
         }
       });
 
@@ -189,6 +191,7 @@ export class CronogramaConversionService {
     for (const fase of fases) {
       const faseCreada = await prisma.proyectoFase.create({
         data: {
+          id: crypto.randomUUID(),
           proyectoId,
           proyectoCronogramaId,
           nombre: fase.nombre,
@@ -196,7 +199,8 @@ export class CronogramaConversionService {
           orden: fase.orden,
           fechaInicioPlan: fase.fechaInicio,
           fechaFinPlan: fase.fechaFin,
-          estado: 'planificado'
+          estado: 'planificado',
+          updatedAt: new Date()
         }
       });
       fasesCreadas.push(faseCreada);
@@ -223,10 +227,11 @@ export class CronogramaConversionService {
        // Crear EDT de proyecto
        const edtProyecto = await prisma.proyectoEdt.create({
          data: {
+           id: crypto.randomUUID(),
            proyectoId,
            proyectoCronogramaId,
            nombre: edtComercial.nombre || edtComercial.cotizacionServicio?.nombre || 'EDT sin nombre',
-           categoriaServicioId: edtComercial.categoriaServicioId,
+           edtId: edtComercial.edtId,
            fechaInicioPlan: edtComercial.fechaInicioComercial,
            fechaFinPlan: edtComercial.fechaFinComercial,
            horasPlan: edtComercial.horasEstimadas || 0,
@@ -234,7 +239,8 @@ export class CronogramaConversionService {
            descripcion: edtComercial.descripcion,
            prioridad: edtComercial.prioridad || 'media',
            estado: 'planificado',
-           porcentajeAvance: 0
+           porcentajeAvance: 0,
+           updatedAt: new Date()
          }
        });
 
@@ -281,6 +287,7 @@ export class CronogramaConversionService {
       for (const actividadComercial of actividadesComerciales) {
         const actividadProyecto = await prisma.proyectoActividad.create({
           data: {
+            id: crypto.randomUUID(),
             proyectoEdtId: edtProyectoId, // ✅ Directamente bajo EDT
             proyectoCronogramaId: asignacion.proyectoCronogramaId, // ✅ Referencia al cronograma
             nombre: actividadComercial.nombre,
@@ -290,7 +297,8 @@ export class CronogramaConversionService {
             porcentajeAvance: actividadComercial.porcentajeAvance || 0,
             descripcion: actividadComercial.descripcion,
             prioridad: actividadComercial.prioridad || 'media',
-            horasPlan: actividadComercial.horasEstimadas || 0
+            horasPlan: actividadComercial.horasEstimadas || 0,
+            updatedAt: new Date()
           }
         } as any);
 
@@ -308,6 +316,7 @@ export class CronogramaConversionService {
       if (actividadesComerciales.length === 0) {
         const actividadProyecto = await prisma.proyectoActividad.create({
           data: {
+            id: crypto.randomUUID(),
             proyectoEdtId: edtProyectoId,
             proyectoCronogramaId: asignacion.proyectoCronogramaId,
             nombre: `Actividad Principal - ${asignacion.edtComercial?.nombre || 'EDT'}`,
@@ -317,7 +326,8 @@ export class CronogramaConversionService {
             porcentajeAvance: 0,
             descripcion: 'Actividad principal del EDT',
             prioridad: 'media',
-            horasPlan: asignacion.edtComercial?.horasEstimadas || 0
+            horasPlan: asignacion.edtComercial?.horasEstimadas || 0,
+            updatedAt: new Date()
           }
         } as any);
 
@@ -349,6 +359,7 @@ export class CronogramaConversionService {
         for (const tareaComercial of actividadAsignacion.tareas || []) {
           await prisma.proyectoTarea.create({
             data: {
+              id: crypto.randomUUID(),
               proyectoEdtId: asignacion.edtProyecto,
               proyectoCronogramaId: asignacion.proyectoCronogramaId,
               proyectoActividadId: actividadProyectoId,
@@ -359,7 +370,8 @@ export class CronogramaConversionService {
               horasEstimadas: tareaComercial.horasEstimadas,
               responsableId: tareaComercial.responsableId,
               prioridad: tareaComercial.prioridad || 'media',
-              estado: 'pendiente'
+              estado: 'pendiente',
+              updatedAt: new Date()
             }
           });
 
@@ -370,6 +382,7 @@ export class CronogramaConversionService {
         if ((actividadAsignacion.tareas || []).length === 0) {
           await prisma.proyectoTarea.create({
             data: {
+              id: crypto.randomUUID(),
               proyectoEdtId: asignacion.edtProyecto,
               proyectoCronogramaId: asignacion.proyectoCronogramaId,
               proyectoActividadId: actividadProyectoId,
@@ -379,7 +392,8 @@ export class CronogramaConversionService {
               fechaFin: actividadAsignacion.actividadComercial?.fechaFinComercial,
               horasEstimadas: actividadAsignacion.actividadComercial?.horasEstimadas || 0,
               prioridad: 'media',
-              estado: 'pendiente'
+              estado: 'pendiente',
+              updatedAt: new Date()
             }
           });
 
@@ -395,7 +409,7 @@ export class CronogramaConversionService {
    * ✅ Determinar fase apropiada para un EDT comercial
    */
   private static determinarFaseParaEdt(edtComercial: any, fases: any[]): any {
-    const categoria = edtComercial.categoriaServicio?.nombre?.toLowerCase() || '';
+    const categoria = edtComercial.edt?.nombre?.toLowerCase() || '';
     const nombreServicio = edtComercial.cotizacionServicio?.nombre?.toLowerCase() || '';
 
     // Reglas de asignación por categoría/servicio
@@ -476,7 +490,7 @@ export class CronogramaConversionService {
       const cotizacion = await prisma.cotizacion.findUnique({
         where: { id: cotizacionId },
         include: {
-          proyectos: {
+          proyecto: {
             select: {
               id: true,
               nombre: true,
@@ -491,11 +505,11 @@ export class CronogramaConversionService {
         throw new Error('Cotización no encontrada');
       }
 
-      if (!cotizacion.proyectos || cotizacion.proyectos.length === 0) {
+      if (!cotizacion.proyecto || cotizacion.proyecto.length === 0) {
         throw new Error('La cotización no tiene proyecto asociado');
       }
 
-      const proyectoAsociado = cotizacion.proyectos[0];
+      const proyectoAsociado = cotizacion.proyecto[0];
 
       // 2. Obtener EDTs comerciales
       const edtsComerciales = await prisma.cotizacionEdt.findMany({
@@ -507,7 +521,7 @@ export class CronogramaConversionService {
               nombre: true
             }
           },
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
@@ -625,7 +639,7 @@ export class CronogramaConversionService {
 
       return {
         edtNombre: edt.nombre || edt.cotizacionServicio?.nombre || 'Sin nombre',
-        categoria: edt.categoriaServicio?.nombre || 'Sin categoría',
+        categoria: edt.edt?.nombre || 'Sin categoría',
         faseAsignada: faseAsignada.nombre,
         actividadesCount,
         tareasCount,

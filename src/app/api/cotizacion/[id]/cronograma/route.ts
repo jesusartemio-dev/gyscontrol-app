@@ -61,10 +61,10 @@ export async function GET(
     const cronograma = await prisma.cotizacionEdt.findMany({
       where: whereClause,
       include: {
-        categoriaServicio: {
+        edt: {
           select: { id: true, nombre: true }
         },
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         },
         cotizacionFase: {
@@ -72,10 +72,10 @@ export async function GET(
         },
         cotizacionActividad: {
           include: {
-            cotizacionTareas: {
+            cotizacionTarea: {
               orderBy: { fechaInicio: 'asc' },
               include: {
-                responsable: {
+                user: {
                   select: { id: true, name: true, email: true }
                 }
               }
@@ -90,7 +90,7 @@ export async function GET(
     // Flatten tasks from the hierarchy for backward compatibility
     const cronogramaConTareas = cronograma.map(edt => ({
       ...edt,
-      tareas: edt.cotizacionActividad?.flatMap(actividad => actividad.cotizacionTareas || []) || []
+      tareas: edt.cotizacionActividad?.flatMap(actividad => actividad.cotizacionTarea || []) || []
     }))
 
     logger.info(`📅 Cronograma obtenido: ${cronograma.length} EDTs - Cotización: ${id}`)
@@ -136,7 +136,7 @@ export async function POST(
     const body = await request.json()
     console.log('📥 Received body:', body)
     console.log('📥 Body types:', {
-      categoriaServicioId: typeof body.categoriaServicioId,
+      edtId: typeof body.edtId,
       zona: typeof body.zona,
       fechaInicioCom: typeof body.fechaInicioCom,
       fechaFinCom: typeof body.fechaFinCom,
@@ -186,10 +186,10 @@ export async function POST(
     const cotizacionServicio = await prisma.cotizacionServicio.findFirst({
       where: {
         cotizacionId: id,
-        items: {
+        cotizacionServicioItem: {
           some: {
             catalogoServicio: {
-              categoriaId: validData.categoriaServicioId
+              categoriaId: validData.edtId
             }
           }
         }
@@ -211,7 +211,7 @@ export async function POST(
       cotizacionId: id,
       nombre: validData.nombre,
       cotizacionServicioId: cotizacionServicio.id,
-      categoriaServicioId: validData.categoriaServicioId,
+      edtId: validData.edtId,
       prioridad: validData.prioridad
     }
 
@@ -247,8 +247,8 @@ export async function POST(
     const nuevoEdt = await prisma.cotizacionEdt.create({
       data: createData as any, // Type assertion to bypass type checking until Prisma client is regenerated
       include: {
-        categoriaServicio: true,
-        responsable: true,
+        edt: true,
+        user: true,
         cotizacionFase: true
       }
     })

@@ -13,9 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { startOfWeek, endOfWeek, format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
@@ -122,7 +120,7 @@ export async function GET(request: NextRequest) {
         }
       },
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -134,7 +132,7 @@ export async function GET(request: NextRequest) {
             nombre: true
           }
         },
-        categoriaServicioRef: {
+        edt: {
           select: {
             id: true,
             nombre: true
@@ -144,7 +142,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             nombre: true,
-            categoriaServicio: {
+            edt: {
               select: {
                 id: true,
                 nombre: true
@@ -156,7 +154,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             nombre: true,
-            proyecto_actividad: {
+            proyectoActividad: {
               select: {
                 id: true,
                 nombre: true
@@ -210,12 +208,12 @@ export async function GET(request: NextRequest) {
         const getTextoJerarquico = () => {
           let texto = proyecto.codigo
           
-          if (registro.categoriaServicioRef?.nombre && registro.categoriaServicioRef.nombre !== 'Sin EDT') {
-            texto += `-"${registro.categoriaServicioRef.nombre}"`
+          if (registro.edt?.nombre && registro.edt.nombre !== 'Sin EDT') {
+            texto += `-"${registro.edt.nombre}"`
           }
           
-          if (registro.proyectoTarea?.proyecto_actividad?.nombre) {
-            texto += `-"${registro.proyectoTarea.proyecto_actividad.nombre}"`
+          if (registro.proyectoTarea?.proyectoActividad?.nombre) {
+            texto += `-"${registro.proyectoTarea.proyectoActividad.nombre}"`
           }
           
           if (registro.proyectoTarea?.nombre) {
@@ -232,9 +230,9 @@ export async function GET(request: NextRequest) {
           proyectoNombre: codigoProyecto,
           textoJerarquico: getTextoJerarquico(),
           usuario: {
-            id: registro.usuario.id,
-            nombre: registro.usuario.name || registro.usuario.email,
-            email: registro.usuario.email
+            id: registro.user.id,
+            nombre: registro.user.name || registro.user.email,
+            email: registro.user.email
           },
           recursoNombre: registro.recurso?.nombre || 'Sin recurso',
           tareaTipo: 'registro',
@@ -256,14 +254,14 @@ export async function GET(request: NextRequest) {
     const usuariosMap = new Map()
     
     registrosHoras.forEach(registro => {
-      const usuarioId = registro.usuario.id
-      const usuarioNombre = registro.usuario.name || registro.usuario.email
+      const usuarioId = registro.user.id
+      const usuarioNombre = registro.user.name || registro.user.email
       
       if (!usuariosMap.has(usuarioId)) {
         usuariosMap.set(usuarioId, {
           usuarioId,
           nombre: usuarioNombre,
-          email: registro.usuario.email,
+          email: registro.user.email,
           horas: 0,
           registros: 0,
           diasActivos: new Set()
@@ -337,7 +335,5 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     )
-  } finally {
-    await prisma.$disconnect()
   }
 }

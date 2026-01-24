@@ -45,7 +45,7 @@ export async function GET(
             orden: true
           }
         },
-        servicios: {
+        catalogoServicio: {
           select: {
             id: true,
             nombre: true,
@@ -63,12 +63,12 @@ export async function GET(
     const edtsProyecto = await prisma.proyectoEdt.findMany({
       where: { proyectoId },
       select: {
-        categoriaServicioId: true, // Este es el ID del EDT del catálogo
+        edtId: true, // Este es el ID del EDT del catálogo
         nombre: true
       }
     })
 
-    const edtsExistentesIds = new Set(edtsProyecto.map(edt => edt.categoriaServicioId))
+    const edtsExistentesIds = new Set(edtsProyecto.map(edt => edt.edtId))
 
     // ✅ Filtrar EDTs disponibles (que no estén ya en el proyecto)
     let edtsDisponibles = edtsCatalogo.filter(edt => !edtsExistentesIds.has(edt.id))
@@ -100,12 +100,12 @@ export async function GET(
       nombre: edt.nombre,
       descripcion: edt.descripcion,
       faseDefault: edt.faseDefault,
-      serviciosCount: edt.servicios.length,
-      servicios: edt.servicios,
+      serviciosCount: edt.catalogoServicio.length,
+      servicios: edt.catalogoServicio,
       // Información adicional para el modal de importación
       metadata: {
         tieneFaseDefault: !!edt.faseDefault,
-        serviciosDisponibles: edt.servicios.length
+        serviciosDisponibles: edt.catalogoServicio.length
       }
     }))
 
@@ -189,7 +189,7 @@ export async function POST(
       where: { id: { in: edtIds } },
       include: {
         faseDefault: true,
-        servicios: true
+        catalogoServicio: true
       }
     })
 
@@ -218,16 +218,18 @@ export async function POST(
         // Crear el EDT en el proyecto
         const edtProyecto = await prisma.proyectoEdt.create({
           data: {
+            id: `proyecto-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             proyectoId,
             proyectoCronogramaId: cronograma.id,
             proyectoFaseId,
             nombre: edtCatalogo.nombre,
             descripcion: edtCatalogo.descripcion,
-            categoriaServicioId: edtCatalogo.id,
+            edtId: edtCatalogo.id,
             estado: 'planificado',
             porcentajeAvance: 0,
             horasPlan: 0, // Se calculará después basado en servicios
-            prioridad: 'media'
+            prioridad: 'media',
+            updatedAt: new Date()
           },
           include: {
             proyectoFase: {

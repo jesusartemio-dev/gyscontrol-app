@@ -16,21 +16,27 @@ const cuidSchema = z.string().regex(/^c[a-z0-9]{24}$/, 'ID debe ser un CUID vál
 // ✅ Legacy UUID validation schema (for backward compatibility)
 const uuidSchema = z.string().uuid('ID debe ser un UUID válido');
 
+// ✅ Combined ID schema that accepts both CUID and UUID formats
+const idSchema = z.string().refine(
+  (val) => /^c[a-z0-9]{24}$/.test(val) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val),
+  'ID debe ser un CUID o UUID válido'
+);
+
 // ✅ Proyecto route params validation
 export const proyectoParamsSchema = z.object({
-  id: cuidSchema
+  id: idSchema
 });
 
 // ✅ Lista Equipo Detail route params validation
 export const listaEquipoDetailParamsSchema = z.object({
-  id: cuidSchema, // proyectoId
-  listaId: cuidSchema
+  id: idSchema, // proyectoId
+  listaId: idSchema
 });
 
 // ✅ Generic route params validation
 export const genericDetailParamsSchema = z.object({
-  id: cuidSchema,
-  detailId: cuidSchema.optional()
+  id: idSchema,
+  detailId: idSchema.optional()
 });
 
 // ✅ Search params validation for lists

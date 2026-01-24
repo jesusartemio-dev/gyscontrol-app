@@ -2,6 +2,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Función para detectar si un string parece ser un CUID (ID autogenerado)
+function pareceSerCuid(str: string | null | undefined): boolean {
+  if (!str) return false;
+  // CUID válido: empieza con 'c', tiene EXACTAMENTE 25-30 caracteres alfanuméricos
+  return /^c[a-z0-9]{24,29}$/.test(str);
+}
+
+// Función para obtener un nombre legible, evitando mostrar IDs
+function obtenerNombreLegible(nombre: string | null | undefined, fallback: string = 'Sin nombre'): string {
+  if (!nombre) return fallback;
+  
+  // Si es un CUID, usar fallback
+  if (pareceSerCuid(nombre)) return fallback;
+  
+  // Si no es CUID, devolver el nombre tal cual
+  return nombre;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -16,40 +34,44 @@ export async function GET(request: NextRequest) {
 
     console.log('🔍 EDTS SIMPLE: Consultando EDTs para proyecto:', proyectoId);
 
-    // 1. PRIORIDAD: Obtener EDTs del CRONOGRAMA DE EJECUCIÓN (vista completa)
-    const cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
-      where: { 
-        proyectoId,
-        tipo: 'ejecucion' // Cronograma de ejecución tiene todos los EDTs
+    // 1. Obtener TODOS los EDTs del proyecto (de cualquier cronograma)
+    let proyectoEdts: any[] = await prisma.proyectoEdt.findMany({
+      where: {
+        proyectoId
       },
-      select: { id: true }
+      select: {
+        id: true,
+        nombre: true,
+        descripcion: true,
+        horasPlan: true,
+        horasReales: true,
+        estado: true,
+        porcentajeAvance: true,
+        orden: true,
+        edtId: true,
+        proyectoCronogramaId: true,
+        edt: {
+          select: { id: true, nombre: true, descripcion: true }
+        },
+        user: {
+          select: { id: true, name: true }
+        }
+      },
+      orderBy: { orden: 'asc' }
     });
 
-    let proyectoEdts = [];
-
-    if (cronogramaEjecucion) {
-      console.log('🔍 EDTS SIMPLE: Usando cronograma de ejecución:', cronogramaEjecucion.id);
-      
-      // Obtener EDTs del cronograma de ejecución
-      proyectoEdts = await prisma.proyectoEdt.findMany({
-        where: { 
-          proyectoId,
-          proyectoCronogramaId: cronogramaEjecucion.id
-        },
-        include: {
-          categoriaServicio: { 
-            select: { id: true, nombre: true } 
-          },
-          responsable: { 
-            select: { id: true, name: true } 
-          }
-        },
-        orderBy: { orden: 'asc' }
+    console.log(`🔍 EDTS SIMPLE: EDTs del proyecto:`, proyectoEdts.length);
+    proyectoEdts.forEach((edt: any, index: number) => {
+      console.log(`🔍 EDT ${index + 1}:`, {
+        id: edt.id,
+        nombre: edt.nombre,
+        edtNombre: edt.edt?.nombre,
+        responsable: edt.user?.name
       });
+    });
 
-      console.log('🔍 EDTS SIMPLE: EDTs de cronograma ejecución:', proyectoEdts.length);
-
-    } else {
+    // 2. Si no hay EDTs en cronogramas, usar fallback de servicios
+    if (proyectoEdts.length === 0) {
       console.log('🔍 EDTS SIMPLE: No hay cronograma de ejecución, usando servicios como fallback');
       
       // 2. FALLBACK: Si no hay cronograma de ejecución, usar servicios
@@ -57,8 +79,8 @@ export async function GET(request: NextRequest) {
         where: { proyectoId },
         select: {
           id: true,
-          edt: { select: { nombre: true } },
-          responsable: {
+          categoria: true,
+          user: {
             select: { name: true }
           }
         }
@@ -66,18 +88,26 @@ export async function GET(request: NextRequest) {
 
       console.log('🔍 EDTS SIMPLE: Servicios del proyecto:', proyectoServicios.length);
 
-      // Crear EDTs basados en las categorías de servicios (ahora desde EDT)
-      const categoriasEdt = [...new Set(proyectoServicios.map(s => s.edt?.nombre).filter(Boolean))];
-      
-      proyectoEdts = categoriasEdt.map((categoria, index) => ({
+      // Crear EDTs basados en las categorías de servicios (campo categoria directo)
+      const categoriasEdt = [...new Set(proyectoServicios.map(s => s.categoria).filter(Boolean))];
+
+      // Obtener nombres de los EDTs desde la tabla Edt
+      const edtsInfo = await Promise.all(
+        categoriasEdt.map(async (categoriaId) => {
+          const edt = await prisma.edt.findUnique({
+            where: { id: categoriaId },
+            select: { id: true, nombre: true }
+          });
+          return { categoriaId, nombre: edt?.nombre || categoriaId };
+        })
+      );
+
+      proyectoEdts = edtsInfo.map(({ categoriaId, nombre }, index) => ({
         id: `categoria-${index}`, // ID temporal
-        nombre: `EDT - ${categoria}`,
-        categoriaServicioId: categoria,
-        categoriaServicio: {
-          id: categoria,
-          nombre: categoria
-        },
-        responsable: proyectoServicios.find(s => s.edt?.nombre === categoria)?.responsable || { name: 'Sin responsable' },
+        nombre: nombre, // ✅ Usar el nombre real del EDT
+        edtId: categoriaId,
+        edt: null, // No hay relación a catálogo Edt en este caso
+        user: proyectoServicios.find(s => s.categoria === categoriaId)?.user || { name: 'Sin responsable' },
         horasPlan: 0,
         horasReales: 0,
         estado: 'planificado',
@@ -89,28 +119,66 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. DEDUPLICACIÓN: Solo eliminar duplicados exactos por ID (no por categoría)
-    const edtsUnicos = proyectoEdts.reduce((acc, edt) => {
+    const edtsUnicos = proyectoEdts.reduce((acc: Record<string, any>, edt: any) => {
       const edtId = edt.id;
-      
+
       // Solo mantener un EDT por ID específico
       if (!acc[edtId]) {
         acc[edtId] = edt;
       }
-      
+
       return acc;
     }, {} as Record<string, any>);
 
     // 4. MAPEAR al formato esperado por el wizard
-    const edts = Object.values(edtsUnicos).map((edt: any) => ({
-      id: edt.id,
-      nombre: edt.nombre,
-      categoriaNombre: edt.categoriaServicio?.nombre || 'Sin categoría',
-      responsableNombre: edt.responsable?.name || 'Sin responsable',
-      horasPlan: Number(edt.horasPlan || 0),
-      horasReales: Number(edt.horasReales || 0),
-      estado: edt.estado,
-      progreso: edt.porcentajeAvance
-    }));
+    const edts = Object.values(edtsUnicos).map((edt: any, index: number) => {
+      const fallbackNombre = `EDT ${index + 1}`;
+
+      // Log detallado para debug
+      console.log(`🔍 Procesando EDT ${index + 1}:`, {
+        id: edt.id,
+        nombre: edt.nombre,
+        pareceSerCuidNombre: pareceSerCuid(edt.nombre),
+        descripcion: edt.descripcion,
+        edtId: edt.edtId,
+        edtRelacion: edt.edt ? {
+          id: edt.edt.id,
+          nombre: edt.edt.nombre,
+          pareceSerCuidEdtNombre: pareceSerCuid(edt.edt?.nombre),
+          descripcion: edt.edt.descripcion
+        } : 'NO HAY RELACION EDT'
+      });
+
+      // ✅ Buscar un nombre legible en este orden de prioridad:
+      // 1. nombre del ProyectoEdt (si no es un CUID)
+      // 2. nombre del catálogo Edt (si no es un CUID)
+      // 3. descripción del ProyectoEdt
+      // 4. descripción del catálogo Edt
+      // 5. Fallback genérico con índice
+      let nombreFinal = obtenerNombreLegible(edt.nombre, '');
+      if (!nombreFinal) nombreFinal = obtenerNombreLegible(edt.edt?.nombre, '');
+      if (!nombreFinal) nombreFinal = obtenerNombreLegible(edt.descripcion, '');
+      if (!nombreFinal) nombreFinal = obtenerNombreLegible(edt.edt?.descripcion, '');
+      if (!nombreFinal) nombreFinal = fallbackNombre;
+
+      // Para categoriaNombre, usar la misma lógica
+      let categoriaNombre = obtenerNombreLegible(edt.edt?.nombre, '');
+      if (!categoriaNombre) categoriaNombre = obtenerNombreLegible(edt.edt?.descripcion, '');
+      if (!categoriaNombre) categoriaNombre = nombreFinal;
+
+      console.log(`✅ EDT ${index + 1} resultado: nombre="${nombreFinal}", categoria="${categoriaNombre}"`);
+
+      return {
+        id: edt.id,
+        nombre: nombreFinal,
+        categoriaNombre: categoriaNombre,
+        responsableNombre: edt.user?.name || 'Sin responsable',
+        horasPlan: Number(edt.horasPlan || 0),
+        horasReales: Number(edt.horasReales || 0),
+        estado: edt.estado,
+        progreso: edt.porcentajeAvance
+      }
+    });
 
     console.log('🔍 EDTS SIMPLE: EDTs finales únicos:', edts.length);
 

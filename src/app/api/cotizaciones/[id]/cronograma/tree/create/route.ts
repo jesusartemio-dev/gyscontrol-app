@@ -44,7 +44,7 @@ export async function POST(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -81,11 +81,13 @@ export async function POST(
 
         newNode = await prisma.cotizacionFase.create({
           data: {
+            id: `cot-fase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             cotizacionId: id,
             nombre: validatedData.data.nombre,
             descripcion: validatedData.data.descripcion,
             orden,
-            estado: (validatedData.data.estado as any) || 'planificado'
+            estado: (validatedData.data.estado as any) || 'planificado',
+            updatedAt: new Date()
           }
         })
         break
@@ -102,13 +104,15 @@ export async function POST(
 
         newNode = await prisma.cotizacionEdt.create({
           data: {
+            id: `cot-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             cotizacionId: id,
             cotizacionFaseId: fasePadreId || undefined,
             nombre: validatedData.data.nombre,
             descripcion: validatedData.data.descripcion,
             horasEstimadas: validatedData.data.horasEstimadas,
             prioridad: validatedData.data.prioridad as any || 'media',
-            estado: validatedData.data.estado as any || 'planificado'
+            estado: validatedData.data.estado as any || 'planificado',
+            updatedAt: new Date()
           }
         })
         break
@@ -131,6 +135,7 @@ export async function POST(
 
         newNode = await prisma.cotizacionActividad.create({
           data: {
+            id: `cot-act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             cotizacionEdtId: edtPadreId,
             nombre: validatedData.data.nombre,
             descripcion: validatedData.data.descripcion,
@@ -138,7 +143,8 @@ export async function POST(
             fechaFinComercial: validatedData.data.fechaFinComercial ? new Date(validatedData.data.fechaFinComercial) : undefined,
             horasEstimadas: validatedData.data.horasEstimadas,
             prioridad: validatedData.data.prioridad as any || 'media',
-            estado: validatedData.data.estado as any || 'pendiente'
+            estado: validatedData.data.estado as any || 'pendiente',
+            updatedAt: new Date()
           }
         } as any)
         break
@@ -161,6 +167,7 @@ export async function POST(
 
         newNode = await prisma.cotizacionTarea.create({
           data: {
+            id: `cot-tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             cotizacionActividadId: actividadPadreId,
             nombre: validatedData.data.nombre,
             descripcion: validatedData.data.descripcion,
@@ -168,7 +175,8 @@ export async function POST(
             fechaFin: validatedData.data.fechaFinComercial ? new Date(validatedData.data.fechaFinComercial) : new Date(),
             horasEstimadas: validatedData.data.horasEstimadas,
             prioridad: validatedData.data.prioridad as any || 'media',
-            estado: validatedData.data.estado as any || 'pendiente'
+            estado: validatedData.data.estado as any || 'pendiente',
+            updatedAt: new Date()
           }
         })
         break

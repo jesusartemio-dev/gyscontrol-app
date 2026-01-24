@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
     const items = await prisma.proyectoEquipoCotizadoItem.findMany({
       where: {
-        proyectoEquipo: {
+        proyectoEquipoCotizado: {
           proyectoId: id,
         },
         ...(soloDisponibles && {
@@ -24,23 +24,23 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
         }),
       },
       include: {
-        proyectoEquipo: {
+        proyectoEquipoCotizado: {
           select: {
             id: true,
             nombre: true,
           },
         },
         catalogoEquipo: true,
-        lista: {
+        listaEquipo: {
           select: {
             id: true,
             nombre: true,
           },
         },
-        listaEquipos: {
+        listaEquipoItemsAsociados: {
           select: {
             id: true,
-            cantidad: true, // ✅ Trae cantidad para saber cuánto ya se listó
+            cantidad: true,
           },
         },
         listaEquipoSeleccionado: {
@@ -56,7 +56,15 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       },
     })
 
-    return NextResponse.json(items)
+    // Map for frontend compatibility
+    const itemsFormatted = items.map((item: any) => ({
+      ...item,
+      proyectoEquipo: item.proyectoEquipoCotizado,
+      lista: item.listaEquipo,
+      listaEquipos: item.listaEquipoItemsAsociados
+    }))
+
+    return NextResponse.json(itemsFormatted)
   } catch (error) {
     console.error('❌ Error al obtener items por proyecto:', error)
     return NextResponse.json({ error: 'Error al obtener items' }, { status: 500 })

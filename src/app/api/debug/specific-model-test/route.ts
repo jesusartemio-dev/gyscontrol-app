@@ -26,7 +26,7 @@ export async function GET() {
     // Try to access the model directly
     try {
       console.log('Testing Prisma model access...')
-      const model = (prisma as any).plantillaDuracionCronograma
+      const model = prisma.plantillaDuracionCronograma
       console.log('✅ Model accessible:', typeof model)
       
       if (model) {
@@ -34,7 +34,7 @@ export async function GET() {
         console.log('✅ Model query successful, count:', result3.length)
       }
     } catch (modelError) {
-      console.log('❌ Model access error:', modelError.message)
+      console.log('❌ Model access error:', modelError instanceof Error ? modelError.message : 'Unknown error')
     }
     
     await prisma.$disconnect()
@@ -50,8 +50,8 @@ export async function GET() {
     console.error('❌ Specific test failed:', error)
     return NextResponse.json({
       success: false,
-      error: error.message,
-      stack: error.stack
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
 }

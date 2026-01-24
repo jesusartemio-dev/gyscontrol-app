@@ -159,7 +159,7 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-semibold text-sm">
-                          {cotizacion.cotizacion?.proveedor?.nombre || 'Proveedor desconocido'}
+                          {cotizacion.cotizacionProveedor?.proveedor?.nombre || 'Proveedor desconocido'}
                         </h4>
                         {isCurrentSelection && !isSelected && (
                           <Badge className="bg-green-600 text-white text-xs">
@@ -188,7 +188,7 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
                       </div>
 
                       <div className="text-xs text-muted-foreground">
-                        Cotización: {cotizacion.cotizacion?.codigo || 'N/A'}
+                        Cotización: {cotizacion.cotizacionProveedor?.codigo || 'N/A'}
                       </div>
                     </div>
 

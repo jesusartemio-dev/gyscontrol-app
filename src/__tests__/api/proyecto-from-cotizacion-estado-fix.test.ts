@@ -94,7 +94,7 @@ describe('POST /api/proyecto/from-cotizacion - Estado Fix', () => {
     mockPrisma.proyectoTarea.create.mockResolvedValue({ id: 'tarea-1' } as any)
     mockPrisma.registroHoras.create.mockResolvedValue({ id: 'registro-1' } as any)
     mockPrisma.proyectoServicioCotizado.findFirst.mockResolvedValue({ id: 'servicio-1' } as any)
-    mockPrisma.categoriaServicio.findFirst.mockResolvedValue({ id: 'categoria-1' } as any)
+    mockPrisma.edt.findFirst.mockResolvedValue({ id: 'categoria-1' } as any)
     mockPrisma.cliente.update.mockResolvedValue({ id: 'cliente-1', numeroSecuencia: 2 } as any)
     mockPrisma.proyectoCronograma.create.mockResolvedValue({ id: 'cronograma-1' } as any)
     mockPrisma.proyectoFase.create.mockResolvedValue({ id: 'fase-1' } as any)
@@ -104,7 +104,7 @@ describe('POST /api/proyecto/from-cotizacion - Estado Fix', () => {
     mockPrisma.proyectoTarea.create.mockResolvedValue({ id: 'tarea-1' } as any)
     mockPrisma.registroHoras.create.mockResolvedValue({ id: 'registro-1' } as any)
     mockPrisma.proyectoServicioCotizado.findFirst.mockResolvedValue({ id: 'servicio-1' } as any)
-    mockPrisma.categoriaServicio.findFirst.mockResolvedValue({ id: 'categoria-1' } as any)
+    mockPrisma.edt.findFirst.mockResolvedValue({ id: 'categoria-1' } as any)
 
     // 📡 Crear request
     const requestBody = {

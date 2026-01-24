@@ -265,7 +265,7 @@ async function generarReporteDetallado(whereConditions: any, incluirDetalles: bo
   const items = await prisma.pedidoEquipoItem.findMany({
     where: whereConditions,
     include: {
-      pedido: {
+      pedidoEquipo: {
         include: {
           proyecto: {
             select: {
@@ -302,7 +302,7 @@ async function generarReporteDetallado(whereConditions: any, incluirDetalles: bo
       },
       pedido: {
           id: item.pedidoId,
-          proyecto: item.pedido.proyecto?.nombre,
+          proyecto: item.pedidoEquipo?.proyecto?.nombre,
           proveedor: item.listaEquipoItem?.proveedor?.nombre
         },
       cantidad: item.cantidadPedida,

@@ -117,8 +117,8 @@ export async function GET(request: NextRequest) {
         { codigo: { contains: search, mode: 'insensitive' } },
         { proyecto: { nombre: { contains: search, mode: 'insensitive' } } },
         { proyecto: { codigo: { contains: search, mode: 'insensitive' } } },
-        { lista: { nombre: { contains: search, mode: 'insensitive' } } },
-        { lista: { codigo: { contains: search, mode: 'insensitive' } } }
+        { listaEquipo: { nombre: { contains: search, mode: 'insensitive' } } },
+        { listaEquipo: { codigo: { contains: search, mode: 'insensitive' } } }
       ]
     }
 
@@ -133,20 +133,20 @@ export async function GET(request: NextRequest) {
             codigo: true
           }
         },
-        lista: {
+        listaEquipo: {
           select: {
             id: true,
             codigo: true,
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true
           }
         },
-        items: {
+        pedidoEquipoItem: {
           select: {
             id: true,
             codigo: true,
@@ -190,8 +190,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Calculate progreso
-      const totalItems = pedido.items.length
-      const itemsCompletados = pedido.items.filter(item => 
+      const totalItems = pedido.pedidoEquipoItem.length
+      const itemsCompletados = pedido.pedidoEquipoItem.filter(item =>
         (item.cantidadAtendida ?? 0) >= item.cantidadPedida
       ).length
       const progreso = totalItems > 0 ? (itemsCompletados / totalItems) * 100 : 0
@@ -200,10 +200,10 @@ export async function GET(request: NextRequest) {
         id: pedido.id,
         codigo: pedido.codigo,
         proyecto: pedido.proyecto,
-        lista: pedido.lista,
+        lista: pedido.listaEquipo,
         responsable: {
-          id: pedido.responsable.id,
-          name: pedido.responsable.name || 'Sin nombre'
+          id: pedido.user.id,
+          name: pedido.user.name || 'Sin nombre'
         },
         estado: pedido.estado,
         prioridad: pedido.prioridad,
@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
         fechaEntregaReal: pedido.fechaEntregaReal,
         presupuestoTotal: pedido.presupuestoTotal,
         costoRealTotal: pedido.costoRealTotal || 0,
-        items: pedido.items,
+        items: pedido.pedidoEquipoItem,
         tiempoEntrega,
         diasRetraso,
         progreso: Math.round(progreso)
@@ -298,20 +298,20 @@ export async function PUT(request: NextRequest) {
             codigo: true
           }
         },
-        lista: {
+        listaEquipo: {
           select: {
             id: true,
             codigo: true,
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true
           }
         },
-        items: true
+        pedidoEquipoItem: true
       }
     })
 

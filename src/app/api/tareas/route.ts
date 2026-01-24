@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import Prisma from '@prisma/client';
 
 const crearTareaSchema = z.object({
   nombre: z.string().min(1),
@@ -66,34 +67,32 @@ export async function POST(request: NextRequest) {
     // Crear la nueva tarea
     const nuevaTarea = await prisma.proyectoTarea.create({
       data: {
+        id: `tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nombre,
         descripcion,
         fechaInicio: new Date(fechaInicio),
         fechaFin: new Date(fechaFin),
         proyectoEdtId,
         proyectoCronogramaId: cronogramaEjecucion.id,
-        horasEstimadas: horasEstimadas.toString(),
+        horasEstimadas: horasEstimadas,
         estado,
         porcentajeCompletado: 0,
         horasReales: 0,
-        orden: 999 // Orden al final por defecto
+        orden: 999, // Orden al final por defecto
+        updatedAt: new Date()
       }
     });
 
     console.log('✅ CREAR TAREA: Tarea creada exitosamente:', nuevaTarea.id);
 
     return NextResponse.json({
-      success: true,
-      message: `Tarea "${nombre}" creada exitosamente`,
-      data: {
-        id: nuevaTarea.id,
-        nombre: nuevaTarea.nombre,
-        descripcion: nuevaTarea.descripcion,
-        fechaInicio: nuevaTarea.fechaInicio,
-        fechaFin: nuevaTarea.fechaFin,
-        estado: nuevaTarea.estado,
-        horasEstimadas: nuevaTarea.horasEstimadas
-      }
+      id: nuevaTarea.id,
+      nombre: nuevaTarea.nombre,
+      descripcion: nuevaTarea.descripcion,
+      fechaInicio: nuevaTarea.fechaInicio,
+      fechaFin: nuevaTarea.fechaFin,
+      estado: nuevaTarea.estado,
+      horasEstimadas: nuevaTarea.horasEstimadas
     });
 
   } catch (error) {

@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       const lista = await tx.listaEquipo.findUnique({
         where: { id: listaId },
         include: {
-          items: {
+          listaEquipoItem: {
             include: {
               proyectoEquipoItem: {
                 include: {
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
                   id: true,
                   precioUnitario: true,
                   tiempoEntrega: true,
-                  cotizacion: {
+                  cotizacionProveedor: {
                     select: {
                       proveedor: {
                         select: {
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
               nombre: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true // ✅ Corregido: usar 'name' en lugar de 'nombre' para User
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       }> = []
 
       for (const itemConversion of items) {
-        const listaItem = lista.items.find(item => item.id === itemConversion.itemId)
+        const listaItem = lista.listaEquipoItem.find(item => item.id === itemConversion.itemId)
         
         if (!listaItem) {
           erroresValidacion.push(`Item ${itemConversion.itemId} no encontrado en la lista`)
@@ -236,8 +236,9 @@ export async function POST(request: NextRequest) {
       // 5. Crear el pedido
       const pedido = await tx.pedidoEquipo.create({
         data: {
+          id: `pedido-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           codigo: codigoPedido,
-          numeroSecuencia: numeroSecuencial, // ✅ Campo requerido agregado
+          numeroSecuencia: numeroSecuencial,
           proyectoId: lista.proyectoId,
           listaId: lista.id,
           responsableId: session.user.id,
@@ -247,27 +248,29 @@ export async function POST(request: NextRequest) {
           fechaPedido: new Date(),
           fechaNecesaria: fechaNecesariaDate,
           presupuestoTotal,
-          observacion: observaciones || `Convertido desde lista ${lista.codigo}`, // ✅ Corregido: usar 'observacion' según schema Prisma
-          items: {
-            create: itemsValidos.map(item => ({
+          observacion: observaciones || `Convertido desde lista ${lista.codigo}`,
+          updatedAt: new Date(),
+          pedidoEquipoItem: {
+            create: itemsValidos.map((item, idx) => ({
+              id: `pedido-item-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
               listaId: lista.id,
               listaEquipoItemId: item.listaItem.id,
-              responsableId: session.user.id, // ✅ Campo requerido agregado
-              codigo: item.listaItem.proyectoEquipoItem?.catalogoEquipo?.codigo || 'SIN-CODIGO', // ✅ Manejar catalogoEquipo null
-          descripcion: item.listaItem.proyectoEquipoItem?.catalogoEquipo?.descripcion || 'Sin descripción', // ✅ Manejar catalogoEquipo null
-              unidad: item.listaItem.unidad, // ✅ Corregido: usar 'unidad' del ListaEquipoItem
+              responsableId: session.user.id,
+              codigo: item.listaItem.proyectoEquipoItem?.catalogoEquipo?.codigo || 'SIN-CODIGO',
+              descripcion: item.listaItem.proyectoEquipoItem?.catalogoEquipo?.descripcion || 'Sin descripción',
+              unidad: item.listaItem.unidad,
               cantidadPedida: item.cantidadAConvertir,
               cantidadAtendida: 0,
               precioUnitario: item.costoUnitario,
               costoTotal: item.costoTotal,
-              tiempoEntrega: item.listaItem.cotizacionSeleccionada?.tiempoEntrega || 15,
-              proveedor: item.listaItem.cotizacionSeleccionada?.cotizacion?.proveedor?.nombre || 'Por definir', // ✅ Corregido: acceder al proveedor anidado
-              estado: 'pendiente'
+              tiempoEntrega: item.listaItem.cotizacionSeleccionada?.tiempoEntrega || '15 días',
+              estado: 'pendiente',
+              updatedAt: new Date()
             }))
           }
         },
         include: {
-          items: true,
+          pedidoEquipoItem: true,
           proyecto: {
             select: {
               id: true,
@@ -275,17 +278,17 @@ export async function POST(request: NextRequest) {
               nombre: true
             }
           },
-          lista: {
+          listaEquipo: {
             select: {
               id: true,
               codigo: true,
               nombre: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
-              name: true // ✅ Corregido: usar 'name' según schema Prisma User
+              name: true
             }
           }
         }

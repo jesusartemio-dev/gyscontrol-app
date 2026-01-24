@@ -6,8 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { ProyectoCronogramaTab } from '@/components/proyectos/cronograma/ProyectoCronogramaTab';
-import { Calendar, Clock, BarChart3 } from 'lucide-react';
-import type { Proyecto, ProyectoCronograma } from '@/types/modelos';
+import type { Proyecto } from '@/types/modelos';
 import { getProyectoForCronograma } from '@/lib/server/cronograma';
 
 // ✅ Props de la página
@@ -153,17 +152,17 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <Link href="/proyectos">
-              <BreadcrumbLink>Proyectos</BreadcrumbLink>
-            </Link>
+            <BreadcrumbLink asChild>
+              <Link href="/proyectos">Proyectos</Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <Link href={`/proyectos/${id}`}>
-              <BreadcrumbLink>
+            <BreadcrumbLink asChild>
+              <Link href={`/proyectos/${id}`}>
                 {proyecto.nombre}
-              </BreadcrumbLink>
-            </Link>
+              </Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

@@ -413,15 +413,15 @@ export async function ejecutarRollupHoras(cronogramaId: string, prismaClient = p
     console.log('📊 Paso 1: Roll-up tareas → actividades')
     const actividadesConTareas = await prismaClient.cotizacionActividad.findMany({
       where: {
-        cotizacion_edt: { cotizacionId: cronogramaId }
+        cotizacionEdt: { cotizacionId: cronogramaId }
       },
-      include: { cotizacion_tarea: true }
+      include: { cotizacionTarea: true }
     })
 
     console.log(`📊 Encontradas ${actividadesConTareas.length} actividades con tareas`)
 
     for (const actividad of actividadesConTareas) {
-      const tareasHoras = actividad.cotizacion_tarea.map((t: any) => ({
+      const tareasHoras = actividad.cotizacionTarea.map((t: any) => ({
         nombre: t.nombre,
         horas: Number(t.horasEstimadas || 0)
       }))
@@ -450,13 +450,13 @@ export async function ejecutarRollupHoras(cronogramaId: string, prismaClient = p
     console.log('📊 Paso 2: Roll-up actividades → EDTs')
     const edts = await prismaClient.cotizacionEdt.findMany({
       where: { cotizacionId: cronogramaId },
-      include: { cotizacion_actividad: true }
+      include: { cotizacionActividad: true }
     })
 
     console.log(`📊 Encontrados ${edts.length} EDTs`)
 
     for (const edt of edts) {
-      const actividadesHoras = edt.cotizacion_actividad.map((a: any) => ({
+      const actividadesHoras = edt.cotizacionActividad.map((a: any) => ({
         nombre: a.nombre,
         horas: Number(a.horasEstimadas || 0)
       }))
@@ -485,13 +485,13 @@ export async function ejecutarRollupHoras(cronogramaId: string, prismaClient = p
     console.log('📊 Paso 3: Roll-up EDTs → fases')
     const fases = await prismaClient.cotizacionFase.findMany({
       where: { cotizacionId: cronogramaId },
-      include: { edts: true }
+      include: { cotizacionEdt: true }
     })
 
     console.log(`📊 Encontradas ${fases.length} fases`)
 
     for (const fase of fases) {
-      const edtsHoras = fase.edts.map((e: any) => ({
+      const edtsHoras = fase.cotizacionEdt.map((e: any) => ({
         nombre: e.nombre,
         horas: Number(e.horasEstimadas || 0)
       }))

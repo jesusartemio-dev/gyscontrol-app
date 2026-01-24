@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, Clock, User, MapPin, AlertTriangle, CheckCircle, Edit, Trash2 } from 'lucide-react';
+import { Calendar, Clock, User, MapPin, AlertTriangle, CheckCircle, Edit, Trash2, PauseCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ProyectoEdtConRelaciones, EstadoEdt } from '@/types/modelos';
 import { formatearFecha, formatearHoras } from '@/lib/utils';
@@ -30,7 +30,8 @@ const estadoColors = {
   en_progreso: 'secondary',
   detenido: 'destructive',
   completado: 'outline',
-  cancelado: 'destructive'
+  cancelado: 'destructive',
+  pausado: 'secondary'
 } as const;
 
 const estadoIcons = {
@@ -38,7 +39,8 @@ const estadoIcons = {
   en_progreso: Clock,
   detenido: AlertTriangle,
   completado: CheckCircle,
-  cancelado: AlertTriangle
+  cancelado: AlertTriangle,
+  pausado: PauseCircle
 };
 
 const estadoLabels = {
@@ -46,7 +48,8 @@ const estadoLabels = {
   en_progreso: 'En Progreso',
   detenido: 'Detenido',
   completado: 'Completado',
-  cancelado: 'Cancelado'
+  cancelado: 'Cancelado',
+  pausado: 'Pausado'
 };
 
 // ✅ Componente principal
@@ -76,7 +79,7 @@ export function EdtList({
     if (filtroTexto) {
       const textoLower = filtroTexto.toLowerCase();
       resultado = resultado.filter(edt =>
-        edt.categoriaServicio.nombre.toLowerCase().includes(textoLower) ||
+        edt.edt.nombre.toLowerCase().includes(textoLower) ||
         edt.descripcion?.toLowerCase().includes(textoLower) ||
         edt.responsable?.name?.toLowerCase().includes(textoLower)
       );
@@ -87,7 +90,7 @@ export function EdtList({
 
   // ✅ Manejar eliminación con confirmación
   const handleDelete = async (edt: ProyectoEdtConRelaciones) => {
-    if (window.confirm(`¿Estás seguro de eliminar el EDT "${edt.categoriaServicio.nombre}"?`)) {
+    if (window.confirm(`¿Estás seguro de eliminar el EDT "${edt.edt.nombre}"?`)) {
       try {
         await onEdtDelete?.(edt.id);
         toast({
@@ -148,6 +151,7 @@ export function EdtList({
             <SelectItem value="detenido">Detenido</SelectItem>
             <SelectItem value="completado">Completado</SelectItem>
             <SelectItem value="cancelado">Cancelado</SelectItem>
+            <SelectItem value="pausado">Pausado</SelectItem>
           </SelectContent>
         </Select>
         {onRefresh && (
@@ -216,7 +220,7 @@ export function EdtList({
                         <div className="flex-1">
                           <CardTitle className="text-lg flex items-center gap-2">
                             <IconoEstado className="h-5 w-5" />
-                            {edt.categoriaServicio.nombre}
+                            {edt.edt.nombre}
                           </CardTitle>
                           {edt.descripcion && (
                             <p className="text-sm text-muted-foreground mt-1">
@@ -324,19 +328,19 @@ export function EdtList({
                       </div>
 
                       {/* ✅ Últimos registros de horas */}
-                      {edt.registrosHoras && edt.registrosHoras.length > 0 && (
+                      {edt.registroHoras && edt.registroHoras.length > 0 && (
                         <div className="border-t pt-3">
                           <p className="text-sm font-medium mb-2">Últimos registros</p>
                           <div className="space-y-1">
-                            {edt.registrosHoras.slice(0, 3).map((registro) => (
+                            {edt.registroHoras.slice(0, 3).map((registro) => (
                               <div key={registro.id} className="flex justify-between text-xs text-muted-foreground">
-                                <span>{formatearFecha(registro.fechaTrabajo)} - {registro.usuario?.name || 'Usuario'}</span>
+                                <span>{formatearFecha(registro.fechaTrabajo)} - {registro.user?.name || 'Usuario'}</span>
                                 <span>{formatearHoras(Number(registro.horasTrabajadas))}</span>
                               </div>
                             ))}
-                            {edt.registrosHoras.length > 3 && (
+                            {edt.registroHoras.length > 3 && (
                               <p className="text-xs text-muted-foreground text-center pt-1">
-                                +{edt.registrosHoras.length - 3} registros más
+                                +{edt.registroHoras.length - 3} registros más
                               </p>
                             )}
                           </div>

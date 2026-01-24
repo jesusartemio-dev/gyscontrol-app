@@ -20,7 +20,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Nombre requerido' }, { status: 400 })
     }
 
-    const nueva = await prisma.unidad.create({ data: { nombre } })
+    const nueva = await prisma.unidad.create({
+      data: {
+        id: `unidad-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        nombre,
+        updatedAt: new Date()
+      }
+    })
     return NextResponse.json(nueva, { status: 201 })
   } catch (error) {
     console.error('❌ Error al crear unidad:', error)

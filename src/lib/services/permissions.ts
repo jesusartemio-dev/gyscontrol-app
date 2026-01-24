@@ -31,7 +31,7 @@ export async function checkUserPermission(
 ): Promise<PermissionCheckResult> {
   try {
     // 1. Buscar permisos directos del usuario
-    const userPermissions = await prisma.userPermissions.findMany({
+    const userPermissions = await prisma.userPermission.findMany({
       where: {
         userId,
         permission: {
@@ -223,7 +223,7 @@ export async function assignPermissionToUser(
     }
 
     // Crear o actualizar el permiso de usuario
-    const userPermission = await prisma.userPermissions.upsert({
+    const userPermission = await prisma.userPermission.upsert({
       where: {
         userId_permissionId: {
           userId: payload.userId,
@@ -235,10 +235,12 @@ export async function assignPermissionToUser(
         updatedAt: new Date()
       },
       create: {
+        id: crypto.randomUUID(),
         userId: payload.userId,
         permissionId: payload.permissionId,
         type: payload.type,
-        createdBy: assignedBy
+        createdBy: assignedBy,
+        updatedAt: new Date()
       },
       include: {
         user: true,
@@ -270,7 +272,7 @@ export async function revokePermissionFromUser(
   revokedBy?: string
 ): Promise<void> {
   try {
-    const userPermission = await prisma.userPermissions.findUnique({
+    const userPermission = await prisma.userPermission.findUnique({
       where: {
         userId_permissionId: {
           userId,
@@ -283,7 +285,7 @@ export async function revokePermissionFromUser(
       throw new Error('El usuario no tiene este permiso asignado');
     }
 
-    await prisma.userPermissions.delete({
+    await prisma.userPermission.delete({
       where: {
         userId_permissionId: {
           userId,
@@ -323,11 +325,13 @@ export async function createPermission(
 
     const permission = await prisma.permission.create({
       data: {
+        id: crypto.randomUUID(),
         name: payload.name,
         description: payload.description,
         resource: payload.resource,
         action: payload.action,
-        isSystemPermission: payload.isSystemPermission ?? true
+        isSystemPermission: payload.isSystemPermission ?? true,
+        updatedAt: new Date()
       }
     });
 
@@ -451,14 +455,17 @@ export async function initializeSystemPermissions(): Promise<void> {
         update: {
           description: basePermission.description,
           resource: basePermission.resource,
-          action: basePermission.action
+          action: basePermission.action,
+          updatedAt: new Date()
         },
         create: {
+          id: crypto.randomUUID(),
           name: basePermission.name,
           description: basePermission.description,
           resource: basePermission.resource,
           action: basePermission.action,
-          isSystemPermission: basePermission.isSystemPermission
+          isSystemPermission: basePermission.isSystemPermission,
+          updatedAt: new Date()
         }
       });
     }

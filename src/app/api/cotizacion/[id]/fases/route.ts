@@ -29,15 +29,15 @@ export async function GET(
     const fases = await prisma.cotizacionFase.findMany({
       where: { cotizacionId: id },
       include: {
-        cotizacion_edt: {
+        cotizacionEdt: {
           include: {
-            categoriaServicio: true,
-            responsable: true,
+            edt: true,
+            user: true,
             cotizacionActividad: {
               include: {
-                cotizacionTareas: {
+                cotizacionTarea: {
                   include: {
-                    responsable: true
+                    user: true
                   },
                   orderBy: { fechaInicio: 'asc' }
                 }
@@ -56,14 +56,14 @@ export async function GET(
       data: fases,
       meta: {
         totalFases: fases.length,
-        totalEdts: fases.reduce((sum: number, f: any) => sum + f.cotizacion_edt.length, 0),
+        totalEdts: fases.reduce((sum: number, f: any) => sum + f.cotizacionEdt.length, 0),
         totalActividades: fases.reduce((sum: number, f: any) =>
-          sum + f.cotizacion_edt.reduce((sumEdt: number, edt: any) => sumEdt + (edt.cotizacionActividad?.length || 0), 0), 0
+          sum + f.cotizacionEdt.reduce((sumEdt: number, edt: any) => sumEdt + (edt.cotizacionActividad?.length || 0), 0), 0
         ),
         totalTareas: fases.reduce((sum: number, f: any) =>
-          sum + f.cotizacion_edt.reduce((sumEdt: number, edt: any) =>
+          sum + f.cotizacionEdt.reduce((sumEdt: number, edt: any) =>
             sumEdt + edt.cotizacionActividad?.reduce((sumAct: number, actividad: any) =>
-              sumAct + (actividad.cotizacionTareas?.length || 0), 0
+              sumAct + (actividad.cotizacionTarea?.length || 0), 0
             ) || 0, 0
           ), 0
         )

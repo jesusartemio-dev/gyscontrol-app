@@ -33,8 +33,8 @@ interface PlantillaEquipoIndependiente {
   grandTotal: number
   createdAt: string
   updatedAt: string
-  items: any[] // We don't need the full items type for editing
-  _count?: { items: number }
+  plantillaEquipoItemIndependiente: any[] // We don't need the full items type for editing
+  _count?: { plantillaEquipoItemIndependiente: number }
 }
 
 interface Props {

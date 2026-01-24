@@ -28,7 +28,7 @@ export async function DELETE(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -50,9 +50,9 @@ export async function DELETE(
         cotizacionId: id
       },
       include: {
-        actividadesDirectas: {
+        cotizacionActividad: {
           include: {
-            tareas: true
+            cotizacionTarea: true
           }
         }
       }
@@ -66,7 +66,7 @@ export async function DELETE(
 
     // ✅ ELIMINACIÓN EN CASCADA: Eliminar elementos dependientes primero (5 niveles)
     // 1. Eliminar tareas de actividades directas
-    for (const actividad of edt.actividadesDirectas) {
+    for (const actividad of edt.cotizacionActividad) {
       await prisma.cotizacionTarea.deleteMany({
         where: { cotizacionActividadId: actividad.id }
       })

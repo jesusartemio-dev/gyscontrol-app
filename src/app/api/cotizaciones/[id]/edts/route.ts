@@ -49,7 +49,7 @@ export async function GET(
       where: { id },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -72,9 +72,9 @@ export async function GET(
     }
 
     // Filtros opcionales
-    const categoriaServicioId = searchParams.get('categoriaServicioId')
-    if (categoriaServicioId) {
-      where.categoriaServicioId = categoriaServicioId
+    const edtId = searchParams.get('edtId')
+    if (edtId) {
+      where.edtId = edtId
     }
 
     const estado = searchParams.get('estado')
@@ -95,19 +95,17 @@ export async function GET(
       include: {
         cotizacionServicio: true,
         cotizacionFase: true,
-        // Nota: Las zonas se incluyen a través de la relación zonas
-        categoriaServicio: true,
-        responsable: {
+        edt: true,
+        user: {
           select: {
             id: true,
             name: true,
             email: true
           }
         },
-        // ✅ SISTEMA SIMPLIFICADO: Actividades directas bajo EDT
-        actividadesDirectas: {
+        cotizacionActividad: {
           include: {
-            tareas: true
+            cotizacionTarea: true
           }
         }
       },
@@ -117,12 +115,12 @@ export async function GET(
       ]
     })
 
-    // ✅ Calcular estadísticas para cada EDT (jerarquía simplificada)
+    // ✅ Calcular estadísticas para cada EDT
     const edtsConEstadisticas = edts.map(edt => {
-      const totalActividades = edt.actividadesDirectas?.length || 0
-      const totalTareas = edt.actividadesDirectas?.reduce((acc, act) => acc + (act.tareas?.length || 0), 0) || 0
-      const tareasCompletadas = edt.actividadesDirectas?.reduce((acc, act) =>
-        acc + (act.tareas?.filter(t => t.estado === 'completada').length || 0), 0
+      const totalActividades = edt.cotizacionActividad?.length || 0
+      const totalTareas = edt.cotizacionActividad?.reduce((acc: number, act) => acc + (act.cotizacionTarea?.length || 0), 0) || 0
+      const tareasCompletadas = edt.cotizacionActividad?.reduce((acc: number, act) =>
+        acc + (act.cotizacionTarea?.filter((t: { estado: string }) => t.estado === 'completada').length || 0), 0
       ) || 0
       const porcentajeAvance = totalTareas > 0 ? Math.round((tareasCompletadas / totalTareas) * 100) : 0
 
@@ -141,7 +139,7 @@ export async function GET(
       success: true,
       data: edtsConEstadisticas,
       filtros: {
-        categoriaServicioId,
+        edtId,
         estado,
         responsableId
       }
@@ -176,7 +174,7 @@ export async function POST(
       where: { id },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -246,6 +244,7 @@ export async function POST(
     // Crear el EDT
     const nuevoEdt = await prisma.cotizacionEdt.create({
       data: {
+        id: crypto.randomUUID(),
         cotizacionId: id,
         cotizacionServicioId: validatedData.cotizacionServicioId,
         cotizacionFaseId: validatedData.cotizacionFaseId,
@@ -256,23 +255,23 @@ export async function POST(
         horasEstimadas: validatedData.horasEstimadas,
         estado: validatedData.estado,
         responsableId: validatedData.responsableId,
-        prioridad: validatedData.prioridad
+        prioridad: validatedData.prioridad,
+        updatedAt: new Date()
       },
       include: {
         cotizacionServicio: true,
         cotizacionFase: true,
-        categoriaServicio: true,
-        responsable: {
+        edt: true,
+        user: {
           select: {
             id: true,
             name: true,
             email: true
           }
         },
-        // ✅ SISTEMA SIMPLIFICADO: Actividades directas bajo EDT
-        actividadesDirectas: {
+        cotizacionActividad: {
           include: {
-            tareas: true
+            cotizacionTarea: true
           }
         }
       }

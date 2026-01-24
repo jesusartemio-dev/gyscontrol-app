@@ -57,7 +57,7 @@ interface CotizacionEdt {
   descripcion?: string
   prioridad: string
   createdAt: string
-  categoriaServicio: {
+  edt: {
     id: string
     nombre: string
   }
@@ -232,7 +232,7 @@ export function CotizacionEdtList({
                         {edt.nombre}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        {edt.categoriaServicio.nombre}
+                        {edt.edt.nombre}
                         {edt.zona && ` - ${edt.zona}`}
                       </p>
                     </div>

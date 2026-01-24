@@ -163,10 +163,10 @@ export async function PATCH(
       where: { id: edtId },
       data: updateData,
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true }
         },
-        categoriaServicio: {
+        edt: {
           select: { id: true, nombre: true }
         }
       }

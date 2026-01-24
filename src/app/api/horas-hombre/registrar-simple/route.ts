@@ -1,9 +1,25 @@
-// API para registro de horas sin autenticación (para wizard)
+// API para registro de horas (para wizard)
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { randomUUID } from 'crypto';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    // Obtener sesión del usuario logueado
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      console.log('❌ REGISTRO SIMPLE: No hay sesión válida');
+      return NextResponse.json(
+        { error: 'No autorizado - debe iniciar sesión' },
+        { status: 401 }
+      );
+    }
+
+    console.log('✅ REGISTRO SIMPLE: Usuario autenticado:', session.user.id, session.user.email);
+
     const body = await request.json();
     const { fecha, horas, descripcion, proyectoId, proyectoEdtId, proyectoTareaId, proyectoActividadId, elementoTipo } = body;
 
@@ -32,17 +48,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar un servicio del proyecto para asociar (incluyendo la relación con EDT)
+    // Buscar un servicio del proyecto para asociar
     const proyectoServicio = await prisma.proyectoServicioCotizado.findFirst({
       where: { proyectoId },
       select: {
         id: true,
         nombre: true,
-        edt: { select: { nombre: true } } // Obtener la categoría desde el EDT relacionado
+        categoria: true // Campo string que contiene la categoría
       }
     });
 
+    // Si no hay servicio, retornar error ya que es requerido
     if (!proyectoServicio) {
+      console.log('❌ REGISTRO SIMPLE: No hay servicio asociado al proyecto');
       return NextResponse.json(
         { error: 'No se encontró un servicio asociado al proyecto' },
         { status: 404 }
@@ -64,20 +82,17 @@ export async function POST(request: NextRequest) {
     // Obtener el EDT para el registro
     const proyectoEdt = proyectoEdtId ? await prisma.proyectoEdt.findUnique({
       where: { id: proyectoEdtId },
-      select: { id: true, categoriaServicioId: true, categoriaServicio: { select: { nombre: true } } }
+      select: {
+        id: true,
+        nombre: true,
+        edtId: true,
+        edt: { select: { nombre: true } } // Relación al catálogo Edt
+      }
     }) : null;
 
-    // Buscar un usuario por defecto para el wizard
-    const usuario = await prisma.user.findFirst({
-      select: { id: true, name: true }
-    });
-
-    if (!usuario) {
-      return NextResponse.json(
-        { error: 'No hay usuarios disponibles en el sistema' },
-        { status: 404 }
-      );
-    }
+    // Usar el usuario de la sesión actual
+    const usuarioId = session.user.id;
+    const usuarioNombre = session.user.name || session.user.email || 'Usuario';
 
     // Crear registro de horas con corrección de zona horaria
     // Convertir fecha YYYY-MM-DD a Date en zona horaria local (GMT-5)
@@ -90,22 +105,34 @@ export async function POST(request: NextRequest) {
       zonaHoraria: 'GMT-5 (Colombia)'
     });
 
+    // Determinar la categoría en orden de prioridad:
+    // 1. Nombre del ProyectoEdt (proyectoEdt.nombre)
+    // 2. Nombre del catálogo Edt (proyectoEdt.edt.nombre)
+    // 3. Categoría del servicio cotizado (proyectoServicio.categoria)
+    // 4. 'general' como fallback
+    const categoriaFinal = proyectoEdt?.nombre ||
+                           proyectoEdt?.edt?.nombre ||
+                           proyectoServicio.categoria ||
+                           'general';
+
     const registroHoras = await prisma.registroHoras.create({
       data: {
+        id: randomUUID(),
         proyectoId,
         proyectoServicioId: proyectoServicio.id,
-        categoria: proyectoEdt?.categoriaServicio?.nombre || proyectoServicio.edt?.nombre || 'general',
-        nombreServicio: proyectoServicio.nombre,
+        categoria: categoriaFinal,
+        nombreServicio: proyectoServicio.nombre || proyectoEdt?.nombre || 'Sin servicio',
         recursoId: recurso.id,
         recursoNombre: recurso.nombre,
-        usuarioId: usuario.id,
+        usuarioId: usuarioId,
         fechaTrabajo: fechaLocal, // ✅ FECHA CORREGIDA
         horasTrabajadas: parseFloat(horas),
         descripcion,
-        proyectoTareaId: proyectoTareaId || null,
-        proyectoEdtId: proyectoEdtId || null,
-        categoriaServicioId: proyectoEdt?.categoriaServicioId || null,
-        origen: 'oficina'
+        proyectoTareaId: proyectoTareaId || undefined,
+        proyectoEdtId: proyectoEdtId || undefined,
+        edtId: proyectoEdt?.edtId || undefined,
+        origen: 'oficina',
+        updatedAt: new Date()
       }
     });
 
@@ -118,7 +145,7 @@ export async function POST(request: NextRequest) {
         id: registroHoras.id,
         horasRegistradas: parseFloat(horas),
         proyecto: proyecto.nombre,
-        edt: proyectoEdt?.categoriaServicio?.nombre || 'Sin EDT',
+        edt: proyectoEdt?.nombre || proyectoEdt?.edt?.nombre || 'Sin EDT',
         elemento: elementoTipo || 'N/A'
       }
     });

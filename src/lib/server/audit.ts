@@ -19,6 +19,7 @@ export async function registrarCreacion(
   try {
     await prisma.auditLog.create({
       data: {
+        id: crypto.randomUUID(),
         entidadTipo,
         entidadId,
         accion: 'CREAR',
@@ -45,6 +46,7 @@ export async function registrarActualizacion(
   try {
     await prisma.auditLog.create({
       data: {
+        id: crypto.randomUUID(),
         entidadTipo,
         entidadId,
         accion: 'ACTUALIZAR',
@@ -71,6 +73,7 @@ export async function registrarEliminacion(
   try {
     await prisma.auditLog.create({
       data: {
+        id: crypto.randomUUID(),
         entidadTipo,
         entidadId,
         accion: 'ELIMINAR',
@@ -137,7 +140,7 @@ export async function obtenerHistorialEntidad(
     const data = await prisma.auditLog.findMany({
       where,
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -179,7 +182,7 @@ export async function obtenerActividadReciente(
     const actividad = await prisma.auditLog.findMany({
       where,
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,

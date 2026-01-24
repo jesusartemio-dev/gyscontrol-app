@@ -297,21 +297,22 @@ export async function GET(
     }
 
     // ✅ Obtener todas las tareas del proyecto
-    const tareas = await (prisma as any).proyectoTarea.findMany({
+    const tareas = await prisma.proyectoTarea.findMany({
       where: { proyectoEdt: { proyectoId: id } },
       include: {
         proyectoEdt: {
           include: {
-            categoriaServicio: true
+            edt: true,
+            proyecto: { select: { id: true, nombre: true } }
           }
         },
-        responsable: true,
-        dependencia: true,
-        tareasDependientes: true,
-        registrosHoras: true,
-        subtareas: true,
+        user: true,
+        dependenciasComoOrigen: true,
+        dependenciasComoDependiente: true,
+        registroHoras: true,
+        proyectoSubtarea: true,
         _count: {
-          select: { subtareas: true, registrosHoras: true }
+          select: { proyectoSubtarea: true, registroHoras: true }
         }
       },
       orderBy: { fechaInicio: 'asc' }
@@ -362,12 +363,12 @@ export async function POST(
         id: validatedData.proyectoActividadId
       },
       include: {
-        proyecto_edt: true
+        proyectoEdt: true
       }
     })
 
     // Verificar que pertenece al proyecto
-    if (!actividad || actividad.proyecto_edt.proyectoId !== id) {
+    if (!actividad || actividad.proyectoEdt.proyectoId !== id) {
       return NextResponse.json(
         { error: 'Actividad no encontrada o no pertenece al proyecto' },
         { status: 404 }

@@ -65,7 +65,7 @@ export async function GET(
     const tareas = await prisma.cotizacionTarea.findMany({
       where: { cotizacionActividad: { cotizacionEdtId: edtId } },
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         }
       },
@@ -160,7 +160,7 @@ export async function POST(
         cotizacionActividadId: '' // TODO: Fix to use proper activity ID
       } as any,
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         }
       }

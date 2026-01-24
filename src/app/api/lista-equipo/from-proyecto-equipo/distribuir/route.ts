@@ -118,6 +118,7 @@ export async function POST(req: Request) {
       // 1. Crear la ListaEquipo
       const lista = await tx.listaEquipo.create({
         data: {
+          id: crypto.randomUUID(),
           codigo,
           nombre,
           estado: 'borrador',
@@ -137,9 +138,10 @@ export async function POST(req: Request) {
 
         await tx.listaEquipoItem.create({
           data: {
+            id: crypto.randomUUID(),
             listaId: lista.id,
             proyectoEquipoItemId: proyectoItem.id,
-            codigo: proyectoItem.codigo, // ✅ Usar código original del catálogo
+            codigo: proyectoItem.codigo,
             descripcion: proyectoItem.descripcion,
             unidad: proyectoItem.unidad || 'UND',
             cantidad: proyectoItem.cantidad,
@@ -161,7 +163,6 @@ export async function POST(req: Request) {
         },
         data: {
           listaId: lista.id
-          // estado permanece como 'pendiente' para permitir múltiples listas
         }
       })
 
@@ -194,22 +195,29 @@ export async function POST(req: Request) {
     }
 
     // ✅ Retornar la lista creada con sus items
-    const listaCompleta = await prisma.listaEquipo.findUnique({
+    const listaCompletaRaw = await prisma.listaEquipo.findUnique({
       where: { id: nuevaLista.id },
       include: {
         proyecto: true,
-        responsable: true,
-        items: {
+        user: true,
+        listaEquipoItem: {
           include: {
             proyectoEquipoItem: {
               include: {
-                proyectoEquipo: true
+                proyectoEquipoCotizado: true
               }
             }
           }
         }
       }
     })
+
+    // Map for frontend compatibility
+    const listaCompleta = listaCompletaRaw ? {
+      ...listaCompletaRaw,
+      responsable: listaCompletaRaw.user,
+      items: listaCompletaRaw.listaEquipoItem
+    } : null
 
     return NextResponse.json({
       ...listaCompleta,

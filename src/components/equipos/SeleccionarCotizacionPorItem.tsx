@@ -60,7 +60,7 @@ export default function SeleccionarCotizacionPorItem({
               <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
                 <div>
                   <strong>Proveedor:</strong>{' '}
-                  {cot.cotizacion?.proveedor?.nombre || 'Desconocido'}
+                  {cot.cotizacionProveedor?.proveedor?.nombre || 'Desconocido'}
                 </div>
                 <div>
                   <strong>Precio:</strong>{' '}

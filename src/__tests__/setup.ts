@@ -598,13 +598,14 @@ export async function createTestData() {
       }
     })
 
-    // Crear categoría de servicio básica
-    const categoriaServicio = await prisma.categoriaServicio.upsert({
+    // Crear EDT del catálogo básico
+    const edtCatalogo = await prisma.edt.upsert({
       where: { id: 'cat-serv-test-unit' },
       update: {},
       create: {
         id: 'cat-serv-test-unit',
-        nombre: 'Categoría Test Unit'
+        nombre: 'EDT Test Unit',
+        updatedAt: new Date()
       }
     })
 
@@ -616,7 +617,7 @@ export async function createTestData() {
         id: 'edt-test-unit',
         proyectoId: proyecto.id,
         nombre: 'EDT Test Unit',
-        categoriaServicioId: categoriaServicio.id,
+        edtId: edtCatalogo.id,
         estado: 'planificado'
       }
     })
@@ -627,7 +628,7 @@ export async function createTestData() {
       cliente,
       comercial,
       gestor,
-      categoriaServicio
+      edtCatalogo
     }
 
   } catch (error) {

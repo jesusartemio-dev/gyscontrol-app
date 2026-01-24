@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
     // 📊 Crear proyecto
     const nuevoProyecto = await prisma.proyecto.create({
       data: {
+        id: `proy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nombre: body.nombre,
         clienteId: body.clienteId,
         comercialId: body.comercialId || 'default-comercial-id', // TODO: Obtener del usuario actual
@@ -167,7 +168,8 @@ export async function POST(request: NextRequest) {
         fechaInicio: body.fechaInicio ? new Date(body.fechaInicio) : new Date(),
         fechaFin: body.fechaFin ? new Date(body.fechaFin) : null,
         totalCliente: body.totalCliente || 0,
-        estado: body.estado || 'activo'
+        estado: body.estado || 'activo',
+        updatedAt: new Date()
       },
       select: {
         id: true,

@@ -91,7 +91,7 @@ export default function CotizacionServicioItemList({ items, onUpdated, onDeleted
               <div className="font-semibold text-base text-gray-900">{item.nombre}</div>
               <div className="text-xs text-gray-600 italic">{item.descripcion}</div>
               <div className="text-gray-500">{item.recursoNombre} • {item.unidadServicioNombre}</div>
-              <div className="text-xs text-gray-500 italic">Categoría: {item.categoria} • Fórmula: {item.formula}</div>
+              <div className="text-xs text-gray-500 italic">EDT: {item.edt?.nombre || 'Sin EDT'} • Fórmula: {item.formula}</div>
               <div className="text-xs text-gray-600">
                 Costo/Hr: $ {item.costoHora.toFixed(2)} • FS: {item.factorSeguridad}
               </div>

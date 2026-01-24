@@ -162,7 +162,7 @@ export default function ListasEquipoPageContent() {
            cronogramas: []
          },
          // ✅ Transform items to ListaEquipoItemDetail[]
-         items: (lista.items || []).map(item => ({
+         items: (lista.listaEquipoItem || []).map(item => ({
            ...item,
            calculated: {
              costoTotal: item.precioElegido || item.presupuesto || 0,
@@ -174,12 +174,12 @@ export default function ListasEquipoPageContent() {
          })),
          // ✅ Calculate stats from items
          stats: {
-           totalItems: lista._count?.items || 0,
+           totalItems: lista._count?.listaEquipoItem || 0,
            itemsVerificados: 0,
            itemsAprobados: 0,
            itemsRechazados: 0,
-           itemsPendientes: lista._count?.items || 0,
-           costoTotal: (lista.items || []).reduce((total, item) => {
+           itemsPendientes: lista._count?.listaEquipoItem || 0,
+           costoTotal: (lista.listaEquipoItem || []).reduce((total, item) => {
              const precio = item.precioElegido || item.presupuesto || 0;
              const cantidad = item.cantidad || 0;
              return total + (precio * cantidad);

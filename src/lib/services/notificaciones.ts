@@ -22,8 +22,9 @@ export interface NotificacionData {
 // ✅ Crear notificación
 export async function crearNotificacion(data: NotificacionData) {
   try {
-    const notificacion = await prisma.notificaciones.create({
+    const notificacion = await prisma.notificacion.create({
       data: {
+        id: crypto.randomUUID(),
         titulo: data.titulo,
         mensaje: data.mensaje,
         tipo: data.tipo,
@@ -32,7 +33,8 @@ export async function crearNotificacion(data: NotificacionData) {
         entidadTipo: data.entidadTipo,
         entidadId: data.entidadId,
         accionUrl: data.accionUrl,
-        accionTexto: data.accionTexto
+        accionTexto: data.accionTexto,
+        updatedAt: new Date()
       }
     })
     return notificacion
@@ -45,7 +47,7 @@ export async function crearNotificacion(data: NotificacionData) {
 // ✅ Obtener notificaciones de un usuario
 export async function obtenerNotificacionesUsuario(usuarioId: string, limite: number = 50) {
   try {
-    const notificaciones = await prisma.notificaciones.findMany({
+    const notificaciones = await prisma.notificacion.findMany({
       where: { usuarioId },
       orderBy: { createdAt: 'desc' },
       take: limite
@@ -60,7 +62,7 @@ export async function obtenerNotificacionesUsuario(usuarioId: string, limite: nu
 // ✅ Marcar notificación como leída
 export async function marcarNotificacionLeida(id: string) {
   try {
-    const notificacion = await prisma.notificaciones.update({
+    const notificacion = await prisma.notificacion.update({
       where: { id },
       data: {
         leida: true,
@@ -77,7 +79,7 @@ export async function marcarNotificacionLeida(id: string) {
 // ✅ Obtener notificaciones no leídas
 export async function obtenerNotificacionesNoLeidas(usuarioId: string) {
   try {
-    const count = await prisma.notificaciones.count({
+    const count = await prisma.notificacion.count({
       where: {
         usuarioId,
         leida: false

@@ -28,7 +28,7 @@ export async function DELETE(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -50,11 +50,11 @@ export async function DELETE(
         cotizacionId: id
       },
       include: {
-        cotizacion_edt: {
+        cotizacionEdt: {
           include: {
             cotizacionActividad: {
               include: {
-                cotizacionTareas: true
+                cotizacionTarea: true
               }
             }
           }
@@ -69,10 +69,10 @@ export async function DELETE(
     }
 
     // Verificar si tiene elementos dependientes
-    const totalEdts = fase.cotizacion_edt.length
-    const totalActividades = fase.cotizacion_edt.reduce((sum, edt) => sum + edt.cotizacionActividad.length, 0)
-    const totalTareas = fase.cotizacion_edt.reduce((sum, edt) =>
-      sum + edt.cotizacionActividad.reduce((sumAct, act) => sumAct + act.cotizacionTareas.length, 0), 0
+    const totalEdts = fase.cotizacionEdt.length
+    const totalActividades = fase.cotizacionEdt.reduce((sum, edt) => sum + edt.cotizacionActividad.length, 0)
+    const totalTareas = fase.cotizacionEdt.reduce((sum, edt) =>
+      sum + edt.cotizacionActividad.reduce((sumAct, act) => sumAct + act.cotizacionTarea.length, 0), 0
     )
 
     if (totalEdts > 0 || totalActividades > 0 || totalTareas > 0) {

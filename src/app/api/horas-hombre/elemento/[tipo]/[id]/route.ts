@@ -1,7 +1,7 @@
 /**
  * API para obtener información detallada de un elemento específico
  *
- * Retorna información completa de EDT, Zona, Actividad o Tarea
+ * Retorna información completa de EDT, Actividad o Tarea
  * Incluye responsables, progreso, horas, y elementos relacionados
  */
 
@@ -32,41 +32,19 @@ export async function GET(
         elemento = await prisma.proyectoEdt.findUnique({
           where: { id },
           include: {
-            responsable: {
+            user: {
               select: { id: true, name: true, email: true }
             },
             proyecto: {
               select: { id: true, nombre: true }
+            },
+            proyectoActividad: {
+              include: {
+                proyectoTarea: true
+              }
             }
           }
         })
-
-        // Obtener zonas y actividades relacionadas por separado
-        if (elemento) {
-          const zonas = await prisma.proyectoZona.findMany({
-            where: { proyectoEdtId: id },
-            include: {
-              actividades: {
-                include: {
-                  tareas: true
-                }
-              }
-            }
-          })
-
-          const actividadesDirectas = await prisma.proyectoActividad.findMany({
-            where: {
-              proyectoEdtId: id,
-              proyectoZonaId: null
-            },
-            include: {
-              tareas: true
-            }
-          })
-
-          elemento.zonas = zonas
-          elemento.actividadesDirectas = actividadesDirectas
-        }
 
         if (elemento) {
           elemento = {
@@ -74,56 +52,14 @@ export async function GET(
             nombre: elemento.nombre,
             tipo: 'edt',
             proyecto: elemento.proyecto,
-            responsable: elemento.responsable,
+            responsable: elemento.user,
             horasPlan: elemento.horasPlan || 0,
             horasReales: elemento.horasReales || 0,
             progreso: elemento.porcentajeAvance || 0,
             estado: elemento.estado,
             fechaInicio: elemento.fechaInicioPlan,
             fechaFin: elemento.fechaFinPlan,
-            zonas: elemento.zonas,
-            actividadesDirectas: elemento.actividadesDirectas
-          }
-        }
-        break
-
-      case 'zona':
-        elemento = await prisma.proyectoZona.findUnique({
-          where: { id },
-          include: {
-            proyectoEdt: {
-              include: {
-                proyecto: {
-                  select: { id: true, nombre: true }
-                }
-              }
-            },
-            actividades: {
-              include: {
-                tareas: true
-              }
-            }
-          }
-        })
-
-        if (elemento) {
-          elemento = {
-            id: elemento.id,
-            nombre: elemento.nombre,
-            tipo: 'zona',
-            proyecto: elemento.proyectoEdt.proyecto,
-            edt: {
-              id: elemento.proyectoEdt.id,
-              nombre: elemento.proyectoEdt.nombre
-            },
-            responsable: null, // Zonas no tienen responsables
-            horasPlan: elemento.horasPlan || 0,
-            horasReales: elemento.horasReales || 0,
-            progreso: elemento.porcentajeAvance || 0,
-            estado: elemento.estado,
-            fechaInicio: elemento.fechaInicioPlan,
-            fechaFin: elemento.fechaFinPlan,
-            actividades: elemento.actividades
+            actividades: elemento.proyectoActividad
           }
         }
         break
@@ -132,6 +68,9 @@ export async function GET(
         elemento = await prisma.proyectoActividad.findUnique({
           where: { id },
           include: {
+            user: {
+              select: { id: true, name: true, email: true }
+            },
             proyectoEdt: {
               include: {
                 proyecto: {
@@ -139,10 +78,7 @@ export async function GET(
                 }
               }
             },
-            proyectoZona: {
-              select: { id: true, nombre: true }
-            },
-            tareas: true
+            proyectoTarea: true
           }
         })
 
@@ -156,15 +92,14 @@ export async function GET(
               id: elemento.proyectoEdt.id,
               nombre: elemento.proyectoEdt.nombre
             },
-            zona: elemento.proyectoZona,
-            responsable: null, // Actividades no tienen responsables
+            responsable: elemento.user,
             horasPlan: elemento.horasPlan || 0,
             horasReales: elemento.horasReales || 0,
             progreso: elemento.porcentajeAvance || 0,
             estado: elemento.estado,
             fechaInicio: elemento.fechaInicioPlan,
             fechaFin: elemento.fechaFinPlan,
-            tareas: elemento.tareas
+            tareas: elemento.proyectoTarea
           }
         }
         break
@@ -173,7 +108,7 @@ export async function GET(
         elemento = await prisma.proyectoTarea.findUnique({
           where: { id },
           include: {
-            responsable: {
+            user: {
               select: { id: true, name: true, email: true }
             },
             proyectoActividad: {
@@ -184,9 +119,6 @@ export async function GET(
                       select: { id: true, nombre: true }
                     }
                   }
-                },
-                proyectoZona: {
-                  select: { id: true, nombre: true }
                 }
               }
             }
@@ -207,8 +139,7 @@ export async function GET(
               id: elemento.proyectoActividad.id,
               nombre: elemento.proyectoActividad.nombre
             },
-            zona: elemento.proyectoActividad.proyectoZona,
-            responsable: elemento.responsable,
+            responsable: elemento.user,
             horasPlan: elemento.horasEstimadas || 0,
             horasReales: elemento.horasReales || 0,
             progreso: elemento.porcentajeCompletado || 0,

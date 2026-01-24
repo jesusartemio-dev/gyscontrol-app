@@ -153,6 +153,7 @@ export async function POST(request: NextRequest) {
     // Crear registro de horas con información jerárquica
     const registroHoras = await prisma.registroHoras.create({
       data: {
+        id: `reg-hrs-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoId,
         proyectoServicioId: proyectoServicio.id,
         categoria: `${elementoTipo}_jerarquico`,
@@ -163,7 +164,8 @@ export async function POST(request: NextRequest) {
         fechaTrabajo: new Date(fecha),
         horasTrabajadas: horas,
         descripcion: `[EDT: ${edt.nombre}] [${elementoTipo.toUpperCase()}: ${elemento.nombre}] ${descripcion}`,
-        origen: 'oficina' // Usar un valor válido existente
+        origen: 'oficina', // Usar un valor válido existente
+        updatedAt: new Date()
       },
       include: {
         proyecto: {

@@ -253,14 +253,14 @@ export async function GET(request: NextRequest) {
               codigo: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          items: {
+          listaEquipoItem: {
             select: {
               cantidad: true,
               precioElegido: true,
@@ -269,7 +269,7 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              items: true
+              listaEquipoItem: true
             }
           }
         },
@@ -384,10 +384,10 @@ export async function POST(request: NextRequest) {
             codigo: true
           }
         },
-        items: true,
+        listaEquipoItem: true,
         _count: {
           select: {
-            items: true
+            listaEquipoItem: true
           }
         }
       }

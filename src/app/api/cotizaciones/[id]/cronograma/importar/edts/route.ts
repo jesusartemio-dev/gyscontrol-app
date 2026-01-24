@@ -1,7 +1,7 @@
 // ===================================================
 // 📁 Archivo: route.ts
 // 📌 Ubicación: /api/cotizaciones/[id]/cronograma/importar/edts
-// 🔧 Descripción: Importar EDTs desde categorías de servicios a fases
+// 🔧 Descripción: Importar EDTs desde EDTs de servicios a fases
 // ✅ POST: Importar EDTs seleccionados a una fase específica
 // ===================================================
 
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 
 const importEdtsSchema = z.object({
   faseId: z.string().min(1, 'La fase es requerida'),
-  categoriaIds: z.array(z.string()).min(1, 'Debe seleccionar al menos una categoría')
+  edtIds: z.array(z.string()).min(1, 'Debe seleccionar al menos un EDT')
 })
 
 // ✅ POST /api/cotizaciones/[id]/cronograma/importar/edts
@@ -34,7 +34,7 @@ export async function POST(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -67,34 +67,36 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Obtener servicios de la cotización agrupados por categoría
+    // Obtener servicios de la cotización agrupados por edtId
     const servicios = await prisma.cotizacionServicio.findMany({
       where: { cotizacionId: id },
       include: {
-        items: true
+        cotizacionServicioItem: true,
+        edt: true
       }
     })
 
-    // Filtrar categorías seleccionadas que tienen servicios
-    const categoriasDisponibles = new Map()
+    // Filtrar EDTs seleccionados que tienen servicios
+    const edtsDisponibles = new Map()
     servicios.forEach(servicio => {
-      if (validatedData.categoriaIds.includes(servicio.categoria)) {
-        if (!categoriasDisponibles.has(servicio.categoria)) {
-          categoriasDisponibles.set(servicio.categoria, {
-            categoria: servicio.categoria,
+      if (servicio.edtId && validatedData.edtIds.includes(servicio.edtId)) {
+        if (!edtsDisponibles.has(servicio.edtId)) {
+          edtsDisponibles.set(servicio.edtId, {
+            edtId: servicio.edtId,
+            nombre: servicio.edt?.nombre || servicio.edtId,
             servicios: [],
             totalHoras: 0
           })
         }
-        const categoriaData = categoriasDisponibles.get(servicio.categoria)
-        categoriaData.servicios.push(servicio)
-        categoriaData.totalHoras += servicio.items.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
+        const edtData = edtsDisponibles.get(servicio.edtId)
+        edtData.servicios.push(servicio)
+        edtData.totalHoras += servicio.cotizacionServicioItem.reduce((sum: number, item: any) => sum + (Number(item.horaTotal) || 0), 0)
       }
     })
 
-    if (categoriasDisponibles.size === 0) {
+    if (edtsDisponibles.size === 0) {
       return NextResponse.json({
-        error: 'Ninguna de las categorías seleccionadas tiene servicios en esta cotización'
+        error: 'Ninguno de los EDTs seleccionados tiene servicios en esta cotización'
       }, { status: 400 })
     }
 
@@ -109,31 +111,34 @@ export async function POST(
 
     const nombresExistentes = edtsExistentes.map(edt => edt.nombre)
 
-    // Crear EDTs para las categorías seleccionadas
+    // Crear EDTs para los seleccionados
     const edtsCreados = []
-    for (const [categoriaNombre, categoriaData] of categoriasDisponibles) {
+    for (const [edtId, edtData] of edtsDisponibles) {
       // Verificar que no exista ya un EDT con este nombre en la fase
-      if (nombresExistentes.includes(categoriaNombre)) {
-        continue // Saltar esta categoría
+      if (nombresExistentes.includes(edtData.nombre)) {
+        continue // Saltar este EDT
       }
 
       const nuevoEdt = await prisma.cotizacionEdt.create({
         data: {
+          id: `cot-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           cotizacionId: id,
           cotizacionFaseId: validatedData.faseId,
-          cotizacionServicioId: categoriaData.servicios[0]?.id, // Link to first service in category
-          nombre: categoriaNombre,
-          descripcion: `EDT importado manualmente para categoría ${categoriaNombre}`,
-          horasEstimadas: categoriaData.totalHoras,
+          cotizacionServicioId: edtData.servicios[0]?.id, // Link to first service
+          edtId: edtId,
+          nombre: edtData.nombre,
+          descripcion: `EDT importado para ${edtData.nombre}`,
+          horasEstimadas: edtData.totalHoras,
           estado: 'planificado',
-          prioridad: 'media'
+          prioridad: 'media',
+          updatedAt: new Date()
         }
       })
 
       edtsCreados.push({
         ...nuevoEdt,
-        serviciosCount: categoriaData.servicios.length,
-        totalHoras: categoriaData.totalHoras
+        serviciosCount: edtData.servicios.length,
+        totalHoras: edtData.totalHoras
       })
     }
 
@@ -141,7 +146,7 @@ export async function POST(
       success: true,
       data: edtsCreados,
       message: `Se importaron ${edtsCreados.length} EDTs exitosamente`,
-      skipped: categoriasDisponibles.size - edtsCreados.length
+      skipped: edtsDisponibles.size - edtsCreados.length
     }, { status: 201 })
 
   } catch (error) {
@@ -160,7 +165,7 @@ export async function POST(
   }
 }
 
-// ✅ GET /api/cotizaciones/[id]/cronograma/importar/edts - Obtener categorías disponibles para importar
+// ✅ GET /api/cotizaciones/[id]/cronograma/importar/edts - Obtener EDTs disponibles para importar
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -178,7 +183,7 @@ export async function GET(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -193,39 +198,37 @@ export async function GET(
       return NextResponse.json({ error: 'No tiene permisos para ver el cronograma' }, { status: 403 })
     }
 
-    // Obtener servicios agrupados por categoría
+    // Obtener servicios agrupados por edtId
     const servicios = await prisma.cotizacionServicio.findMany({
       where: { cotizacionId: id },
       include: {
-        items: true
+        cotizacionServicioItem: true,
+        edt: true
       }
     })
 
-    // Obtener información de categorías reales
-    const categoriasTabla = await prisma.categoriaServicio.findMany()
-    const categoriaMap = new Map(categoriasTabla.map(cat => [cat.id, cat]))
-
-    // Agrupar por categoría
-    const categoriasMap = new Map()
+    // Agrupar por edtId
+    const edtsMap = new Map()
     servicios.forEach(servicio => {
-      const categoriaId = servicio.categoria
-      if (!categoriasMap.has(categoriaId)) {
-        const categoriaInfo = categoriaMap.get(categoriaId)
-        categoriasMap.set(categoriaId, {
-          id: categoriaId,
-          nombre: categoriaInfo?.nombre || categoriaId,
-          descripcion: categoriaInfo?.descripcion || 'Sin descripción',
+      const edtId = servicio.edtId
+      if (!edtId) return
+
+      if (!edtsMap.has(edtId)) {
+        edtsMap.set(edtId, {
+          id: edtId,
+          nombre: servicio.edt?.nombre || edtId,
+          descripcion: servicio.edt?.descripcion || 'Sin descripción',
           servicios: [],
           totalHoras: 0
         })
       }
-      const categoriaData = categoriasMap.get(categoriaId)
-      categoriaData.servicios.push(servicio)
-      categoriaData.totalHoras += servicio.items.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
+      const edtData = edtsMap.get(edtId)
+      edtData.servicios.push(servicio)
+      edtData.totalHoras += servicio.cotizacionServicioItem.reduce((sum: number, item: any) => sum + (Number(item.horaTotal) || 0), 0)
     })
 
-    // Convertir a array y filtrar categorías que ya tienen EDTs en la fase (si se especifica)
-    let categorias = Array.from(categoriasMap.values())
+    // Convertir a array y filtrar EDTs que ya existen en la fase (si se especifica)
+    let edts = Array.from(edtsMap.values())
 
     if (faseId) {
       // Obtener EDTs existentes en esta fase
@@ -239,17 +242,17 @@ export async function GET(
 
       const nombresEdtsExistentes = edtsExistentes.map(edt => edt.nombre)
 
-      // Filtrar categorías que no tienen EDT ya creado
-      categorias = categorias.filter(cat => !nombresEdtsExistentes.includes(cat.nombre))
+      // Filtrar EDTs que no tienen uno ya creado
+      edts = edts.filter(edt => !nombresEdtsExistentes.includes(edt.nombre))
     }
 
     return NextResponse.json({
       success: true,
-      data: categorias
+      data: edts
     })
 
   } catch (error) {
-    console.error('❌ Error obteniendo categorías disponibles:', error)
+    console.error('❌ Error obteniendo EDTs disponibles:', error)
     return NextResponse.json({
       error: 'Error interno del servidor',
       details: error instanceof Error ? error.message : 'Error desconocido'

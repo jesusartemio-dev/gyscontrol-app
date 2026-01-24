@@ -117,7 +117,8 @@ export default function ModalAgregarItemDesdeCatalogo({
         await createListaEquipoItem({
           listaId,
           proyectoEquipoId,
-          responsableId: session.user.id, // ✅ Agregar responsableId
+          catalogoEquipoId: equipo.id, // ✅ Relacionar con el catálogo para exportar categoría/marca
+          responsableId: session.user.id,
           codigo: equipo.codigo,
           descripcion: equipo.descripcion,
           unidad: equipo.unidad?.nombre || 'UND',

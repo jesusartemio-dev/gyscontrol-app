@@ -34,7 +34,7 @@ export async function POST(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -108,6 +108,7 @@ export async function POST(
 
       const nuevaTarea = await prisma.cotizacionTarea.create({
         data: {
+          id: `cot-tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           cotizacionActividadId: validatedData.actividadId,
           cotizacionServicioItemId: item.id,
           nombre: item.nombre,
@@ -116,7 +117,8 @@ export async function POST(
           fechaFin: actividad.fechaFinComercial || new Date(),
           horasEstimadas: item.horaTotal,
           estado: 'pendiente',
-          prioridad: 'media'
+          prioridad: 'media',
+          updatedAt: new Date()
         }
       })
 
@@ -168,7 +170,7 @@ export async function GET(
     // Verificar permisos
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
-      include: { comercial: true }
+      include: { user: true }
     })
 
     if (!cotizacion) {
@@ -233,7 +235,7 @@ export async function GET(
         nombre: item.nombre,
         descripcion: item.descripcion,
         servicioNombre: item.cotizacionServicio.nombre,
-        categoria: item.categoria,
+        edtId: item.edtId,
         recursoNombre: item.recurso.nombre,
         unidadServicioNombre: item.unidadServicio.nombre,
         horaTotal: item.horaTotal,
@@ -256,12 +258,11 @@ export async function GET(
 
 // Función auxiliar para obtener condición de padre de actividad
 async function getActividadParentCondition(cotizacionId: string, actividadId: string) {
-  // Verificar si la actividad pertenece a un EDT o zona de esta cotización
+  // Verificar si la actividad pertenece a un EDT de esta cotización
   const actividad = await prisma.cotizacionActividad.findUnique({
     where: { id: actividadId },
     select: {
-      cotizacionEdtId: true,
-      cotizacionZonaId: true
+      cotizacionEdtId: true
     }
   })
 
@@ -270,12 +271,6 @@ async function getActividadParentCondition(cotizacionId: string, actividadId: st
   if (actividad.cotizacionEdtId) {
     return {
       cotizacionEdt: {
-        cotizacionId
-      }
-    }
-  } else if (actividad.cotizacionZonaId) {
-    return {
-      cotizacionZona: {
         cotizacionId
       }
     }

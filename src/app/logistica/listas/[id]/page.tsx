@@ -59,7 +59,7 @@ export default function LogisticaListaDetallePage() {
           </p>
           <p className="text-sm text-gray-700">
             <strong>Costo Total Elegido:</strong>{' '}
-            $ {(lista.items?.reduce((total, item) => total + (item.costoElegido ?? 0), 0) ?? 0).toFixed(2)}
+            $ {(lista.listaEquipoItem?.reduce((total, item) => total + (item.costoElegido ?? 0), 0) ?? 0).toFixed(2)}
           </p>
 
           {/* Botones de acción */}
@@ -117,8 +117,8 @@ export default function LogisticaListaDetallePage() {
         </CardContent>
       </Card>
 
-      {lista.items.length > 0 ? (
-        <LogisticaListaDetalleItemTableProfessional items={lista.items} onUpdated={handleRefetch} />
+      {lista.listaEquipoItem.length > 0 ? (
+        <LogisticaListaDetalleItemTableProfessional items={lista.listaEquipoItem} onUpdated={handleRefetch} />
       ) : (
         <p className="text-gray-500">No hay ítems en esta lista.</p>
       )}

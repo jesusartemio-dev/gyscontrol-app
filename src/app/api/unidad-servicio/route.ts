@@ -48,7 +48,11 @@ export async function POST(req: Request) {
     }
 
     const creada = await prisma.unidadServicio.create({
-      data: { nombre }
+      data: {
+        id: `unidad-servicio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        nombre,
+        updatedAt: new Date()
+      }
     })
 
     return NextResponse.json(creada, { status: 201 })

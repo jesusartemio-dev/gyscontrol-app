@@ -38,14 +38,14 @@ export async function GET(request: NextRequest) {
     const edtsComerciales = await prisma.cotizacionEdt.findMany({
       where: {
         cotizacion: {
-          proyectos: {
+          proyecto: {
             some: { id: proyectoId }
           }
         }
       },
       include: {
-        categoriaServicio: true,
-        responsable: true
+        edt: true,
+        user: true
       }
     });
 
@@ -53,9 +53,9 @@ export async function GET(request: NextRequest) {
     const edtsPlanificados = await prisma.proyectoEdt.findMany({
       where: { proyectoId },
       include: {
-        categoriaServicio: true,
-        responsable: true,
-        registrosHoras: {
+        edt: true,
+        user: true,
+        registroHoras: {
           select: { horasTrabajadas: true },
           where: { aprobado: true }
         }
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     // Obtener EDTs reales (con horas registradas)
     const edtsReales = edtsPlanificados.filter(edt =>
-      edt.registrosHoras.length > 0 || Number(edt.horasReales) > 0
+      edt.registroHoras.length > 0 || Number(edt.horasReales) > 0
     );
 
     // Calcular métricas
@@ -116,21 +116,21 @@ export async function GET(request: NextRequest) {
 
 // Funciones auxiliares
 async function calcularAnalisisPorCategoria(proyectoId: string) {
-  const categorias = await prisma.categoriaServicio.findMany({
+  const categorias = await prisma.edt.findMany({
     include: {
-      proyectoEdts: {
+      proyectoEdt: {
         where: { proyectoId },
         include: {
-          registrosHoras: {
+          registroHoras: {
             select: { horasTrabajadas: true },
             where: { aprobado: true }
           }
         }
       },
-      cotizacionEdts: {
+      cotizacionEdt: {
         where: {
           cotizacion: {
-            proyectos: {
+            proyecto: {
               some: { id: proyectoId }
             }
           }
@@ -140,10 +140,10 @@ async function calcularAnalisisPorCategoria(proyectoId: string) {
   });
 
   return categorias.map(cat => {
-    const planificado = cat.proyectoEdts.length;
-    const comercial = cat.cotizacionEdts.length;
-    const real = cat.proyectoEdts.filter(edt =>
-      edt.registrosHoras.length > 0 || Number(edt.horasReales) > 0
+    const planificado = cat.proyectoEdt.length;
+    const comercial = cat.cotizacionEdt.length;
+    const real = cat.proyectoEdt.filter(edt =>
+      edt.registroHoras.length > 0 || Number(edt.horasReales) > 0
     ).length;
 
     return {
@@ -166,7 +166,7 @@ function calcularDesviacionesTemporales(edts: any[]) {
       const diasRetraso = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       return {
-        nombre: edt.nombre || `EDT ${edt.categoriaServicio?.nombre}`,
+        nombre: edt.nombre || `EDT ${edt.edt?.nombre}`,
         diasRetraso: diasRetraso > 0 ? diasRetraso : 0,
         estado: diasRetraso > 0 ? 'retrasado' : 'a_tiempo'
       };
@@ -180,7 +180,7 @@ function calcularPrecisionComercial(comercial: any[], planificado: any[]) {
 
   const coincidencias = comercial.filter(com =>
     planificado.some(plan =>
-      plan.categoriaServicioId === com.categoriaServicioId
+      plan.edtId === com.edtId
     )
   ).length;
 
@@ -192,7 +192,7 @@ function calcularEficienciaPlanificacion(planificado: any[]) {
 
   const completados = planificado.filter(edt =>
     edt.estado === 'completado' ||
-    (edt.registrosHoras.length > 0 && edt.horasReales >= edt.horasPlan)
+    (edt.registroHoras.length > 0 && edt.horasReales >= edt.horasPlan)
   ).length;
 
   return (completados / planificado.length) * 100;

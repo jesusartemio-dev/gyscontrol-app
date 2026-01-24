@@ -98,8 +98,8 @@ export function CotizacionInfo({
                 Seleccionar cotización:
               </p>
               {cotizaciones.map((cotizacion) => {
-                const codigo = cotizacion.cotizacion?.codigo || "Sin código"
-                const proveedor = cotizacion.cotizacion?.proveedor?.nombre || "Sin proveedor"
+                const codigo = cotizacion.cotizacionProveedor?.codigo || "Sin código"
+                const proveedor = cotizacion.cotizacionProveedor?.proveedor?.nombre || "Sin proveedor"
                 return (
                   <Button
                     key={cotizacion.id}
@@ -131,7 +131,7 @@ export function CotizacionInfo({
             variant="outline" 
             className="text-xs text-muted-foreground"
           >
-            {cotizacion.cotizacion?.codigo || "Sin código"}
+            {cotizacion.cotizacionProveedor?.codigo || "Sin código"}
           </Badge>
         ))}
         <Badge variant="outline" className="text-xs text-orange-600 border-orange-200">
@@ -151,10 +151,10 @@ export function CotizacionInfo({
             <Button 
               variant="outline" 
               size="sm" 
-              className="h-6 px-2 text-xs bg-green-500 hover:bg-green-600 text-white border-green-500"
+              className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white border-green-500"
               disabled={isLoading}
             >
-              {selectedCotizacion?.cotizacion?.codigo || "Sin código"}
+              {selectedCotizacion?.cotizacionProveedor?.codigo || "Sin código"}
               <Check className="ml-1 h-3 w-3" />
               <ChevronDown className="ml-1 h-3 w-3" />
             </Button>
@@ -166,8 +166,8 @@ export function CotizacionInfo({
               </p>
               {cotizaciones.map((cotizacion) => {
                 const isSelected = cotizacionSeleccionadaId === cotizacion.id
-                const codigo = cotizacion.cotizacion?.codigo || "Sin código"
-                const proveedor = cotizacion.cotizacion?.proveedor?.nombre || "Sin proveedor"
+                const codigo = cotizacion.cotizacionProveedor?.codigo || "Sin código"
+                const proveedor = cotizacion.cotizacionProveedor?.proveedor?.nombre || "Sin proveedor"
                 return (
                   <Button
                     key={cotizacion.id}
@@ -175,7 +175,7 @@ export function CotizacionInfo({
                     size="sm"
                     className={cn(
                       "w-full justify-start h-auto p-2 text-xs",
-                      isSelected && "bg-green-500 hover:bg-green-600 text-white"
+                      isSelected && "bg-blue-600 hover:bg-blue-700 text-white"
                     )}
                     onClick={() => !isSelected && handleSelectionChange(cotizacion.id)}
                     disabled={isLoading || isSelected}
@@ -200,9 +200,9 @@ export function CotizacionInfo({
       <div className="flex items-center gap-2">
         <Badge 
           variant="default"
-          className="bg-green-500 hover:bg-green-600 text-white text-xs"
+          className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
         >
-          {selectedCotizacion?.cotizacion?.codigo || "Sin código"}
+          {selectedCotizacion?.cotizacionProveedor?.codigo || "Sin código"}
           <Check className="ml-1 h-3 w-3" />
         </Badge>
         <Badge variant="secondary" className="text-xs">
@@ -218,7 +218,7 @@ export function CotizacionInfo({
       <div className="flex flex-wrap gap-1 items-center">
         {cotizaciones.map((cotizacion) => {
           const isSelected = cotizacionSeleccionadaId === cotizacion.id
-          const codigo = cotizacion.cotizacion?.codigo || "Sin código"
+          const codigo = cotizacion.cotizacionProveedor?.codigo || "Sin código"
           
           return (
             <Button
@@ -227,7 +227,7 @@ export function CotizacionInfo({
               size="sm"
               className={cn(
                 "h-6 px-2 text-xs transition-colors",
-                isSelected && "bg-green-500 hover:bg-green-600 text-white",
+                isSelected && "bg-blue-600 hover:bg-blue-700 text-white",
                 !isSelected && "text-muted-foreground hover:text-foreground hover:bg-muted"
               )}
               onClick={() => !isSelected && handleSelectionChange(cotizacion.id)}
@@ -251,7 +251,7 @@ export function CotizacionInfo({
     <div className="flex flex-wrap gap-1 items-center">
       {cotizaciones.map((cotizacion) => {
         const isSelected = cotizacionSeleccionadaId === cotizacion.id
-        const codigo = cotizacion.cotizacion?.codigo || "Sin código"
+        const codigo = cotizacion.cotizacionProveedor?.codigo || "Sin código"
         
         return (
           <Badge 
@@ -259,7 +259,7 @@ export function CotizacionInfo({
             variant={isSelected ? "default" : "outline"}
             className={cn(
               "text-xs transition-colors",
-              isSelected && "bg-green-500 hover:bg-green-600 text-white",
+              isSelected && "bg-blue-600 hover:bg-blue-700 text-white",
               !isSelected && "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -296,10 +296,10 @@ export function CotizacionBadge({
       variant={isSelected ? "default" : "outline"}
       className={cn(
         "transition-colors",
-        isSelected && "bg-green-500 hover:bg-green-600 text-white"
+        isSelected && "bg-blue-600 hover:bg-blue-700 text-white"
       )}
     >
-      {cotizacion.cotizacion?.codigo || "Sin código"}
+      {cotizacion.cotizacionProveedor?.codigo || "Sin código"}
       {isSelected && <Check className="ml-1 h-3 w-3" />}
     </Badge>
   )
@@ -345,25 +345,25 @@ export function CotizacionCodigoSimple({
   return (
       <div className="flex flex-col gap-1">
         {cotizaciones.map((cotizacion) => {
-          const codigo = cotizacion.cotizacion?.codigo || "Sin código"
+          const codigo = cotizacion.cotizacionProveedor?.codigo || "Sin código"
           const isSelected = cotizacion.id === cotizacionSeleccionadaId
           const precio = cotizacion.precioUnitario || 0
           const tiempoEntrega = cotizacion.tiempoEntrega || "No especificado"
-          
+
           return (
             <Tooltip key={cotizacion.id}>
               <TooltipTrigger asChild>
-                <Badge 
+                <Badge
                   variant={isSelected ? "default" : "outline"}
                   className={cn(
-                    "text-[10px] px-2 py-1 flex items-center gap-1 cursor-help transition-all duration-200",
-                    isSelected 
-                      ? "bg-green-500 hover:bg-green-600 text-white animate-pulse" 
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    "text-[10px] px-2 py-1 flex items-center gap-1 cursor-help",
+                    isSelected
+                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   )}
                 >
                   {isSelected && (
-                    <Check className="w-3 h-3 animate-bounce" />
+                    <Check className="w-3 h-3" />
                   )}
                   {codigo}
                 </Badge>

@@ -35,7 +35,7 @@ export async function GET(
       ...(tipo && { tipo })
     };
 
-    const dependencias = await prisma.proyectoDependenciaTarea.findMany({
+    const dependencias = await prisma.proyectoDependenciasTarea.findMany({
       where: whereClause,
       include: {
         tareaOrigen: {
@@ -154,7 +154,7 @@ export async function POST(
     }
 
     // Verificar que no exista ya la dependencia
-    const dependenciaExistente = await prisma.proyectoDependenciaTarea.findFirst({
+    const dependenciaExistente = await prisma.proyectoDependenciasTarea.findFirst({
       where: {
         tareaOrigenId,
         tareaDependienteId
@@ -184,8 +184,9 @@ export async function POST(
     }
 
     // Crear dependencia
-    const nuevaDependencia = await prisma.proyectoDependenciaTarea.create({
+    const nuevaDependencia = await prisma.proyectoDependenciasTarea.create({
       data: {
+        id: `dep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         tareaOrigenId,
         tareaDependienteId,
         tipo: tipo || 'finish_to_start'
@@ -228,7 +229,7 @@ export async function POST(
 // Función auxiliar para verificar ciclos en dependencias
 async function verificarCiclo(tareaActualId: string, tareaBuscadaId: string): Promise<boolean> {
   // Obtener todas las dependencias donde la tarea actual es origen
-  const dependencias = await prisma.proyectoDependenciaTarea.findMany({
+  const dependencias = await prisma.proyectoDependenciasTarea.findMany({
     where: { tareaOrigenId: tareaActualId },
     select: { tareaDependienteId: true }
   });

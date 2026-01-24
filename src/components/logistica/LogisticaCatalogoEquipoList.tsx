@@ -152,7 +152,7 @@ export default function LogisticaCatalogoEquipoList({ data, onUpdate, onDelete }
               
               <TableCell>
                 <Badge variant="outline" className="font-normal">
-                  {eq.categoria.nombre}
+                  {eq.categoriaEquipo?.nombre || 'Sin categoría'}
                 </Badge>
               </TableCell>
               

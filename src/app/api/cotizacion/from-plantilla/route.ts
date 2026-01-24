@@ -13,11 +13,11 @@ import { generateNextCotizacionCode } from '@/lib/utils/cotizacionCodeGenerator'
 type PlantillaServicioWithItems = {
   id: string
   nombre: string
-  categoria: string
+  edtId?: string | null
   descripcion?: string | null
   subtotalInterno: number
   subtotalCliente: number
-  items: any[]
+  plantillaServicioItem: any[]
 }
 
 export async function POST(req: Request) {
@@ -82,11 +82,11 @@ export async function POST(req: Request) {
     }
 
     // ✅ Validar que todos los servicios tienen recursos y unidades válidos
-    for (const servicio of plantilla.servicios) {
-      for (const item of servicio.items) {
+    for (const servicio of plantilla.plantillaServicio) {
+      for (const item of servicio.plantillaServicioItem) {
         if (!item.recursoId || !item.unidadServicioId) {
-          return NextResponse.json({ 
-            error: `El servicio '${item.nombre}' tiene referencias inválidas. Recurso: ${item.recursoId}, Unidad: ${item.unidadServicioId}` 
+          return NextResponse.json({
+            error: `El servicio '${item.nombre}' tiene referencias inválidas. Recurso: ${item.recursoId}, Unidad: ${item.unidadServicioId}`
           }, { status: 400 })
         }
       }
@@ -98,12 +98,14 @@ export async function POST(req: Request) {
     console.log('✅ [DEBUG] Código generado:', { codigo, numeroSecuencia })
 
     const baseData = {
+      id: `cot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       codigo, // ✅ Código automático formato GYS-XXXX-YY
       numeroSecuencia, // ✅ Número secuencial
       nombre: `Cotización de ${plantilla.nombre}`,
       clienteId,
       comercialId: session.user.id, // Se actualizará más adelante si es necesario
       plantillaId: plantilla.id,
+      updatedAt: new Date(),
       totalInterno: plantilla.totalInterno,
       totalCliente: plantilla.totalCliente,
       totalEquiposInterno: plantilla.totalEquiposInterno,
@@ -115,13 +117,16 @@ export async function POST(req: Request) {
       descuento: plantilla.descuento,
       grandTotal: plantilla.grandTotal,
       cotizacionEquipo: {
-        create: plantilla.plantillaEquipo.map(e => ({
+        create: plantilla.plantillaEquipo.map((e, eIdx) => ({
+          id: `cot-equipo-${Date.now()}-${eIdx}-${Math.random().toString(36).substr(2, 9)}`,
           nombre: e.nombre,
           descripcion: e.descripcion,
           subtotalInterno: e.subtotalInterno,
           subtotalCliente: e.subtotalCliente,
+          updatedAt: new Date(),
           cotizacionEquipoItem: {
-            create: e.plantillaEquipoItem.map(item => ({
+            create: e.plantillaEquipoItem.map((item, itemIdx) => ({
+              id: `cot-equipo-item-${Date.now()}-${eIdx}-${itemIdx}-${Math.random().toString(36).substr(2, 9)}`,
               catalogoEquipoId: item.catalogoEquipoId,
               codigo: item.codigo,
               descripcion: item.descripcion,
@@ -133,20 +138,24 @@ export async function POST(req: Request) {
               precioCliente: item.precioCliente,
               costoInterno: item.costoInterno,
               costoCliente: item.costoCliente,
+              updatedAt: new Date(),
             })),
           },
         })),
       },
       cotizacionServicio: {
-        create: plantilla.plantillaServicio.map((s: PlantillaServicioWithItems) => ({
+        create: plantilla.plantillaServicio.map((s: PlantillaServicioWithItems, sIdx: number) => ({
+          id: `cot-servicio-${Date.now()}-${sIdx}-${Math.random().toString(36).substr(2, 9)}`,
           nombre: s.nombre,
-          categoria: s.categoria,
+          edtId: s.edtId,
           subtotalInterno: Number(s.subtotalInterno),
           subtotalCliente: Number(s.subtotalCliente),
+          updatedAt: new Date(),
           cotizacionServicioItem: {
-            create: s.plantillaServicioItem.map(item => ({
+            create: s.plantillaServicioItem.map((item: any, itemIdx: number) => ({
+              id: `cot-servicio-item-${Date.now()}-${sIdx}-${itemIdx}-${Math.random().toString(36).substr(2, 9)}`,
               catalogoServicioId: item.catalogoServicioId,
-              categoria: item.categoria,
+              edtId: item.edtId,
               unidadServicioId: item.unidadServicioId, // ✅ Campo obligatorio
               recursoId: item.recursoId, // ✅ Campo obligatorio
               unidadServicioNombre: item.unidadServicioNombre,
@@ -166,17 +175,21 @@ export async function POST(req: Request) {
               costoInterno: item.costoInterno,
               costoCliente: item.costoCliente,
               orden: item.orden || 0, // ✅ Copiar orden desde plantilla
+              updatedAt: new Date(),
             })),
           },
         })),
       },
       cotizacionGasto: {
-        create: plantilla.plantillaGasto.map(g => ({
+        create: plantilla.plantillaGasto.map((g, gIdx) => ({
+          id: `cot-gasto-${Date.now()}-${gIdx}-${Math.random().toString(36).substr(2, 9)}`,
           nombre: g.nombre,
           subtotalInterno: g.subtotalInterno,
           subtotalCliente: g.subtotalCliente,
+          updatedAt: new Date(),
           cotizacionGastoItem: {
-            create: g.plantillaGastoItem.map(item => ({
+            create: g.plantillaGastoItem.map((item, itemIdx) => ({
+              id: `cot-gasto-item-${Date.now()}-${gIdx}-${itemIdx}-${Math.random().toString(36).substr(2, 9)}`,
               nombre: item.nombre,
               descripcion: item.descripcion,
               cantidad: item.cantidad,
@@ -185,6 +198,7 @@ export async function POST(req: Request) {
               margen: item.margen,
               costoInterno: item.costoInterno,
               costoCliente: item.costoCliente,
+              updatedAt: new Date(),
             })),
           },
         })),
@@ -197,9 +211,9 @@ export async function POST(req: Request) {
       clienteId,
       comercialId: session.user.id,
       plantillaNombre: plantilla.nombre,
-      equiposCount: plantilla.equipos.length,
-      serviciosCount: plantilla.servicios.length,
-      gastosCount: plantilla.gastos.length
+      equiposCount: plantilla.plantillaEquipo.length,
+      serviciosCount: plantilla.plantillaServicio.length,
+      gastosCount: plantilla.plantillaGasto.length
     })
     
     // Verificar que los IDs de foreign keys existen
@@ -236,7 +250,7 @@ export async function POST(req: Request) {
     console.log('✅ [DEBUG] Foreign keys verificados correctamente')
     console.log('📋 [DEBUG] Usando comercialId:', comercialId)
     
-    const cotizacion = await prisma.cotizacion.create({ data: baseData })
+    const cotizacion = await prisma.cotizacion.create({ data: baseData as any })
     console.log('✅ [DEBUG] Cotización base creada:', cotizacion.id)
     return NextResponse.json(cotizacion)
   } catch (error: any) {

@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const data = await prisma.plantillaGasto.findMany({
       include: {
-        items: true,
+        plantillaGastoItem: true,
         plantilla: true,
       },
     })
@@ -28,11 +28,13 @@ export async function POST(req: Request) {
 
     const data = await prisma.plantillaGasto.create({
       data: {
+        id: `plantilla-gasto-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         plantillaId: payload.plantillaId,
         nombre: payload.nombre,
         descripcion: payload.descripcion,
         subtotalInterno: payload.subtotalInterno,
         subtotalCliente: payload.subtotalCliente,
+        updatedAt: new Date()
       },
     })
 

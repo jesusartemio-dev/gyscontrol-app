@@ -28,7 +28,7 @@ export class CronogramaAnalyticsService {
     try {
       const whereClause = {
         ...(proyectoId && { proyectoId }),
-        ...(filtros.categoriaServicioId && { categoriaServicioId: filtros.categoriaServicioId }),
+        ...(filtros.edtId && { edtId: filtros.edtId }),
         ...(filtros.responsableId && { responsableId: filtros.responsableId }),
         ...(filtros.fechaDesde && {
           fechaInicioPlan: {
@@ -215,7 +215,7 @@ export class CronogramaAnalyticsService {
       };
 
       const rendimientoPorCategoria = await prisma.proyectoEdt.groupBy({
-        by: ['categoriaServicioId'],
+        by: ['edtId'],
         where: whereClause,
         _count: {
           id: true
@@ -229,12 +229,12 @@ export class CronogramaAnalyticsService {
         }
       });
 
-      // 🔍 Obtener nombres de categorías
-      const categoriasIds = rendimientoPorCategoria.map(r => r.categoriaServicioId);
-      const categorias = await prisma.categoriaServicio.findMany({
+      // 🔍 Obtener nombres de EDTs
+      const edtIds = rendimientoPorCategoria.map(r => r.edtId);
+      const edts = await prisma.edt.findMany({
         where: {
           id: {
-            in: categoriasIds
+            in: edtIds
           }
         },
         select: {
@@ -243,7 +243,7 @@ export class CronogramaAnalyticsService {
         }
       });
 
-      const categoriasMap = new Map(categorias.map(c => [c.id, c.nombre]));
+      const edtsMap = new Map(edts.map(c => [c.id, c.nombre]));
 
       const analisis: AnalisisRendimiento[] = rendimientoPorCategoria.map(rendimiento => {
         const totalEdts = rendimiento._count.id;
@@ -268,8 +268,8 @@ export class CronogramaAnalyticsService {
         }
 
         return {
-          categoriaServicioId: rendimiento.categoriaServicioId,
-          categoriaServicioNombre: categoriasMap.get(rendimiento.categoriaServicioId) || 'Sin categoría',
+          edtId: rendimiento.edtId, // Campo DB aún es edtId
+          edtNombre: edtsMap.get(rendimiento.edtId) || 'Sin EDT',
           totalEdts,
           horasPlan,
           horasReales,
@@ -312,8 +312,8 @@ export class CronogramaAnalyticsService {
         },
         include: {
           proyecto: { select: { nombre: true } },
-          categoriaServicio: { select: { nombre: true } },
-          responsable: { select: { name: true } }
+          edt: { select: { nombre: true } },
+          user: { select: { name: true } }
         }
       });
 
@@ -322,7 +322,7 @@ export class CronogramaAnalyticsService {
         alertas.push({
           tipo: 'retraso',
           severidad: diasRetraso > 7 ? 'alta' : 'media',
-          titulo: `EDT retrasado: ${edt.categoriaServicio.nombre}`,
+          titulo: `EDT retrasado: ${edt.edt.nombre}`,
           descripcion: `${diasRetraso} días de retraso en ${edt.proyecto.nombre}`,
           proyectoId: edt.proyectoId,
           edtId: edt.id,
@@ -348,8 +348,8 @@ export class CronogramaAnalyticsService {
         },
         include: {
           proyecto: { select: { nombre: true } },
-          categoriaServicio: { select: { nombre: true } },
-          responsable: { select: { name: true } }
+          edt: { select: { nombre: true } },
+          user: { select: { name: true } }
         }
       });
 
@@ -358,7 +358,7 @@ export class CronogramaAnalyticsService {
         alertas.push({
           tipo: 'vencimiento_proximo',
           severidad: diasRestantes <= 3 ? 'alta' : 'media',
-          titulo: `EDT próximo a vencer: ${edt.categoriaServicio.nombre}`,
+          titulo: `EDT próximo a vencer: ${edt.edt.nombre}`,
           descripcion: `Vence en ${diasRestantes} días en ${edt.proyecto.nombre}`,
           proyectoId: edt.proyectoId,
           edtId: edt.id,
@@ -382,8 +382,8 @@ export class CronogramaAnalyticsService {
         },
         include: {
           proyecto: { select: { nombre: true } },
-          categoriaServicio: { select: { nombre: true } },
-          responsable: { select: { name: true } }
+          edt: { select: { nombre: true } },
+          user: { select: { name: true } }
         }
       });
 
@@ -396,7 +396,7 @@ export class CronogramaAnalyticsService {
           alertas.push({
             tipo: 'desviacion_horas',
             severidad: Math.abs(desviacion) > 50 ? 'alta' : 'media',
-            titulo: `Desviación de horas: ${edt.categoriaServicio.nombre}`,
+            titulo: `Desviación de horas: ${edt.edt.nombre}`,
             descripcion: `${desviacion > 0 ? 'Exceso' : 'Déficit'} de ${Math.abs(desviacion)}% en ${edt.proyecto.nombre}`,
             proyectoId: edt.proyectoId,
             edtId: edt.id,
@@ -419,7 +419,7 @@ export class CronogramaAnalyticsService {
         where: {
           ...whereClause,
           estado: 'en_progreso',
-          registrosHoras: {
+          registroHoras: {
             none: {
               fechaTrabajo: {
                 gte: fechaLimite
@@ -429,8 +429,8 @@ export class CronogramaAnalyticsService {
         },
         include: {
           proyecto: { select: { nombre: true } },
-          categoriaServicio: { select: { nombre: true } },
-          responsable: { select: { name: true } }
+          edt: { select: { nombre: true } },
+          user: { select: { name: true } }
         }
       });
 
@@ -438,7 +438,7 @@ export class CronogramaAnalyticsService {
         alertas.push({
           tipo: 'sin_progreso',
           severidad: 'media',
-          titulo: `Sin progreso reciente: ${edt.categoriaServicio.nombre}`,
+          titulo: `Sin progreso reciente: ${edt.edt.nombre}`,
           descripcion: `No hay registros de horas en los últimos 7 días en ${edt.proyecto.nombre}`,
           proyectoId: edt.proyectoId,
           edtId: edt.id,

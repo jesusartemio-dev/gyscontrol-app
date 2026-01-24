@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { createId } from '@paralleldrive/cuid2'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,7 @@ export async function POST(req: Request) {
     // ✅ 2. Crear el ListaEquipoItem incluyendo proyectoEquipoId y responsableId
     const nuevo = await prisma.listaEquipoItem.create({
       data: {
+        id: createId(),
         listaId,
         proyectoEquipoItemId,
         proyectoEquipoId: item.proyectoEquipoId ?? null,
@@ -59,6 +61,7 @@ export async function POST(req: Request) {
         presupuesto: item.precioInterno,
         origen: 'cotizado',
         estado: 'borrador',
+        updatedAt: new Date(),
       },
     })
 

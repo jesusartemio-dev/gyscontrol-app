@@ -79,14 +79,22 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
     // Buscar un servicio del proyecto para asociar
     let proyectoServicio = null
     if (edtId) {
-      // Buscar servicios del proyecto asociados al EDT seleccionado
-      proyectoServicio = await prisma.proyectoServicioCotizado.findFirst({
-        where: {
-          proyectoId,
-          edtId: edtId // Filtrar por el EDT específico seleccionado
-        },
-        select: { id: true, nombre: true }
+      // Buscar el EDT para obtener su categoría
+      const edtInfo = await prisma.proyectoEdt.findUnique({
+        where: { id: edtId },
+        select: { nombre: true }
       })
+
+      // Buscar servicios del proyecto que coincidan con el nombre del EDT
+      if (edtInfo) {
+        proyectoServicio = await prisma.proyectoServicioCotizado.findFirst({
+          where: {
+            proyectoId,
+            categoria: edtInfo.nombre
+          },
+          select: { id: true, nombre: true }
+        })
+      }
     }
     
     // Si no se encontró servicio por categoría, usar el primero disponible
@@ -122,20 +130,21 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
 
     console.log('✅ POST registrar: Recurso encontrado', { recurso })
 
-    // Si hay un EDT seleccionado, obtener su categoría
-    let categoriaServicioId = null
+    // Si hay un EDT seleccionado, obtener su categoría del catálogo
+    let edtCatalogoId: string | null = null
     if (edtId) {
       const edt = await prisma.proyectoEdt.findUnique({
         where: { id: edtId },
-        select: { categoriaServicioId: true }
+        select: { edtId: true }
       })
-      categoriaServicioId = edt?.categoriaServicioId || null
+      edtCatalogoId = edt?.edtId || null
     }
 
     try {
       // Crear registro de horas
       const registroHoras = await prisma.registroHoras.create({
         data: {
+          id: `reg-hrs-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           proyectoId,
           proyectoServicioId: proyectoServicio.id,
           categoria: 'general',
@@ -148,8 +157,9 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
           descripcion,
           proyectoEdtId: edtId || null,
           proyectoTareaId: tareaId || null,
-          categoriaServicioId: categoriaServicioId || null,
-          origen: 'oficina'
+          edtId: edtCatalogoId || null,
+          origen: 'oficina',
+          updatedAt: new Date()
         },
         include: {
           proyecto: {
@@ -190,7 +200,7 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
         console.log('🔍 DEBUG: Error message contains:', {
           contains_proyectoEdtId: errorMessage.includes('proyectoEdtId'),
           contains_proyectoServicioId: errorMessage.includes('proyectoServicioId'),
-          contains_categoriaServicioId: errorMessage.includes('categoriaServicioId'),
+          contains_edtId: errorMessage.includes('edtId'),
           contains_proyectoTareaId: errorMessage.includes('proyectoTareaId'),
           contains_recursoId: errorMessage.includes('recursoId'),
           contains_usuarioId: errorMessage.includes('usuarioId'),
@@ -205,7 +215,7 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
             code: 'FOREIGN_KEY_VIOLATION',
             field: errorMessage.includes('proyectoEdtId') ? 'proyectoEdtId' :
                    errorMessage.includes('proyectoServicioId') ? 'proyectoServicioId' :
-                   errorMessage.includes('categoriaServicioId') ? 'categoriaServicioId' :
+                   errorMessage.includes('edtId') ? 'edtId' :
                    errorMessage.includes('proyectoTareaId') ? 'proyectoTareaId' :
                    errorMessage.includes('recursoId') ? 'recursoId' :
                    errorMessage.includes('usuarioId') ? 'usuarioId' : 'unknown',
@@ -239,7 +249,6 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
             servicioId: proyectoServicio?.id,
             recursoId: recurso.id,
             userId: session.user.id,
-            categoriaServicioId,
             // Validar que todos los IDs existan
             validaciones: {
               edtExiste: await prisma.proyectoEdt.findUnique({ where: { id: edtId }, select: { id: true } }).then(r => !!r),

@@ -37,6 +37,7 @@ import { validarAntesDeExportar, autoCorregirInconsistencias } from '@/lib/valid
 
 interface CronogramaGanttViewProProps {
   cotizacionId: string
+  cronogramaId?: string
   refreshKey?: number
 }
 
@@ -75,7 +76,7 @@ interface TimelineConfig {
   totalWidth: number
 }
 
-export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaGanttViewProProps) {
+export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey }: CronogramaGanttViewProProps) {
   const [tasks, setTasks] = useState<GanttTask[]>([])
   const [filteredTasks, setFilteredTasks] = useState<GanttTask[]>([])
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
@@ -103,10 +104,17 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
   const { toast } = useToast()
 
   const timelineRef = useRef<HTMLDivElement>(null)
+  const tasksContainerRef = useRef<HTMLDivElement>(null)
+
+  // Constantes para dimensiones
+  const ROW_HEIGHT = 60
+  const BAR_TOP_OFFSET = 8 // top-2 = 8px
+  const BAR_HEIGHT = 32 // h-8 = 32px
+  const TASK_COLUMN_WIDTH = 320 // w-80 = 320px
 
   useEffect(() => {
     loadGanttData()
-  }, [cotizacionId, refreshKey])
+  }, [cotizacionId, cronogramaId, refreshKey])
 
   // Optional: Auto-expand tasks that have dependencies (commented out for manual control)
   // useEffect(() => {
@@ -189,13 +197,15 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
       let response;
       let apiPath = 'proyectos';
 
-      console.log('🔍 [GANTT PRO] Trying project API first:', `/api/proyectos/${cotizacionId}/cronograma/tree`)
-      response = await fetch(`/api/proyectos/${cotizacionId}/cronograma/tree`)
+      // Construir URL con cronogramaId si está disponible
+      const cronogramaParam = cronogramaId ? `?cronogramaId=${cronogramaId}` : ''
+      console.log('🔍 [GANTT PRO] Trying project API first:', `/api/proyectos/${cotizacionId}/cronograma/tree${cronogramaParam}`)
+      response = await fetch(`/api/proyectos/${cotizacionId}/cronograma/tree${cronogramaParam}`)
 
       if (!response.ok && response.status === 404) {
-        console.log('⚠️ [GANTT PRO] Project API not found, trying quote API:', `/api/cotizaciones/${cotizacionId}/cronograma/tree`)
+        console.log('⚠️ [GANTT PRO] Project API not found, trying quote API:', `/api/cotizaciones/${cotizacionId}/cronograma/tree${cronogramaParam}`)
         apiPath = 'cotizaciones'
-        response = await fetch(`/api/cotizaciones/${cotizacionId}/cronograma/tree`)
+        response = await fetch(`/api/cotizaciones/${cotizacionId}/cronograma/tree${cronogramaParam}`)
       }
 
       if (!response.ok) {
@@ -306,7 +316,10 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
         nivel: node.level,
         parentId,
         horasEstimadas: node.data?.horasEstimadas,
-        responsable: node.data?.responsable,
+        // responsable puede ser un objeto {id, name, email} o un string
+        responsable: typeof node.data?.responsable === 'object' && node.data?.responsable !== null
+          ? (node.data.responsable.name || node.data.responsable.nombre || node.data.responsable.email || 'Sin nombre')
+          : node.data?.responsable,
         descripcion: node.data?.descripcion,
         dependenciaId: node.data?.dependenciaId, // Para dependencias entre tareas
         color: getTaskColor(node.type),
@@ -546,6 +559,200 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
     setZoomLevel(1)
   }
 
+  // Función para obtener lista plana de tareas visibles con su índice de fila
+  const getVisibleTasksWithIndex = useCallback((): Map<string, number> => {
+    const taskIndexMap = new Map<string, number>()
+    let rowIndex = 0
+
+    const processTask = (task: GanttTask) => {
+      taskIndexMap.set(task.id, rowIndex)
+      rowIndex++
+
+      if (expandedTasks.has(task.id) && task.children) {
+        task.children.forEach(child => processTask(child))
+      }
+    }
+
+    filteredTasks.forEach(task => processTask(task))
+    return taskIndexMap
+  }, [filteredTasks, expandedTasks])
+
+  // Función para calcular la posición X de una tarea (en porcentaje)
+  const getTaskXPosition = useCallback((task: GanttTask, position: 'start' | 'end'): number => {
+    if (!task.fechaInicio || !task.fechaFin) return 0
+
+    const timeRange = timeline.endDate.getTime() - timeline.startDate.getTime()
+    if (timeRange === 0) return 0
+
+    if (position === 'start') {
+      return ((task.fechaInicio.getTime() - timeline.startDate.getTime()) / timeRange) * 100
+    } else {
+      return ((task.fechaFin.getTime() - timeline.startDate.getTime()) / timeRange) * 100
+    }
+  }, [timeline])
+
+  // Función para renderizar las líneas de dependencia SVG
+  // Usamos viewBox de 100 unidades de ancho para trabajar con porcentajes
+  const renderDependencyLines = useCallback(() => {
+    if (!showDependencies || dependencies.length === 0) return null
+
+    const taskIndexMap = getVisibleTasksWithIndex()
+    const lines: React.ReactNode[] = []
+
+    // Contar tareas visibles para calcular altura total
+    let visibleTaskCount = 0
+    const countVisible = (tasks: GanttTask[]) => {
+      tasks.forEach(task => {
+        visibleTaskCount++
+        if (expandedTasks.has(task.id) && task.children) {
+          countVisible(task.children)
+        }
+      })
+    }
+    countVisible(filteredTasks)
+
+    dependencies.forEach((dep, idx) => {
+      const sourceTask = dep.tareaOrigen
+      const targetTask = dep.tareaDependiente
+
+      // Buscar índices de las tareas (pueden tener prefijo tarea-)
+      let sourceIndex = taskIndexMap.get(sourceTask.id)
+      let targetIndex = taskIndexMap.get(targetTask.id)
+
+      // Intentar sin prefijo si no se encontró
+      if (sourceIndex === undefined) {
+        sourceIndex = taskIndexMap.get(sourceTask.id.replace('tarea-', ''))
+      }
+      if (targetIndex === undefined) {
+        targetIndex = taskIndexMap.get(targetTask.id.replace('tarea-', ''))
+      }
+
+      // Intentar con prefijo si no se encontró
+      if (sourceIndex === undefined) {
+        sourceIndex = taskIndexMap.get(`tarea-${sourceTask.id}`)
+      }
+      if (targetIndex === undefined) {
+        targetIndex = taskIndexMap.get(`tarea-${targetTask.id}`)
+      }
+
+      // Si alguna tarea no está visible, no dibujar la línea
+      if (sourceIndex === undefined || targetIndex === undefined) {
+        console.log('⚠️ Dependencia no visible:', dep.id, 'source:', sourceTask.id, sourceIndex, 'target:', targetTask.id, targetIndex)
+        return
+      }
+
+      // Calcular posiciones X (0-100 para viewBox)
+      let startX: number, endX: number
+
+      switch (dep.tipo) {
+        case 'finish_to_start':
+          startX = getTaskXPosition(sourceTask, 'end')
+          endX = getTaskXPosition(targetTask, 'start')
+          break
+        case 'start_to_start':
+          startX = getTaskXPosition(sourceTask, 'start')
+          endX = getTaskXPosition(targetTask, 'start')
+          break
+        case 'finish_to_finish':
+          startX = getTaskXPosition(sourceTask, 'end')
+          endX = getTaskXPosition(targetTask, 'end')
+          break
+        case 'start_to_finish':
+          startX = getTaskXPosition(sourceTask, 'start')
+          endX = getTaskXPosition(targetTask, 'end')
+          break
+        default:
+          startX = getTaskXPosition(sourceTask, 'end')
+          endX = getTaskXPosition(targetTask, 'start')
+      }
+
+      // Posiciones Y en píxeles (centro de la barra)
+      const startY = sourceIndex * ROW_HEIGHT + BAR_TOP_OFFSET + BAR_HEIGHT / 2
+      const endY = targetIndex * ROW_HEIGHT + BAR_TOP_OFFSET + BAR_HEIGHT / 2
+
+      // Calcular control points para curva bezier suave
+      const deltaY = endY - startY
+      const deltaX = endX - startX
+
+      // Tipo de curva según dirección
+      let pathD: string
+      const curveOffset = 3 // Offset horizontal para el inicio de la curva
+
+      if (Math.abs(deltaY) < ROW_HEIGHT) {
+        // Tareas en filas cercanas - línea más directa
+        pathD = `M ${startX} ${startY}
+                 C ${startX + curveOffset} ${startY},
+                   ${endX - curveOffset} ${endY},
+                   ${endX} ${endY}`
+      } else {
+        // Tareas en filas distantes - curva en S
+        const midY = (startY + endY) / 2
+        pathD = `M ${startX} ${startY}
+                 C ${startX + curveOffset} ${startY},
+                   ${startX + curveOffset} ${midY},
+                   ${(startX + endX) / 2} ${midY}
+                 S ${endX - curveOffset} ${endY},
+                   ${endX} ${endY}`
+      }
+
+      // Color y marcador según tipo de dependencia
+      let depColor: string
+      let markerId: string
+
+      switch (dep.tipo) {
+        case 'finish_to_start':
+          depColor = '#3b82f6' // blue
+          markerId = 'arrowhead'
+          break
+        case 'start_to_start':
+          depColor = '#10b981' // green
+          markerId = 'arrowhead-green'
+          break
+        case 'finish_to_finish':
+          depColor = '#f59e0b' // amber
+          markerId = 'arrowhead-amber'
+          break
+        case 'start_to_finish':
+          depColor = '#ef4444' // red
+          markerId = 'arrowhead-red'
+          break
+        default:
+          depColor = '#3b82f6'
+          markerId = 'arrowhead'
+      }
+
+      lines.push(
+        <g key={`dep-${dep.id}-${idx}`} className="dependency-line">
+          {/* Línea de dependencia */}
+          <path
+            d={pathD}
+            fill="none"
+            stroke={depColor}
+            strokeWidth="0.5"
+            strokeDasharray={dep.tipo === 'finish_to_start' ? 'none' : '2,1'}
+            opacity="0.9"
+            markerEnd={`url(#${markerId})`}
+            vectorEffect="non-scaling-stroke"
+            style={{ strokeWidth: '2px' }}
+          />
+          {/* Círculo en el punto de inicio */}
+          <circle
+            cx={startX}
+            cy={startY}
+            r="0.8"
+            fill={depColor}
+            stroke="white"
+            strokeWidth="0.3"
+            vectorEffect="non-scaling-stroke"
+            style={{ strokeWidth: '1.5px' }}
+          />
+        </g>
+      )
+    })
+
+    return lines
+  }, [showDependencies, dependencies, getVisibleTasksWithIndex, getTaskXPosition, expandedTasks, filteredTasks])
+
   const handleExportToMSProject = () => {
     try {
       if (filteredTasks.length === 0) {
@@ -616,14 +823,50 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
     const isExpanded = expandedTasks.has(task.id)
     const hasChildren = task.children && task.children.length > 0
 
+    // Background colors based on hierarchy level
+    const levelBackgrounds = [
+      'bg-blue-50/70 border-l-4 border-l-blue-500',     // Level 0: Fase
+      'bg-green-50/50 border-l-4 border-l-green-400',   // Level 1: EDT
+      'bg-amber-50/40 border-l-4 border-l-amber-300',   // Level 2: Actividad
+      'bg-gray-50/30 border-l-4 border-l-gray-300',     // Level 3: Tarea
+    ]
+    const levelBackground = levelBackgrounds[level] || levelBackgrounds[3]
+
     return (
       <React.Fragment key={task.id}>
-        <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+        <div className={`flex items-center border-b border-gray-100 hover:bg-gray-100/50 transition-colors ${levelBackground}`}>
           {/* Task info column */}
           <div className="w-80 flex-shrink-0 p-3 border-r border-gray-200">
-            <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-2"
+              style={{ paddingLeft: `${level * 16}px` }}
+            >
+              {/* Hierarchy connector lines */}
+              {level > 0 && (
+                <div className="relative flex items-center">
+                  {/* Vertical line */}
+                  <div
+                    className="absolute border-l-2 border-gray-300"
+                    style={{
+                      left: '-8px',
+                      top: '-30px',
+                      height: '38px'
+                    }}
+                  />
+                  {/* Horizontal line */}
+                  <div
+                    className="absolute border-t-2 border-gray-300"
+                    style={{
+                      left: '-8px',
+                      width: '8px',
+                      top: '8px'
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Expand/collapse button */}
-              <div className="w-6 flex justify-center">
+              <div className="w-6 flex justify-center flex-shrink-0">
                 {hasChildren && (
                   <Button
                     variant="ghost"
@@ -640,12 +883,21 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Badge
-                    className="text-xs px-2 py-0.5"
-                    style={{ backgroundColor: task.color + '20', color: task.color, borderColor: task.color }}
+                    className={`text-xs px-2 py-0.5 ${level === 0 ? 'font-semibold' : ''}`}
+                    style={{
+                      backgroundColor: task.color + (level === 0 ? '30' : '20'),
+                      color: task.color,
+                      borderColor: task.color,
+                      fontSize: level === 0 ? '0.75rem' : level === 1 ? '0.7rem' : '0.65rem'
+                    }}
                   >
                     {task.tipo}
                   </Badge>
-                  <span className="font-medium text-sm truncate" title={task.nombre}>
+                  <span
+                    className={`truncate ${level === 0 ? 'font-semibold text-sm' : level === 1 ? 'font-medium text-sm' : 'font-normal text-xs'}`}
+                    title={task.nombre}
+                    style={{ color: level === 0 ? '#1f2937' : level === 1 ? '#374151' : '#6b7280' }}
+                  >
                     {task.nombre}
                   </span>
                 </div>
@@ -660,7 +912,9 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
                   {task.responsable && (
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
-                      {task.responsable}
+                      {typeof task.responsable === 'string'
+                        ? task.responsable
+                        : (task.responsable as any)?.name || (task.responsable as any)?.nombre || 'Sin asignar'}
                     </span>
                   )}
                   <Badge
@@ -753,49 +1007,29 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
               </TooltipProvider>
             )}
 
-            {/* Dependency indicators on task bars */}
+            {/* Indicador sutil de tarea con dependencias - ahora las líneas SVG muestran las conexiones */}
             {showDependencies && (() => {
               const taskDependencies = dependencies.filter(dep =>
-                dep.tareaOrigen.id === task.id || dep.tareaDependiente.id === task.id
+                dep.tareaOrigen.id === task.id || dep.tareaDependiente.id === task.id ||
+                dep.tareaOrigen.id === `tarea-${task.id}` || dep.tareaDependiente.id === `tarea-${task.id}` ||
+                dep.tareaOrigen.id === task.id.replace('tarea-', '') || dep.tareaDependiente.id === task.id.replace('tarea-', '')
               )
 
               if (taskDependencies.length === 0) return null
 
+              // Solo mostrar un indicador de número de dependencias
               return (
-                <>
-                  {/* Start indicator */}
-                  <div
-                    className="absolute left-0 top-0 bottom-0 flex items-center justify-center bg-blue-600 text-white text-xs font-bold"
-                    style={{
-                      width: '16px',
-                      zIndex: 100,
-                      borderRadius: '0 4px 4px 0'
-                    }}
-                  >
-                    →
-                  </div>
-
-                  {/* End indicator */}
-                  <div
-                    className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-blue-600 text-white text-xs font-bold"
-                    style={{
-                      width: '16px',
-                      zIndex: 100,
-                      borderRadius: '4px 0 0 4px'
-                    }}
-                  >
-                    ←
-                  </div>
-
-                  {/* Subtle border highlight */}
-                  <div
-                    className="absolute inset-0 pointer-events-none border-2 border-blue-400 rounded-md"
-                    style={{
-                      zIndex: 99,
-                      opacity: 0.7
-                    }}
-                  />
-                </>
+                <div
+                  className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    zIndex: 100
+                  }}
+                  title={`${taskDependencies.length} dependencia(s)`}
+                >
+                  {taskDependencies.length}
+                </div>
               )
             })()}
           </div>
@@ -1022,7 +1256,7 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
         </div>
 
         {/* Tasks */}
-        <div className="max-h-96 overflow-y-auto">
+        <div className="max-h-[500px] overflow-y-auto" ref={tasksContainerRef}>
           {filteredTasks.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -1030,19 +1264,113 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
               <p className="text-sm">Ajusta los filtros para ver más tareas</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
-              {filteredTasks.map(task => renderTaskRow(task))}
+            <div className="relative">
+              {/* Tareas */}
+              <div className="divide-y divide-gray-100">
+                {filteredTasks.map(task => renderTaskRow(task))}
+              </div>
+
+              {/* SVG Overlay para líneas de dependencia */}
+              {showDependencies && dependencies.length > 0 && (() => {
+                // Calcular altura total basada en tareas visibles
+                let visibleCount = 0
+                const countVisible = (tasks: GanttTask[]) => {
+                  tasks.forEach(task => {
+                    visibleCount++
+                    if (expandedTasks.has(task.id) && task.children) {
+                      countVisible(task.children)
+                    }
+                  })
+                }
+                countVisible(filteredTasks)
+                const totalHeight = visibleCount * ROW_HEIGHT
+
+                return (
+                  <svg
+                    className="absolute top-0 pointer-events-none"
+                    viewBox={`0 0 100 ${totalHeight}`}
+                    preserveAspectRatio="none"
+                    style={{
+                      left: TASK_COLUMN_WIDTH,
+                      width: `calc(100% - ${TASK_COLUMN_WIDTH}px)`,
+                      height: totalHeight,
+                      overflow: 'visible',
+                      zIndex: 50
+                    }}
+                  >
+                    <defs>
+                      {/* Marcadores de flecha para diferentes colores */}
+                      <marker
+                        id="arrowhead"
+                        markerWidth="10"
+                        markerHeight="7"
+                        refX="9"
+                        refY="3.5"
+                        orient="auto"
+                        markerUnits="strokeWidth"
+                      >
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+                      </marker>
+                      <marker
+                        id="arrowhead-green"
+                        markerWidth="10"
+                        markerHeight="7"
+                        refX="9"
+                        refY="3.5"
+                        orient="auto"
+                        markerUnits="strokeWidth"
+                      >
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
+                      </marker>
+                      <marker
+                        id="arrowhead-amber"
+                        markerWidth="10"
+                        markerHeight="7"
+                        refX="9"
+                        refY="3.5"
+                        orient="auto"
+                        markerUnits="strokeWidth"
+                      >
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b" />
+                      </marker>
+                      <marker
+                        id="arrowhead-red"
+                        markerWidth="10"
+                        markerHeight="7"
+                        refX="9"
+                        refY="3.5"
+                        orient="auto"
+                        markerUnits="strokeWidth"
+                      >
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+                      </marker>
+                      <marker
+                        id="arrowhead-reverse"
+                        markerWidth="10"
+                        markerHeight="7"
+                        refX="1"
+                        refY="3.5"
+                        orient="auto"
+                        markerUnits="strokeWidth"
+                      >
+                        <polygon points="10 0, 0 3.5, 10 7" fill="#3b82f6" />
+                      </marker>
+                    </defs>
+                    {renderDependencyLines()}
+                  </svg>
+                )
+              })()}
             </div>
           )}
         </div>
 
         {/* Footer with statistics */}
-        <div className="p-4 border-t bg-gray-50">
+        <div className="p-4 border-t bg-gray-50 space-y-3">
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-green-600" />
-                <span>Progreso general: {Math.round(filteredTasks.reduce((sum, task) => sum + task.progreso, 0) / filteredTasks.length)}%</span>
+                <span>Progreso general: {Math.round(filteredTasks.reduce((sum, task) => sum + task.progreso, 0) / Math.max(filteredTasks.length, 1))}%</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-blue-600" />
@@ -1061,6 +1389,31 @@ export function CronogramaGanttViewPro({ cotizacionId, refreshKey }: CronogramaG
               Zoom: {Math.round(zoomLevel * 100)}%
             </div>
           </div>
+
+          {/* Leyenda de tipos de dependencia */}
+          {showDependencies && dependencies.length > 0 && (
+            <div className="flex items-center gap-6 pt-2 border-t border-gray-200">
+              <span className="text-xs font-medium text-gray-600">Tipos de dependencia:</span>
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-6 h-0.5 bg-blue-500"></div>
+                  <span className="text-gray-600">Fin → Inicio (FS)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-6 h-0.5 bg-emerald-500" style={{ borderStyle: 'dashed', borderWidth: '1px', height: 0 }}></div>
+                  <span className="text-gray-600">Inicio → Inicio (SS)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-6 h-0.5 bg-amber-500" style={{ borderStyle: 'dashed', borderWidth: '1px', height: 0 }}></div>
+                  <span className="text-gray-600">Fin → Fin (FF)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-6 h-0.5 bg-red-500" style={{ borderStyle: 'dashed', borderWidth: '1px', height: 0 }}></div>
+                  <span className="text-gray-600">Inicio → Fin (SF)</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

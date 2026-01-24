@@ -65,9 +65,9 @@ export async function GET(
     const fases = await (prisma as any).proyectoFase.findMany({
       where,
       include: {
-        edts: true,
+        proyectoEdt: true,
         _count: {
-          select: { edts: true }
+          select: { proyectoEdt: true }
         }
       },
       orderBy: { orden: 'asc' }
@@ -156,7 +156,7 @@ export async function POST(
         porcentajeAvance: 0
       },
       include: {
-        edts: true
+        proyectoEdt: true
       }
     })
 

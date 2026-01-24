@@ -43,7 +43,7 @@ export async function POST(
     // Obtener datos del catálogo
     const catalogoServicio = await prisma.catalogoServicio.findUnique({
       where: { id: catalogoServicioId },
-      include: { categoria: true, recurso: true, unidadServicio: true }
+      include: { edt: true }
     })
 
     if (!catalogoServicio) {
@@ -53,19 +53,28 @@ export async function POST(
       )
     }
 
+    // Obtener datos del recurso y unidad de servicio
+    const [recurso, unidadServicio] = await Promise.all([
+      recursoId ? prisma.recurso.findUnique({ where: { id: recursoId } }) : null,
+      unidadServicioId ? prisma.unidadServicio.findUnique({ where: { id: unidadServicioId } }) : null
+    ])
+
     // Calcular horas totales basado en la fórmula escalonada (única fórmula ahora)
     const horasBase = (catalogoServicio.horaBase || 0) + Math.max(0, cantidad - 1) * (catalogoServicio.horaRepetido || 0);
     const factorDificultad = catalogoServicio.nivelDificultad || 1;
     const horaTotal = horasBase * factorDificultad;
 
     // Calcular costos
-    const costoHora = catalogoServicio.recurso.costoHora
-    const costoInterno = horaTotal * costoHora
-    const costoCliente = precioCliente * cantidad
+    // ✅ FÓRMULA CORRECTA:
+    // 1. costoHora = costo por hora del recurso (ej: $11)
+    // 2. costoInterno = horaTotal × costoHora × factorSeguridad
+    // 3. costoCliente = costoInterno × (1 + margen)
+    const costoHora = recurso?.costoHora || 0
+    const factorSeguridad = 1.0 // Factor de seguridad (puede ser 1.0, 1.1, etc.)
+    const margen = 0.35 // Margen de ganancia del 35%
 
-    // Calcular factor de seguridad y margen (valores por defecto)
-    const factorSeguridad = 1.0 // Sin factor de seguridad adicional por defecto
-    const margen = precioCliente > 0 ? (precioCliente - precioInterno) / precioInterno : 0
+    const costoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
+    const costoCliente = +(costoInterno * (1 + margen)).toFixed(2)
 
     // Crear el item
     const nuevoItem = await prisma.plantillaServicioItemIndependiente.create({
@@ -75,9 +84,9 @@ export async function POST(
         catalogoServicioId,
         nombre: catalogoServicio.nombre,
         descripcion: catalogoServicio.descripcion,
-        categoria: catalogoServicio.categoria.nombre,
-        unidadServicioNombre: catalogoServicio.unidadServicio.nombre,
-        recursoNombre: catalogoServicio.recurso.nombre,
+        categoria: catalogoServicio.edt?.nombre || 'Sin categoría',
+        unidadServicioNombre: unidadServicio?.nombre || 'Sin unidad',
+        recursoNombre: recurso?.nombre || 'Sin recurso',
         formula: 'Escalonada', // Solo fórmula escalonada ahora
         horaBase: catalogoServicio.horaBase,
         horaRepetido: catalogoServicio.horaRepetido,
@@ -111,7 +120,8 @@ export async function POST(
       data: {
         totalInterno,
         totalCliente,
-        grandTotal
+        grandTotal,
+        updatedAt: new Date()
       }
     })
 

@@ -292,7 +292,7 @@ export interface CotizacionEquipoPayload {
 export interface CotizacionServicioPayload {
   cotizacionId: string
   nombre: string
-  categoria: string
+  edtId: string
   subtotalInterno: number
   subtotalCliente: number
 }
@@ -324,10 +324,10 @@ export interface CotizacionServicioItemPayload {
   catalogoServicioId?: string
   unidadServicioId: string
   recursoId: string
+  edtId: string
   // Datos copiados desde plantilla/catalogo
   nombre: string
   descripcion: string
-  categoria: string
   unidadServicioNombre: string
   recursoNombre: string
   formula: TipoFormula
@@ -526,6 +526,7 @@ export interface ListaEquipoItemPayload {
   listaId: string
   proyectoEquipoItemId?: string
   proyectoEquipoId?: string
+  catalogoEquipoId?: string
   reemplazaProyectoEquipoCotizadoItemId?: string // 🆕 Nuevo campo claro
   responsableId?: string // 🆕 Campo para identificar quién registra el item
 
@@ -534,7 +535,7 @@ export interface ListaEquipoItemPayload {
 
   codigo: string
   descripcion: string
-  categoria: string // ✅ Campo agregado para consistencia con otras entidades
+  categoria?: string // ✅ Opcional - si hay catalogoEquipoId, se obtiene del catálogo
   unidad: string
   cantidad: number
 
@@ -1156,7 +1157,7 @@ export interface GanttChartPayload {
 export interface ProyectoEdtPayload {
   proyectoId: string
   nombre: string
-  categoriaServicioId: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -1178,7 +1179,7 @@ export interface ProyectoEdtUpdatePayload extends Partial<ProyectoEdtPayload> {
 // 📊 Payload para filtros de búsqueda EDT
 export interface EdtPaginationParams extends PaginationParams {
   proyectoId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
   responsableId?: string
@@ -1193,7 +1194,7 @@ export interface EdtPaginationParams extends PaginationParams {
 // 📈 Payload para métricas EDT
 export interface MetricasEdtPayload {
   proyectoId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   responsableId?: string
   fechaInicio?: string
   fechaFin?: string
@@ -1234,7 +1235,7 @@ export interface ReporteEdtPayload {
   tipo: 'resumen' | 'detallado' | 'metricas' | 'progreso'
   filtros: {
     proyectoId?: string
-    categoriaServicioId?: string
+    edtId?: string // Refactored: categoriaServicioId → edtId
     estado?: EstadoEdt[]
     prioridad?: PrioridadEdt[]
     responsableId?: string
@@ -1285,7 +1286,7 @@ export interface TendenciasMensualesPayload {
 export interface AnalisisRendimientoPayload {
   proyectoId?: string
   responsableId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   incluirRecomendaciones?: boolean
@@ -1335,7 +1336,7 @@ export interface CreateRegistroHorasPayload {
 // ✅ Filtros para Cronograma
 export interface FiltrosCronogramaPayload {
   proyectoId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
   responsableId?: string
@@ -1357,7 +1358,7 @@ export interface CreateProyectoEdtPayload {
   proyectoId: string
   proyectoCronogramaId: string
   nombre: string
-  categoriaServicioId: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   horasEstimadas: number

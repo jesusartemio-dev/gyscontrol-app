@@ -384,7 +384,7 @@ export function ProyectoEdtList({
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Categoría</span>
                     <span className="font-medium bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
-                      {edt.categoriaServicio?.nombre || 'Sin categoría'}
+                      {edt.edt?.nombre || 'Sin categoría'}
                     </span>
                   </div>
 

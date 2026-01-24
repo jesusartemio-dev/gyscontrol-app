@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, Minimize2, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
 import { updateListaEquipoItem, deleteListaEquipoItem } from '@/lib/services/listaEquipoItem'
@@ -119,7 +119,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   const [isLoading, setIsLoading] = useState(false)
 
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('list') // ✅ Default to list view
-  const [compactMode, setCompactMode] = useState(true) // ✅ Compact mode by default
   const [showModalAgregarCatalogo, setShowModalAgregarCatalogo] = useState(false)
   const [showModalAgregarEquipo, setShowModalAgregarEquipo] = useState(false)
   const [showModalImportarExcel, setShowModalImportarExcel] = useState(false)
@@ -402,20 +401,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                Lista
              </Button>
            </div>
-           
-           {/* Compact Mode Toggle */}
-           {viewMode === 'list' && (
-             <Button
-               variant={compactMode ? 'default' : 'outline'}
-               size="sm"
-               onClick={() => setCompactMode(!compactMode)}
-               className="h-8 px-3"
-             >
-               <Minimize2 className="h-4 w-4 mr-1" />
-               Compacto
-             </Button>
-           )}
-           
+
            {/* Column Visibility Toggle */}
            {viewMode === 'list' && (
              <Popover>
@@ -527,28 +513,28 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     </div>
   )
 
-  // 🎨 Render list view (table) - Enhanced alignment
+  // 🎨 Render list view (table) - Compact layout
   const renderListView = () => {
-    const cellPadding = compactMode ? 'px-2 py-1.5' : 'px-3 py-2'
-    const textSize = compactMode ? 'text-xs' : 'text-sm'
-    
+    const cellPadding = 'px-2 py-1.5'
+    const textSize = 'text-xs'
+
     // ✅ Define optimized column widths for compact layout
     const columnWidths = {
-      codigoDescripcion: compactMode ? 'w-48' : 'w-56', // ✅ Reduced width
+      codigoDescripcion: 'w-48',
       unidad: 'w-16',
       cantidad: 'w-20',
-      cantidadUnidad: 'w-28', // ✅ Nueva columna unificada Cantidad/Unidad
-      pedidos: 'w-24', // ✅ Nueva columna: estado de pedidos
+      cantidadUnidad: 'w-28',
+      pedidos: 'w-24',
       cotizacion: 'w-28',
       costo: 'w-24',
       entrega: 'w-20',
       origen: 'w-20',
       estado: 'w-24',
-      pedidosLinks: 'w-32', // ✅ Nueva columna para pedidos (links)
+      pedidosLinks: 'w-32',
       verificado: 'w-12',
-      comentario: compactMode ? 'w-56' : 'w-64', // ✅ Significantly increased width for optimal comment editing
+      comentario: 'w-56',
       equipo: 'w-24',
-      acciones: 'w-24' // ✅ Compact action buttons
+      acciones: 'w-24'
     }
     
     return (
@@ -649,8 +635,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                 <tr
                    key={item.id}
                    className={`border-b hover:bg-gray-50 transition-colors ${
-                     item.estado === 'rechazado' ? 'bg-red-50/50' :
-                     item.estado === 'aprobado' ? 'bg-green-50/50' : ''
+                     item.estado === 'rechazado' ? 'bg-red-50/30' :
+                     item.estado === 'aprobado' ? 'bg-blue-50/30' : ''
                    } ${clasesFilaPorEstado}`}
                  >
                    {visibleColumns.codigoDescripcion && (
@@ -735,11 +721,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                          const cantidadTotal = item.cantidad || 0
 
                          if (cantidadPedida === 0) {
-                           return <Badge variant="outline" className="text-xs">Sin pedidos</Badge>
+                           return <Badge variant="outline" className="text-xs text-gray-500">Sin pedidos</Badge>
                          } else if (cantidadPedida >= cantidadTotal) {
-                           return <Badge variant="default" className="text-xs bg-green-600">Completo</Badge>
+                           return <Badge variant="default" className="text-xs bg-blue-600">Completo</Badge>
                          } else {
-                           return <Badge variant="secondary" className="text-xs">{cantidadPedida}/{cantidadTotal}</Badge>
+                           return <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">{cantidadPedida}/{cantidadTotal}</Badge>
                          }
                        })()}
                      </td>
@@ -987,8 +973,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                   className="h-full"
                 >
                   <Card className={`h-full transition-all duration-200 hover:shadow-md ${
-                    item.estado === 'rechazado' ? 'border-red-200 bg-red-50/50' : 
-                    item.estado === 'aprobado' ? 'border-green-200 bg-green-50/50' : ''
+                    item.estado === 'rechazado' ? 'border-red-200 bg-red-50/30' :
+                    item.estado === 'aprobado' ? 'border-blue-200 bg-blue-50/30' : ''
                   }`}>
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">

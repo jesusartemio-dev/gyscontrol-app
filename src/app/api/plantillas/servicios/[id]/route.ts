@@ -17,6 +17,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    console.log('📋 GET plantilla - id:', id)
 
     const plantilla = await prisma.plantillaServicioIndependiente.findUnique({
       where: { id },
@@ -34,6 +35,9 @@ export async function GET(
         }
       }
     })
+
+    console.log('📋 Items encontrados:', plantilla?.plantillaServicioItemIndependiente?.length || 0)
+    console.log('📋 Items IDs:', plantilla?.plantillaServicioItemIndependiente?.map(i => i.id))
 
     if (plantilla) {
       // Get categoria name if categoria is an ID

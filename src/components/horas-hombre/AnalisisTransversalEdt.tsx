@@ -119,14 +119,15 @@ export function AnalisisTransversalEdt() {
     try {
       // Crear CSV con los datos
       const csvContent = [
-        'Categoría EDT,Total Horas Planificadas,Total Horas Reales,Variación,Total Proyectos,Costo Total Calculado',
-        ...data.resumenTransversal.map(edt => 
-          `${edt.categoria},${edt.totalHorasPlanificadas},${edt.totalHorasReales},${edt.variacionHoras},${edt.totalProyectos},${edt.costoTotalCalculado.toFixed(2)}`
+        'EDT,Total Horas Planificadas,Total Horas Reales,Variacion,Total Proyectos,Costo Total Calculado',
+        ...data.resumenTransversal.map(edt =>
+          `"${edt.categoria}",${edt.totalHorasPlanificadas.toFixed(1)},${edt.totalHorasReales.toFixed(1)},${edt.variacionHoras.toFixed(1)},${edt.totalProyectos},${edt.costoTotalCalculado.toFixed(2)}`
         )
       ].join('\n')
 
-      // Descargar archivo
-      const blob = new Blob([csvContent], { type: 'text/csv' })
+      // Agregar BOM UTF-8 para que Excel reconozca correctamente los caracteres
+      const BOM = '\uFEFF'
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -135,13 +136,13 @@ export function AnalisisTransversalEdt() {
       window.URL.revokeObjectURL(url)
 
       toast({
-        title: 'Éxito',
-        description: 'Análisis exportado correctamente'
+        title: 'Exito',
+        description: 'Analisis exportado correctamente'
       })
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'No se pudo exportar el análisis',
+        description: 'No se pudo exportar el analisis',
         variant: 'destructive'
       })
     }
@@ -263,7 +264,7 @@ export function AnalisisTransversalEdt() {
           {/* Análisis por EDT */}
           <Card>
             <CardHeader>
-              <CardTitle>Análisis por Categoría EDT</CardTitle>
+              <CardTitle>Análisis por EDT</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">

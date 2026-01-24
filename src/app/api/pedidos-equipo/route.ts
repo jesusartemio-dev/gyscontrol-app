@@ -89,14 +89,14 @@ export async function GET(request: NextRequest) {
               codigo: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          lista: {
+          listaEquipo: {
             select: {
               id: true,
               codigo: true,
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              items: true
+              pedidoEquipoItem: true
             }
           }
         },
@@ -125,14 +125,14 @@ export async function GET(request: NextRequest) {
           codigo: pedido.proyecto.codigo
         },
         responsable: {
-          id: pedido.responsable?.id || '',
-          name: pedido.responsable?.name || 'Sin asignar',
-          email: pedido.responsable?.email || ''
+          id: pedido.user?.id || '',
+          name: pedido.user?.name || 'Sin asignar',
+          email: pedido.user?.email || ''
         },
-        lista: pedido.lista ? {
-          id: pedido.lista.id,
-          codigo: pedido.lista.codigo,
-          nombre: pedido.lista.nombre
+        lista: pedido.listaEquipo ? {
+          id: pedido.listaEquipo.id,
+          codigo: pedido.listaEquipo.codigo,
+          nombre: pedido.listaEquipo.nombre
         } : null,
         estado: pedido.estado,
         prioridad: pedido.prioridad || 'media',
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
         fechaNecesaria: pedido.fechaNecesaria?.toISOString() || '',
         fechaEntregaEstimada: pedido.fechaEntregaEstimada?.toISOString() || '',
         fechaEntregaReal: pedido.fechaEntregaReal?.toISOString() || '',
-        itemsCount: pedido._count.items,
+        itemsCount: pedido._count.pedidoEquipoItem,
         observaciones: pedido.observacion || '',
         createdAt: pedido.createdAt.toISOString(),
         updatedAt: pedido.updatedAt.toISOString()
@@ -245,6 +245,7 @@ export async function POST(request: NextRequest) {
     // 💾 Crear pedido
     const nuevoPedido = await prisma.pedidoEquipo.create({
       data: {
+        id: `pedido-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         codigo,
         numeroSecuencia,
         proyectoId,
@@ -253,7 +254,8 @@ export async function POST(request: NextRequest) {
         fechaNecesaria: new Date(fechaNecesaria),
         prioridad,
         observacion,
-        estado: 'borrador'
+        estado: 'borrador',
+        updatedAt: new Date()
       },
       include: {
         proyecto: {
@@ -263,13 +265,13 @@ export async function POST(request: NextRequest) {
             codigo: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true
           }
         },
-        lista: {
+        listaEquipo: {
           select: {
             id: true,
             codigo: true,

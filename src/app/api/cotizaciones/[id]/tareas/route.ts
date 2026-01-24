@@ -48,7 +48,7 @@ export async function GET(
       where: { id },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -68,10 +68,8 @@ export async function GET(
     // Construir filtros
     const where: any = {
       cotizacionActividad: {
-        cotizacionZona: {
-          cotizacionEdt: {
-            cotizacionId: id
-          }
+        cotizacionEdt: {
+          cotizacionId: id
         }
       }
     }
@@ -103,18 +101,14 @@ export async function GET(
       include: {
         cotizacionActividad: {
           include: {
-            cotizacionZona: {
+            cotizacionEdt: {
               include: {
-                cotizacionEdt: {
-                  include: {
-                    cotizacionServicio: true
-                  }
-                }
+                cotizacionServicio: true
               }
             }
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -122,13 +116,13 @@ export async function GET(
           }
         },
         cotizacionServicioItem: true,
-        dependencia: {
+        tareaPadre: {
           select: {
             id: true,
             nombre: true
           }
         },
-        tareasDependientes: {
+        tareasHijas: {
           select: {
             id: true,
             nombre: true,
@@ -137,7 +131,7 @@ export async function GET(
         }
       },
       orderBy: [
-        { cotizacionActividad: { cotizacionZona: { cotizacionEdt: { createdAt: 'asc' } } } },
+        { cotizacionActividad: { cotizacionEdt: { createdAt: 'asc' } } },
         { orden: 'asc' },
         { fechaInicio: 'asc' }
       ]
@@ -181,7 +175,7 @@ export async function POST(
       where: { id },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -206,10 +200,8 @@ export async function POST(
     const actividad = await prisma.cotizacionActividad.findFirst({
       where: {
         id: validatedData.cotizacionActividadId,
-        cotizacionZona: {
-          cotizacionEdt: {
-            cotizacionId: id
-          }
+        cotizacionEdt: {
+          cotizacionId: id
         }
       }
     })
@@ -279,6 +271,7 @@ export async function POST(
     // Crear la tarea
     const nuevaTarea = await prisma.cotizacionTarea.create({
       data: {
+        id: `cot-tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionActividadId: validatedData.cotizacionActividadId,
         nombre: validatedData.nombre,
         descripcion: validatedData.descripcion,
@@ -289,23 +282,20 @@ export async function POST(
         estado: validatedData.estado,
         responsableId: validatedData.responsableId,
         orden: validatedData.orden,
-        cotizacionServicioItemId: validatedData.cotizacionServicioItemId
+        cotizacionServicioItemId: validatedData.cotizacionServicioItemId,
+        updatedAt: new Date()
       },
       include: {
         cotizacionActividad: {
           include: {
-            cotizacionZona: {
+            cotizacionEdt: {
               include: {
-                cotizacionEdt: {
-                  include: {
-                    cotizacionServicio: true
-                  }
-                }
+                cotizacionServicio: true
               }
             }
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -313,13 +303,13 @@ export async function POST(
           }
         },
         cotizacionServicioItem: true,
-        dependencia: {
+        tareaPadre: {
           select: {
             id: true,
             nombre: true
           }
         },
-        tareasDependientes: {
+        tareasHijas: {
           select: {
             id: true,
             nombre: true,

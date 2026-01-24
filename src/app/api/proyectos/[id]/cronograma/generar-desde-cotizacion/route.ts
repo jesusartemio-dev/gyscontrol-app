@@ -39,9 +39,9 @@ export async function POST(
       include: {
         cotizacion: {
           include: {
-            servicios: {
+            cotizacionServicio: {
               include: {
-                items: true
+                cotizacionServicioItem: true
               }
             }
           }
@@ -82,9 +82,9 @@ export async function POST(
     }
 
     // Obtener servicios de la cotización
-    const servicios = proyecto.cotizacion.servicios
+    const servicios = proyecto.cotizacion.cotizacionServicio
 
-    if (servicios.length === 0) {
+    if (!servicios || servicios.length === 0) {
       return NextResponse.json({
         error: 'No hay servicios en la cotización para generar el cronograma'
       }, { status: 400 })
@@ -93,11 +93,13 @@ export async function POST(
     // Crear el cronograma
     const cronograma = await prisma.proyectoCronograma.create({
       data: {
+        id: `proyecto-cronograma-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoId,
         tipo: validatedData.tipo,
         nombre: validatedData.nombre,
         esBaseline: validatedData.esBaseline,
-        version: 1
+        version: 1,
+        updatedAt: new Date()
       }
     })
 
@@ -166,6 +168,7 @@ async function generarCronogramaDesdeServicios({
   for (const faseData of fasesDefault) {
     const fase = await prisma.proyectoFase.create({
       data: {
+        id: `proyecto-fase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoId,
         proyectoCronogramaId: cronogramaId,
         nombre: faseData.nombre,
@@ -173,7 +176,8 @@ async function generarCronogramaDesdeServicios({
         orden: faseData.orden,
         estado: 'planificado',
         fechaInicioPlan: new Date().toISOString(),
-        fechaFinPlan: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 días
+        fechaFinPlan: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días
+        updatedAt: new Date()
       }
     })
     fasesCreadas.push(fase)
@@ -182,42 +186,78 @@ async function generarCronogramaDesdeServicios({
   }
 
   // 2. Crear EDTs agrupando servicios por categoría
-  const serviciosPorCategoria = new Map()
+  // 2.1 Extraer IDs de categoría únicos
+  const categoriaIdsUnicos = new Set<string>()
   servicios.forEach(servicio => {
-    const categoria = servicio.categoria || 'Sin Categoría'
+    const categoria = servicio.categoria
+    if (categoria) {
+      categoriaIdsUnicos.add(categoria)
+    }
+  })
+
+  // 2.2 Obtener nombres de EDT desde el catálogo
+  const edtsCatalogo = await prisma.edt.findMany({
+    where: {
+      id: { in: Array.from(categoriaIdsUnicos) }
+    },
+    select: {
+      id: true,
+      nombre: true,
+      descripcion: true
+    }
+  })
+
+  // Crear mapa de ID -> nombre del catálogo
+  const edtNombresMap = new Map<string, string>()
+  for (const edt of edtsCatalogo) {
+    edtNombresMap.set(edt.id, edt.nombre)
+  }
+
+  console.log(`📊 [GENERAR] EDTs encontrados en catálogo: ${edtsCatalogo.length}`)
+  edtsCatalogo.forEach(e => console.log(`   - ${e.id}: ${e.nombre}`))
+
+  // 2.3 Agrupar servicios por categoría
+  const serviciosPorCategoria = new Map<string, any[]>()
+  servicios.forEach(servicio => {
+    const categoria = servicio.categoria || 'sin-categoria'
     if (!serviciosPorCategoria.has(categoria)) {
       serviciosPorCategoria.set(categoria, [])
     }
-    serviciosPorCategoria.get(categoria).push(servicio)
+    serviciosPorCategoria.get(categoria)!.push(servicio)
   })
 
   // Asignar EDTs a fases (balanceo simple)
   const fasesDisponibles = fasesCreadas
   let faseIndex = 0
 
-  for (const [categoriaNombre, serviciosCategoria] of serviciosPorCategoria.entries()) {
+  for (const [categoriaId, serviciosCategoria] of serviciosPorCategoria.entries()) {
+    // ✅ Obtener nombre del catálogo EDT, NO usar el ID como nombre
+    const edtNombre = edtNombresMap.get(categoriaId) || `EDT ${categoriaId}`
+
     // Calcular horas totales
     const horasTotales = serviciosCategoria.reduce((sum: number, servicio: any) =>
-      sum + servicio.items.reduce((itemSum: number, item: any) => itemSum + (item.horaTotal || 0), 0), 0
+      sum + (servicio.cotizacionServicioItem || []).reduce((itemSum: number, item: any) => itemSum + (item.horaTotal || 0), 0), 0
     )
 
     // Asignar a fase (rotativo)
     const faseAsignada = fasesDisponibles[faseIndex % fasesDisponibles.length]
     faseIndex++
 
-    // Crear EDT
+    // Crear EDT con nombre del catálogo
     const edt = await prisma.proyectoEdt.create({
       data: {
+        id: `proyecto-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoId,
         proyectoCronogramaId: cronogramaId,
         proyectoFaseId: faseAsignada.id,
-        nombre: categoriaNombre,
-        categoriaServicioId: categoriaNombre, // Usar nombre como ID temporal
+        nombre: edtNombre, // ✅ Usar nombre del catálogo
+        edtId: categoriaId, // ✅ Guardar el ID real del EDT
         fechaInicioPlan: new Date().toISOString(),
         fechaFinPlan: new Date(Date.now() + Math.max(7, Math.ceil(horasTotales / 8)) * 24 * 60 * 60 * 1000).toISOString(),
         horasPlan: horasTotales,
         estado: 'planificado',
-        descripcion: `EDT generado automáticamente para categoría ${categoriaNombre}`
+        descripcion: `EDT generado automáticamente`,
+        updatedAt: new Date()
       }
     })
 
@@ -226,7 +266,8 @@ async function generarCronogramaDesdeServicios({
 
     // 3. Crear actividades desde servicios
     for (const servicio of serviciosCategoria) {
-      const horasServicio = servicio.items.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
+      const items = servicio.cotizacionServicioItem || []
+      const horasServicio = items.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
 
       const actividad = await prisma.proyectoActividad.create({
         data: {
@@ -249,9 +290,10 @@ async function generarCronogramaDesdeServicios({
       console.log(`⚙️ Actividad creada: ${actividad.nombre} (${horasServicio}h)`)
 
       // 4. Crear tareas desde items del servicio
-      for (const item of servicio.items) {
+      for (const item of items) {
         const tarea = await prisma.proyectoTarea.create({
           data: {
+            id: `proyecto-tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             proyectoEdtId: edt.id,
             proyectoActividadId: actividad.id,
             proyectoCronogramaId: cronogramaId,
@@ -261,7 +303,8 @@ async function generarCronogramaDesdeServicios({
             fechaFin: new Date(Date.now() + Math.max(1, Math.ceil(item.horaTotal / 8)) * 24 * 60 * 60 * 1000).toISOString(),
             horasEstimadas: item.horaTotal,
             estado: 'pendiente',
-            prioridad: 'media'
+            prioridad: 'media',
+            updatedAt: new Date()
           }
         })
 

@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 
 import {
@@ -200,7 +201,9 @@ export default function PlantillaServiciosDetallePage() {
       })
 
       if (!response.ok) {
-        throw new Error('Error al eliminar el item')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ Error response:', errorData)
+        throw new Error(errorData.details || errorData.error || 'Error al eliminar el item')
       }
 
       // Update local state by removing the item and recalculate totals
@@ -210,7 +213,7 @@ export default function PlantillaServiciosDetallePage() {
         const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
         const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
         const newGrandTotal = newTotalCliente - prev.descuento
-        return { ...prev, items: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
+        return { ...prev, plantillaServicioItemIndependiente: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
       })
       toast.success('Item eliminado de la plantilla')
     } catch (err) {
@@ -264,7 +267,7 @@ export default function PlantillaServiciosDetallePage() {
         const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
         const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
         const newGrandTotal = newTotalCliente - prev.descuento
-        return { ...prev, items: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
+        return { ...prev, plantillaServicioItemIndependiente: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
       })
       toast.success('Cantidad actualizada')
 
@@ -324,7 +327,7 @@ export default function PlantillaServiciosDetallePage() {
         const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
         const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
         const newGrandTotal = newTotalCliente - prev.descuento
-        return { ...prev, items: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
+        return { ...prev, plantillaServicioItemIndependiente: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
       })
       toast.success('Factor de seguridad actualizado')
 
@@ -376,7 +379,7 @@ export default function PlantillaServiciosDetallePage() {
         const newTotalInterno = newItems.reduce((sum, item) => sum + item.costoInterno, 0)
         const newTotalCliente = newItems.reduce((sum, item) => sum + item.costoCliente, 0)
         const newGrandTotal = newTotalCliente - prev.descuento
-        return { ...prev, items: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
+        return { ...prev, plantillaServicioItemIndependiente: newItems, totalInterno: newTotalInterno, totalCliente: newTotalCliente, grandTotal: newGrandTotal }
       })
       toast.success('Dificultad actualizada')
 
@@ -408,7 +411,7 @@ export default function PlantillaServiciosDetallePage() {
     return viewMode
   }, [viewMode])
 
-  // Table row component for compact view
+  // Table row component with grouped columns (Option 3)
   const TableItemRow = React.memo(({
     item,
     index,
@@ -432,6 +435,13 @@ export default function PlantillaServiciosDetallePage() {
     editedQuantity: number
     isSaving: boolean
   }) => {
+    const dificultadLabels: Record<number, string> = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Crítica' }
+    const dificultadColors: Record<number, string> = {
+      1: 'bg-green-100 text-green-700',
+      2: 'bg-yellow-100 text-yellow-700',
+      3: 'bg-orange-100 text-orange-700',
+      4: 'bg-red-100 text-red-700'
+    }
 
     return (
       <motion.tr
@@ -439,214 +449,235 @@ export default function PlantillaServiciosDetallePage() {
         transition={{ delay: index * 0.02 }}
         className="border-b hover:bg-gray-50"
       >
-        <td className="p-3 text-center">
-          <span className="text-sm font-medium">{item.orden ?? 0}</span>
-        </td>
-        <td className="p-3">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900">{item.nombre}</span>
-            <Badge variant="outline" className="text-xs">
+        {/* Servicio - nombre + unidad */}
+        <td className="p-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-medium text-gray-900 text-sm">{item.nombre}</span>
+            <Badge variant="outline" className="text-[10px] px-1 py-0">
               {item.unidadServicioNombre}
             </Badge>
-            <Badge variant="secondary" className="text-xs">
-              Escalonada
-            </Badge>
           </div>
-          <div className="text-sm text-gray-600 mt-1">{item.descripcion}</div>
         </td>
-        <td className="p-3 text-sm text-gray-600">
-          {item.recursoNombre}
-          <div className="text-xs text-gray-500">${item.costoHora}/hora</div>
+
+        {/* Recurso + Costo/Hora agrupado */}
+        <td className="p-2">
+          <div className="text-sm text-gray-700">{item.recursoNombre}</div>
+          <div className="text-xs text-gray-500">${item.costoHora}/h</div>
         </td>
-        <td className="p-3">
-          {isEditing ? (
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min="1"
-                value={editedQuantity}
-                onChange={(e) => onQuantityChange(item.id, e.target.value)}
-                className="w-20 h-8 text-sm"
-                disabled={isSaving}
-              />
-              <Button
-                size="sm"
-                onClick={() => onUpdateQuantity(item.id)}
-                disabled={isSaving || editedQuantity === item.cantidad}
-                className="h-8 px-2"
-              >
-                {isSaving ? <Loader2 className="h-3 w-3" /> : <Save className="h-3 w-3" />}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onCancelEdit(item.id)}
-                disabled={isSaving}
-                className="h-8 px-2"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{item.cantidad}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onStartEdit(item.id, item.cantidad)}
-                className="h-8 px-2 text-blue-600 hover:text-blue-700"
-              >
-                <Edit className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
+
+        {/* Cantidad - editable con altura fija */}
+        <td className="p-2">
+          <div className="h-8 flex items-center w-[100px]">
+            {isEditing ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={editedQuantity}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '')
+                    onQuantityChange(item.id, val || '0')
+                  }}
+                  className="w-10 h-7 text-sm text-center border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSaving}
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  onClick={() => onUpdateQuantity(item.id)}
+                  disabled={isSaving || editedQuantity === item.cantidad}
+                  className="h-7 w-7 p-0"
+                >
+                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onCancelEdit(item.id)}
+                  disabled={isSaving}
+                  className="h-7 w-7 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span className="font-semibold w-10 text-center">{item.cantidad}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onStartEdit(item.id, item.cantidad)}
+                  className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700"
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
         </td>
-        <td className="p-3 text-center">
-          {editingDificultades[item.id] !== undefined ? (
-            <div className="flex items-center gap-2">
-              <select
-                className="border rounded px-2 py-1 text-sm"
-                value={editingDificultades[item.id]}
-                onChange={(e) => setEditingDificultades(prev => ({
-                  ...prev,
-                  [item.id]: parseInt(e.target.value)
-                }))}
-                disabled={isSaving}
-              >
-                <option value={1}>Baja (1.0x)</option>
-                <option value={2}>Media (1.2x)</option>
-                <option value={3}>Alta (1.5x)</option>
-                <option value={4}>Crítica (2.0x)</option>
-              </select>
-              <Button
-                size="sm"
-                onClick={() => handleUpdateDificultad(item.id)}
-                disabled={isSaving}
-                className="h-8 px-2"
-              >
-                {isSaving ? <Loader2 className="h-3 w-3" /> : <Save className="h-3 w-3" />}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setEditingDificultades(prev => {
-                  const newState = { ...prev }
-                  delete newState[item.id]
-                  return newState
-                })}
-                disabled={isSaving}
-                className="h-8 px-2"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 justify-center">
-              <Badge variant="outline" className="text-xs">
-                {(() => {
-                  const dificultad = item.nivelDificultad || 1;
-                  const labels = { 1: 'Baja (1.0x)', 2: 'Media (1.2x)', 3: 'Alta (1.5x)', 4: 'Crítica (2.0x)' };
-                  return labels[dificultad as keyof typeof labels] || 'Baja (1.0x)';
-                })()}
-              </Badge>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditingDificultades(prev => ({
-                  ...prev,
-                  [item.id]: item.nivelDificultad || 1
-                }))}
-                className="h-6 px-1 text-blue-600 hover:text-blue-700"
-              >
-                <Edit className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
+
+        {/* Horas agrupadas: Total (base+repet) con tooltip */}
+        <td className="p-2 text-center">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="cursor-help">
+                  <div className="font-medium text-purple-600">{item.horaTotal}h</div>
+                  <div className="text-[10px] text-gray-400">{item.horaBase || 0}+{item.horaRepetido || 0}</div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <div className="text-xs space-y-1">
+                  <p className="font-semibold">Fórmula Escalonada:</p>
+                  <p><span className="text-gray-500">Hora Base:</span> {item.horaBase || 0}h (primera unidad)</p>
+                  <p><span className="text-gray-500">Hora Repetido:</span> {item.horaRepetido || 0}h (por c/unidad adicional)</p>
+                  <p className="pt-1 border-t mt-1">
+                    <span className="text-gray-500">Cálculo:</span> {item.horaBase || 0} + ({item.cantidad - 1} × {item.horaRepetido || 0}) = <span className="font-semibold text-purple-600">{item.horaTotal}h</span>
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </td>
-        <td className="p-3 text-center">
-          <span className="text-sm font-medium">{item.horaBase || 0}h</span>
-        </td>
-        <td className="p-3 text-center">
-          <span className="text-sm font-medium">{item.horaRepetido || 0}h</span>
-        </td>
-        <td className="p-3">
-          {editingFactors[item.id] !== undefined ? (
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                step="0.01"
-                min="1.0"
-                value={editingFactors[item.id]}
-                onChange={(e) => setEditingFactors(prev => ({
-                  ...prev,
-                  [item.id]: parseFloat(e.target.value) || 1
-                }))}
-                className="w-16 h-8 text-sm text-center"
-                disabled={isSaving}
-              />
-              <Button
-                size="sm"
-                onClick={() => handleUpdateFactor(item.id)}
-                disabled={isSaving}
-                className="h-8 px-2"
-              >
-                {isSaving ? <Loader2 className="h-3 w-3" /> : <Save className="h-3 w-3" />}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setEditingFactors(prev => {
-                  const newState = { ...prev }
-                  delete newState[item.id]
-                  return newState
-                })}
-                disabled={isSaving}
-                className="h-8 px-2"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 justify-center">
-              <span className="text-sm font-medium">{(item.factorSeguridad || 1).toFixed(2)}x</span>
-              <Button
-                size="sm"
-                variant="ghost"
+
+        {/* Factor Seguridad - editable con altura fija */}
+        <td className="p-2 text-center">
+          <div className="h-8 flex items-center justify-center w-[90px] mx-auto">
+            {editingFactors[item.id] !== undefined ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={editingFactors[item.id]}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9.]/g, '')
+                    setEditingFactors(prev => ({
+                      ...prev,
+                      [item.id]: parseFloat(val) || 1
+                    }))
+                  }}
+                  className="w-12 h-7 text-sm text-center border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSaving}
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  onClick={() => handleUpdateFactor(item.id)}
+                  disabled={isSaving}
+                  className="h-7 w-7 p-0"
+                >
+                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditingFactors(prev => {
+                    const newState = { ...prev }
+                    delete newState[item.id]
+                    return newState
+                  })}
+                  disabled={isSaving}
+                  className="h-7 w-7 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-1 cursor-pointer group"
                 onClick={() => setEditingFactors(prev => ({
                   ...prev,
                   [item.id]: item.factorSeguridad || 1
                 }))}
-                className="h-6 px-1 text-blue-600 hover:text-blue-700"
               >
-                <Edit className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
+                <span className="text-sm font-medium w-10 text-center">{(item.factorSeguridad || 1).toFixed(1)}x</span>
+                <Edit className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            )}
+          </div>
         </td>
-        <td className="p-3 text-center">
-          <span className="text-sm font-medium">{((item.margen || 0) * 100).toFixed(1)}%</span>
+
+        {/* Dificultad - editable con altura fija */}
+        <td className="p-2 text-center">
+          <div className="h-8 flex items-center justify-center w-[110px] mx-auto">
+            {editingDificultades[item.id] !== undefined ? (
+              <div className="flex items-center gap-1">
+                <select
+                  className="border rounded px-1 h-7 text-xs w-16 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editingDificultades[item.id]}
+                  onChange={(e) => setEditingDificultades(prev => ({
+                    ...prev,
+                    [item.id]: parseInt(e.target.value)
+                  }))}
+                  disabled={isSaving}
+                  autoFocus
+                >
+                  <option value={1}>Baja</option>
+                  <option value={2}>Media</option>
+                  <option value={3}>Alta</option>
+                  <option value={4}>Crítica</option>
+                </select>
+                <Button
+                  size="sm"
+                  onClick={() => handleUpdateDificultad(item.id)}
+                  disabled={isSaving}
+                  className="h-7 w-7 p-0"
+                >
+                  {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditingDificultades(prev => {
+                    const newState = { ...prev }
+                    delete newState[item.id]
+                    return newState
+                  })}
+                  disabled={isSaving}
+                  className="h-7 w-7 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="cursor-pointer group flex items-center gap-1"
+                onClick={() => setEditingDificultades(prev => ({
+                  ...prev,
+                  [item.id]: item.nivelDificultad || 1
+                }))}
+              >
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] px-1.5 py-0 ${dificultadColors[item.nivelDificultad || 1]}`}
+                >
+                  {dificultadLabels[item.nivelDificultad || 1]}
+                </Badge>
+                <Edit className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            )}
+          </div>
         </td>
-        <td className="p-3 text-center">
-          <span className="text-sm font-medium">${item.costoHora}</span>
+
+        {/* Margen */}
+        <td className="p-2 text-center">
+          <span className="text-sm">{((item.margen || 0) * 100).toFixed(0)}%</span>
         </td>
-        <td className="p-3 text-sm">
-          <div className="font-medium">{item.horaTotal}h</div>
-          <div className="text-xs text-gray-500">calculado</div>
-        </td>
-        <td className="p-3 text-right">
-          <div className="font-semibold text-blue-600">{formatCurrency(item.costoInterno)}</div>
-          <div className="text-xs text-gray-500">Interno</div>
-        </td>
-        <td className="p-3 text-right">
+
+        {/* Precios agrupados: Interno / Cliente */}
+        <td className="p-2 text-right">
+          <div className="text-xs text-blue-600">{formatCurrency(item.costoInterno)}</div>
           <div className="font-semibold text-green-600">{formatCurrency(item.costoCliente)}</div>
-          <div className="text-xs text-gray-500">Cliente</div>
         </td>
-        <td className="p-3">
+
+        {/* Acciones */}
+        <td className="p-2 text-center">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onDelete(item.id)}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
             disabled={isSaving}
           >
             <Trash2 className="h-4 w-4" />
@@ -1112,52 +1143,37 @@ export default function PlantillaServiciosDetallePage() {
               ) : (
                 <div>
                   {currentViewMode === 'table' ? (
-                    /* Table View */
+                    /* Table View - Grouped columns */
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
+                      <table className="min-w-full divide-y divide-gray-200 table-fixed">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Orden
-                            </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[18%]">
                               Servicio
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                               Recurso
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Cantidad
+                            <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                              Cant.
                             </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Dificultad
-                            </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Hora Base
-                            </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Hora Repet.
-                            </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Factor Seg.
-                            </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Margen
-                            </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Costo/Hora
-                            </th>
-                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[8%]">
                               Horas
                             </th>
-                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Precio Interno
+                            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                              Factor
                             </th>
-                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Precio Cliente
+                            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                              Dificultad
                             </th>
-                            <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Acciones
+                            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[7%]">
+                              Marg.
+                            </th>
+                            <th className="px-2 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[13%]">
+                              Precios
+                            </th>
+                            <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider w-[6%]">
+
                             </th>
                           </tr>
                         </thead>

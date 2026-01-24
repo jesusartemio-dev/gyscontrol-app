@@ -332,7 +332,7 @@ const InlineEditCell: React.FC<{
         className={`cursor-pointer hover:bg-gray-50 p-1 rounded ${disabled ? 'opacity-50' : ''}`}
         onClick={() => !disabled && setIsEditing(true)}
       >
-        {type === 'date' && value ? new Date(String(value)).toLocaleDateString() : String(value)}
+        {type === 'date' && value ? new Date(String(value)).toLocaleDateString('es-PE') : String(value)}
       </div>
     );
   }
@@ -429,19 +429,19 @@ const PedidoEquipoTableRow = memo<PedidoTableRowProps>(({
 
   const fechaPedidoDisplay = useMemo(() => {
     return pedido.fechaPedido 
-      ? new Date(pedido.fechaPedido).toLocaleDateString() 
+      ? new Date(pedido.fechaPedido).toLocaleDateString('es-PE') 
       : '-';
   }, [pedido.fechaPedido]);
 
   const fechaNecesariaDisplay = useMemo(() => {
     return pedido.fechaNecesaria 
-      ? new Date(pedido.fechaNecesaria).toLocaleDateString() 
+      ? new Date(pedido.fechaNecesaria).toLocaleDateString('es-PE') 
       : '-';
   }, [pedido.fechaNecesaria]);
 
   const fechaEntregaDisplay = useMemo(() => {
     return pedido.fechaEntregaEstimada 
-      ? new Date(pedido.fechaEntregaEstimada).toLocaleDateString() 
+      ? new Date(pedido.fechaEntregaEstimada).toLocaleDateString('es-PE') 
       : '-';
   }, [pedido.fechaEntregaEstimada]);
 

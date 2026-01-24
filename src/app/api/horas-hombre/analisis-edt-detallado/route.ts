@@ -11,9 +11,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, ProyectoEstado } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { ProyectoEstado } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,16 +68,16 @@ export async function GET(request: NextRequest) {
           }
         },
         // 🔧 HORAS PLANIFICADAS: Desde EDT del cronograma (incluir todos)
-        proyectoEdts: {
+        proyectoEdt: {
           include: {
-            categoriaServicio: {
+            edt: {
               select: {
                 id: true,
                 nombre: true
               }
             },
             // 🔧 HORAS REALES: Desde registroHoras agrupadas por EDT
-            registrosHoras: {
+            registroHoras: {
               select: {
                 horasTrabajadas: true
               }
@@ -109,7 +108,7 @@ export async function GET(request: NextRequest) {
     // 🔍 DEBUG: Proyectos con EDTs
     const proyectosConEdts = await prisma.proyecto.findMany({
       where: {
-        proyectoEdts: {
+        proyectoEdt: {
           some: {}
         }
       },
@@ -117,7 +116,7 @@ export async function GET(request: NextRequest) {
         id: true,
         codigo: true,
         nombre: true,
-        proyectoEdts: {
+        proyectoEdt: {
           select: {
             id: true
           }
@@ -126,16 +125,16 @@ export async function GET(request: NextRequest) {
     })
     console.log(`🔍 DEBUG: Proyectos con EDTs: ${proyectosConEdts.length}`)
     proyectosConEdts.forEach((proyecto, index) => {
-      console.log(`   Proyecto con EDTs ${index + 1}: ${proyecto.codigo} - ${proyecto.nombre} (${proyecto.proyectoEdts.length} EDTs)`)
+      console.log(`   Proyecto con EDTs ${index + 1}: ${proyecto.codigo} - ${proyecto.nombre} (${proyecto.proyectoEdt.length} EDTs)`)
     })
 
     // DEBUG: Log de proyectos y sus EDTs
     console.log(`🔍 DEBUG: Proyectos encontrados: ${proyectos.length}`)
     proyectos.forEach((proyecto, index) => {
       console.log(`   Proyecto ${index + 1}: ${proyecto.codigo} - ${proyecto.nombre}`)
-      console.log(`   EDTs en proyecto: ${proyecto.proyectoEdts.length}`)
-      proyecto.proyectoEdts.forEach((edt, edtIndex) => {
-        console.log(`     EDT ${edtIndex + 1}: ${edt.categoriaServicio.nombre} (ID: ${edt.id})`)
+      console.log(`   EDTs en proyecto: ${proyecto.proyectoEdt.length}`)
+      proyecto.proyectoEdt.forEach((edt, edtIndex) => {
+        console.log(`     EDT ${edtIndex + 1}: ${edt.edt.nombre} (ID: ${edt.id})`)
       })
     })
 
@@ -150,11 +149,11 @@ export async function GET(request: NextRequest) {
         const cotizacionData = await prisma.cotizacion.findUnique({
           where: { id: proyecto.cotizacionId },
           include: {
-            servicios: {
+            cotizacionServicio: {
               include: {
-                items: {
+                cotizacionServicioItem: {
                   select: {
-                    categoria: true,
+                    edtId: true,
                     horaTotal: true
                   }
                 }
@@ -164,12 +163,12 @@ export async function GET(request: NextRequest) {
         })
 
         if (cotizacionData) {
-          // Agrupar horas cotizadas por EDT (categoria)
-          for (const servicio of cotizacionData.servicios) {
-            for (const item of servicio.items) {
-              const edtNombre = item.categoria
+          // Agrupar horas cotizadas por EDT (edtId)
+          for (const servicio of cotizacionData.cotizacionServicio) {
+            for (const item of servicio.cotizacionServicioItem) {
+              const edtNombre = item.edtId
               const horasCotizadas = parseFloat(item.horaTotal?.toString() || '0')
-              
+
               const key = `${proyecto.id}_${edtNombre}`
               horasCotizadasMap.set(key, horasCotizadas)
             }
@@ -186,20 +185,20 @@ export async function GET(request: NextRequest) {
     for (const proyecto of proyectos) {
       const analisisEdts = []
       
-      console.log(`🔍 DEBUG: Procesando proyecto ${proyecto.codigo} - EDTs encontrados: ${proyecto.proyectoEdts.length}`)
+      console.log(`🔍 DEBUG: Procesando proyecto ${proyecto.codigo} - EDTs encontrados: ${proyecto.proyectoEdt.length}`)
 
-      for (const proyectoEdt of proyecto.proyectoEdts) {
-        console.log(`   🔍 DEBUG: Procesando EDT: ${proyectoEdt.categoriaServicio.nombre} (ID: ${proyectoEdt.id})`)
+      for (const proyectoEdt of proyecto.proyectoEdt) {
+        console.log(`   🔍 DEBUG: Procesando EDT: ${proyectoEdt.edt.nombre} (ID: ${proyectoEdt.id})`)
         
         // 🔧 ASIGNAR NOMBRES ÚNICOS BASADOS EN EL CATÁLOGO COMPLETO
-        let edtNombre = proyectoEdt.categoriaServicio.nombre
+        let edtNombre = proyectoEdt.edt.nombre
         
         // Obtener nombres únicos de EDTs del proyecto
-        const nombresEdtsDelProyecto = [...new Set(proyecto.proyectoEdts.map(pe => pe.categoriaServicio.nombre))]
+        const nombresEdtsDelProyecto = [...new Set(proyecto.proyectoEdt.map(pe => pe.edt.nombre))]
         
         // Si hay nombres duplicados (como múltiples "GES"), usar el catálogo para asignar nombres únicos
         if (nombresEdtsDelProyecto.length === 1 && nombresEdtsDelProyecto[0] === 'GES' && catalogoEdts.length > 0) {
-          const indexEnProyecto = proyecto.proyectoEdts.findIndex(pe => pe.id === proyectoEdt.id)
+          const indexEnProyecto = proyecto.proyectoEdt.findIndex(pe => pe.id === proyectoEdt.id)
           
           // Asignar nombres del catálogo basándose en el orden del proyecto
           if (indexEnProyecto < catalogoEdts.length) {
@@ -221,7 +220,7 @@ export async function GET(request: NextRequest) {
         const horasPlanificadas = parseFloat(proyectoEdt.horasPlan?.toString() || '0')
 
         // 🔧 3. HORAS EJECUTADAS
-        const horasEjecutadas = proyectoEdt.registrosHoras.reduce((total, registro) => {
+        const horasEjecutadas = proyectoEdt.registroHoras.reduce((total, registro) => {
           return total + registro.horasTrabajadas
         }, 0)
 
@@ -382,7 +381,5 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     )
-  } finally {
-    await prisma.$disconnect()
   }
 }

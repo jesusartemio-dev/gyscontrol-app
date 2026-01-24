@@ -41,7 +41,7 @@ interface CotizacionActividad {
   cotizacionEdt?: {
     id: string
     nombre: string
-    categoriaServicio: {
+    edt: {
       nombre: string
     }
   }
@@ -51,7 +51,7 @@ interface CotizacionActividad {
 interface CotizacionEdt {
   id: string
   nombre: string
-  categoriaServicio: {
+  edt: {
     id: string
     nombre: string
   }
@@ -235,7 +235,7 @@ export function CotizacionActividadList({
 
     // Buscar EDTs que correspondan a la categoría del servicio
     const edtCompatible = edts.find(edt =>
-      edt.categoriaServicio?.nombre === servicio.categoria
+      edt.edt?.nombre === servicio.categoria
     )
 
     if (edtCompatible) {
@@ -597,7 +597,7 @@ export function CotizacionActividadList({
                         <SelectItem value="none">Sin EDT específico</SelectItem>
                         {edts.map((edt) => (
                           <SelectItem key={edt.id} value={edt.id}>
-                            {edt.nombre} ({edt.categoriaServicio?.nombre})
+                            {edt.nombre} ({edt.edt?.nombre})
                           </SelectItem>
                         ))}
                       </SelectContent>

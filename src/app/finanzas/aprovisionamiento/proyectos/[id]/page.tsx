@@ -102,7 +102,7 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
   // 🔁 Calculate project stats
   const stats = {
     totalListas: listasData.data.pagination.total,
-    listasAprobadas: listasData.data.listas.filter(item => item.estado === 'aprobado').length,
+    listasAprobadas: listasData.data.listas.filter(item => item.estado === 'aprobada').length,
     totalPedidos: pedidosData.data.pagination.total,
     pedidosRecibidos: pedidosData.data.pedidos.filter(item => item.estado === 'entregado').length,
     montoTotalListas: listasData.data.listas.reduce((sum, item) => sum + (item.estadisticas?.montoTotal || 0), 0),

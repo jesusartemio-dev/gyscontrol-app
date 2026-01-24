@@ -20,9 +20,9 @@ export async function GET(
     const edtsExistentes = await prisma.cotizacionEdt.findMany({
       where: { cotizacionId },
       include: {
-        cotizacion_actividad: {
+        cotizacionActividad: {
           include: {
-            cotizacion_tarea: true
+            cotizacionTarea: true
           }
         }
       }
@@ -34,14 +34,14 @@ export async function GET(
 
     const tareas = await prisma.cotizacionTarea.findMany({
       where: {
-        cotizacion_actividad: {
-          cotizacion_edt: { cotizacionId }
+        cotizacionActividad: {
+          cotizacionEdt: { cotizacionId }
         }
       },
       include: {
-        cotizacion_actividad: {
+        cotizacionActividad: {
           include: {
-            cotizacion_edt: {
+            cotizacionEdt: {
               select: { nombre: true }
             }
           }
@@ -61,13 +61,13 @@ export async function GET(
       horasEstimadas: tarea.horasEstimadas,
       cotizacionActividadId: tarea.cotizacionActividadId,
       cotizacionActividad: {
-        nombre: tarea.cotizacion_actividad?.nombre || 'Sin Actividad',
+        nombre: tarea.cotizacionActividad?.nombre || 'Sin Actividad',
         cotizacionEdt: {
-          nombre: tarea.cotizacion_actividad?.cotizacion_edt?.nombre || 'Sin EDT'
+          nombre: tarea.cotizacionActividad?.cotizacionEdt?.nombre || 'Sin EDT'
         }
       },
-      actividadNombre: tarea.cotizacion_actividad?.nombre || 'Sin Actividad',
-      edtNombre: tarea.cotizacion_actividad?.cotizacion_edt?.nombre || 'Sin EDT',
+      actividadNombre: tarea.cotizacionActividad?.nombre || 'Sin Actividad',
+      edtNombre: tarea.cotizacionActividad?.cotizacionEdt?.nombre || 'Sin EDT',
       fechaInicio: tarea.fechaInicio?.toISOString() || null,
       fechaFin: tarea.fechaFin?.toISOString() || null,
       esHito: tarea.esHito,

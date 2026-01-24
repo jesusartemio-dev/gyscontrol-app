@@ -9,11 +9,11 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import PlantillaServicioItemsModal from '@/components/plantillas/PlantillaServicioItemsModal'
 import { getCatalogoServiciosByCategoriaId } from '@/lib/services/catalogoServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 
 // 🔧 Mocks
 jest.mock('@/lib/services/catalogoServicio')
-jest.mock('@/lib/services/categoriaServicio')
+jest.mock('@/lib/services/edt')
 jest.mock('@/lib/services/plantillaServicioItem')
 jest.mock('@/lib/services/plantilla')
 jest.mock('sonner', () => ({
@@ -56,13 +56,14 @@ jest.mock('lucide-react', () => ({
 }))
 
 const mockGetCatalogoServiciosByCategoriaId = getCatalogoServiciosByCategoriaId as jest.MockedFunction<typeof getCatalogoServiciosByCategoriaId>
-const mockGetCategoriasServicio = getCategoriasServicio as jest.MockedFunction<typeof getCategoriasServicio>
+const mockGetEdts = getEdts as jest.MockedFunction<typeof getEdts>
 
 describe('PlantillaServicioItemsModal', () => {
   const mockProps = {
     open: true,
     onClose: jest.fn(),
     plantillaId: 'plantilla-123',
+    plantillaServicioId: 'plantilla-servicio-789',
     categoriaId: 'categoria-456',
     categoriaNombre: 'Servicios de Consultoría',
     onCreated: jest.fn()
@@ -70,14 +71,13 @@ describe('PlantillaServicioItemsModal', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGetCategoriasServicio.mockResolvedValue([
+    mockGetEdts.mockResolvedValue([
       {
         id: 'categoria-456',
         nombre: 'Servicios de Consultoría',
         descripcion: 'Categoría de servicios',
-        activo: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ])
     mockGetCatalogoServiciosByCategoriaId.mockResolvedValue([])

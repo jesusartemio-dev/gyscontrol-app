@@ -156,11 +156,11 @@ export async function analizarProyectoEquipo(proyectoEquipo: ProyectoEquipoCotiz
     // ✅ Priorizar categoría del catálogo si está disponible
     let categoriaNombre = 'SIN-CATEGORIA'
 
-    if (item.catalogoEquipo?.categoria) {
-      // Si categoria es un objeto, extraer el nombre
-      categoriaNombre = typeof item.catalogoEquipo.categoria === 'string'
-        ? item.catalogoEquipo.categoria
-        : item.catalogoEquipo.categoria.nombre || 'SIN-CATEGORIA'
+    if (item.catalogoEquipo?.categoriaEquipo) {
+      // Si categoriaEquipo es un objeto, extraer el nombre
+      categoriaNombre = typeof item.catalogoEquipo.categoriaEquipo === 'string'
+        ? item.catalogoEquipo.categoriaEquipo
+        : item.catalogoEquipo.categoriaEquipo.nombre || 'SIN-CATEGORIA'
     } else if (item.categoria) {
       categoriaNombre = item.categoria
     }

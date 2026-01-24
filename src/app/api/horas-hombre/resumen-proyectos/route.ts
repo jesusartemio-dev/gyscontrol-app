@@ -12,9 +12,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, ProyectoEstado } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { ProyectoEstado } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
@@ -70,7 +69,7 @@ export async function GET(request: NextRequest) {
           }
         },
         // 🔧 HORAS PLANIFICADAS: Desde servicios del proyecto
-        servicios: {
+        proyectoServicioCotizado: {
           select: {
             id: true,
             nombre: true,
@@ -78,7 +77,7 @@ export async function GET(request: NextRequest) {
             subtotalInterno: true,
             subtotalReal: true,
             // ✅ AGREGADO: Relación con EDTs del proyecto para obtener nombres reales
-            items: {
+            proyectoServicioCotizadoItem: {
               select: {
                 nombre: true,
                 horasEjecutadas: true,
@@ -88,7 +87,7 @@ export async function GET(request: NextRequest) {
           }
         },
         // 🔧 HORAS REALES: Desde registroHoras
-        registrosHoras: {
+        registroHoras: {
           select: {
             horasTrabajadas: true,
             fechaTrabajo: true,
@@ -107,14 +106,14 @@ export async function GET(request: NextRequest) {
     console.log(`🔍 DEBUG: Verificando datos de proyectos:`)
     proyectos.forEach((proyecto, index) => {
       console.log(`   Proyecto ${index + 1}: ${proyecto.codigo} - ${proyecto.nombre}`)
-      console.log(`     Servicios: ${proyecto.servicios.length}`)
-      console.log(`     Registros de horas: ${proyecto.registrosHoras.length}`)
-      proyecto.servicios.forEach((servicio, servicioIndex) => {
-        const horasEstimadas = servicio.items?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
+      console.log(`     Servicios: ${proyecto.proyectoServicioCotizado.length}`)
+      console.log(`     Registros de horas: ${proyecto.registroHoras.length}`)
+      proyecto.proyectoServicioCotizado.forEach((servicio, servicioIndex) => {
+        const horasEstimadas = servicio.proyectoServicioCotizadoItem?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
         console.log(`       Servicio ${servicioIndex + 1}: ${servicio.nombre} - ${horasEstimadas}h estimadas`)
       })
-      if (proyecto.registrosHoras.length > 0) {
-        proyecto.registrosHoras.slice(0, 2).forEach((registro, regIndex) => {
+      if (proyecto.registroHoras.length > 0) {
+        proyecto.registroHoras.slice(0, 2).forEach((registro, regIndex) => {
           console.log(`       Registro ${regIndex + 1}: ${registro.horasTrabajadas}h - ${registro.nombreServicio}`)
         })
       }
@@ -138,13 +137,13 @@ export async function GET(request: NextRequest) {
     //  PROCESAR DATOS PARA CALCULAR RESUMEN
     const resumenProyectos = proyectos.map(proyecto => {
       // ✅ CORREGIDO: Calcular horas planificadas desde servicios del proyecto
-      const horasPlanificadas = proyecto.servicios.reduce((total, servicio) => {
-        const horasServicio = servicio.items?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
+      const horasPlanificadas = proyecto.proyectoServicioCotizado.reduce((total, servicio) => {
+        const horasServicio = servicio.proyectoServicioCotizadoItem?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
         return total + horasServicio
       }, 0)
 
       // Calcular horas ejecutadas reales
-      const horasEjecutadas = proyecto.registrosHoras.reduce((total, registro) => {
+      const horasEjecutadas = proyecto.registroHoras.reduce((total, registro) => {
         return total + registro.horasTrabajadas
       }, 0)
 
@@ -167,18 +166,18 @@ export async function GET(request: NextRequest) {
       }
 
       // Contar registros de horas
-      const totalRegistros = proyecto.registrosHoras.length
+      const totalRegistros = proyecto.registroHoras.length
 
       // ✅ CORREGIDO: Usar servicios reales del proyecto
-      const nombresServiciosDelProyecto = [...new Set(proyecto.servicios.map(s => s.nombre))]
+      const nombresServiciosDelProyecto = [...new Set(proyecto.proyectoServicioCotizado.map(s => s.nombre))]
       
-      console.log(`🔍 DEBUG: Proyecto ${proyecto.codigo} - Servicios: ${proyecto.servicios.length}, Nombres únicos: ${nombresServiciosDelProyecto.length}`)
+      console.log(`🔍 DEBUG: Proyecto ${proyecto.codigo} - Servicios: ${proyecto.proyectoServicioCotizado.length}, Nombres únicos: ${nombresServiciosDelProyecto.length}`)
       console.log(`   Nombres: [${nombresServiciosDelProyecto.join(', ')}]`)
       
       // ✅ CORREGIDO: Obtener TODOS los servicios del proyecto
-      const todosServiciosProyecto = proyecto.servicios
+      const todosServiciosProyecto = proyecto.proyectoServicioCotizado
         .map((servicio, index) => {
-          const horasEstimadas = servicio.items?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
+          const horasEstimadas = servicio.proyectoServicioCotizadoItem?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
           
           console.log(`🔍 DEBUG: Procesando Servicio ${index}: ${servicio.nombre}`)
           
@@ -191,7 +190,7 @@ export async function GET(request: NextRequest) {
             horasEstimadas: horasEstimadas,
             subtotalInterno: servicio.subtotalInterno || 0,
             subtotalReal: servicio.subtotalReal || 0,
-            itemsCount: servicio.items?.length || 0
+            itemsCount: servicio.proyectoServicioCotizadoItem?.length || 0
           }
         })
         // ✅ MANTENER EL ORDEN ORIGINAL DE LA BD
@@ -248,8 +247,8 @@ export async function GET(request: NextRequest) {
     
     resumenOrdenado.forEach((proyecto: any, index: number) => {
       console.log(`   Proyecto ${index + 1}: ${proyecto.proyecto.codigo}`)
-      console.log(`     Servicios principales: ${proyecto.servicios.length}`)
-      proyecto.servicios.forEach((servicio: any, servicioIndex: number) => {
+      console.log(`     Servicios: ${proyecto.servicios?.length || 0}`)
+      proyecto.servicios?.forEach((servicio: any, servicioIndex: number) => {
         console.log(`       ${servicio.nombre}: ${servicio.horasEstimadas}h (${servicio.edt})`)
       })
     })
@@ -288,7 +287,5 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     )
-  } finally {
-    await prisma.$disconnect()
   }
 }

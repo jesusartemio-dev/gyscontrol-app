@@ -141,7 +141,7 @@ export default function ComparacionEquiposPage() {
           getListaEquiposPorProyecto(id)
         ])
         
-        const items = listaData.flatMap((l) => l.items)
+        const items = listaData.flatMap((l) => l.listaEquipoItem)
         setProyecto(proyectoData)
         setListaItems(items)
         
