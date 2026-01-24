@@ -74,7 +74,7 @@ export const calculateMasterStats = (items: ListaEquipoItem[]): ListaEquipoMaste
  * Transforma una ListaEquipo completa a formato Master (optimizado)
  */
 export const transformToMaster: ListaEquipoToMasterTransformer = (lista: ListaEquipo): ListaEquipoMaster => {
-  const stats = calculateMasterStats(lista.items || []);
+  const stats = calculateMasterStats(lista.listaEquipoItem || []);
   
   return {
     id: lista.id,
@@ -119,12 +119,14 @@ export const calculateMasterListStats = (listas: ListaEquipoMaster[]) => {
     costoAprobado: 0,
     listasPorEstado: {
       borrador: 0,
+      enviada: 0,
       por_revisar: 0,
       por_cotizar: 0,
       por_validar: 0,
       por_aprobar: 0,
-      aprobado: 0,
-      rechazado: 0
+      aprobada: 0,
+      rechazada: 0,
+      completada: 0
     },
     progresoPromedio: 0
   };
@@ -267,18 +269,22 @@ export const masterListUtils = {
     switch (estado) {
       case 'borrador':
         return 'secondary';
+      case 'enviada':
+        return 'outline';
       case 'por_revisar':
+        return 'outline';
+      case 'por_cotizar':
         return 'outline';
       case 'por_validar':
         return 'default';
       case 'por_aprobar':
         return 'default';
-      case 'aprobado':
+      case 'aprobada':
         return 'default';
-      case 'rechazado':
+      case 'rechazada':
         return 'destructive';
-      case 'por_cotizar':
-        return 'outline';
+      case 'completada':
+        return 'default';
       default:
         return 'secondary';
     }

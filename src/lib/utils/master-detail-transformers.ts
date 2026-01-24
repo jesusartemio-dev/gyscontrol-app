@@ -133,7 +133,7 @@ export const calculateDetailStats = (items: ListaEquipoItem[]): ListaEquipoDetai
  * Transforma una ListaEquipo completa a formato Master (optimizado)
  */
 export const transformToMaster: ListaEquipoToMasterTransformer = (lista: ListaEquipo): ListaEquipoMaster => {
-  const stats = calculateMasterStats(lista.items || [])
+  const stats = calculateMasterStats(lista.listaEquipoItem || [])
   
   return {
     id: lista.id,
@@ -160,8 +160,8 @@ export const transformToMaster: ListaEquipoToMasterTransformer = (lista: ListaEq
  * Transforma una ListaEquipo a formato Detail (completo)
  */
 export const transformToDetail: ListaEquipoToDetailTransformer = (lista: ListaEquipo): ListaEquipoDetail => {
-  const stats = calculateDetailStats(lista.items || [])
-  const itemsDetail = (lista.items || []).map(transformItemToDetail)
+  const stats = calculateDetailStats(lista.listaEquipoItem || [])
+  const itemsDetail = (lista.listaEquipoItem || []).map(transformItemToDetail)
   
   return {
     ...lista,
@@ -238,7 +238,7 @@ export const calculateAvailableActions: ActionsCalculator = (
     canAddItems: (estado === 'borrador' || estado === 'por_revisar') && canProject,
     
     // 📦 Crear pedido
-    canCreatePedido: estado === 'aprobado' && canProject,
+    canCreatePedido: estado === 'aprobada' && canProject,
     
     // ✅ Aprobar
     canApprove: (
@@ -268,12 +268,14 @@ export const calculateAvailableActions: ActionsCalculator = (
 export const getEstadoListaBadgeVariant = (estado: EstadoListaEquipo) => {
   switch (estado) {
     case 'borrador': return 'secondary'
+    case 'enviada': return 'outline'
     case 'por_revisar': return 'outline'
     case 'por_cotizar': return 'outline'
     case 'por_validar': return 'default'
     case 'por_aprobar': return 'default'
-    case 'aprobado': return 'default'
-    case 'rechazado': return 'destructive'
+    case 'aprobada': return 'default'
+    case 'rechazada': return 'destructive'
+    case 'completada': return 'default'
     default: return 'secondary'
   }
 }

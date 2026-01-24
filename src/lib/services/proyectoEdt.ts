@@ -33,7 +33,7 @@ export class ProyectoEdtService {
       // First, try a simple query without relations to check if the basic query works
       const basicEdts = await prisma.proyectoEdt.findMany({
         where: { proyectoId },
-        select: { id: true, proyectoId: true, categoriaServicioId: true }
+        select: { id: true, proyectoId: true, edtId: true }
       });
 
       logger.info(`Basic query found ${basicEdts.length} EDTs`);
@@ -41,7 +41,7 @@ export class ProyectoEdtService {
       const edts = await prisma.proyectoEdt.findMany({
         where: {
           proyectoId,
-          ...(filtros.categoriaServicioId && { categoriaServicioId: filtros.categoriaServicioId }),
+          ...(filtros.edtId && { edtId: filtros.edtId }),
           ...(filtros.estado && { estado: filtros.estado }),
           ...(filtros.responsableId && { responsableId: filtros.responsableId }),
           ...(filtros.fechaDesde && {
@@ -59,11 +59,12 @@ export class ProyectoEdtService {
           id: true,
           proyectoId: true,
           nombre: true,
-          categoriaServicioId: true,
+          edtId: true,
           responsableId: true,
           descripcion: true,
           estado: true,
           prioridad: true,
+          orden: true,
           fechaInicioPlan: true,
           fechaFinPlan: true,
           fechaInicioReal: true,
@@ -81,20 +82,20 @@ export class ProyectoEdtService {
               estado: true
             }
           },
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          registrosHoras: {
+          registroHoras: {
             select: {
               id: true,
               proyectoId: true,
@@ -110,12 +111,12 @@ export class ProyectoEdtService {
               observaciones: true,
               aprobado: true,
               proyectoEdtId: true,
-              categoriaServicioId: true,
+              edtId: true,
               origen: true,
               ubicacion: true,
               createdAt: true,
               updatedAt: true,
-              usuario: {
+              user: {
                 select: {
                   id: true,
                   name: true,
@@ -140,12 +141,13 @@ export class ProyectoEdtService {
       return edts.map(edt => ({
         ...edt,
         nombre: edt.nombre,
+        orden: edt.orden ?? 0,
         fechaInicio: edt.fechaInicioPlan?.toISOString() || undefined,
         fechaFin: edt.fechaFinPlan?.toISOString() || undefined,
         fechaInicioReal: edt.fechaInicioReal?.toISOString() || undefined,
         fechaFinReal: edt.fechaFinReal?.toISOString() || undefined,
         horasPlan: Number(edt.horasPlan || 0),
-        registrosHoras: edt.registrosHoras.map(registro => ({
+        registroHoras: edt.registroHoras.map(registro => ({
           ...registro,
           proyectoId: registro.proyectoId || '',
           categoria: registro.categoria || '',
@@ -162,7 +164,7 @@ export class ProyectoEdtService {
           recursoId: registro.recursoId || '',
           recursoNombre: registro.recursoNombre || '',
           proyectoEdtId: registro.proyectoEdtId || '',
-          categoriaServicioId: registro.categoriaServicioId || '',
+          edtId: registro.edtId || '',
           origen: registro.origen || '',
           ubicacion: registro.ubicacion || ''
         })),
@@ -171,12 +173,12 @@ export class ProyectoEdtService {
         descripcion: edt.descripcion || undefined,
         createdAt: edt.createdAt.toISOString(),
         updatedAt: edt.updatedAt.toISOString(),
-        responsable: edt.responsable || undefined,
+        responsable: edt.user || undefined,
         proyecto: {
           ...edt.proyecto,
           estado: edt.proyecto.estado as any
         },
-        categoriaServicio: edt.categoriaServicio
+        edt: edt.edt
       })) as ProyectoEdtConRelaciones[];
     } catch (error) {
       logger.error('Error al obtener EDT por proyecto:', {
@@ -203,20 +205,20 @@ export class ProyectoEdtService {
               estado: true
             }
           },
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          registrosHoras: {
+          registroHoras: {
             select: {
               id: true,
               proyectoId: true,
@@ -232,12 +234,12 @@ export class ProyectoEdtService {
               observaciones: true,
               aprobado: true,
               proyectoEdtId: true,
-              categoriaServicioId: true,
+              edtId: true,
               origen: true,
               ubicacion: true,
               createdAt: true,
               updatedAt: true,
-              usuario: {
+              user: {
                 select: {
                   id: true,
                   name: true,
@@ -267,12 +269,12 @@ export class ProyectoEdtService {
         descripcion: edt.descripcion || undefined,
         createdAt: edt.createdAt.toISOString(),
         updatedAt: edt.updatedAt.toISOString(),
-        responsable: edt.responsable || undefined,
+        responsable: edt.user || undefined,
         proyecto: {
           ...edt.proyecto,
           estado: edt.proyecto.estado as any
         },
-        registrosHoras: edt.registrosHoras.map(registro => ({
+        registroHoras: edt.registroHoras.map(registro => ({
           ...registro,
           proyectoId: registro.proyectoId || '',
           categoria: registro.categoria || '',
@@ -289,7 +291,7 @@ export class ProyectoEdtService {
           recursoId: registro.recursoId || '',
           recursoNombre: registro.recursoNombre || '',
           proyectoEdtId: registro.proyectoEdtId || '',
-          categoriaServicioId: registro.categoriaServicioId || '',
+          edtId: registro.edtId || '',
           origen: registro.origen || '',
           ubicacion: registro.ubicacion || ''
         }))
@@ -316,7 +318,7 @@ export class ProyectoEdtService {
       const edtExistente = await prisma.proyectoEdt.findFirst({
         where: {
           proyectoId: data.proyectoId,
-          categoriaServicioId: data.categoriaServicioId
+          edtId: data.edtId
         }
       });
 
@@ -327,9 +329,11 @@ export class ProyectoEdtService {
       // 🏗️ Crear EDT
       const nuevoEdt = await prisma.proyectoEdt.create({
         data: {
+          id: crypto.randomUUID(),
           ...data,
           nombre: data.nombre,
-          proyectoCronogramaId: data.proyectoCronogramaId
+          proyectoCronogramaId: data.proyectoCronogramaId,
+          updatedAt: new Date()
         },
         include: {
           proyecto: {
@@ -340,20 +344,20 @@ export class ProyectoEdtService {
               estado: true
             }
           },
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          registrosHoras: {
+          registroHoras: {
             select: {
               id: true,
               proyectoId: true,
@@ -369,12 +373,12 @@ export class ProyectoEdtService {
               observaciones: true,
               aprobado: true,
               proyectoEdtId: true,
-              categoriaServicioId: true,
+              edtId: true,
               origen: true,
               ubicacion: true,
               createdAt: true,
               updatedAt: true,
-              usuario: {
+              user: {
                 select: {
                   id: true,
                   name: true,
@@ -403,12 +407,12 @@ export class ProyectoEdtService {
         updatedAt: nuevoEdt.updatedAt.toISOString(),
         horasPlan: Number(nuevoEdt.horasPlan || 0),
         horasReales: Number(nuevoEdt.horasReales || 0),
-        responsable: nuevoEdt.responsable || undefined,
+        responsable: nuevoEdt.user || undefined,
         proyecto: {
           ...nuevoEdt.proyecto,
           estado: nuevoEdt.proyecto.estado as any
         },
-        registrosHoras: nuevoEdt.registrosHoras.map(registro => ({
+        registroHoras: nuevoEdt.registroHoras.map(registro => ({
           ...registro,
           proyectoId: registro.proyectoId || '',
           categoria: registro.categoria || '',
@@ -425,7 +429,7 @@ export class ProyectoEdtService {
           recursoId: registro.recursoId || '',
           recursoNombre: registro.recursoNombre || '',
           proyectoEdtId: registro.proyectoEdtId || '',
-          categoriaServicioId: registro.categoriaServicioId || '',
+          edtId: registro.edtId || '',
           origen: registro.origen || '',
           ubicacion: registro.ubicacion || ''
         }))
@@ -515,20 +519,20 @@ export class ProyectoEdtService {
               estado: true
             }
           },
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          registrosHoras: {
+          registroHoras: {
             select: {
               id: true,
               proyectoId: true,
@@ -544,12 +548,12 @@ export class ProyectoEdtService {
               observaciones: true,
               aprobado: true,
               proyectoEdtId: true,
-              categoriaServicioId: true,
+              edtId: true,
               origen: true,
               ubicacion: true,
               createdAt: true,
               updatedAt: true,
-              usuario: {
+              user: {
                 select: {
                   id: true,
                   name: true,
@@ -570,7 +574,7 @@ export class ProyectoEdtService {
         nombre: edtActualizado.nombre,
         responsableId: edtActualizado.responsableId ?? undefined,
         descripcion: edtActualizado.descripcion ?? undefined,
-        responsable: edtActualizado.responsable ?? undefined,
+        responsable: edtActualizado.user ?? undefined,
         fechaInicio: edtActualizado.fechaInicioPlan?.toISOString() ?? undefined,
         fechaFin: edtActualizado.fechaFinPlan?.toISOString() ?? undefined,
         fechaInicioReal: edtActualizado.fechaInicioReal?.toISOString() ?? undefined,
@@ -583,7 +587,7 @@ export class ProyectoEdtService {
           ...edtActualizado.proyecto,
           estado: edtActualizado.proyecto.estado as any
         },
-        registrosHoras: edtActualizado.registrosHoras.map(registro => ({
+        registroHoras: edtActualizado.registroHoras.map(registro => ({
           ...registro,
           proyectoId: registro.proyectoId || '',
           categoria: registro.categoria || '',
@@ -600,7 +604,7 @@ export class ProyectoEdtService {
           recursoId: registro.recursoId || '',
           recursoNombre: registro.recursoNombre || '',
           proyectoEdtId: registro.proyectoEdtId || '',
-          categoriaServicioId: registro.categoriaServicioId || '',
+          edtId: registro.edtId || '',
           origen: registro.origen || '',
           ubicacion: registro.ubicacion || ''
         }))
@@ -618,7 +622,7 @@ export class ProyectoEdtService {
       const edtExistente = await prisma.proyectoEdt.findUnique({
         where: { id: edtId },
         include: {
-          registrosHoras: {
+          registroHoras: {
             select: { id: true }
           }
         }
@@ -629,7 +633,7 @@ export class ProyectoEdtService {
       }
 
       // 📡 Validar que no tenga registros de horas
-      if (edtExistente.registrosHoras.length > 0) {
+      if (edtExistente.registroHoras.length > 0) {
         throw new Error('No se puede eliminar un EDT que tiene registros de horas asociados');
       }
 
@@ -785,7 +789,7 @@ export class ProyectoEdtService {
           proyectoId
         },
         include: {
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
@@ -793,7 +797,7 @@ export class ProyectoEdtService {
           }
         },
         orderBy: {
-          categoriaServicio: {
+          edt: {
             nombre: 'asc'
           }
         }
@@ -817,8 +821,8 @@ export class ProyectoEdtService {
         }
 
         return {
-          categoriaServicioId: edt.categoriaServicioId,
-          categoriaServicioNombre: edt.categoriaServicio.nombre,
+          edtId: edt.edtId,
+          edtNombre: edt.edt.nombre,
           horasPlan,
           horasReales,
           porcentajeAvance: edt.porcentajeAvance,
@@ -860,29 +864,20 @@ export class ProyectoEdtService {
               nombre: true
             }
           },
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          tareas: {
-            include: {
-              responsable: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            },
+          cotizacionActividad: {
             orderBy: { createdAt: 'asc' }
           }
         },
@@ -894,7 +889,7 @@ export class ProyectoEdtService {
         id: edt.id,
         proyectoId: proyectoId, // Referencia al proyecto actual
         nombre: edt.cotizacionServicio?.nombre || 'EDT sin nombre', // Copiar nombre del servicio
-        categoriaServicioId: edt.categoriaServicioId,
+        edtId: edt.edtId,
         fechaInicio: edt.fechaInicioComercial?.toISOString(),
         fechaFin: edt.fechaFinComercial?.toISOString(),
         horasPlan: Number(edt.horasEstimadas || 0),
@@ -910,28 +905,28 @@ export class ProyectoEdtService {
           codigo: '',
           estado: 'en_ejecucion' as any // Estado por defecto para comerciales
         },
-        categoriaServicio: edt.categoriaServicio,
-        responsable: edt.responsable,
-        tareas: edt.tareas.map(tarea => ({
-          id: tarea.id,
-          nombre: tarea.nombre,
-          descripcion: tarea.descripcion,
-          fechaInicio: tarea.fechaInicio.toISOString(),
-          fechaFin: tarea.fechaFin.toISOString(),
-          horasEstimadas: Number(tarea.horasEstimadas || 0),
-          estado: tarea.estado,
-          prioridad: tarea.prioridad,
-          responsableId: tarea.responsableId,
-          dependenciaId: tarea.dependenciaId,
-          responsable: tarea.responsable,
-          createdAt: tarea.createdAt.toISOString(),
-          updatedAt: tarea.updatedAt.toISOString()
+        edt: edt.edt,
+        responsable: edt.user,
+        tareas: edt.cotizacionActividad.map(actividad => ({
+          id: actividad.id,
+          nombre: actividad.nombre,
+          descripcion: actividad.descripcion,
+          fechaInicio: actividad.fechaInicioComercial?.toISOString() || '',
+          fechaFin: actividad.fechaFinComercial?.toISOString() || '',
+          horasEstimadas: Number(actividad.horasEstimadas || 0),
+          estado: actividad.estado,
+          prioridad: actividad.prioridad,
+          responsableId: null,
+          dependenciaId: null,
+          responsable: null,
+          createdAt: actividad.createdAt.toISOString(),
+          updatedAt: actividad.updatedAt.toISOString()
         })),
         // Campos específicos de EDT comercial
         tipo: 'comercial',
         horasReales: 0, // No aplica para comerciales
         porcentajeAvance: 0, // No aplica para comerciales
-        registrosHoras: [] // No aplica para comerciales
+        registroHoras: [] // No aplica para comerciales
       }));
     } catch (error) {
       logger.error('Error al obtener EDTs comerciales del proyecto:', error);
@@ -960,20 +955,20 @@ export class ProyectoEdtService {
               estado: true
             }
           },
-          categoriaServicio: {
+          edt: {
             select: {
               id: true,
               nombre: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          registrosHoras: {
+          registroHoras: {
             select: {
               id: true,
               proyectoId: true,
@@ -989,12 +984,12 @@ export class ProyectoEdtService {
               observaciones: true,
               aprobado: true,
               proyectoEdtId: true,
-              categoriaServicioId: true,
+              edtId: true,
               origen: true,
               ubicacion: true,
               createdAt: true,
               updatedAt: true,
-              usuario: {
+              user: {
                 select: {
                   id: true,
                   name: true,
@@ -1019,7 +1014,7 @@ export class ProyectoEdtService {
         nombre: edt.nombre,
         responsableId: edt.responsableId ?? undefined,
         descripcion: edt.descripcion ?? undefined,
-        responsable: edt.responsable ?? undefined,
+        responsable: edt.user ?? undefined,
         fechaInicio: edt.fechaInicioPlan?.toISOString() ?? undefined,
         fechaFin: edt.fechaFinPlan?.toISOString() ?? undefined,
         fechaInicioReal: edt.fechaInicioReal?.toISOString() ?? undefined,
@@ -1032,7 +1027,7 @@ export class ProyectoEdtService {
           ...edt.proyecto,
           estado: edt.proyecto.estado as any
         },
-        registrosHoras: edt.registrosHoras.map(registro => ({
+        registroHoras: edt.registroHoras.map(registro => ({
           ...registro,
           fechaTrabajo: registro.fechaTrabajo.toISOString(),
           createdAt: registro.createdAt.toISOString(),
@@ -1043,7 +1038,7 @@ export class ProyectoEdtService {
           recursoId: registro.recursoId || '',
           recursoNombre: registro.recursoNombre || '',
           proyectoEdtId: registro.proyectoEdtId || '',
-          categoriaServicioId: registro.categoriaServicioId || '',
+          edtId: registro.edtId || '',
           origen: registro.origen || '',
           ubicacion: registro.ubicacion || ''
         }))

@@ -11,12 +11,12 @@ import { prisma } from '@/lib/prisma'
 
 /**
  * ✅ Recalcula cantidadPedida para un ListaEquipoItem específico
- * basándose en la suma real de sus pedidos asociados
+ * basándose en la suma real de sus pedidoEquipoItem asociados
  */
 export async function recalcularCantidadPedida(listaEquipoItemId: string): Promise<number> {
   try {
-    // 📡 Obtener todos los pedidos asociados al item
-    const pedidos = await prisma.pedidoEquipoItem.findMany({
+    // 📡 Obtener todos los pedidoEquipoItem asociados al item
+    const pedidoEquipoItem = await prisma.pedidoEquipoItem.findMany({
       where: {
         listaEquipoItemId: listaEquipoItemId
       },
@@ -26,7 +26,7 @@ export async function recalcularCantidadPedida(listaEquipoItemId: string): Promi
     })
 
     // ✅ Calcular la suma real
-    const cantidadPedidaReal = pedidos.reduce((total, pedido) => {
+    const cantidadPedidaReal = pedidoEquipoItem.reduce((total, pedido) => {
       return total + (pedido.cantidadPedida || 0)
     }, 0)
 
@@ -149,10 +149,10 @@ export async function obtenerEstadisticasConsistencia(): Promise<{
   porcentajeConsistencia: number
 }> {
   try {
-    // 📡 Obtener todos los items con sus pedidos
+    // 📡 Obtener todos los items con sus pedidoEquipoItem
     const items = await prisma.listaEquipoItem.findMany({
       include: {
-        pedidos: {
+        pedidoEquipoItem: {
           select: {
             cantidadPedida: true
           }
@@ -165,7 +165,7 @@ export async function obtenerEstadisticasConsistencia(): Promise<{
 
     // 🔁 Verificar consistencia de cada item
     for (const item of items) {
-      const cantidadPedidaReal = item.pedidos.reduce((total, pedido) => {
+      const cantidadPedidaReal = item.pedidoEquipoItem.reduce((total, pedido) => {
         return total + (pedido.cantidadPedida || 0)
       }, 0)
 
@@ -205,7 +205,7 @@ export async function repararInconsistencias(): Promise<{
   try {
     const items = await prisma.listaEquipoItem.findMany({
       include: {
-        pedidos: {
+        pedidoEquipoItem: {
           select: {
             cantidadPedida: true
           }
@@ -218,7 +218,7 @@ export async function repararInconsistencias(): Promise<{
 
     for (const item of items) {
       try {
-        const cantidadPedidaReal = item.pedidos.reduce((total, pedido) => {
+        const cantidadPedidaReal = item.pedidoEquipoItem.reduce((total, pedido) => {
           return total + (pedido.cantidadPedida || 0)
         }, 0)
 

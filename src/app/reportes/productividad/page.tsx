@@ -196,13 +196,25 @@ export default function ReportesProductividadPage() {
     setMiembros(miembrosSimulados)
   }, [])
 
+  const defaultMetrica: MetricaProductividad = {
+    periodo: '',
+    horasRegistradas: 0,
+    horasObjetivo: 0,
+    eficiencia: 0,
+    tareasCompletadas: 0,
+    tareasAsignadas: 0,
+    proyectosActivos: 0,
+    miembrosActivos: 0,
+    tendencia: 'stable'
+  }
+
   const metricaActual = metricas.find(m => {
     switch (periodoSeleccionado) {
       case 'semana': return m.periodo === 'Esta semana'
       case 'mes': return m.periodo === 'Este mes'
       default: return m.periodo === 'Este mes'
     }
-  }) || metricas[0]
+  }) || metricas[0] || defaultMetrica
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {

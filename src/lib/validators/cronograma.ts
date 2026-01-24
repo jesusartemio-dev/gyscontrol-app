@@ -40,7 +40,7 @@ const horasSchema = z.number()
 // 🔧 Esquema para crear ProyectoEdt
 export const crearProyectoEdtSchema = z.object({
   proyectoId: cuidSchema,
-  categoriaServicioId: cuidSchema,
+  edtId: cuidSchema,
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
   fechaInicioReal: fechaSchema,
@@ -89,7 +89,7 @@ export const crearProyectoEdtSchema = z.object({
 // 🔧 Esquema base para ProyectoEdt (sin refinements)
 const proyectoEdtBaseSchema = z.object({
   proyectoId: cuidSchema,
-  categoriaServicioId: cuidSchema,
+  edtId: cuidSchema,
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
   fechaInicioReal: fechaSchema,
@@ -116,7 +116,7 @@ export const edtFiltrosSchema = z.object({
   limit: z.number().min(1).max(100).optional().default(10),
   search: z.string().optional(),
   proyectoId: z.string().uuid().optional(),
-  categoriaServicioId: z.string().uuid().optional(),
+  edtId: z.string().uuid().optional(),
   estado: z.enum(['planificado', 'en_progreso', 'completado', 'detenido', 'cancelado']).optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional(),
   responsableId: z.string().uuid().optional(),
@@ -165,7 +165,7 @@ export const edtFiltrosSchema = z.object({
 // 📈 Esquema para métricas EDT
 export const metricasEdtSchema = z.object({
   proyectoId: z.string().uuid().optional(),
-  categoriaServicioId: z.string().uuid().optional(),
+  edtId: z.string().uuid().optional(),
   responsableId: z.string().uuid().optional(),
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
@@ -195,7 +195,7 @@ export const reporteEdtSchema = z.object({
   tipo: z.enum(['resumen', 'detallado', 'metricas', 'progreso']),
   filtros: z.object({
     proyectoId: z.string().uuid().optional(),
-    categoriaServicioId: z.string().uuid().optional(),
+    edtId: z.string().uuid().optional(),
     estado: z.array(z.enum(['planificado', 'en_progreso', 'completado', 'detenido', 'cancelado'])).optional(),
     prioridad: z.array(z.enum(['baja', 'media', 'alta', 'critica'])).optional(),
     responsableId: z.string().uuid().optional(),
@@ -300,8 +300,9 @@ export type EdtViewConfigInput = z.infer<typeof edtViewConfigSchema>
 export function puedecambiarEstado(estadoActual: EstadoEdt, nuevoEstado: EstadoEdt): boolean {
   const transicionesPermitidas: Record<EstadoEdt, EstadoEdt[]> = {
     'planificado': ['en_progreso', 'cancelado'],
-    'en_progreso': ['completado', 'detenido', 'cancelado'],
+    'en_progreso': ['completado', 'detenido', 'pausado', 'cancelado'],
     'detenido': ['en_progreso', 'cancelado'],
+    'pausado': ['en_progreso', 'cancelado'],
     'completado': [], // No se puede cambiar desde completado
     'cancelado': ['planificado'] // Solo se puede reactivar
   }
@@ -495,7 +496,7 @@ export function validarEstadoEdt(estado: string): boolean {
 
 // ✅ Esquema base para CotizacionEdt (sin refinaciones)
 const cotizacionEdtBaseSchema = z.object({
-  categoriaServicioId: cuidSchema,
+  edtId: cuidSchema,
   fechaInicioCom: fechaSchema,
   fechaFinCom: fechaSchema,
   horasCom: horasSchema,
@@ -509,7 +510,7 @@ const cotizacionEdtBaseSchema = z.object({
 // ✅ Esquema para crear CotizacionEdt
 export const crearCotizacionEdtSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(255, 'El nombre no puede exceder 255 caracteres'),
-  categoriaServicioId: cuidSchema,
+  edtId: cuidSchema,
   fechaInicioCom: fechaSchema,
   fechaFinCom: fechaSchema,
   horasCom: horasSchema,
@@ -572,7 +573,7 @@ export const filtrosCotizacionCronogramaSchema = z.object({
   page: z.number().min(1).optional().default(1),
   limit: z.number().min(1).max(100).optional().default(10),
   search: z.string().optional(),
-  categoriaServicioId: cuidSchema.optional(),
+  edtId: cuidSchema.optional(),
   responsableId: cuidSchema.optional(),
   fechaDesde: fechaSchema,
   fechaHasta: fechaSchema,
@@ -625,8 +626,9 @@ export type FiltrosCotizacionCronogramaInput = z.infer<typeof filtrosCotizacionC
 export function puedecambiarEstadoCotizacionEdt(estadoActual: EstadoEdt, nuevoEstado: EstadoEdt): boolean {
   const transicionesPermitidas: Record<EstadoEdt, EstadoEdt[]> = {
     'planificado': ['en_progreso', 'cancelado'],
-    'en_progreso': ['completado', 'detenido', 'cancelado'],
+    'en_progreso': ['completado', 'detenido', 'pausado', 'cancelado'],
     'detenido': ['en_progreso', 'cancelado'],
+    'pausado': ['en_progreso', 'cancelado'],
     'completado': [], // No se puede cambiar desde completado
     'cancelado': ['planificado'] // Solo se puede reactivar
   }
