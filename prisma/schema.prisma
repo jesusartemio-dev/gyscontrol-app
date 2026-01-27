@@ -90,6 +90,34 @@ model CategoriaEquipo {
   @@map("categoria_equipo")
 }
 
+model CategoriaGasto {
+  id             String          @id @default(cuid())
+  nombre         String          @unique
+  descripcion    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  catalogoGastos CatalogoGasto[]
+
+  @@map("categoria_gasto")
+}
+
+model CatalogoGasto {
+  id              String         @id @default(cuid())
+  codigo          String         @unique
+  descripcion     String
+  categoriaId     String
+  cantidad        Float          @default(1)
+  precioInterno   Float
+  margen          Float          @default(0.2)
+  precioVenta     Float
+  estado          String         @default("activo")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  categoria       CategoriaGasto @relation(fields: [categoriaId], references: [id])
+
+  @@map("catalogo_gasto")
+}
+
 model Cliente {
   id                       String                   @id
   codigo                   String                   @unique

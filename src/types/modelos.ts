@@ -359,6 +359,29 @@ export interface CategoriaEquipo {
   updatedAt: string
 }
 
+export interface CategoriaGasto {
+  id: string
+  nombre: string
+  descripcion?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CatalogoGasto {
+  id: string
+  codigo: string
+  descripcion: string
+  categoriaId: string
+  categoria?: CategoriaGasto
+  cantidad: number
+  precioInterno: number
+  margen: number
+  precioVenta: number
+  estado: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface NivelServicio {
   id: string
   nombre: string

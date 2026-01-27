@@ -252,7 +252,9 @@ export default function Sidebar() {
         // 📦 Catálogos de productos y servicios
         { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
         { href: '/catalogo/servicios', label: 'Catálogo Servicios', icon: FileText },
+        { href: '/catalogo/gastos', label: 'Catálogo Gastos', icon: Receipt },
         { href: '/catalogo/categorias-equipo', label: 'Categorías Equipo', icon: FolderOpen },
+        { href: '/catalogo/categorias-gasto', label: 'Categorías Gasto', icon: FolderOpen },
         { href: '/catalogo/edts', label: 'EDTs', icon: FolderOpen },
         { href: '/catalogo/unidades', label: 'Unidades Equipos', icon: Calculator },
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },

@@ -83,6 +83,26 @@ export interface CategoriaEquipoPayload {
 }
 export interface CategoriaEquipoUpdatePayload extends CategoriaEquipoPayload {}
 
+// ✅ CategoriaGasto
+export interface CategoriaGastoPayload {
+  nombre: string
+  descripcion?: string | null
+}
+export interface CategoriaGastoUpdatePayload extends CategoriaGastoPayload {}
+
+// ✅ CatalogoGasto
+export interface CatalogoGastoPayload {
+  codigo: string
+  descripcion: string
+  categoriaId: string
+  cantidad?: number
+  precioInterno: number
+  margen?: number
+  precioVenta: number
+  estado?: string
+}
+export interface CatalogoGastoUpdatePayload extends Partial<CatalogoGastoPayload> {}
+
 // ✅ NivelServicio
 export interface NivelServicioPayload {
   nombre: string
