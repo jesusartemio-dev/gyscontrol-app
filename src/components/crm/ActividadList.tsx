@@ -207,10 +207,10 @@ export default function ActividadList({ oportunidadId, onNuevaActividad }: Activ
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{formatDateOnly(actividad.fecha)}</span>
-                          {actividad.usuario && (
+                          {actividad.user && (
                             <>
                               <span>•</span>
-                              <span>{actividad.usuario.name}</span>
+                              <span>{actividad.user.name}</span>
                             </>
                           )}
                         </div>

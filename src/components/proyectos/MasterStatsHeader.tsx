@@ -32,11 +32,17 @@ interface MasterStats {
   totalItems: number;
   totalCosto: number;
   progresoPromedio: number;
+  costoAprobado?: number;
   listasPorEstado?: {
-    aprobado?: number;
-    pendiente?: number;
-    revision?: number;
-    rechazado?: number;
+    borrador?: number;
+    enviada?: number;
+    por_revisar?: number;
+    por_cotizar?: number;
+    por_validar?: number;
+    por_aprobar?: number;
+    aprobada?: number;
+    rechazada?: number;
+    completada?: number;
   };
 }
 
@@ -85,7 +91,7 @@ export function MasterStatsHeader({
   
   // 📊 Calculate derived metrics
   const completionRate = stats.totalListas > 0 
-    ? Math.round((stats.listasPorEstado?.aprobado || 0) / stats.totalListas * 100)
+    ? Math.round((stats.listasPorEstado?.aprobada || 0) / stats.totalListas * 100)
     : 0;
     
   const avgItemsPerList = stats.totalListas > 0 

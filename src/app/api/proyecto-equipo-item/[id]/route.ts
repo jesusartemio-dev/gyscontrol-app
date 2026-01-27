@@ -18,11 +18,11 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       where: { id },
       include: {
         catalogoEquipo: true,
-        proyectoEquipo: true,
-        lista: true,
+        proyectoEquipoCotizado: true,
+        listaEquipo: true,
         listaEquipoSeleccionado: true,
-        listaEquipos: true,
-        reemplazadoPor: true,
+        listaEquipoItemsAsociados: true,
+        listaEquipoItemsReemplazo: true,
       },
     })
 

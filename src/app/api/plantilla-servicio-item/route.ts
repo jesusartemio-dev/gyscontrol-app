@@ -41,7 +41,9 @@ export async function POST(req: Request) {
     // ✅ Crear ítem de servicio
     const creado = await prisma.plantillaServicioItem.create({
       data: {
+        id: `plantilla-servicio-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         plantillaServicioId: data.plantillaServicioId,
+        updatedAt: new Date(),
         catalogoServicioId: data.catalogoServicioId,
         unidadServicioId: data.unidadServicioId,
         recursoId: data.recursoId,

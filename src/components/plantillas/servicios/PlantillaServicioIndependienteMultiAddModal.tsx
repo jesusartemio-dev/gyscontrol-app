@@ -7,16 +7,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Search, Plus, Trash2, Package, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Package, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { getCatalogoServicios } from '@/lib/services/catalogoServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { getRecursos } from '@/lib/services/recurso'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { formatCurrency } from '@/lib/utils/plantilla-utils'
-import { calcularHoras } from '@/lib/utils/formulas'
-import type { CatalogoServicio, CategoriaServicio, Recurso, UnidadServicio } from '@/types'
+import type { CatalogoServicio, Edt, Recurso, UnidadServicio } from '@/types'
 
 // Define the missing types
 interface PlantillaServicioItemIndependiente {
@@ -25,7 +24,8 @@ interface PlantillaServicioItemIndependiente {
   catalogoServicioId?: string
   nombre: string
   descripcion: string
-  categoria: string
+  edtId?: string
+  edt?: { id: string; nombre: string }
   unidadServicioNombre: string
   recursoNombre: string
   formula: string
@@ -48,7 +48,7 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   plantillaId: string
-  categoriaId?: string // Nueva prop opcional para filtrar por categoría
+  edtId?: string // Prop opcional para filtrar por EDT
   onItemsCreated: (items: PlantillaServicioItemIndependiente[]) => void
 }
 
@@ -65,46 +65,47 @@ export default function PlantillaServicioIndependienteMultiAddModal({
   isOpen,
   onClose,
   plantillaId,
-  categoriaId,
+  edtId,
   onItemsCreated
 }: Props) {
   const [servicios, setServicios] = useState<CatalogoServicio[]>([])
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [edts, setEdts] = useState<Edt[]>([])
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [unidadesServicio, setUnidadesServicio] = useState<UnidadServicio[]>([])
   const [filteredServicios, setFilteredServicios] = useState<CatalogoServicio[]>([])
   const [selectedServicios, setSelectedServicios] = useState<SelectedServicio[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [categoriaFiltro, setCategoriaFiltro] = useState('todas')
+  const [edtFiltro, setEdtFiltro] = useState('todas')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
 
   // ✅ Load servicios and related data when modal opens
   useEffect(() => {
     console.log('🛠️ Modal useEffect triggered, isOpen:', isOpen)
-    console.log('🛠️ Modal props:', { isOpen, plantillaId, categoriaId })
+    console.log('🛠️ Modal props:', { isOpen, plantillaId, edtId })
     if (isOpen) {
       loadData()
     }
   }, [isOpen])
 
-  // ✅ Set initial category filter when categoriaId prop changes
+  // ✅ Set initial EDT filter when edtId prop changes
   useEffect(() => {
-    if (categoriaId) {
-      setCategoriaFiltro(categoriaId)
+    if (edtId) {
+      setEdtFiltro(edtId)
     } else {
-      setCategoriaFiltro('todas')
+      setEdtFiltro('todas')
     }
-  }, [categoriaId])
+  }, [edtId])
 
-  // ✅ Filter servicios based on search term and category
+  // ✅ Filter servicios based on search term and EDT
   useEffect(() => {
     let filtered = servicios
 
-    // Filter by category (use categoriaId prop if provided, otherwise use filter)
-    const effectiveCategoriaFiltro = categoriaId || categoriaFiltro
-    if (effectiveCategoriaFiltro !== 'todas') {
-      filtered = filtered.filter(servicio => servicio.categoriaId === effectiveCategoriaFiltro)
+    // Filter by EDT (use edtId prop if provided, otherwise use filter)
+    const effectiveEdtFiltro = edtId || edtFiltro
+    if (effectiveEdtFiltro !== 'todas') {
+      filtered = filtered.filter(servicio => servicio.categoriaId === effectiveEdtFiltro)
     }
 
     // Filter by search term
@@ -115,28 +116,31 @@ export default function PlantillaServicioIndependienteMultiAddModal({
       )
     }
 
+    // ✅ Mantener el orden que viene de la API (ya ordenado por orden)
+    console.log('🛠️ Servicios filtrados (manteniendo orden de API):', filtered.map(s => ({ nombre: s.nombre, orden: s.orden })))
     setFilteredServicios(filtered)
-  }, [searchTerm, categoriaFiltro, servicios, categoriaId])
+  }, [searchTerm, edtFiltro, servicios, edtId])
 
   const loadData = async () => {
     console.log('🛠️ loadData called')
     setLoading(true)
     try {
-      const [serviciosData, categoriasData, recursosData, unidadesData] = await Promise.all([
+      const [serviciosData, edtsData, recursosData, unidadesData] = await Promise.all([
         getCatalogoServicios(),
-        getCategoriasServicio(),
+        getEdts(),
         getRecursos(),
         getUnidadesServicio()
       ])
 
       console.log('🛠️ Data loaded:')
       console.log('🛠️ serviciosData:', serviciosData)
-      console.log('🛠️ categoriasData:', categoriasData)
+      console.log('🛠️ edtsData:', edtsData)
       console.log('🛠️ recursosData:', recursosData)
       console.log('🛠️ unidadesData:', unidadesData)
 
+      console.log('🛠️ Servicios desde API:', serviciosData.map(s => ({ nombre: s.nombre, orden: s.orden })))
       setServicios(serviciosData)
-      setCategorias(categoriasData)
+      setEdts(edtsData)
       setRecursos(recursosData)
       setUnidadesServicio(unidadesData)
       setFilteredServicios(serviciosData)
@@ -164,21 +168,20 @@ export default function PlantillaServicioIndependienteMultiAddModal({
       console.log('🛠️ Increased quantity for existing servicio:', updated[existingIndex])
     } else {
       // Add new selection with default values
-      const defaultRecurso = recursos.find(r => r.nombre === 'Ingeniero Senior') || recursos[0]
-      const defaultUnidad = unidadesServicio.find(u => u.nombre === 'hora') || unidadesServicio[0]
+      const validRecursos = recursos.filter(r => r && r.id)
+      const validUnidades = unidadesServicio.filter(u => u && u.id)
+      const defaultRecurso = validRecursos.find(r => r.nombre === 'Ingeniero Senior') || validRecursos[0]
+      const defaultUnidad = validUnidades.find(u => u.nombre === 'hora') || validUnidades[0]
 
-      // Calculate default prices using the same logic as CotizacionServicioItemAddModal
+      // Calculate default prices using the new escalonada formula with difficulty
       const cantidad = 1
-      const horaTotal = calcularHoras({
-        formula: servicio.formula,
-        cantidad,
-        horaBase: servicio.horaBase,
-        horaRepetido: servicio.horaRepetido,
-        horaUnidad: servicio.horaUnidad,
-        horaFijo: servicio.horaFijo
-      })
+      const horasBase = (servicio.horaBase || 0) + Math.max(0, cantidad - 1) * (servicio.horaRepetido || 0);
+      const factorDificultad = servicio.nivelDificultad || 1;
+      const horaTotal = horasBase * factorDificultad;
 
-      const costoHora = servicio.recurso.costoHora
+      // Get costoHora from servicio.recurso OR look it up from recursos array
+      const servicioRecurso = servicio.recurso || validRecursos.find(r => r.id === servicio.recursoId)
+      const costoHora = servicioRecurso?.costoHora || defaultRecurso?.costoHora || 0
       const factorSeguridad = 1.0
       const margen = 1.35
       const calculatedCostoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
@@ -330,6 +333,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
   const handleClose = () => {
     setSelectedServicios([])
     setSearchTerm('')
+    setExpandedItemId(null)
     onClose()
   }
 
@@ -339,7 +343,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-600" />
-            {categoriaId ? 'Agregar Servicios de la Plantilla' : 'Agregar Múltiples Servicios'}
+            {edtId ? 'Agregar Servicios de la Plantilla' : 'Agregar Múltiples Servicios'}
           </DialogTitle>
         </DialogHeader>
 
@@ -353,25 +357,25 @@ export default function PlantillaServicioIndependienteMultiAddModal({
               className="w-full"
             />
           </div>
-          {categoriaId ? (
+          {edtId ? (
             <div className="w-48">
               <div className="flex items-center justify-center h-10 px-3 bg-blue-50 border border-blue-200 rounded-md">
                 <span className="text-sm text-blue-700 font-medium">
-                  {categorias.find(c => c.id === categoriaId)?.nombre || 'Categoría filtrada'}
+                  {edts.find(e => e.id === edtId)?.nombre || 'EDT filtrado'}
                 </span>
               </div>
             </div>
           ) : (
             <div className="w-48">
-              <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+              <Select value={edtFiltro} onValueChange={setEdtFiltro}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Todas las categorías" />
+                  <SelectValue placeholder="Todos los EDTs" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todas las categorías</SelectItem>
-                  {categorias.map(categoria => (
-                    <SelectItem key={categoria.id} value={categoria.id!}>
-                      {categoria.nombre}
+                  <SelectItem value="todas">Todos los EDTs</SelectItem>
+                  {edts.filter(e => e && e.id).map(edt => (
+                    <SelectItem key={edt.id} value={edt.id!}>
+                      {edt.nombre}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -421,8 +425,8 @@ export default function PlantillaServicioIndependienteMultiAddModal({
                             <h4 className="font-medium text-sm">{servicio.nombre}</h4>
                             <p className="text-xs text-gray-600 line-clamp-2">{servicio.descripcion}</p>
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-500">{servicio.categoria.nombre}</span>
-                              <span className="text-gray-500">{servicio.formula}</span>
+                              <span className="text-gray-500">{servicio.categoria?.nombre || 'Sin categoría'}</span>
+                              <span className="text-gray-500">Escalonada (Dificultad: {servicio.nivelDificultad || 1})</span>
                             </div>
                             {isSelected && (
                               <div className="text-blue-600 text-xs font-medium">
@@ -458,105 +462,143 @@ export default function PlantillaServicioIndependienteMultiAddModal({
 
             {selectedServicios.length > 0 ? (
               <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                {selectedServicios.map((item) => (
-                  <div key={item.servicio.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <h4 className="font-medium text-sm text-blue-900">{item.servicio.nombre}</h4>
-                        <p className="text-xs text-blue-700 line-clamp-2">{item.servicio.descripcion}</p>
+                {selectedServicios.map((item) => {
+                  const isExpanded = expandedItemId === item.servicio.id
+                  const recursoNombre = recursos.find(r => r.id === item.recursoId)?.nombre || 'Sin recurso'
 
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs font-medium">Cantidad:</Label>
+                  return (
+                    <div
+                      key={item.servicio.id}
+                      className={`border rounded-lg transition-all ${
+                        isExpanded ? 'border-blue-400 bg-blue-50' : 'border-blue-200 bg-blue-50/50'
+                      }`}
+                    >
+                      {/* Header siempre visible - clickeable para expandir */}
+                      <div
+                        className="p-3 flex items-center justify-between cursor-pointer"
+                        onClick={() => setExpandedItemId(isExpanded ? null : item.servicio.id!)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-sm text-blue-900 truncate">
+                              {item.servicio.nombre}
+                            </h4>
+                            <Badge variant="outline" className="shrink-0 text-xs">
+                              x{item.cantidad}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 mt-1 text-xs">
+                            <span className="text-gray-500">{recursoNombre}</span>
+                            <span className="font-semibold text-blue-600">
+                              {formatCurrency(item.cantidad * item.precioCliente)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRemoveServicio(item.servicio.id!)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-blue-500" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-blue-500" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Contenido expandible */}
+                      {isExpanded && (
+                        <div className="px-3 pb-3 pt-0 border-t border-blue-200">
+                          <p className="text-xs text-blue-700 mb-3 mt-2">{item.servicio.descripcion}</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs text-gray-600">Cantidad</Label>
                               <Input
                                 type="number"
                                 min="1"
                                 value={item.cantidad}
                                 onChange={(e) => handleUpdateQuantity(item.servicio.id!, parseInt(e.target.value) || 1)}
-                                className="w-16 h-7 text-xs"
+                                className="h-8 text-sm"
                               />
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs font-medium">Precio Int:</Label>
+                            <div>
+                              <Label className="text-xs text-gray-600">Recurso</Label>
+                              <Select
+                                value={item.recursoId}
+                                onValueChange={(value) => handleUpdateRecurso(item.servicio.id!, value)}
+                              >
+                                <SelectTrigger className="h-8 text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {recursos.filter(r => r && r.id).map(recurso => (
+                                    <SelectItem key={recurso.id} value={recurso.id!}>
+                                      {recurso.nombre}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-gray-600">Precio Interno</Label>
                               <Input
                                 type="number"
                                 min="0"
                                 step="0.01"
                                 value={item.precioInterno.toString()}
                                 onChange={(e) => handleUpdatePrice(item.servicio.id!, 'precioInterno', parseFloat(e.target.value) || 0)}
-                                className="w-24 h-7 text-xs"
+                                className="h-8 text-sm"
                               />
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs font-medium">Precio Cli:</Label>
+                            <div>
+                              <Label className="text-xs text-gray-600">Unidad</Label>
+                              <Select
+                                value={item.unidadServicioId}
+                                onValueChange={(value) => handleUpdateUnidad(item.servicio.id!, value)}
+                              >
+                                <SelectTrigger className="h-8 text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {unidadesServicio.filter(u => u && u.id).map(unidad => (
+                                    <SelectItem key={unidad.id} value={unidad.id!}>
+                                      {unidad.nombre}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-gray-600">Precio Cliente</Label>
                               <Input
                                 type="number"
                                 min="0"
                                 step="0.01"
                                 value={item.precioCliente.toString()}
                                 onChange={(e) => handleUpdatePrice(item.servicio.id!, 'precioCliente', parseFloat(e.target.value) || 0)}
-                                className="w-24 h-7 text-xs"
+                                className="h-8 text-sm"
                               />
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="text-xs font-medium text-green-600">
-                                Total: {formatCurrency(item.cantidad * item.precioCliente)}
+                            <div>
+                              <Label className="text-xs text-gray-600">Total</Label>
+                              <div className="h-8 flex items-center font-bold text-blue-600 text-lg">
+                                {formatCurrency(item.cantidad * item.precioCliente)}
                               </div>
                             </div>
                           </div>
                         </div>
-
-                        <div className="flex gap-2">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs">Recurso:</Label>
-                            <Select
-                              value={item.recursoId}
-                              onValueChange={(value) => handleUpdateRecurso(item.servicio.id!, value)}
-                            >
-                              <SelectTrigger className="w-32 h-6 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {recursos.map(recurso => (
-                                  <SelectItem key={recurso.id} value={recurso.id!}>
-                                    {recurso.nombre}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs">Unidad:</Label>
-                            <Select
-                              value={item.unidadServicioId}
-                              onValueChange={(value) => handleUpdateUnidad(item.servicio.id!, value)}
-                            >
-                              <SelectTrigger className="w-24 h-6 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {unidadesServicio.map(unidad => (
-                                  <SelectItem key={unidad.id} value={unidad.id!}>
-                                    {unidad.nombre}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRemoveServicio(item.servicio.id!)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0 ml-2 h-7 w-7 p-0"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center">

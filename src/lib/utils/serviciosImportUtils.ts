@@ -8,7 +8,7 @@
 
 import * as xlsx from 'xlsx'
 import type { CatalogoServicioPayload } from '@/types'
-import type { CategoriaServicio, UnidadServicio, Recurso } from '@/types'
+import type { Edt, UnidadServicio, Recurso } from '@/types'
 
 // 📄 Leer servicios desde Excel
 export async function leerServiciosDesdeExcel(file: File): Promise<any[]> {
@@ -30,7 +30,7 @@ export async function leerServiciosDesdeExcel(file: File): Promise<any[]> {
 // 🔧 Validar servicios leídos desde Excel
 export async function importarServiciosDesdeExcelValidado(
   rows: any[],
-  categorias: CategoriaServicio[],
+  categorias: Edt[],
   unidades: UnidadServicio[],
   recursos: Recurso[],
   serviciosExistentes: { nombre: string, id: string }[]
@@ -46,28 +46,34 @@ export async function importarServiciosDesdeExcelValidado(
   for (let [index, row] of rows.entries()) {
     const fila = index + 2
 
-    const nombre = row['Nombre']?.trim()
-    const descripcion = row['Descripción']?.trim()
-    const formula = row['Fórmula']?.trim()
-    const categoriaNombre = row['Categoría']?.trim()
-    const unidadNombre = row['UnidadServicio']?.trim()
+    const nombre = row['Servicio']?.trim()
+    const descripcion = row['Descripción']?.trim() || ''
+    const categoriaNombre = row['EDT']?.trim()
+    const orden = parseInt(row['Orden']) || 0
     const recursoNombre = row['Recurso']?.trim()
+    const unidadNombre = row['Unidad']?.trim()
+    const cantidad = parseInt(row['Cantidad']) || 1
+    const dificultad = parseInt(row['Dificultad']) || 1
+    // Solo fórmula escalonada - ignorar fórmula del Excel si existe
+    const horaBase = parseFloat(row['HH Base']) || 0
+    const horaRepetido = parseFloat(row['HH Repetido']) || 0
+    // Ignorar columnas calculadas: HH Total, Costo/Hora, Costo Total
+    const horasTotales = parseFloat(row['HH Total']) || 0
+    const costoHora = parseFloat(row['Costo/Hora']) || 0
+    const totalUSD = parseFloat(row['Costo Total']) || 0
 
-    const horaBase = parseFloat(row['HoraBase']) || 0
-    const horaRepetido = parseFloat(row['HoraRepetido']) || 0
-    const horaUnidad = parseFloat(row['HoraUnidad']) || 0
-    const horaFijo = parseFloat(row['HoraFijo']) || 0
+    // Columnas opcionales para compatibilidad con archivos antiguos
+    // HorasTotales y Total USD se ignoran en importación (se recalculan)
 
     const categoria = categorias.find(c => c.nombre.toLowerCase() === categoriaNombre?.toLowerCase())
     const unidad = unidades.find(u => u.nombre.toLowerCase() === unidadNombre?.toLowerCase())
     const recurso = recursos.find(r => r.nombre.toLowerCase() === recursoNombre?.toLowerCase())
 
     // --- Validaciones Base ---
-    if (!nombre || !formula || !categoria || !unidad || !recurso) {
+    if (!nombre || !categoria || !unidad || !recurso) {
       errores.push(
         `Fila ${fila}: ` +
         (!nombre ? 'Falta nombre. ' : '') +
-        (!formula ? 'Falta fórmula. ' : '') +
         (!categoria ? `Categoría "${categoriaNombre}" no encontrada. ` : '') +
         (!unidad ? `Unidad "${unidadNombre}" no encontrada. ` : '') +
         (!recurso ? `Recurso "${recursoNombre}" no encontrado. ` : '')
@@ -75,30 +81,26 @@ export async function importarServiciosDesdeExcelValidado(
       continue
     }
 
-    // --- Validaciones Específicas por Fórmula ---
-    if (formula === 'Proporcional' && horaUnidad <= 0) {
-      errores.push(`Fila ${fila}: Para fórmula Proporcional, falta HoraUnidad.`)
+    // --- Validaciones para fórmula escalonada ---
+    if (horaBase < 0 || horaRepetido < 0) {
+      errores.push(`Fila ${fila}: Las horas no pueden ser negativas.`)
       continue
     }
 
-    if (formula === 'Escalonada' && (horaBase <= 0 || horaRepetido <= 0)) {
-      errores.push(`Fila ${fila}: Para fórmula Escalonada, falta HoraBase o HoraRepetido.`)
-      continue
-    }
-
-    if (formula === 'Fijo' && horaFijo <= 0) {
-      errores.push(`Fila ${fila}: Para fórmula Fijo, falta HoraFijo.`)
+    // Validación recomendada: al menos una hora debe ser mayor a 0
+    if (horaBase === 0 && horaRepetido === 0) {
+      errores.push(`Fila ${fila}: Debe especificar al menos HoraBase o HoraRepetido.`)
       continue
     }
 
     const payload: CatalogoServicioPayload = {
       nombre,
       descripcion: descripcion || '',
-      formula,
+      cantidad,
       horaBase,
       horaRepetido,
-      horaUnidad,
-      horaFijo,
+      orden,
+      nivelDificultad: dificultad,
       categoriaId: categoria.id,
       unidadServicioId: unidad.id,
       recursoId: recurso.id,

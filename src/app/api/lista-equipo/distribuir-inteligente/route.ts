@@ -144,6 +144,7 @@ export async function POST(req: Request) {
         // Crear la ListaEquipo
         const lista = await tx.listaEquipo.create({
           data: {
+            id: `lista-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             codigo,
             nombre: sugerencia.nombre,
             estado: 'borrador',
@@ -162,13 +163,17 @@ export async function POST(req: Request) {
 
           await tx.listaEquipoItem.create({
             data: {
+              id: `lista-item-${Date.now()}-${itemIndex}-${Math.random().toString(36).substr(2, 9)}`,
               listaId: lista.id,
               proyectoEquipoItemId: proyectoItem.id,
               codigo: proyectoItem.codigo, // ✅ Usar código original del catálogo
               descripcion: proyectoItem.descripcion,
+              marca: proyectoItem.marca || '', // ✅ Copiar marca
+              categoria: proyectoItem.categoria || '', // ✅ Copiar categoria
               unidad: proyectoItem.unidad || 'UND',
               cantidad: proyectoItem.cantidad,
               cantidadPedida: 0,
+              presupuesto: proyectoItem.precioCliente || 0, // ✅ Copiar presupuesto
               estado: 'borrador',
               origen: 'cotizado' as const,
               responsableId: session.user.id,

@@ -63,7 +63,7 @@ async function detectarCiclo(tareaOrigenId: string, tareaDestinoId: string): Pro
     }
     
     // Obtener todas las tareas que dependen de la tarea actual
-    const dependencias = await prisma.dependenciaTarea.findMany({
+    const dependencias = await prisma.dependenciasTarea.findMany({
       where: { tareaOrigenId: tareaActual },
       select: { tareaDependienteId: true }
     })
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     
     // 🔍 Ejecutar consultas en paralelo
     const [dependencias, total] = await Promise.all([
-      prisma.dependenciaTarea.findMany({
+      prisma.dependenciasTarea.findMany({
         where,
         include: {
           tareaOrigen: {
@@ -134,10 +134,11 @@ export async function GET(request: NextRequest) {
               estado: true,
               fechaInicio: true,
               fechaFin: true,
-              proyectoServicio: {
+              proyectoServicioCotizado: {
                 select: {
                   id: true,
-                  categoria: true,
+                  edtId: true,
+                  edt: { select: { nombre: true } },
                   proyecto: {
                     select: {
                       id: true,
@@ -156,10 +157,11 @@ export async function GET(request: NextRequest) {
               estado: true,
               fechaInicio: true,
               fechaFin: true,
-              proyectoServicio: {
+              proyectoServicioCotizado: {
                 select: {
                   id: true,
-                  categoria: true,
+                  edtId: true,
+                  edt: { select: { nombre: true } },
                   proyecto: {
                     select: {
                       id: true,
@@ -176,7 +178,7 @@ export async function GET(request: NextRequest) {
         skip: offset,
         take: limit
       }),
-      prisma.dependenciaTarea.count({ where })
+      prisma.dependenciasTarea.count({ where })
     ])
     
     // 📊 Construir metadatos de paginación
@@ -279,7 +281,7 @@ export async function POST(request: NextRequest) {
     }
     
     // 🔍 Verificar que no exista ya esta dependencia
-    const dependenciaExistente = await prisma.dependenciaTarea.findFirst({
+    const dependenciaExistente = await prisma.dependenciasTarea.findFirst({
       where: {
         tareaOrigenId: validatedData.tareaOrigenId,
         tareaDependienteId: validatedData.tareaDestinoId
@@ -305,8 +307,9 @@ export async function POST(request: NextRequest) {
     }
     
     // 📝 Crear la dependencia
-    const nuevaDependencia = await prisma.dependenciaTarea.create({
+    const nuevaDependencia = await prisma.dependenciasTarea.create({
       data: {
+        id: `dep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         tipo: validatedData.tipo,
         tareaOrigenId: validatedData.tareaOrigenId,
         tareaDependienteId: validatedData.tareaDestinoId
@@ -319,10 +322,11 @@ export async function POST(request: NextRequest) {
             estado: true,
             fechaInicio: true,
             fechaFin: true,
-            proyectoServicio: {
+            proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edtId: true,
+                edt: { select: { nombre: true } },
                 proyecto: {
                   select: {
                     id: true,
@@ -341,10 +345,11 @@ export async function POST(request: NextRequest) {
             estado: true,
             fechaInicio: true,
             fechaFin: true,
-            proyectoServicio: {
+            proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edtId: true,
+                edt: { select: { nombre: true } },
                 proyecto: {
                   select: {
                     id: true,

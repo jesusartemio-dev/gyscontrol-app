@@ -19,13 +19,12 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const equipo = await prisma.proyectoEquipoCotizado.findUnique({
       where: { id },
       include: {
-        responsable: true,
-        items: {
+        user: true,
+        proyectoEquipoCotizadoItem: {
           include: {
             catalogoEquipo: true,
-            lista: true,
-            listaEquipoSeleccionado: true,
-            listaEquipos: true
+            listaEquipo: true,
+            listaEquipoSeleccionado: true
           }
         }
       }
@@ -35,7 +34,14 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json(equipo)
+    // Map relation names for frontend compatibility
+    const equipoFormatted = {
+      ...equipo,
+      responsable: equipo.user,
+      items: equipo.proyectoEquipoCotizadoItem
+    }
+
+    return NextResponse.json(equipoFormatted)
   } catch (error) {
     console.error('Error en GET /api/proyecto-equipo/[id]', error)
     return NextResponse.json({ error: 'Error al obtener equipo del proyecto' }, { status: 500 })

@@ -55,7 +55,8 @@ export async function createCotizacionEquipoItem(data: {
     
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}))
-      throw new Error(errorData.error || 'Error al crear item de cotización de equipo')
+      console.error('❌ Error response from API:', errorData)
+      throw new Error(errorData.details || errorData.error || 'Error al crear item de cotización de equipo')
     }
     
     return await res.json()

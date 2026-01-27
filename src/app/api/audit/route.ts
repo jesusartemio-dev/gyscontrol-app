@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const auditLogs = await prisma.auditLog.findMany({
       where,
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -49,10 +49,12 @@ export async function GET(request: NextRequest) {
       take: Math.min(limit, 100) // Máximo 100 registros
     });
 
-    // Transformar fechas para compatibilidad con frontend
+    // Transformar para compatibilidad con frontend
     const transformedLogs = auditLogs.map((log: any) => ({
       ...log,
-      createdAt: log.createdAt.toISOString()
+      createdAt: log.createdAt.toISOString(),
+      // 🔄 Frontend compatibility mapping
+      usuario: log.user
     }));
 
     return NextResponse.json(transformedLogs);

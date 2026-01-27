@@ -30,27 +30,27 @@ export async function GET(
         proyectoEdtId: id
       },
       include: {
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
             email: true
           }
         },
-        dependencia: {
+        tareaPadre: {
           select: {
             id: true,
             nombre: true
           }
         },
-        tareasDependientes: {
+        tareasHijas: {
           select: {
             id: true,
             nombre: true,
             estado: true
           }
         },
-        registrosHoras: {
+        registroHoras: {
           take: 5,
           orderBy: { fechaTrabajo: 'desc' },
           select: {
@@ -59,7 +59,7 @@ export async function GET(
             aprobado: true
           }
         },
-        subtareas: {
+        proyectoSubtarea: {
           select: {
             id: true,
             nombre: true,
@@ -152,6 +152,7 @@ export async function POST(
 
     const nuevaTarea = await prisma.proyectoTarea.create({
       data: {
+        id: `proyecto-tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoEdtId: id,
         proyectoCronogramaId: edt.proyectoCronogramaId,
         nombre: data.nombre,
@@ -160,10 +161,11 @@ export async function POST(
         fechaFin,
         horasEstimadas: data.horasEstimadas,
         responsableId: data.responsableId,
-        prioridad: data.prioridad || 'media'
+        prioridad: data.prioridad || 'media',
+        updatedAt: new Date()
       },
       include: {
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,

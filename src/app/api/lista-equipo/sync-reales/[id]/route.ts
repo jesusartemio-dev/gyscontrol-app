@@ -19,7 +19,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     const listas = await prisma.listaEquipo.findMany({
       where: { proyectoId },
       include: {
-        items: {
+        listaEquipoItem: {
           where: { proyectoEquipoItemId: { not: null } },
         },
       },
@@ -27,7 +27,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     // 2. Crear actualizaciones de ProyectoEquipoItem con los datos reales desde la lista
     const actualizaciones = listas.flatMap(lista =>
-      lista.items
+      lista.listaEquipoItem
         .filter(item => item.proyectoEquipoItemId)
         .map(item =>
           prisma.proyectoEquipoCotizadoItem.update({

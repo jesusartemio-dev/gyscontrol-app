@@ -57,7 +57,7 @@ export default function CotizacionEquipoItemForm({ cotizacionEquipoId, onCreated
       return
     }
 
-    if (!equipo.categoria?.nombre || !equipo.unidad?.nombre) {
+    if (!equipo.categoriaEquipo?.nombre || !equipo.unidad?.nombre) {
       setValidationState('error')
       toast.error('Este equipo no tiene categoría o unidad asignada')
       return
@@ -77,7 +77,7 @@ export default function CotizacionEquipoItemForm({ cotizacionEquipoId, onCreated
         catalogoEquipoId: equipo.id,
         codigo: equipo.codigo,
         descripcion: equipo.descripcion,
-        categoria: equipo.categoria.nombre,
+        categoria: equipo.categoriaEquipo.nombre,
         unidad: equipo.unidad.nombre,
         marca: equipo.marca,
         precioInterno: equipo.precioInterno,
@@ -202,7 +202,7 @@ export default function CotizacionEquipoItemForm({ cotizacionEquipoId, onCreated
                           <div className="font-semibold">{equipo.codigo}</div>
                           <div className="text-sm text-muted-foreground">{equipo.descripcion}</div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            {equipo.categoria?.nombre} • {equipo.unidad?.nombre} • {equipo.marca}
+                            {equipo.categoriaEquipo?.nombre} • {equipo.unidad?.nombre} • {equipo.marca}
                           </div>
                         </div>
                         <div className="text-right">

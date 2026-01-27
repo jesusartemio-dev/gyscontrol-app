@@ -14,7 +14,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const data = await prisma.catalogoServicio.findUnique({
       where: { id },
       include: {
-        categoria: true,
+        edt: true,
         unidadServicio: true,
         recurso: true,
       },
@@ -35,10 +35,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       nombre: body.nombre,
       descripcion: body.descripcion,
       formula: body.formula,
+      cantidad: body.cantidad,
       horaBase: body.horaBase,
       horaRepetido: body.horaRepetido,
       horaUnidad: body.horaUnidad,
       horaFijo: body.horaFijo,
+      orden: body.orden,
+      nivelDificultad: body.nivelDificultad,
       categoria: { connect: { id: body.categoriaId } },
       unidadServicio: { connect: { id: body.unidadServicioId } },
       recurso: { connect: { id: body.recursoId } },

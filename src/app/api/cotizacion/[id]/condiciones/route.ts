@@ -125,10 +125,12 @@ export async function POST(
     // Crear la condición
     const nuevaCondicion = await prisma.cotizacionCondicion.create({
       data: {
+        id: `cot-cond-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionId: id,
         descripcion: descripcion.trim(),
         tipo: tipo?.trim() || null,
-        orden: ordenFinal
+        orden: ordenFinal,
+        updatedAt: new Date()
       }
     })
 

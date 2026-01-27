@@ -23,7 +23,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
         codigo: true,
         descripcion: true,
         cantidadPedida: true,
-        pedido: {
+        pedidoEquipo: {
           select: {
             codigo: true,
             proyecto: {
@@ -83,7 +83,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
         codigo: itemExistente.codigo,
         descripcion: itemExistente.descripcion,
         cantidadPedida: itemExistente.cantidadPedida,
-        pedido: itemExistente.pedido
+        pedido: itemExistente.pedidoEquipo
       },
       historial: historialEntregas,
       estadisticas

@@ -1,23 +1,29 @@
-// ===================================================
-// 📁 Archivo: EquiposCardView.tsx
-// 📌 Ubicación: src/components/proyectos/equipos/
-// 🔧 Descripción: Vista de cards para la lista de equipos (grupos)
-//
-// 🧠 Uso: Se utiliza en la página de lista de equipos para mostrar equipos en cards
-// ✍️ Autor: Kilo Code
-// 📅 Última actualización: 2025-09-27
-// ===================================================
-
 'use client'
 
-import React, { memo, useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
+import Link from 'next/link'
 import type { ProyectoEquipoCotizado } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Search, Eye, Edit, Trash2, User, Package, DollarSign, TrendingUp, List } from 'lucide-react'
-import Link from 'next/link'
+import { cn } from '@/lib/utils'
+import {
+  Search,
+  Eye,
+  User,
+  Package,
+  CheckCircle2,
+  Clock,
+  ChevronRight
+} from 'lucide-react'
+
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
 
 interface Props {
   equipos: ProyectoEquipoCotizado[]
@@ -29,158 +35,125 @@ interface Props {
 
 const EquiposCardView = memo(function EquiposCardView({
   equipos,
-  proyectoId,
-  onEquipoChange,
-  onEquipoDelete,
-  onCreateList
+  proyectoId
 }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
 
-  // ✅ Filtrar equipos
   const filteredEquipos = useMemo(() => {
     return equipos.filter(equipo => {
-      const matchesSearch = searchTerm === '' ||
-        equipo.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        equipo.responsable?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (equipo.descripcion && equipo.descripcion.toLowerCase().includes(searchTerm.toLowerCase()))
-
-      return matchesSearch
+      const term = searchTerm.toLowerCase()
+      return searchTerm === '' ||
+        equipo.nombre.toLowerCase().includes(term) ||
+        equipo.responsable?.name?.toLowerCase().includes(term) ||
+        equipo.descripcion?.toLowerCase().includes(term)
     })
   }, [equipos, searchTerm])
 
-  // ✅ Calcular estadísticas de un equipo
   const getEquipoStats = (equipo: ProyectoEquipoCotizado) => {
     const totalItems = equipo.items?.length || 0
-    const totalCost = equipo.items?.reduce((sum, item) =>
-      sum + (item.precioCliente * item.cantidad), 0
-    ) || 0
+    const totalCost = equipo.items?.reduce((sum, item) => sum + (item.precioCliente * item.cantidad), 0) || 0
     const completedItems = equipo.items?.filter(item =>
       item.estado === 'en_lista' || item.estado === 'reemplazado' || item.listaId
     ).length || 0
     const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
-    const hasListsCreated = completedItems > 0
 
-    return { totalItems, totalCost, completedItems, progress, hasListsCreated }
+    return { totalItems, totalCost, completedItems, progress }
   }
 
   return (
-    <div className="space-y-4">
-      {/* 🔍 Búsqueda */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Buscar por nombre, responsable o descripción..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+    <div className="space-y-3">
+      {/* Search */}
+      {equipos.length > 3 && (
+        <div className="flex items-center gap-3">
+          <div className="relative max-w-xs">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+            <Input
+              placeholder="Buscar..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-7 h-7 text-xs"
+            />
+          </div>
+          <span className="text-[10px] text-muted-foreground">
+            {filteredEquipos.length} de {equipos.length}
+          </span>
         </div>
-        <div className="text-sm text-gray-600">
-          {filteredEquipos.length} de {equipos.length} equipos
-        </div>
-      </div>
+      )}
 
-      {/* 📋 Grid de Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {filteredEquipos.length === 0 ? (
-          <div className="col-span-full text-center py-8 text-gray-500">
-            No se encontraron equipos que coincidan con la búsqueda
+          <div className="col-span-full text-center py-8 text-muted-foreground text-sm">
+            {searchTerm ? 'No se encontraron equipos' : 'Sin equipos'}
           </div>
         ) : (
           filteredEquipos.map((equipo) => {
             const stats = getEquipoStats(equipo)
             return (
-              <Card key={equipo.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-lg font-semibold text-blue-600">
-                        {equipo.nombre}
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm text-gray-600">
-                          {equipo.responsable?.name || 'Sin asignar'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/proyectos/${proyectoId}/equipos/detalle/${equipo.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEquipoChange?.(equipo.id, {})}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEquipoDelete?.(equipo.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              <Link
+                key={equipo.id}
+                href={`/proyectos/${proyectoId}/equipos/detalle/${equipo.id}`}
+                className={cn(
+                  'block border rounded-lg p-3 transition-all group',
+                  'hover:border-orange-300 hover:shadow-sm hover:bg-orange-50/30'
+                )}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Package className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                    <span className="font-medium text-sm text-gray-900 truncate">
+                      {equipo.nombre}
+                    </span>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {equipo.descripcion && (
-                    <p className="text-sm text-gray-700 line-clamp-2">
-                      {equipo.descripcion}
-                    </p>
-                  )}
+                  <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-orange-500 flex-shrink-0" />
+                </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <div className="text-xs text-gray-600">Ítems</div>
-                        <div className="font-semibold">{stats.totalItems}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <div className="text-xs text-gray-600">Costo</div>
-                        <div className="font-semibold">
-                          ${stats.totalCost.toLocaleString('es-PE', { minimumFractionDigits: 0 })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                {/* Responsable */}
+                <div className="flex items-center gap-1 text-xs text-gray-500 mb-3">
+                  <User className="h-3 w-3" />
+                  <span className="truncate">{equipo.responsable?.name || 'Sin asignar'}</span>
+                </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-1">
-                        <TrendingUp className="h-4 w-4 text-gray-500" />
-                        Progreso
-                      </span>
-                      <span className="font-medium">{stats.progress.toFixed(0)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                {/* Stats */}
+                <div className="flex items-center gap-3 text-xs mb-3">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
+                    {stats.totalItems} items
+                  </Badge>
+                  <span className="text-gray-300">|</span>
+                  <span className="font-mono text-green-600 font-medium">
+                    {formatCurrency(stats.totalCost)}
+                  </span>
+                </div>
+
+                {/* Progress */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                       <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        className={cn(
+                          'h-1.5 rounded-full transition-all',
+                          stats.progress === 100 ? 'bg-green-500' : 'bg-orange-500'
+                        )}
                         style={{ width: `${stats.progress}%` }}
                       />
                     </div>
-                    <div className="text-xs text-gray-600 text-center">
-                      {stats.completedItems} de {stats.totalItems} ítems completados
-                    </div>
+                    <span className="text-[10px] font-medium w-8 text-right">
+                      {stats.progress.toFixed(0)}%
+                    </span>
+                    {stats.progress === 100 ? (
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                    ) : stats.completedItems > 0 ? (
+                      <Clock className="h-3 w-3 text-orange-500" />
+                    ) : (
+                      <Clock className="h-3 w-3 text-gray-300" />
+                    )}
                   </div>
-
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link href={`/proyectos/${proyectoId}/equipos/${equipo.id}`}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver Detalle
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
+                  <div className="text-[10px] text-gray-500">
+                    {stats.completedItems} de {stats.totalItems} en lista
+                  </div>
+                </div>
+              </Link>
             )
           })
         )}

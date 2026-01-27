@@ -35,7 +35,7 @@ export async function GET(
     const { id } = paramsSchema.parse(resolvedParams)
     
     // 🔍 Buscar dependencia con todas las relaciones
-    const dependencia = await prisma.dependenciaTarea.findUnique({
+    const dependencia = await prisma.dependenciasTarea.findUnique({
       where: { id },
       include: {
         tareaOrigen: {
@@ -52,17 +52,18 @@ export async function GET(
             porcentajeCompletado: true,
             horasEstimadas: true,
             horasReales: true,
-            responsable: {
+            user: {
               select: {
                 id: true,
                 name: true,
                 email: true
               }
             },
-            proyectoServicio: {
+            proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edtId: true,
+                edt: { select: { nombre: true } },
                 proyecto: {
                   select: {
                     id: true,
@@ -94,17 +95,18 @@ export async function GET(
             porcentajeCompletado: true,
             horasEstimadas: true,
             horasReales: true,
-            responsable: {
+            user: {
               select: {
                 id: true,
                 name: true,
                 email: true
               }
             },
-            proyectoServicio: {
+            proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edtId: true,
+                edt: { select: { nombre: true } },
                 proyecto: {
                   select: {
                     id: true,
@@ -165,7 +167,7 @@ export async function DELETE(
     const { id } = paramsSchema.parse(resolvedParams)
     
     // 🔍 Verificar que la dependencia existe
-    const dependenciaExistente = await prisma.dependenciaTarea.findUnique({
+    const dependenciaExistente = await prisma.dependenciasTarea.findUnique({
       where: { id },
       include: {
         tareaOrigen: {
@@ -213,7 +215,7 @@ export async function DELETE(
     }
     
     // 🗑️ Eliminar la dependencia
-    await prisma.dependenciaTarea.delete({
+    await prisma.dependenciasTarea.delete({
       where: { id }
     })
     

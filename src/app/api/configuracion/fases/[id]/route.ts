@@ -64,7 +64,7 @@ export async function PUT(
 
     const { id } = await params
     const data = await request.json()
-    const { nombre, descripcion, orden, porcentajeDuracion, color, activo } = data
+    const { nombre, descripcion, orden, duracionDias, color, activo } = data
 
     // ✅ Validaciones
     if (!nombre?.trim()) {
@@ -93,7 +93,7 @@ export async function PUT(
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
         orden: orden || 0,
-        porcentajeDuracion: porcentajeDuracion || null,
+        duracionDias: duracionDias || 0,
         color: color || null,
         activo: activo !== undefined ? activo : faseExistente.activo
       }

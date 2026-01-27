@@ -30,9 +30,9 @@ export default function ProyectoServicioAccordion({ servicio, onUpdatedItem }: P
 
   // 🎨 Función para formatear moneda
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'PEN',
+      currency: 'USD',
       minimumFractionDigits: 2,
     }).format(amount)
   }
@@ -156,7 +156,7 @@ export default function ProyectoServicioAccordion({ servicio, onUpdatedItem }: P
                               Ejecutadas: <span className="font-medium">{item.horasEjecutadas}h</span>
                             </span>
                             <span className="text-sm text-slate-600">
-                              Categoría: <span className="font-medium">{item.categoria}</span>
+                              EDT: <span className="font-medium">{item.categoria}</span>
                             </span>
                           </div>
                           {item.motivoCambio && (

@@ -24,6 +24,7 @@ export async function crearNotificacion(data: NotificacionData) {
   try {
     const notificacion = await prisma.notificacion.create({
       data: {
+        id: crypto.randomUUID(),
         titulo: data.titulo,
         mensaje: data.mensaje,
         tipo: data.tipo,
@@ -32,7 +33,8 @@ export async function crearNotificacion(data: NotificacionData) {
         entidadTipo: data.entidadTipo,
         entidadId: data.entidadId,
         accionUrl: data.accionUrl,
-        accionTexto: data.accionTexto
+        accionTexto: data.accionTexto,
+        updatedAt: new Date()
       }
     })
     return notificacion

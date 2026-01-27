@@ -54,14 +54,14 @@ export default function PlantillaEquipoAccordion({
   const [nameError, setNameError] = useState<string | null>(null)
   const [showMultiAddModal, setShowMultiAddModal] = useState(false)
 
+  useEffect(() => {
+    setNuevoNombre(equipo.nombre)
+  }, [equipo.nombre])
+
   // Show skeleton while loading
   if (isLoading) {
     return <PlantillaEquipoAccordionSkeleton />
   }
-
-  useEffect(() => {
-    setNuevoNombre(equipo.nombre)
-  }, [equipo.nombre])
 
   const validateName = (name: string): boolean => {
     if (!name.trim()) {

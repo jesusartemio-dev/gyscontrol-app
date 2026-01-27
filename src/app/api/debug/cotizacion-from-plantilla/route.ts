@@ -66,18 +66,18 @@ export async function POST(req: Request) {
     const plantilla = await prisma.plantilla.findUnique({
       where: { id: plantillaId },
       include: {
-        equipos: { include: { items: true } },
-        servicios: { 
-          include: { 
-            items: {
+        plantillaEquipo: { include: { plantillaEquipoItem: true } },
+        plantillaServicio: {
+          include: {
+            plantillaServicioItem: {
               include: {
                 recurso: true,
                 unidadServicio: true,
               }
-            } 
-          } 
+            }
+          }
         },
-        gastos: { include: { items: true } },
+        plantillaGasto: { include: { plantillaGastoItem: true } },
       },
     })
 
@@ -87,15 +87,15 @@ export async function POST(req: Request) {
     }
 
     console.log('✅ DEBUG - Plantilla encontrada:', plantilla.nombre)
-    console.log('📊 DEBUG - Equipos:', plantilla.equipos.length)
-    console.log('🔧 DEBUG - Servicios:', plantilla.servicios.length)
-    console.log('💰 DEBUG - Gastos:', plantilla.gastos.length)
+    console.log('📊 DEBUG - Equipos:', plantilla.plantillaEquipo.length)
+    console.log('🔧 DEBUG - Servicios:', plantilla.plantillaServicio.length)
+    console.log('💰 DEBUG - Gastos:', plantilla.plantillaGasto.length)
 
     // Validar servicios detalladamente
     console.log('🔍 DEBUG - Validando servicios...')
-    for (const servicio of plantilla.servicios) {
+    for (const servicio of plantilla.plantillaServicio) {
       console.log(`\n📋 DEBUG - Servicio: ${servicio.nombre}`)
-      for (const item of servicio.items) {
+      for (const item of servicio.plantillaServicioItem) {
         console.log(`  🔸 DEBUG - Item: ${item.nombre}`)
         console.log(`     recursoId: ${item.recursoId}`)
         console.log(`     unidadServicioId: ${item.unidadServicioId}`)
@@ -156,7 +156,11 @@ export async function POST(req: Request) {
     console.log('🔍 DEBUG - Creando cotización base...')
     try {
       const cotizacionBase = await prisma.cotizacion.create({
-        data: baseData
+        data: {
+          id: `cot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          ...baseData,
+          updatedAt: new Date()
+        }
       })
       
       console.log('✅ DEBUG - Cotización base creada exitosamente:', cotizacionBase.id)
@@ -169,9 +173,9 @@ export async function POST(req: Request) {
           plantilla: plantilla.nombre,
           cliente: cliente.nombre,
           usuario: usuario.name,
-          equipos: plantilla.equipos.length,
-          servicios: plantilla.servicios.length,
-          gastos: plantilla.gastos.length
+          equipos: plantilla.plantillaEquipo.length,
+          servicios: plantilla.plantillaServicio.length,
+          gastos: plantilla.plantillaGasto.length
         }
       })
       

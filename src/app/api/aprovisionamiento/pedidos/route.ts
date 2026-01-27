@@ -33,13 +33,13 @@ function calcularDatosGantt(pedido: any) {
   // fechaInicio = fechaPedido
   // fechaFin = fechaEntrega
   // montoReal = SUM(cantidadPedida * precioUnitario)
-  
-  const items = pedido.items || []
+
+  const items = pedido.pedidoEquipoItem || []
   const fechaPedido = pedido.fechaPedido || pedido.createdAt
   const fechaEntrega = pedido.fechaEntregaEstimada || new Date()
-  
+
   const montoReal = items.reduce((total: number, item: any) => {
-    return total + (item.cantidadPedida * item.precioUnitario)
+    return total + (item.cantidadPedida * (item.precioUnitario || 0))
   }, 0)
   
   // Calcular duración en días
@@ -59,7 +59,7 @@ function calcularDatosGantt(pedido: any) {
 
 // 🔁 Función para calcular coherencia con lista
 function calcularCoherencia(pedido: any) {
-  const lista = pedido.lista
+  const lista = pedido.listaEquipo
   if (!lista) {
     return {
       esCoherente: false,
@@ -68,9 +68,9 @@ function calcularCoherencia(pedido: any) {
       }
     }
   }
-  
-  const itemsPedido = pedido.items || []
-  const itemsLista = lista.items || []
+
+  const itemsPedido = pedido.pedidoEquipoItem || []
+  const itemsLista = lista.listaEquipoItem || []
   
   // Mapear items de pedido a sus correspondientes en lista
   const itemsMapeados = itemsPedido.map((itemPedido: any) => {
@@ -143,13 +143,11 @@ export async function GET(request: NextRequest) {
 
     // 📡 Construir condiciones de filtro
     const where: any = {}
-    
+
     if (filtros.proyectoId) {
-      where.lista = {
-        proyectoId: filtros.proyectoId
-      }
+      where.proyectoId = filtros.proyectoId
     }
-    
+
     if (filtros.listaId) {
       where.listaId = filtros.listaId
     }
@@ -162,8 +160,9 @@ export async function GET(request: NextRequest) {
     
     if (filtros.responsable) {
       where.OR = [
-        { lista: { proyecto: { comercialId: filtros.responsable } } },
-        { lista: { proyecto: { gestorId: filtros.responsable } } }
+        { proyecto: { comercialId: filtros.responsable } },
+        { proyecto: { gestorId: filtros.responsable } },
+        { responsableId: filtros.responsable }
       ]
     }
     
@@ -181,7 +180,7 @@ export async function GET(request: NextRequest) {
       where.OR = [
         { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
         { observacion: { contains: filtros.busqueda, mode: 'insensitive' } },
-        { lista: { codigo: { contains: filtros.busqueda, mode: 'insensitive' } } },
+        { listaEquipo: { codigo: { contains: filtros.busqueda, mode: 'insensitive' } } },
         { proyecto: { codigo: { contains: filtros.busqueda, mode: 'insensitive' } } },
         { proyecto: { nombre: { contains: filtros.busqueda, mode: 'insensitive' } } }
       ]
@@ -218,7 +217,7 @@ export async function GET(request: NextRequest) {
             }
           },
           // ✅ Lista asociada (opcional)
-          lista: {
+          listaEquipo: {
             select: {
               id: true,
               codigo: true,
@@ -228,7 +227,7 @@ export async function GET(request: NextRequest) {
             }
           },
           // ✅ Items del pedido para calcular monto total
-          items: {
+          pedidoEquipoItem: {
             select: {
               id: true,
               cantidadPedida: true,
@@ -262,10 +261,17 @@ export async function GET(request: NextRequest) {
         return null
       }
       
+      // Calcular porcentaje de coherencia para el frontend
+      const porcentajeCoherencia = coherencia.totalItems > 0
+        ? Math.round(((coherencia.itemsCoherentes + coherencia.preciosCoherentes) / (coherencia.totalItems * 2)) * 100)
+        : 100
+
       return {
         id: pedido.id,
         codigo: pedido.codigo,
         estado: pedido.estado,
+        proyectoId: pedido.proyectoId,
+        listaId: pedido.listaId,
         fechaPedido: pedido.fechaPedido,
         fechaEntregaEstimada: pedido.fechaEntregaEstimada,
         fechaEntregaReal: pedido.fechaEntregaReal,
@@ -281,13 +287,14 @@ export async function GET(request: NextRequest) {
           gestor: pedido.proyecto.gestor
         } : null,
         // ✅ Lista asociada (opcional)
-        lista: pedido.lista,
+        lista: pedido.listaEquipo,
         // ✅ Items del pedido
-        items: pedido.items || [],
+        items: pedido.pedidoEquipoItem || [],
         gantt: datosGantt,
-        coherencia,
+        coherencia: porcentajeCoherencia,
+        coherenciaDetalle: coherencia,
         estadisticas: {
-          totalItems: pedido.items?.length || 0,
+          totalItems: pedido.pedidoEquipoItem?.length || 0,
           montoTotal: datosGantt.montoReal,
           diasEntrega: datosGantt.duracionDias
         }
@@ -306,10 +313,10 @@ export async function GET(request: NextRequest) {
         return acc
       }, {}),
       alertasGlobales: {
-        pedidosIncoherentes: pedidosConCalculos.filter(p => !p?.coherencia.esCoherente).length,
+        pedidosIncoherentes: pedidosConCalculos.filter(p => !(p as any)?.coherenciaDetalle?.esCoherente).length,
         pedidosRetrasados: pedidosConCalculos.filter(p => {
-          return p?.fechaEntregaEstimada && new Date(p.fechaEntregaEstimada) > new Date() && 
-                 p?.lista?.fechaNecesaria && new Date(p.fechaEntregaEstimada) > new Date(p.lista.fechaNecesaria)
+          return p?.fechaEntregaEstimada && new Date(p.fechaEntregaEstimada) < new Date() &&
+                 (p as any)?.lista?.fechaNecesaria && new Date(p.fechaEntregaEstimada) > new Date((p as any).lista.fechaNecesaria)
         }).length
       }
     }
@@ -323,9 +330,20 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: pedidosConCalculos,
+      data: {
+        pedidos: pedidosConCalculos,
+        pagination: {
+          page: filtros.page,
+          limit: filtros.limit,
+          total,
+          pages: Math.ceil(total / filtros.limit),
+          hasNext: filtros.page < Math.ceil(total / filtros.limit),
+          hasPrev: filtros.page > 1
+        }
+      },
       estadisticas,
-      filtros: filtros
+      filtros: filtros,
+      timestamp: new Date().toISOString()
     })
 
   } catch (error) {

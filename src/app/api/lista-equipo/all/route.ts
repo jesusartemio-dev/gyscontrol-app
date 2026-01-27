@@ -6,7 +6,7 @@ export async function GET() {
     const data = await prisma.listaEquipo.findMany({
       include: {
         proyecto: true,
-        items: true,
+        listaEquipoItem: true,
       },
       orderBy: {
         createdAt: 'desc',

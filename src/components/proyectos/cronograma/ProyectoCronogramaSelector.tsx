@@ -1,31 +1,31 @@
 // ===================================================
 // 📁 Archivo: ProyectoCronogramaSelector.tsx
 // 📌 Ubicación: src/components/proyectos/cronograma/ProyectoCronogramaSelector.tsx
-// 🔧 Descripción: Componente para seleccionar y gestionar tipos de cronograma
-// 🎯 Funcionalidades: Crear, copiar y cambiar entre tipos de cronograma
-// ✍️ Autor: Sistema de IA Mejorado
-// 📅 Última actualización: 2025-09-23
+// 🔧 Descripción: Selector compacto de cronogramas de proyecto
+// 🎯 Funcionalidades: Selector horizontal con indicadores de estado
 // ===================================================
 
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Plus,
-  Copy,
   Calendar,
   Target,
   PlayCircle,
   CheckCircle,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  Lock,
+  ChevronRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ProyectoCronograma } from '@/types/modelos'
@@ -40,24 +40,39 @@ interface ProyectoCronogramaSelectorProps {
 const TIPO_CRONOGRAMA_INFO = {
   comercial: {
     label: 'Comercial',
-    description: 'Cronograma basado en la cotización y estimaciones comerciales',
+    shortLabel: 'Comercial',
+    description: 'Estimación inicial',
     icon: Calendar,
-    color: 'bg-blue-100 text-blue-800',
-    bgColor: 'bg-blue-50'
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-300',
+    badgeColor: 'bg-blue-100 text-blue-700',
+    readOnly: true,
+    isMain: false
   },
   planificacion: {
     label: 'Planificación',
-    description: 'Cronograma detallado de planificación y preparación',
+    shortLabel: 'Planificación',
+    description: 'Línea base',
     icon: Target,
-    color: 'bg-purple-100 text-purple-800',
-    bgColor: 'bg-purple-50'
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-300',
+    badgeColor: 'bg-purple-100 text-purple-700',
+    readOnly: false,
+    isMain: false
   },
   ejecucion: {
     label: 'Ejecución',
-    description: 'Cronograma real de ejecución y seguimiento del proyecto',
+    shortLabel: 'Ejecución',
+    description: 'Trabajo real',
     icon: PlayCircle,
-    color: 'bg-green-100 text-green-800',
-    bgColor: 'bg-green-50'
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-300',
+    badgeColor: 'bg-green-100 text-green-700',
+    readOnly: false,
+    isMain: true
   }
 }
 
@@ -67,8 +82,6 @@ export function ProyectoCronogramaSelector({
   onCronogramaChange,
   onCronogramaCreate
 }: ProyectoCronogramaSelectorProps) {
-  console.log('🔍 [CRONOGRAMA SELECTOR] Iniciando componente ProyectoCronogramaSelector', { proyectoId })
-
   const [cronogramas, setCronogramas] = useState<ProyectoCronograma[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -79,7 +92,6 @@ export function ProyectoCronogramaSelector({
   })
 
   useEffect(() => {
-    console.log('🔄 [CRONOGRAMA SELECTOR] Ejecutando useEffect para cargar cronogramas')
     loadCronogramas()
   }, [proyectoId])
 
@@ -88,42 +100,43 @@ export function ProyectoCronogramaSelector({
     if (cronogramas.length > 0 && !selectedCronograma) {
       const baselineCronograma = cronogramas.find(c => c.esBaseline) || cronogramas[0]
       if (baselineCronograma) {
-        console.log('🔄 [CRONOGRAMA SELECTOR] Setting baseline cronograma as selected:', baselineCronograma)
         onCronogramaChange?.(baselineCronograma)
       }
     }
   }, [cronogramas, selectedCronograma, onCronogramaChange])
 
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (showCreateDialog) {
+      const availableTypes = getAvailableTypesForCreation()
+      if (availableTypes.length > 0) {
+        const firstType = availableTypes[0]
+        setCreateForm({
+          tipo: firstType,
+          nombre: `Cronograma de ${TIPO_CRONOGRAMA_INFO[firstType].label}`,
+          copiarDesdeId: firstType === 'ejecucion' ? (getCronogramaBaseline()?.id || 'none') : 'none'
+        })
+      }
+    }
+  }, [showCreateDialog, cronogramas])
+
   const loadCronogramas = async () => {
     try {
-      console.log('🔄 [CRONOGRAMA SELECTOR] Iniciando carga de cronogramas desde API')
       setLoading(true)
       const response = await fetch(`/api/proyectos/${proyectoId}/cronograma`)
-      console.log('📡 [CRONOGRAMA SELECTOR] Respuesta de API recibida:', response.status)
-
       if (!response.ok) {
-        // If API doesn't exist or returns error, show empty state
-        console.warn('⚠️ [CRONOGRAMA SELECTOR] API no disponible o error:', response.status)
         setCronogramas([])
         return
       }
-
       const data = await response.json()
-      console.log('📦 [CRONOGRAMA SELECTOR] Datos recibidos:', data)
-
       if (data.success) {
-        console.log('✅ [CRONOGRAMA SELECTOR] Cronogramas cargados:', data.data.length)
         setCronogramas(data.data)
       } else {
-        console.warn('⚠️ [CRONOGRAMA SELECTOR] API retornó error:', data.error)
         setCronogramas([])
       }
-    } catch (error) {
-      console.error('❌ [CRONOGRAMA SELECTOR] Error cargando cronogramas:', error)
-      // Don't show error toast, just show empty state
+    } catch {
       setCronogramas([])
     } finally {
-      console.log('🏁 [CRONOGRAMA SELECTOR] Finalizando carga de cronogramas')
       setLoading(false)
     }
   }
@@ -137,9 +150,7 @@ export function ProyectoCronogramaSelector({
     try {
       const response = await fetch(`/api/proyectos/${proyectoId}/cronograma`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tipo: createForm.tipo,
           nombre: createForm.nombre,
@@ -151,332 +162,304 @@ export function ProyectoCronogramaSelector({
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('❌ [FRONTEND] Error response from API:', errorData)
-        throw new Error(errorData.error || errorData.details || 'Error al crear cronograma')
+        const errorMessage = errorData.details
+          ? `${errorData.error}: ${errorData.details}`
+          : errorData.error || 'Error al crear cronograma'
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
       toast.success(data.message || 'Cronograma creado exitosamente')
-
       setShowCreateDialog(false)
-      setCreateForm({
-        tipo: 'planificacion',
-        nombre: '',
-        copiarDesdeId: 'none'
-      })
-
+      setCreateForm({ tipo: 'planificacion', nombre: '', copiarDesdeId: 'none' })
       loadCronogramas()
       onCronogramaCreate?.()
     } catch (error) {
-      console.error('Error creating cronograma:', error)
       toast.error(error instanceof Error ? error.message : 'Error al crear el cronograma')
     }
-  }
-
-  const handleCronogramaSelect = (cronograma: ProyectoCronograma) => {
-    onCronogramaChange?.(cronograma)
   }
 
   const getCronogramasPorTipo = (tipo: keyof typeof TIPO_CRONOGRAMA_INFO) => {
     return cronogramas.filter(c => c.tipo === tipo)
   }
 
-  const getCronogramaActivo = () => {
-    return selectedCronograma || cronogramas.find(c => c.esBaseline) || cronogramas[0]
+  const getCronogramaBaseline = () => {
+    return cronogramas.find(c => c.esBaseline && c.tipo === 'planificacion')
   }
+
+  const canCreateEjecucion = () => {
+    return getCronogramaBaseline() !== undefined
+  }
+
+  const getAvailableTypesForCreation = (): (keyof typeof TIPO_CRONOGRAMA_INFO)[] => {
+    const available: (keyof typeof TIPO_CRONOGRAMA_INFO)[] = []
+    if (!cronogramas.some(c => c.tipo === 'planificacion')) {
+      available.push('planificacion')
+    }
+    if (!cronogramas.some(c => c.tipo === 'ejecucion') && canCreateEjecucion()) {
+      available.push('ejecucion')
+    }
+    return available
+  }
+
+  const canCreateAnyCronograma = (): boolean => {
+    return getAvailableTypesForCreation().length > 0
+  }
+
+  const getStatusForTipo = (tipo: keyof typeof TIPO_CRONOGRAMA_INFO) => {
+    const cronogramasTipo = getCronogramasPorTipo(tipo)
+    if (cronogramasTipo.length > 0) {
+      return { status: 'exists', cronograma: cronogramasTipo[0] }
+    }
+    if (tipo === 'ejecucion' && !canCreateEjecucion()) {
+      return { status: 'blocked', cronograma: null }
+    }
+    return { status: 'missing', cronograma: null }
+  }
+
+  const handleCronogramaSelect = (cronograma: ProyectoCronograma) => {
+    onCronogramaChange?.(cronograma)
+  }
+
+  // Check if ejecucion is missing (for alert)
+  const ejecucionStatus = getStatusForTipo('ejecucion')
+  const showEjecucionAlert = ejecucionStatus.status === 'missing' && canCreateEjecucion()
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-24 bg-gray-200 rounded animate-pulse" />
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg animate-pulse">
+        <div className="h-8 w-24 bg-gray-200 rounded" />
+        <div className="h-8 w-24 bg-gray-200 rounded" />
+        <div className="h-8 w-24 bg-gray-200 rounded" />
+      </div>
     )
   }
 
-  const cronogramaActivo = getCronogramaActivo()
+  const tipoOrder: (keyof typeof TIPO_CRONOGRAMA_INFO)[] = ['comercial', 'planificacion', 'ejecucion']
+  const cronogramaActivo = selectedCronograma || cronogramas.find(c => c.esBaseline) || cronogramas[0]
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Tipos de Cronograma</h2>
-          <p className="text-gray-600 mt-1">
-            Gestiona diferentes versiones del cronograma del proyecto
-          </p>
+    <div className="space-y-2">
+      {/* Compact Alert for missing Ejecución */}
+      {showEjecucionAlert && (
+        <Alert className="border-amber-200 bg-amber-50 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <span className="text-sm text-amber-700">
+                Falta cronograma de <strong>Ejecución</strong> para registrar avances
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+              onClick={() => {
+                setCreateForm({
+                  tipo: 'ejecucion',
+                  nombre: 'Cronograma de Ejecución',
+                  copiarDesdeId: getCronogramaBaseline()?.id || 'none'
+                })
+                setShowCreateDialog(true)
+              }}
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Crear
+            </Button>
+          </div>
+        </Alert>
+      )}
+
+      {/* Compact Horizontal Selector */}
+      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+        {/* Flow Steps */}
+        <div className="flex items-center gap-1 flex-1">
+          {tipoOrder.map((tipo, index) => {
+            const info = TIPO_CRONOGRAMA_INFO[tipo]
+            const { status, cronograma } = getStatusForTipo(tipo)
+            const Icon = info.icon
+            const isSelected = cronogramaActivo?.tipo === tipo
+
+            return (
+              <React.Fragment key={tipo}>
+                {/* Step Button */}
+                <button
+                  onClick={() => cronograma && handleCronogramaSelect(cronograma)}
+                  disabled={!cronograma}
+                  className={`
+                    relative flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-sm
+                    ${isSelected
+                      ? `${info.bgColor} ${info.borderColor} border-2 shadow-sm`
+                      : 'bg-white border border-gray-200 hover:border-gray-300'
+                    }
+                    ${!cronograma ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
+                  `}
+                >
+                  {/* Status dot */}
+                  <div className={`
+                    absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center
+                    ${status === 'exists' ? 'bg-green-500' : ''}
+                    ${status === 'missing' ? 'bg-amber-400' : ''}
+                    ${status === 'blocked' ? 'bg-gray-300' : ''}
+                  `}>
+                    {status === 'exists' && <CheckCircle className="h-3 w-3 text-white" />}
+                    {status === 'missing' && <AlertTriangle className="h-2.5 w-2.5 text-white" />}
+                    {status === 'blocked' && <Lock className="h-2 w-2 text-white" />}
+                  </div>
+
+                  <Icon className={`h-4 w-4 ${isSelected ? info.color : 'text-gray-500'}`} />
+
+                  <div className="text-left">
+                    <div className={`font-medium ${isSelected ? info.color : 'text-gray-700'}`}>
+                      {info.shortLabel}
+                    </div>
+                    {cronograma && (
+                      <div className="text-xs text-gray-500 truncate max-w-[100px]">
+                        {cronograma.nombre}
+                      </div>
+                    )}
+                    {!cronograma && status === 'missing' && tipo !== 'comercial' && (
+                      <div className="text-xs text-amber-600">Sin crear</div>
+                    )}
+                    {!cronograma && status === 'blocked' && (
+                      <div className="text-xs text-gray-400">Bloqueado</div>
+                    )}
+                    {!cronograma && tipo === 'comercial' && (
+                      <div className="text-xs text-gray-400">Desde cotización</div>
+                    )}
+                  </div>
+
+                  {/* Badges */}
+                  {cronograma?.esBaseline && tipo === 'planificacion' && (
+                    <Badge className="ml-1 h-5 px-1.5 text-xs bg-purple-100 text-purple-700">
+                      Base
+                    </Badge>
+                  )}
+                  {info.readOnly && cronograma && (
+                    <Eye className="h-3 w-3 text-gray-400 ml-1" />
+                  )}
+                  {info.isMain && cronograma && (
+                    <Badge className="ml-1 h-5 px-1.5 text-xs bg-green-100 text-green-700">
+                      Activo
+                    </Badge>
+                  )}
+                </button>
+
+                {/* Arrow */}
+                {index < tipoOrder.length - 1 && (
+                  <ChevronRight className="h-4 w-4 text-gray-300 flex-shrink-0" />
+                )}
+              </React.Fragment>
+            )
+          })}
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Actions */}
+        <div className="flex items-center gap-1 border-l pl-3">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={loadCronogramas}
             disabled={loading}
+            className="h-8 w-8 p-0"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
 
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Cronograma
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Crear Nuevo Cronograma</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tipo">Tipo de Cronograma</Label>
-                  <Select
-                    value={createForm.tipo}
-                    onValueChange={(value: keyof typeof TIPO_CRONOGRAMA_INFO) =>
-                      setCreateForm(prev => ({ ...prev, tipo: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(TIPO_CRONOGRAMA_INFO).map(([key, info]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
-                            <info.icon className="h-4 w-4" />
-                            {info.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          {canCreateAnyCronograma() && (
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Nuevo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Crear Cronograma</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Alert className="border-blue-200 bg-blue-50 py-2">
+                    <AlertDescription className="text-blue-700 text-sm">
+                      Solo se permite <strong>1 cronograma por tipo</strong>.
+                    </AlertDescription>
+                  </Alert>
 
-                <div className="space-y-2">
-                  <Label htmlFor="nombre">Nombre del Cronograma</Label>
-                  <Input
-                    id="nombre"
-                    value={createForm.nombre}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, nombre: e.target.value }))}
-                    placeholder="Ej: Cronograma de Ejecución v2"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="copiarDesde">Copiar desde (opcional)</Label>
-                  <Select
-                    value={createForm.copiarDesdeId}
-                    onValueChange={(value) => setCreateForm(prev => ({ ...prev, copiarDesdeId: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar cronograma origen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Crear desde cero</SelectItem>
-                      {cronogramas.map((cronograma) => (
-                        <SelectItem key={cronograma.id} value={cronograma.id}>
-                          {cronograma.nombre} ({TIPO_CRONOGRAMA_INFO[cronograma.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.label})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCreateDialog(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleCreateCronograma}>
-                    Crear Cronograma
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* Cronograma Activo */}
-      {cronogramaActivo && (
-        <Card className="border-2 border-blue-200 bg-blue-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  {React.createElement(TIPO_CRONOGRAMA_INFO[cronogramaActivo.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.icon || Calendar, {
-                    className: "h-6 w-6 text-blue-600"
-                  })}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-blue-900">
-                    Cronograma Activo: {cronogramaActivo.nombre}
-                  </h3>
-                  <p className="text-sm text-blue-700">
-                    {TIPO_CRONOGRAMA_INFO[cronogramaActivo.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.description}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {cronogramaActivo.esBaseline && (
-                  <Badge className="bg-green-100 text-green-800">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Baseline
-                  </Badge>
-                )}
-                <Badge className={TIPO_CRONOGRAMA_INFO[cronogramaActivo.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.color}>
-                  {TIPO_CRONOGRAMA_INFO[cronogramaActivo.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.label}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tipos de Cronograma */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {Object.entries(TIPO_CRONOGRAMA_INFO).map(([tipo, info]) => {
-          const cronogramasTipo = getCronogramasPorTipo(tipo as keyof typeof TIPO_CRONOGRAMA_INFO)
-          const Icon = info.icon
-
-          return (
-            <Card key={tipo} className={`transition-all duration-200 hover:shadow-lg ${info.bgColor}`}>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-lg">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-6 w-6" style={{ color: `var(--${tipo}-600)` }} />
-                    {info.label}
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {cronogramasTipo.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  {info.description}
-                </p>
-
-                {/* Lista de cronogramas de este tipo */}
-                <div className="space-y-2">
-                  {cronogramasTipo.slice(0, 3).map((cronograma) => (
-                    <div
-                      key={cronograma.id}
-                      className={`p-2 rounded-lg cursor-pointer transition-all ${
-                        cronogramaActivo?.id === cronograma.id
-                          ? 'bg-white shadow-sm border-2 border-blue-200'
-                          : 'bg-white/50 hover:bg-white/80'
-                      }`}
-                      onClick={() => handleCronogramaSelect(cronograma)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium truncate">
-                          {cronograma.nombre}
-                        </span>
-                        {cronograma.esBaseline && (
-                          <Badge className="bg-green-100 text-green-800 text-xs">
-                            Base
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {cronogramasTipo.length === 0 && (
-                    <div className="p-2 rounded-lg bg-white/30 text-center">
-                      <p className="text-xs text-gray-500">Sin cronogramas</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Acciones */}
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      setCreateForm(prev => ({
-                        ...prev,
-                        tipo: tipo as keyof typeof TIPO_CRONOGRAMA_INFO,
-                        copiarDesdeId: 'none'
-                      }))
-                      setShowCreateDialog(true)
-                    }}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Crear
-                  </Button>
-
-                  {cronogramasTipo.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => {
+                  <div className="space-y-2">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={createForm.tipo}
+                      onValueChange={(value: keyof typeof TIPO_CRONOGRAMA_INFO) =>
                         setCreateForm(prev => ({
                           ...prev,
-                          tipo: tipo as keyof typeof TIPO_CRONOGRAMA_INFO,
-                          copiarDesdeId: cronogramasTipo[0].id
+                          tipo: value,
+                          nombre: `Cronograma de ${TIPO_CRONOGRAMA_INFO[value].label}`,
+                          copiarDesdeId: value === 'ejecucion' ? (getCronogramaBaseline()?.id || 'none') : 'none'
                         }))
-                        setShowCreateDialog(true)
-                      }}
+                      }
                     >
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copiar
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getAvailableTypesForCreation().map((key) => {
+                          const info = TIPO_CRONOGRAMA_INFO[key]
+                          return (
+                            <SelectItem key={key} value={key}>
+                              <div className="flex items-center gap-2">
+                                <info.icon className="h-4 w-4" />
+                                {info.label}
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-      {/* Información adicional */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Badge variant="default">🏗️ Proyecto</Badge>
-                <span>Nivel superior del proyecto</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">📋 Fases</Badge>
-                <span>Etapas del proyecto (Planificación, Ejecución, Cierre)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">🔧 EDTs</Badge>
-                <span>Estructura de Desglose de Trabajo</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">✅ Tareas</Badge>
-                <span>Actividades específicas ejecutables</span>
-              </div>
-            </div>
-            <div>
-              Total cronogramas: {cronogramas.length}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                  <div className="space-y-2">
+                    <Label>Nombre</Label>
+                    <Input
+                      value={createForm.nombre}
+                      onChange={(e) => setCreateForm(prev => ({ ...prev, nombre: e.target.value }))}
+                      placeholder="Ej: Cronograma de Ejecución"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Copiar desde (opcional)</Label>
+                    <Select
+                      value={createForm.copiarDesdeId}
+                      onValueChange={(value) => setCreateForm(prev => ({ ...prev, copiarDesdeId: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar origen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Crear desde cero</SelectItem>
+                        {cronogramas.map((cronograma) => (
+                          <SelectItem key={cronograma.id} value={cronograma.id}>
+                            {cronograma.nombre} ({TIPO_CRONOGRAMA_INFO[cronograma.tipo as keyof typeof TIPO_CRONOGRAMA_INFO]?.label})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleCreateCronograma}>
+                      Crear
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

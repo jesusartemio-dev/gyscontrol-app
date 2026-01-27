@@ -23,10 +23,19 @@ export interface CrmActividad {
   updatedAt: string
 
   // Relaciones
-  usuario?: {
+  user?: {
     id: string
     name: string
     email: string
+  }
+  crmOportunidad?: {
+    id: string
+    nombre: string
+    cliente?: {
+      id: string
+      nombre: string
+      codigo: string
+    }
   }
 }
 

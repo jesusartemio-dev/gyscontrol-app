@@ -235,10 +235,12 @@ export async function assignPermissionToUser(
         updatedAt: new Date()
       },
       create: {
+        id: crypto.randomUUID(),
         userId: payload.userId,
         permissionId: payload.permissionId,
         type: payload.type,
-        createdBy: assignedBy
+        createdBy: assignedBy,
+        updatedAt: new Date()
       },
       include: {
         user: true,
@@ -323,11 +325,13 @@ export async function createPermission(
 
     const permission = await prisma.permission.create({
       data: {
+        id: crypto.randomUUID(),
         name: payload.name,
         description: payload.description,
         resource: payload.resource,
         action: payload.action,
-        isSystemPermission: payload.isSystemPermission ?? true
+        isSystemPermission: payload.isSystemPermission ?? true,
+        updatedAt: new Date()
       }
     });
 
@@ -451,14 +455,17 @@ export async function initializeSystemPermissions(): Promise<void> {
         update: {
           description: basePermission.description,
           resource: basePermission.resource,
-          action: basePermission.action
+          action: basePermission.action,
+          updatedAt: new Date()
         },
         create: {
+          id: crypto.randomUUID(),
           name: basePermission.name,
           description: basePermission.description,
           resource: basePermission.resource,
           action: basePermission.action,
-          isSystemPermission: basePermission.isSystemPermission
+          isSystemPermission: basePermission.isSystemPermission,
+          updatedAt: new Date()
         }
       });
     }

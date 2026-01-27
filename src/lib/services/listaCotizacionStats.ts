@@ -20,10 +20,10 @@ export interface ListaCotizacionStats {
  * Calcula las estadísticas de cotización para una lista de equipos
  */
 export function calcularStatsCotizacionLista(lista: ListaEquipo): ListaCotizacionStats {
-  let totalItems = lista.items?.length || 0
+  let totalItems = lista.listaEquipoItem?.length || 0
 
   // Calcular items que tienen al menos una cotización
-  let itemsCotizados = lista.items?.filter(item =>
+  let itemsCotizados = lista.listaEquipoItem?.filter(item =>
     item.cotizaciones && item.cotizaciones.length > 0
   ).length || 0
 
@@ -38,7 +38,7 @@ export function calcularStatsCotizacionLista(lista: ListaEquipo): ListaCotizacio
 
   // Calcular número de cotizaciones activas
   const allCotizaciones = [
-    ...(lista.items?.flatMap(item => item.cotizaciones || []) || []),
+    ...(lista.listaEquipoItem?.flatMap(item => item.cotizaciones || []) || []),
     ...listaCotizaciones
   ]
   const cotizacionesCount = allCotizaciones.length

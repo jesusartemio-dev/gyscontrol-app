@@ -9,6 +9,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,16 +18,18 @@ export async function GET() {
   try {
     const plantillas = await prisma.plantillaServicioIndependiente.findMany({
       include: {
-        items: {
+        edt: true,
+        plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
+            edt: true,
             recurso: true,
             unidadServicio: true
           },
           orderBy: { orden: 'asc' }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       },
       orderBy: { createdAt: 'desc' },
@@ -46,7 +49,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
-    const { nombre, descripcion, categoria } = data
+    const { nombre, descripcion, edtId } = data
 
     if (!nombre || typeof nombre !== 'string') {
       return NextResponse.json({ error: 'Nombre es requerido' }, { status: 400 })
@@ -54,19 +57,22 @@ export async function POST(req: NextRequest) {
 
     const nueva = await prisma.plantillaServicioIndependiente.create({
       data: {
+        id: randomUUID(),
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
-        categoria: categoria || 'General',
+        edtId: edtId || null,
         estado: 'borrador',
         totalInterno: 0,
         totalCliente: 0,
         descuento: 0,
         grandTotal: 0,
+        updatedAt: new Date(),
       },
       include: {
-        items: true,
+        edt: true,
+        plantillaServicioItemIndependiente: true,
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       }
     })

@@ -35,12 +35,12 @@ import { CronogramaValidationService } from '@/lib/services/cronogramaValidation
 import { toast } from '@/hooks/use-toast';
 import { ProyectoEdtService } from '@/lib/services/proyectoEdt';
 import { CronogramaAnalyticsService } from '@/lib/services/cronogramaAnalytics';
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio';
+import { getEdts } from '@/lib/services/edt';
 import { getUsers } from '@/lib/services/user';
 import type { 
   Proyecto, 
   ProyectoEdtConRelaciones,
-  CategoriaServicio,
+  Edt,
   User,
   KpisCronograma,
   TendenciaMensual,
@@ -73,7 +73,7 @@ export function CronogramaContainer({ proyectoId, proyecto }: CronogramaContaine
   const [edts, setEdts] = useState<ProyectoEdtConRelaciones[]>([]);
   const [comercialEdts, setComercialEdts] = useState<ProyectoEdtConRelaciones[]>([]);
   const [registrosHoras, setRegistrosHoras] = useState<any[]>([]);
-  const [categoriasServicios, setCategoriasServicios] = useState<CategoriaServicio[]>([]);
+  const [edtsCatalogo, setEdtsCatalogo] = useState<Edt[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [edtSeleccionado, setEdtSeleccionado] = useState<ProyectoEdtConRelaciones | null>(null);
 
@@ -102,7 +102,7 @@ export function CronogramaContainer({ proyectoId, proyecto }: CronogramaContaine
       const [edtsResponse, comercialEdtsResponse, categoriasData, usuariosData] = await Promise.all([
         fetch(`/api/proyecto-edt?proyectoId=${proyectoId}`),
         fetch(`/api/proyecto-edt/comercial?proyectoId=${proyectoId}`),
-        getCategoriasServicio(),
+        getEdts(),
         getUsers()
       ]);
 
@@ -118,7 +118,7 @@ export function CronogramaContainer({ proyectoId, proyecto }: CronogramaContaine
 
       setEdts(edtsData);
       setComercialEdts(comercialEdtsData);
-      setCategoriasServicios(categoriasData);
+      setEdtsCatalogo(categoriasData);
       setUsuarios(usuariosData || []);
 
       // Cargar analytics si hay EDT
@@ -550,7 +550,7 @@ export function CronogramaContainer({ proyectoId, proyecto }: CronogramaContaine
           </DialogHeader>
           <EdtForm
             proyectoId={proyectoId}
-            categoriasServicios={categoriasServicios}
+            edtsCatalogo={edtsCatalogo}
             usuarios={usuarios}
             onSubmit={handleCrearEdt}
             onCancel={() => setModalActivo(null)}
@@ -571,7 +571,7 @@ export function CronogramaContainer({ proyectoId, proyecto }: CronogramaContaine
             <EdtForm
               proyectoId={proyectoId}
               edt={edtSeleccionado}
-              categoriasServicios={categoriasServicios}
+              edtsCatalogo={edtsCatalogo}
               usuarios={usuarios}
               onSubmit={handleActualizarEdt}
               onCancel={() => {

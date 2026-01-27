@@ -6,7 +6,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { searchParams } = new URL(request.url)
   const cronogramaId = searchParams.get('cronogramaId')
 
-  const dependencies = await prisma.proyectoDependenciaTarea.findMany({
+  const dependencies = await prisma.proyectoDependenciasTarea.findMany({
     where: {
       tareaOrigen: {
         proyectoEdt: {
@@ -41,8 +41,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { fromTaskId, toTaskId, type = 'finish_to_start' } = await request.json()
 
-  const dependency = await prisma.proyectoDependenciaTarea.create({
+  const dependency = await prisma.proyectoDependenciasTarea.create({
     data: {
+      id: `dep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       tareaOrigenId: fromTaskId,
       tareaDependienteId: toTaskId,
       tipo: type
@@ -60,7 +61,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: 'ID de dependencia requerido' }, { status: 400 })
   }
 
-  await prisma.proyectoDependenciaTarea.delete({
+  await prisma.proyectoDependenciasTarea.delete({
     where: { id: dependencyId }
   })
 

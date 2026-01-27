@@ -5,11 +5,11 @@ export async function POST(request: Request) {
   try {
     const { listaEquipoItemId, cotizacionProveedorItemId } = await request.json()
 
-    // 🔍 Buscar la cotización con la relación cotizacion.proveedorId
+    // 🔍 Buscar la cotización con la relación cotizacionProveedor.proveedorId
     const cotizacion = await prisma.cotizacionProveedorItem.findUnique({
       where: { id: cotizacionProveedorItemId },
       include: {
-        cotizacion: {
+        cotizacionProveedor: {
           select: {
             proveedorId: true,
           },
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         cotizacionSeleccionadaId: cotizacion.id,
         precioElegido: cotizacion.precioUnitario ?? undefined,
         costoElegido,
-        proveedorId: cotizacion.cotizacion.proveedorId,
+        proveedorId: cotizacion.cotizacionProveedor.proveedorId,
       },
     })
 

@@ -57,7 +57,7 @@ interface ConversionItemDetail {
     id: string
     precioUnitario: number | null
     tiempoEntrega: string | null
-    cotizacion: {
+    cotizacionProveedor: {
       proveedor: {
         nombre: string
       }
@@ -134,13 +134,13 @@ export async function GET(request: NextRequest) {
             codigo: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true
           }
         },
-        items: {
+        listaEquipoItem: {
           select: {
             id: true,
             listaId: true,
@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
                 id: true,
                 precioUnitario: true,
                 tiempoEntrega: true,
-                cotizacion: {
+                cotizacionProveedor: {
                   select: {
                     proveedor: {
                       select: {
@@ -210,7 +210,7 @@ export async function GET(request: NextRequest) {
 
     // 🧮 Process conversion data
     const conversiones: ConversionItem[] = listas.map(lista => {
-      const costoCalculado = lista.items.reduce((sum, item) => {
+      const costoCalculado = lista.listaEquipoItem.reduce((sum, item) => {
         // ✅ Create a compatible item for calcularCostoItem
         const compatibleItem = {
           ...item,
@@ -274,7 +274,7 @@ export async function GET(request: NextRequest) {
             updatedAt: new Date().toISOString(),
             proveedor: {
               id: '',
-              nombre: item.cotizacionSeleccionada.cotizacion.proveedor.nombre,
+              nombre: item.cotizacionSeleccionada.cotizacionProveedor.proveedor.nombre,
               ruc: undefined
             },
             proyecto: {} as any,
@@ -310,8 +310,8 @@ export async function GET(request: NextRequest) {
       const desviacion = presupuestoEstimado > 0 ?
         ((costoCalculado - presupuestoEstimado) / presupuestoEstimado) * 100 : 0
       
-      const itemsCount = lista.items.length
-      const itemsPendientes = lista.items.filter(item => 
+      const itemsCount = lista.listaEquipoItem.length
+      const itemsPendientes = lista.listaEquipoItem.filter(item => 
         (item.cantidadPedida ?? 0) < item.cantidad
       ).length
       
@@ -340,7 +340,7 @@ export async function GET(request: NextRequest) {
         codigo: lista.codigo,
         nombre: lista.nombre,
         proyecto: lista.proyecto,
-        responsable: lista.responsable,
+        responsable: lista.user,
         estado: lista.estado,
         presupuestoEstimado,
         costoCalculado,
@@ -388,13 +388,13 @@ async function getListaDetalle(listaId: string) {
             codigo: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true
           }
         },
-        items: {
+        listaEquipoItem: {
           include: {
             proyectoEquipoItem: {
               include: {
@@ -418,7 +418,7 @@ async function getListaDetalle(listaId: string) {
                 id: true,
                 precioUnitario: true,
                 tiempoEntrega: true,
-                cotizacion: {
+                cotizacionProveedor: {
                   select: {
                     proveedor: {
                       select: {
@@ -442,7 +442,7 @@ async function getListaDetalle(listaId: string) {
     }
 
     // 🧮 Process items detail
-    const itemsDetalle: ConversionItemDetail[] = lista.items.map(item => {
+    const itemsDetalle: ConversionItemDetail[] = lista.listaEquipoItem.map(item => {
       // ✅ Create a compatible item for calcularCostoItem
       const compatibleItem = {
         ...item,
@@ -525,7 +525,7 @@ async function getListaDetalle(listaId: string) {
         codigo: lista.codigo,
         nombre: lista.nombre,
         proyecto: lista.proyecto,
-        responsable: lista.responsable,
+        responsable: lista.user,
         estado: lista.estado,
         presupuestoEstimado: 0 // Campo no disponible en el modelo actual
       },
@@ -575,7 +575,7 @@ export async function POST(request: NextRequest) {
       const lista = await tx.listaEquipo.findUnique({
         where: { id: listaId },
         include: {
-          items: {
+          listaEquipoItem: {
             include: {
               proyectoEquipoItem: {
                 include: {
@@ -592,7 +592,7 @@ export async function POST(request: NextRequest) {
               },
               cotizacionSeleccionada: {
                 include: {
-                  cotizacion: {
+                  cotizacionProveedor: {
                     include: {
                       proveedor: {
                         select: {
@@ -636,6 +636,7 @@ export async function POST(request: NextRequest) {
       // 3. Calcular totales
       let presupuestoTotal = 0
       const itemsParaPedido: {
+        id: string
         listaId: string
         listaEquipoItemId: string
         responsableId: string
@@ -646,12 +647,12 @@ export async function POST(request: NextRequest) {
         precioUnitario: number
         costoTotal: number
         tiempoEntrega: string
-        proveedor: string
         estado: EstadoPedidoItem
+        updatedAt: Date
       }[] = []
 
       for (const itemConversion of items) {
-        const listaItem = lista.items.find(item => item.id === itemConversion.itemId)
+        const listaItem = lista.listaEquipoItem.find(item => item.id === itemConversion.itemId)
         if (!listaItem || !listaItem.proyectoEquipoItem?.catalogoEquipo) continue
 
         const cantidadAConvertir = Math.min(
@@ -673,19 +674,20 @@ export async function POST(request: NextRequest) {
         const costoTotal = costoUnitario * cantidadAConvertir
         presupuestoTotal += costoTotal
 
-        itemsParaPedido.push({ 
-           listaId: lista.id, 
-           listaEquipoItemId: listaItem.id, 
+        itemsParaPedido.push({
+           id: `pedido-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+           listaId: lista.id,
+           listaEquipoItemId: listaItem.id,
            responsableId: session.user.id,
            codigo: listaItem.proyectoEquipoItem?.catalogoEquipo?.codigo || 'SIN-CODIGO',
-        descripcion: listaItem.proyectoEquipoItem?.catalogoEquipo?.descripcion || 'Sin descripción',
-        unidad: listaItem.proyectoEquipoItem?.catalogoEquipo?.unidad?.nombre || 'und', 
-           cantidadPedida: cantidadAConvertir, 
-           precioUnitario: costoUnitario, 
-           costoTotal, 
-           tiempoEntrega: listaItem.cotizacionSeleccionada?.tiempoEntrega || '15 días', 
-           proveedor: listaItem.cotizacionSeleccionada?.cotizacion?.proveedor?.nombre || 'Por definir', 
-           estado: EstadoPedidoItem.pendiente 
+           descripcion: listaItem.proyectoEquipoItem?.catalogoEquipo?.descripcion || 'Sin descripción',
+           unidad: listaItem.proyectoEquipoItem?.catalogoEquipo?.unidad?.nombre || 'und',
+           cantidadPedida: cantidadAConvertir,
+           precioUnitario: costoUnitario,
+           costoTotal,
+           tiempoEntrega: listaItem.cotizacionSeleccionada?.tiempoEntrega || '15 días',
+           estado: EstadoPedidoItem.pendiente,
+           updatedAt: new Date()
          })
 
         // 4. Actualizar cantidad pedida en lista item
@@ -704,6 +706,7 @@ export async function POST(request: NextRequest) {
       // 5. Crear el pedido
       const pedido = await tx.pedidoEquipo.create({
         data: {
+          id: `pedido-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           codigo: codigoPedido,
           proyectoId: lista.proyectoId,
           listaId: lista.id,
@@ -716,19 +719,20 @@ export async function POST(request: NextRequest) {
           fechaNecesaria: new Date(fechaNecesaria),
           presupuestoTotal,
           observacion: observaciones,
-          items: {
+          updatedAt: new Date(),
+          pedidoEquipoItem: {
             create: itemsParaPedido
           }
         },
         include: {
-          items: true,
+          pedidoEquipoItem: true,
           proyecto: true,
-          lista: true
+          listaEquipo: true
         }
       })
 
       // 6. Actualizar estado de la lista si es necesario
-      const itemsPendientes = lista.items.filter(item => {
+      const itemsPendientes = lista.listaEquipoItem.filter(item => {
         const itemActualizado = itemsParaPedido.find(ip => ip.listaEquipoItemId === item.id)
         const cantidadPedidaFinal = (item.cantidadPedida ?? 0) + (itemActualizado?.cantidadPedida || 0)
         return cantidadPedidaFinal < item.cantidad

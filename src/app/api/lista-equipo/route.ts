@@ -31,20 +31,20 @@ export async function GET(req: NextRequest) {
       },
       include: {
         proyecto: true,
-        responsable: true,
-        items: {
+        user: true,
+        listaEquipoItem: {
           include: {
-            lista: true, // ✅ Relación agregada
+            listaEquipo: true,
             proveedor: true,
-            cotizaciones: true,
-            pedidos: {
+            cotizacionProveedorItems: true,
+            pedidoEquipoItem: {
               include: {
-                pedido: true
+                pedidoEquipo: true
               }
             },
             proyectoEquipoItem: {
               include: {
-                proyectoEquipo: true,
+                proyectoEquipoCotizado: true,
               },
             },
           },
@@ -56,35 +56,42 @@ export async function GET(req: NextRequest) {
     })
 
     // ✅ Calculate montoEstimado and cantidadPedida for each lista
-    const dataWithMontos = data.map(lista => {
-      const montoEstimado = lista.items.reduce((total, item) => {
+    const dataWithMontos = data.map((lista: any) => {
+      const items = lista.listaEquipoItem || []
+      const montoEstimado = items.reduce((total: number, item: any) => {
         // Use the best available price: cotización > precioElegido > presupuesto
-        const mejorCotizacion = item.cotizaciones.length > 0 
-          ? Math.min(...item.cotizaciones.map(c => c.precioUnitario || 0))
+        const cotizaciones = item.cotizacionProveedorItems || []
+        const mejorCotizacion = cotizaciones.length > 0
+          ? Math.min(...cotizaciones.map((c: any) => c.precioUnitario || 0))
           : 0
-        const precioUnitario = mejorCotizacion > 0 
-          ? mejorCotizacion 
+        const precioUnitario = mejorCotizacion > 0
+          ? mejorCotizacion
           : (item.precioElegido || item.presupuesto || 0)
-        
+
         return total + (precioUnitario * (item.cantidad || 0))
       }, 0)
 
       // 🔄 Calculate cantidadPedida for each item
-      const itemsWithCantidadPedida = lista.items.map(item => {
-        const cantidadPedida = item.pedidos.reduce((total, pedidoItem) => {
+      const itemsWithCantidadPedida = items.map((item: any) => {
+        const pedidos = item.pedidoEquipoItem || []
+        const cantidadPedida = pedidos.reduce((total: number, pedidoItem: any) => {
           return total + (pedidoItem.cantidadPedida || 0)
         }, 0)
-        
+
         return {
           ...item,
+          lista: item.listaEquipo,
+          cotizaciones: item.cotizacionProveedorItems,
+          pedidos: item.pedidoEquipoItem,
           cantidadPedida
         }
       })
 
       return {
         ...lista,
-        montoEstimado,
-        items: itemsWithCantidadPedida
+        responsable: lista.user,
+        items: itemsWithCantidadPedida,
+        montoEstimado
       }
     })
 
@@ -135,37 +142,46 @@ export async function POST(request: Request) {
     const nuevoNumero = ultimaLista ? ultimaLista.numeroSecuencia + 1 : 1
     const codigoGenerado = `${proyecto.codigo}-LST-${String(nuevoNumero).padStart(3, '0')}`
 
-    const nuevaLista = await prisma.listaEquipo.create({
+    const nuevaListaRaw = await prisma.listaEquipo.create({
       data: {
+        id: crypto.randomUUID(),
         proyectoId: parsed.data.proyectoId,
         responsableId: session.user.id,
         codigo: codigoGenerado,
         numeroSecuencia: nuevoNumero,
         nombre: parsed.data.nombre,
-        fechaNecesaria: parsed.data.fechaNecesaria ? new Date(parsed.data.fechaNecesaria) : null, // ✅ fecha necesaria
-      } satisfies Prisma.ListaEquipoUncheckedCreateInput,
+        fechaNecesaria: parsed.data.fechaNecesaria ? new Date(parsed.data.fechaNecesaria) : null,
+        updatedAt: new Date()
+      },
       include: {
         proyecto: true,
-        responsable: true,
-        items: {
+        user: true,
+        listaEquipoItem: {
           include: {
-            lista: true, // ✅ Relación agregada
+            listaEquipo: true,
             proveedor: true,
-            cotizaciones: true,
-            pedidos: {
+            cotizacionProveedorItems: true,
+            pedidoEquipoItem: {
               include: {
-                pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+                pedidoEquipo: true
               }
             },
             proyectoEquipoItem: {
               include: {
-                proyectoEquipo: true,
+                proyectoEquipoCotizado: true,
               },
             },
           },
         },
       },
     })
+
+    // Map for frontend compatibility
+    const nuevaLista = {
+      ...nuevaListaRaw,
+      responsable: nuevaListaRaw.user,
+      items: nuevaListaRaw.listaEquipoItem
+    }
 
     // ✅ Registrar en auditoría
     try {
@@ -175,7 +191,7 @@ export async function POST(request: Request) {
         session.user.id,
         nuevaLista.nombre,
         {
-          proyecto: nuevaLista.proyecto.nombre,
+          proyecto: proyecto.nombre,
           codigo: nuevaLista.codigo,
           fechaNecesaria: parsed.data.fechaNecesaria
         }

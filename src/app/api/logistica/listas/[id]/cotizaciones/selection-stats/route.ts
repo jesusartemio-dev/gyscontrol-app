@@ -12,9 +12,9 @@ export async function GET(
     const listItems = await prisma.listaEquipoItem.findMany({
       where: { listaId: id },
       include: {
-        cotizaciones: {
+        cotizacionProveedorItems: {
           include: {
-            cotizacion: {
+            cotizacionProveedor: {
               include: {
                 proveedor: true
               }
@@ -26,7 +26,7 @@ export async function GET(
 
     const totalItems = listItems.length
     const selectedItems = listItems.filter(item =>
-      item.cotizaciones.some(cot => cot.esSeleccionada)
+      item.cotizacionProveedorItems.some(cot => cot.esSeleccionada)
     ).length
 
     const pendingItems = totalItems - selectedItems
@@ -40,7 +40,7 @@ export async function GET(
     let fastestDeliveryItems = 0
 
     listItems.forEach(item => {
-      const quotations = item.cotizaciones.filter(cot =>
+      const quotations = item.cotizacionProveedorItems.filter(cot =>
         cot.precioUnitario && cot.precioUnitario > 0
       )
 
@@ -59,7 +59,7 @@ export async function GET(
       }
 
       // Calculate delivery times
-      const validDeliveryTimes = item.cotizaciones.filter(cot =>
+      const validDeliveryTimes = item.cotizacionProveedorItems.filter(cot =>
         cot.tiempoEntregaDias && cot.tiempoEntregaDias > 0
       )
 

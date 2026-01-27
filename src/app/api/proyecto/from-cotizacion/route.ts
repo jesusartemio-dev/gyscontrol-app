@@ -7,24 +7,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createProyectoFromCotizacionSchema } from '@/lib/validators/proyecto'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
+import { Prisma, EstadoFase, EstadoTarea, EstadoActividad, EstadoEdt } from '@prisma/client'
+import { randomUUID } from 'crypto'
 
-// ✅ Tipo explícito para cotización con includes
+// ✅ Tipo explícito para cotización con includes (5 niveles sin zonas)
 type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
   include: {
     cliente: true
-    equipos: { include: { items: true } }
-    servicios: { include: { items: true } }
-    gastos: { include: { items: true } }
+    cotizacionEquipo: { include: { cotizacionEquipoItem: true } }
+    cotizacionServicio: { include: { cotizacionServicioItem: true } }
+    cotizacionGasto: { include: { cotizacionGastoItem: true } }
     fases: true
     cronograma: {
       include: {
-        categoriaServicio: true
-        responsable: true
-        cotizacionFase: true
-        tareas: {
+        edt: true,
+        responsable: true,
+        cotizacionFase: true,
+        cotizacionActividad: {
           include: {
-            responsable: true
+            cotizacionTarea: {
+              include: {
+                responsable: true
+              }
+            }
           }
         }
       }
@@ -104,16 +109,19 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 [API PROYECTO FROM COTIZACION] Iniciando creación de proyecto desde cotización')
+
     const body = await request.json()
-    
+    console.log('📦 [API PROYECTO FROM COTIZACION] Body recibido:', body)
+
     // ✅ Validate request body using the new schema (includes cotizacionId)
     const validatedData = createProyectoFromCotizacionSchema.parse(body)
-    const { 
-      cotizacionId, 
-      nombre, 
-      fechaInicio, 
-      fechaFin, 
-      gestorId, 
+    const {
+      cotizacionId,
+      nombre,
+      fechaInicio,
+      fechaFin,
+      gestorId,
       estado = 'creado',
       totalEquiposInterno,
       totalServiciosInterno,
@@ -126,6 +134,15 @@ export async function POST(request: NextRequest) {
       comercialId
     } = validatedData
 
+    console.log('✅ [API PROYECTO FROM COTIZACION] Datos validados:', {
+      cotizacionId,
+      nombre,
+      fechaInicio,
+      gestorId,
+      clienteId,
+      comercialId
+    })
+
     // ✅ Validate required fields
     if (!cotizacionId) {
       return NextResponse.json(
@@ -134,28 +151,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const cotizacion: CotizacionConIncludes | null = await prisma.cotizacion.findUnique({
+    const cotizacion = await prisma.cotizacion.findUnique({
       where: { id: cotizacionId },
       include: {
         cliente: true,
-        equipos: { include: { items: true } },
-        servicios: { include: { items: true } },
-        gastos: { include: { items: true } },
-        fases: true,
-        cronograma: {
+        cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
+        cotizacionServicio: { include: { cotizacionServicioItem: true } },
+        cotizacionGasto: { include: { cotizacionGastoItem: true } },
+        cotizacionFase: true,
+        cotizacionEdt: {
           include: {
-            categoriaServicio: true,
-            responsable: true,
+            edt: true,
+            user: true,
             cotizacionFase: true,
-            tareas: {
+            cotizacionActividad: {
               include: {
-                responsable: true
+                cotizacionTarea: {
+                  include: {
+                    user: true
+                  }
+                }
               }
             }
           }
         }
       },
-    })
+    }) as any
 
     if (!cotizacion || cotizacion.estado !== 'aprobada') {
       return NextResponse.json({ error: 'Cotización no válida o no aprobada' }, { status: 400 })
@@ -186,9 +207,9 @@ export async function POST(request: NextRequest) {
     })
 
     // 🔁 Calculate totals from request data or cotización data as fallback
-    const finalTotalEquiposInterno = totalEquiposInterno ?? cotizacion.equipos.reduce((sum: number, grupo) => sum + (grupo as any).subtotalInterno, 0)
-    const finalTotalServiciosInterno = totalServiciosInterno ?? cotizacion.servicios.reduce((sum: number, grupo) => sum + grupo.subtotalInterno, 0)
-    const finalTotalGastosInterno = totalGastosInterno ?? cotizacion.gastos.reduce((sum: number, grupo) => sum + grupo.subtotalInterno, 0)
+    const finalTotalEquiposInterno = totalEquiposInterno ?? cotizacion.cotizacionEquipo.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
+    const finalTotalServiciosInterno = totalServiciosInterno ?? cotizacion.cotizacionServicio.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
+    const finalTotalGastosInterno = totalGastosInterno ?? cotizacion.cotizacionGasto.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)
     const finalTotalInterno = totalInterno ?? (finalTotalEquiposInterno + finalTotalServiciosInterno + finalTotalGastosInterno)
     
     const finalTotalCliente = totalCliente ?? cotizacion.totalCliente ?? 0
@@ -197,6 +218,7 @@ export async function POST(request: NextRequest) {
 
     const proyecto = await prisma.proyecto.create({
       data: {
+        id: randomUUID(),
         clienteId: clienteId ?? cotizacion.clienteId,
         comercialId: comercialId ?? cotizacion.comercialId,
         gestorId,
@@ -214,16 +236,20 @@ export async function POST(request: NextRequest) {
         totalCliente: finalTotalCliente,
         descuento: finalDescuento,
         grandTotal: finalGrandTotal,
+        updatedAt: new Date(),
 
-        equipos: {
-          create: cotizacion.equipos.map((grupo) => ({
+        proyectoEquipoCotizado: {
+          create: cotizacion.cotizacionEquipo.map((grupo: any) => ({
+            id: randomUUID(),
             nombre: grupo.nombre,
             descripcion: grupo.descripcion,
-            subtotalInterno: (grupo as any).subtotalInterno,
-            subtotalCliente: (grupo as any).subtotalCliente,
+            subtotalInterno: grupo.subtotalInterno,
+            subtotalCliente: grupo.subtotalCliente,
             responsableId: gestorId,
-            items: {
-              create: grupo.items.map((item) => ({
+            updatedAt: new Date(),
+            proyectoEquipoCotizadoItem: {
+              create: (grupo.cotizacionEquipoItem || []).map((item: any) => ({
+                id: randomUUID(),
                 catalogoEquipoId: item.catalogoEquipoId,
                 codigo: item.codigo,
                 descripcion: item.descripcion,
@@ -235,41 +261,49 @@ export async function POST(request: NextRequest) {
                 precioCliente: item.precioCliente,
                 costoInterno: item.costoInterno,
                 costoCliente: item.costoCliente,
+                updatedAt: new Date(),
               })),
             },
           })),
         },
 
-        servicios: {
-          create: cotizacion.servicios.map((grupo) => ({
+        proyectoServicioCotizado: {
+          create: cotizacion.cotizacionServicio.map((grupo: any) => ({
+            id: randomUUID(),
             nombre: grupo.nombre,
-            categoria: grupo.categoria,
+            edtId: grupo.edtId,
             subtotalInterno: grupo.subtotalInterno,
             subtotalCliente: grupo.subtotalCliente,
             responsableId: gestorId,
-            items: {
-              create: grupo.items.map((item) => ({
+            updatedAt: new Date(),
+            proyectoServicioCotizadoItem: {
+              create: (grupo.cotizacionServicioItem || []).map((item: any) => ({
+                id: randomUUID(),
                 catalogoServicioId: item.catalogoServicioId,
-                categoria: item.categoria,
+                edtId: item.edtId,
                 costoHoraInterno: item.costoHora,
                 costoHoraCliente: item.costoHora * item.margen,
                 nombre: item.nombre,
                 cantidadHoras: item.horaTotal,
                 costoInterno: item.costoInterno,
                 costoCliente: item.costoCliente,
+                updatedAt: new Date(),
               })),
             },
           })),
         },
 
-        gastos: {
-          create: cotizacion.gastos.map((grupo) => ({
+        proyectoGastoCotizado: {
+          create: cotizacion.cotizacionGasto.map((grupo: any) => ({
+            id: randomUUID(),
             nombre: grupo.nombre,
             descripcion: grupo.descripcion,
             subtotalInterno: grupo.subtotalInterno,
             subtotalCliente: grupo.subtotalCliente,
-            items: {
-              create: grupo.items.map((item) => ({
+            updatedAt: new Date(),
+            proyectoGastoCotizadoItem: {
+              create: (grupo.cotizacionGastoItem || []).map((item: any) => ({
+                id: randomUUID(),
                 nombre: item.nombre,
                 descripcion: item.descripcion,
                 cantidad: item.cantidad,
@@ -278,6 +312,7 @@ export async function POST(request: NextRequest) {
                 margen: item.margen,
                 costoInterno: item.costoInterno,
                 costoCliente: item.costoCliente,
+                updatedAt: new Date(),
               })),
             },
           })),
@@ -285,222 +320,378 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // ✅ Convertir EDTs comerciales a jerarquía completa de 4 niveles
+    // ✅ Convertir EDTs comerciales a jerarquía completa de 5 niveles (sin zonas)
+    // ✅ Crear SOLO cronograma comercial (baseline histórica)
     let cronogramaConvertido = 0
-    if (cotizacion.cronograma && cotizacion.cronograma.length > 0) {
-      try {
-        console.log(`📅 Convirtiendo ${cotizacion.cronograma.length} EDTs comerciales a jerarquía de 4 niveles para proyecto ${proyecto.id}`)
+    console.log('🔍 [CRONOGRAMA] Verificando si hay cronograma en cotización...')
+    console.log('🔍 [CRONOGRAMA] cotizacion.cotizacionEdt:', cotizacion.cotizacionEdt)
+    console.log('🔍 [CRONOGRAMA] cotizacion.cotizacionEdt.length:', cotizacion.cotizacionEdt?.length)
 
-        // Crear cronograma comercial
-        const cronogramaComercial = await (prisma as any).proyectoCronograma.create({
+    if (!cotizacion.cotizacionEdt || cotizacion.cotizacionEdt.length === 0) {
+      console.log('⚠️ [CRONOGRAMA] No hay cronograma en la cotización, creando cronograma comercial vacío por defecto')
+      // Crear solo cronograma comercial vacío por defecto
+      try {
+        const cronogramaComercial = await prisma.proyectoCronograma.create({
           data: {
+            id: randomUUID(),
             proyectoId: proyecto.id,
             tipo: 'comercial',
             nombre: 'Cronograma Comercial',
             copiadoDesdeCotizacionId: cotizacion.id,
-            esBaseline: true,
-            version: 1
+            esBaseline: false, // NO es baseline, es solo referencia histórica
+            version: 1,
+            updatedAt: new Date()
+          }
+        })
+        console.log(`✅ [CRONOGRAMA] Cronograma comercial vacío creado con ID: ${cronogramaComercial.id}`)
+      } catch (emptyCronogramaError) {
+        console.log('❌ [CRONOGRAMA] Error creando cronograma comercial vacío:', emptyCronogramaError)
+      }
+      return NextResponse.json({
+        ...proyecto,
+        cronogramaConvertido: 0
+      })
+    }
+
+    if (cotizacion.cotizacionEdt && cotizacion.cotizacionEdt.length > 0) {
+      try {
+        console.log(`📅 [CRONOGRAMA] Iniciando conversión de ${cotizacion.cotizacionEdt.length} EDTs comerciales a jerarquía de 5 niveles`)
+
+        // ✅ PASO 1: Calcular offset de fechas para ajuste
+        console.log('📅 [CRONOGRAMA] PASO 1: Calculando offset de fechas')
+        const proyectoFechaInicio = new Date(fechaInicio)
+        console.log('📅 [CRONOGRAMA] Fecha de inicio del proyecto:', proyectoFechaInicio.toISOString())
+
+        const fechasCotizacion: Date[] = [
+          // Fechas de fases
+          ...cotizacion.cotizacionFase.flatMap((fase: any) => [
+            fase.fechaInicioPlan,
+            fase.fechaFinPlan
+          ].filter((f: any) => f)),
+          // Fechas de EDTs, actividades y tareas
+          ...cotizacion.cotizacionEdt.flatMap((edt: any) => [
+            edt.fechaInicioComercial,
+            edt.fechaFinComercial,
+            ...edt.cotizacionActividad.flatMap((act: any) => [
+              act.fechaInicioComercial,
+              act.fechaFinComercial,
+              ...act.cotizacionTarea.flatMap((tarea: any) => [
+                tarea.fechaInicio,
+                tarea.fechaFin
+              ].filter((f: any) => f))
+            ].filter((f: any) => f))
+          ].filter((f: any) => f))
+        ]
+
+        console.log('📅 [CRONOGRAMA] Fechas encontradas en cotización:', fechasCotizacion.length)
+        console.log('📅 [CRONOGRAMA] Fechas específicas:', fechasCotizacion.map(f => f?.toISOString()).filter(Boolean))
+
+        // Encontrar fecha más antigua
+        const fechaMasAntigua = fechasCotizacion
+          .filter(f => f)
+          .sort((a, b) => a.getTime() - b.getTime())[0]
+
+        console.log('📅 [CRONOGRAMA] Fecha más antigua en cotización:', fechaMasAntigua?.toISOString())
+
+        let offsetMs = 0
+        if (fechaMasAntigua) {
+          offsetMs = proyectoFechaInicio.getTime() - fechaMasAntigua.getTime()
+          console.log(`📅 [CRONOGRAMA] Offset calculado: ${Math.floor(offsetMs / (1000 * 60 * 60 * 24))} días (${offsetMs} ms)`)
+        } else {
+          console.log('⚠️ [CRONOGRAMA] No se encontraron fechas válidas en la cotización, offset = 0')
+        }
+
+        // ✅ Función para ajustar fechas (maneja null/undefined)
+        const ajustarFecha = (fechaOriginal: Date | string | null): Date | null => {
+          if (!fechaOriginal) return null
+          const fecha = typeof fechaOriginal === 'string' ? new Date(fechaOriginal) : fechaOriginal
+          const fechaAjustada = new Date(fecha.getTime() + offsetMs)
+          console.log(`📅 [CRONOGRAMA] Ajustando fecha ${fecha.toISOString()} -> ${fechaAjustada.toISOString()}`)
+          return fechaAjustada
+        }
+
+        // ✅ PASO 2: Crear CRONOGRAMA COMERCIAL (referencia histórica - NO baseline)
+        console.log('🏗️ [CRONOGRAMA] PASO 2: Creando cronograma comercial')
+        const cronogramaComercial = await prisma.proyectoCronograma.create({
+          data: {
+            id: randomUUID(),
+            proyectoId: proyecto.id,
+            tipo: 'comercial',
+            nombre: 'Cronograma Comercial',
+            copiadoDesdeCotizacionId: cotizacion.id,
+            esBaseline: false, // NO es baseline, es solo referencia histórica
+            version: 1,
+            updatedAt: new Date()
           }
         })
 
-        console.log(`✅ Cronograma comercial creado: ${cronogramaComercial.id}`)
+        console.log(`✅ [CRONOGRAMA] Cronograma comercial creado con ID: ${cronogramaComercial.id}`)
 
-        // ✅ PASO 1: Crear TODAS las fases desde la cotización primero
-        const fasesMap = new Map<string, string>() // Map<cotizacionFaseId, proyectoFaseId>
+        // ✅ PASO 3: Crear TODAS las fases para el cronograma comercial
+        console.log('📋 [CRONOGRAMA] PASO 3: Creando fases para el cronograma comercial')
+        const fasesComercialMap = new Map<string, string>() // Map<cotizacionFaseId, proyectoFaseId> para comercial
 
-        if (cotizacion.fases && cotizacion.fases.length > 0) {
-          console.log(`📋 Creando ${cotizacion.fases.length} fases desde cotización...`)
+        console.log('📋 [CRONOGRAMA] Fases en cotización:', cotizacion.cotizacionFase?.length || 0)
+        console.log('📋 [CRONOGRAMA] Detalle de fases:', cotizacion.cotizacionFase?.map((f: any) => ({ id: f.id, nombre: f.nombre })))
 
-          for (const faseCotizacion of cotizacion.fases) {
-            const nuevaFase = await (prisma as any).proyectoFase.create({
+        if (cotizacion.cotizacionFase && cotizacion.cotizacionFase.length > 0) {
+          console.log(`📋 [CRONOGRAMA] Creando ${cotizacion.cotizacionFase.length} fases para el cronograma comercial...`)
+
+          for (const faseCotizacion of cotizacion.cotizacionFase) {
+            console.log(`📋 [CRONOGRAMA] Procesando fase: ${faseCotizacion.nombre} (ID: ${faseCotizacion.id})`)
+
+            // Crear fase en CRONOGRAMA COMERCIAL (fechas ajustadas según nueva fecha inicio)
+            console.log('📋 [CRONOGRAMA] Creando fase comercial...')
+            const nuevaFaseComercial = await (prisma as any).proyectoFase.create({
               data: {
+                id: crypto.randomUUID(),
                 proyectoId: proyecto.id,
                 proyectoCronogramaId: cronogramaComercial.id,
                 nombre: faseCotizacion.nombre,
                 descripcion: faseCotizacion.descripcion,
                 orden: faseCotizacion.orden,
-                estado: 'planificado',
+                estado: EstadoFase.planificado,
                 porcentajeAvance: 0,
-                fechaInicioPlan: faseCotizacion.fechaInicioPlan ? new Date(faseCotizacion.fechaInicioPlan) : undefined,
-                fechaFinPlan: faseCotizacion.fechaFinPlan ? new Date(faseCotizacion.fechaFinPlan) : undefined
+                fechaInicioPlan: ajustarFecha(faseCotizacion.fechaInicioPlan),
+                fechaFinPlan: ajustarFecha(faseCotizacion.fechaFinPlan),
+                updatedAt: new Date()
               }
             })
-            fasesMap.set(faseCotizacion.id, nuevaFase.id)
-            console.log(`✅ Fase creada: ${nuevaFase.nombre} (${nuevaFase.id})`)
+            fasesComercialMap.set(faseCotizacion.id, nuevaFaseComercial.id)
+            console.log(`✅ [CRONOGRAMA] Fase comercial creada: ${nuevaFaseComercial.nombre} (ID: ${nuevaFaseComercial.id})`)
           }
         } else {
+          console.log('⚠️ [CRONOGRAMA] No hay fases en la cotización, creando fase por defecto...')
+
           // Crear fase por defecto si no hay fases en la cotización
-          const fasePorDefecto = await (prisma as any).proyectoFase.create({
+          const fasePorDefectoComercial = await (prisma as any).proyectoFase.create({
             data: {
+              id: crypto.randomUUID(),
               proyectoId: proyecto.id,
               proyectoCronogramaId: cronogramaComercial.id,
               nombre: 'Fase Principal',
               descripcion: 'Fase principal del proyecto',
               orden: 1,
-              estado: 'planificado',
-              porcentajeAvance: 0
+              estado: EstadoTarea.pendiente,
+              porcentajeAvance: 0,
+              updatedAt: new Date()
             }
           })
-          fasesMap.set('default', fasePorDefecto.id)
-          console.log(`✅ Fase por defecto creada: ${fasePorDefecto.id}`)
+          fasesComercialMap.set('default', fasePorDefectoComercial.id)
+          console.log(`✅ [CRONOGRAMA] Fase comercial por defecto creada: ${fasePorDefectoComercial.nombre}`)
         }
 
-        // ✅ PASO 2: Crear EDTs y asociarlos a las fases correspondientes
-        console.log(`🔧 Creando ${cotizacion.cronograma.length} EDTs...`)
+        // ✅ PASO 4: Crear EDTs para el cronograma comercial
+        console.log(`🔧 [CRONOGRAMA] PASO 4: Creando ${cotizacion.cotizacionEdt.length} EDTs para el cronograma comercial`)
 
-        for (const edtComercial of cotizacion.cronograma) {
-          console.log(`🔧 Procesando EDT comercial: ${edtComercial.id} - ${edtComercial.nombre}`)
+        for (const edtComercial of cotizacion.cotizacionEdt) {
+          console.log(`🔧 [CRONOGRAMA] Procesando EDT comercial: ${edtComercial.id} - ${edtComercial.nombre}`)
+          console.log(`🔧 [CRONOGRAMA] EDT tiene ${edtComercial.cotizacionActividad?.length || 0} actividades`)
 
-          // Determinar fase para el EDT
-          let faseId: string | undefined
-          if (edtComercial.cotizacionFaseId && fasesMap.has(edtComercial.cotizacionFaseId)) {
-            faseId = fasesMap.get(edtComercial.cotizacionFaseId)
-            console.log(`📋 EDT asignado a fase: ${faseId}`)
-          } else if (fasesMap.has('default')) {
-            faseId = fasesMap.get('default')
-            console.log(`📋 EDT asignado a fase por defecto: ${faseId}`)
+          // Determinar fase para el EDT en el cronograma comercial
+          let faseComercialId: string | undefined
+
+          if (edtComercial.cotizacionFaseId) {
+            faseComercialId = fasesComercialMap.get(edtComercial.cotizacionFaseId)
+            console.log(`📋 EDT asignado a fase: ${faseComercialId} (comercial)`)
           } else {
-            // Si no hay fase por defecto, usar la primera fase creada
-            faseId = Array.from(fasesMap.values())[0]
-            console.log(`📋 EDT asignado a primera fase disponible: ${faseId}`)
+            // Usar fase por defecto
+            faseComercialId = fasesComercialMap.get('default')
+            console.log(`📋 EDT asignado a fase por defecto`)
           }
 
-          // Obtener categoriaServicioId - puede venir directamente o a través de la relación
-          let categoriaServicioId = edtComercial.categoriaServicioId
-          if (!categoriaServicioId && edtComercial.categoriaServicio) {
-            categoriaServicioId = edtComercial.categoriaServicio.id
+          // Obtener edtId - puede venir directamente o a través de la relación
+          let edtId = edtComercial.edtId
+          if (!edtId && edtComercial.edt) {
+            edtId = edtComercial.edt.id
           }
 
-          // Si no hay categoriaServicioId, intentar obtenerlo del servicio relacionado
-          if (!categoriaServicioId) {
-            // Buscar el servicio correspondiente para obtener la categoría
-            const servicioRelacionado = cotizacion.servicios.find(s =>
+          // Si no hay edtId, intentar obtenerlo del servicio relacionado
+          if (!edtId) {
+            // Buscar el servicio correspondiente para obtener la EDT
+            const servicioRelacionado = cotizacion.cotizacionServicio.find((s: any) =>
               s.id === edtComercial.cotizacionServicioId
             )
             if (servicioRelacionado) {
-              // categoria es un string, necesitamos encontrar la CategoriaServicio por nombre
-              const categoriaServicio = await prisma.categoriaServicio.findFirst({
+              // categoria es un string, necesitamos encontrar la Edt por nombre
+              const categoriaServicio = await prisma.edt.findFirst({
                 where: { nombre: servicioRelacionado.categoria }
               })
               if (categoriaServicio) {
-                categoriaServicioId = categoriaServicio.id
+                edtId = categoriaServicio.id
               }
             }
           }
 
-          if (!categoriaServicioId) {
-            console.warn(`⚠️ EDT comercial ${edtComercial.id} no tiene categoriaServicioId válido, usando categoría genérica`)
+          if (!edtId) {
+            console.warn(`⚠️ EDT comercial ${edtComercial.id} no tiene edtId válido, usando categoría genérica`)
             // Buscar una categoría de servicio por defecto o crear una genérica
-            const categoriaDefault = await prisma.categoriaServicio.findFirst({
+            const categoriaDefault = await prisma.edt.findFirst({
               where: { nombre: { contains: 'General' } }
-            }) || await prisma.categoriaServicio.findFirst()
+            }) || await prisma.edt.findFirst()
 
             if (categoriaDefault) {
-              categoriaServicioId = categoriaDefault.id
+              edtId = categoriaDefault.id
             } else {
-              console.error(`❌ No se pudo encontrar categoriaServicioId para EDT ${edtComercial.id}, saltando...`)
+              console.error(`❌ No se pudo encontrar edtId para EDT ${edtComercial.id}, saltando...`)
               continue
             }
           }
 
           try {
-            const edtProyecto = await (prisma as any).proyectoEdt.create({
+            console.log(`🔧 [CRONOGRAMA] Creando EDT comercial...`)
+            // Crear EDT en CRONOGRAMA COMERCIAL (fechas ajustadas según nueva fecha inicio)
+            const edtComercialProyecto = await (prisma as any).proyectoEdt.create({
               data: {
+                id: crypto.randomUUID(),
                 proyectoId: proyecto.id,
                 proyectoCronogramaId: cronogramaComercial.id,
-                proyectoFaseId: faseId,
+                proyectoFaseId: faseComercialId,
                 nombre: edtComercial.nombre || `EDT ${edtComercial.id}`,
-                categoriaServicioId: categoriaServicioId,
-                zona: edtComercial.zona,
-                fechaInicioPlan: edtComercial.fechaInicioComercial,
-                fechaFinPlan: edtComercial.fechaFinComercial,
+                edtId: edtId,
+                zona: undefined,
+                fechaInicioPlan: ajustarFecha(edtComercial.fechaInicioComercial),
+                fechaFinPlan: ajustarFecha(edtComercial.fechaFinComercial),
                 horasPlan: new Prisma.Decimal(edtComercial.horasEstimadas || 0),
                 responsableId: edtComercial.responsableId,
                 descripcion: edtComercial.descripcion,
                 prioridad: edtComercial.prioridad || 'media',
-                estado: 'planificado',
-                porcentajeAvance: 0
+                estado: EstadoEdt.planificado,
+                porcentajeAvance: 0,
+                updatedAt: new Date()
               }
             })
+            console.log(`✅ [CRONOGRAMA] EDT comercial creado: ${edtComercialProyecto.nombre} (ID: ${edtComercialProyecto.id})`)
+            console.log(`✅ [CRONOGRAMA] EDT creado exitosamente para: ${edtComercial.nombre}`)
 
-            console.log(`✅ EDT proyecto creado: ${edtProyecto.id} desde comercial ${edtComercial.id}`)
+            // Convertir actividades comerciales a actividades ejecutables (5 niveles sin zonas)
+            // Process through actividades -> tareas hierarchy directly under EDT
+            let actividadesComerciales = edtComercial.cotizacionActividad || []
 
-            // Convertir tareas comerciales a tareas ejecutables (4to nivel)
-            if (edtComercial.tareas && edtComercial.tareas.length > 0) {
-              console.log(`📝 Procesando ${edtComercial.tareas.length} tareas para EDT ${edtProyecto.id}`)
+            if (actividadesComerciales.length === 0) {
+              // Create default actividad for EDTs without activities
+              actividadesComerciales = [{
+                id: `default-${edtComercial.id}`,
+                nombre: `Actividad Principal - ${edtComercial.nombre || 'EDT'}`,
+                fechaInicioComercial: edtComercial.fechaInicioComercial,
+                fechaFinComercial: edtComercial.fechaFinComercial,
+                estado: EstadoEdt.planificado,
+                porcentajeAvance: 0,
+                descripcion: 'Actividad principal del EDT',
+                prioridad: 'media',
+                cotizacionTarea: [] // Will be populated below
+              }]
+              console.log(`⚙️ Creada actividad por defecto para EDT ${edtComercialProyecto.nombre}`)
+            }
 
-              for (const tareaComercial of edtComercial.tareas) {
+            console.log(`⚙️ [CRONOGRAMA] Procesando ${actividadesComerciales.length} actividades para EDT ${edtComercialProyecto.id}`)
+
+            for (const actividadComercial of actividadesComerciales) {
+              console.log(`⚙️ [CRONOGRAMA] Procesando actividad: ${actividadComercial.nombre}`)
+
+              // Create ProyectoActividad en CRONOGRAMA COMERCIAL (fechas ajustadas según nueva fecha inicio)
+              const actividadComercialProyecto = await (prisma as any).proyectoActividad.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  proyectoEdtId: edtComercialProyecto.id,
+                  proyectoCronogramaId: cronogramaComercial.id,
+                  nombre: actividadComercial.nombre,
+                  fechaInicioPlan: ajustarFecha(actividadComercial.fechaInicioComercial),
+                  fechaFinPlan: ajustarFecha(actividadComercial.fechaFinComercial),
+                  estado: EstadoTarea.pendiente,
+                  porcentajeAvance: 0,
+                  horasPlan: new Prisma.Decimal(actividadComercial.horasEstimadas || 0),
+                  prioridad: actividadComercial.prioridad || 'media',
+                  orden: 0,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                }
+              })
+
+              console.log(`✅ [CRONOGRAMA] ProyectoActividad creada: ${actividadComercialProyecto.nombre} (comercial ID: ${actividadComercialProyecto.id})`)
+
+              // Process tareas within actividad
+              let tareasComerciales = actividadComercial.cotizacionTarea || []
+
+              if (tareasComerciales.length === 0) {
+                // Create default tarea for activities without tareas
+                tareasComerciales = [{
+                  id: `default-${actividadComercial.id}`,
+                  nombre: `Tarea Principal - ${actividadComercial.nombre}`,
+                  descripcion: 'Tarea principal de la actividad',
+                  fechaInicio: actividadComercial.fechaInicioComercial,
+                  fechaFin: actividadComercial.fechaFinComercial,
+                  horasEstimadas: edtComercial.horasEstimadas || 0,
+                  prioridad: 'media',
+                  responsableId: edtComercial.responsableId,
+                  estado: 'pendiente'
+                }]
+                console.log(`📝 Creada tarea por defecto para actividad ${actividadComercialProyecto.nombre}`)
+              }
+
+              console.log(`📝 [CRONOGRAMA] Procesando ${tareasComerciales.length} tareas para actividad ${actividadComercialProyecto.id}`)
+
+              for (const tareaComercial of tareasComerciales) {
                 console.log(`📝 Procesando tarea: ${tareaComercial.nombre}`)
 
                 // Crear tarea incluso si no tiene fechas específicas
-                const fechaInicio = tareaComercial.fechaInicio || edtComercial.fechaInicioComercial || new Date()
-                const fechaFin = tareaComercial.fechaFin || edtComercial.fechaFinComercial || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // +7 días por defecto
+                // Aplicar ajustarFecha para desplazar según nueva fecha de inicio del proyecto
+                const fechaInicioOriginal = tareaComercial.fechaInicio || actividadComercial.fechaInicioComercial || new Date()
+                const fechaFinOriginal = tareaComercial.fechaFin || actividadComercial.fechaFinComercial || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // +7 días por defecto
+                const fechaInicioAjustada = ajustarFecha(fechaInicioOriginal)
+                const fechaFinAjustada = ajustarFecha(fechaFinOriginal)
 
                 try {
-                  const tareaProyecto = await (prisma as any).proyectoTarea.create({
+                  // Crear tarea en CRONOGRAMA COMERCIAL (fechas ajustadas según nueva fecha inicio)
+                  const tareaComercialProyecto = await prisma.proyectoTarea.create({
                     data: {
-                      proyectoEdtId: edtProyecto.id,
+                      id: randomUUID(),
+                      proyectoEdtId: edtComercialProyecto.id,
+                      proyectoActividadId: actividadComercialProyecto.id,
                       proyectoCronogramaId: cronogramaComercial.id,
                       nombre: tareaComercial.nombre || `Tarea ${tareaComercial.id}`,
                       descripcion: tareaComercial.descripcion,
-                      fechaInicio: fechaInicio,
-                      fechaFin: fechaFin,
+                      fechaInicio: fechaInicioAjustada ?? new Date(),
+                      fechaFin: fechaFinAjustada ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                      fechaInicioReal: null,
+                      fechaFinReal: null,
                       horasEstimadas: tareaComercial.horasEstimadas,
+                      horasReales: 0,
                       prioridad: tareaComercial.prioridad || 'media',
                       responsableId: tareaComercial.responsableId,
-                      estado: 'pendiente',
-                      porcentajeCompletado: 0
+                      estado: EstadoTarea.pendiente,
+                      porcentajeCompletado: 0,
+                      orden: 0,
+                      createdAt: new Date(),
+                      updatedAt: new Date()
                     }
                   })
 
-                  console.log(`✅ Tarea ejecutable creada: ${tareaProyecto.id} desde comercial ${tareaComercial.id}`)
+                  console.log(`✅ [CRONOGRAMA] ProyectoTarea creada: ${tareaComercialProyecto.nombre} (comercial ID: ${tareaComercialProyecto.id})`)
 
-                  // Crear registro de horas inicial basado en la tarea
-                  if (tareaComercial.horasEstimadas && Number(tareaComercial.horasEstimadas) > 0) {
-                    try {
-                      // Obtener el primer servicio de proyecto para asociar las horas
-                      const primerServicioProyecto = await prisma.proyectoServicioCotizado.findFirst({
-                        where: { proyectoId: proyecto.id }
-                      })
-
-                      await prisma.registroHoras.create({
-                        data: {
-                          proyectoId: proyecto.id,
-                          proyectoServicioId: primerServicioProyecto?.id || '',
-                          categoria: edtComercial.categoriaServicio?.nombre || 'Sin categoría',
-                          nombreServicio: tareaComercial.nombre || `Tarea ${tareaComercial.id}`,
-                          recursoId: '', // TODO: Determinar recurso apropiado
-                          recursoNombre: 'Recurso por asignar',
-                          usuarioId: tareaComercial.responsableId || gestorId,
-                          fechaTrabajo: fechaInicio,
-                          horasTrabajadas: Number(tareaComercial.horasEstimadas),
-                          descripcion: `Tarea ejecutable: ${tareaComercial.nombre || `Tarea ${tareaComercial.id}`}`,
-                          proyectoEdtId: edtProyecto.id,
-                          categoriaServicioId: categoriaServicioId
-                        }
-                      })
-
-                      console.log(`✅ Registro de horas creado para tarea ${tareaProyecto.id}`)
-                    } catch (horasError) {
-                      console.warn(`⚠️ Error creando registro de horas para tarea ${tareaProyecto.id}:`, horasError)
-                    }
-                  }
+                  // Skip registro de horas creation during conversion to avoid foreign key issues
+                  // This can be created later when the user assigns resources
+                  console.log(`ℹ️ Registro de horas omitido para tarea ${tareaComercialProyecto.nombre}`)
                 } catch (tareaError) {
-                  console.error(`❌ Error creando tarea ${tareaComercial.nombre}:`, tareaError)
+                  console.log(`❌ Error creando tarea ${tareaComercial.nombre}`)
                 }
               }
-            } else {
-              console.log(`ℹ️ EDT ${edtProyecto.id} no tiene tareas asociadas`)
             }
           } catch (edtError) {
-            console.error(`❌ Error creando EDT ${edtComercial.nombre}:`, edtError)
+            console.log(`❌ Error creando EDT ${edtComercial.nombre}`)
           }
         }
 
-        cronogramaConvertido = cotizacion.cronograma.length
-        console.log(`✅ Conversión completa: Jerarquía de 4 niveles creada para proyecto ${proyecto.id}`)
+        cronogramaConvertido = cotizacion.cotizacionEdt.length
+        console.log(`✅ [CRONOGRAMA] Conversión completa: ${cronogramaConvertido} EDTs convertidos con jerarquía de 5 niveles`)
+        console.log(`📊 [CRONOGRAMA] Resumen final:`)
+        console.log(`   - Cronograma creado: 1 (comercial)`)
+        console.log(`   - Fases creadas: ${fasesComercialMap.size}`)
+        console.log(`   - EDTs creados: ${cotizacion.cotizacionEdt.length}`)
+        console.log(`   - Total elementos jerarquía: ${fasesComercialMap.size + cotizacion.cotizacionEdt.length}`)
       } catch (cronogramaError) {
-        console.error('❌ Error en conversión de cronograma:', cronogramaError)
+        console.log('❌ [CRONOGRAMA] Error en conversión de cronograma:', cronogramaError)
+        console.log('❌ [CRONOGRAMA] Detalles del error:', cronogramaError instanceof Error ? cronogramaError.message : String(cronogramaError))
         // No fallar la creación del proyecto por errores en el cronograma
         cronogramaConvertido = 0
       }
@@ -511,7 +702,27 @@ export async function POST(request: NextRequest) {
       cronogramaConvertido
     })
   } catch (error) {
-    console.error('❌ Error al crear proyecto desde cotización:', error)
-    return NextResponse.json({ error: 'Error interno al crear proyecto' }, { status: 500 })
+    console.log('❌ Error al crear proyecto desde cotización:', error)
+    console.log('❌ Stack trace:', error instanceof Error ? error.stack : String(error))
+    
+    // ✅ Proporcionar información específica del error para debugging
+    let errorMessage = 'Error interno al crear proyecto'
+    let errorDetails = ''
+    
+    if (error instanceof z.ZodError) {
+      errorMessage = 'Error de validación de datos'
+      errorDetails = JSON.stringify(error.errors, null, 2)
+      console.log('❌ Zod validation errors:', errorDetails)
+    } else if (error instanceof Error) {
+      errorMessage = error.message
+      errorDetails = error.stack || ''
+      console.log('❌ Error details:', errorDetails)
+    }
+    
+    return NextResponse.json({
+      error: errorMessage,
+      details: errorDetails,
+      timestamp: new Date().toISOString()
+    }, { status: 500 })
   }
 }

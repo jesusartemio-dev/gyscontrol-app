@@ -1,0 +1,96 @@
+  // Cargar proyectos disponibles
+  const loadProyectos = async () => {
+    try {
+      setLoadingProyectos(true)
+      const response = await fetch('/api/proyectos')
+      if (!response.ok) throw new Error('Error al cargar proyectos')
+      
+      const data = await response.json()
+      console.log('✅ Proyectos cargados Timesheet:', data)
+      
+      // Transformar datos para el select
+      const proyectosFormatted = data.data?.map((proyecto: any) => ({
+        id: proyecto.id,
+        nombre: proyecto.nombre,
+        cliente: proyecto.cliente?.nombre || 'Sin cliente'
+      })) || []
+      
+      console.log('🎨 DEBUG: Proyectos formatted en Timesheet:', proyectosFormatted)
+      console.log('🎨 DEBUG: Array length en Timesheet:', proyectosFormatted.length)
+      
+      setProyectos(proyectosFormatted)
+    } catch (error) {
+      console.error('Error cargando proyectos:', error)
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar los proyectos',
+        variant: 'destructive'
+      })
+    } finally {
+      setLoadingProyectos(false)
+    }
+  }
+
+  // Cargar EDTs del proyecto seleccionado
+  const loadEdtsProyecto = async (proyectoId: string) => {
+    try {
+      setLoadingElementos(true)
+      console.log('🎨 DEBUG: Cargando EDTs para proyecto:', proyectoId)
+      
+      const response = await fetch(`/api/horas-hombre/edts-por-proyecto?proyectoId=${proyectoId}`)
+      if (!response.ok) throw new Error('Error al cargar EDTs')
+      
+      const data = await response.json()
+      console.log('🎨 DEBUG: EDTs cargados:', data)
+      
+      // Transformar EDTs
+      const edtsFormatted = data.data?.map((edt: any) => ({
+        id: edt.id,
+        nombre: edt.nombre
+      })) || []
+      
+      console.log('🎨 DEBUG: EDTs formatted:', edtsFormatted)
+      setEdtsDisponibles(edtsFormatted)
+      
+      // Limpiar tarea seleccionada cuando cambia el proyecto
+      setEdtSeleccionado('')
+      setTareaSeleccionada('')
+      setTareasDisponibles([])
+      
+    } catch (error) {
+      console.error('Error cargando EDTs:', error)
+      setEdtsDisponibles([])
+    } finally {
+      setLoadingElementos(false)
+    }
+  }
+  
+  // Cargar tareas del EDT seleccionado
+  const loadTareasEdt = async (edtId: string) => {
+    try {
+      console.log('🎨 DEBUG: Cargando tareas para EDT:', edtId)
+      
+      const response = await fetch(`/api/horas-hombre/buscar-elementos?edtId=${edtId}`)
+      if (!response.ok) throw new Error('Error al cargar tareas')
+      
+      const data = await response.json()
+      console.log('🎨 DEBUG: Tareas cargadas:', data)
+      
+      // Transformar tareas
+      const tareasFormatted = data.data?.tareas?.map((tarea: any) => ({
+        id: tarea.id,
+        nombre: tarea.nombre,
+        edt: tarea.edtNombre
+      })) || []
+      
+      console.log('🎨 DEBUG: Tareas formatted:', tareasFormatted)
+      setTareasDisponibles(tareasFormatted)
+      
+      // Limpiar tarea seleccionada cuando cambia el EDT
+      setTareaSeleccionada('')
+      
+    } catch (error) {
+      console.error('Error cargando tareas:', error)
+      setTareasDisponibles([])
+    }
+  }

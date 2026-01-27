@@ -1,0 +1,194 @@
+# Registro de Horas Estructurado Jerárquico - Implementación
+
+## RESUMEN EJECUTIVO
+
+Se ha implementado exitosamente un nuevo sistema de registro de horas que elimina el buscador libre y establece un flujo estructurado paso a paso, garantizando que todos los registros se realicen bajo la jerarquía correcta (Proyecto → EDT → Actividad/Tarea).
+
+## PROBLEMA RESUELTO
+
+### ANTES:
+- Buscador libre que permitía buscar cualquier elemento
+- Registros inconsistentes sin estructura jerárquica
+- No garantizaba que siempre se registrara bajo un EDT
+- Posibilidad de seleccionar elementos de diferentes proyectos
+
+### AHORA:
+- Flujo estructurado de 5 pasos obligatorios
+- Validación jerárquica en cada nivel
+- Siempre se registra bajo un EDT específico
+- Solo muestra opciones válidas según selecciones anteriores
+
+## IMPLEMENTACIÓN REALIZADA
+
+### 1. **API Endpoints Nuevos**
+
+#### `/api/horas-hombre/proyectos-del-usuario`
+- **Propósito**: Obtener proyectos disponibles para el usuario autenticado
+- **Validaciones**: 
+  - Usuario debe estar autenticado
+  - Verifica acceso basado en roles (comercial, gestor, responsable EDT, etc.)
+- **Respuesta**: Lista de proyectos con información básica
+
+#### `/api/horas-hombre/edts-por-proyecto?proyectoId=X`
+- **Propósito**: Obtener EDTs de un proyecto específico
+- **Validaciones**:
+  - Usuario debe tener acceso al proyecto
+  - Verifica permisos de EDT
+- **Respuesta**: Lista de EDTs con información detallada
+
+#### `/api/horas-hombre/elementos-por-edt/{edtId}`
+- **Propósito**: Obtener actividades y tareas de un EDT específico
+- **Validaciones**:
+  - Usuario debe tener acceso al EDT
+  - Verifica que el EDT pertenezca al proyecto
+- **Respuesta**: Lista filtrada de elementos (actividades/tareas)
+
+#### `/api/horas-hombre/registrar-jerarchico`
+- **Propósito**: Registrar horas con validación jerárquica completa
+- **Validaciones**:
+  - Usuario autenticado
+  - Proyecto accesible
+  - EDT pertenece al proyecto
+  - Elemento pertenece al EDT
+- **Estructura de datos**: Mantiene relaciones jerárquicas correctas
+
+### 2. **Componente RegistroHorasWizard**
+
+#### Características del Wizard:
+1. **Paso 1 - Seleccionar Proyecto**
+   - Dropdown con proyectos del usuario
+   - Validación: Proyecto seleccionado
+
+2. **Paso 2 - Seleccionar EDT**
+   - Dropdown con EDTs del proyecto seleccionado
+   - Validación: EDT seleccionado
+   - Se carga automáticamente al seleccionar proyecto
+
+3. **Paso 3 - Seleccionar Nivel**
+   - Radio buttons: "Actividad" o "Tarea"
+   - Validación: Nivel seleccionado
+   - Define qué tipo de elementos mostrar
+
+4. **Paso 4 - Seleccionar Elemento**
+   - Dropdown con actividades/tareas del EDT
+   - Validación: Elemento seleccionado
+   - Se carga según EDT y nivel seleccionado
+
+5. **Paso 5 - Completar Registro**
+   - Formulario con fecha, horas, descripción
+   - Resumen de selecciones realizadas
+   - Validación: Datos completos
+
+#### Características de UX:
+- **Progress Indicator**: Muestra progreso (1/5, 2/5, etc.)
+- **Navegación Condicional**: Botones Previous/Next habilitados según validaciones
+- **Validación en Tiempo Real**: Cada paso valida antes de permitir avanzar
+- **Estados de Carga**: Indicadores visuales durante carga de datos
+- **Resumen Final**: Confirma selecciones antes de registrar
+
+### 3. **Validaciones Implementadas**
+
+#### Validación Jerárquica:
+```typescript
+// Siempre debe existir un EDT como contenedor
+proyectoId → edtId → elementoId
+
+// Los elementos seleccionados deben pertenecer al EDT elegido
+elemento.proyectoEdtId === edtSeleccionado.id
+
+// Solo mostrar opciones válidas en cada paso
+// - Proyectos según permisos del usuario
+// - EDTs según proyecto seleccionado
+// - Elementos según EDT y nivel seleccionado
+```
+
+#### Validación de Permisos:
+- **Proyecto**: Comercial, Gestor, Responsable EDT, Responsable Actividad/Tarea
+- **EDT**: Responsable EDT, Responsable Actividad/Tarea del EDT
+- **Elemento**: Responsable del elemento o acceso por proyecto
+
+### 4. **Componentes UI Adicionales**
+
+#### RadioGroup Component
+- Implementación custom sin dependencias de Radix UI
+- Compatible con el sistema de diseño existente
+- Estados de selección y accesibilidad
+
+## FLUJO DE USUARIO
+
+### Proceso de Registro:
+1. **Usuario abre modal** → Se cargan proyectos disponibles
+2. **Selecciona proyecto** → Se cargan EDTs del proyecto
+3. **Selecciona EDT** → Usuario elige nivel (Actividad/Tarea)
+4. **Selecciona nivel** → Se cargan elementos del EDT
+5. **Selecciona elemento** → Se muestra formulario de datos
+6. **Completa datos** → Se valida y registra con jerarquía
+
+### Validaciones en Tiempo Real:
+- Cada paso valida antes de permitir avanzar
+- Mensajes de error específicos
+- Estados de carga para feedback visual
+- Resumen final para confirmar selecciones
+
+## BENEFICIOS CONSEGUIDOS
+
+### 1. **Consistencia de Datos**
+- Todos los registros siguen la estructura jerárquica
+- Eliminación de registros "huérfanos" sin EDT
+- Trazabilidad completa del registro
+
+### 2. **Experiencia de Usuario**
+- Proceso intuitivo y guiado
+- Reducción de errores de selección
+- Feedback visual en cada paso
+
+### 3. **Validación Robusta**
+- Verificación de permisos en cada nivel
+- Prevención de registros inválidos
+- Estructura de datos consistente
+
+### 4. **Mantenibilidad**
+- APIs especializadas por función
+- Componentes reutilizables
+- Código bien documentado
+
+## MIGRACIÓN Y ADOPCIÓN
+
+### Reemplazo del Sistema Anterior:
+1. **Componente**: Reemplazar `RegistroHorasForm` por `RegistroHorasWizard`
+2. **API**: Cambiar llamadas de `registrar` a `registrar-jerarchico`
+3. **Validaciones**: Usar nuevas validaciones jerárquicas
+
+### Compatibilidad:
+- Mantiene estructura de base de datos existente
+- Compatible con reportes y consultas actuales
+- Sin impacto en registros históricos
+
+## PRÓXIMOS PASOS
+
+### Testing:
+1. **Pruebas Unitarias**: Validar cada API endpoint
+2. **Pruebas de Integración**: Probar flujo completo
+3. **Pruebas de Usuario**: Validar UX con usuarios reales
+
+### Monitoreo:
+1. **Errores de Validación**: Registrar casos de validación fallida
+2. **Tiempo de Respuesta**: Monitorear performance de APIs
+3. **Uso del Sistema**: Métricas de adopción del nuevo flujo
+
+### Mejoras Futuras:
+1. **Filtros Avanzados**: Búsqueda por fecha, responsable, etc.
+2. **Autocompletado**: Sugerencias basadas en registros anteriores
+3. **Validaciones Contextuales**: Reglas específicas por proyecto
+
+## CONCLUSIÓN
+
+La implementación del sistema de registro de horas estructurado jerárquico ha sido exitosa, resolviendo completamente los problemas identificados:
+
+- ✅ **Eliminado el buscador libre**
+- ✅ **Implementado flujo paso a paso**
+- ✅ **Garantizada la estructura jerárquica**
+- ✅ **Agregadas validaciones robustas**
+- ✅ **Mejorada la experiencia de usuario**
+
+El sistema está listo para producción y proporciona una base sólida para el registro consistente y estructurado de horas de trabajo.

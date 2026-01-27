@@ -16,14 +16,16 @@ import {
 } from '@/types'
 import { buildApiUrl } from '@/lib/utils'
 
-const BASE_URL = '/api/cotizacion-proveedor'
+const BASE_URL = '/api/logistica/cotizaciones-proveedor'
 
 // ✅ Obtener todas las cotizaciones
 export async function getCotizacionesProveedor(): Promise<CotizacionProveedor[] | null> {
   try {
     const res = await fetch(BASE_URL)
     if (!res.ok) throw new Error('Error al obtener cotizaciones')
-    return await res.json()
+    const response = await res.json()
+    if (!response.ok) throw new Error(response.error)
+    return response.data
   } catch (error) {
     console.error('❌ getCotizacionesProveedor:', error)
     return null
@@ -36,7 +38,9 @@ export async function getCotizacionProveedorById(id: string): Promise<Cotizacion
     const url = buildApiUrl(`${BASE_URL}/${id}`)
     const res = await fetch(url)
     if (!res.ok) throw new Error('Error al obtener la cotización')
-    return await res.json()
+    const response = await res.json()
+    if (!response.ok) throw new Error(response.error)
+    return response.data
   } catch (error) {
     console.error('❌ getCotizacionProveedorById:', error)
     return null
@@ -54,7 +58,9 @@ export async function createCotizacionProveedor(
       body: JSON.stringify(payload),
     })
     if (!res.ok) throw new Error('Error al crear cotización')
-    return await res.json()
+    const response = await res.json()
+    if (!response.ok) throw new Error(response.error)
+    return response.data
   } catch (error) {
     console.error('❌ createCotizacionProveedor:', error)
     return null
@@ -87,12 +93,14 @@ export async function updateCotizacionProveedor(
   try {
     const url = buildApiUrl(`${BASE_URL}/${id}`)
     const res = await fetch(url, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
     if (!res.ok) throw new Error('Error al actualizar cotización')
-    return await res.json()
+    const response = await res.json()
+    if (!response.ok) throw new Error(response.error)
+    return response.data
   } catch (error) {
     console.error('❌ updateCotizacionProveedor:', error)
     return null
@@ -106,7 +114,9 @@ export async function deleteCotizacionProveedor(id: string): Promise<boolean> {
     const res = await fetch(url, {
       method: 'DELETE',
     })
-    return res.ok
+    if (!res.ok) return false
+    const response = await res.json()
+    return response.ok
   } catch (error) {
     console.error('❌ deleteCotizacionProveedor:', error)
     return false

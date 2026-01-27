@@ -21,9 +21,9 @@ export async function GET(
     const plantilla = await prisma.plantillaGastoIndependiente.findUnique({
       where: { id },
       include: {
-        items: true,
+        plantillaGastoItemIndependiente: true,
         _count: {
-          select: { items: true }
+          select: { plantillaGastoItemIndependiente: true }
         }
       }
     })
@@ -70,9 +70,9 @@ export async function PUT(
         updatedAt: new Date()
       },
       include: {
-        items: true,
+        plantillaGastoItemIndependiente: true,
         _count: {
-          select: { items: true }
+          select: { plantillaGastoItemIndependiente: true }
         }
       }
     })

@@ -118,7 +118,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => (
       <Text style={styles.seccionTitulo}>🛠️ Servicios</Text>
       {cotizacion.servicios.map(s => (
         <View key={s.id} style={styles.tabla}>
-          <Text style={styles.bold}>{s.categoria}</Text>
+          <Text style={styles.bold}>{s.edt?.nombre || s.nombre}</Text>
           {s.items.map(i => (
             <View key={i.id} style={styles.fila}>
               <Text>{i.descripcion}</Text>

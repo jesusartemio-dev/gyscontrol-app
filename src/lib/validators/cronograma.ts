@@ -32,11 +32,6 @@ const horasSchema = z.number()
   .min(0, 'Las horas no pueden ser negativas')
   .max(10000, 'Las horas no pueden exceder 10,000')
 
-// ✅ Validador para zona (texto opcional)
-const zonaSchema = z.string()
-  .min(1, 'La zona no puede estar vacía')
-  .max(100, 'La zona no puede exceder 100 caracteres')
-  .optional()
 
 // ===================================================
 // 📋 ESQUEMAS PRINCIPALES EDT
@@ -45,8 +40,7 @@ const zonaSchema = z.string()
 // 🔧 Esquema para crear ProyectoEdt
 export const crearProyectoEdtSchema = z.object({
   proyectoId: cuidSchema,
-  categoriaServicioId: cuidSchema,
-  zona: zonaSchema,
+  edtId: cuidSchema,
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
   fechaInicioReal: fechaSchema,
@@ -95,8 +89,7 @@ export const crearProyectoEdtSchema = z.object({
 // 🔧 Esquema base para ProyectoEdt (sin refinements)
 const proyectoEdtBaseSchema = z.object({
   proyectoId: cuidSchema,
-  categoriaServicioId: cuidSchema,
-  zona: zonaSchema,
+  edtId: cuidSchema,
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
   fechaInicioReal: fechaSchema,
@@ -123,11 +116,10 @@ export const edtFiltrosSchema = z.object({
   limit: z.number().min(1).max(100).optional().default(10),
   search: z.string().optional(),
   proyectoId: z.string().uuid().optional(),
-  categoriaServicioId: z.string().uuid().optional(),
+  edtId: z.string().uuid().optional(),
   estado: z.enum(['planificado', 'en_progreso', 'completado', 'detenido', 'cancelado']).optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional(),
   responsableId: z.string().uuid().optional(),
-  zona: z.string().optional(),
   fechaDesde: fechaSchema,
   fechaHasta: fechaSchema,
   porcentajeAvanceMin: z.number().min(0).max(100).optional(),
@@ -173,7 +165,7 @@ export const edtFiltrosSchema = z.object({
 // 📈 Esquema para métricas EDT
 export const metricasEdtSchema = z.object({
   proyectoId: z.string().uuid().optional(),
-  categoriaServicioId: z.string().uuid().optional(),
+  edtId: z.string().uuid().optional(),
   responsableId: z.string().uuid().optional(),
   fechaInicio: fechaSchema,
   fechaFin: fechaSchema,
@@ -203,13 +195,12 @@ export const reporteEdtSchema = z.object({
   tipo: z.enum(['resumen', 'detallado', 'metricas', 'progreso']),
   filtros: z.object({
     proyectoId: z.string().uuid().optional(),
-    categoriaServicioId: z.string().uuid().optional(),
+    edtId: z.string().uuid().optional(),
     estado: z.array(z.enum(['planificado', 'en_progreso', 'completado', 'detenido', 'cancelado'])).optional(),
     prioridad: z.array(z.enum(['baja', 'media', 'alta', 'critica'])).optional(),
     responsableId: z.string().uuid().optional(),
     fechaInicio: fechaSchema,
-    fechaFin: fechaSchema,
-    zona: z.string().optional()
+    fechaFin: fechaSchema
   }),
   formato: z.enum(['pdf', 'excel', 'csv']),
   incluirGraficos: z.boolean().optional().default(true),
@@ -309,8 +300,9 @@ export type EdtViewConfigInput = z.infer<typeof edtViewConfigSchema>
 export function puedecambiarEstado(estadoActual: EstadoEdt, nuevoEstado: EstadoEdt): boolean {
   const transicionesPermitidas: Record<EstadoEdt, EstadoEdt[]> = {
     'planificado': ['en_progreso', 'cancelado'],
-    'en_progreso': ['completado', 'detenido', 'cancelado'],
+    'en_progreso': ['completado', 'detenido', 'pausado', 'cancelado'],
     'detenido': ['en_progreso', 'cancelado'],
+    'pausado': ['en_progreso', 'cancelado'],
     'completado': [], // No se puede cambiar desde completado
     'cancelado': ['planificado'] // Solo se puede reactivar
   }
@@ -504,8 +496,7 @@ export function validarEstadoEdt(estado: string): boolean {
 
 // ✅ Esquema base para CotizacionEdt (sin refinaciones)
 const cotizacionEdtBaseSchema = z.object({
-  categoriaServicioId: cuidSchema,
-  zona: zonaSchema,
+  edtId: cuidSchema,
   fechaInicioCom: fechaSchema,
   fechaFinCom: fechaSchema,
   horasCom: horasSchema,
@@ -519,8 +510,7 @@ const cotizacionEdtBaseSchema = z.object({
 // ✅ Esquema para crear CotizacionEdt
 export const crearCotizacionEdtSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(255, 'El nombre no puede exceder 255 caracteres'),
-  categoriaServicioId: cuidSchema,
-  zona: zonaSchema,
+  edtId: cuidSchema,
   fechaInicioCom: fechaSchema,
   fechaFinCom: fechaSchema,
   horasCom: horasSchema,
@@ -583,9 +573,8 @@ export const filtrosCotizacionCronogramaSchema = z.object({
   page: z.number().min(1).optional().default(1),
   limit: z.number().min(1).max(100).optional().default(10),
   search: z.string().optional(),
-  categoriaServicioId: cuidSchema.optional(),
+  edtId: cuidSchema.optional(),
   responsableId: cuidSchema.optional(),
-  zona: z.string().optional(),
   fechaDesde: fechaSchema,
   fechaHasta: fechaSchema,
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional(),
@@ -637,8 +626,9 @@ export type FiltrosCotizacionCronogramaInput = z.infer<typeof filtrosCotizacionC
 export function puedecambiarEstadoCotizacionEdt(estadoActual: EstadoEdt, nuevoEstado: EstadoEdt): boolean {
   const transicionesPermitidas: Record<EstadoEdt, EstadoEdt[]> = {
     'planificado': ['en_progreso', 'cancelado'],
-    'en_progreso': ['completado', 'detenido', 'cancelado'],
+    'en_progreso': ['completado', 'detenido', 'pausado', 'cancelado'],
     'detenido': ['en_progreso', 'cancelado'],
+    'pausado': ['en_progreso', 'cancelado'],
     'completado': [], // No se puede cambiar desde completado
     'cancelado': ['planificado'] // Solo se puede reactivar
   }

@@ -18,6 +18,7 @@ export async function POST() {
       where: { email: 'admin@gys.com' },
       update: {},
       create: {
+        id: `user-admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         email: 'admin@gys.com',
         name: 'Administrador GYS',
         password: hashedPassword,
@@ -31,6 +32,7 @@ export async function POST() {
       where: { email: 'comercial@gys.com' },
       update: {},
       create: {
+        id: `user-comercial-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         email: 'comercial@gys.com',
         name: 'Usuario Comercial',
         password: hashedPassword,
@@ -44,6 +46,7 @@ export async function POST() {
       where: { email: 'logistico@gys.com' },
       update: {},
       create: {
+        id: `user-logistico-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         email: 'logistico@gys.com',
         name: 'Usuario Logístico',
         password: hashedPassword,

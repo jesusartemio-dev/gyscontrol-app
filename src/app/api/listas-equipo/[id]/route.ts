@@ -35,16 +35,16 @@ export async function GET(
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
             email: true
           }
         },
-        items: {
+        listaEquipoItem: {
           include: {
-            proyectoEquipo: {
+            proyectoEquipoCotizado: {
               select: {
                 id: true,
                 nombre: true,
@@ -118,7 +118,7 @@ export async function PUT(
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -144,7 +144,7 @@ export async function PUT(
         body,
         {
           proyectoNombre: listaEquipoActualizada.proyecto.nombre,
-          responsableNombre: listaEquipoActualizada.responsable.name
+          responsableNombre: listaEquipoActualizada.user.name
         }
       )
     } catch (auditError) {
@@ -180,8 +180,8 @@ export async function DELETE(
     const listaExistente = await prisma.listaEquipo.findUnique({
       where: { id },
       include: {
-        items: true,
-        pedidoEquipos: true
+        listaEquipoItem: true,
+        pedidoEquipo: true
       }
     })
 
@@ -193,7 +193,7 @@ export async function DELETE(
     }
 
     // 🚫 Verificar que no tenga pedidos asociados
-    if (listaExistente.pedidoEquipos && listaExistente.pedidoEquipos.length > 0) {
+    if (listaExistente.pedidoEquipo && listaExistente.pedidoEquipo.length > 0) {
       return NextResponse.json(
         { error: 'No se puede eliminar la lista porque tiene pedidos asociados' },
         { status: 400 }
@@ -216,7 +216,7 @@ export async function DELETE(
     logger.info(`Lista de equipos eliminada: ${id}`, {
       userId: session.user.id,
       listaId: id,
-      itemsCount: listaExistente.items?.length || 0
+      itemsCount: listaExistente.listaEquipoItem?.length || 0
     })
 
     return NextResponse.json(

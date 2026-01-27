@@ -24,7 +24,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body: ProveedorPayload = await request.json()
-    const data = await prisma.proveedor.create({ data: body })
+    const data = await prisma.proveedor.create({
+      data: {
+        ...body,
+        id: `proveedor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        updatedAt: new Date()
+      }
+    })
     return NextResponse.json(data)
   } catch (error) {
     return NextResponse.json({ error: 'Error al crear proveedor: ' + String(error) }, { status: 500 })

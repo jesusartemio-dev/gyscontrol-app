@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const servicios = await prisma.cotizacionServicio.findMany({
       where: cotizacionId ? { cotizacionId } : undefined,
       include: {
-        items: true
+        cotizacionServicioItem: true
       },
       orderBy: { createdAt: 'asc' }
     })
@@ -43,9 +43,9 @@ export async function POST(req: NextRequest) {
     const data: CotizacionServicioPayload = await req.json()
 
     // ✅ Validación básica de campos obligatorios
-    if (!data.cotizacionId || !data.categoria || !data.nombre) {
+    if (!data.cotizacionId || !data.edtId || !data.nombre) {
       return NextResponse.json(
-        { error: 'Faltan campos obligatorios: cotizacionId, categoría y nombre' },
+        { error: 'Faltan campos obligatorios: cotizacionId, edtId y nombre' },
         { status: 400 }
       )
     }
@@ -53,11 +53,13 @@ export async function POST(req: NextRequest) {
     // ✅ Crear grupo de servicios
     const nuevo = await prisma.cotizacionServicio.create({
       data: {
+        id: `cot-servicio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionId: data.cotizacionId,
         nombre: data.nombre,
-        categoria: data.categoria,
+        edtId: data.edtId,
         subtotalInterno: data.subtotalInterno ?? 0,
-        subtotalCliente: data.subtotalCliente ?? 0
+        subtotalCliente: data.subtotalCliente ?? 0,
+        updatedAt: new Date()
       }
     })
 

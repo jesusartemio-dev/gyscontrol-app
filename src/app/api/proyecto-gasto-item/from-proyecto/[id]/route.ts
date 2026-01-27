@@ -14,9 +14,9 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const { id } = await context.params
 
     const items = await prisma.proyectoGastoCotizadoItem.findMany({
-      where: { gasto: { proyectoId: id } },
+      where: { proyectoGastoCotizado: { proyectoId: id } },
       include: {
-        gasto: true,
+        proyectoGastoCotizado: true,
       },
       orderBy: {
         createdAt: 'asc',

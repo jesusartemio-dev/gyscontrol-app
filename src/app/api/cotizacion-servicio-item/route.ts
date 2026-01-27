@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { CotizacionServicioItemPayload } from '@/types'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
+import { randomUUID } from 'crypto'
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
       !data.cotizacionServicioId ||
       !data.nombre ||
       !data.descripcion ||
-      !data.categoria ||
+      !data.edtId ||
       !data.formula ||
       !data.unidadServicioNombre ||
       !data.unidadServicioId ||
@@ -45,13 +46,14 @@ export async function POST(req: Request) {
     // ✅ Crear ítem de servicio
     const creado = await prisma.cotizacionServicioItem.create({
       data: {
+        id: randomUUID(),
         cotizacionServicioId: data.cotizacionServicioId,
         catalogoServicioId: data.catalogoServicioId,
         unidadServicioId: data.unidadServicioId,
         recursoId: data.recursoId,
         nombre: data.nombre,
         descripcion: data.descripcion,
-        categoria: data.categoria,
+        edtId: data.edtId,
         formula: data.formula,
         horaBase: data.horaBase,
         horaRepetido: data.horaRepetido,
@@ -65,7 +67,10 @@ export async function POST(req: Request) {
         factorSeguridad: data.factorSeguridad,
         margen: data.margen,
         costoInterno: data.costoInterno,
-        costoCliente: data.costoCliente
+        costoCliente: data.costoCliente,
+        orden: data.orden ?? 0,
+        nivelDificultad: data.nivelDificultad ?? 1,
+        updatedAt: new Date(),
       }
     })
 

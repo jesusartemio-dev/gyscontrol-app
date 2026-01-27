@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 
 // ✅ Obtener fases de una cotización
 export async function GET(
@@ -28,15 +29,20 @@ export async function GET(
     const fases = await prisma.cotizacionFase.findMany({
       where: { cotizacionId: id },
       include: {
-        edts: {
+        cotizacionEdt: {
           include: {
-            categoriaServicio: true,
-            responsable: true,
-            tareas: {
+            edt: true,
+            user: true,
+            cotizacionActividad: {
               include: {
-                responsable: true
+                cotizacionTarea: {
+                  include: {
+                    user: true
+                  },
+                  orderBy: { fechaInicio: 'asc' }
+                }
               },
-              orderBy: { fechaInicio: 'asc' }
+              orderBy: { fechaInicioComercial: 'asc' }
             }
           },
           orderBy: { fechaInicioComercial: 'asc' }
@@ -50,9 +56,16 @@ export async function GET(
       data: fases,
       meta: {
         totalFases: fases.length,
-        totalEdts: fases.reduce((sum: number, f: any) => sum + f.edts.length, 0),
+        totalEdts: fases.reduce((sum: number, f: any) => sum + f.cotizacionEdt.length, 0),
+        totalActividades: fases.reduce((sum: number, f: any) =>
+          sum + f.cotizacionEdt.reduce((sumEdt: number, edt: any) => sumEdt + (edt.cotizacionActividad?.length || 0), 0), 0
+        ),
         totalTareas: fases.reduce((sum: number, f: any) =>
-          sum + f.edts.reduce((sumEdt: number, edt: any) => sumEdt + edt.tareas.length, 0), 0
+          sum + f.cotizacionEdt.reduce((sumEdt: number, edt: any) =>
+            sumEdt + edt.cotizacionActividad?.reduce((sumAct: number, actividad: any) =>
+              sumAct + (actividad.cotizacionTarea?.length || 0), 0
+            ) || 0, 0
+          ), 0
         )
       }
     })
@@ -104,12 +117,14 @@ export async function POST(
     // ✅ Crear fase
     const nuevaFase = await prisma.cotizacionFase.create({
       data: {
+        id: randomUUID(),
         cotizacionId: id,
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
         orden: orden || 0,
         fechaInicioPlan: fechaInicioPlan ? new Date(fechaInicioPlan) : null,
-        fechaFinPlan: fechaFinPlan ? new Date(fechaFinPlan) : null
+        fechaFinPlan: fechaFinPlan ? new Date(fechaFinPlan) : null,
+        updatedAt: new Date()
       }
     })
 

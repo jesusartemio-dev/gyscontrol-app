@@ -1,23 +1,15 @@
-// ===================================================
-// 📁 Archivo: CotizacionServicioItemTable.tsx
-// 📌 Ubicación: src/components/cotizaciones/
-// 🔧 Tabla editable de ítems de servicio con tooltip elegante
-// ===================================================
-
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-  CotizacionServicioItem,
-  Recurso,
-  UnidadServicio
-} from '@/types'
-import { Trash2, Pencil, Save, X, Info } from 'lucide-react'
+import { CotizacionServicioItem, Recurso } from '@/types'
+import { Trash2, Edit, Save, X, Loader2 } from 'lucide-react'
 import { getRecursos } from '@/lib/services/recurso'
-import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { updateCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { calcularHoras } from '@/lib/utils/formulas'
-import * as Tooltip from '@radix-ui/react-tooltip'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 interface Props {
   items: CotizacionServicioItem[]
@@ -25,15 +17,32 @@ interface Props {
   onDeleted: (id: string) => void
 }
 
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
+
+const dificultadLabels: Record<number, string> = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Crítica' }
+const dificultadColors: Record<number, string> = {
+  1: 'bg-green-100 text-green-700',
+  2: 'bg-yellow-100 text-yellow-700',
+  3: 'bg-orange-100 text-orange-700',
+  4: 'bg-red-100 text-red-700'
+}
+
 export default function CotizacionServicioItemTable({ items, onUpdated, onDeleted }: Props) {
   const [recursos, setRecursos] = useState<Recurso[]>([])
-  const [unidades, setUnidades] = useState<UnidadServicio[]>([])
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editableItem, setEditableItem] = useState<Partial<CotizacionServicioItem>>({})
+  const [saving, setSaving] = useState(false)
+
+  const sortedItems = [...items].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
 
   useEffect(() => {
     getRecursos().then(setRecursos)
-    getUnidadesServicio().then(setUnidades)
   }, [])
 
   const startEditing = (item: CotizacionServicioItem) => {
@@ -46,18 +55,14 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
     setEditableItem({})
   }
 
-  // ✅ Real-time calculation updates during editing
   const handleChange = (field: keyof CotizacionServicioItem, value: any) => {
     setEditableItem(prev => {
       const updated = { ...prev, [field]: value }
-      
-      // 🔁 Recalculate values when relevant fields change
-      if (['cantidad', 'factorSeguridad', 'margen', 'recursoId'].includes(field)) {
+
+      if (['cantidad', 'factorSeguridad', 'margen', 'recursoId', 'nivelDificultad'].includes(field)) {
         const original = items.find(i => i.id === editandoId)
         if (original) {
           const merged = { ...original, ...updated }
-          
-          // Calculate hours
           const horas = calcularHoras({
             formula: merged.formula,
             cantidad: merged.cantidad ?? 0,
@@ -66,26 +71,30 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
             horaUnidad: merged.horaUnidad ?? 0,
             horaFijo: merged.horaFijo ?? 0
           })
-          
-          // Get resource cost
+
           const recurso = recursos.find(r => r.id === merged.recursoId)
           const costoHora = recurso?.costoHora ?? 0
-          
-          // Calculate costs
-          const costoInterno = horas * costoHora * (merged.factorSeguridad ?? 1)
+          const dificultadMultiplier = (() => {
+            const dificultad = merged.nivelDificultad ?? 1
+            switch (dificultad) {
+              case 1: return 1.0
+              case 2: return 1.2
+              case 3: return 1.5
+              case 4: return 2.0
+              default: return 1.0
+            }
+          })()
+
+          const costoInterno = horas * costoHora * (merged.factorSeguridad ?? 1) * dificultadMultiplier
           const costoCliente = costoInterno * (merged.margen ?? 1)
-          
-          // Update with calculated values (ensure they're valid numbers)
+
           updated.horaTotal = isNaN(horas) ? 0 : horas
           updated.costoInterno = isNaN(costoInterno) ? 0 : costoInterno
           updated.costoCliente = isNaN(costoCliente) ? 0 : costoCliente
           updated.costoHora = isNaN(costoHora) ? 0 : costoHora
-          if (recurso) {
-            updated.recursoNombre = recurso.nombre
-          }
+          if (recurso) updated.recursoNombre = recurso.nombre
         }
       }
-      
       return updated
     })
   }
@@ -95,11 +104,8 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
     const original = items.find(i => i.id === editandoId)
     if (!original) return
 
-    const updated: CotizacionServicioItem = {
-      ...original,
-      ...editableItem,
-    }
-
+    setSaving(true)
+    const updated: CotizacionServicioItem = { ...original, ...editableItem }
     const horas = calcularHoras({
       formula: updated.formula,
       cantidad: updated.cantidad ?? 0,
@@ -111,7 +117,18 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
 
     const recurso = recursos.find(r => r.id === updated.recursoId)
     const costoHora = recurso?.costoHora ?? 0
-    const costoInterno = horas * costoHora * (updated.factorSeguridad ?? 1)
+    const dificultadMultiplier = (() => {
+      const dificultad = updated.nivelDificultad ?? 1
+      switch (dificultad) {
+        case 1: return 1.0
+        case 2: return 1.2
+        case 3: return 1.5
+        case 4: return 2.0
+        default: return 1.0
+      }
+    })()
+
+    const costoInterno = horas * costoHora * (updated.factorSeguridad ?? 1) * dificultadMultiplier
     const costoCliente = costoInterno * (updated.margen ?? 1)
 
     const finalUpdated = {
@@ -124,7 +141,6 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
     }
 
     try {
-      // 📡 Save to database first
       await updateCotizacionServicioItem(editandoId, {
         recursoId: finalUpdated.recursoId,
         cantidad: finalUpdated.cantidad,
@@ -133,39 +149,32 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
         horaTotal: finalUpdated.horaTotal,
         costoInterno: finalUpdated.costoInterno,
         costoCliente: finalUpdated.costoCliente,
-        costoHora: finalUpdated.costoHora
+        costoHora: finalUpdated.costoHora,
+        orden: finalUpdated.orden
       })
-
-      // ✅ Update local state after successful save
       onUpdated(finalUpdated)
       cancelEditing()
     } catch (error) {
       console.error('Error saving item:', error)
-      // TODO: Show error toast to user
+    } finally {
+      setSaving(false)
     }
   }
 
-  // ✅ Calculate totals including edited values for real-time updates
   const calculateTotals = () => {
     const allItems = items.map(item => {
       if (editandoId === item.id && editableItem) {
-        // Use edited values for the item being edited
         return {
           ...item,
           horaTotal: editableItem.horaTotal ?? item.horaTotal ?? 0,
-          factorSeguridad: editableItem.factorSeguridad ?? item.factorSeguridad ?? 1,
-          margen: editableItem.margen ?? item.margen ?? 1,
           costoInterno: editableItem.costoInterno ?? item.costoInterno ?? 0,
           costoCliente: editableItem.costoCliente ?? item.costoCliente ?? 0
         }
       }
       return item
     })
-
     return {
       totalHH: allItems.reduce((sum, i) => sum + (i.horaTotal ?? 0), 0),
-      promedioFactor: allItems.length ? allItems.reduce((sum, i) => sum + (i.factorSeguridad ?? 1), 0) / allItems.length : 0,
-      promedioMargen: allItems.length ? allItems.reduce((sum, i) => sum + (i.margen ?? 1), 0) / allItems.length : 0,
       totalCostoInterno: allItems.reduce((sum, i) => sum + (i.costoInterno ?? 0), 0),
       totalCostoCliente: allItems.reduce((sum, i) => sum + (i.costoCliente ?? 0), 0)
     }
@@ -174,142 +183,238 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
   const totals = calculateTotals()
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border rounded shadow-sm">
-        <thead className="bg-gray-100 text-gray-700">
-          <tr>
-            <th className="p-2">Nombre</th>
-            <th className="p-2">Categoría</th>
-            <th className="p-2">Recurso</th>
-            <th className="p-2">Unidad</th>
-            <th className="p-2 text-center">Cantidad</th>
-            <th className="p-2 text-center">Costo/Hora</th>
-            <th className="p-2 text-center">HH Totales</th>
-            <th className="p-2 text-center">Factor</th>
-            <th className="p-2 text-center text-blue-700">Costo Interno</th>
-            <th className="p-2 text-center">Margen</th>
-            <th className="p-2 text-right text-green-700">Costo Cliente</th>
-            <th className="p-2 text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, index) => {
-            const editando = editandoId === item.id
-            const key = item.id || `temp-${index}`
-            return (
-              <tr key={key} className="border-t hover:bg-gray-50">
-                <td className="p-2 flex items-center gap-1">
-                  <span>{item.nombre}</span>
-                  {item.descripcion && (
-                    <Tooltip.Provider>
-                      <Tooltip.Root>
-                        <Tooltip.Trigger asChild>
-                          <button className="text-gray-400 hover:text-blue-600">
-                            <Info className="w-4 h-4" />
-                          </button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Portal>
-                          <Tooltip.Content
-                            side="right"
-                            sideOffset={6}
-                            className="bg-black text-white px-2 py-1 rounded text-xs shadow-md max-w-xs z-50"
-                          >
+    <div className="border rounded-lg overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-gray-50/80 border-b">
+              <th className="px-2 py-1.5 text-left font-semibold text-gray-700">Servicio</th>
+              <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-20">Recurso</th>
+              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Cant.</th>
+              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Horas</th>
+              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Factor</th>
+              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16">Dific.</th>
+              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Marg.</th>
+              <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-20">Interno</th>
+              <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-20">Cliente</th>
+              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {sortedItems.map((item, idx) => {
+              const editando = editandoId === item.id
+              const currentItem = editando ? { ...item, ...editableItem } : item
+
+              return (
+                <tr
+                  key={item.id}
+                  className={cn(
+                    'hover:bg-blue-50/50 transition-colors',
+                    idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                  )}
+                >
+                  {/* Servicio */}
+                  <td className="px-2 py-1.5">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-help">
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium text-gray-900 line-clamp-1">{item.nombre}</span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 flex-shrink-0">
+                                {item.unidadServicioNombre}
+                              </Badge>
+                            </div>
+                            {item.edt?.nombre && (
+                              <div className="text-[10px] text-gray-400">{item.edt.nombre}</div>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        {item.descripcion && (
+                          <TooltipContent side="right" className="max-w-xs text-xs">
                             {item.descripcion}
-                            <Tooltip.Arrow className="fill-black" />
-                          </Tooltip.Content>
-                        </Tooltip.Portal>
-                      </Tooltip.Root>
-                    </Tooltip.Provider>
-                  )}
-                </td>
-                <td className="p-2">{item.categoria}</td>
-                <td className="p-2">
-                  {editando ? (
-                    <select
-                      className="border rounded px-2 py-1 text-sm"
-                      value={editableItem.recursoId}
-                      onChange={(e) => handleChange('recursoId', e.target.value)}
-                    >
-                      {recursos.map(r => (
-                        <option key={r.id} value={r.id}>{r.nombre}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    item.recursoNombre
-                  )}
-                </td>
-                <td className="p-2">{item.unidadServicioNombre}</td>
-                <td className="p-2 text-center">
-                  {editando ? (
-                    <input
-                      type="number"
-                      className="border rounded px-2 py-1 w-20"
-                      value={editableItem.cantidad ?? item.cantidad}
-                      onChange={(e) => handleChange('cantidad', +e.target.value)}
-                    />
-                  ) : (
-                    item.cantidad
-                  )}
-                </td>
-                <td className="p-2 text-center text-blue-700">${(editando && editableItem.costoHora !== undefined ? editableItem.costoHora : item.costoHora)?.toFixed(2)}</td>
-                <td className="p-2 text-center">{(editando && editableItem.horaTotal !== undefined ? editableItem.horaTotal : item.horaTotal)?.toFixed(2)}</td>
-                <td className="p-2 text-center">
-                  {editando ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="border rounded px-2 py-1 w-20"
-                      value={editableItem.factorSeguridad ?? item.factorSeguridad}
-                      onChange={(e) => handleChange('factorSeguridad', +e.target.value)}
-                    />
-                  ) : (
-                    item.factorSeguridad
-                  )}
-                </td>
-                <td className="p-2 text-center text-blue-700">${(editando && editableItem.costoInterno !== undefined ? editableItem.costoInterno : item.costoInterno)?.toFixed(2)}</td>
-                <td className="p-2 text-center">
-                  {editando ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="border rounded px-2 py-1 w-20"
-                      value={editableItem.margen ?? item.margen}
-                      onChange={(e) => handleChange('margen', +e.target.value)}
-                    />
-                  ) : (
-                    item.margen
-                  )}
-                </td>
-                <td className="p-2 text-right text-green-700">${(editando && editableItem.costoCliente !== undefined ? editableItem.costoCliente : item.costoCliente)?.toFixed(2)}</td>
-                <td className="p-2 text-center space-x-1">
-                  {editando ? (
-                    <>
-                      <button onClick={handleSave}><Save className="w-5 h-5 text-green-600" /></button>
-                      <button onClick={cancelEditing}><X className="w-5 h-5 text-gray-500" /></button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => startEditing(item)}><Pencil className="w-5 h-5 text-blue-600" /></button>
-                      <button onClick={() => onDeleted(item.id)}><Trash2 className="w-5 h-5 text-red-500" /></button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-        <tfoot className="bg-gray-100 font-semibold text-sm">
-          <tr>
-            <td className="p-2" colSpan={6}>Totales</td>
-            <td className="p-2 text-center">{totals.totalHH.toFixed(2)}</td>
-            <td className="p-2 text-center">{totals.promedioFactor.toFixed(2)}</td>
-            <td className="p-2 text-center text-blue-700">${totals.totalCostoInterno.toFixed(2)}</td>
-            <td className="p-2 text-center">{totals.promedioMargen.toFixed(2)}</td>
-            <td className="p-2 text-right text-green-700">${totals.totalCostoCliente.toFixed(2)}</td>
-            <td />
-          </tr>
-        </tfoot>
-      </table>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  </td>
+
+                  {/* Recurso */}
+                  <td className="px-2 py-1.5">
+                    {editando ? (
+                      <select
+                        className="w-full h-5 text-[10px] border rounded px-1"
+                        value={editableItem.recursoId ?? item.recursoId}
+                        onChange={(e) => handleChange('recursoId', e.target.value)}
+                        disabled={saving}
+                      >
+                        {recursos.map(r => (
+                          <option key={r.id} value={r.id}>{r.nombre}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div>
+                        <div className="text-gray-700">{item.recursoNombre}</div>
+                        <div className="text-[10px] text-gray-400">${item.costoHora}/h</div>
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Cantidad */}
+                  <td className="px-2 py-1.5 text-center">
+                    {editando ? (
+                      <input
+                        type="number"
+                        min={1}
+                        value={editableItem.cantidad ?? item.cantidad}
+                        onChange={(e) => handleChange('cantidad', parseInt(e.target.value) || 0)}
+                        className="w-10 h-5 text-xs text-center border rounded"
+                        disabled={saving}
+                      />
+                    ) : (
+                      <span className="font-medium">{item.cantidad}</span>
+                    )}
+                  </td>
+
+                  {/* Horas */}
+                  <td className="px-2 py-1.5 text-center">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="font-medium text-purple-600 cursor-help">
+                            {(currentItem.horaTotal ?? 0).toFixed(0)}h
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          <p>Base: {item.horaBase || 0}h + ({item.cantidad - 1} × {item.horaRepetido || 0}h)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </td>
+
+                  {/* Factor */}
+                  <td className="px-2 py-1.5 text-center">
+                    {editando ? (
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={1}
+                        value={editableItem.factorSeguridad ?? item.factorSeguridad}
+                        onChange={(e) => handleChange('factorSeguridad', parseFloat(e.target.value) || 1)}
+                        className="w-10 h-5 text-xs text-center border rounded"
+                        disabled={saving}
+                      />
+                    ) : (
+                      <span>{(item.factorSeguridad ?? 1).toFixed(1)}x</span>
+                    )}
+                  </td>
+
+                  {/* Dificultad */}
+                  <td className="px-2 py-1.5 text-center">
+                    {editando ? (
+                      <select
+                        className="h-5 text-[10px] border rounded px-0.5"
+                        value={editableItem.nivelDificultad ?? item.nivelDificultad ?? 1}
+                        onChange={(e) => handleChange('nivelDificultad', parseInt(e.target.value))}
+                        disabled={saving}
+                      >
+                        <option value={1}>Baja</option>
+                        <option value={2}>Media</option>
+                        <option value={3}>Alta</option>
+                        <option value={4}>Crítica</option>
+                      </select>
+                    ) : (
+                      <Badge variant="outline" className={cn('text-[10px] px-1 py-0', dificultadColors[item.nivelDificultad || 1])}>
+                        {dificultadLabels[item.nivelDificultad || 1]}
+                      </Badge>
+                    )}
+                  </td>
+
+                  {/* Margen */}
+                  <td className="px-2 py-1.5 text-center">
+                    {editando ? (
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={1}
+                        value={editableItem.margen ?? item.margen}
+                        onChange={(e) => handleChange('margen', parseFloat(e.target.value) || 1)}
+                        className="w-10 h-5 text-xs text-center border rounded"
+                        disabled={saving}
+                      />
+                    ) : (
+                      <span>{(item.margen ?? 1).toFixed(2)}x</span>
+                    )}
+                  </td>
+
+                  {/* Interno */}
+                  <td className="px-2 py-1.5 text-right font-mono text-gray-700">
+                    {formatCurrency(currentItem.costoInterno ?? 0)}
+                  </td>
+
+                  {/* Cliente */}
+                  <td className="px-2 py-1.5 text-right font-mono font-medium text-green-600">
+                    {formatCurrency(currentItem.costoCliente ?? 0)}
+                  </td>
+
+                  {/* Acciones */}
+                  <td className="px-2 py-1.5 text-center">
+                    <div className="flex items-center justify-center gap-0.5">
+                      {editando ? (
+                        <>
+                          <Button size="sm" onClick={handleSave} disabled={saving} className="h-5 w-5 p-0">
+                            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={cancelEditing} disabled={saving} className="h-5 w-5 p-0">
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => startEditing(item)}
+                            className="h-5 w-5 p-0"
+                          >
+                            <Edit className="h-3 w-3 text-gray-500" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDeleted(item.id)}
+                            className="h-5 w-5 p-0 hover:bg-red-100"
+                          >
+                            <Trash2 className="h-3 w-3 text-gray-500" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="bg-gray-100/80 border-t-2">
+              <td colSpan={3} className="px-2 py-1.5 text-right font-medium text-gray-700">
+                Total ({sortedItems.length} servicios):
+              </td>
+              <td className="px-2 py-1.5 text-center font-medium text-purple-700">
+                {totals.totalHH.toFixed(0)}h
+              </td>
+              <td colSpan={3}></td>
+              <td className="px-2 py-1.5 text-right font-mono font-medium text-gray-700">
+                {formatCurrency(totals.totalCostoInterno)}
+              </td>
+              <td className="px-2 py-1.5 text-right font-mono font-bold text-green-700">
+                {formatCurrency(totals.totalCostoCliente)}
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   )
 }

@@ -108,7 +108,8 @@ export async function createTestData() {
       create: {
         id: 'prov-test-001',
         nombre: 'Proveedor Test E2E',
-        ruc: '20123456789'
+        ruc: '20123456789',
+        updatedAt: new Date()
       }
     })
     
@@ -118,7 +119,8 @@ export async function createTestData() {
       update: {},
       create: {
         id: 'cat-test-001',
-        nombre: 'MAQUINARIA_PESADA'
+        nombre: 'MAQUINARIA_PESADA',
+        updatedAt: new Date()
       }
     })
 
@@ -128,7 +130,8 @@ export async function createTestData() {
       update: {},
       create: {
         id: 'unidad-test-001',
-        nombre: 'UNIDAD'
+        nombre: 'UNIDAD',
+        updatedAt: new Date()
       }
     })
 
@@ -146,7 +149,8 @@ export async function createTestData() {
         precioInterno: 150000,
         margen: 0.2,
         precioVenta: 180000,
-        estado: 'ACTIVO'
+        estado: 'ACTIVO',
+        updatedAt: new Date()
       }
     })
     
@@ -161,7 +165,8 @@ export async function createTestData() {
         ruc: '20123456789',
         direccion: 'Lima, Perú',
         telefono: '01-234-5678',
-        correo: 'cliente@test.com'
+        correo: 'cliente@test.com',
+        updatedAt: new Date()
       }
     })
 
@@ -202,7 +207,8 @@ export async function createTestData() {
         nombre: 'Proyecto Test E2E',
         codigo: 'PROJ-TEST-001',
         fechaInicio: new Date(),
-        estado: 'en_ejecucion'
+        estado: 'en_ejecucion',
+        updatedAt: new Date()
       }
     })
     
@@ -217,7 +223,8 @@ export async function createTestData() {
         codigo: 'PED-TEST-001',
         numeroSecuencia: 1,
         fechaNecesaria: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
-        estado: 'enviado'
+        estado: 'enviado',
+        updatedAt: new Date()
       }
     })
     

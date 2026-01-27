@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const data = await prisma.plantillaGastoItem.findMany({
       include: {
-        gasto: true,
+        plantillaGasto: true,
       },
     })
     return NextResponse.json(data)
@@ -28,7 +28,11 @@ export async function POST(req: Request) {
     const payload: PlantillaGastoItemPayload = await req.json()
 
     const data = await prisma.plantillaGastoItem.create({
-      data: payload,
+      data: {
+        ...payload,
+        id: `plantilla-gasto-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        updatedAt: new Date()
+      },
     })
 
     // 🔁 Recalcular totales de la plantilla

@@ -260,7 +260,7 @@ export function FasesList({ fases, onFaseEdit, onFaseDelete, onRefresh }: FasesL
                             <div>
                               <div className="font-medium">{edt.nombre}</div>
                               <div className="text-muted-foreground">
-                                {edt.categoriaServicio?.nombre}
+                                {edt.edt?.nombre}
                               </div>
                             </div>
                             <Badge variant="outline" className={getEstadoColor(edt.estado)}>

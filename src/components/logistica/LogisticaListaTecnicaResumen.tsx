@@ -20,8 +20,8 @@ export default function LogisticaListaTecnicaResumen({
   const totalListas = listas.length
   const totalPorCotizar = listas.filter((l) => l.estado === 'por_cotizar').length
   const totalPorValidar = listas.filter((l) => l.estado === 'por_validar').length
-  const totalAprobadas = listas.filter((l) => l.estado === 'aprobado').length
-  const totalRechazadas = listas.filter((l) => l.estado === 'rechazado').length
+  const totalAprobadas = listas.filter((l) => l.estado === 'aprobada').length
+  const totalRechazadas = listas.filter((l) => l.estado === 'rechazada').length
 
   const handleProyectoChange = (proyectoId: string) => {
     setSelectedProyecto(proyectoId)

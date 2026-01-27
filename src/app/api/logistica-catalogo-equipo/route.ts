@@ -20,7 +20,7 @@ export async function GET() {
         marca: true,
         precioInterno: true,
         estado: true,
-        categoria: { select: { id: true, nombre: true } },
+        categoriaEquipo: { select: { id: true, nombre: true } },
         unidad: { select: { id: true, nombre: true } },
       },
       orderBy: { createdAt: 'desc' }
@@ -47,6 +47,7 @@ export async function POST(req: Request) {
 
     const nuevo = await prisma.catalogoEquipo.create({
       data: {
+        id: `cat-equipo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         codigo: data.codigo,
         descripcion: data.descripcion,
         marca: data.marca,
@@ -55,7 +56,8 @@ export async function POST(req: Request) {
         precioVenta: 0,     // Logística no define precioVenta → fijo en 0
         categoriaId: data.categoriaId,
         unidadId: data.unidadId,
-        estado: data.estado
+        estado: data.estado,
+        updatedAt: new Date()
       },
       select: {
         id: true,
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
         marca: true,
         precioInterno: true,
         estado: true,
-        categoria: { select: { id: true, nombre: true } },
+        categoriaEquipo: { select: { id: true, nombre: true } },
         unidad: { select: { id: true, nombre: true } },
       }
     })

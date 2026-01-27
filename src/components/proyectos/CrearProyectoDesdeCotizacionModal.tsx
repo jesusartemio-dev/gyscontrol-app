@@ -29,7 +29,6 @@ export default function CrearProyectoDesdeCotizacionModal({
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [fechaInicio, setFechaInicio] = useState('')
-  const [fechaFin, setFechaFin] = useState('')
   const [loading, setLoading] = useState(false)
 
   // ✅ Validaciones de negocio (re-evaluadas en cada render)
@@ -62,7 +61,7 @@ export default function CrearProyectoDesdeCotizacionModal({
         grandTotal: cotizacion.grandTotal,
         estado: 'creado', // ✅ Use correct enum value
         fechaInicio,
-        fechaFin: fechaFin || undefined
+        fechaFin: undefined
       })
 
       toast.success('Proyecto creado exitosamente')
@@ -70,7 +69,6 @@ export default function CrearProyectoDesdeCotizacionModal({
 
       // Reset form
       setFechaInicio('')
-      setFechaFin('')
 
       // Navigate to the new project (client-side navigation)
       router.push(`/proyectos/${proyecto.id}`)
@@ -177,29 +175,15 @@ export default function CrearProyectoDesdeCotizacionModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="fechaInicio">Fecha de inicio *</Label>
-              <Input
-                id="fechaInicio"
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-full"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fechaFin">Fecha de fin (opcional)</Label>
-              <Input
-                id="fechaFin"
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="w-full"
-                min={fechaInicio}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="fechaInicio">Fecha de inicio *</Label>
+            <Input
+              id="fechaInicio"
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+              className="w-full"
+            />
           </div>
         </div>
 

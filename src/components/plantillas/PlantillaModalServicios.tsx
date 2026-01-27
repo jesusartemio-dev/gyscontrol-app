@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Loader2, AlertCircle, X, Truck } from 'lucide-react'
 import { createPlantilla } from '@/lib/services/plantilla'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
-import type { Plantilla, CategoriaServicio } from '@/types'
+import { getEdts } from '@/lib/services/edt'
+import type { Plantilla, Edt } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,40 +24,47 @@ import {
 interface Props {
   onCreated: (nueva: Plantilla) => void
   trigger?: React.ReactNode
+  isOpen?: boolean
+  onClose?: () => void
 }
 
-export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
-  const [open, setOpen] = useState(false)
+export default function PlantillaModalServicios({ onCreated, trigger, isOpen, onClose }: Props) {
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  // Determinar si usar control externo
+  const isExternallyControlled = isOpen !== undefined
+  const open = isExternallyControlled ? isOpen : internalOpen
+  const setOpen = onClose !== undefined ? (value: boolean) => { if (!value) onClose() } : setInternalOpen
   const [nombre, setNombre] = useState('')
-  const [categoriaId, setCategoriaId] = useState('')
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [edtId, setEdtId] = useState('')
+  const [edts, setEdts] = useState<Edt[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [loadingCategorias, setLoadingCategorias] = useState(false)
-  const [errors, setErrors] = useState<{ nombre?: string; categoriaId?: string }>({})
+  const [loadingEdts, setLoadingEdts] = useState(false)
+  const [errors, setErrors] = useState<{ nombre?: string; edtId?: string }>({})
 
-  // Load categorias when modal opens
+  // Load EDTs when modal opens
   useEffect(() => {
     if (open) {
-      loadCategorias()
+      loadEdts()
     }
   }, [open])
 
-  const loadCategorias = async () => {
-    setLoadingCategorias(true)
+  const loadEdts = async () => {
+    setLoadingEdts(true)
     try {
-      const data = await getCategoriasServicio()
-      setCategorias(data)
+      const data = await getEdts()
+      setEdts(data)
     } catch (error) {
-      console.error('Error loading categorias:', error)
+      console.error('Error loading EDTs:', error)
     } finally {
-      setLoadingCategorias(false)
+      setLoadingEdts(false)
     }
   }
 
   // ✅ Form validation
   const validateForm = () => {
-    const newErrors: { nombre?: string; categoriaId?: string } = {}
+    const newErrors: { nombre?: string; edtId?: string } = {}
 
     if (!nombre.trim()) {
       newErrors.nombre = 'El nombre es obligatorio'
@@ -67,8 +74,8 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
       newErrors.nombre = 'El nombre no puede exceder 100 caracteres'
     }
 
-    if (!categoriaId) {
-      newErrors.categoriaId = 'Debe seleccionar una categoría de servicios'
+    if (!edtId) {
+      newErrors.edtId = 'Debe seleccionar un EDT'
     }
 
     setErrors(newErrors)
@@ -94,7 +101,7 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
         },
         body: JSON.stringify({
           nombre: nombre.trim(),
-          categoria: categoriaId,
+          edtId: edtId,
         }),
       })
 
@@ -108,7 +115,7 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
         onCreated(nueva)
         // Reset form and close modal
         setNombre('')
-        setCategoriaId('')
+        setEdtId('')
         setError(null)
         setErrors({})
         setOpen(false)
@@ -129,7 +136,7 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
     if (!newOpen) {
       // Reset form when closing
       setNombre('')
-      setCategoriaId('')
+      setEdtId('')
       setError(null)
       setErrors({})
     }
@@ -137,14 +144,16 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button className="bg-green-600 hover:bg-green-700 text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Plantilla de Servicios
-          </Button>
-        )}
-      </DialogTrigger>
+      {!isExternallyControlled && (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button className="bg-green-600 hover:bg-green-700 text-white">
+              <Plus className="h-4 w-4 mr-2" />
+              Servicios
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -200,37 +209,37 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
             )}
           </div>
 
-          {/* Category Selection */}
+          {/* EDT Selection */}
           <div className="space-y-2">
-            <Label htmlFor="categoria">Categoría de Servicios *</Label>
+            <Label htmlFor="edt">EDT *</Label>
             <Select
-              value={categoriaId}
+              value={edtId}
               onValueChange={(value) => {
-                setCategoriaId(value)
-                if (errors.categoriaId) {
-                  setErrors(prev => ({ ...prev, categoriaId: undefined }))
+                setEdtId(value)
+                if (errors.edtId) {
+                  setErrors(prev => ({ ...prev, edtId: undefined }))
                 }
               }}
-              disabled={loading || loadingCategorias}
+              disabled={loading || loadingEdts}
             >
-              <SelectTrigger className={errors.categoriaId ? 'border-red-500 focus:border-red-500' : ''}>
-                <SelectValue placeholder={loadingCategorias ? "Cargando categorías..." : "Selecciona una categoría"} />
+              <SelectTrigger className={errors.edtId ? 'border-red-500 focus:border-red-500' : ''}>
+                <SelectValue placeholder={loadingEdts ? "Cargando EDTs..." : "Selecciona un EDT"} />
               </SelectTrigger>
               <SelectContent>
-                {categorias.map((categoria) => (
-                  <SelectItem key={categoria.id} value={categoria.id}>
-                    {categoria.nombre}
+                {edts.map((edt) => (
+                  <SelectItem key={edt.id} value={edt.id}>
+                    {edt.nombre}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.categoriaId && (
+            {errors.edtId && (
               <motion.p
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-sm text-red-600"
               >
-                {errors.categoriaId}
+                {errors.edtId}
               </motion.p>
             )}
           </div>
@@ -239,10 +248,10 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
           <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center gap-2 text-green-800">
               <Truck className="h-4 w-4" />
-              <span className="text-sm font-medium">Plantilla de Servicios por Categoría</span>
+              <span className="text-sm font-medium">Plantilla de Servicios por EDT</span>
             </div>
             <p className="text-xs text-green-700 mt-1">
-              Esta plantilla solo permitirá agregar servicios de la categoría seleccionada. Podrás elegir múltiples items del catálogo de servicios para crear una plantilla especializada.
+              Esta plantilla solo permitirá agregar servicios del EDT seleccionado. Podrás elegir múltiples items del catálogo de servicios para crear una plantilla especializada.
             </p>
           </div>
 
@@ -257,7 +266,7 @@ export default function PlantillaModalServicios({ onCreated, trigger }: Props) {
             </Button>
             <Button
               type="submit"
-              disabled={loading || !nombre.trim() || !categoriaId}
+              disabled={loading || !nombre.trim() || !edtId}
               className="bg-green-600 hover:bg-green-700 text-white"
             >
               {loading ? (

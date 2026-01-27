@@ -106,7 +106,7 @@ export async function GET(req: Request, context: { params: Promise<{ proyectoEqu
       include: {
         catalogoEquipo: {
           select: {
-            categoria: true
+            categoriaEquipo: true
           }
         }
       },
@@ -130,7 +130,7 @@ export async function GET(req: Request, context: { params: Promise<{ proyectoEqu
       const proyectoEquipoConItems = await prisma.proyectoEquipoCotizado.findUnique({
         where: { id: proyectoEquipoId },
         include: {
-          items: {
+          proyectoEquipoCotizadoItem: {
             select: {
               id: true,
               descripcion: true,
@@ -143,8 +143,8 @@ export async function GET(req: Request, context: { params: Promise<{ proyectoEqu
 
       console.log('🔍 Verificación del ProyectoEquipo:', {
         proyectoEquipoEncontrado: !!proyectoEquipoConItems,
-        itemsEnProyectoEquipo: proyectoEquipoConItems?.items?.length || 0,
-        itemsDetalle: proyectoEquipoConItems?.items || []
+        itemsEnProyectoEquipo: proyectoEquipoConItems?.proyectoEquipoCotizadoItem?.length || 0,
+        itemsDetalle: proyectoEquipoConItems?.proyectoEquipoCotizadoItem || []
       })
     }
 

@@ -19,7 +19,6 @@ import {
   deletePlantillaServicioItem,
   updatePlantillaServicioItem
 } from '@/lib/services/plantillaServicioItem'
-import { recalcularTotalesPlantilla } from '@/lib/utils/recalculoPlantilla'
 import PlantillaServicioItemList from '@/components/plantillas/PlantillaServicioItemList'
 import { calcularSubtotal } from '@/lib/utils/costos'
 import type { PlantillaServicio, PlantillaServicioItem } from '@/types'
@@ -44,7 +43,7 @@ export default function ServicioDetallePage() {
     setGrupo({ ...grupo, items: nuevosItems, ...nuevosTotales })
 
     // ✅ Recalcula y guarda los totales globales
-    await recalcularTotalesPlantilla(plantillaId)
+    await fetch(`/api/plantilla/${plantillaId}/recalcular`, { method: 'POST' })
   }
 
   if (error) return <p className="text-red-500">{error}</p>

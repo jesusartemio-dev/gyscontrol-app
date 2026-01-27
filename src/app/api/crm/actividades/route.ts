@@ -56,14 +56,14 @@ export async function GET(request: NextRequest) {
       prisma.crmActividad.findMany({
         where,
         include: {
-          usuario: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          oportunidad: {
+          crmOportunidad: {
             select: {
               id: true,
               nombre: true,

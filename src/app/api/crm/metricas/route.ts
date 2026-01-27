@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         }
       },
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
       totales,
       promedios,
       usuarios: metricas.map(metrica => ({
-        usuario: metrica.usuario,
+        usuario: metrica.user,
         metricas: {
           cotizacionesGeneradas: metrica.cotizacionesGeneradas,
           cotizacionesAprobadas: metrica.cotizacionesAprobadas,
@@ -104,8 +104,8 @@ export async function GET(request: NextRequest) {
       })),
       estadisticas: {
         numUsuarios,
-        mejorVendedor: metricas[0]?.usuario || null,
-        peorVendedor: metricas[metricas.length - 1]?.usuario || null,
+        mejorVendedor: metricas[0]?.user || null,
+        peorVendedor: metricas[metricas.length - 1]?.user || null,
         promedioCotizacionesPorUsuario: numUsuarios > 0 ? totales.cotizacionesGeneradas / numUsuarios : 0,
         promedioValorPorUsuario: numUsuarios > 0 ? totales.valorTotalVendido / numUsuarios : 0
       }

@@ -19,11 +19,13 @@ export async function POST(req: Request) {
     // ✅ Crear el nuevo grupo de equipos
     const nuevo = await prisma.cotizacionEquipo.create({
       data: {
+        id: `cot-equipo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionId: data.cotizacionId,
         nombre: data.nombre,
         descripcion: data.descripcion || '',
         subtotalInterno: 0,
         subtotalCliente: 0,
+        updatedAt: new Date()
       },
     })
 

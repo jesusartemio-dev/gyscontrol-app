@@ -30,9 +30,13 @@ export async function PATCH(
     const tareaExistente = await prisma.cotizacionTarea.findUnique({
       where: { id: taskId },
       include: {
-        cotizacionEdt: {
+        cotizacionActividad: {
           include: {
-            cotizacion: true
+            cotizacionEdt: {
+              include: {
+                cotizacion: true
+              }
+            }
           }
         }
       }
@@ -45,7 +49,7 @@ export async function PATCH(
       )
     }
 
-    if (tareaExistente.cotizacionEdt.cotizacionId !== id) {
+    if (tareaExistente.cotizacionActividad?.cotizacionEdt.cotizacionId !== id) {
       return NextResponse.json(
         { error: 'La tarea no pertenece a esta cotización' },
         { status: 403 }
@@ -100,8 +104,8 @@ export async function PATCH(
       }
 
       // Verificar que las fechas estén dentro del EDT
-      const edtStart = tareaExistente.cotizacionEdt.fechaInicioComercial
-      const edtEnd = tareaExistente.cotizacionEdt.fechaFinComercial
+      const edtStart = tareaExistente.cotizacionActividad?.cotizacionEdt.fechaInicioComercial
+      const edtEnd = tareaExistente.cotizacionActividad?.cotizacionEdt.fechaFinComercial
 
       if (edtStart && startDate && startDate < new Date(edtStart)) {
         return NextResponse.json(
@@ -164,7 +168,7 @@ export async function PATCH(
       where: { id: taskId },
       data: updateData,
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true }
         }
       }

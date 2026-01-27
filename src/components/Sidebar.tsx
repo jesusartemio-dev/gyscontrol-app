@@ -40,7 +40,10 @@ import {
   GitBranch,
   Calendar,
   FileCheck,
-  Target
+  Target,
+  Shield,
+  UserCheck,
+  History
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -61,6 +64,8 @@ export default function Sidebar() {
     comercial: false,
     crm: false,
     proyectos: false,
+    'mi-trabajo': false,
+    supervision: false,
     logistica: false,
     finanzas: false,
     gestion: false,
@@ -158,17 +163,34 @@ export default function Sidebar() {
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart },
-        { 
-          href: '/proyectos/tareas', 
-          label: 'Gestión de Tareas', 
-          icon: CheckSquare,
-          submenu: [
-            { href: '/proyectos/tareas', label: 'Lista de Tareas', icon: CheckSquare },
-            { href: '/proyectos/tareas/gantt', label: 'Cronograma Gantt', icon: Calendar },
-            { href: '/proyectos/tareas/dependencias', label: 'Dependencias', icon: GitBranch }
-          ]
-        },
       ],
+    },
+    // 2.1. Mi Trabajo - Registro personal de horas y tareas (para todos)
+    {
+      key: 'mi-trabajo',
+      title: 'Mi Trabajo',
+      icon: Clock,
+      color: 'text-emerald-400',
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador'],
+      links: [
+        { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
+        { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
+        { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
+      ]
+    },
+    // 2.2. Supervisión - Vista de equipo y análisis (solo supervisores)
+    {
+      key: 'supervision',
+      title: 'Supervisión',
+      icon: Users,
+      color: 'text-red-400',
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'],
+      links: [
+        { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
+        { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
+        { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
+        { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
+      ]
     },
     // 3. Logística - Gestión completa de la cadena logística
     {
@@ -181,12 +203,10 @@ export default function Sidebar() {
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
-        { href: '/gestion/reportes/pedidos', label: 'Dashboard de Pedidos', icon: BarChart3 },
-        { href: '/gestion/reportes/trazabilidad', label: 'Trazabilidad', icon: Activity },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
       ],
     },
-    // 4. Finanzas - Control financiero y flujo de caja
+    // 4. Finanzas - Control financiero y aprovisionamiento
     {
       key: 'finanzas',
       title: 'Finanzas',
@@ -195,23 +215,10 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'gestor'],
       links: [
         { href: '/finanzas/dashboard', label: 'Dashboard', icon: BarChart3 },
-        { 
-          href: '/finanzas/aprovisionamiento', 
-          label: 'Aprovisionamiento', 
-          icon: Clock,
-          submenu: [
-            { href: '/finanzas/aprovisionamiento', label: 'Dashboard', icon: BarChart3 },
-            { href: '/finanzas/aprovisionamiento/proyectos', label: 'Proyectos', icon: FolderOpen },
-            { href: '/finanzas/aprovisionamiento/listas', label: 'Listas de Equipo', icon: FileText },
-            { href: '/finanzas/aprovisionamiento/pedidos', label: 'Pedidos', icon: Package },
-            { href: '/finanzas/aprovisionamiento/timeline', label: 'Timeline Gantt', icon: Clock }
-          ]
-        },
-        { href: '/finanzas/flujo-caja', label: 'Flujo de Caja', icon: TrendingUp },
-        { href: '/finanzas/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: DollarSign },
-        { href: '/finanzas/cuentas-pagar', label: 'Cuentas por Pagar', icon: CreditCard },
-        { href: '/finanzas/presupuestos', label: 'Presupuestos', icon: PieChart },
-        { href: '/finanzas/rentabilidad', label: 'Análisis Rentabilidad', icon: BarChart3 },
+        { href: '/finanzas/aprovisionamiento/proyectos', label: 'Proyectos', icon: FolderOpen },
+        { href: '/finanzas/aprovisionamiento/listas', label: 'Listas', icon: FileText },
+        { href: '/finanzas/aprovisionamiento/pedidos', label: 'Pedidos', icon: Package },
+        { href: '/finanzas/aprovisionamiento/timeline', label: 'Timeline', icon: Clock },
       ],
     },
     // 5. Gestión - Análisis y control
@@ -222,20 +229,10 @@ export default function Sidebar() {
       color: 'text-cyan-400',
       roles: ['admin', 'gerente', 'gestor'],
       links: [
-        { href: '/gestion/valorizaciones', label: 'Valorizaciones', icon: Calculator },
-        { 
-          href: '/gestion/reportes', 
-          label: 'Reportes', 
-          icon: BarChart3,
-          submenu: [
-            { href: '/gestion/reportes', label: 'Dashboard Reportes', icon: BarChart3 },
-            { href: '/gestion/reportes/pedidos', label: 'Reportes Pedidos', icon: Package },
-            { href: '/gestion/reportes/trazabilidad', label: 'Trazabilidad', icon: Activity },
-            { href: '/gestion/reportes/performance', label: 'Performance', icon: TrendingUp },
-            { href: '/gestion/reportes/financiero', label: 'Financiero', icon: DollarSign }
-          ]
-        },
-        { href: '/gestion/indicadores', label: 'Indicadores', icon: BarChart3 },
+        { href: '/gestion/reportes', label: 'Reportes', icon: BarChart3 },
+        { href: '/gestion/reportes/pedidos', label: 'Pedidos', icon: Package },
+        { href: '/gestion/reportes/performance', label: 'Performance', icon: TrendingUp },
+        { href: '/gestion/reportes/financiero', label: 'Financiero', icon: DollarSign },
       ],
     },
     // 6. Configuración - Administración del sistema y catálogos
@@ -247,6 +244,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'comercial', 'logistico', 'proyectos'],
       links: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+        { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },
         // 🏢 Entidades maestras del negocio
@@ -255,7 +253,7 @@ export default function Sidebar() {
         { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
         { href: '/catalogo/servicios', label: 'Catálogo Servicios', icon: FileText },
         { href: '/catalogo/categorias-equipo', label: 'Categorías Equipo', icon: FolderOpen },
-        { href: '/catalogo/categorias-servicio', label: 'Categorías Servicio', icon: FolderOpen },
+        { href: '/catalogo/edts', label: 'EDTs', icon: FolderOpen },
         { href: '/catalogo/unidades', label: 'Unidades Equipos', icon: Calculator },
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },
         { href: '/catalogo/recursos', label: 'Recursos', icon: Wrench },
@@ -264,6 +262,10 @@ export default function Sidebar() {
         { href: '/catalogo/condiciones', label: 'Condiciones', icon: FileCheck },
         // 🏗️ Configuración de fases
         { href: '/configuracion/fases', label: 'Fases por Defecto', icon: GitBranch },
+        // 📅 Configuración de duraciones de cronograma
+        { href: '/configuracion/duraciones-cronograma', label: 'Duraciones Cronograma', icon: Calendar },
+        // 🗓️ Configuración de calendarios laborales
+        { href: '/configuracion/calendario-laboral', label: 'Calendarios Laborales', icon: Calendar },
       ],
     },
   ]

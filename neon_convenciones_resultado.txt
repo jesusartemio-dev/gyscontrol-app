@@ -1,0 +1,18 @@
+
+ANÁLISIS DE CONVENCIONES DE NOMENCLATURA
+======================================
+
+Total columnas analizadas: 100
+
+📋 CLASIFICACIÓN:
+- snake_case: 6 columnas
+- camelCase: 94 columnas  
+- PascalCase: 0 columnas
+- Inconsistente: 0 columnas
+
+EJEMPLOS DE CONVENCIONES:
+- snake_case: refresh_token, access_token, expires_at, token_type, id_token, session_state
+- camelCase: id, userId, type, provider, providerAccountId, scope, id, categoriaId, unidadId, codigo
+- PascalCase: 
+- Inconsistente: 
+

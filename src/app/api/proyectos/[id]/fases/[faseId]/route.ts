@@ -55,17 +55,17 @@ export async function GET(
         proyectoCronograma: {
           select: { id: true, nombre: true, tipo: true }
         },
-        edts: {
+        proyectoEdt: {
           include: {
-            tareas: true,
-            categoriaServicio: {
+            proyectoTarea: true,
+            edt: {
               select: { id: true, nombre: true }
             }
           }
         },
         _count: {
           select: {
-            edts: true
+            proyectoEdt: true
           }
         }
       }

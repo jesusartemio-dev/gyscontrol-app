@@ -12,44 +12,44 @@ import { prisma } from '@/lib/prisma'
 import type { ListaEquipoItemPayload } from '@/types/payloads'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { createId } from '@paralleldrive/cuid2'
 
 // ✅ Obtener todos los ítems
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const proyectoId = searchParams.get('proyectoId')
-    
+
     // 🔍 Construir filtros dinámicamente
     const whereClause: any = {}
-    
+
     if (proyectoId) {
       whereClause.lista = {
         proyectoId: proyectoId
       }
     }
-    
+
     console.log('🔍 DEBUG API lista-equipo-item - Filtros aplicados:', whereClause)
-    
+
     const items = await prisma.listaEquipoItem.findMany({
       where: whereClause,
       include: {
-        lista: true,
+        listaEquipo: true,
         proveedor: true,
-        pedidos: {
+        catalogoEquipo: {
           include: {
-            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+            categoriaEquipo: true
           }
         },
-        proyectoEquipoItem: {
+        pedidoEquipoItem: {
           include: {
-            proyectoEquipo: true,
-            listaEquipoSeleccionado: true,
-          },
+            pedidoEquipo: true
+          }
         },
-        proyectoEquipo: true,
-        cotizaciones: {
+        proyectoEquipoCotizado: true,
+        cotizacionProveedorItems: {
           include: {
-            cotizacion: {
+            cotizacionProveedor: {
               select: {
                 id: true,
                 codigo: true,
@@ -60,19 +60,6 @@ export async function GET(request: Request) {
             },
           },
           orderBy: { codigo: 'asc' },
-        },
-        cotizacionSeleccionada: {
-          include: {
-            cotizacion: {
-              select: {
-                id: true,
-                codigo: true,
-                proveedor: {
-                  select: { nombre: true },
-                },
-              },
-            },
-          },
         },
       },
       orderBy: { codigo: 'asc' },
@@ -148,19 +135,23 @@ export async function POST(request: Request) {
     // ✅ Crear nuevo ítem
     const nuevo = await prisma.listaEquipoItem.create({
       data: {
+        id: createId(), // ✅ Generar ID manualmente ya que el schema no tiene @default(cuid())
         listaId: body.listaId,
         proyectoEquipoItemId: body.proyectoEquipoItemId || null,
         proyectoEquipoId: body.proyectoEquipoId || null,
         reemplazaProyectoEquipoCotizadoItemId: body.reemplazaProyectoEquipoCotizadoItemId || null, // ✅ actualizado
         proveedorId: body.proveedorId || null,
         cotizacionSeleccionadaId: body.cotizacionSeleccionadaId || null,
+        catalogoEquipoId: body.catalogoEquipoId || null,
         responsableId: session.user.id,
         codigo: body.codigo,
         descripcion: body.descripcion,
+        categoria: body.categoria || 'SIN-CATEGORIA',
         unidad: body.unidad,
+        marca: body.marca || 'SIN-MARCA',
         cantidad: body.cantidad ?? 0,
         verificado: body.verificado ?? false,
-        comentarioRevision: body.comentarioRevision || null,
+        comentarioRevision: body.categoria ? `CATEGORIA:${body.categoria}` : body.comentarioRevision || null,
         presupuesto: body.presupuesto ?? null,
         precioElegido: body.precioElegido ?? null,
         costoElegido: body.costoElegido ?? null,
@@ -170,24 +161,25 @@ export async function POST(request: Request) {
         cantidadEntregada: body.cantidadEntregada ?? 0,
         origen: body.origen ?? 'nuevo',
         estado: body.estado ?? 'borrador',
-      },
+        updatedAt: new Date(),
+      } as any,
       include: {
-        lista: true,
+        listaEquipo: true,
         proveedor: true,
-        pedidos: {
+        catalogoEquipo: {
           include: {
-            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+            categoriaEquipo: true
           }
         },
-        proyectoEquipoItem: {
+        pedidoEquipoItem: {
           include: {
-            proyectoEquipo: true,
-          },
+            pedidoEquipo: true
+          }
         },
-        proyectoEquipo: true,
-        cotizaciones: {
+        proyectoEquipoCotizado: true,
+        cotizacionProveedorItems: {
           include: {
-            cotizacion: {
+            cotizacionProveedor: {
               select: {
                 id: true,
                 codigo: true,
@@ -198,19 +190,6 @@ export async function POST(request: Request) {
             },
           },
           orderBy: { codigo: 'asc' },
-        },
-        cotizacionSeleccionada: {
-          include: {
-            cotizacion: {
-              select: {
-                id: true,
-                codigo: true,
-                proveedor: {
-                  select: { nombre: true },
-                },
-              },
-            },
-          },
         },
       },
     })

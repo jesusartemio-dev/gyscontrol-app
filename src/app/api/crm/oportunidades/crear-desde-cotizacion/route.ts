@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       where: { id: cotizacionId },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
     // Crear la oportunidad
     const oportunidad = await prisma.crmOportunidad.create({
       data: {
+        id: crypto.randomUUID(),
         clienteId: cotizacion.cliente.id,
         nombre: cotizacion.nombre || `Oportunidad desde cotización ${cotizacion.codigo}`,
         descripcion: descripcion || `Oportunidad creada automáticamente desde la cotización ${cotizacion.codigo}`,
@@ -68,10 +69,11 @@ export async function POST(req: NextRequest) {
         probabilidad: 50, // Probabilidad inicial por defecto
         estado: 'contacto_inicial',
         fuente: 'cotizacion_existente',
-        comercialId: comercialId || cotizacion.comercial?.id,
-        responsableId: comercialId || cotizacion.comercial?.id,
+        comercialId: comercialId || cotizacion.user?.id,
+        responsableId: comercialId || cotizacion.user?.id,
         cotizacionId: cotizacion.id,
-        fechaCierreEstimada: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 días por defecto
+        fechaCierreEstimada: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días por defecto
+        updatedAt: new Date()
       },
       include: {
         cliente: {
@@ -86,12 +88,14 @@ export async function POST(req: NextRequest) {
     // Crear actividad inicial
     await prisma.crmActividad.create({
       data: {
+        id: crypto.randomUUID(),
         oportunidadId: oportunidad.id,
         tipo: 'seguimiento',
         descripcion: `Oportunidad creada desde cotización ${cotizacion.codigo}`,
         fecha: new Date().toISOString(),
         resultado: 'neutro',
-        usuarioId: comercialId || cotizacion.comercial?.id || 'system'
+        usuarioId: comercialId || cotizacion.user?.id || 'system',
+        updatedAt: new Date()
       }
     })
 

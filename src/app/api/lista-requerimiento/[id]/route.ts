@@ -18,7 +18,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const data = await prisma.listaEquipo.findUnique({
       where: { id },
       include: {
-        items: true,
+        listaEquipoItem: true,
         proyecto: { select: { id: true, nombre: true } }
       }
     })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 
 export async function GET() {
   try {
@@ -14,7 +15,13 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const data = await prisma.recurso.create({ data: body })
+    const data = await prisma.recurso.create({
+      data: {
+        id: randomUUID(),
+        updatedAt: new Date(),
+        ...body,
+      }
+    })
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error en POST /recurso:', error)

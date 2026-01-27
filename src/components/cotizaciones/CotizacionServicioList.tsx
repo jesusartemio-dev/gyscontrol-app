@@ -42,7 +42,7 @@ export default function CotizacionServicioList({
     try {
       setError(null)
       setLoading(id)
-      const actualizado = await updateCotizacionServicio(id, { categoria: value })
+      const actualizado = await updateCotizacionServicio(id, { edtId: value })
       onUpdated(actualizado)
     } catch {
       setError('Error al actualizar la sección.')
@@ -85,12 +85,12 @@ export default function CotizacionServicioList({
                 suppressContentEditableWarning
                 onBlur={(e) => {
                   const value = e.currentTarget.textContent?.trim() || ''
-                  if (value !== s.categoria) {
+                  if (value !== (s.edt?.nombre || s.nombre)) {
                     handleEdit(s.id, value)
                   }
                 }}
               >
-                {loading === s.id ? 'Actualizando...' : s.categoria}
+                {loading === s.id ? 'Actualizando...' : (s.edt?.nombre || s.nombre)}
               </td>
               <td className="border px-4 py-2">$ {s.subtotalCliente.toFixed(2)}</td>
               <td className="border px-4 py-2 space-x-2">

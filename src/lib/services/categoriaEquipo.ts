@@ -11,6 +11,8 @@ export async function getCategoriasEquipo() {
 }
 
 export async function createCategoriaEquipo(data: { nombre: string; descripcion?: string | null }) {
+  console.log('🔹 Creating categoria equipo:', data)
+  
   const res = await fetch(buildApiUrl('/api/categoria-equipo'), {
     method: 'POST',
     headers: {
@@ -20,10 +22,14 @@ export async function createCategoriaEquipo(data: { nombre: string; descripcion?
   })
   
   if (!res.ok) {
-    throw new Error('Failed to create categoria equipo')
+    const errorData = await res.json().catch(() => ({ error: 'Unknown error' }))
+    console.error('❌ Error creating categoria equipo:', res.status, errorData)
+    throw new Error(`Failed to create categoria equipo: ${errorData.error || res.statusText}`)
   }
   
-  return res.json()
+  const result = await res.json()
+  console.log('✅ Categoria equipo created:', result)
+  return result
 }
 
 export async function updateCategoriaEquipo(id: string, data: { nombre: string; descripcion?: string | null }) {

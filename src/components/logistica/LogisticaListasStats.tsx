@@ -40,53 +40,65 @@ interface StatsData {
   completionRate: number
 }
 
-const ESTADOS_CONFIG: Record<EstadoListaEquipo, { 
+const ESTADOS_CONFIG: Record<EstadoListaEquipo, {
   label: string
   color: string
   bgColor: string
   icon: React.ComponentType<{ className?: string }>
 }> = {
-  borrador: { 
-    label: 'Borrador', 
-    color: 'text-gray-700', 
+  borrador: {
+    label: 'Borrador',
+    color: 'text-gray-700',
     bgColor: 'bg-gray-100',
     icon: FileText
   },
-  por_revisar: { 
-    label: 'Por Revisar', 
-    color: 'text-yellow-700', 
+  enviada: {
+    label: 'Enviada',
+    color: 'text-indigo-700',
+    bgColor: 'bg-indigo-100',
+    icon: FileText
+  },
+  por_revisar: {
+    label: 'Por Revisar',
+    color: 'text-yellow-700',
     bgColor: 'bg-yellow-100',
     icon: Clock
   },
-  por_cotizar: { 
-    label: 'Por Cotizar', 
-    color: 'text-blue-700', 
+  por_cotizar: {
+    label: 'Por Cotizar',
+    color: 'text-blue-700',
     bgColor: 'bg-blue-100',
     icon: Package
   },
-  por_validar: { 
-    label: 'Por Validar', 
-    color: 'text-orange-700', 
+  por_validar: {
+    label: 'Por Validar',
+    color: 'text-orange-700',
     bgColor: 'bg-orange-100',
     icon: AlertCircle
   },
-  por_aprobar: { 
-    label: 'Por Aprobar', 
-    color: 'text-purple-700', 
+  por_aprobar: {
+    label: 'Por Aprobar',
+    color: 'text-purple-700',
     bgColor: 'bg-purple-100',
     icon: Clock
   },
-  aprobado: { 
-    label: 'Aprobado', 
-    color: 'text-green-700', 
+  aprobada: {
+    label: 'Aprobada',
+    color: 'text-green-700',
     bgColor: 'bg-green-100',
     icon: CheckCircle
   },
-  rechazado: { 
-    label: 'Rechazado', 
-    color: 'text-red-700', 
+  rechazada: {
+    label: 'Rechazada',
+    color: 'text-red-700',
     bgColor: 'bg-red-100',
     icon: XCircle
+  },
+  completada: {
+    label: 'Completada',
+    color: 'text-emerald-700',
+    bgColor: 'bg-emerald-100',
+    icon: CheckCircle
   },
 }
 
@@ -98,12 +110,14 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
         total: 0,
         porEstado: {
           borrador: 0,
+          enviada: 0,
           por_revisar: 0,
           por_cotizar: 0,
           por_validar: 0,
           por_aprobar: 0,
-          aprobado: 0,
-          rechazado: 0
+          aprobada: 0,
+          rechazada: 0,
+          completada: 0
         },
         totalItems: 0,
         promedioItemsPorLista: 0,
@@ -129,7 +143,7 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
     })
 
     // Total items across all lists
-    const totalItems = listas.reduce((sum, lista) => sum + (lista.items?.length || 0), 0)
+    const totalItems = listas.reduce((sum, lista) => sum + (lista.listaEquipoItem?.length || 0), 0)
     
     // Average items per list
     const promedioItemsPorLista = total > 0 ? Math.round(totalItems / total * 10) / 10 : 0
@@ -146,7 +160,7 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
     ).length
     
     // Completion rate (approved / total)
-    const completionRate = total > 0 ? Math.round((porEstado.aprobado / total) * 100) : 0
+    const completionRate = total > 0 ? Math.round((porEstado.aprobada / total) * 100) : 0
     
     return {
       total,
@@ -250,7 +264,7 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-gray-700">Aprobadas: {stats.porEstado.aprobado}</span>
+              <span className="text-gray-700">Aprobadas: {stats.porEstado.aprobada}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-yellow-500" />
@@ -262,7 +276,7 @@ export default function LogisticaListasStats({ listas, proyectos, className }: L
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-gray-700">Rechazadas: {stats.porEstado.rechazado}</span>
+              <span className="text-gray-700">Rechazadas: {stats.porEstado.rechazada}</span>
             </div>
           </div>
 

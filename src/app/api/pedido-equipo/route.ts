@@ -13,6 +13,7 @@ import type { PedidoEquipoPayload } from '@/types'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarCreacion } from '@/lib/services/audit'
+import { randomUUID } from 'crypto'
 
 // ✅ Obtener todos los pedidos con filtros avanzados
 export async function GET(request: Request) {
@@ -57,14 +58,14 @@ export async function GET(request: Request) {
       whereClause.OR = [
         { codigo: { contains: searchText, mode: 'insensitive' } },
         { observacion: { contains: searchText, mode: 'insensitive' } },
-        { lista: { nombre: { contains: searchText, mode: 'insensitive' } } },
-        { responsable: { name: { contains: searchText, mode: 'insensitive' } } },
+        { listaEquipo: { nombre: { contains: searchText, mode: 'insensitive' } } },
+        { user: { name: { contains: searchText, mode: 'insensitive' } } },
       ]
     }
 
     // Filtros por fecha OC recomendada
     if (fechaOCDesde || fechaOCHasta || soloVencidas) {
-      whereClause.items = {
+      whereClause.pedidoEquipoItem = {
         some: {
           fechaOrdenCompraRecomendada: {
             ...(fechaOCDesde && { gte: new Date(fechaOCDesde) }),
@@ -92,7 +93,7 @@ export async function GET(request: Request) {
         listaId: true,
         createdAt: true,
         updatedAt: true,
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -106,11 +107,11 @@ export async function GET(request: Request) {
             nombre: true,
           },
         },
-        lista: {
+        listaEquipo: {
           select: {
             id: true,
             nombre: true,
-            items: {
+            listaEquipoItem: {
               select: {
                 id: true,
                 cantidadPedida: true,
@@ -124,7 +125,7 @@ export async function GET(request: Request) {
             },
           },
         },
-        items: {
+        pedidoEquipoItem: {
            select: {
              id: true,
              cantidadPedida: true,
@@ -161,7 +162,18 @@ export async function GET(request: Request) {
       orderBy: { fechaPedido: 'desc' },
     })
 
-    return NextResponse.json(data)
+    // Transformar para compatibilidad con frontend
+    const response = data.map(pedido => ({
+      ...pedido,
+      responsable: pedido.user,
+      lista: pedido.listaEquipo ? {
+        ...pedido.listaEquipo,
+        items: pedido.listaEquipo.listaEquipoItem
+      } : null,
+      items: pedido.pedidoEquipoItem
+    }))
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('❌ Error en GET /api/pedido-equipo:', error)
     return NextResponse.json(
@@ -228,8 +240,10 @@ export async function POST(request: Request) {
     const codigoGenerado = `${proyecto.codigo}-PED-${String(nuevoNumero).padStart(3, '0')}`
 
     // 📝 Crear pedido
+    const pedidoId = randomUUID()
     const pedido = await prisma.pedidoEquipo.create({
       data: {
+        id: pedidoId,
         proyectoId: body.proyectoId,
         responsableId: body.responsableId,
         listaId: body.listaId ?? null,
@@ -241,8 +255,86 @@ export async function POST(request: Request) {
         fechaNecesaria: new Date(body.fechaNecesaria),
         fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : null,
         fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : null,
+        updatedAt: new Date(),
       },
     })
+
+    // 📦 Crear items del pedido si se envían itemsSeleccionados
+    if (body.itemsSeleccionados && body.itemsSeleccionados.length > 0) {
+      // Obtener datos de los items de la lista
+      const listaItemIds = body.itemsSeleccionados.map(item => item.listaEquipoItemId)
+      const listaItems = await prisma.listaEquipoItem.findMany({
+        where: { id: { in: listaItemIds } },
+        select: {
+          id: true,
+          codigo: true,
+          descripcion: true,
+          unidad: true,
+          precioElegido: true,
+          tiempoEntrega: true,
+          tiempoEntregaDias: true,
+          listaId: true,
+          responsableId: true,
+          cantidad: true,
+          cantidadPedida: true,
+        },
+      })
+
+      // Crear map para acceso rápido
+      const listaItemsMap = new Map(listaItems.map(item => [item.id, item]))
+
+      // Crear los PedidoEquipoItem
+      const pedidoItems = body.itemsSeleccionados.map(itemSel => {
+        const listaItem = listaItemsMap.get(itemSel.listaEquipoItemId)
+        if (!listaItem) {
+          throw new Error(`Item de lista no encontrado: ${itemSel.listaEquipoItemId}`)
+        }
+
+        const precioUnitario = listaItem.precioElegido || 0
+        const costoTotal = precioUnitario * itemSel.cantidadPedida
+
+        return {
+          id: randomUUID(),
+          pedidoId: pedidoId,
+          listaEquipoItemId: listaItem.id,
+          listaId: listaItem.listaId,
+          codigo: listaItem.codigo,
+          descripcion: listaItem.descripcion,
+          unidad: listaItem.unidad,
+          cantidadPedida: itemSel.cantidadPedida,
+          precioUnitario,
+          costoTotal,
+          tiempoEntrega: listaItem.tiempoEntrega,
+          tiempoEntregaDias: listaItem.tiempoEntregaDias,
+          responsableId: body.responsableId,
+          estado: 'pendiente' as const,
+          estadoEntrega: 'pendiente' as const,
+          updatedAt: new Date(),
+        }
+      })
+
+      // Insertar items del pedido
+      await prisma.pedidoEquipoItem.createMany({
+        data: pedidoItems,
+      })
+
+      // Actualizar cantidadPedida en ListaEquipoItem
+      for (const itemSel of body.itemsSeleccionados) {
+        const listaItem = listaItemsMap.get(itemSel.listaEquipoItemId)
+        if (listaItem) {
+          const nuevaCantidadPedida = (listaItem.cantidadPedida || 0) + itemSel.cantidadPedida
+          await prisma.listaEquipoItem.update({
+            where: { id: itemSel.listaEquipoItemId },
+            data: {
+              cantidadPedida: nuevaCantidadPedida,
+              updatedAt: new Date(),
+            },
+          })
+        }
+      }
+
+      console.log(`✅ ${pedidoItems.length} items creados para pedido ${pedido.codigo}`)
+    }
 
     // ✅ Registrar en auditoría
     try {

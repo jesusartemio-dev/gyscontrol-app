@@ -36,14 +36,16 @@ export async function GET(
         cotizacionId: id // Verificar que pertenece a la cotización
       },
       include: {
-        categoriaServicio: {
+        edt: {
           select: { id: true, nombre: true }
         },
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         },
-        tareas: {
-          orderBy: { createdAt: 'asc' }
+        cotizacionActividad: {
+          include: {
+            cotizacionTarea: true
+          }
         }
       }
     })
@@ -105,33 +107,16 @@ export async function PUT(
       )
     }
 
-    // Si se está cambiando la categoría o zona, verificar unicidad
-    if (validData.categoriaServicioId || validData.zona !== undefined) {
-      const nuevaCategoria = validData.categoriaServicioId || edtExistente.categoriaServicioId
-      const nuevaZona = validData.zona !== undefined ? validData.zona : edtExistente.zona
-
-      const conflicto = await prisma.cotizacionEdt.findFirst({
-        where: {
-          cotizacionId: id,
-          categoriaServicioId: nuevaCategoria,
-          zona: nuevaZona,
-          id: { not: edtId } // Excluir el EDT actual
-        }
-      })
-
-      if (conflicto) {
-        return NextResponse.json(
-          { error: 'Ya existe un EDT para esta combinación de categoría y zona' },
-          { status: 400 }
-        )
-      }
+    // Si se está cambiando la categoría, verificar unicidad de nombre por cotización
+    if (validData.edtId) {
+      // La unicidad se basa en nombre único por cotización (ya definido en el schema)
+      // No necesitamos verificación adicional aquí
     }
 
     const edtActualizado = await prisma.cotizacionEdt.update({
       where: { id: edtId },
       data: {
-        ...(validData.categoriaServicioId && { categoriaServicioId: validData.categoriaServicioId }),
-        ...(validData.zona !== undefined && { zona: validData.zona }),
+        ...(validData.edtId && { edtId: validData.edtId }),
         ...(validData.fechaInicioCom && { fechaInicioComercial: new Date(validData.fechaInicioCom) }),
         ...(validData.fechaFinCom && { fechaFinComercial: new Date(validData.fechaFinCom) }),
         ...(validData.horasCom !== undefined && { horasEstimadas: validData.horasCom }),
@@ -140,9 +125,13 @@ export async function PUT(
         ...(validData.prioridad && { prioridad: validData.prioridad })
       },
       include: {
-        categoriaServicio: true,
-        responsable: true,
-        tareas: true
+        edt: true,
+        user: true,
+        cotizacionActividad: {
+          include: {
+            cotizacionTarea: true
+          }
+        }
       }
     })
 
@@ -194,8 +183,12 @@ export async function DELETE(
         cotizacionId: id
       },
       include: {
-        tareas: {
-          select: { id: true }
+        cotizacionActividad: {
+          include: {
+            cotizacionTarea: {
+              select: { id: true }
+            }
+          }
         }
       }
     })
@@ -207,19 +200,39 @@ export async function DELETE(
       )
     }
 
-    // Eliminar el EDT (las tareas se eliminan automáticamente por cascade)
+    // ✅ Eliminar el EDT con todas sus dependencias en orden correcto
+    // 1. Eliminar tareas relacionadas
+    await prisma.cotizacionTarea.deleteMany({
+      where: {
+        cotizacionActividad: {
+          cotizacionEdtId: edtId
+        }
+      }
+    })
+
+    // 2. Eliminar actividades relacionadas
+    await prisma.cotizacionActividad.deleteMany({
+      where: {
+        cotizacionEdtId: edtId
+      }
+    })
+
+    // 4. Finalmente eliminar el EDT
     await prisma.cotizacionEdt.delete({
       where: { id: edtId }
     })
 
-    logger.info(`✅ EDT comercial eliminado: ${edtId} - Tareas eliminadas: ${edt.tareas.length}`)
+    // Calcular total de tareas eliminadas
+    const totalTareasEliminadas = edt.cotizacionActividad.reduce((total: number, act: any) => total + act.cotizacionTarea.length, 0)
+
+    logger.info(`✅ EDT comercial eliminado: ${edtId} - Tareas eliminadas: ${totalTareasEliminadas}`)
 
     return NextResponse.json({
       success: true,
       message: 'EDT comercial eliminado exitosamente',
       data: {
         edtId,
-        tareasEliminadas: edt.tareas.length
+        tareasEliminadas: totalTareasEliminadas
       }
     })
 

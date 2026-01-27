@@ -12,19 +12,23 @@ export const dynamic = 'force-dynamic' // ✅ Previene errores de caché en ruta
 
 // ✅ Obtener cotización por ID
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await context.params // 👈 Previene errores de acceso a params
+   try {
+     const { id } = await context.params // 👈 Previene errores de acceso a params
+
+     if (typeof id !== 'string') {
+       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+     }
 
     const cotizacion = await prisma.cotizacion.findUnique({
       where: { id },
       include: {
         cliente: true,
-        comercial: true,
+        user: true,
         plantilla: true,
-        equipos: { include: { items: true } },
-        servicios: {
+        cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
+        cotizacionServicio: {
           include: {
-            items: {
+            cotizacionServicioItem: {
               include: {
                 unidadServicio: true,
                 recurso: true,
@@ -33,17 +37,24 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
             }
           }
         },
-        gastos: {
+        cotizacionGasto: {
           include: {
-            items: true
+            cotizacionGastoItem: true
           }
         },
         // ✅ Nuevas relaciones para exclusiones y condiciones
-        exclusiones: {
+        cotizacionExclusion: {
           orderBy: { orden: 'asc' }
         },
-        condiciones: {
+        cotizacionCondicion: {
           orderBy: { orden: 'asc' }
+        },
+        // ✅ Relación con CRM Oportunidad
+        crmOportunidad: {
+          include: {
+            cliente: true,
+            comercial: true
+          }
         }
       }
     })
@@ -52,7 +63,29 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
     }
 
-    return NextResponse.json(cotizacion)
+    // Map camelCase relation names for frontend compatibility
+    const cotizacionFormatted = {
+      ...cotizacion,
+      comercial: cotizacion.user, // Alias for frontend compatibility
+      equipos: cotizacion.cotizacionEquipo?.map(equipo => ({
+        ...equipo,
+        items: equipo.cotizacionEquipoItem || []
+      })) || [],
+      servicios: cotizacion.cotizacionServicio?.map(servicio => ({
+        ...servicio,
+        items: servicio.cotizacionServicioItem || []
+      })) || [],
+      gastos: cotizacion.cotizacionGasto?.map(gasto => ({
+        ...gasto,
+        items: gasto.cotizacionGastoItem || []
+      })) || [],
+      exclusiones: cotizacion.cotizacionExclusion || [],
+      condiciones: cotizacion.cotizacionCondicion || [],
+      // ✅ Mapeamos crmOportunidad a oportunidadCrm para compatibilidad con frontend
+      oportunidadCrm: cotizacion.crmOportunidad || null
+    }
+
+    return NextResponse.json(cotizacionFormatted)
   } catch (error) {
     console.error('❌ Error al obtener cotización:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
@@ -88,8 +121,12 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 
 // ✅ Eliminar cotización
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await context.params
+   try {
+     const { id } = await context.params
+
+     if (typeof id !== 'string') {
+       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+     }
 
     await prisma.cotizacion.delete({ where: { id } })
 

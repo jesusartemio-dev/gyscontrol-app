@@ -1,27 +1,16 @@
-// ===================================================
-// 📁 Archivo: LogisticaCotizacionSelector.tsx
-// 📌 Descripción: Componente profesional para selección de cotizaciones por ítem
-// 📌 Características: Comparación visual, filtros, ordenamiento y selección intuitiva
-// ✍️ Autor: Sistema de IA
-// 📅 Creado: 2025-01-27
-// ===================================================
-
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ListaEquipoItem } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import {
   Trophy,
-  DollarSign,
-  Clock,
   CheckCircle2,
   AlertCircle,
   Loader2,
-  X
+  X,
+  Circle,
 } from 'lucide-react'
 
 interface Props {
@@ -29,262 +18,276 @@ interface Props {
   onUpdated?: () => void
 }
 
-
 export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) {
-  const [selectedCotizacionId, setSelectedCotizacionId] = useState<string | null>(item.cotizacionSeleccionadaId || null)
+  const [selectedId, setSelectedId] = useState<string | null>(
+    item.cotizacionSeleccionadaId || null
+  )
   const [isConfirming, setIsConfirming] = useState(false)
 
-  // 🔄 Obtener todas las cotizaciones disponibles ordenadas por precio
-  const availableCotizaciones = useMemo(() => {
-    // Mostrar todas las cotizaciones excepto las rechazadas
-    const disponibles = item.cotizaciones.filter(cot => cot.estado !== 'rechazado')
-    return [...disponibles].sort((a, b) => (a.precioUnitario ?? 0) - (b.precioUnitario ?? 0))
+  // Obtener cotizaciones disponibles ordenadas por precio
+  const cotizaciones = useMemo(() => {
+    const list = item.cotizaciones || []
+    const disponibles = list.filter((cot: any) => {
+      const estado = cot.cotizacion?.estado || cot.estado
+      return estado !== 'rechazado'
+    })
+    return [...disponibles].sort(
+      (a: any, b: any) => (a.precioUnitario ?? 0) - (b.precioUnitario ?? 0)
+    )
   }, [item.cotizaciones])
 
-  // 🎯 Manejar selección visual (sin guardar aún)
-  const handleCotizacionClick = (cotizacionId: string) => {
-    setSelectedCotizacionId(cotizacionId)
-  }
-
-  // ✅ Confirmar selección final
-  const handleConfirmarSeleccion = async () => {
-    if (!selectedCotizacionId) return
-
-    setIsConfirming(true)
-    try {
-      const res = await fetch(`/api/lista-equipo-item/${item.id}/seleccionar-cotizacion`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cotizacionProveedorItemId: selectedCotizacionId }),
-      })
-
-      if (res.ok) {
-        toast.success('✅ Cotización seleccionada correctamente')
-        onUpdated?.()
-      } else {
-        const data = await res.json()
-        toast.error(`❌ Error: ${data.error || 'No se pudo seleccionar cotización'}`)
-      }
-    } catch (error) {
-      toast.error('❌ Error inesperado al seleccionar cotización')
-    } finally {
-      setIsConfirming(false)
-    }
-  }
-
-  // ❌ Deseleccionar cotización actual
-  const handleDeseleccionar = async () => {
-    setIsConfirming(true)
-    try {
-      const res = await fetch(`/api/lista-equipo-item/${item.id}/seleccionar-cotizacion`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cotizacionProveedorItemId: null }), // Enviar null para deseleccionar
-      })
-
-      if (res.ok) {
-        toast.success('✅ Cotización deseleccionada correctamente')
-        setSelectedCotizacionId(null)
-        onUpdated?.()
-      } else {
-        const data = await res.json()
-        toast.error(`❌ Error: ${data.error || 'No se pudo deseleccionar cotización'}`)
-      }
-    } catch (error) {
-      toast.error('❌ Error inesperado al deseleccionar cotización')
-    } finally {
-      setIsConfirming(false)
-    }
-  }
-
-  // 📊 Calcular estadísticas rápidas
+  // Stats
   const stats = useMemo(() => {
-    const precios = availableCotizaciones.map(c => c.precioUnitario ?? 0).filter(p => p > 0)
+    const precios = cotizaciones
+      .map((c: any) => c.precioUnitario ?? 0)
+      .filter((p) => p > 0)
+    const tiempos = cotizaciones
+      .map((c: any) => c.tiempoEntregaDias ?? 999)
+      .filter((t) => t < 999)
     return {
       precioMin: precios.length > 0 ? Math.min(...precios) : 0,
       precioMax: precios.length > 0 ? Math.max(...precios) : 0,
-      totalDisponibles: availableCotizaciones.length
+      tiempoMin: tiempos.length > 0 ? Math.min(...tiempos) : null,
     }
-  }, [availableCotizaciones])
+  }, [cotizaciones])
+
+  // Auto-seleccionar si hay solo 1 cotización y no hay selección actual
+  useEffect(() => {
+    if (cotizaciones.length === 1 && !item.cotizacionSeleccionadaId) {
+      setSelectedId(cotizaciones[0].id)
+    }
+  }, [cotizaciones, item.cotizacionSeleccionadaId])
+
+  const handleConfirmar = async () => {
+    if (!selectedId) return
+
+    setIsConfirming(true)
+    try {
+      const res = await fetch(
+        `/api/lista-equipo-item/${item.id}/seleccionar-cotizacion`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cotizacionProveedorItemId: selectedId }),
+        }
+      )
+
+      if (res.ok) {
+        toast.success('Cotización seleccionada')
+        onUpdated?.()
+      } else {
+        const data = await res.json()
+        toast.error(data.error || 'Error al seleccionar')
+      }
+    } catch {
+      toast.error('Error inesperado')
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
+  const handleDeseleccionar = async () => {
+    setIsConfirming(true)
+    try {
+      const res = await fetch(
+        `/api/lista-equipo-item/${item.id}/seleccionar-cotizacion`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cotizacionProveedorItemId: null }),
+        }
+      )
+
+      if (res.ok) {
+        toast.success('Cotización deseleccionada')
+        setSelectedId(null)
+        onUpdated?.()
+      } else {
+        const data = await res.json()
+        toast.error(data.error || 'Error al deseleccionar')
+      }
+    } catch {
+      toast.error('Error inesperado')
+    } finally {
+      setIsConfirming(false)
+    }
+  }
+
+  const getProveedorNombre = (cot: any) =>
+    cot.cotizacion?.proveedor?.nombre ||
+    cot.cotizacionProveedor?.proveedor?.nombre ||
+    'Proveedor'
+
+  const getCodigo = (cot: any) =>
+    cot.cotizacion?.codigo || cot.cotizacionProveedor?.codigo || '-'
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="text-center">
-        <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
-          <Trophy className="h-5 w-5 text-yellow-500" />
-          {item.descripcion} ({item.unidad})
-        </h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Haz clic en una cotización para seleccionarla, luego confirma tu elección
-        </p>
+    <div className="space-y-3">
+      {/* Header compacto */}
+      <div className="flex items-center gap-2 pb-2 border-b">
+        <Trophy className="h-4 w-4 text-yellow-500 shrink-0" />
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold truncate">{item.descripcion}</h3>
+          <p className="text-[10px] text-muted-foreground">
+            {item.cantidad} {item.unidad} • Selecciona proveedor
+          </p>
+        </div>
       </div>
 
-      {/* Lista de opciones con selección */}
-      {availableCotizaciones.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No hay cotizaciones disponibles para este ítem</p>
+      {/* Lista de cotizaciones */}
+      {cotizaciones.length === 0 ? (
+        <div className="text-center py-6">
+          <AlertCircle className="h-6 w-6 mx-auto mb-2 text-gray-300" />
+          <p className="text-xs text-muted-foreground">Sin cotizaciones</p>
         </div>
       ) : (
-        <div className="space-y-3 max-h-[400px] overflow-y-auto">
-          {availableCotizaciones.map((cotizacion) => {
-            const precio = cotizacion.precioUnitario ?? 0
-            const cantidad = item.cantidad ?? 1
-            const costoTotal = precio * cantidad
-            const isSelected = selectedCotizacionId === cotizacion.id
-            const isCurrentSelection = item.cotizacionSeleccionadaId === cotizacion.id
-
-            // Indicadores de mejor opción
+        <div className="space-y-1.5">
+          {cotizaciones.map((cot: any) => {
+            const precio = cot.precioUnitario ?? 0
+            const costoTotal = precio * (item.cantidad ?? 1)
+            const isSelected = selectedId === cot.id
+            const isCurrent = item.cotizacionSeleccionadaId === cot.id
             const esMejorPrecio = precio === stats.precioMin && precio > 0
-            const esMejorTiempo = (cotizacion.tiempoEntregaDias ?? 999) === Math.min(
-              ...availableCotizaciones.map(c => c.tiempoEntregaDias ?? 999).filter(t => t < 999)
-            )
 
             return (
-              <Card
-                key={cotizacion.id}
-                className={`transition-all duration-200 cursor-pointer ${
-                  isSelected
-                    ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200 shadow-md'
-                    : isCurrentSelection
-                    ? 'ring-2 ring-green-500 bg-green-50 border-green-200'
-                    : 'hover:shadow-md hover:border-gray-300'
-                }`}
-                onClick={() => handleCotizacionClick(cotizacion.id)}
+              <div
+                key={cot.id}
+                onClick={() => setSelectedId(cot.id)}
+                className={`
+                  relative p-2.5 rounded-md border cursor-pointer transition-all
+                  ${isSelected
+                    ? 'bg-blue-50 border-blue-400 shadow-sm'
+                    : isCurrent
+                    ? 'bg-green-50 border-green-400'
+                    : 'hover:bg-gray-50 border-gray-200'
+                  }
+                `}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    {/* Información del proveedor */}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm">
-                          {cotizacion.cotizacion?.proveedor?.nombre || 'Proveedor desconocido'}
-                        </h4>
-                        {isCurrentSelection && !isSelected && (
-                          <Badge className="bg-green-600 text-white text-xs">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Actual
-                          </Badge>
-                        )}
-                        {isSelected && (
-                          <Badge className="bg-blue-600 text-white text-xs">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Seleccionado
-                          </Badge>
-                        )}
-                        {esMejorPrecio && !isSelected && !isCurrentSelection && (
-                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                            <DollarSign className="h-3 w-3 mr-1" />
-                            Mejor precio
-                          </Badge>
-                        )}
-                        {esMejorTiempo && !isSelected && !isCurrentSelection && (
-                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Menor tiempo
-                          </Badge>
-                        )}
-                      </div>
+                {/* Indicador de selección izquierdo */}
+                {isSelected && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-md" />
+                )}
+                {isCurrent && !isSelected && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-l-md" />
+                )}
 
-                      <div className="text-xs text-muted-foreground">
-                        Cotización: {cotizacion.cotizacion?.codigo || 'N/A'}
-                      </div>
+                <div className="flex items-center gap-3">
+                  {/* Radio indicator */}
+                  <div className="shrink-0">
+                    {isSelected ? (
+                      <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                    ) : isCurrent ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-gray-300" />
+                    )}
+                  </div>
+
+                  {/* Proveedor info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-xs font-medium truncate ${
+                        isSelected ? 'text-blue-700' : isCurrent ? 'text-green-700' : ''
+                      }`}>
+                        {getProveedorNombre(cot)}
+                      </span>
+                      {esMejorPrecio && (
+                        <span className="text-[9px] px-1 py-0.5 bg-green-100 text-green-700 rounded shrink-0">
+                          Mejor
+                        </span>
+                      )}
+                      {isCurrent && !isSelected && (
+                        <span className="text-[9px] px-1 py-0.5 bg-green-600 text-white rounded shrink-0">
+                          Actual
+                        </span>
+                      )}
                     </div>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {getCodigo(cot)}
+                    </p>
+                  </div>
 
-                    {/* Información de precios y entrega */}
-                    <div className="flex items-center gap-6 text-right">
-                      <div>
-                        <div className={`text-sm font-bold ${
-                          isSelected ? 'text-blue-600' :
-                          isCurrentSelection ? 'text-green-600' : 'text-gray-700'
-                        }`}>
-                          ${precio.toFixed(2)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">unitario</div>
+                  {/* Precios en línea */}
+                  <div className="flex items-center gap-3 shrink-0 text-right">
+                    <div>
+                      <div className={`text-xs font-bold ${
+                        isSelected ? 'text-blue-600' : isCurrent ? 'text-green-600' : ''
+                      }`}>
+                        ${precio.toFixed(2)}
                       </div>
-
-                      <div>
-                        <div className={`text-sm font-semibold ${
-                          isSelected ? 'text-blue-600' :
-                          isCurrentSelection ? 'text-green-600' : 'text-gray-700'
-                        }`}>
-                          ${costoTotal.toFixed(2)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">total</div>
+                      <div className="text-[9px] text-muted-foreground">unit.</div>
+                    </div>
+                    <div>
+                      <div className={`text-xs font-bold ${
+                        isSelected ? 'text-blue-600' : isCurrent ? 'text-green-600' : ''
+                      }`}>
+                        ${costoTotal.toFixed(2)}
                       </div>
-
-                      <div className="min-w-[80px]">
-                        <div className={`text-sm font-medium ${
-                          isSelected ? 'text-blue-600' :
-                          isCurrentSelection ? 'text-green-600' : 'text-gray-700'
-                        }`}>
-                          {cotizacion.tiempoEntrega || 'N/A'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">entrega</div>
+                      <div className="text-[9px] text-muted-foreground">total</div>
+                    </div>
+                    <div className="w-12">
+                      <div className={`text-[10px] font-medium ${
+                        isSelected ? 'text-blue-600' : isCurrent ? 'text-green-600' : ''
+                      }`}>
+                        {cot.tiempoEntregaDias ? `${cot.tiempoEntregaDias}d` : '-'}
                       </div>
+                      <div className="text-[9px] text-muted-foreground">entrega</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )
           })}
         </div>
       )}
 
-      {/* Botones de acción */}
-      {availableCotizaciones.length > 0 && (
-        <div className="flex justify-center gap-3 pt-4 border-t">
-          {/* Botón para deseleccionar */}
-          {item.cotizacionSeleccionadaId && (
+      {/* Footer con acciones */}
+      {cotizaciones.length > 0 && (
+        <div className="flex items-center justify-between pt-2 border-t">
+          <span className="text-[10px] text-muted-foreground">
+            {cotizaciones.length} opción{cotizaciones.length > 1 ? 'es' : ''} •
+            ${stats.precioMin.toFixed(2)}
+            {stats.precioMax !== stats.precioMin && ` - $${stats.precioMax.toFixed(2)}`}
+          </span>
+          <div className="flex items-center gap-1.5">
+            {item.cotizacionSeleccionadaId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDeseleccionar}
+                disabled={isConfirming}
+                className="h-6 text-[10px] text-red-600 hover:text-red-700 hover:bg-red-50 px-2"
+              >
+                {isConfirming ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <>
+                    <X className="h-3 w-3 mr-0.5" />
+                    Quitar
+                  </>
+                )}
+              </Button>
+            )}
             <Button
-              onClick={handleDeseleccionar}
-              disabled={isConfirming}
-              variant="outline"
-              className="px-6 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
-              size="lg"
+              size="sm"
+              onClick={handleConfirmar}
+              disabled={
+                !selectedId ||
+                isConfirming ||
+                selectedId === item.cotizacionSeleccionadaId
+              }
+              className="h-6 text-[10px] px-3"
             >
               {isConfirming ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deseleccionando...
-                </>
+                <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
                 <>
-                  <X className="h-4 w-4 mr-2" />
-                  Deseleccionar
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Confirmar
                 </>
               )}
             </Button>
-          )}
-
-          {/* Botón de confirmación */}
-          <Button
-            onClick={handleConfirmarSeleccion}
-            disabled={!selectedCotizacionId || isConfirming || selectedCotizacionId === item.cotizacionSeleccionadaId}
-            className="px-8"
-            size="lg"
-          >
-            {isConfirming ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Confirmando...
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Aceptar Selección
-              </>
-            )}
-          </Button>
-        </div>
-      )}
-
-      {/* Footer con estadísticas */}
-      {availableCotizaciones.length > 0 && (
-        <div className="text-xs text-muted-foreground text-center pt-2">
-          {stats.totalDisponibles} cotizaciones para comparar •
-          Rango de precios: ${stats.precioMin.toFixed(2)} - ${stats.precioMax.toFixed(2)}
+          </div>
         </div>
       )}
     </div>

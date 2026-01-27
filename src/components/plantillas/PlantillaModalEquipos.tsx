@@ -22,10 +22,17 @@ import {
 interface Props {
   onCreated: (nueva: Plantilla) => void
   trigger?: React.ReactNode
+  isOpen?: boolean
+  onClose?: () => void
 }
 
-export default function PlantillaModalEquipos({ onCreated, trigger }: Props) {
-  const [open, setOpen] = useState(false)
+export default function PlantillaModalEquipos({ onCreated, trigger, isOpen, onClose }: Props) {
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  // Determinar si usar control externo
+  const isExternallyControlled = isOpen !== undefined
+  const open = isExternallyControlled ? isOpen : internalOpen
+  const setOpen = onClose !== undefined ? (value: boolean) => { if (!value) onClose() } : setInternalOpen
   const [nombre, setNombre] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -93,14 +100,16 @@ export default function PlantillaModalEquipos({ onCreated, trigger }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button className="bg-orange-600 hover:bg-orange-700 text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Plantilla de Equipos
-          </Button>
-        )}
-      </DialogTrigger>
+      {!isExternallyControlled && (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white">
+              <Plus className="h-4 w-4 mr-2" />
+              Equipos
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

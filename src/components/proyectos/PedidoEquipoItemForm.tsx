@@ -141,7 +141,7 @@ export const PedidoEquipoItemForm: React.FC<PedidoEquipoItemFormProps> = ({
   // 📡 Load items when lista changes
   useEffect(() => {
     if (selectedLista) {
-      const items = selectedLista.items || []
+      const items = selectedLista.listaEquipoItem || []
       setAvailableItems(items)
       
       // Reset selected item when lista changes
@@ -274,7 +274,7 @@ export const PedidoEquipoItemForm: React.FC<PedidoEquipoItemFormProps> = ({
                     <div className="flex items-center justify-between w-full">
                       <span>{lista.nombre}</span>
                       <Badge variant="outline" className="ml-2">
-                        {lista.items?.length || 0} items
+                        {lista.listaEquipoItem?.length || 0} items
                       </Badge>
                     </div>
                   </SelectItem>

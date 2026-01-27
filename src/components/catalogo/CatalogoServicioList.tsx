@@ -7,7 +7,7 @@
 // ===================================================
 
 import { useEffect, useState } from 'react'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { getRecursos } from '@/lib/services/recurso'
 import { CatalogoServicio } from '@/types'
@@ -36,7 +36,7 @@ export default function CatalogoServicioList({ data, onUpdate, onDelete }: Props
   }, [data])
 
   useEffect(() => {
-    getCategoriasServicio().then(setCategorias)
+    getEdts().then(setCategorias)
     getUnidadesServicio().then(setUnidades)
     getRecursos().then(setRecursos)
   }, [])

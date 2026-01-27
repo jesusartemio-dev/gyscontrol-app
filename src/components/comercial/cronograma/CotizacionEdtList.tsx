@@ -22,15 +22,13 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   MoreHorizontal,
   Edit,
@@ -59,7 +57,7 @@ interface CotizacionEdt {
   descripcion?: string
   prioridad: string
   createdAt: string
-  categoriaServicio: {
+  edt: {
     id: string
     nombre: string
   }
@@ -89,7 +87,12 @@ export function CotizacionEdtList({
   const [edts, setEdts] = useState<CotizacionEdt[]>([])
   const [loading, setLoading] = useState(true)
   const [editingEdt, setEditingEdt] = useState<CotizacionEdt | null>(null)
-  const [deletingEdt, setDeletingEdt] = useState<CotizacionEdt | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean
+    edtId: string
+    edtNombre: string
+  }>({ open: false, edtId: '', edtNombre: '' })
+  const [deletingEdt, setDeletingEdt] = useState<string | null>(null)
   const [expandedEdt, setExpandedEdt] = useState<string | null>(null)
   const { toast } = useToast()
 
@@ -123,11 +126,16 @@ export function CotizacionEdtList({
 
   // Eliminar EDT
   const handleDeleteEdt = async () => {
-    if (!deletingEdt) return
+    const edtId = deleteDialog.edtId
+    const edtNombre = deleteDialog.edtNombre
 
     try {
+      // Set loading state and close dialog
+      setDeletingEdt(edtId)
+      setDeleteDialog({ open: false, edtId: '', edtNombre: '' })
+
       const response = await fetch(
-        `/api/cotizacion/${cotizacionId}/cronograma/${deletingEdt.id}`,
+        `/api/cotizacion/${cotizacionId}/cronograma/${edtId}`,
         {
           method: 'DELETE'
         }
@@ -151,6 +159,7 @@ export function CotizacionEdtList({
         description: 'No se pudo eliminar el EDT.',
         variant: 'destructive'
       })
+      setDeletingEdt(null)
     }
   }
 
@@ -223,7 +232,7 @@ export function CotizacionEdtList({
                         {edt.nombre}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        {edt.categoriaServicio.nombre}
+                        {edt.edt.nombre}
                         {edt.zona && ` - ${edt.zona}`}
                       </p>
                     </div>
@@ -264,7 +273,12 @@ export function CotizacionEdtList({
                         Editar EDT
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => setDeletingEdt(edt)}
+                        onClick={() => {
+                          // Small delay to ensure dropdown closes before dialog opens
+                          setTimeout(() => {
+                            setDeleteDialog({ open: true, edtId: edt.id, edtNombre: edt.nombre })
+                          }, 100)
+                        }}
                         className="text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -332,8 +346,7 @@ export function CotizacionEdtList({
                 <div className="border-t pt-4">
                   <CotizacionTareaList
                     cotizacionId={cotizacionId}
-                    edtId={edt.id}
-                    edt={edt}
+                    refreshKey={refreshKey}
                     onRefresh={onRefresh}
                   />
                 </div>
@@ -357,28 +370,46 @@ export function CotizacionEdtList({
       )}
 
       {/* Dialog de confirmación de eliminación */}
-      <AlertDialog open={!!deletingEdt} onOpenChange={() => setDeletingEdt(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar EDT comercial?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción eliminará el EDT "{deletingEdt?.nombre}"
-              {deletingEdt?.categoriaServicio.nombre && ` (${deletingEdt.categoriaServicio.nombre})`}
-              {deletingEdt?.zona && ` - ${deletingEdt.zona}`} y todas sus tareas asociadas.
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => {
+        // Solo permitir cerrar si no estamos en medio de una operación
+        if (!open) {
+          setDeleteDialog({ open: false, edtId: '', edtNombre: '' })
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar EDT comercial?</DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará el EDT "{deleteDialog.edtNombre}"
+              y todas sus tareas asociadas.
               Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteEdt}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialog({ open: false, edtId: '', edtNombre: '' })}
+              disabled={deletingEdt !== null}
             >
-              Eliminar EDT
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleDeleteEdt}
+              disabled={deletingEdt !== null}
+              variant="destructive"
+            >
+              {deletingEdt !== null ? (
+                <>
+                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Eliminando...
+                </>
+              ) : (
+                'Eliminar EDT'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

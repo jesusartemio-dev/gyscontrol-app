@@ -15,7 +15,7 @@ export async function GET() {
   try {
     const data = await prisma.listaEquipo.findMany({
       include: {
-        items: true,
+        listaEquipoItem: true,
         proyecto: {
           select: {
             id: true,
@@ -38,12 +38,14 @@ export async function POST(request: Request) {
 
     const creada = await prisma.listaEquipo.create({
       data: {
+        id: `lista-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoId: payload.proyectoId,
         responsableId: payload.responsableId || payload.proyectoId, // temporal fallback
         codigo: payload.codigo || `LST-${Date.now()}`, // generar código si no se proporciona
         nombre: payload.nombre,
         numeroSecuencia: payload.numeroSecuencia || 1,
-        estado: (payload.estado || 'borrador') as any
+        estado: (payload.estado || 'borrador') as any,
+        updatedAt: new Date()
       }
     })
 

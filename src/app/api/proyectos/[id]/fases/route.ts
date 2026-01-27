@@ -69,15 +69,15 @@ export async function GET(
         proyectoCronograma: {
           select: { id: true, nombre: true, tipo: true }
         },
-        edts: {
+        proyectoEdt: {
           include: {
-            ProyectoTarea: true,
-            categoriaServicio: true,
-            responsable: true
+            proyectoTarea: true,
+            edt: true,
+            user: true
           }
         },
         _count: {
-          select: { edts: true }
+          select: { proyectoEdt: true }
         }
       },
       orderBy: { orden: 'asc' }

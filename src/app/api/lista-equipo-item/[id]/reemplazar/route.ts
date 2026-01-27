@@ -67,10 +67,14 @@ export async function PATCH(
     // 4. Crear nuevo ítem de reemplazo
     const nuevoItem = await prisma.listaEquipoItem.create({
       data: {
+        id: `lista-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         codigo: nuevo.codigo,
         descripcion: nuevo.descripcion,
+        marca: nuevo.marca || proyectoItem.marca || '', // ✅ Copiar marca
+        categoria: nuevo.categoria || proyectoItem.categoria || '', // ✅ Copiar categoria
         unidad: nuevo.unidad,
         cantidad: nuevo.cantidad,
+        presupuesto: nuevo.presupuesto || proyectoItem.precioCliente || 0, // ✅ Copiar presupuesto
         listaId: original.listaId,
         responsableId: session.user.id,
         estado: 'borrador',
@@ -80,6 +84,7 @@ export async function PATCH(
         cotizacionSeleccionadaId: nuevo.cotizacionSeleccionadaId || undefined,
         proyectoEquipoItemId: nuevo.proyectoEquipoItemId,
         reemplazaProyectoEquipoCotizadoItemId: original.proyectoEquipoItemId || undefined, // ✅ nuevo campo correcto
+        updatedAt: new Date()
       },
     })
 

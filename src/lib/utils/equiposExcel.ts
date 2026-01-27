@@ -15,7 +15,7 @@ export function exportarEquiposAExcel(equipos: CatalogoEquipo[]) {
   const data = equipos.map(eq => ({
     Código: eq.codigo,
     Descripción: eq.descripcion,
-    Categoría: eq.categoria?.nombre ?? '',
+    Categoría: eq.categoriaEquipo?.nombre ?? '',
     Unidad: eq.unidad?.nombre ?? '',
     Marca: eq.marca,
     PrecioInterno: eq.precioInterno

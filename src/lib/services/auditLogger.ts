@@ -5,7 +5,7 @@
  * Extiende el sistema de auditoría existente para incluir eventos de permisos.
  */
 
-import { prisma } from '@/lib/prisma';
+import type { PrismaClient } from '@prisma/client'
 
 // ✅ Función para registrar cambios de permisos
 export async function logPermissionChange(data: {
@@ -18,8 +18,10 @@ export async function logPermissionChange(data: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
+    const { prisma } = await import('@/lib/prisma');
     await prisma.auditLog.create({
       data: {
+        id: crypto.randomUUID(),
         entidadTipo: data.entityType === 'permission' ? 'PERMISO' : 'PERMISO_USUARIO',
         entidadId: data.entityId,
         accion: data.action.toUpperCase(),
@@ -47,8 +49,10 @@ export async function logPermissionDenied(data: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
+    const { prisma } = await import('@/lib/prisma');
     await prisma.auditLog.create({
       data: {
+        id: crypto.randomUUID(),
         entidadTipo: 'PERMISO_ACCESO',
         entidadId: data.userId,
         accion: 'ACCESO_DENEGADO',
@@ -156,6 +160,7 @@ export async function getPermissionAuditHistory(filters: {
   total: number;
 }> {
   try {
+    const { prisma } = await import('@/lib/prisma');
     const where: any = {};
 
     if (filters.userId) {
@@ -180,7 +185,7 @@ export async function getPermissionAuditHistory(filters: {
       prisma.auditLog.findMany({
         where,
         include: {
-          usuario: {
+          user: {
             select: {
               id: true,
               name: true,
@@ -201,7 +206,7 @@ export async function getPermissionAuditHistory(filters: {
       logs: logs.map((log: any) => ({
         id: log.id,
         fecha: log.createdAt,
-        usuario: log.usuario,
+        usuario: log.user,
         accion: log.accion,
         descripcion: log.descripcion,
         cambios: log.cambios ? JSON.parse(log.cambios) : undefined,
@@ -229,6 +234,7 @@ export async function getPermissionAuditStats(period: 'day' | 'week' | 'month' =
   }>;
 }> {
   try {
+    const { prisma } = await import('@/lib/prisma');
     const dateFrom = new Date();
     switch (period) {
       case 'day':
@@ -284,7 +290,7 @@ export async function getPermissionAuditStats(period: 'day' | 'week' | 'month' =
           createdAt: { gte: dateFrom }
         },
         include: {
-          usuario: {
+          user: {
             select: { name: true }
           }
         },
@@ -311,7 +317,7 @@ export async function getPermissionAuditStats(period: 'day' | 'week' | 'month' =
       recentCriticalChanges: recentCriticalChanges.map((change: any) => ({
         id: change.id,
         fecha: change.createdAt,
-        usuario: change.usuario.name || 'Sin nombre',
+        usuario: change.user.name || 'Sin nombre',
         descripcion: change.descripcion
       }))
     };
@@ -333,16 +339,22 @@ export async function logStatusChange(data: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
+    const { prisma } = await import('@/lib/prisma');
+    const { randomUUID } = await import('crypto');
+
     await prisma.auditLog.create({
       data: {
-        entidadTipo: data.entityType.toUpperCase(),
+        id: randomUUID(),
+        entidadTipo: data.entityType,
         entidadId: data.entityId,
-        accion: 'STATUS_CHANGE',
+        accion: 'CAMBIAR_ESTADO',
         usuarioId: data.userId,
-        descripcion: data.description || `Cambio de estado${data.oldStatus ? ` de "${data.oldStatus}"` : ''} a "${data.newStatus}"`,
+        descripcion: data.description || `Estado cambiado de ${data.oldStatus || 'N/A'} a ${data.newStatus}`,
         cambios: JSON.stringify({
-          oldStatus: data.oldStatus,
-          newStatus: data.newStatus
+          estado: {
+            anterior: data.oldStatus || null,
+            nuevo: data.newStatus
+          }
         }),
         metadata: data.metadata ? JSON.stringify(data.metadata) : null
       }

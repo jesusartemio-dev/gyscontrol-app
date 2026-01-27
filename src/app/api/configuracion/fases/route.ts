@@ -1,49 +1,54 @@
 // ===================================================
 // 📁 Archivo: route.ts
-// 📌 Ubicación: /api/configuracion/fases/
-// 🔧 Descripción: API para gestión de fases por defecto
-// ✅ GET: Listar fases por defecto activas
+// 📌 Ubicación: /api/configuracion/fases
+// 🔧 Descripción: API para gestionar fases de configuración
+// ✅ GET: Obtener fases disponibles para importación
 // ✅ POST: Crear nueva fase por defecto
-// ✍️ Autor: Sistema GYS - Asistente IA
-// 📅 Última actualización: 2025-09-22
 // ===================================================
 
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { randomUUID } from 'crypto'
 
-// ✅ Obtener fases por defecto activas
-export async function GET() {
+const createFaseSchema = z.object({
+  nombre: z.string().min(1, 'El nombre es obligatorio'),
+  descripcion: z.string().optional(),
+  orden: z.number().min(0).default(0),
+  duracionDias: z.number().min(1, 'La duración es obligatoria'),
+  color: z.string().optional(),
+  activo: z.boolean().default(true)
+})
+
+// ✅ GET /api/configuracion/fases - Obtener fases de configuración
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
+    const { searchParams } = new URL(request.url)
+    const all = searchParams.get('all') === 'true'
 
-    const fasesDefault = await prisma.faseDefault.findMany({
-      where: { activo: true },
+    // Obtener fases de la base de datos
+    const fases = await prisma.faseDefault.findMany({
+      where: all ? {} : { activo: true },
       orderBy: { orden: 'asc' }
     })
 
     return NextResponse.json({
       success: true,
-      data: fasesDefault,
-      meta: {
-        totalFases: fasesDefault.length
-      }
+      data: fases
     })
 
-  } catch (error: any) {
-    console.error('❌ Error al obtener fases por defecto:', error)
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    )
+  } catch (error) {
+    console.error('❌ Error obteniendo fases de configuración:', error)
+    return NextResponse.json({
+      error: 'Error interno del servidor',
+      details: error instanceof Error ? error.message : 'Error desconocido'
+    }, { status: 500 })
   }
 }
 
-// ✅ Crear nueva fase por defecto
+// ✅ POST /api/configuracion/fases - Crear nueva fase por defecto
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -51,49 +56,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const data = await request.json()
-    const { nombre, descripcion, orden, porcentajeDuracion, color } = data
+    const body = await request.json()
+    const validatedData = createFaseSchema.parse(body)
 
-    // ✅ Validaciones
-    if (!nombre?.trim()) {
-      return NextResponse.json(
-        { error: 'El nombre de la fase es obligatorio' },
-        { status: 400 }
-      )
+    // Verificar que no existe una fase con el mismo nombre
+    const faseExistente = await prisma.faseDefault.findFirst({
+      where: { nombre: validatedData.nombre }
+    })
+
+    if (faseExistente) {
+      return NextResponse.json({
+        error: 'Ya existe una fase por defecto con ese nombre'
+      }, { status: 400 })
     }
 
-    // ✅ Crear fase por defecto
-    const nuevaFaseDefault = await prisma.faseDefault.create({
+    // Crear nueva fase por defecto
+    const nuevaFase = await prisma.faseDefault.create({
       data: {
-        nombre: nombre.trim(),
-        descripcion: descripcion?.trim(),
-        orden: orden || 0,
-        porcentajeDuracion: porcentajeDuracion || null,
-        color: color || null,
-        activo: true
+        id: randomUUID(),
+        nombre: validatedData.nombre,
+        descripcion: validatedData.descripcion,
+        orden: validatedData.orden,
+        duracionDias: validatedData.duracionDias,
+        color: validatedData.color,
+        activo: validatedData.activo,
+        updatedAt: new Date()
       }
     })
 
     return NextResponse.json({
       success: true,
-      data: nuevaFaseDefault,
+      data: nuevaFase,
       message: 'Fase por defecto creada exitosamente'
     }, { status: 201 })
 
-  } catch (error: any) {
-    console.error('❌ Error al crear fase por defecto:', error)
-
-    // ✅ Manejar errores específicos de Prisma
-    if (error?.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Ya existe una fase por defecto con ese nombre' },
-        { status: 400 }
-      )
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({
+        error: 'Datos de entrada inválidos',
+        details: error.errors
+      }, { status: 400 })
     }
 
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    )
+    console.error('❌ Error creando fase por defecto:', error)
+    return NextResponse.json({
+      error: 'Error interno del servidor',
+      details: error instanceof Error ? error.message : 'Error desconocido'
+    }, { status: 500 })
   }
 }

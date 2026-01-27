@@ -1,30 +1,33 @@
-// ===================================================
-// 📁 Archivo: src/app/logistica/listas/[id]/page.tsx
-// 📌 Descripción: Página detalle de lista logística usando tabla de ítems con comparativo
-// ✍️ Autor: Jesús Artemio
-// 📅 Actualizado: 2025-06-09 (usa tabla en vez de tarjetas por ítem)
-// ===================================================
-
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
-import { FileText, Plus, Lightbulb, Target } from 'lucide-react'
+import {
+  ArrowLeft,
+  FileText,
+  Plus,
+  Package,
+  CheckCircle,
+  ChevronRight,
+  Loader2
+} from 'lucide-react'
 import { getLogisticaListaById } from '@/lib/services/logisticaLista'
+import { updateListaEstado } from '@/lib/services/listaEquipo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { updateListaEstado } from '@/lib/services/listaEquipo'
+import { Skeleton } from '@/components/ui/skeleton'
 import LogisticaListaDetalleItemTableProfessional from '@/components/logistica/LogisticaListaDetalleItemTableProfessional'
 import ModalCrearCotizacionDesdeLista from '@/components/logistica/ModalCrearCotizacionDesdeLista'
 import type { ListaEquipo } from '@/types'
-import Link from 'next/link'
 
 export default function LogisticaListaDetallePage() {
   const { id } = useParams<{ id: string }>()
   const [lista, setLista] = useState<ListaEquipo | null>(null)
+  const [loading, setLoading] = useState(true)
   const [showCrearCotizacion, setShowCrearCotizacion] = useState(false)
+  const [updatingEstado, setUpdatingEstado] = useState(false)
 
   const handleRefetch = async () => {
     try {
@@ -37,93 +40,166 @@ export default function LogisticaListaDetallePage() {
   }
 
   useEffect(() => {
-    handleRefetch()
+    const fetchData = async () => {
+      setLoading(true)
+      await handleRefetch()
+      setLoading(false)
+    }
+    fetchData()
   }, [id])
 
-  if (!lista) return <p className="p-4">Cargando...</p>
+  const handleAvanzarEstado = async () => {
+    if (!lista) return
+    try {
+      setUpdatingEstado(true)
+      const updated = await updateListaEstado(lista.id, 'por_validar')
+      if (updated) {
+        toast.success('Estado actualizado')
+        handleRefetch()
+      } else {
+        toast.error('Error al actualizar')
+      }
+    } catch {
+      toast.error('Error al avanzar estado')
+    } finally {
+      setUpdatingEstado(false)
+    }
+  }
+
+  const getEstadoBadge = (estado: string) => {
+    const styles: Record<string, string> = {
+      borrador: 'bg-gray-100 text-gray-700',
+      por_revisar: 'bg-yellow-100 text-yellow-700',
+      por_cotizar: 'bg-blue-100 text-blue-700',
+      por_validar: 'bg-purple-100 text-purple-700',
+      por_aprobar: 'bg-orange-100 text-orange-700',
+      aprobada: 'bg-green-100 text-green-700',
+      rechazada: 'bg-red-100 text-red-700',
+      enviada: 'bg-cyan-100 text-cyan-700',
+      completada: 'bg-emerald-100 text-emerald-700',
+    }
+    return styles[estado] || 'bg-gray-100 text-gray-700'
+  }
+
+  if (loading) {
+    return (
+      <div className="p-4 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    )
+  }
+
+  if (!lista) {
+    return (
+      <div className="p-4">
+        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-white">
+          <Package className="h-10 w-10 text-gray-300 mb-3" />
+          <p className="text-sm text-muted-foreground">Lista no encontrada</p>
+          <Button variant="outline" size="sm" className="mt-3 h-7 text-xs" asChild>
+            <Link href="/logistica/listas">Volver a Listas</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Use lista.items (transformed with cotizaciones) or fallback to listaEquipoItem
+  const items = (lista as any).items || lista.listaEquipoItem || []
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header con información de la lista */}
-        <div className="p-4 border rounded-xl bg-white space-y-2">
-          <h1 className="text-2xl font-bold flex justify-between items-center">
-            {lista.codigo}
-            <Badge variant="outline">{lista.estado}</Badge>
-          </h1>
-          <p className="text-sm text-gray-700">
-            <strong>Proyecto:</strong> {lista.proyecto?.nombre || 'Sin proyecto'}
-          </p>
-          <p className="text-sm text-gray-700">
-            <strong>Fecha creación:</strong>{' '}
-            {new Date(lista.createdAt).toLocaleDateString()}
-          </p>
-          <p className="text-sm text-gray-700">
-            <strong>Costo Total Elegido:</strong>{' '}
-            $ {(lista.items?.reduce((total, item) => total + (item.costoElegido ?? 0), 0) ?? 0).toFixed(2)}
-          </p>
+    <div className="min-h-screen bg-gray-50/50">
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="px-4 py-3">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Link href="/logistica" className="hover:text-foreground">Logística</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link href="/logistica/listas" className="hover:text-foreground">Listas</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground font-medium">{lista.codigo}</span>
+          </div>
 
-          {/* Botones de acción */}
-          <div className="pt-4 flex flex-wrap gap-3">
-            <Button
-              onClick={() => setShowCrearCotizacion(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Crear Cotización
-            </Button>
-
-            {lista.estado === 'por_cotizar' && (
-              <Button
-                onClick={async () => {
-                  try {
-                    const updated = await updateListaEstado(lista.id, 'por_validar')
-                    if (updated) {
-                      toast.success('Estado actualizado a por_validar')
-                      handleRefetch()
-                    } else {
-                      toast.error('Error al actualizar el estado')
-                    }
-                  } catch (error) {
-                    toast.error('Error al avanzar estado')
-                  }
-                }}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                Avanzar a Por Validar
+          {/* Title row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" asChild className="h-7 px-2">
+                <Link href="/logistica/listas">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </Link>
               </Button>
-            )}
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-base font-semibold">{lista.codigo}</h1>
+                    <Badge className={`text-[10px] h-5 ${getEstadoBadge(lista.estado)}`}>
+                      {lista.estado?.replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    {lista.proyecto?.nombre || 'Sin proyecto'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCrearCotizacion(true)}
+                className="h-7 text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Cotización
+              </Button>
+              {lista.estado === 'por_cotizar' && (
+                <Button
+                  size="sm"
+                  onClick={handleAvanzarEstado}
+                  disabled={updatingEstado}
+                  className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                >
+                  {updatingEstado ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                  )}
+                  Avanzar
+                </Button>
+              )}
+            </div>
           </div>
         </div>
+      </div>
 
-      {/* Nuevo: Centro Unificado de Cotizaciones */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-900">
-            <Lightbulb className="h-5 w-5" />
-            ✨ Nuevo: Centro Unificado de Cotizaciones
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-blue-800 mb-4">
-            Gestiona todas las cotizaciones de esta lista desde un solo lugar.
-            Acceso rápido a actualización masiva y selección de ganadores.
-          </p>
-          <Button asChild className="bg-blue-600 hover:bg-blue-700">
-            <Link href={`/logistica/listas/${id}/cotizaciones`}>
-              <Target className="h-4 w-4 mr-2" />
-              Probar el Nuevo Centro de Cotizaciones
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="p-4 space-y-4">
+        {/* Items table */}
+        {items.length > 0 ? (
+          <LogisticaListaDetalleItemTableProfessional
+            items={items}
+            onUpdated={handleRefetch}
+          />
+        ) : (
+          <div className="bg-white rounded-lg border">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Package className="h-10 w-10 text-gray-300 mb-3" />
+              <p className="text-sm text-muted-foreground">No hay items en esta lista</p>
+            </div>
+          </div>
+        )}
+      </div>
 
-      {lista.items.length > 0 ? (
-        <LogisticaListaDetalleItemTableProfessional items={lista.items} onUpdated={handleRefetch} />
-      ) : (
-        <p className="text-gray-500">No hay ítems en esta lista.</p>
-      )}
-
-      {/* Modal para crear cotización desde lista */}
+      {/* Modal */}
       {lista.proyecto && (
         <ModalCrearCotizacionDesdeLista
           open={showCrearCotizacion}
@@ -131,9 +207,8 @@ export default function LogisticaListaDetallePage() {
           lista={lista}
           proyecto={lista.proyecto}
           onCreated={() => {
-            toast.success('Cotización creada exitosamente')
-            // Opcional: redirigir a la página de cotizaciones
-            // router.push('/logistica/cotizaciones')
+            toast.success('Cotización creada')
+            handleRefetch()
           }}
         />
       )}

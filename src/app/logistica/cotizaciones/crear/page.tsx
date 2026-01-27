@@ -69,7 +69,7 @@ export default function LogisticaCotizacionCrearPage() {
       return
     }
     const listaSeleccionada = listasFiltradas.find((l) => l.id === listaId)
-    setItems(listaSeleccionada?.items || [])
+    setItems(listaSeleccionada?.listaEquipoItem || [])
   }, [listaId, listasFiltradas])
 
   const handleSelectItem = (item: ListaEquipoItem, checked: boolean) => {

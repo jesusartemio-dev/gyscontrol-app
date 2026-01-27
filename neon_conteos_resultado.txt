@@ -1,0 +1,23 @@
+CONTEO DE REGISTROS POR TABLA
+============================
+
+Account: 0
+CatalogoEquipo: 0
+CatalogoServicio: 0
+CategoriaEquipo: 1
+CategoriaServicio: 0
+Cliente: 0
+Cotizacion: 0
+CotizacionEquipo: 0
+CotizacionEquipoItem: 0
+CotizacionGasto: 0
+CotizacionGastoItem: 0
+CotizacionProveedor: 0
+CotizacionProveedorItem: 0
+CotizacionServicio: 0
+CotizacionServicioItem: 0
+ListaEquipo: 0
+ListaEquipoItem: 0
+PedidoEquipo: 0
+PedidoEquipoItem: 0
+Plantilla: 0

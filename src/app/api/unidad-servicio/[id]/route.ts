@@ -15,9 +15,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const data = await prisma.unidadServicio.findUnique({
       where: { id },
       include: {
-        servicios: true,
-        plantillaServicioItems: true,
-        cotizacionServicioItems: true
+        catalogoServicio: true,
+        plantillaServicioItem: true,
+        cotizacionServicioItem: true
       }
     })
     return NextResponse.json(data)

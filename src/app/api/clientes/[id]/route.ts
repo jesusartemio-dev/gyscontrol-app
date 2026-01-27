@@ -12,7 +12,7 @@ export async function GET(
     const cliente = await prisma.cliente.findUnique({
       where: { id },
       include: {
-        cotizaciones: {
+        cotizacion: {
           select: {
             id: true,
             nombre: true,
@@ -22,7 +22,7 @@ export async function GET(
           },
           orderBy: { createdAt: 'desc' }
         },
-        proyectos: {
+        proyecto: {
           select: {
             id: true,
             nombre: true,
@@ -97,8 +97,8 @@ export async function DELETE(
     const clienteConDependencias = await prisma.cliente.findUnique({
       where: { id },
       include: {
-        cotizaciones: { select: { id: true } },
-        proyectos: { select: { id: true } }
+        cotizacion: { select: { id: true } },
+        proyecto: { select: { id: true } }
       }
     })
 
@@ -110,11 +110,11 @@ export async function DELETE(
     }
 
     // Verificar si tiene proyectos activos (no se pueden eliminar)
-    if (clienteConDependencias.proyectos.length > 0) {
+    if (clienteConDependencias.proyecto.length > 0) {
       return NextResponse.json(
         {
           error: 'No se puede eliminar el cliente porque tiene proyectos asociados',
-          details: `El cliente tiene ${clienteConDependencias.proyectos.length} proyecto(s) asociado(s)`
+          details: `El cliente tiene ${clienteConDependencias.proyecto.length} proyecto(s) asociado(s)`
         },
         { status: 400 }
       )
@@ -123,7 +123,7 @@ export async function DELETE(
     // Eliminar cotizaciones en cascada y luego el cliente
     await prisma.$transaction(async (tx) => {
       // Eliminar cotizaciones relacionadas
-      if (clienteConDependencias.cotizaciones.length > 0) {
+      if (clienteConDependencias.cotizacion.length > 0) {
         await tx.cotizacion.deleteMany({
           where: { clienteId: id }
         })

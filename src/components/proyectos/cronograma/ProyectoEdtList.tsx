@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import {
   Plus,
   Edit,
@@ -28,9 +29,13 @@ import {
   Target,
   Calendar,
   User,
-  BarChart3
+  BarChart3,
+  GripVertical
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ProyectoEdtForm } from './ProyectoEdtForm'
+import { SortableList } from '@/components/ui/sortable-list'
+import { useSortableList } from '@/hooks/useSortableList'
 import type { ProyectoEdt } from '@/types/modelos'
 
 interface ProyectoEdtListProps {
@@ -55,6 +60,17 @@ export function ProyectoEdtList({
   const [edts, setEdts] = useState<ProyectoEdt[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedEdtId, setSelectedEdtId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingEdt, setEditingEdt] = useState<ProyectoEdt | null>(null)
+
+  // Hook para manejar reordenamiento
+  const { reorderItems, isReordering } = useSortableList({
+    proyectoId,
+    tipo: 'edt',
+    parentId: faseId,
+    cronogramaId
+  })
 
   useEffect(() => {
     loadEdts()
@@ -74,7 +90,9 @@ export function ProyectoEdtList({
 
       const data = await response.json()
       if (data.success) {
-        setEdts(data.data)
+        // Ordenar por el campo orden
+        const sortedEdts = data.data.sort((a: ProyectoEdt, b: ProyectoEdt) => a.orden - b.orden)
+        setEdts(sortedEdts)
       } else {
         console.warn('API returned error:', data.error)
         setEdts([])
@@ -114,6 +132,29 @@ export function ProyectoEdtList({
       console.error('Error deleting EDT:', error)
       toast.error('Error al eliminar el EDT')
     }
+  }
+
+  const handleCreateEdt = () => {
+    setShowCreateModal(true)
+  }
+
+  const handleEditEdt = (edt: ProyectoEdt) => {
+    setEditingEdt(edt)
+    setShowEditModal(true)
+  }
+
+  const handleEdtSuccess = (edt: ProyectoEdt) => {
+    setShowCreateModal(false)
+    setShowEditModal(false)
+    setEditingEdt(null)
+    loadEdts()
+    onEdtCreate?.()
+  }
+
+  const handleEdtCancel = () => {
+    setShowCreateModal(false)
+    setShowEditModal(false)
+    setEditingEdt(null)
   }
 
   const getStatusInfo = (estado: string) => {
@@ -219,7 +260,7 @@ export function ProyectoEdtList({
             Estructura de Desglose de Trabajo y planificación detallada
           </p>
         </div>
-        <Button onClick={onEdtCreate} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={handleCreateEdt} className="bg-blue-600 hover:bg-blue-700">
           <Plus className="h-4 w-4 mr-2" />
           Nuevo EDT
         </Button>
@@ -236,15 +277,18 @@ export function ProyectoEdtList({
             <p className="text-gray-600 text-center mb-4">
               Crea tu primera Estructura de Desglose de Trabajo para organizar las tareas del proyecto
             </p>
-            <Button onClick={onEdtCreate} variant="outline">
+            <Button onClick={handleCreateEdt} variant="outline">
               <Plus className="h-4 w-4 mr-2" />
               Crear Primer EDT
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {edts.map((edt) => {
+        <SortableList
+          items={edts}
+          onReorder={reorderItems}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          renderItem={(edt) => {
             const statusInfo = getStatusInfo(edt.estado)
             const prioridadInfo = getPrioridadInfo(edt.prioridad)
             const isSelected = selectedEdtId === edt.id
@@ -340,7 +384,7 @@ export function ProyectoEdtList({
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Categoría</span>
                     <span className="font-medium bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
-                      {edt.categoriaServicio?.nombre || 'Sin categoría'}
+                      {edt.edt?.nombre || 'Sin categoría'}
                     </span>
                   </div>
 
@@ -351,7 +395,7 @@ export function ProyectoEdtList({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
-                        onEdtEdit?.(edt)
+                        handleEditEdt(edt)
                       }}
                       className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
                     >
@@ -372,9 +416,36 @@ export function ProyectoEdtList({
                 </CardContent>
               </Card>
             )
-          })}
-        </div>
+          }}
+        />
       )}
+
+      {/* Modal Crear EDT */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <ProyectoEdtForm
+            proyectoId={proyectoId}
+            cronogramaId={cronogramaId}
+            onSuccess={handleEdtSuccess}
+            onCancel={handleEdtCancel}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Editar EDT */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {editingEdt && (
+            <ProyectoEdtForm
+              proyectoId={proyectoId}
+              cronogramaId={cronogramaId}
+              edt={editingEdt}
+              onSuccess={handleEdtSuccess}
+              onCancel={handleEdtCancel}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

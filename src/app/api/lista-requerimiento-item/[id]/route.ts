@@ -18,10 +18,10 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const item = await prisma.listaEquipoItem.findUnique({
       where: { id },
       include: {
-        lista: true,
+        listaEquipo: true,
         proyectoEquipoItem: true,
         proveedor: true,
-        cotizaciones: true,
+        cotizacionProveedorItems: true,
       },
     })
     return NextResponse.json(item)

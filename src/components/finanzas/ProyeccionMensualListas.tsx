@@ -491,8 +491,8 @@ export default function ProyeccionMensualListas({
       const detalleEstados = {
         borrador: listasDelMes.filter(l => l.estado === 'borrador').length,
         revision: listasDelMes.filter(l => l.estado === 'por_revisar').length,
-        aprobada: listasDelMes.filter(l => l.estado === 'aprobado').length,
-        rechazada: listasDelMes.filter(l => l.estado === 'rechazado').length
+        aprobada: listasDelMes.filter(l => l.estado === 'aprobada').length,
+        rechazada: listasDelMes.filter(l => l.estado === 'rechazada').length
       }
       
       // Filtrar items del mes
@@ -510,7 +510,7 @@ export default function ProyeccionMensualListas({
       // Calcular costo real (solo items de listas aprobadas)
       const itemsAprobados = itemsDelMes.filter(item => {
         const lista = listasDelMes.find(l => l.id === item.listaId)
-        return lista?.estado === 'aprobado'
+        return lista?.estado === 'aprobada'
       })
       
       const costoReal = itemsAprobados.reduce((sum, item) => {

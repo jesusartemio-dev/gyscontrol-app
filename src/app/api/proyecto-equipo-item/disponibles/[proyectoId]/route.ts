@@ -14,15 +14,15 @@ export async function GET(_: Request, context: { params: Promise<{ proyectoId: s
   try {
       const items = await prisma.proyectoEquipoCotizadoItem.findMany({
         where: {
-          proyectoEquipo: {
+          proyectoEquipoCotizado: {
             proyectoId: proyectoId,
           },
-          listaEquipos: {
+          listaEquipoItemsAsociados: {
             none: {}, // ❌ No debe estar referenciado en ninguna lista
           },
         },
         include: {
-          proyectoEquipo: true,
+          proyectoEquipoCotizado: true,
           catalogoEquipo: true,
           listaEquipoSeleccionado: {
             select: {

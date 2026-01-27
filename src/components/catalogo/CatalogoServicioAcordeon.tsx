@@ -37,11 +37,9 @@ export default function CatalogoServicioAcordeon({ servicio, categorias, unidade
     const payload: CatalogoServicioUpdatePayload = {
       nombre: valores.nombre ?? servicio.nombre,
       descripcion: valores.descripcion ?? servicio.descripcion,
-      formula: valores.formula ?? servicio.formula,
       horaBase: valores.horaBase ?? servicio.horaBase ?? 0,
       horaRepetido: valores.horaRepetido ?? servicio.horaRepetido ?? 0,
-      horaUnidad: valores.horaUnidad ?? servicio.horaUnidad ?? 0,
-      horaFijo: valores.horaFijo ?? servicio.horaFijo ?? 0,
+      cantidad: valores.cantidad ?? servicio.cantidad ?? 0,
       categoriaId: valores.categoriaId ?? servicio.categoriaId,
       unidadServicioId: valores.unidadServicioId ?? servicio.unidadServicioId,
       recursoId: valores.recursoId ?? servicio.recursoId,
@@ -77,12 +75,10 @@ export default function CatalogoServicioAcordeon({ servicio, categorias, unidade
         <div className="space-y-1 flex-1">
           <h3 className="font-bold text-lg">{servicio.nombre}</h3>
           <div className="flex flex-wrap text-sm text-gray-600 gap-x-4 gap-y-1">
-            <span>{resumenFormula[servicio.formula]}</span>
-            <span>{servicio.categoria?.nombre}</span>
+            <span>{servicio.edt?.nombre || 'Sin EDT'}</span>
             <span>{servicio.unidadServicio?.nombre}</span>
             <span>Hora Base: {servicio.horaBase ?? 0}</span>
             <span>Hora Repetido: {servicio.horaRepetido ?? 0}</span>
-            <span>Hora Unidad: {servicio.horaUnidad ?? 0}</span>
           </div>
         </div>
         <Button variant="outline" size="icon" className="rounded-full">

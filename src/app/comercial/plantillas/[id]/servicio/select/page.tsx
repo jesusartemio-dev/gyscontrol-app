@@ -14,9 +14,9 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getCatalogoServiciosByCategoriaId } from '@/lib/services/catalogoServicio'
 import { createPlantillaServicioItem } from '@/lib/services/plantillaServicioItem'
 import { recalcularPlantillaDesdeAPI } from '@/lib/services/plantilla'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { calcularHoras } from '@/lib/utils/formulas'
-import type { CatalogoServicio, CategoriaServicio } from '@/types'
+import type { CatalogoServicio, Edt } from '@/types'
 
 export default function SelectorServiciosPage() {
   const { id } = useParams()
@@ -24,14 +24,14 @@ export default function SelectorServiciosPage() {
   const router = useRouter()
   const plantillaServicioId = searchParams.get('grupo')
 
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('')
   const [catalogo, setCatalogo] = useState<CatalogoServicio[]>([])
   const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({})
   const [cantidades, setCantidades] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    getCategoriasServicio()
+    getEdts()
       .then((cats) => {
         setCategorias(cats)
         if (cats.length > 0) setCategoriaSeleccionada(cats[0].id)
@@ -53,6 +53,7 @@ export default function SelectorServiciosPage() {
     try {
       for (const s of catalogo) {
         if (!seleccionados[s.id]) continue
+        if (!s.unidadServicio || !s.recurso) continue
 
         const cantidad = cantidades[s.id] || 1
         const horas = calcularHoras({
@@ -64,6 +65,8 @@ export default function SelectorServiciosPage() {
           horaFijo: s.horaFijo
         })
 
+        const costoHora = s.recurso.costoHora || 0
+        const categoriaNombre = s.edt?.nombre || ''
         const payload = {
           plantillaServicioId,
           catalogoServicioId: s.id,
@@ -71,7 +74,7 @@ export default function SelectorServiciosPage() {
           recursoId: s.recurso.id,
           nombre: s.nombre,
           descripcion: s.descripcion,
-          categoria: s.categoria.nombre,
+          categoria: categoriaNombre,
           formula: s.formula,
           horaBase: s.horaBase,
           horaRepetido: s.horaRepetido,
@@ -79,13 +82,13 @@ export default function SelectorServiciosPage() {
           horaFijo: s.horaFijo,
           unidadServicioNombre: s.unidadServicio.nombre,
           recursoNombre: s.recurso.nombre,
-          costoHora: s.recurso.costoHora,
+          costoHora,
           cantidad,
           horaTotal: horas,
           factorSeguridad: 1.0,
-          costoInterno: horas * s.recurso.costoHora,
+          costoInterno: horas * costoHora,
           margen: 1.35,
-          costoCliente: horas * s.recurso.costoHora * 1.35
+          costoCliente: horas * costoHora * 1.35
         }
 
         await createPlantillaServicioItem(payload)
@@ -138,8 +141,8 @@ export default function SelectorServiciosPage() {
                 />
               </td>
               <td className="p-2">{s.nombre}</td>
-              <td className="p-2">{s.recurso.nombre}</td>
-              <td className="p-2">{s.unidadServicio.nombre}</td>
+              <td className="p-2">{s.recurso?.nombre || '-'}</td>
+              <td className="p-2">{s.unidadServicio?.nombre || '-'}</td>
               <td className="p-2">
                 <input
                   type="number"

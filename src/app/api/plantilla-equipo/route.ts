@@ -19,11 +19,13 @@ export async function POST(req: Request) {
     // ✅ Crear el nuevo equipo
     const nuevo = await prisma.plantillaEquipo.create({
       data: {
+        id: `plantilla-equipo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         plantillaId: data.plantillaId,
         nombre: data.nombre,
         descripcion: data.descripcion || '',
         subtotalInterno: 0,
         subtotalCliente: 0,
+        updatedAt: new Date()
       },
     })
 

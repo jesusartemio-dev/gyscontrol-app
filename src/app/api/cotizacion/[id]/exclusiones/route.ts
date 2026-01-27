@@ -125,9 +125,11 @@ export async function POST(
     // Crear la exclusión
     const nuevaExclusion = await prisma.cotizacionExclusion.create({
       data: {
+        id: `cot-excl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionId: id,
         descripcion: descripcion.trim(),
-        orden: ordenFinal
+        orden: ordenFinal,
+        updatedAt: new Date()
       }
     })
 

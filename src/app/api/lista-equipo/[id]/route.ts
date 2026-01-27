@@ -25,19 +25,19 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       where: { id },
       include: {
         proyecto: true,
-        responsable: true,
-        items: {
+        user: true,
+        listaEquipoItem: {
           include: {
             proveedor: true,
-            cotizaciones: true,
-            pedidos: {
+            cotizacionProveedorItems: true,
+            pedidoEquipoItem: {
               include: {
-                pedido: true
+                pedidoEquipo: true
               }
             },
             proyectoEquipoItem: {
               include: {
-                proyectoEquipo: true,
+                proyectoEquipoCotizado: true,
               },
             },
           },
@@ -46,9 +46,9 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     })
 
     // 🔄 Calculate cantidadPedida for each item
-    if (data?.items) {
-      data.items = data.items.map(item => {
-        const cantidadPedida = item.pedidos.reduce((total, pedidoItem) => {
+    if (data?.listaEquipoItem) {
+      data.listaEquipoItem = data.listaEquipoItem.map(item => {
+        const cantidadPedida = item.pedidoEquipoItem.reduce((total, pedidoItem) => {
           return total + (pedidoItem.cantidadPedida || 0)
         }, 0)
         
@@ -113,13 +113,13 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         case 'por_aprobar':
           updateData.fechaValidacion = now
           break
-        case 'aprobado':
+        case 'aprobada':
           updateData.fechaAprobacionRevision = now
           break
         case 'por_cotizar':
           updateData.fechaEnvioLogistica = now
           break
-        case 'rechazado':
+        case 'rechazada':
           // No se actualiza ninguna fecha específica para rechazado
           break
       }

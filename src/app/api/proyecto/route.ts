@@ -5,17 +5,26 @@ import { authOptions } from '@/lib/auth'
 
 export async function GET() {
   try {
-    const proyectos = await prisma.proyecto.findMany({
+    const proyectosRaw = await prisma.proyecto.findMany({
       include: {
         cliente: true,
         comercial: true,
         gestor: true,
-        equipos: true,
-        servicios: true,
-        gastos: true,
+        proyectoEquipoCotizado: true,
+        proyectoServicioCotizado: true,
+        proyectoGastoCotizado: true,
       },
       orderBy: { createdAt: 'desc' },
     })
+
+    // 🔄 Frontend compatibility mapping
+    const proyectos = proyectosRaw.map((proyecto: any) => ({
+      ...proyecto,
+      equipos: proyecto.proyectoEquipoCotizado,
+      servicios: proyecto.proyectoServicioCotizado,
+      gastos: proyecto.proyectoGastoCotizado
+    }))
+
     return NextResponse.json(proyectos)
   } catch (error) {
     console.error('❌ Error en GET /api/proyecto:', error)

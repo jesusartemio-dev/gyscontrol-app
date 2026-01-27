@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { CotizacionGastoItemPayload } from '@/types/payloads'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
+import { randomUUID } from 'crypto'
 
 export async function GET(req: Request) {
   try {
@@ -17,10 +18,10 @@ export async function GET(req: Request) {
     const data = gastoId
       ? await prisma.cotizacionGastoItem.findMany({
           where: { gastoId },
-          include: { gasto: true },
+          include: { cotizacionGasto: true },
         })
       : await prisma.cotizacionGastoItem.findMany({
-          include: { gasto: true },
+          include: { cotizacionGasto: true },
         })
 
     return NextResponse.json(data)
@@ -44,7 +45,11 @@ export async function POST(req: Request) {
     }
 
     const data = await prisma.cotizacionGastoItem.create({
-      data: payload,
+      data: {
+        id: randomUUID(),
+        ...payload,
+        updatedAt: new Date(),
+      },
     })
 
     await recalcularTotalesCotizacion(gasto.cotizacionId)

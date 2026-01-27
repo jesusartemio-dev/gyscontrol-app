@@ -1,13 +1,12 @@
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { ProyectoCronogramaTab } from '@/components/proyectos/cronograma/ProyectoCronogramaTab';
-import { prisma } from '@/lib/prisma';
-import { Calendar, Clock, BarChart3 } from 'lucide-react';
-import type { Proyecto, ProyectoCronograma } from '@/types/modelos';
+import type { Proyecto } from '@/types/modelos';
+import { getProyectoForCronograma } from '@/lib/server/cronograma';
 
 // ✅ Props de la página
 interface CronogramaPageProps {
@@ -20,10 +19,7 @@ interface CronogramaPageProps {
 export async function generateMetadata({ params }: CronogramaPageProps): Promise<Metadata> {
   const { id } = await params;
   try {
-    const proyecto = await prisma.proyecto.findUnique({
-      where: { id },
-      select: { id: true, nombre: true, estado: true, fechaFin: true, totalReal: true, totalInterno: true }
-    }) as Proyecto | null;
+    const proyecto = await getProyectoForCronograma(id);
     
     if (!proyecto) {
       return {
@@ -108,87 +104,49 @@ function CronogramaSkeleton() {
 
 // ✅ Componente principal de la página
 export default async function CronogramaPage({ params }: CronogramaPageProps) {
-  console.log('🔍 [CRONOGRAMA] Iniciando carga de página de cronograma');
-
   const { id } = await params;
-  console.log('🔍 [CRONOGRAMA] ID del proyecto:', id);
 
   // ✅ Validar que el ID sea válido
   if (!id || typeof id !== 'string') {
-    console.log('❌ [CRONOGRAMA] ID inválido, redirigiendo a 404');
     notFound();
   }
 
   // ✅ Obtener información básica del proyecto para el breadcrumb
   let proyecto: Proyecto | null = null;
   try {
-    console.log('🔍 [CRONOGRAMA] Obteniendo proyecto por ID...');
-    proyecto = await prisma.proyecto.findUnique({
-      where: { id },
-      select: { id: true, nombre: true, estado: true, fechaFin: true, totalReal: true, totalInterno: true }
-    }) as Proyecto | null;
-    console.log('✅ [CRONOGRAMA] Proyecto obtenido:', proyecto?.nombre);
+    proyecto = await getProyectoForCronograma(id);
     if (!proyecto) {
-      console.log('❌ [CRONOGRAMA] Proyecto no encontrado');
       // Redirect to 404 page instead of using notFound()
       return (
         <div className="container mx-auto px-4 py-6 space-y-6">
           <div className="text-center py-12">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Proyecto no encontrado</h1>
             <p className="text-gray-600 mb-6">El proyecto solicitado no existe o no tienes permisos para verlo.</p>
-            <a href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
+            <Link href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
               Volver a la lista de proyectos
-            </a>
+            </Link>
           </div>
         </div>
       );
     }
   } catch (error) {
-    console.error('❌ [CRONOGRAMA] Error al cargar proyecto:', error);
+    console.error('Error al cargar proyecto:', error);
     return (
       <div className="container mx-auto px-4 py-6 space-y-6">
         <div className="text-center py-12">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Error al cargar el proyecto</h1>
           <p className="text-gray-600 mb-6">Ha ocurrido un error al cargar la información del proyecto.</p>
-          <a href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
+          <Link href="/proyectos" className="text-blue-600 hover:text-blue-800 underline">
             Volver a la lista de proyectos
-          </a>
+          </Link>
         </div>
       </div>
     );
   }
 
-  console.log('✅ [CRONOGRAMA] Proyecto cargado exitosamente, renderizando componente');
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
-      {/* ✅ Breadcrumb navigation */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/proyectos">Proyectos</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href={`/proyectos/${id}`}>
-              {proyecto.nombre}
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Cronograma</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      {/* ✅ Header compacto de la página */}
-      <div className="flex items-center justify-between py-2">
-        <h1 className="text-xl font-semibold text-gray-900">
-          Cronograma - {proyecto.nombre}
-        </h1>
-      </div>
-
-      {/* ✅ Contenedor principal del cronograma */}
+    <div className="space-y-2">
       <Suspense fallback={<CronogramaSkeleton />}>
         <ProyectoCronogramaTab
           proyectoId={id}

@@ -26,33 +26,33 @@ export async function recalcularTotalesPlantilla(id: string) {
   const plantilla = await prisma.plantilla.findUnique({
     where: { id },
     include: {
-      equipos: { include: { items: true } },
-      servicios: { include: { items: true } },
-      gastos: { include: { items: true } }
+      plantillaEquipo: { include: { plantillaEquipoItem: true } },
+      plantillaServicio: { include: { plantillaServicioItem: true } },
+      plantillaGasto: { include: { plantillaGastoItem: true } }
     }
   })
 
   if (!plantilla) throw new Error('Plantilla no encontrada')
 
   const equiposActualizados = await Promise.all(
-    plantilla.equipos.map(async (eq) => {
-      const subtotales = calcularSubtotal(eq.items)
+    plantilla.plantillaEquipo.map(async (eq) => {
+      const subtotales = calcularSubtotal(eq.plantillaEquipoItem)
       await prisma.plantillaEquipo.update({ where: { id: eq.id }, data: subtotales })
       return subtotales
     })
   )
 
   const serviciosActualizados = await Promise.all(
-    plantilla.servicios.map(async (sv) => {
-      const subtotales = calcularSubtotal(sv.items)
+    plantilla.plantillaServicio.map(async (sv) => {
+      const subtotales = calcularSubtotal(sv.plantillaServicioItem)
       await prisma.plantillaServicio.update({ where: { id: sv.id }, data: subtotales })
       return subtotales
     })
   )
 
   const gastosActualizados = await Promise.all(
-    plantilla.gastos.map(async (gt) => {
-      const subtotales = calcularSubtotal(gt.items)
+    plantilla.plantillaGasto.map(async (gt) => {
+      const subtotales = calcularSubtotal(gt.plantillaGastoItem)
       await prisma.plantillaGasto.update({ where: { id: gt.id }, data: subtotales })
       return subtotales
     })

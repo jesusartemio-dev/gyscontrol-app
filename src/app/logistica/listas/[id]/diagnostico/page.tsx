@@ -83,19 +83,19 @@ export default function DiagnosticoPage() {
         <div>
           <h1 className="text-2xl font-bold">Diagnóstico de Acciones</h1>
           <p className="text-muted-foreground">
-            Lista: {lista.nombre} | Items: {lista.items.length}
+            Lista: {lista.nombre} | Items: {lista.listaEquipoItem.length}
           </p>
         </div>
       </div>
 
       {/* 🔍 Diagnósticos por item */}
       <div className="space-y-6">
-        {lista.items.length === 0 ? (
+        {lista.listaEquipoItem.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500">No hay ítems en esta lista para diagnosticar</p>
           </div>
         ) : (
-          lista.items.map((item, index) => (
+          lista.listaEquipoItem.map((item, index) => (
             <div key={item.id} className="space-y-2">
               <div className="border-l-4 border-blue-500 pl-4">
                 <h3 className="font-semibold text-lg">
@@ -121,18 +121,18 @@ export default function DiagnosticoPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <p className="font-medium">Total Items:</p>
-            <p className="text-2xl font-bold text-blue-600">{lista.items.length}</p>
+            <p className="text-2xl font-bold text-blue-600">{lista.listaEquipoItem.length}</p>
           </div>
           <div>
             <p className="font-medium">Items con Cotizaciones:</p>
             <p className="text-2xl font-bold text-green-600">
-              {lista.items.filter(item => item.cotizaciones && item.cotizaciones.length > 0).length}
+              {lista.listaEquipoItem.filter(item => item.cotizaciones && item.cotizaciones.length > 0).length}
             </p>
           </div>
           <div>
             <p className="font-medium">Items Seleccionados:</p>
             <p className="text-2xl font-bold text-purple-600">
-              {lista.items.filter(item => 
+              {lista.listaEquipoItem.filter(item => 
                 item.cotizaciones &&
             item.cotizaciones.some(cot => cot.esSeleccionada)
               ).length}
@@ -141,7 +141,7 @@ export default function DiagnosticoPage() {
           <div>
             <p className="font-medium">Items Pendientes:</p>
             <p className="text-2xl font-bold text-orange-600">
-              {lista.items.filter(item => 
+              {lista.listaEquipoItem.filter(item => 
                 !item.cotizaciones ||
             item.cotizaciones.length === 0 ||
             !item.cotizaciones.some(cot => cot.esSeleccionada)

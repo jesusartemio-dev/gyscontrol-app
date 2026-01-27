@@ -9,17 +9,22 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 
 export async function GET() {
   try {
     const data = await prisma.catalogoServicio.findMany({
-      orderBy: { nombre: 'asc' },
+      orderBy: [
+        { orden: 'asc' },
+        { nombre: 'asc' }
+      ],
       include: {
-        categoria: true,
+        edt: true,
         unidadServicio: true,
         recurso: true,
       },
     })
+    console.log('📊 Servicios ordenados desde API:', data.map(s => ({ nombre: s.nombre, orden: s.orden })))
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error en GET /catalogo-servicio:', error)
@@ -30,7 +35,13 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const data = await prisma.catalogoServicio.create({ data: body })
+    const data = await prisma.catalogoServicio.create({
+      data: {
+        id: randomUUID(),
+        updatedAt: new Date(),
+        ...body,
+      }
+    })
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error en POST /catalogo-servicio:', error)

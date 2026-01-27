@@ -1,397 +1,191 @@
-/**
- * 🎯 Project Equipment Page
- * 
- * Displays equipment from commercial quotes (ProyectoEquipo, ProyectoEquipoItem).
- * This follows the Template -> Quote -> Project flow.
- * 
- * Features:
- * - Equipment groups from quotes
- * - Editable items within groups
- * - Cost tracking and progress
- * - Integration with technical lists creation
- * 
- * @author GYS Team
- * @version 1.0.0
- */
+'use client'
 
-'use client';
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Package, LayoutList, LayoutGrid, List } from 'lucide-react'
 
-import { Suspense, useEffect, useState } from 'react';
-import { notFound } from 'next/navigation';
-import { getProyectoById } from '@/lib/services/proyecto';
-import { getProyectoEquipos } from '@/lib/services/proyectoEquipo';
-import EquiposTableView from '@/components/proyectos/equipos/EquiposTableView';
-import EquiposCardView from '@/components/proyectos/equipos/EquiposCardView';
-import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import {
-  Package,
-  DollarSign,
-  Calendar,
-  ArrowLeft,
-  Settings,
-  Download,
-  Share2,
-  List,
-  BarChart3,
-  Plus,
-  Grid3X3,
-  Table
-} from 'lucide-react';
-import Link from 'next/link';
-import type { Proyecto, ProyectoEquipoCotizado } from '@/types';
-import { useDebugPanel, DebugPanel } from '@/components/debug/DebugPanel';
+import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import EquiposTableView from '@/components/proyectos/equipos/EquiposTableView'
+import EquiposCardView from '@/components/proyectos/equipos/EquiposCardView'
+import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal'
 
-// ✅ Page props interface
-interface PageProps {
-  params: Promise<{
-    id: string;
-  }>;
+import { useProyectoContext } from '../ProyectoContext'
+import type { ProyectoEquipoCotizado } from '@/types'
+
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
 }
 
-// ✅ Loading skeleton component
-function EquipmentPageSkeleton() {
+function EquiposSkeleton() {
   return (
-    <div className="space-y-6">
-      {/* Header skeleton */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-32" />
-          <Skeleton className="h-10 w-32" />
-        </div>
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 pb-3 border-b">
+        <Skeleton className="h-5 w-5" />
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-4 w-48" />
       </div>
-      
-      {/* Stats cards skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="border rounded-lg">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-20" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-16" />
-            </CardContent>
-          </Card>
+          <div key={i} className="flex gap-4 p-2 border-b last:border-0">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-24" />
+          </div>
         ))}
       </div>
-      
-      {/* Equipment list skeleton */}
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="border rounded-lg p-4">
-              <Skeleton className="h-6 w-64 mb-2" />
-              <Skeleton className="h-4 w-full mb-4" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-      
-      {/* 🐛 Debug Panel for monitoring re-renders */}
-      <DebugPanel position="top-right" />
     </div>
-  );
+  )
 }
 
-// ✅ Main page component
-export default function ProjectEquipmentPage({ params }: PageProps) {
-  const [proyecto, setProyecto] = useState<Proyecto | null>(null);
-  const [equipos, setEquipos] = useState<ProyectoEquipoCotizado[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [proyectoId, setProyectoId] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedEquipo, setSelectedEquipo] = useState<ProyectoEquipoCotizado | null>(null);
-
-  // 🐛 Debug panel for monitoring re-renders
-  const { DebugPanel } = useDebugPanel();
+export default function ProyectoEquiposPage() {
+  const { proyecto } = useProyectoContext()
+  const [equipos, setEquipos] = useState<ProyectoEquipoCotizado[]>([])
+  const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [selectedEquipo, setSelectedEquipo] = useState<ProyectoEquipoCotizado | null>(null)
 
   useEffect(() => {
-    const fetchParams = async () => {
-      const resolvedParams = await params;
-      setProyectoId(resolvedParams.id);
-    };
-    fetchParams();
-  }, [params]);
+    if (!proyecto?.id) return
 
-  useEffect(() => {
-    if (!proyectoId) return;
-
-    const fetchData = async () => {
+    const fetchEquipos = async () => {
       try {
-        const [proyectoData, equiposData] = await Promise.all([
-          getProyectoById(proyectoId),
-          getProyectoEquipos(proyectoId)
-        ]);
-        
-        if (!proyectoData) {
-          notFound();
-          return;
-        }
-        
-        setProyecto(proyectoData);
-        setEquipos(equiposData);
+        const data = await getProyectoEquipos(proyecto.id)
+        setEquipos(data)
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching equipos:', error)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchData();
-  }, [proyectoId]);
+    fetchEquipos()
+  }, [proyecto?.id])
 
-  if (loading) {
-    return <EquipmentPageSkeleton />;
-  }
+  if (!proyecto) return null
 
-  // ✅ Handle not found
-  if (!proyecto) {
-    notFound();
-  }
-
-  // ✅ Handle modal opening
   const handleOpenModal = (equipo: ProyectoEquipoCotizado) => {
-    setSelectedEquipo(equipo);
-    setModalOpen(true);
-  };
+    setSelectedEquipo(equipo)
+    setModalOpen(true)
+  }
 
   const handleCloseModal = () => {
-    setModalOpen(false);
-    setSelectedEquipo(null);
-  };
+    setModalOpen(false)
+    setSelectedEquipo(null)
+  }
 
   const handleDistribucionCompletada = (listaId: string) => {
-    console.log('Lista creada:', listaId);
-    // TODO: Refresh data or navigate to list
-  };
+    console.log('Lista creada:', listaId)
+  }
 
-  // ✅ Calculate statistics
-  const stats = {
-    totalGroups: equipos.length,
-    totalItems: equipos.reduce((sum, equipo) => sum + (equipo.items?.length || 0), 0),
-    totalCost: equipos.reduce((sum, equipo) => 
-      sum + (equipo.items?.reduce((itemSum, item) => 
-        itemSum + (item.precioCliente * item.cantidad), 0
-      ) || 0), 0
-    ),
-    avgProgress: equipos.length > 0 
-      ? equipos.reduce((sum, equipo) => {
-          const totalItems = equipo.items?.length || 0;
-          const itemsCompletados = equipo.items?.filter(item => 
-            item.estado === 'en_lista' || item.estado === 'reemplazado'
-          ).length || 0;
-          const progreso = totalItems > 0 ? (itemsCompletados / totalItems) * 100 : 0;
-          return sum + progreso;
-        }, 0) / equipos.length 
-      : 0
-  };
+  const totalItems = equipos.reduce((sum, eq) => sum + (eq.items?.length || 0), 0)
+  const totalCosto = equipos.reduce((sum, eq) =>
+    sum + (eq.items?.reduce((s, i) => s + (i.precioCliente * i.cantidad), 0) || 0), 0
+  )
+  const completedItems = equipos.reduce((sum, eq) =>
+    sum + (eq.items?.filter(i => i.estado === 'en_lista' || i.estado === 'reemplazado' || i.listaId).length || 0), 0
+  )
 
   return (
-    <div className="space-y-6">
-      {/* 📋 Breadcrumb Navigation */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/proyectos" className="hover:text-foreground transition-colors">
-          Proyectos
-        </Link>
-        <span>/</span>
-        <Link 
-          href={`/proyectos/${proyectoId}`} 
-          className="hover:text-foreground transition-colors"
-        >
-          {proyecto.nombre}
-        </Link>
-        <span>/</span>
-        <span className="text-foreground font-medium">Equipos</span>
-      </div>
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 pb-3 border-b">
+        <Package className="h-5 w-5 text-orange-500" />
+        <h2 className="text-lg font-semibold">Equipos Cotizados</h2>
 
-      {/* 🎯 Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <Package className="h-8 w-8 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {proyecto.codigo} - Equipos Cotizados
-              </h1>
-              <p className="text-gray-600">
-                Equipos provenientes de la cotización comercial
-              </p>
-            </div>
-          </div>
+        {/* Stats inline */}
+        <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
+            {equipos.length} grupos
+          </Badge>
+          <span className="text-gray-300">|</span>
+          <span>{totalItems} items</span>
+          <span className="text-gray-300">|</span>
+          <span className="text-green-600">{completedItems} en lista</span>
+          <span className="text-gray-300">|</span>
+          <span className="font-mono text-green-600 font-medium">{formatCurrency(totalCosto)}</span>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 border rounded-lg p-1">
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('table')}
-              className="h-8"
-            >
-              <Table className="h-4 w-4 mr-2" />
-              Tabla
-            </Button>
-            <Button
-              variant={viewMode === 'card' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('card')}
-              className="h-8"
-            >
-              <Grid3X3 className="h-4 w-4 mr-2" />
-              Cards
-            </Button>
-          </div>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
+
+        <div className="flex-1" />
+
+        {/* View Mode Toggle */}
+        <div className="flex items-center border rounded-md">
+          <Button
+            variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+            className="h-6 px-2 rounded-r-none"
+          >
+            <LayoutList className="h-3 w-3" />
           </Button>
-          <Button variant="outline" size="sm">
-            <Share2 className="h-4 w-4 mr-2" />
-            Compartir
-          </Button>
-          <Button asChild>
-            <Link href={`/proyectos/${proyectoId}/equipos/listas`}>
-              <List className="h-4 w-4 mr-2" />
-              Ver Listas Técnicas
-            </Link>
+          <Button
+            variant={viewMode === 'card' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('card')}
+            className="h-6 px-2 rounded-l-none"
+          >
+            <LayoutGrid className="h-3 w-3" />
           </Button>
         </div>
+
+        <Button variant="outline" size="sm" asChild className="h-7 text-xs">
+          <Link href={`/proyectos/${proyecto.id}/equipos/listas`}>
+            <List className="h-3 w-3 mr-1" />
+            Listas
+          </Link>
+        </Button>
       </div>
 
-      <Separator />
-
-      {/* 📊 Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Grupos de Equipos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {stats.totalGroups}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Total Items
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {stats.totalItems}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Costo Total
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              ${stats.totalCost.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Progreso Promedio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {stats.avgProgress.toFixed(1)}%
-            </div>
-          </CardContent>
-        </Card>
+      {/* Mobile Stats */}
+      <div className="sm:hidden flex items-center justify-between text-xs text-muted-foreground pb-2">
+        <span>{equipos.length} grupos · {totalItems} items</span>
+        <span className="font-mono text-green-600 font-medium">{formatCurrency(totalCosto)}</span>
       </div>
 
-      {/* 🎯 Equipment List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-blue-600" />
-            {proyecto.codigo} - Equipos Cotizados por Comercial
-            <Badge variant="secondary" className="ml-auto">
-              {viewMode === 'table' ? 'Vista Tabla' : 'Vista Cards'}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Suspense fallback={<EquipmentPageSkeleton />}>
-            {viewMode === 'table' ? (
-              <EquiposTableView
-                equipos={equipos}
-                proyectoId={proyectoId}
-                onCreateList={handleOpenModal}
-                onEquipoChange={(equipoId, changes) => {
-                  console.log('Equipo changed:', equipoId, changes);
-                  // TODO: Implement equipment update logic
-                }}
-                onEquipoDelete={(equipoId) => {
-                  console.log('Equipo deleted:', equipoId);
-                  // TODO: Implement equipment delete logic
-                }}
-              />
-            ) : (
-              <EquiposCardView
-                equipos={equipos}
-                proyectoId={proyectoId}
-                onCreateList={handleOpenModal}
-                onEquipoChange={(equipoId, changes) => {
-                  console.log('Equipo changed:', equipoId, changes);
-                  // TODO: Implement equipment update logic
-                }}
-                onEquipoDelete={(equipoId) => {
-                  console.log('Equipo deleted:', equipoId);
-                  // TODO: Implement equipment delete logic
-                }}
-              />
-            )}
-          </Suspense>
-        </CardContent>
-      </Card>
+      {/* Content */}
+      {loading ? (
+        <EquiposSkeleton />
+      ) : equipos.length === 0 ? (
+        <div className="flex items-center justify-center py-12 border-2 border-dashed rounded-lg bg-muted/30">
+          <div className="text-center">
+            <Package className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground mb-1">No hay equipos en este proyecto</p>
+            <p className="text-xs text-muted-foreground">Los equipos se importan desde la cotización.</p>
+          </div>
+        </div>
+      ) : viewMode === 'table' ? (
+        <EquiposTableView
+          equipos={equipos}
+          proyectoId={proyecto.id}
+          onCreateList={handleOpenModal}
+        />
+      ) : (
+        <EquiposCardView
+          equipos={equipos}
+          proyectoId={proyecto.id}
+          onCreateList={handleOpenModal}
+        />
+      )}
 
-      {/* Modal for creating lists */}
+      {/* Modal */}
       {selectedEquipo && (
         <CrearListaMultipleModal
           isOpen={modalOpen}
           onClose={handleCloseModal}
           proyectoEquipo={selectedEquipo as any}
-          proyectoId={proyectoId}
+          proyectoId={proyecto.id}
           onDistribucionCompletada={handleDistribucionCompletada}
         />
       )}
     </div>
-  );
+  )
 }

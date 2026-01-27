@@ -34,16 +34,15 @@ import {
   PlayCircle
 } from 'lucide-react'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { CotizacionFasesForm } from './CotizacionFasesForm'
 
 interface CotizacionFase {
   id: string
@@ -58,11 +57,15 @@ interface CotizacionFase {
   edts: {
     id: string
     nombre: string
-    categoriaServicio: {
+    edt: {
       nombre: string
     }
     estado: string
-    tareas: any[]
+    zonas: {
+      actividades: {
+        tareas: any[]
+      }[]
+    }[]
   }[]
 }
 
@@ -80,6 +83,7 @@ export function CotizacionFasesList({
   const [fases, setFases] = useState<CotizacionFase[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedFase, setExpandedFase] = useState<string | null>(null)
+  const [editingFase, setEditingFase] = useState<CotizacionFase | null>(null)
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean
     faseId: string
@@ -252,6 +256,10 @@ export function CotizacionFasesList({
                       <BarChart3 className="h-4 w-4 mr-2" />
                       {expandedFase === fase.id ? 'Ocultar' : 'Ver'} EDTs
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setEditingFase(fase)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar Fase
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => handleDeleteFase(fase.id, fase.nombre)}
                       disabled={deletingFase === fase.id}
@@ -334,7 +342,7 @@ export function CotizacionFasesList({
                       <div key={edt.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <Badge variant="outline" className="text-xs">
-                            {edt.categoriaServicio.nombre}
+                            {edt.edt.nombre}
                           </Badge>
                           <span className="text-sm font-medium">{edt.nombre}</span>
                           <Badge variant={getEstadoColor(edt.estado)} className="text-xs">
@@ -342,7 +350,11 @@ export function CotizacionFasesList({
                           </Badge>
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {edt.tareas?.length || 0} tareas
+                          {edt.zonas?.reduce((total, zona) =>
+                            total + zona.actividades?.reduce((actTotal, actividad) =>
+                              actTotal + (actividad.tareas?.length || 0), 0
+                            ) || 0, 0
+                          ) || 0} tareas
                         </div>
                       </div>
                     ))}
@@ -354,29 +366,47 @@ export function CotizacionFasesList({
         ))
       )}
 
+      {/* Modal de edición */}
+      {editingFase && (
+        <CotizacionFasesForm
+          cotizacionId={cotizacionId}
+          fase={editingFase}
+          onSuccess={() => {
+            setEditingFase(null)
+            loadFases()
+            onRefresh()
+          }}
+          onCancel={() => setEditingFase(null)}
+        />
+      )}
+
       {/* Diálogo de confirmación para eliminar fase */}
-      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => {
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => {
         // Solo permitir cerrar si no estamos en medio de una operación
         if (!open) {
           setDeleteDialog({ open: false, faseId: '', faseNombre: '' })
         }
       }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar fase?</AlertDialogTitle>
-            <AlertDialogDescription>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar fase?</DialogTitle>
+            <DialogDescription>
               ¿Estás seguro de que quieres eliminar la fase "{deleteDialog.faseNombre}"?
               Esta acción no se puede deshacer y eliminará todos los EDTs asociados a esta fase.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingFase !== null}>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialog({ open: false, faseId: '', faseNombre: '' })}
+              disabled={deletingFase !== null}
+            >
               Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
+            </Button>
+            <Button
               onClick={confirmDeleteFase}
               disabled={deletingFase !== null}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              variant="destructive"
             >
               {deletingFase !== null ? (
                 <>
@@ -386,10 +416,10 @@ export function CotizacionFasesList({
               ) : (
                 'Eliminar'
               )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )

@@ -52,6 +52,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { ListaEquipoMaster } from '@/types/master-detail';
+import type { EstadoListaEquipo } from '@/types/modelos';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -68,12 +69,18 @@ interface ListaEquipoMasterCardProps {
 }
 
 // ✅ Status configuration (alineado con EstadoListaEquipo)
-const statusConfig = {
+const statusConfig: Record<EstadoListaEquipo, { variant: 'default' | 'secondary' | 'outline' | 'destructive'; icon: typeof Clock; color: string; bgColor: string }> = {
   borrador: {
     variant: 'secondary' as const,
     icon: Clock,
     color: 'text-gray-500',
     bgColor: 'bg-gray-50'
+  },
+  enviada: {
+    variant: 'outline' as const,
+    icon: AlertCircle,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50'
   },
   por_revisar: {
     variant: 'outline' as const,
@@ -99,17 +106,23 @@ const statusConfig = {
     color: 'text-orange-600',
     bgColor: 'bg-orange-50'
   },
-  aprobado: {
+  aprobada: {
     variant: 'default' as const,
     icon: CheckCircle2,
     color: 'text-green-600',
     bgColor: 'bg-green-50'
   },
-  rechazado: {
+  rechazada: {
     variant: 'destructive' as const,
     icon: AlertCircle,
     color: 'text-red-600',
     bgColor: 'bg-red-50'
+  },
+  completada: {
+    variant: 'default' as const,
+    icon: CheckCircle2,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50'
   }
 };
 

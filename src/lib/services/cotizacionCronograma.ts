@@ -29,9 +29,8 @@ export class CotizacionCronogramaService {
    static async crearEdtComercial(data: {
      cotizacionId: string
      cotizacionServicioId: string
-     categoriaServicioId: string
+     edtId: string
      nombre: string
-     zona?: string
      fechaInicioCom?: Date
      fechaFinCom?: Date
      horasCom?: number
@@ -50,21 +49,22 @@ export class CotizacionCronogramaService {
 
       const nuevoEdt = await prisma.cotizacionEdt.create({
         data: {
+          id: crypto.randomUUID(),
           cotizacionId: data.cotizacionId,
           cotizacionServicioId: data.cotizacionServicioId || '', // ✅ Add required field
-          categoriaServicioId: data.categoriaServicioId,
+          edtId: data.edtId,
           nombre: data.nombre,
-          zona: data.zona,
           fechaInicioComercial: data.fechaInicioCom,
           fechaFinComercial: data.fechaFinCom,
           horasEstimadas: data.horasCom,
           responsableId: data.responsableId,
           descripcion: data.descripcion,
-          prioridad: data.prioridad || 'media'
+          prioridad: data.prioridad || 'media',
+          updatedAt: new Date()
         },
         include: {
-          categoriaServicio: true,
-          responsable: true
+          edt: true,
+          user: true
         }
       })
 
@@ -85,9 +85,13 @@ export class CotizacionCronogramaService {
       const edts = await prisma.cotizacionEdt.findMany({
         where: { cotizacionId },
         include: {
-          categoriaServicio: true,
-          responsable: true,
-          tareas: true
+          edt: true,
+          user: true,
+          cotizacionActividad: {
+            include: {
+              cotizacionTarea: true
+            }
+          }
         },
         orderBy: { createdAt: 'asc' }
       })
@@ -106,7 +110,6 @@ export class CotizacionCronogramaService {
   static async actualizarEdtComercial(
     edtId: string,
     data: Partial<{
-      zona: string
       fechaInicioCom: Date
       fechaFinCom: Date
       horasCom: number
@@ -136,7 +139,6 @@ export class CotizacionCronogramaService {
       const edtActualizado = await prisma.cotizacionEdt.update({
         where: { id: edtId },
         data: {
-          ...(data.zona !== undefined && { zona: data.zona }),
           ...(data.fechaInicioCom && { fechaInicioComercial: data.fechaInicioCom }),
           ...(data.fechaFinCom && { fechaFinComercial: data.fechaFinCom }),
           ...(data.horasCom !== undefined && { horasEstimadas: data.horasCom }),
@@ -145,9 +147,13 @@ export class CotizacionCronogramaService {
           ...(data.prioridad && { prioridad: data.prioridad })
         },
         include: {
-          categoriaServicio: true,
-          responsable: true,
-          tareas: true
+          edt: true,
+          user: true,
+          cotizacionActividad: {
+            include: {
+              cotizacionTarea: true
+            }
+          }
         }
       })
 
@@ -186,6 +192,7 @@ export class CotizacionCronogramaService {
    */
   static async crearTareaComercial(data: {
     cotizacionEdtId: string
+    cotizacionActividadId: string
     nombre: string
     fechaInicioCom?: Date
     fechaFinCom?: Date
@@ -209,7 +216,9 @@ export class CotizacionCronogramaService {
         const dependencia = await prisma.cotizacionTarea.findFirst({
           where: {
             id: data.dependenciaDeId,
-            cotizacionEdtId: data.cotizacionEdtId
+            cotizacionActividad: {
+              cotizacionEdtId: data.cotizacionEdtId
+            }
           }
         })
 
@@ -220,7 +229,8 @@ export class CotizacionCronogramaService {
 
       const nuevaTarea = await prisma.cotizacionTarea.create({
         data: {
-          cotizacionEdtId: data.cotizacionEdtId,
+          id: crypto.randomUUID(),
+          cotizacionActividadId: data.cotizacionActividadId,
           nombre: data.nombre,
           fechaInicio: data.fechaInicioCom || new Date(),
           fechaFin: data.fechaFinCom || new Date(),
@@ -228,11 +238,12 @@ export class CotizacionCronogramaService {
           dependenciaId: data.dependenciaDeId,
           descripcion: data.descripcion,
           prioridad: data.prioridad || 'media',
-          responsableId: data.responsableId
+          responsableId: data.responsableId,
+          updatedAt: new Date()
         },
         include: {
-          dependencia: true,
-          responsable: true
+          tareaPadre: true,
+          user: true
         }
       })
 
@@ -251,15 +262,19 @@ export class CotizacionCronogramaService {
   static async obtenerTareasEdt(edtId: string): Promise<any[]> {
     try {
       const tareas = await prisma.cotizacionTarea.findMany({
-        where: { cotizacionEdtId: edtId },
+        where: {
+          cotizacionActividad: {
+            cotizacionEdtId: edtId
+          }
+        },
         include: {
-          dependencia: {
+          tareaPadre: {
             select: { id: true, nombre: true }
           },
-          tareasDependientes: {
+          tareasHijas: {
             select: { id: true, nombre: true }
           },
-          responsable: {
+          user: {
             select: { id: true, name: true, email: true }
           }
         },
@@ -293,31 +308,35 @@ export class CotizacionCronogramaService {
       const edtsProyecto: ProyectoEdt[] = []
 
       for (const edtComercial of edtsComerciales) {
+        // Obtener el edtId del catálogo (puede venir de la relación edt o del campo edtId)
+        const catalogoEdtId = edtComercial.edt?.id || ''
+
         // Crear EDT de proyecto basado en el comercial
         const edtProyecto = await prisma.proyectoEdt.create({
           data: {
+            id: crypto.randomUUID(),
             proyectoId,
             proyectoCronogramaId,
-            categoriaServicioId: edtComercial.categoriaServicioId || '',
-            nombre: edtComercial.nombre || `EDT ${edtComercial.categoriaServicio?.nombre || 'Sin nombre'}`,
-            zona: edtComercial.zona,
+            edtId: catalogoEdtId,
+            nombre: edtComercial.nombre || `EDT ${edtComercial.edt?.nombre || 'Sin nombre'}`,
             fechaInicioPlan: edtComercial.fechaInicioComercial,
             fechaFinPlan: edtComercial.fechaFinComercial,
             horasPlan: edtComercial.horasEstimadas,
             responsableId: edtComercial.responsableId,
             descripcion: edtComercial.descripcion,
-            prioridad: edtComercial.prioridad
+            prioridad: edtComercial.prioridad,
+            updatedAt: new Date()
           },
           include: {
             proyecto: true,
-            categoriaServicio: true
+            edt: true
           }
         })
 
         // Convert null values to undefined for type compatibility
         const edtCompatible: ProyectoEdt = {
           ...edtProyecto,
-          zona: edtProyecto.zona || undefined,
+          edtId: edtProyecto.edtId,
           responsableId: edtProyecto.responsableId || undefined,
           descripcion: edtProyecto.descripcion || undefined,
           fechaInicioReal: edtProyecto.fechaInicioReal?.toISOString() || undefined,
@@ -325,9 +344,7 @@ export class CotizacionCronogramaService {
           horasPlan: Number(edtProyecto.horasPlan) || 0,
           horasReales: Number(edtProyecto.horasReales) || 0,
           createdAt: edtProyecto.createdAt.toISOString(),
-          updatedAt: edtProyecto.updatedAt.toISOString(),
-          proyecto: edtProyecto.proyecto,
-          categoriaServicio: edtProyecto.categoriaServicio
+          updatedAt: edtProyecto.updatedAt.toISOString()
         }
         edtsProyecto.push(edtCompatible)
 
@@ -390,7 +407,8 @@ export class CotizacionCronogramaService {
       let edtsEnRiesgo = 0
 
       for (const edt of edts) {
-        totalTareas += edt.tareas?.length || 0
+        const tareasEdt = edt.cotizacionActividad?.flatMap((act: { cotizacionTarea?: unknown[] }) => act.cotizacionTarea || []) || []
+        totalTareas += tareasEdt.length
         horasTotales += Number(edt.horasEstimadas) || 0
 
         // Verificar si está en riesgo
@@ -435,7 +453,7 @@ export class CotizacionCronogramaService {
           alertas.push({
             tipo: 'sin_fechas' as const,
             severidad: 'media' as const,
-            mensaje: `EDT ${edt.categoriaServicio?.nombre || 'Sin nombre'} sin fechas definidas`,
+            mensaje: `EDT ${edt.edt?.nombre || 'Sin nombre'} sin fechas definidas`,
             edtId: edt.id
           })
         }
@@ -445,7 +463,7 @@ export class CotizacionCronogramaService {
           alertas.push({
             tipo: 'sin_responsable' as const,
             severidad: 'baja' as const,
-            mensaje: `EDT ${edt.categoriaServicio?.nombre || 'Sin nombre'} sin responsable asignado`,
+            mensaje: `EDT ${edt.edt?.nombre || 'Sin nombre'} sin responsable asignado`,
             edtId: edt.id
           })
         }
@@ -456,7 +474,7 @@ export class CotizacionCronogramaService {
           alertas.push({
             tipo: 'retraso' as const,
             severidad: 'alta' as const,
-            mensaje: `EDT ${edt.categoriaServicio?.nombre || 'Sin nombre'} en riesgo de retraso`,
+            mensaje: `EDT ${edt.edt?.nombre || 'Sin nombre'} en riesgo de retraso`,
             edtId: edt.id
           })
         }

@@ -16,7 +16,7 @@ import {
   updateCatalogoServicio,
   deleteCatalogoServicio,
 } from '@/lib/services/catalogoServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { getRecursos } from '@/lib/services/recurso'
 import { exportarServiciosAExcel } from '@/lib/utils/serviciosExcel'
@@ -153,7 +153,7 @@ export default function CatalogoServicioPage() {
     try {
       const datos = await leerServiciosDesdeExcel(file)
       const [categorias, unidades, recursos, serviciosExistentes] = await Promise.all([
-        getCategoriasServicio(),
+        getEdts(),
         getUnidadesServicio(),
         getRecursos(),
         getCatalogoServicios(),

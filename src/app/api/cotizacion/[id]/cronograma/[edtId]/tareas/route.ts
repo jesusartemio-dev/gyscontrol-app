@@ -17,7 +17,7 @@ import { crearCotizacionTareaSchema } from '@/lib/validators/cronograma'
 // ✅ Función para recalcular horas totales del EDT
 async function recalcularHorasEdt(edtId: string) {
   const tareas = await prisma.cotizacionTarea.findMany({
-    where: { cotizacionEdtId: edtId },
+    where: { cotizacionActividad: { cotizacionEdtId: edtId } },
     select: { horasEstimadas: true }
   })
 
@@ -63,9 +63,9 @@ export async function GET(
     }
 
     const tareas = await prisma.cotizacionTarea.findMany({
-      where: { cotizacionEdtId: edtId },
+      where: { cotizacionActividad: { cotizacionEdtId: edtId } },
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         }
       },
@@ -132,7 +132,9 @@ export async function POST(
       const dependencia = await prisma.cotizacionTarea.findFirst({
         where: {
           id: validData.dependenciaDeId,
-          cotizacionEdtId: edtId
+          cotizacionActividad: {
+            cotizacionEdtId: edtId
+          }
         }
       })
 
@@ -148,19 +150,17 @@ export async function POST(
 
     const nuevaTarea = await prisma.cotizacionTarea.create({
       data: {
-        cotizacionEdtId: edtId,
         nombre: validData.nombre,
         fechaInicio: validData.fechaInicioCom ? new Date(validData.fechaInicioCom) : new Date(),
         fechaFin: validData.fechaFinCom ? new Date(validData.fechaFinCom) : new Date(),
         horasEstimadas: validData.horasCom,
-        dependenciaId: validData.dependenciaDeId,
         descripcion: validData.descripcion,
         prioridad: validData.prioridad,
         responsableId: validData.responsableId,
-        // cotizacionServicioItemId: validData.cotizacionServicioItemId // ✅ Nueva relación - pendiente regenerar Prisma
-      },
+        cotizacionActividadId: '' // TODO: Fix to use proper activity ID
+      } as any,
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         }
       }

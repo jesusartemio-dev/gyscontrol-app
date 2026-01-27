@@ -91,10 +91,10 @@ export async function GET(request: NextRequest) {
               id: true,
               nombre: true,
               estado: true,
-              proyectoServicio: {
+              proyectoServicioCotizado: {
                 select: {
                   id: true,
-                  categoria: true,
+                  edt: true,
                   proyecto: {
                     select: {
                       id: true,
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          asignado: {
+          user: {
             select: {
               id: true,
               name: true,
@@ -156,12 +156,12 @@ export async function GET(request: NextRequest) {
         id: subtarea.tarea.id,
         nombre: subtarea.tarea.nombre,
         estado: subtarea.tarea.estado,
-        proyectoServicio: subtarea.tarea.proyectoServicio
+        proyectoServicio: subtarea.tarea.proyectoServicioCotizado
       } as any,
-      asignado: subtarea.asignado ? {
-        id: subtarea.asignado.id,
-        name: subtarea.asignado.name || undefined,
-        email: subtarea.asignado.email
+      asignado: subtarea.user ? {
+        id: subtarea.user.id,
+        name: subtarea.user.name || undefined,
+        email: subtarea.user.email
       } as any : undefined,
       registrosProgreso: subtarea.registrosProgreso.map(registro => ({
         id: registro.id,
@@ -294,10 +294,10 @@ export async function POST(request: NextRequest) {
             id: true,
             nombre: true,
             estado: true,
-            proyectoServicio: {
+            proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edt: true,
                 proyecto: {
                   select: {
                     id: true,
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest) {
             }
           }
         },
-        asignado: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
         }
       }
     })
-    
+
     return NextResponse.json(nuevaSubtarea, { status: 201 })
     
   } catch (error) {

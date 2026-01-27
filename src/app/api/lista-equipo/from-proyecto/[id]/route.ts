@@ -27,9 +27,9 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     }
     // 1. Obtener todos los ProyectoEquipoItem del proyecto
     const items = await prisma.proyectoEquipoCotizadoItem.findMany({
-      where: { proyectoEquipo: { proyectoId } },
+      where: { proyectoEquipoCotizado: { proyectoId } },
       include: {
-        proyectoEquipo: true,
+        proyectoEquipoCotizado: true,
       },
     })
 
@@ -44,28 +44,34 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     const resultado = await prisma.$transaction(async (tx) => {
       const nuevaLista = await tx.listaEquipo.create({
         data: {
+          id: `lista-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           proyectoId,
           responsableId: session.user.id,
           codigo: `LST-${Date.now()}`, // Código único temporal
           nombre: 'Lista desde Cotización',
           numeroSecuencia: 1, // Número de secuencia inicial
+          updatedAt: new Date()
         },
       })
 
-      const nuevosItems = items.map((item) =>
+      const nuevosItems = items.map((item, index) =>
         tx.listaEquipoItem.create({
           data: {
+            id: `lista-item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
             listaId: nuevaLista.id,
             proyectoEquipoItemId: item.id,
             proyectoEquipoId: item.proyectoEquipoId,
             responsableId: session.user.id,
             codigo: item.codigo,
             descripcion: item.descripcion || '',
+            marca: item.marca || '', // ✅ Copiar marca
+            categoria: item.categoria || '', // ✅ Copiar categoria
             unidad: item.unidad || 'UND',
             cantidad: item.cantidad,
             presupuesto: item.precioCliente || 0,
             origen: 'cotizado', // ✅ Campo requerido
             estado: 'borrador', // ✅ Campo requerido
+            updatedAt: new Date()
           },
         })
       )

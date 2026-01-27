@@ -215,7 +215,7 @@ src/                                 # Código fuente principal
 │   ├── 📁 catalogo/                 # Módulo de catálogo
 │   │   ├── 📁 categorias-equipo/
 │   │   │   └── 📄 page.tsx
-│   │   ├── 📁 categorias-servicio/
+│   │   ├── 📁 edts/
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 equipos/
 │   │   │   └── 📄 page.tsx

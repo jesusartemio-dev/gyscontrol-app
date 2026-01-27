@@ -18,11 +18,12 @@ export async function PATCH(
   try {
     const { id, itemId } = await params
     const data = await req.json()
-    const { cantidad } = data
+    const { cantidad, factorSeguridad } = data
 
-    if (!cantidad || cantidad <= 0) {
+    // Validar que al menos uno de los campos a actualizar esté presente
+    if ((cantidad !== undefined && cantidad <= 0) || (factorSeguridad !== undefined && factorSeguridad < 1)) {
       return NextResponse.json(
-        { error: 'Cantidad inválida' },
+        { error: cantidad !== undefined && cantidad <= 0 ? 'Cantidad inválida' : 'Factor de seguridad debe ser >= 1' },
         { status: 400 }
       )
     }
@@ -42,29 +43,50 @@ export async function PATCH(
       )
     }
 
-    // Calcular nuevas horas totales basado en la fórmula
-    const { calcularHoras } = await import('@/lib/utils/formulas')
-    const horaTotal = calcularHoras({
-      formula: item.formula as 'Fijo' | 'Proporcional' | 'Escalonada',
-      cantidad,
-      horaBase: item.horaBase || undefined,
-      horaRepetido: item.horaRepetido || undefined,
-      horaUnidad: item.horaUnidad || undefined,
-      horaFijo: item.horaFijo || undefined
-    })
+    // Obtener el nivel de dificultad del catálogo de servicios
+    const catalogoServicio = await prisma.catalogoServicio.findUnique({
+      where: { id: item.catalogoServicioId || '' },
+      select: { nivelDificultad: true }
+    });
+
+    // Calcular horas totales - solo si se está actualizando cantidad
+    let horaTotal = item.horaTotal; // Mantener el valor actual por defecto
+
+    if (cantidad !== undefined) {
+      // Calcular nuevas horas totales basado en la fórmula escalonada simplificada
+      const horasBase = (item.horaBase || 0) + Math.max(0, cantidad - 1) * (item.horaRepetido || 0);
+      const factorDificultad = catalogoServicio?.nivelDificultad || 1;
+      horaTotal = horasBase * factorDificultad;
+    }
 
     // Recalcular costos
-    const costoInterno = +(horaTotal * item.costoHora * item.factorSeguridad).toFixed(2)
+    const costoInterno = +(horaTotal * item.costoHora).toFixed(2)
     const costoCliente = +(costoInterno * (1 + item.margen)).toFixed(2)
+
+    // Preparar datos de actualización
+    const updateData: any = {
+      horaTotal,
+      costoInterno,
+      costoCliente
+    }
+
+    if (cantidad !== undefined) {
+      updateData.cantidad = cantidad
+    }
+
+    if (factorSeguridad !== undefined) {
+      updateData.factorSeguridad = factorSeguridad
+      // Recalcular costos con el nuevo factor de seguridad
+      updateData.costoInterno = +(horaTotal * item.costoHora * factorSeguridad).toFixed(2)
+      updateData.costoCliente = +(updateData.costoInterno * (1 + item.margen)).toFixed(2)
+    }
 
     // Actualizar el item
     const updatedItem = await prisma.plantillaServicioItemIndependiente.update({
       where: { id: itemId },
       data: {
-        cantidad,
-        horaTotal,
-        costoInterno,
-        costoCliente
+        ...updateData,
+        updatedAt: new Date()
       }
     })
 
@@ -87,7 +109,8 @@ export async function PATCH(
         data: {
           totalInterno,
           totalCliente,
-          grandTotal
+          grandTotal,
+          updatedAt: new Date()
         }
       })
     }
@@ -108,6 +131,7 @@ export async function DELETE(
 ) {
   try {
     const { id, itemId } = await params
+    console.log('🗑️ DELETE request - plantillaId:', id, 'itemId:', itemId)
 
     // Verificar que el item existe y pertenece a la plantilla
     const item = await prisma.plantillaServicioItemIndependiente.findFirst({
@@ -117,19 +141,24 @@ export async function DELETE(
       }
     })
 
+    console.log('🔍 Item encontrado:', item ? 'Sí' : 'No')
+
     if (!item) {
       return NextResponse.json(
-        { error: 'Item no encontrado' },
+        { error: 'Item no encontrado', details: `itemId: ${itemId}, plantillaId: ${id}` },
         { status: 404 }
       )
     }
 
     // Eliminar el item
+    console.log('🗑️ Eliminando item...')
     await prisma.plantillaServicioItemIndependiente.delete({
       where: { id: itemId }
     })
+    console.log('✅ Item eliminado')
 
     // Recalcular totales de la plantilla
+    console.log('📊 Recalculando totales de la plantilla...')
     const plantilla = await prisma.plantillaServicioIndependiente.findUnique({
       where: { id }
     })
@@ -139,25 +168,40 @@ export async function DELETE(
         where: { plantillaServicioId: id }
       })
 
+      console.log('📊 Items restantes:', items.length)
       const totalInterno = items.reduce((sum, item) => sum + item.costoInterno, 0)
       const totalCliente = items.reduce((sum, item) => sum + item.costoCliente, 0)
       const grandTotal = totalCliente - plantilla.descuento
+      console.log('📊 Nuevos totales - Interno:', totalInterno, 'Cliente:', totalCliente, 'Grand:', grandTotal)
 
       await prisma.plantillaServicioIndependiente.update({
         where: { id },
         data: {
           totalInterno,
           totalCliente,
-          grandTotal
+          grandTotal,
+          updatedAt: new Date()
         }
       })
+      console.log('✅ Totales actualizados')
     }
 
+    console.log('✅ DELETE completado exitosamente')
     return NextResponse.json({ message: 'Item eliminado exitosamente' })
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error al eliminar item de plantilla de servicios:', error)
+    console.error('❌ Error stack:', error?.stack)
+    console.error('❌ Error code:', error?.code)
+
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+    const errorCode = error?.code || 'UNKNOWN'
+
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      {
+        error: 'Error interno del servidor',
+        details: errorMessage,
+        code: errorCode
+      },
       { status: 500 }
     )
   }

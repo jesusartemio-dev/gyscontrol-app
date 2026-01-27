@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
           }
         },
         // 👤 Responsible info (minimal)
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -75,18 +75,18 @@ export async function GET(req: NextRequest) {
         // 📊 Aggregated item statistics
         _count: {
           select: {
-            items: true
+            listaEquipoItem: true
           }
         },
         // 💰 Essential item data for calculations
-        items: {
+        listaEquipoItem: {
           select: {
             id: true,
             cantidad: true,
             presupuesto: true,
             precioElegido: true,
             // 💵 Best cotización price
-            cotizaciones: {
+            cotizacionProveedorItems: {
               select: {
                 precioUnitario: true
               },
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
               take: 1
             },
             // 📦 Pedidos information
-            pedidos: {
+            pedidoEquipoItem: {
               select: {
                 id: true,
                 estado: true,
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
 
     // 🧮 Calculate summary statistics for each lista
     const listasWithStats = listas.map((lista: any) => {
-      const totalItems = lista._count.items
+      const totalItems = lista._count.listaEquipoItem
 
       // 💰 Calculate costs and statistics
       let costoTotal = 0
@@ -133,8 +133,10 @@ export async function GET(req: NextRequest) {
       let pedidosPendientes = 0
       let numeroPedidos = 0
 
-      lista.items.forEach((item: any) => {
-        const mejorCotizacion = item.cotizaciones[0]?.precioUnitario || 0
+      const items = lista.listaEquipoItem || []
+      items.forEach((item: any) => {
+        const cotizaciones = item.cotizacionProveedorItems || []
+        const mejorCotizacion = cotizaciones[0]?.precioUnitario || 0
         const precioUnitario = mejorCotizacion > 0
           ? mejorCotizacion
           : (item.precioElegido || item.presupuesto || 0)
@@ -144,19 +146,20 @@ export async function GET(req: NextRequest) {
 
         // Note: We would need item status to calculate these properly
         // For now, using basic logic based on available data
-        if (item.cotizaciones.length > 0) {
+        if (cotizaciones.length > 0) {
           itemsVerificados++
           costoAprobado += costoItem
         }
 
         // 📦 Calculate order statistics
-        const tienePedidos = item.pedidos.length > 0
+        const pedidos = item.pedidoEquipoItem || []
+        const tienePedidos = pedidos.length > 0
         if (tienePedidos) {
           itemsConPedido++
-          numeroPedidos += item.pedidos.length // Count each pedido
+          numeroPedidos += pedidos.length
 
           // Calculate order status for each pedido
-          item.pedidos.forEach((pedido: any) => {
+          pedidos.forEach((pedido: any) => {
             const cantidadPedida = pedido.cantidadPedida || 0
             const cantidadAtendida = pedido.cantidadAtendida || 0
 
@@ -181,7 +184,7 @@ export async function GET(req: NextRequest) {
         estado: lista.estado,
         createdAt: lista.createdAt.toISOString(),
         updatedAt: lista.updatedAt.toISOString(),
-        
+
         // 📊 Estadísticas calculadas para la vista Master
         stats: {
           totalItems,
@@ -198,19 +201,19 @@ export async function GET(req: NextRequest) {
           pedidosParciales,
           pedidosPendientes
         },
-        
+
         // 🏗️ Información mínima del proyecto
         proyecto: {
           id: lista.proyecto.id,
           nombre: lista.proyecto.nombre,
           codigo: lista.proyecto.codigo
         },
-        
+
         // 👤 Responsable (opcional)
-        ...(lista.responsable && {
+        ...(lista.user && {
           responsable: {
-            id: lista.responsable.id,
-            name: lista.responsable.name
+            id: lista.user.id,
+            name: lista.user.name
           }
         })
       }

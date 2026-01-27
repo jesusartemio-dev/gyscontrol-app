@@ -16,7 +16,7 @@ export async function GET(
         }
       },
       include: {
-        cotizacion: {
+        cotizacionProveedor: {
           include: {
             proveedor: {
               select: {

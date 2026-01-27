@@ -24,7 +24,10 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 
     const actualizado = await prisma.cotizacionServicioItem.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        updatedAt: new Date(),
+      },
       select: {
         id: true,
         cotizacionServicioId: true,
@@ -33,7 +36,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         recursoId: true,
         nombre: true,
         descripcion: true,
-        categoria: true,
+        edtId: true,
         formula: true,
         horaBase: true,
         horaRepetido: true,
@@ -48,6 +51,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         margen: true,
         costoInterno: true,
         costoCliente: true,
+        orden: true,
         createdAt: true,
         updatedAt: true
       }

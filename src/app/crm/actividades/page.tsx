@@ -15,7 +15,7 @@ import { getOportunidades, CrmOportunidad } from '@/lib/services/crm/oportunidad
 import { getUsuarios, Usuario } from '@/lib/services/usuario'
 
 interface ActividadExtendida extends CrmActividad {
-  oportunidad?: {
+  crmOportunidad?: {
     id: string
     nombre: string
     cliente?: {
@@ -454,33 +454,33 @@ export default function CrmActividadesPage() {
                         {formatDate(actividad.fecha)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        {actividad.usuario && (
+                        {actividad.user && (
                           <div className="flex items-center">
                             <Avatar className="h-6 w-6 mr-2">
                               <AvatarFallback className="text-xs">
-                                {actividad.usuario.name?.substring(0, 2).toUpperCase()}
+                                {actividad.user.name?.substring(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-sm text-gray-900">{actividad.usuario.name}</span>
+                            <span className="text-sm text-gray-900">{actividad.user.name}</span>
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        {actividad.oportunidad && (
+                        {actividad.crmOportunidad && (
                           <div className="text-sm">
                             <div
                               className="text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
                               onClick={() => router.push(`/crm/${actividad.oportunidadId}`)}
                             >
-                              {actividad.oportunidad.nombre}
+                              {actividad.crmOportunidad.nombre}
                             </div>
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        {actividad.oportunidad?.cliente && (
+                        {actividad.crmOportunidad?.cliente && (
                           <div className="text-sm text-gray-900">
-                            {actividad.oportunidad.cliente.nombre}
+                            {actividad.crmOportunidad.cliente.nombre}
                           </div>
                         )}
                       </td>
@@ -536,29 +536,29 @@ export default function CrmActividadesPage() {
 
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4 text-sm text-gray-600">
-                            {actividad.usuario && (
+                            {actividad.user && (
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-6 w-6">
                                   <AvatarFallback className="text-xs">
-                                    {actividad.usuario.name?.substring(0, 2).toUpperCase()}
+                                    {actividad.user.name?.substring(0, 2).toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span>{actividad.usuario.name}</span>
+                                <span>{actividad.user.name}</span>
                               </div>
                             )}
 
-                            {actividad.oportunidad && (
+                            {actividad.crmOportunidad && (
                               <div className="flex items-center gap-2">
                                 <Building2 className="h-3 w-3" />
                                 <span
                                   className="hover:text-blue-600 cursor-pointer"
                                   onClick={() => router.push(`/crm/${actividad.oportunidadId}`)}
                                 >
-                                  {actividad.oportunidad.nombre}
+                                  {actividad.crmOportunidad.nombre}
                                 </span>
-                                {actividad.oportunidad.cliente && (
+                                {actividad.crmOportunidad.cliente && (
                                   <span className="text-muted-foreground">
-                                    ({actividad.oportunidad.cliente.nombre})
+                                    ({actividad.crmOportunidad.cliente.nombre})
                                   </span>
                                 )}
                               </div>

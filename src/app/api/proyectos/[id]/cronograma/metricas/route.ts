@@ -42,12 +42,12 @@ export async function GET(
     const edts = await (prisma as any).proyectoEdt.findMany({
       where: edtWhere,
       include: {
-        tareas: {
+        proyectoTarea: {
           include: {
-            registrosHoras: true
+            registroHoras: true
           }
         },
-        registrosHoras: true
+        registroHoras: true
       }
     })
 
@@ -72,9 +72,9 @@ export async function GET(
     // ✅ Calcular horas totales
     const horasPlanTotal = edts.reduce((sum: number, edt: any) => sum + (edt.horasPlan || 0), 0)
     const horasRealesTotal = edts.reduce((sum: number, edt: any) => {
-      const horasEdt = edt.registrosHoras?.reduce((s: number, r: any) => s + r.horasTrabajadas, 0) || 0
-      const horasTareas = edt.tareas?.reduce((s: number, tarea: any) => {
-        return s + (tarea.registrosHoras?.reduce((ss: number, r: any) => ss + r.horasTrabajadas, 0) || 0)
+      const horasEdt = edt.registroHoras?.reduce((s: number, r: any) => s + r.horasTrabajadas, 0) || 0
+      const horasTareas = edt.proyectoTarea?.reduce((s: number, tarea: any) => {
+        return s + (tarea.registroHoras?.reduce((ss: number, r: any) => ss + r.horasTrabajadas, 0) || 0)
       }, 0) || 0
       return sum + horasEdt + horasTareas
     }, 0)

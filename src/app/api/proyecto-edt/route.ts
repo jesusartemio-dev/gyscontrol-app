@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ProyectoEdtService } from '@/lib/services/proyectoEdt';
 import type { FiltrosCronogramaData } from '@/types/modelos';
 
-// GET /api/proyecto-edt?proyectoId=...&categoriaServicioId=...&estado=...
+// GET /api/proyecto-edt?proyectoId=...&edtId=...&estado=...
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -14,10 +14,9 @@ export async function GET(request: NextRequest) {
 
     // Parse filters from query params
     const filtros: FiltrosCronogramaData = {
-      categoriaServicioId: searchParams.get('categoriaServicioId') || undefined,
+      edtId: searchParams.get('edtId') || undefined,
       estado: searchParams.get('estado') as any || undefined,
       responsableId: searchParams.get('responsableId') || undefined,
-      zona: searchParams.get('zona') || undefined,
       fechaDesde: searchParams.get('fechaDesde') ? new Date(searchParams.get('fechaDesde')!) : undefined,
       fechaHasta: searchParams.get('fechaHasta') ? new Date(searchParams.get('fechaHasta')!) : undefined,
     };

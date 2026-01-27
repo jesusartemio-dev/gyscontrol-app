@@ -1,409 +1,309 @@
-/**
- * 🎯 Cotizacion Proveedor Detail Page
- *
- * Shows detailed view of a specific cotizacion proveedor with its items and audit history.
- * Displays items in table or card view, defaulting to table.
- *
- * Features:
- * - Cotizacion details and statistics
- * - Items list with table/card toggle
- * - Audit history timeline
- * - Status management
- * - Navigation back to cotizaciones list
- *
- * @author GYS Team
- * @version 1.0.0
- */
+'use client'
 
-'use client';
-
-import { Suspense, useEffect, useState } from 'react';
-import { notFound } from 'next/navigation';
-import { getCotizacionProveedorById } from '@/lib/services/cotizacionProveedor';
-import { useSession } from 'next-auth/react';
-import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react'
+import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { getCotizacionProveedorById } from '@/lib/services/cotizacionProveedor'
+import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import {
   ArrowLeft,
   Building2,
   FileText,
-  Calendar,
-  Grid3X3,
-  Table,
-  Edit,
   Package,
   DollarSign,
-  TrendingUp,
-  Mail
-} from 'lucide-react';
-import Link from 'next/link';
-import type { CotizacionProveedor } from '@/types';
-import CotizacionProveedorHistorial from '@/components/logistica/CotizacionProveedorHistorial';
-import CotizacionEstadoFlujoBanner from '@/components/logistica/CotizacionEstadoFlujoBanner';
-import CotizacionProveedorTabla from '@/components/logistica/CotizacionProveedorTabla';
+  Mail,
+  Plus,
+  ChevronRight,
+  ChevronDown,
+  History
+} from 'lucide-react'
+import type { CotizacionProveedor } from '@/types'
+import CotizacionProveedorHistorial from '@/components/logistica/CotizacionProveedorHistorial'
+import CotizacionEstadoFlujoBanner from '@/components/logistica/CotizacionEstadoFlujoBanner'
+import CotizacionProveedorTabla from '@/components/logistica/CotizacionProveedorTabla'
+import ModalAgregarItemCotizacionProveedor from '@/components/logistica/ModalAgregarItemCotizacionProveedor'
 
-// ✅ Page props interface
 interface PageProps {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>
 }
 
-// ✅ Loading skeleton component
-function CotizacionDetailSkeleton() {
-  return (
-    <div className="space-y-6">
-      {/* Header skeleton */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <Skeleton className="h-10 w-32" />
-      </div>
-
-      {/* Cotizacion details skeleton */}
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-6 w-16" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Items list skeleton */}
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="border rounded-lg p-4">
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-3/4" />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ✅ Main page component
 export default function CotizacionProveedorDetailPage({ params }: PageProps) {
-  const { data: session } = useSession();
-  const [cotizacion, setCotizacion] = useState<CotizacionProveedor | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [cotizacionId, setCotizacionId] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const { data: session } = useSession()
+  const [cotizacion, setCotizacion] = useState<CotizacionProveedor | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [cotizacionId, setCotizacionId] = useState('')
+  const [showAgregarItems, setShowAgregarItems] = useState(false)
+  const [showHistorial, setShowHistorial] = useState(false)
 
   useEffect(() => {
-    const fetchParams = async () => {
-      const resolvedParams = await params;
-      setCotizacionId(resolvedParams.id);
-    };
-    fetchParams();
-  }, [params]);
+    params.then((p) => setCotizacionId(p.id))
+  }, [params])
 
   useEffect(() => {
-    if (!cotizacionId) return;
+    if (!cotizacionId) return
 
     const fetchData = async () => {
       try {
-        const cotizacionData = await getCotizacionProveedorById(cotizacionId);
-
-        if (!cotizacionData) {
-          notFound();
-          return;
+        const data = await getCotizacionProveedorById(cotizacionId)
+        if (!data) {
+          notFound()
+          return
         }
-
-        setCotizacion(cotizacionData);
+        setCotizacion(data)
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error:', error)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-
-    fetchData();
-  }, [cotizacionId]);
-
-  if (loading) {
-    return <CotizacionDetailSkeleton />;
-  }
-
-  // ✅ Handle not found
-  if (!cotizacion) {
-    notFound();
-  }
-
-  // ✅ Calculate cotizacion statistics
-  const stats = {
-    totalItems: cotizacion.items?.length || 0,
-    totalCost: cotizacion.items?.reduce((sum, item) =>
-      sum + ((item.costoTotal || 0)), 0
-    ) || 0,
-    selectedItems: cotizacion.items?.filter(item => item.esSeleccionada).length || 0,
-    progressPercentage: cotizacion.items?.length ?
-      ((cotizacion.items.filter(item => item.esSeleccionada).length / cotizacion.items.length) * 100) : 0
-  };
-
-  // ✅ Generate email for quotation request
-  const handleSolicitarCotizacion = () => {
-    if (!cotizacion.proveedor?.correo) {
-      toast.error('El proveedor no tiene correo electrónico registrado');
-      return;
     }
 
-    // Generate email content
-    const subject = `Solicitud de Cotización - ${cotizacion.codigo}`;
+    fetchData()
+  }, [cotizacionId])
 
-    // Format items as a clean bullet list
-    const formatItemsAsTable = (items: any[]) => {
-      if (!items || items.length === 0) return 'No hay ítems en esta cotización.';
+  const handleRefresh = async () => {
+    if (!cotizacionId) return
+    try {
+      const updated = await getCotizacionProveedorById(cotizacionId)
+      if (updated) setCotizacion(updated)
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
 
-      return items.map((item) => {
-        return `• ${item.descripcion} (${item.codigo}) - ${item.cantidad} ${item.unidad}`;
-      }).join('\n');
-    };
+  const handleSolicitarCotizacion = () => {
+    if (!cotizacion?.proveedor?.correo) {
+      toast.error('El proveedor no tiene correo')
+      return
+    }
 
-    const body = `Estimado proveedor ${cotizacion.proveedor.nombre},
+    const subject = `Solicitud de Cotización - ${cotizacion.codigo}`
+    const itemsList = cotizacion.items?.map(item =>
+      `• ${item.descripcion} (${item.codigo}) - ${item.cantidad} ${item.unidad}`
+    ).join('\n') || ''
 
-Le solicitamos cotización para los siguientes ítems del proyecto ${cotizacion.proyecto?.nombre || 'Proyecto'}:
+    const body = `Estimado ${cotizacion.proveedor.nombre},
 
-${formatItemsAsTable(cotizacion.items)}
+Solicitamos cotización para:
+
+${itemsList}
 
 Proyecto: ${cotizacion.proyecto?.codigo} - ${cotizacion.proyecto?.nombre}
 Cotización: ${cotizacion.codigo}
 
-Por favor, envíenos su cotización lo antes posible.
+Saludos,
+Equipo de Compras`
 
-Atentamente,
-Equipo de Compras
-GYS Control`;
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cotizacion.proveedor.correo)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    window.open(gmailUrl, '_blank')
+  }
 
-    // Create Gmail compose URL
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(cotizacion.proveedor.correo)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const getEstadoBadge = (estado: string) => {
+    const styles: Record<string, string> = {
+      pendiente: 'bg-gray-100 text-gray-700',
+      enviada: 'bg-blue-100 text-blue-700',
+      cotizada: 'bg-purple-100 text-purple-700',
+      aprobada: 'bg-green-100 text-green-700',
+      rechazada: 'bg-red-100 text-red-700',
+    }
+    return styles[estado] || 'bg-gray-100 text-gray-700'
+  }
 
-    // Open Gmail in new tab
-    window.open(gmailUrl, '_blank');
-  };
+  if (loading) {
+    return (
+      <div className="p-4 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-16" />
+          ))}
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    )
+  }
+
+  if (!cotizacion) notFound()
+
+  const stats = {
+    totalItems: cotizacion.items?.length || 0,
+    totalCost: cotizacion.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0,
+    selectedItems: cotizacion.items?.filter(item => item.esSeleccionada).length || 0,
+  }
 
   return (
-    <div className="space-y-6">
-      {/* 📋 Breadcrumb Navigation */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/logistica" className="hover:text-foreground transition-colors">
-          Logística
-        </Link>
-        <span>/</span>
-        <Link href="/logistica/cotizaciones" className="hover:text-foreground transition-colors">
-          Cotizaciones
-        </Link>
-        <span>/</span>
-        <span className="text-foreground font-medium">{cotizacion.codigo}</span>
-      </div>
+    <div className="min-h-screen bg-gray-50/50">
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="px-4 py-3">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Link href="/logistica" className="hover:text-foreground">Logística</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link href="/logistica/cotizaciones" className="hover:text-foreground">Cotizaciones</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground font-medium">{cotizacion.codigo}</span>
+          </div>
 
-      {/* 🎯 Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <Button variant="ghost" size="sm" asChild className="mb-2">
-            <Link href="/logistica/cotizaciones">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver a Cotizaciones
-            </Link>
-          </Button>
-          <div className="flex items-center gap-3">
-            <FileText className="h-8 w-8 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {cotizacion.codigo}
-              </h1>
-              <p className="text-gray-600">
-                Cotización de proveedor - {cotizacion.proyecto?.nombre || 'Proyecto no especificado'}
-              </p>
+          {/* Title row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" asChild className="h-7 px-2">
+                <Link href="/logistica/cotizaciones">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-base font-semibold">{cotizacion.codigo}</h1>
+                    <Badge className={`text-[10px] h-5 ${getEstadoBadge(cotizacion.estado || 'pendiente')}`}>
+                      {cotizacion.estado}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <Building2 className="h-3 w-3" />
+                    <span>{cotizacion.proveedor?.nombre || 'Sin proveedor'}</span>
+                    <span>•</span>
+                    <span>{cotizacion.proyecto?.nombre}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAgregarItems(true)}
+                className="h-7 text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Items
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSolicitarCotizacion}
+                className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
+              >
+                <Mail className="h-3 w-3 mr-1" />
+                Solicitar
+              </Button>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 border rounded-lg p-1">
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('table')}
-              className="h-8"
-            >
-              <Table className="h-4 w-4 mr-2" />
-              Tabla
-            </Button>
-            <Button
-              variant={viewMode === 'card' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('card')}
-              className="h-8"
-            >
-              <Grid3X3 className="h-4 w-4 mr-2" />
-              Cards
-            </Button>
+        {/* Stats inline */}
+        <div className="px-4 py-2 border-t bg-gray-50/50 flex items-center gap-6 text-xs">
+          <div className="flex items-center gap-1.5">
+            <Package className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Items:</span>
+            <span className="font-semibold">{stats.totalItems}</span>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSolicitarCotizacion}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <Mail className="h-4 w-4 mr-2" />
-            Solicitar Cotización
-          </Button>
-          <Button variant="outline" size="sm">
-            <Edit className="h-4 w-4 mr-2" />
-            Editar Cotización
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="text-muted-foreground">Total:</span>
+            <span className="font-semibold text-emerald-600">
+              ${stats.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">Seleccionados:</span>
+            <span className="font-semibold text-blue-600">{stats.selectedItems}</span>
+          </div>
         </div>
       </div>
 
-      {/* 📊 Cotizacion Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600" />
-            Resumen de la Cotización
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Proveedor
-              </p>
-              <p className="text-lg font-semibold text-gray-900">
-                {cotizacion.proveedor?.nombre || 'No especificado'}
-              </p>
+      <div className="p-4 space-y-4">
+        {/* Estado flujo */}
+        <CotizacionEstadoFlujoBanner
+          estado={cotizacion.estado || 'pendiente'}
+          cotizacionId={cotizacionId}
+          cotizacionNombre={cotizacion.codigo}
+          usuarioId={session?.user?.id}
+          onUpdated={(nuevoEstado: string) => {
+            setCotizacion(prev => prev ? { ...prev, estado: nuevoEstado as any } : null)
+          }}
+        />
+
+        {/* Items table */}
+        <div className="bg-white rounded-lg border">
+          <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium">Items de la Cotización</span>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Total Ítems
-              </p>
-              <p className="text-lg font-semibold text-gray-900">{stats.totalItems}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Costo Total
-              </p>
-              <p className="text-lg font-semibold text-gray-900">
-                ${stats.totalCost.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Ítems Seleccionados
-              </p>
-              <p className="text-lg font-semibold text-gray-900">
-                {stats.selectedItems} ({stats.progressPercentage.toFixed(1)}%)
-              </p>
-            </div>
+            <Badge variant="secondary" className="text-[10px] h-5">
+              {stats.totalItems} items
+            </Badge>
           </div>
-          {cotizacion.proyecto && (
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-sm text-gray-600">
-                <span className="font-medium">Proyecto:</span> {cotizacion.proyecto.nombre}
-              </p>
+
+          {cotizacion.items && cotizacion.items.length > 0 ? (
+            <CotizacionProveedorTabla
+              items={cotizacion.items}
+              onItemUpdated={(updatedItem) => {
+                setCotizacion(prev => prev ? {
+                  ...prev,
+                  items: prev.items?.map(item =>
+                    item.id === updatedItem.id ? updatedItem : item
+                  ) || []
+                } : null)
+              }}
+              onUpdated={handleRefresh}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Package className="h-10 w-10 text-gray-300 mb-3" />
+              <p className="text-sm text-muted-foreground">No hay items</p>
+              <Button
+                variant="link"
+                size="sm"
+                className="text-xs mt-2"
+                onClick={() => setShowAgregarItems(true)}
+              >
+                Agregar items
+              </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* 📊 Estado del flujo de la cotización */}
-      <CotizacionEstadoFlujoBanner
-        estado={cotizacion.estado || 'pendiente'}
-        cotizacionId={cotizacionId}
-        cotizacionNombre={cotizacion.codigo}
-        usuarioId={session?.user?.id}
-        onUpdated={(nuevoEstado: string) => {
-          setCotizacion(prev => prev ? { ...prev, estado: nuevoEstado as any } : null);
-        }}
-      />
-
-      {/* 🎯 Cotizacion Items */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-blue-600" />
-            Ítems de la Cotización
-            <Badge variant="secondary" className="ml-auto">
-              {viewMode === 'table' ? 'Vista Tabla' : 'Vista Cards'}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Suspense fallback={<CotizacionDetailSkeleton />}>
-            {cotizacion.items && cotizacion.items.length > 0 ? (
-              <CotizacionProveedorTabla
-                items={cotizacion.items}
-                onItemUpdated={(updatedItem) => {
-                  setCotizacion(prev => prev ? {
-                    ...prev,
-                    items: prev.items?.map(item =>
-                      item.id === updatedItem.id ? updatedItem : item
-                    ) || []
-                  } : null);
-                }}
-                onUpdated={() => {
-                  // Refetch cotizacion data
-                  if (cotizacionId) {
-                    getCotizacionProveedorById(cotizacionId).then(updated => {
-                      if (updated) setCotizacion(updated);
-                    });
-                  }
-                }}
+        {/* Historial colapsable */}
+        <div className="bg-white rounded-lg border">
+          <button
+            onClick={() => setShowHistorial(!showHistorial)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Historial de Cambios</span>
+            </div>
+            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showHistorial ? 'rotate-180' : ''}`} />
+          </button>
+          {showHistorial && (
+            <div className="px-4 pb-4 border-t">
+              <CotizacionProveedorHistorial
+                cotizacionId={cotizacionId}
+                entidadTipo="COTIZACION_PROVEEDOR"
               />
-            ) : (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  No hay ítems en esta cotización
-                </h3>
-                <p className="text-gray-600">
-                  Esta cotización aún no tiene ítems asociados.
-                </p>
-              </div>
-            )}
-          </Suspense>
-        </CardContent>
-      </Card>
+            </div>
+          )}
+        </div>
+      </div>
 
-      {/* 📋 Historial de Auditoría */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-blue-600" />
-            Historial de Cambios
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CotizacionProveedorHistorial
-            cotizacionId={cotizacionId}
-            entidadTipo="COTIZACION_PROVEEDOR"
-          />
-        </CardContent>
-      </Card>
+      {/* Modal */}
+      <ModalAgregarItemCotizacionProveedor
+        open={showAgregarItems}
+        onClose={() => setShowAgregarItems(false)}
+        cotizacion={cotizacion}
+        proyectoId={cotizacion.proyectoId || ''}
+        onAdded={handleRefresh}
+      />
     </div>
-  );
+  )
 }

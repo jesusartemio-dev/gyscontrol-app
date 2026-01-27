@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
               estado: true
             }
           },
-          actividades: {
+          crmActividad: {
             select: {
               id: true,
               tipo: true,
@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              actividades: true
+              crmActividad: true
             }
           }
         },
@@ -377,6 +377,7 @@ export async function POST(request: NextRequest) {
 
     const nuevaOportunidad = await prisma.crmOportunidad.create({
       data: {
+        id: `crm-opp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         clienteId,
         nombre,
         descripcion: descripcion || null,
@@ -388,7 +389,8 @@ export async function POST(request: NextRequest) {
         comercialId: usuario.id,
         responsableId: responsableId || usuario.id,
         notas: notas || null,
-        competencia: competencia || null
+        competencia: competencia || null,
+        updatedAt: new Date()
       }
     })
 

@@ -22,13 +22,13 @@ export async function GET(request: NextRequest) {
         // Plantillas independientes de equipos
         prisma.plantillaEquipoIndependiente.findMany({
           include: {
-            items: {
+            plantillaEquipoItemIndependiente: {
               include: {
                 catalogoEquipo: true
               }
             },
             _count: {
-              select: { items: true }
+              select: { plantillaEquipoItemIndependiente: true }
             }
           },
           orderBy: { createdAt: 'desc' },
@@ -36,24 +36,24 @@ export async function GET(request: NextRequest) {
         // Plantillas completas que tienen equipos
         prisma.plantilla.findMany({
           where: {
-            equipos: {
+            plantillaEquipo: {
               some: {} // Tiene al menos un equipo
             }
           },
           include: {
-            equipos: {
+            plantillaEquipo: {
               include: {
-                items: true,
+                plantillaEquipoItem: true,
               },
             },
-            servicios: {
+            plantillaServicio: {
               include: {
-                items: true,
+                plantillaServicioItem: true,
               },
             },
-            gastos: {
+            plantillaGasto: {
               include: {
-                items: true,
+                plantillaGastoItem: true,
               },
             },
           },
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         // Plantillas independientes de servicios
         prisma.plantillaServicioIndependiente.findMany({
           include: {
-            items: {
+            plantillaServicioItemIndependiente: {
               include: {
                 catalogoServicio: true,
                 recurso: true,
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
               }
             },
             _count: {
-              select: { items: true }
+              select: { plantillaServicioItemIndependiente: true }
             }
           },
           orderBy: { createdAt: 'desc' },
@@ -88,24 +88,24 @@ export async function GET(request: NextRequest) {
         // Plantillas completas que tienen servicios
         prisma.plantilla.findMany({
           where: {
-            servicios: {
+            plantillaServicio: {
               some: {} // Tiene al menos un servicio
             }
           },
           include: {
-            equipos: {
+            plantillaEquipo: {
               include: {
-                items: true,
+                plantillaEquipoItem: true,
               },
             },
-            servicios: {
+            plantillaServicio: {
               include: {
-                items: true,
+                plantillaServicioItem: true,
               },
             },
-            gastos: {
+            plantillaGasto: {
               include: {
-                items: true,
+                plantillaGastoItem: true,
               },
             },
           },
@@ -124,9 +124,9 @@ export async function GET(request: NextRequest) {
         // Plantillas independientes de gastos
         prisma.plantillaGastoIndependiente.findMany({
           include: {
-            items: true,
+            plantillaGastoItemIndependiente: true,
             _count: {
-              select: { items: true }
+              select: { plantillaGastoItemIndependiente: true }
             }
           },
           orderBy: { createdAt: 'desc' },
@@ -134,24 +134,24 @@ export async function GET(request: NextRequest) {
         // Plantillas completas que tienen gastos
         prisma.plantilla.findMany({
           where: {
-            gastos: {
+            plantillaGasto: {
               some: {} // Tiene al menos un gasto
             }
           },
           include: {
-            equipos: {
+            plantillaEquipo: {
               include: {
-                items: true,
+                plantillaEquipoItem: true,
               },
             },
-            servicios: {
+            plantillaServicio: {
               include: {
-                items: true,
+                plantillaServicioItem: true,
               },
             },
-            gastos: {
+            plantillaGasto: {
               include: {
-                items: true,
+                plantillaGastoItem: true,
               },
             },
           },
@@ -172,19 +172,19 @@ export async function GET(request: NextRequest) {
         prisma.plantilla.findMany({
           where: tipo === 'completa' ? { tipo: 'completa' } : {},
           include: {
-            equipos: {
+            plantillaEquipo: {
               include: {
-                items: true,
+                plantillaEquipoItem: true,
               },
             },
-            servicios: {
+            plantillaServicio: {
               include: {
-                items: true,
+                plantillaServicioItem: true,
               },
             },
-            gastos: {
+            plantillaGasto: {
               include: {
-                items: true,
+                plantillaGastoItem: true,
               },
             },
           },
@@ -237,10 +237,12 @@ export async function POST(req: NextRequest) {
     if (tipo === 'equipos') {
       const nueva = await prisma.plantillaEquipoIndependiente.create({
         data: {
+          id: `plantilla-equipo-ind-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre,
           estado: 'borrador',
           totalInterno: 0,
           totalCliente: 0,
+          updatedAt: new Date()
         },
       })
       return NextResponse.json(nueva, { status: 201 })
@@ -249,11 +251,12 @@ export async function POST(req: NextRequest) {
     if (tipo === 'servicios') {
       const nueva = await prisma.plantillaServicioIndependiente.create({
         data: {
+          id: `plantilla-servicio-ind-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre,
-          categoria: 'General', // Default category
           estado: 'borrador',
           totalInterno: 0,
           totalCliente: 0,
+          updatedAt: new Date()
         },
       })
       return NextResponse.json(nueva, { status: 201 })
@@ -262,10 +265,12 @@ export async function POST(req: NextRequest) {
     if (tipo === 'gastos') {
       const nueva = await prisma.plantillaGastoIndependiente.create({
         data: {
+          id: `plantilla-gasto-ind-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre,
           estado: 'borrador',
           totalInterno: 0,
           totalCliente: 0,
+          updatedAt: new Date()
         },
       })
       return NextResponse.json(nueva, { status: 201 })
@@ -274,11 +279,13 @@ export async function POST(req: NextRequest) {
     // ✅ Para tipo 'completa', crear en la tabla Plantilla
     const nueva = await prisma.plantilla.create({
       data: {
+        id: `plantilla-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nombre,
         tipo: tipo as any,
         estado: 'borrador',
         totalInterno: 0,
         totalCliente: 0,
+        updatedAt: new Date()
       },
     })
 

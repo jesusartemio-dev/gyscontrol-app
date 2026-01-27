@@ -133,7 +133,8 @@ export function useUserPermissions(userId?: string) {
     }
 
     // Use API endpoint instead of direct service call
-    fetch('/api/permissions/user', {
+    const url = userId ? `/api/permissions/user?userId=${userId}` : '/api/permissions/user'
+    fetch(url, {
       method: 'GET',
       credentials: 'include'
     })

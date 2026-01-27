@@ -30,7 +30,7 @@ export async function GET(
       where: { id },
       include: {
         cliente: true,
-        comercial: true
+        user: true
       }
     })
 
@@ -51,7 +51,7 @@ export async function GET(
     const versiones = await prisma.cotizacionVersion.findMany({
       where: { cotizacionId: id },
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,

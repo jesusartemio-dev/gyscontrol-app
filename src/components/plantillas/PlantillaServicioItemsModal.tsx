@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { getCatalogoServiciosByCategoriaId } from '@/lib/services/catalogoServicio'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { createPlantillaServicioItem } from '@/lib/services/plantillaServicioItem'
 import { recalcularPlantillaDesdeAPI } from '@/lib/services/plantilla'
 import { calcularHoras } from '@/lib/utils/formulas'
@@ -54,7 +54,7 @@ export default function PlantillaServicioItemsModal({
           setLoading(true)
           
           // Get all categories to find the ID by name
-          const categorias = await getCategoriasServicio()
+          const categorias = await getEdts()
           const categoria = categorias.find(c => c.nombre === categoriaNombre)
           
           if (!categoria) {
@@ -126,28 +126,29 @@ export default function PlantillaServicioItemsModal({
           horaFijo: servicio.horaFijo
         })
 
+        const costoHora = servicio.recurso?.costoHora || 0
         const payload = {
           plantillaServicioId,
           catalogoServicioId: servicio.id,
-          unidadServicioId: servicio.unidadServicio.id,
-          recursoId: servicio.recurso.id,
+          unidadServicioId: servicio.unidadServicio?.id || '',
+          recursoId: servicio.recurso?.id || '',
           nombre: servicio.nombre,
           descripcion: servicio.descripcion,
-          categoria: servicio.categoria.nombre,
+          categoria: servicio.edt?.nombre || servicio.nombre,
           formula: servicio.formula,
           horaBase: servicio.horaBase,
           horaRepetido: servicio.horaRepetido,
           horaUnidad: servicio.horaUnidad,
           horaFijo: servicio.horaFijo,
-          unidadServicioNombre: servicio.unidadServicio.nombre,
-          recursoNombre: servicio.recurso.nombre,
-          costoHora: servicio.recurso.costoHora,
+          unidadServicioNombre: servicio.unidadServicio?.nombre || '',
+          recursoNombre: servicio.recurso?.nombre || '',
+          costoHora,
           cantidad,
           horaTotal: horas,
           factorSeguridad: 1.0,
-          costoInterno: horas * servicio.recurso.costoHora,
+          costoInterno: horas * costoHora,
           margen: 1.35,
-          costoCliente: horas * servicio.recurso.costoHora * 1.35
+          costoCliente: horas * costoHora * 1.35
         }
 
         const nuevoItem = await createPlantillaServicioItem(payload)

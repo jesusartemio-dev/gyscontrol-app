@@ -16,16 +16,17 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const data = await prisma.cotizacionProveedorItem.findUnique({
       where: { id },
       include: {
-        cotizacion: {
+        cotizacionProveedor: {
           include: {
             proveedor: true,
             proyecto: true,
           },
         },
         listaEquipoItem: true,
-        lista: true,
+        listaEquipo: true,
       },
     })
+    
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error en GET:', error)
@@ -53,17 +54,17 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         esSeleccionada: body.esSeleccionada ?? false,
       },
       include: {
-        cotizacion: {
+        cotizacionProveedor: {
           include: {
             proveedor: true,
             proyecto: true,
           },
         },
         listaEquipoItem: true,
-        lista: true,
+        listaEquipo: true,
       },
     })
-
+    
     return NextResponse.json(updated)
   } catch (error) {
     console.error('❌ Error en PUT:', error)

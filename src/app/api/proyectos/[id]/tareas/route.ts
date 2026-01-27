@@ -83,22 +83,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       include: {
         proyectoEdt: {
           include: {
-            categoriaServicio: true,
-            responsable: true
+            edt: true,
+            user: true
           }
         },
-        responsable: true,
-        subtareas: {
+        user: true,
+        proyectoSubtarea: {
           include: {
-            asignado: true
+            user: true
           }
         },
-        dependenciasOrigen: {
+        dependenciasComoOrigen: {
           include: {
             tareaDependiente: true
           }
         },
-        dependenciasDependiente: {
+        dependenciasComoDependiente: {
           include: {
             tareaOrigen: true
           }
@@ -150,6 +150,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const tarea = await prisma.proyectoTarea.create({
       data: {
+        id: `tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nombre: validatedData.nombre,
         descripcion: validatedData.descripcion,
         proyectoEdtId: validatedData.proyectoEdtId,
@@ -163,19 +164,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         responsableId: validatedData.responsableId,
         estado: validatedData.estado,
         porcentajeCompletado: validatedData.porcentajeCompletado,
-        dependenciaId: validatedData.dependenciaId
+        dependenciaId: validatedData.dependenciaId,
+        updatedAt: new Date()
       },
       include: {
         proyectoEdt: {
           include: {
-            categoriaServicio: true,
-            responsable: true
+            edt: true,
+            user: true
           }
         },
-        responsable: true,
-        subtareas: {
+        user: true,
+        proyectoSubtarea: {
           include: {
-            asignado: true
+            user: true
           }
         }
       }

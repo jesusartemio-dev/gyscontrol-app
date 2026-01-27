@@ -23,7 +23,7 @@ export async function PATCH(
 
     // ✅ Verificar si es una deselección (cotizacionProveedorItemId es null)
     if (cotizacionProveedorItemId === null) {
-      // 📝 Paso 2: actualizar el ListaEquipoItem limpiando la selección
+      // 📝 Paso 2: actualizar el ListaEquipoItem limpiando la selección (incluyendo proveedor)
       const updatedItem = await prisma.listaEquipoItem.update({
         where: { id },
         data: {
@@ -32,6 +32,7 @@ export async function PATCH(
           costoElegido: 0,
           tiempoEntrega: null,
           tiempoEntregaDias: null,
+          proveedorId: null, // ✅ Limpiar el proveedor al deseleccionar
         },
       })
   
@@ -40,7 +41,7 @@ export async function PATCH(
       const pedidosAfectados = await prisma.pedidoEquipoItem.findMany({
         where: { listaEquipoItemId: id },
         include: {
-          pedido: {
+          pedidoEquipo: {
             select: { id: true, codigo: true, proyecto: { select: { nombre: true } } }
           }
         }
@@ -60,9 +61,9 @@ export async function PATCH(
         })
   
         pedidosActualizados.push({
-          pedidoId: pedidoItem.pedido.id,
-          pedidoCodigo: pedidoItem.pedido.codigo,
-          proyectoNombre: pedidoItem.pedido.proyecto.nombre,
+          pedidoId: pedidoItem.pedidoEquipo.id,
+          pedidoCodigo: pedidoItem.pedidoEquipo.codigo,
+          proyectoNombre: pedidoItem.pedidoEquipo.proyecto.nombre,
           itemId: pedidoItem.id,
           precioAnterior: pedidoItem.precioUnitario,
           precioNuevo: 0,
@@ -72,7 +73,7 @@ export async function PATCH(
       }
   
       // 📊 Paso 4: recalcular totales de pedidos afectados
-      const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoId))]
+      const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoEquipo.id))]
       for (const pedidoId of pedidosIds) {
         // Recalcular presupuestoTotal del pedido basado en sus items
         const itemsPedido = await prisma.pedidoEquipoItem.findMany({
@@ -100,9 +101,14 @@ export async function PATCH(
       })
     }
 
-    // ✅ Es una selección normal - buscar la cotización seleccionada
+    // ✅ Es una selección normal - buscar la cotización seleccionada con su proveedor
     const cotizacionItem = await prisma.cotizacionProveedorItem.findUnique({
       where: { id: cotizacionProveedorItemId },
+      include: {
+        cotizacionProveedor: {
+          select: { proveedorId: true }
+        }
+      }
     })
 
     // 🚫 Validación: que la cotización exista y pertenezca al ítem solicitado
@@ -128,7 +134,8 @@ export async function PATCH(
     const tiempoEntrega = cotizacionItem.tiempoEntrega ?? null
     const tiempoEntregaDias = cotizacionItem.tiempoEntregaDias ?? null
 
-    // 📝 Paso 5: actualizar el ListaEquipoItem con la información final
+    // 📝 Paso 5: actualizar el ListaEquipoItem con la información final (incluyendo proveedor)
+    const proveedorId = cotizacionItem.cotizacionProveedor?.proveedorId ?? null
     const updatedItem = await prisma.listaEquipoItem.update({
       where: { id },
       data: {
@@ -137,6 +144,7 @@ export async function PATCH(
         costoElegido,
         tiempoEntrega,
         tiempoEntregaDias,
+        proveedorId, // ✅ Actualizar el proveedor del ítem
       },
     })
 
@@ -145,7 +153,7 @@ export async function PATCH(
     const pedidosAfectados = await prisma.pedidoEquipoItem.findMany({
       where: { listaEquipoItemId: id },
       include: {
-        pedido: {
+        pedidoEquipo: {
           select: { id: true, codigo: true, proyecto: { select: { nombre: true } } }
         }
       }
@@ -167,9 +175,9 @@ export async function PATCH(
       })
 
       pedidosActualizados.push({
-        pedidoId: pedidoItem.pedido.id,
-        pedidoCodigo: pedidoItem.pedido.codigo,
-        proyectoNombre: pedidoItem.pedido.proyecto.nombre,
+        pedidoId: pedidoItem.pedidoEquipo.id,
+        pedidoCodigo: pedidoItem.pedidoEquipo.codigo,
+        proyectoNombre: pedidoItem.pedidoEquipo.proyecto.nombre,
         itemId: pedidoItem.id,
         precioAnterior: pedidoItem.precioUnitario,
         precioNuevo: precioUnitario,
@@ -178,7 +186,7 @@ export async function PATCH(
     }
 
     // 📊 Paso 7: recalcular totales de pedidos afectados
-    const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoId))]
+    const pedidosIds = [...new Set(pedidosAfectados.map(p => p.pedidoEquipo.id))]
     for (const pedidoId of pedidosIds) {
       // Recalcular presupuestoTotal del pedido basado en sus items
       const itemsPedido = await prisma.pedidoEquipoItem.findMany({

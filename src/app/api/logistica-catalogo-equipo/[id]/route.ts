@@ -46,7 +46,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         marca: true,
         precioInterno: true,
         estado: true,
-        categoria: { select: { id: true, nombre: true } },
+        categoriaEquipo: { select: { id: true, nombre: true } },
         unidad: { select: { id: true, nombre: true } },
       },
     })

@@ -1,488 +1,267 @@
 /**
- * 📦 Página de Gestión de Pedidos - Logística
- * 
- * Página principal para gestión logística de pedidos de equipos:
- * - Vista consolidada de todos los pedidos
- * - Métricas de progreso y trazabilidad
- * - Filtros avanzados y búsqueda
- * - Actualización de estados de entrega
- * - Navegación a reportes y dashboard
- * 
+ * 📦 Pedidos - Logística
+ * Diseño minimalista y compacto
  * @author GYS Team
- * @version 2.0.0
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
-
-// 📡 Types & Services
-import {
-  PedidoEquipoUpdatePayload,
-  PedidoEquipoItemUpdatePayload,
-  PedidoEquipo
-} from '@/types'
-import {
-  getAllPedidoEquipos,
-  updatePedidoEquipo,
-  deletePedidoEquipo,
-} from '@/lib/services/pedidoEquipo'
-import {
-  updatePedidoEquipoItem,
-  deletePedidoEquipoItem,
-} from '@/lib/services/pedidoEquipoItem'
-
-// 🎨 UI Components
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Table as TableIcon, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { getAllPedidoEquipos, deletePedidoEquipo } from '@/lib/services/pedidoEquipo'
+import LogisticaPedidosTable from '@/components/logistica/LogisticaPedidosTable'
+import type { PedidoEquipo } from '@/types'
 
-// 🎯 Icons
-import {
-  Package,
-  Truck,
-  BarChart3,
-  Activity,
-  Target,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  RefreshCw,
-  TrendingUp,
-  Calendar,
-  Table,
-  Grid3X3
-} from 'lucide-react'
+const ESTADOS_PEDIDO = [
+  { value: 'all', label: 'Todos' },
+  { value: 'borrador', label: 'Borrador' },
+  { value: 'enviado', label: 'Enviado' },
+  { value: 'atendido', label: 'Atendido' },
+  { value: 'parcial', label: 'Parcial' },
+  { value: 'entregado', label: 'Entregado' },
+  { value: 'cancelado', label: 'Cancelado' },
+]
 
-// 🧩 Components
-import PedidoEquiposTableView from '@/components/equipos/PedidoEquiposTableView'
-import PedidoEquiposCardView from '@/components/equipos/PedidoEquiposCardView'
-import PedidoEquipoEstadoLogistico from '@/components/equipos/PedidoEquipoEstadoLogistico'
-
-export default function PedidosLogisticaPage() {
+export default function LogisticaPedidosPage() {
   const router = useRouter()
-  const { data: session } = useSession()
-  
-  // 🎯 States
   const [pedidos, setPedidos] = useState<PedidoEquipo[]>([])
-  const [filteredPedidos, setFilteredPedidos] = useState<PedidoEquipo[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterEstado, setFilterEstado] = useState('todos')
+  const [refreshing, setRefreshing] = useState(false)
 
-  // 📡 Data loading
-  useEffect(() => {
-    cargarPedidos()
-  }, [])
+  // Filters
+  const [search, setSearch] = useState('')
+  const [estado, setEstado] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
-  // 🔍 Filtrado de pedidos
-  useEffect(() => {
-    let filtered = pedidos
-
-    // Filtro por búsqueda
-    if (searchTerm) {
-      filtered = filtered.filter(pedido =>
-        pedido.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pedido.responsable?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pedido.items?.some(item => item.descripcion.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
-    }
-
-    // Filtro por estado
-    if (filterEstado !== 'todos') {
-      filtered = filtered.filter(pedido => pedido.estado === filterEstado)
-    }
-
-    setFilteredPedidos(filtered)
-  }, [pedidos, searchTerm, filterEstado])
-
-  const cargarPedidos = async () => {
+  const fetchData = async () => {
     try {
-      setLoading(true)
-      setError(null)
-      const data = await getAllPedidoEquipos() // Sin filtro de proyecto para ver todos
+      setRefreshing(true)
+      const data = await getAllPedidoEquipos()
       setPedidos(data || [])
-    } catch (err) {
-      setError('Error al cargar pedidos')
+    } catch (error) {
+      console.error('Error fetching data:', error)
       toast.error('Error al cargar pedidos')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
-  // 🎯 Event handlers
-  const handleUpdate = async (id: string, payload: PedidoEquipoUpdatePayload) => {
-    const actualizado = await updatePedidoEquipo(id, payload)
-    if (actualizado) {
-      toast.success('Pedido actualizado')
-      await cargarPedidos() // Recargar datos
-    } else {
-      toast.error('Error al actualizar pedido')
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  // Filter pedidos
+  const pedidosFiltrados = pedidos.filter((pedido) => {
+    if (search) {
+      const s = search.toLowerCase()
+      const match =
+        pedido.codigo?.toLowerCase().includes(s) ||
+        pedido.responsable?.name?.toLowerCase().includes(s) ||
+        pedido.observacion?.toLowerCase().includes(s)
+      if (!match) return false
     }
+    if (estado !== 'all' && pedido.estado !== estado) return false
+    return true
+  })
+
+  // Stats
+  const stats = {
+    total: pedidos.length,
+    items: pedidos.reduce((sum, p) => sum + (p.items?.length || 0), 0),
+    enProgreso: pedidos.filter(p => ['enviado', 'atendido', 'parcial'].includes(p.estado || '')).length,
+    entregados: pedidos.filter(p => p.estado === 'entregado').length,
+    retrasados: pedidos.filter(p => {
+      if (!p.fechaNecesaria) return false
+      return new Date(p.fechaNecesaria) < new Date() && p.estado !== 'entregado'
+    }).length,
+  }
+
+  const hasFilters = search || estado !== 'all'
+
+  const clearFilters = () => {
+    setSearch('')
+    setEstado('all')
   }
 
   const handleDelete = async (id: string) => {
-    const eliminado = await deletePedidoEquipo(id)
-    if (eliminado) {
+    const deleted = await deletePedidoEquipo(id)
+    if (deleted) {
       toast.success('Pedido eliminado')
-      await cargarPedidos() // Recargar datos
+      fetchData()
     } else {
       toast.error('Error al eliminar pedido')
     }
   }
 
-  const handleUpdateItem = async (
-    id: string,
-    payload: PedidoEquipoItemUpdatePayload
-  ) => {
-    const actualizado = await updatePedidoEquipoItem(id, payload)
-    if (actualizado) {
-      toast.success('Item actualizado')
-      await cargarPedidos() // Recargar datos
-    } else {
-      toast.error('Error al actualizar item')
-    }
+  if (loading) {
+    return (
+      <div className="p-4 space-y-4">
+        <Skeleton className="h-10 w-48" />
+        <div className="grid grid-cols-5 gap-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-16" />
+          ))}
+        </div>
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
   }
-
-  const handleDeleteItem = async (id: string) => {
-    const eliminado = await deletePedidoEquipoItem(id)
-    if (eliminado) {
-      toast.success('Item eliminado')
-      await cargarPedidos() // Recargar datos
-    } else {
-      toast.error('Error al eliminar item')
-    }
-  }
-
-  // 📊 Calculate metrics
-  const totalPedidos = filteredPedidos.length
-  const pedidosEnProgreso = filteredPedidos.filter(p =>
-    ['en_proceso', 'parcial', 'pendiente'].includes(p.estado?.toLowerCase() || '')
-  ).length
-  const pedidosCompletados = filteredPedidos.filter(p =>
-    p.estado?.toLowerCase() === 'completado'
-  ).length
-  const pedidosRetrasados = filteredPedidos.filter(p => {
-    if (!p.fechaNecesaria) return false
-    const fechaLimite = new Date(p.fechaNecesaria)
-    const hoy = new Date()
-    return hoy > fechaLimite && p.estado?.toLowerCase() !== 'completado'
-  }).length
-
-  const totalItems = filteredPedidos.reduce((total, pedido) =>
-    total + (pedido.items?.length || 0), 0
-  )
-  const itemsEntregados = filteredPedidos.reduce((total, pedido) =>
-    total + (pedido.items?.filter(item => item.estado === 'entregado').length || 0), 0
-  )
-  const progresoGeneral = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="container mx-auto p-6 space-y-6"
-    >
-      {/* 🧭 Breadcrumb Navigation */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/logistica">Logística</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Pedidos</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className="min-h-screen bg-gray-50/50">
+      {/* Header sticky */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
+                <Truck className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <h1 className="text-base font-semibold">Pedidos de Equipos</h1>
+                <p className="text-[10px] text-muted-foreground">Control logístico y entregas</p>
+              </div>
+            </div>
 
-      {/* 📋 Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Truck className="h-8 w-8 text-blue-600" />
-            Gestión de Pedidos
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Control logístico y seguimiento de entregas
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex items-center gap-1 border rounded-lg p-1">
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('table')}
-              className="h-8"
-            >
-              <Table className="h-4 w-4 mr-2" />
-              Tabla
-            </Button>
-            <Button
-              variant={viewMode === 'card' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('card')}
-              className="h-8"
-            >
-              <Grid3X3 className="h-4 w-4 mr-2" />
-              Cards
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* View toggle */}
+              <div className="flex items-center border rounded-md p-0.5">
+                <Button
+                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="h-6 px-2"
+                >
+                  <TableIcon className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('cards')}
+                  className="h-6 px-2"
+                >
+                  <LayoutGrid className="h-3 w-3" />
+                </Button>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchData}
+                disabled={refreshing}
+                className="h-7 text-xs"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+            </div>
           </div>
-          <Button
-            onClick={() => router.push('/gestion/reportes/pedidos')}
-            variant="default"
-            size="sm"
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Dashboard
-          </Button>
-          <Button onClick={cargarPedidos} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualizar
-          </Button>
         </div>
-      </motion.div>
+      </div>
 
-      {/* 📊 Métricas Rápidas */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"
-      >
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pedidos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalPedidos}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">En Progreso</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{pedidosEnProgreso}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completados</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{pedidosCompletados}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Retrasados</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{pedidosRetrasados}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Progreso General</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{progresoGeneral}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {itemsEntregados}/{totalItems} items
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      <Separator />
-
-      {/* 🚛 Gestión Logística de Entregas */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="space-y-4"
-      >
-        <div className="flex items-center gap-2">
-          <Truck className="h-5 w-5 text-blue-600" />
-          <h2 className="text-xl font-semibold text-gray-800">
-            Gestión Logística de Entregas
-          </h2>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Administra el estado logístico de los pedidos y coordina las entregas a proyectos.
-        </p>
-
-        {/* Aquí se mostraría un resumen de entregas pendientes */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Entregas Pendientes</CardTitle>
-              <Clock className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {filteredPedidos.filter(p => p.estadoLogistico !== 'entregado').length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Pedidos en proceso logístico
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Entregas Hoy</CardTitle>
-              <Calendar className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {filteredPedidos.filter(p => {
-                  const hoy = new Date().toDateString()
-                  return p.fechaProgramadaEntrega &&
-                         new Date(p.fechaProgramadaEntrega).toDateString() === hoy
-                }).length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Programadas para hoy
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Entregas Retrasadas</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {filteredPedidos.filter(p => {
-                  if (!p.fechaProgramadaEntrega) return false
-                  const fechaProgramada = new Date(p.fechaProgramadaEntrega)
-                  const hoy = new Date()
-                  return fechaProgramada < hoy && p.estadoLogistico !== 'entregado'
-                }).length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Con retraso en entrega
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </motion.div>
-
-      <Separator />
-
-      {/* 📦 Lista de Pedidos */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Pedidos Registrados
-          </h2>
-          <Badge variant="secondary" className="px-3 py-1">
-            {viewMode === 'table' ? 'Vista Tabla' : 'Vista Cards'} • {filteredPedidos.length} pedidos
-          </Badge>
+      <div className="p-4 space-y-4">
+        {/* Stats compactos */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Pedidos</span>
+              <Package className="h-3.5 w-3.5 text-blue-500" />
+            </div>
+            <p className="text-xl font-bold mt-1">{stats.total}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Items</span>
+              <Package className="h-3.5 w-3.5 text-gray-500" />
+            </div>
+            <p className="text-xl font-bold mt-1">{stats.items}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">En Progreso</span>
+              <Clock className="h-3.5 w-3.5 text-amber-500" />
+            </div>
+            <p className="text-xl font-bold mt-1 text-amber-600">{stats.enProgreso}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Entregados</span>
+              <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+            </div>
+            <p className="text-xl font-bold mt-1 text-green-600">{stats.entregados}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Retrasados</span>
+              <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+            </div>
+            <p className="text-xl font-bold mt-1 text-red-600">{stats.retrasados}</p>
+          </div>
         </div>
 
-        {/* Filtros básicos */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-2 flex-1">
-            <div className="relative flex-1 max-w-sm">
+        {/* Filtros en línea */}
+        <div className="bg-white rounded-lg border p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <Input
                 placeholder="Buscar por código, responsable..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-4"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 pl-8 text-xs"
               />
             </div>
-            <Select value={filterEstado} onValueChange={setFilterEstado}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrar por estado" />
+
+            <Select value={estado} onValueChange={setEstado}>
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <Filter className="h-3 w-3 mr-1.5 text-gray-400" />
+                <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos los estados</SelectItem>
-                <SelectItem value="borrador">Borrador</SelectItem>
-                <SelectItem value="enviado">Enviado</SelectItem>
-                <SelectItem value="atendido">Atendido</SelectItem>
-                <SelectItem value="parcial">Parcial</SelectItem>
-                <SelectItem value="entregado">Entregado</SelectItem>
-                <SelectItem value="cancelado">Cancelado</SelectItem>
+                {ESTADOS_PEDIDO.map((e) => (
+                  <SelectItem key={e.value} value={e.value} className="text-xs">
+                    {e.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="text-sm text-gray-600">
-            {filteredPedidos.length} de {pedidos.length} pedidos
+
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs text-red-600">
+                <X className="h-3 w-3 mr-1" />
+                Limpiar
+              </Button>
+            )}
+
+            <div className="ml-auto text-xs text-muted-foreground">
+              {pedidosFiltrados.length} de {pedidos.length}
+            </div>
           </div>
         </div>
 
-        {/* Vista de pedidos */}
-        {filteredPedidos.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Package className="h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">No hay pedidos registrados</h3>
-              <p className="text-gray-600 mb-4 text-center">
-                Los pedidos aparecerán aquí una vez que sean creados desde los proyectos.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          viewMode === 'table' ? (
-            <PedidoEquiposTableView
-              pedidos={filteredPedidos}
-              proyectoId="" // Para logística, no hay proyecto específico
-              onEdit={(pedido) => router.push(`/logistica/pedidos/${pedido.id}`)}
-              onDelete={handleDelete}
-            />
-          ) : (
-            <PedidoEquiposCardView
-              pedidos={filteredPedidos}
-              proyectoId="" // Para logística, no hay proyecto específico
-              onEdit={(pedido) => router.push(`/logistica/pedidos/${pedido.id}`)}
-              onDelete={handleDelete}
-            />
-          )
-        )}
-      </motion.div>
-    </motion.div>
+        {/* Tabla */}
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <LogisticaPedidosTable
+            pedidos={pedidosFiltrados}
+            onRefresh={fetchData}
+            onDelete={handleDelete}
+          />
+        </div>
+      </div>
+    </div>
   )
 }

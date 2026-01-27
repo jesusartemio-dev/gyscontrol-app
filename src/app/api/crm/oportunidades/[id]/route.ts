@@ -66,9 +66,9 @@ export async function GET(
             fechaEnvio: true
           }
         },
-        actividades: {
+        crmActividad: {
           include: {
-            usuario: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -80,7 +80,7 @@ export async function GET(
         },
         _count: {
           select: {
-            actividades: true
+            crmActividad: true
           }
         }
       }

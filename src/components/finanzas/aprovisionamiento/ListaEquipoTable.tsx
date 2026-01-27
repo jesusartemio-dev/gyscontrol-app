@@ -142,15 +142,17 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 ];
 
 // 🎯 Memoized status variants - evita recreación
-const STATUS_VARIANTS = {
-  borrador: { variant: 'secondary' as const, label: 'Borrador' },
-  por_revisar: { variant: 'outline' as const, label: 'Por Revisar' },
-  por_cotizar: { variant: 'outline' as const, label: 'Por Cotizar' },
-  por_validar: { variant: 'outline' as const, label: 'Por Validar' },
-  por_aprobar: { variant: 'outline' as const, label: 'Por Aprobar' },
-  aprobado: { variant: 'default' as const, label: 'Aprobado' },
-  rechazado: { variant: 'destructive' as const, label: 'Rechazado' },
-} as const;
+const STATUS_VARIANTS: Record<EstadoListaEquipo, { variant: 'default' | 'secondary' | 'outline' | 'destructive', label: string }> = {
+  borrador: { variant: 'secondary', label: 'Borrador' },
+  enviada: { variant: 'outline', label: 'Enviada' },
+  por_revisar: { variant: 'outline', label: 'Por Revisar' },
+  por_cotizar: { variant: 'outline', label: 'Por Cotizar' },
+  por_validar: { variant: 'outline', label: 'Por Validar' },
+  por_aprobar: { variant: 'outline', label: 'Por Aprobar' },
+  aprobada: { variant: 'default', label: 'Aprobada' },
+  rechazada: { variant: 'destructive', label: 'Rechazada' },
+  completada: { variant: 'default', label: 'Completada' },
+};
 
 // 🚀 OPTIMIZED: Status badge component with React.memo
 const StatusBadge = memo<{ estado: EstadoListaEquipo }>(({ estado }) => {
@@ -363,7 +365,7 @@ const ListaEquipoTableRow = memo<TableRowProps>(({
   // 🎯 Memoized computed values
   const montoDisplay = useMemo(() => {
     // Calculate total from items if available
-    const montoTotal = lista.items?.reduce((total, item) => {
+    const montoTotal = lista.listaEquipoItem?.reduce((total, item) => {
       const precio = item.precioElegido || item.presupuesto || 0;
       const cantidad = item.cantidad || 0;
       return total + (precio * cantidad);
@@ -372,7 +374,7 @@ const ListaEquipoTableRow = memo<TableRowProps>(({
     return montoTotal > 0
       ? `USD ${montoTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : '-';
-  }, [lista.items, lista.stats?.costoTotal]);
+  }, [lista.listaEquipoItem, lista.stats?.costoTotal]);
 
   const fechaNecesariaDisplay = useMemo(() => {
     return lista.fechaNecesaria 

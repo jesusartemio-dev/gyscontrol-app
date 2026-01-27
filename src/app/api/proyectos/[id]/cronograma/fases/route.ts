@@ -41,6 +41,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const { searchParams } = new URL(request.url)
+    const cronogramaId = searchParams.get('cronogramaId')
 
     // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
@@ -55,13 +57,17 @@ export async function GET(
       )
     }
 
-    // ✅ Obtener todas las fases del proyecto
-    const fases = await prisma.proyectoFase.findMany({
-      where: { proyectoId: id },
+    // ✅ Construir filtros
+    const where: any = { proyectoId: id }
+    if (cronogramaId) where.proyectoCronogramaId = cronogramaId
+
+    // ✅ Obtener fases del proyecto (filtradas por cronograma si se especifica)
+    const fases = await (prisma as any).proyectoFase.findMany({
+      where,
       include: {
-        edts: true,
+        proyectoEdt: true,
         _count: {
-          select: { edts: true }
+          select: { proyectoEdt: true }
         }
       },
       orderBy: { orden: 'asc' }
@@ -150,7 +156,7 @@ export async function POST(
         porcentajeAvance: 0
       },
       include: {
-        edts: true
+        proyectoEdt: true
       }
     })
 

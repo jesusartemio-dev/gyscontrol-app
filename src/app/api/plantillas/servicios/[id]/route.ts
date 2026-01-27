@@ -17,41 +17,29 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    console.log('📋 GET plantilla - id:', id)
 
     const plantilla = await prisma.plantillaServicioIndependiente.findUnique({
       where: { id },
       include: {
-        items: {
+        edt: true,
+        plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
+            edt: true,
             recurso: true,
             unidadServicio: true
           },
           orderBy: { orden: 'asc' }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       }
     })
 
-    if (plantilla) {
-      // Get categoria name if categoria is an ID
-      let categoriaNombre = plantilla.categoria
-      if (plantilla.categoria) {
-        const categoriaServicio = await prisma.categoriaServicio.findUnique({
-          where: { id: plantilla.categoria }
-        })
-        if (categoriaServicio) {
-          categoriaNombre = categoriaServicio.nombre
-        }
-      }
-
-      return NextResponse.json({
-        ...plantilla,
-        categoriaNombre
-      })
-    }
+    console.log('📋 Items encontrados:', plantilla?.plantillaServicioItemIndependiente?.length || 0)
+    console.log('📋 Items IDs:', plantilla?.plantillaServicioItemIndependiente?.map(i => i.id))
 
     if (!plantilla) {
       return NextResponse.json(
@@ -78,7 +66,7 @@ export async function PUT(
     const { id } = await params
     const data = await req.json()
 
-    const { nombre, descripcion } = data
+    const { nombre, descripcion, edtId } = data
 
     if (!nombre || typeof nombre !== 'string' || nombre.trim().length < 3) {
       return NextResponse.json(
@@ -92,38 +80,27 @@ export async function PUT(
       data: {
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
+        edtId: edtId || null,
         updatedAt: new Date()
       },
       include: {
-        items: {
+        edt: true,
+        plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
+            edt: true,
             recurso: true,
             unidadServicio: true
           },
           orderBy: { orden: 'asc' }
         },
         _count: {
-          select: { items: true }
+          select: { plantillaServicioItemIndependiente: true }
         }
       }
     })
 
-    // Get categoria name for the updated plantilla
-    let categoriaNombre = plantillaActualizada.categoria
-    if (plantillaActualizada.categoria) {
-      const categoriaServicio = await prisma.categoriaServicio.findUnique({
-        where: { id: plantillaActualizada.categoria }
-      })
-      if (categoriaServicio) {
-        categoriaNombre = categoriaServicio.nombre
-      }
-    }
-
-    return NextResponse.json({
-      ...plantillaActualizada,
-      categoriaNombre
-    })
+    return NextResponse.json(plantillaActualizada)
   } catch (error) {
     console.error('❌ Error al actualizar plantilla de servicios:', error)
     return NextResponse.json(

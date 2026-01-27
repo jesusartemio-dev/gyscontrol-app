@@ -45,19 +45,27 @@ const estados: {
   bgColor: string;
   description: string;
 }[] = [
-  { 
-    key: 'borrador', 
-    label: 'Borrador', 
-    icon: Clock, 
-    color: 'text-slate-600', 
+  {
+    key: 'borrador',
+    label: 'Borrador',
+    icon: Clock,
+    color: 'text-slate-600',
     bgColor: 'bg-slate-100 border-slate-300',
     description: 'Lista en proceso de creación'
   },
-  { 
-    key: 'por_revisar', 
-    label: 'Por revisar', 
-    icon: RefreshCcw, 
-    color: 'text-amber-600', 
+  {
+    key: 'enviada',
+    label: 'Enviada',
+    icon: ArrowRight,
+    color: 'text-cyan-600',
+    bgColor: 'bg-cyan-50 border-cyan-300',
+    description: 'Lista enviada para revisión'
+  },
+  {
+    key: 'por_revisar',
+    label: 'Por revisar',
+    icon: RefreshCcw,
+    color: 'text-amber-600',
     bgColor: 'bg-amber-50 border-amber-300',
     description: 'Pendiente de revisión técnica'
   },
@@ -85,21 +93,29 @@ const estados: {
     bgColor: 'bg-purple-50 border-purple-300',
     description: 'Pendiente de aprobación final'
   },
-  { 
-    key: 'aprobado', 
-    label: 'Aprobado', 
-    icon: CheckCircle, 
-    color: 'text-green-600', 
+  {
+    key: 'aprobada',
+    label: 'Aprobada',
+    icon: CheckCircle,
+    color: 'text-green-600',
     bgColor: 'bg-green-50 border-green-300',
     description: 'Lista aprobada y lista para uso'
   },
-  { 
-    key: 'rechazado', 
-    label: 'Rechazado', 
-    icon: Ban, 
-    color: 'text-red-600', 
+  {
+    key: 'rechazada',
+    label: 'Rechazada',
+    icon: Ban,
+    color: 'text-red-600',
     bgColor: 'bg-red-50 border-red-300',
     description: 'Lista rechazada, requiere correcciones'
+  },
+  {
+    key: 'completada',
+    label: 'Completada',
+    icon: CheckCircle,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50 border-emerald-300',
+    description: 'Lista completada y procesada'
   },
 ]
 
@@ -113,12 +129,14 @@ const flujoEstados: Record<
   }
 > = {
   borrador: { siguiente: 'por_revisar', roles: ['proyectos', 'admin'] },
-  por_revisar: { siguiente: 'por_cotizar', rechazar: 'rechazado', roles: ['coordinador', 'admin'] },
-  por_cotizar: { siguiente: 'por_validar', rechazar: 'rechazado', roles: ['logistico', 'admin'] },
-  por_validar: { siguiente: 'por_aprobar', rechazar: 'rechazado', roles: ['gestor', 'admin'] },
-  por_aprobar: { siguiente: 'aprobado', rechazar: 'rechazado', roles: ['gerente', 'admin'] },
-  aprobado: { rechazar: 'rechazado', roles: ['gerente', 'admin'] },
-  rechazado: { reset: 'borrador', roles: ['proyectos', 'admin'] },
+  enviada: { siguiente: 'por_revisar', roles: ['coordinador', 'admin'] },
+  por_revisar: { siguiente: 'por_cotizar', rechazar: 'rechazada', roles: ['coordinador', 'admin'] },
+  por_cotizar: { siguiente: 'por_validar', rechazar: 'rechazada', roles: ['logistico', 'admin'] },
+  por_validar: { siguiente: 'por_aprobar', rechazar: 'rechazada', roles: ['gestor', 'admin'] },
+  por_aprobar: { siguiente: 'aprobada', rechazar: 'rechazada', roles: ['gerente', 'admin'] },
+  aprobada: { siguiente: 'completada', rechazar: 'rechazada', roles: ['gerente', 'admin'] },
+  rechazada: { reset: 'borrador', roles: ['proyectos', 'admin'] },
+  completada: { roles: ['gerente', 'admin'] },
 }
 
 interface Props {
@@ -200,7 +218,7 @@ export default function ListaEstadoFlujo({ estado, listaId, onUpdated }: Props) 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Badge 
-            variant={estado === 'aprobado' ? 'default' : estado === 'rechazado' ? 'secondary' : 'secondary'}
+            variant={estado === 'aprobada' ? 'default' : estado === 'rechazada' ? 'secondary' : 'secondary'}
             className="text-sm px-3 py-1"
           >
             {estadoActual && (

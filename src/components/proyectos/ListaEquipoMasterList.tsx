@@ -67,7 +67,7 @@ import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
 import { getListaEquipoDetail } from '@/lib/services/listaEquipo';
 import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
 import { toast } from 'sonner';
-import type { ListaEquipo } from '@/types';
+import type { ListaEquipo, EstadoListaEquipo } from '@/types';
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog';
 
 // ✅ Props interface
@@ -94,14 +94,16 @@ interface ListaEquipoMasterListProps {
 }
 
 // ✅ Status icons mapping
-const statusIcons = {
+const statusIcons: Record<EstadoListaEquipo, typeof Clock> = {
   borrador: Clock,
+  enviada: AlertCircle,
   por_revisar: AlertCircle,
   por_cotizar: TrendingUp,
   por_validar: AlertCircle,
   por_aprobar: Clock,
-  aprobado: CheckCircle2,
-  rechazado: AlertCircle
+  aprobada: CheckCircle2,
+  rechazada: AlertCircle,
+  completada: CheckCircle2
 };
 
 // ✅ Using centralized animation variants from masterDetailAnimations.ts
@@ -362,8 +364,8 @@ const ListaEquipoMasterList: React.FC<ListaEquipoMasterListProps> = ({
                   </TableCell>
                   
                   <TableCell>
-                    <Badge 
-                      variant={lista.estado === 'aprobado' ? 'default' : 'secondary'}
+                    <Badge
+                      variant={lista.estado === 'aprobada' ? 'default' : 'secondary'}
                       className="flex items-center gap-1 w-fit"
                     >
                       <StatusIcon className="w-3 h-3" />

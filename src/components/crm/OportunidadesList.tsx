@@ -17,14 +17,14 @@ import {
   Loader2,
   FileText,
   CheckCircle,
-  Clock,
   Target,
   Users,
   Phone,
   Mail,
   Handshake,
   List,
-  Grid3X3
+  Grid3X3,
+  FolderKanban
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -564,14 +564,14 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 overflow-hidden">
 
-      {/* Barra de búsqueda y filtros en una sola línea */}
-      <div className="flex gap-2 items-center">
-        <div className="relative flex-1 max-w-md">
+      {/* Barra de búsqueda y filtros */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Buscar oportunidades..."
+            placeholder="Buscar..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 h-9"
@@ -584,24 +584,22 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
             size="sm"
             variant={viewMode === 'table' ? 'default' : 'ghost'}
             onClick={() => setViewMode('table')}
-            className="h-8 px-3"
+            className="h-8 px-2"
           >
-            <List className="h-4 w-4 mr-1" />
-            Tabla
+            <List className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
             variant={viewMode === 'card' ? 'default' : 'ghost'}
             onClick={() => setViewMode('card')}
-            className="h-8 px-3"
+            className="h-8 px-2"
           >
-            <Grid3X3 className="h-4 w-4 mr-1" />
-            Cards
+            <Grid3X3 className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Filtros rápidos en línea */}
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           <Button
             variant={Object.keys(filters).length === 0 ? "default" : "outline"}
             size="sm"
@@ -609,7 +607,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
               setFilters({})
               setPagination(prev => ({ ...prev, page: 1 }))
             }}
-            className="text-xs h-9 px-3"
+            className="text-xs h-8 px-2"
           >
             Todas
           </Button>
@@ -620,7 +618,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
               setFilters({ soloActivas: true })
               setPagination(prev => ({ ...prev, page: 1 }))
             }}
-            className="text-xs h-9 px-3"
+            className="text-xs h-8 px-2"
           >
             Activas
           </Button>
@@ -631,9 +629,9 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
               setFilters({ hasCotizacion: true })
               setPagination(prev => ({ ...prev, page: 1 }))
             }}
-            className="text-xs h-9 px-3"
+            className="text-xs h-8 px-2"
           >
-            Con Cotización
+            Con Cotiz.
           </Button>
           <Button
             variant={filters.hasProyecto ? "default" : "outline"}
@@ -642,9 +640,9 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
               setFilters({ hasProyecto: true })
               setPagination(prev => ({ ...prev, page: 1 }))
             }}
-            className="text-xs h-9 px-3"
+            className="text-xs h-8 px-2"
           >
-            Con Proyecto
+            Con Proy.
           </Button>
         </div>
 
@@ -705,167 +703,121 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
         ) : oportunidades.length === 0 ? (
           <EmptyState onCreate={onCreate} />
         ) : viewMode === 'table' ? (
-          <div className="bg-white border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oportunidad</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Probabilidad</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comercial</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cotización</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+          <div className="bg-white border rounded-lg overflow-x-auto">
+            <table className="w-full table-fixed min-w-[700px]">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="w-[18%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Oportunidad</th>
+                  <th className="w-[12%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                  <th className="w-[9%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  <th className="w-[6%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prob.</th>
+                  <th className="w-[12%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="w-[15%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cotización</th>
+                  <th className="w-[13%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proyecto</th>
+                  <th className="w-[15%] px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {oportunidades.map((oportunidad) => (
+                  <tr key={oportunidad.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                          <Target className="h-4 w-4 text-gray-500" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{oportunidad.nombre}</div>
+                          <div className="text-xs text-gray-500">
+                            {oportunidad.fechaCierreEstimada ? `Cierre: ${formatDate(oportunidad.fechaCierreEstimada)}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-sm text-gray-900 truncate">{oportunidad.cliente?.nombre || '-'}</div>
+                      <div className="text-xs text-gray-500 truncate">{oportunidad.cliente?.ruc || ''}</div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-sm font-medium text-gray-900">
+                        {oportunidad.valorEstimado ? formatCurrency(oportunidad.valorEstimado) : '-'}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-sm font-medium">{oportunidad.probabilidad}%</span>
+                    </td>
+                    <td className="px-3 py-3">
+                      {(() => {
+                        const estadoInfo = getEstadoAvanzado(oportunidad.estado, oportunidad.cotizacion)
+                        const Icon = estadoInfo.icon
+                        return (
+                          <Badge className={`text-[10px] ${estadoInfo.color} inline-flex items-center gap-1 px-1.5 py-0.5 border`}>
+                            <Icon className={`h-3 w-3 ${estadoInfo.iconColor}`} />
+                            <span className="truncate max-w-[80px]">{estadoInfo.label}</span>
+                          </Badge>
+                        )
+                      })()}
+                    </td>
+                    <td className="px-3 py-3">
+                      {oportunidad.cotizacion ? (
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 px-1.5 shrink-0">
+                            <FileText className="h-3 w-3 mr-1" />
+                            {oportunidad.cotizacion.codigo}
+                          </Badge>
+                          <Badge
+                            variant={
+                              oportunidad.cotizacion.estado === 'aprobada' ? 'default' :
+                              oportunidad.cotizacion.estado === 'enviada' ? 'secondary' : 'outline'
+                            }
+                            className="text-[10px] px-1.5 shrink-0"
+                          >
+                            {oportunidad.cotizacion.estado}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {(() => {
+                        const proyecto = oportunidad.cotizacionId ? proyectosCache[oportunidad.cotizacionId] : null
+                        return proyecto ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 px-1.5 cursor-pointer hover:bg-purple-100"
+                            onClick={() => router.push(`/proyectos/${proyecto.id}`)}
+                          >
+                            <FolderKanban className="h-3 w-3 mr-1" />
+                            {proyecto.codigo}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )
+                      })()}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center justify-end gap-0.5">
+                        {onView && (
+                          <Button variant="ghost" size="sm" onClick={() => onView(oportunidad)} className="h-7 w-7 p-0">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => onEdit(oportunidad)} className="h-7 w-7 p-0">
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(oportunidad)} className="h-7 w-7 p-0 text-red-600">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  <AnimatePresence>
-                    {oportunidades.map((oportunidad, index) => (
-                      <motion.tr
-                        key={oportunidad.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{
-                          duration: 0.2,
-                          delay: index * 0.05,
-                          ease: [0.4, 0, 0.2, 1]
-                        }}
-                        className="hover:bg-gray-50"
-                      >
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                <Target className="h-5 w-5 text-gray-500" />
-                              </div>
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{oportunidad.nombre}</div>
-                              <div className="text-sm text-gray-500">
-                                {oportunidad.fechaCierreEstimada ? `Cierre: ${formatDate(oportunidad.fechaCierreEstimada)}` : 'Sin fecha'}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{oportunidad.cliente?.nombre || 'Sin cliente'}</div>
-                          <div className="text-sm text-gray-500">{oportunidad.cliente?.ruc || ''}</div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {oportunidad.valorEstimado ? formatCurrency(oportunidad.valorEstimado) : 'N/A'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="text-sm font-medium text-gray-900">{oportunidad.probabilidad}%</div>
-                            <div className="ml-2 w-16 bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-blue-600 h-2 rounded-full"
-                                style={{ width: `${oportunidad.probabilidad}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {(() => {
-                            const estadoInfo = getEstadoAvanzado(oportunidad.estado, oportunidad.cotizacion)
-                            const Icon = estadoInfo.icon
-                            return (
-                              <Badge className={`text-xs font-semibold ${estadoInfo.color} flex items-center gap-1 px-2 py-1 border shadow-sm`}>
-                                <Icon className={`h-3 w-3 ${estadoInfo.iconColor}`} />
-                                {estadoInfo.label}
-                              </Badge>
-                            )
-                          })()}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {oportunidad.comercial?.name || 'N/A'}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {oportunidad.cotizacion ? (
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                                <FileText className="h-3 w-3 mr-1" />
-                                {oportunidad.cotizacion.codigo}
-                              </Badge>
-                              <Badge
-                                variant={
-                                  oportunidad.cotizacion.estado === 'aprobada' ? 'default' :
-                                  oportunidad.cotizacion.estado === 'enviada' ? 'secondary' :
-                                  oportunidad.cotizacion.estado === 'borrador' ? 'outline' : 'destructive'
-                                }
-                                className="text-xs"
-                              >
-                                {oportunidad.cotizacion.estado}
-                              </Badge>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-500">Sin cotización</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex items-center gap-1">
-                            {onView && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => onView(oportunidad)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {onEdit && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => onEdit(oportunidad)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Edit3 className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {onDelete && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(oportunidad)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {onCreateCotizacion && !oportunidad.cotizacion && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => onCreateCotizacion(oportunidad)}
-                                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
-                              >
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {(() => {
-                              const puedeCrear = puedeCrearProyecto(oportunidad)
-                              const tieneProyecto = oportunidad.cotizacionId && proyectosCache[oportunidad.cotizacionId]
-                              const mostrarBotonCrear = puedeCrear && !tieneProyecto
-
-                              return mostrarBotonCrear ? (
-                                <CrearProyectoWrapper cotizacionId={oportunidad.cotizacion!.id} />
-                              ) : null
-                            })()}
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <AnimatePresence>

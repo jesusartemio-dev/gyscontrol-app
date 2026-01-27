@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
     // Crear la nueva versión
     const version = await prisma.cotizacionVersion.create({
       data: {
+        id: `cot-ver-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cotizacionId,
         version: nuevaVersion,
         nombre,
@@ -56,10 +57,11 @@ export async function POST(request: NextRequest) {
         cambios,
         motivoCambio,
         snapshot,
-        usuarioId: session.user.id
+        usuarioId: session.user.id,
+        updatedAt: new Date()
       },
       include: {
-        usuario: {
+        user: {
           select: {
             id: true,
             name: true,

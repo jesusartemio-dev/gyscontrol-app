@@ -78,8 +78,8 @@ export default function PedidoEquipoAccordion({
 
   const lista = pedido.lista
 
-  const itemsDisponibles: ListaEquipoItem[] = lista?.items?.length
-    ? lista.items.filter(
+  const itemsDisponibles: ListaEquipoItem[] = lista?.listaEquipoItem?.length
+    ? lista.listaEquipoItem.filter(
         (item) => item.cantidad - (item.cantidadPedida || 0) > 0
       )
     : []
@@ -194,7 +194,7 @@ export default function PedidoEquipoAccordion({
 
             {/* Acciones rápidas */}
             <div className="flex items-center space-x-2">
-              {onCreateItem && lista && lista.items?.length > 0 && (
+              {onCreateItem && lista && lista.listaEquipoItem?.length > 0 && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -382,7 +382,7 @@ export default function PedidoEquipoAccordion({
           onClose={() => setMostrarModal(false)}
           pedidoId={pedido.id}
           responsableId={responsableId}
-          items={lista.items || []}
+          items={lista.listaEquipoItem || []}
           onCreateItem={handleCreateItem}
           onRefresh={onRefresh}
         />

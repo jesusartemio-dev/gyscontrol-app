@@ -14,9 +14,9 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getCatalogoServiciosByCategoriaId } from '@/lib/services/catalogoServicio'
 import { createCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { recalcularCotizacionDesdeAPI } from '@/lib/services/cotizacion'
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { calcularHoras } from '@/lib/utils/formulas'
-import type { CatalogoServicio, CategoriaServicio } from '@/types'
+import type { CatalogoServicio, Edt } from '@/types'
 
 export default function SelectorServiciosCotizacionPage() {
   const { id } = useParams()
@@ -24,14 +24,14 @@ export default function SelectorServiciosCotizacionPage() {
   const router = useRouter()
   const cotizacionServicioId = searchParams.get('grupo')
 
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
+  const [categorias, setCategorias] = useState<Edt[]>([])
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('')
   const [catalogo, setCatalogo] = useState<CatalogoServicio[]>([])
   const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({})
   const [cantidades, setCantidades] = useState<Record<string, number>>({})
 
   useEffect(() => {
-    getCategoriasServicio()
+    getEdts()
       .then((cats) => {
         setCategorias(cats)
         if (cats.length > 0) setCategoriaSeleccionada(cats[0].id)
@@ -53,6 +53,7 @@ export default function SelectorServiciosCotizacionPage() {
     try {
       for (const s of catalogo) {
         if (!seleccionados[s.id]) continue
+        if (!s.unidadServicio || !s.recurso) continue
 
         const cantidad = cantidades[s.id] || 1
         const horas = calcularHoras({
@@ -64,10 +65,11 @@ export default function SelectorServiciosCotizacionPage() {
           horaFijo: s.horaFijo
         })
 
+        const costoHora = s.recurso.costoHora || 0
         const payload = {
           cotizacionServicioId,
           catalogoServicioId: s.id,
-          categoria: s.categoria.nombre,
+          edtId: s.edt?.id || categoriaSeleccionada,
           unidadServicioId: s.unidadServicio.id,
           recursoId: s.recurso.id,
           unidadServicioNombre: s.unidadServicio.nombre,
@@ -77,15 +79,16 @@ export default function SelectorServiciosCotizacionPage() {
           horaRepetido: s.horaRepetido,
           horaUnidad: s.horaUnidad,
           horaFijo: s.horaFijo,
-          costoHora: s.recurso.costoHora,
+          costoHora,
           nombre: s.nombre,
           descripcion: s.descripcion,
           cantidad,
           horaTotal: horas,
           factorSeguridad: 1.0,
           margen: 1.35,
-          costoInterno: horas * s.recurso.costoHora,
-          costoCliente: horas * s.recurso.costoHora * 1.35
+          costoInterno: horas * costoHora,
+          costoCliente: horas * costoHora * 1.35,
+          nivelDificultad: s.nivelDificultad
         }
 
         await createCotizacionServicioItem(payload)
@@ -138,8 +141,8 @@ export default function SelectorServiciosCotizacionPage() {
                 />
               </td>
               <td className="p-2">{s.nombre}</td>
-              <td className="p-2">{s.recurso.nombre}</td>
-              <td className="p-2">{s.unidadServicio.nombre}</td>
+              <td className="p-2">{s.recurso?.nombre || '-'}</td>
+              <td className="p-2">{s.unidadServicio?.nombre || '-'}</td>
               <td className="p-2">
                 <input
                   type="number"

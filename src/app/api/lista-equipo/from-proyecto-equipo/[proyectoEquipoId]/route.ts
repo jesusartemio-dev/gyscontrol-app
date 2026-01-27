@@ -112,6 +112,7 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
       // 1. Crear la ListaEquipo
       const lista = await tx.listaEquipo.create({
         data: {
+          id: `lista-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           codigo,
           nombre: `${proyectoEquipo.nombre} - Lista Técnica`,
           estado: 'borrador',
@@ -127,13 +128,17 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
       for (const [index, item] of proyectoEquipoItems.entries()) {
         await tx.listaEquipoItem.create({
           data: {
+            id: `lista-item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
             listaId: lista.id,
             proyectoEquipoItemId: item.id,
             codigo: item.codigo, // ✅ Usar código original del catálogo
             descripcion: item.descripcion,
+            marca: item.marca || '', // ✅ Copiar marca
+            categoria: item.categoria || '', // ✅ Copiar categoria
             unidad: item.unidad || 'UND',
             cantidad: item.cantidad,
             cantidadPedida: 0,
+            presupuesto: item.precioCliente || 0, // ✅ Copiar presupuesto
             estado: 'borrador',
             origen: 'cotizado' as const,
             responsableId: session.user.id,
@@ -163,12 +168,12 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
       where: { id: nuevaLista.id },
       include: {
         proyecto: true,
-        responsable: true,
-        items: {
+        user: true,
+        listaEquipoItem: {
           include: {
             proyectoEquipoItem: {
               include: {
-                proyectoEquipo: true
+                proyectoEquipoCotizado: true
               }
             }
           }

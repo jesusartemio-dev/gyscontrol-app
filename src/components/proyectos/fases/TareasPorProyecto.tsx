@@ -200,7 +200,7 @@ export function TareasPorProyecto({ fases, proyectoId, onRefresh }: TareasPorPro
                               <div>
                                 <h4 className="font-medium">{edt.nombre}</h4>
                                 <p className="text-sm text-muted-foreground">
-                                  {edt.categoriaServicio?.nombre} • {edt.zona || 'Sin zona'}
+                                  {edt.edt?.nombre} • {edt.zona || 'Sin zona'}
                                 </p>
                               </div>
                             </div>

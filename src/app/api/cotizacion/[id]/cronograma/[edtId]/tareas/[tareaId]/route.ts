@@ -17,7 +17,7 @@ import { crearCotizacionTareaSchema } from '@/lib/validators/cronograma'
 // ✅ Función para recalcular horas totales del EDT
 async function recalcularHorasEdt(edtId: string) {
   const tareas = await prisma.cotizacionTarea.findMany({
-    where: { cotizacionEdtId: edtId },
+    where: { cotizacionActividad: { cotizacionEdtId: edtId } },
     select: { horasEstimadas: true }
   })
 
@@ -56,9 +56,11 @@ export async function PUT(
     const tareaExistente = await prisma.cotizacionTarea.findFirst({
       where: {
         id: tareaId,
-        cotizacionEdtId: edtId,
-        cotizacionEdt: {
-          cotizacionId: id
+        cotizacionActividad: {
+          cotizacionEdtId: edtId,
+          cotizacionEdt: {
+            cotizacionId: id
+          }
         }
       }
     })
@@ -75,7 +77,9 @@ export async function PUT(
       const dependencia = await prisma.cotizacionTarea.findFirst({
         where: {
           id: validData.dependenciaDeId,
-          cotizacionEdtId: edtId
+          cotizacionActividad: {
+            cotizacionEdtId: edtId
+          }
         }
       })
 
@@ -101,7 +105,7 @@ export async function PUT(
         // cotizacionServicioItemId: validData.cotizacionServicioItemId // ✅ Nueva relación - pendiente regenerar Prisma
       },
       include: {
-        responsable: {
+        user: {
           select: { id: true, name: true, email: true }
         }
       }
@@ -155,9 +159,11 @@ export async function DELETE(
     const tareaExistente = await prisma.cotizacionTarea.findFirst({
       where: {
         id: tareaId,
-        cotizacionEdtId: edtId,
-        cotizacionEdt: {
-          cotizacionId: id
+        cotizacionActividad: {
+          cotizacionEdtId: edtId,
+          cotizacionEdt: {
+            cotizacionId: id
+          }
         }
       }
     })

@@ -34,13 +34,13 @@ export async function GET(
             fechaFin: true
           }
         },
-        categoriaServicio: {
+        edt: {
           select: {
             id: true,
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -48,9 +48,9 @@ export async function GET(
             role: true
           }
         },
-        registrosHoras: {
+        registroHoras: {
           include: {
-            usuario: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -79,7 +79,7 @@ export async function GET(
     }
 
     // 📊 Calcular métricas detalladas
-    const horasRealesCalculadas = edt.registrosHoras.reduce(
+    const horasRealesCalculadas = edt.registroHoras.reduce(
       (sum, reg) => sum + Number(reg.horasTrabajadas),
       0
     );
@@ -88,9 +88,9 @@ export async function GET(
       horasReales: horasRealesCalculadas,
       horasPlan: Number(edt.horasPlan || 0),
       eficiencia: edt.horasPlan ? (horasRealesCalculadas / Number(edt.horasPlan)) * 100 : 0,
-      diasTrabajados: new Set(edt.registrosHoras.map(r => r.fechaTrabajo.toDateString())).size,
-      ultimoRegistro: edt.registrosHoras[0]?.fechaTrabajo || null,
-      registrosPorSemana: edt.registrosHoras.reduce((acc, reg) => {
+      diasTrabajados: new Set(edt.registroHoras.map(r => r.fechaTrabajo.toDateString())).size,
+      ultimoRegistro: edt.registroHoras[0]?.fechaTrabajo || null,
+      registrosPorSemana: edt.registroHoras.reduce((acc, reg) => {
         const semana = getWeekNumber(reg.fechaTrabajo);
         acc[semana] = (acc[semana] || 0) + Number(reg.horasTrabajadas);
         return acc;
@@ -116,7 +116,7 @@ export async function GET(
       });
     }
 
-    logger.info(`📋 EDT consultado: ${edt.id} - ${edt.categoriaServicio.nombre}`);
+    logger.info(`📋 EDT consultado: ${edt.id} - ${edt.edt.nombre}`);
 
     return NextResponse.json({
       success: true,
@@ -227,13 +227,13 @@ export async function PUT(
             codigo: true
           }
         },
-        categoriaServicio: {
+        edt: {
           select: {
             id: true,
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -307,7 +307,7 @@ export async function DELETE(
           proyectoId: id
       },
       include: {
-        registrosHoras: {
+        registroHoras: {
           select: { id: true }
         }
       }
@@ -321,11 +321,11 @@ export async function DELETE(
     }
 
     // ✅ Verificar que no tenga registros de horas
-    if (edt.registrosHoras.length > 0) {
+    if (edt.registroHoras.length > 0) {
       return NextResponse.json(
         { 
           error: 'No se puede eliminar EDT con registros de horas asociados',
-          registrosHoras: edt.registrosHoras.length
+          registroHoras: edt.registroHoras.length
         },
         { status: 409 }
       );

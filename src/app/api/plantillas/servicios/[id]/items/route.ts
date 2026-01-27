@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ export async function POST(
     // Obtener datos del catálogo
     const catalogoServicio = await prisma.catalogoServicio.findUnique({
       where: { id: catalogoServicioId },
-      include: { categoria: true, recurso: true, unidadServicio: true }
+      include: { edt: true }
     })
 
     if (!catalogoServicio) {
@@ -52,42 +53,45 @@ export async function POST(
       )
     }
 
-    // Calcular horas totales basado en la fórmula
-    let horaTotal = 0
-    if (catalogoServicio.formula === 'hora_base') {
-      horaTotal = (catalogoServicio.horaBase || 0) * cantidad
-    } else if (catalogoServicio.formula === 'hora_repetido') {
-      horaTotal = (catalogoServicio.horaRepetido || 0) * cantidad
-    } else if (catalogoServicio.formula === 'hora_unidad') {
-      horaTotal = (catalogoServicio.horaUnidad || 0) * cantidad
-    } else if (catalogoServicio.formula === 'hora_fijo') {
-      horaTotal = catalogoServicio.horaFijo || 0
-    }
+    // Obtener datos del recurso y unidad de servicio
+    const [recurso, unidadServicio] = await Promise.all([
+      recursoId ? prisma.recurso.findUnique({ where: { id: recursoId } }) : null,
+      unidadServicioId ? prisma.unidadServicio.findUnique({ where: { id: unidadServicioId } }) : null
+    ])
+
+    // Calcular horas totales basado en la fórmula escalonada (única fórmula ahora)
+    const horasBase = (catalogoServicio.horaBase || 0) + Math.max(0, cantidad - 1) * (catalogoServicio.horaRepetido || 0);
+    const factorDificultad = catalogoServicio.nivelDificultad || 1;
+    const horaTotal = horasBase * factorDificultad;
 
     // Calcular costos
-    const costoHora = catalogoServicio.recurso.costoHora
-    const costoInterno = horaTotal * costoHora
-    const costoCliente = precioCliente * cantidad
+    // ✅ FÓRMULA CORRECTA:
+    // 1. costoHora = costo por hora del recurso (ej: $11)
+    // 2. costoInterno = horaTotal × costoHora × factorSeguridad
+    // 3. costoCliente = costoInterno × (1 + margen)
+    const costoHora = recurso?.costoHora || 0
+    const factorSeguridad = 1.0 // Factor de seguridad (puede ser 1.0, 1.1, etc.)
+    const margen = 0.35 // Margen de ganancia del 35%
 
-    // Calcular factor de seguridad y margen (valores por defecto)
-    const factorSeguridad = 1.1 // 10% de seguridad
-    const margen = precioCliente > 0 ? (precioCliente - precioInterno) / precioInterno : 0
+    const costoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
+    const costoCliente = +(costoInterno * (1 + margen)).toFixed(2)
 
     // Crear el item
     const nuevoItem = await prisma.plantillaServicioItemIndependiente.create({
       data: {
+        id: randomUUID(),
         plantillaServicioId: id,
         catalogoServicioId,
         nombre: catalogoServicio.nombre,
         descripcion: catalogoServicio.descripcion,
-        categoria: catalogoServicio.categoria.nombre,
-        unidadServicioNombre: catalogoServicio.unidadServicio.nombre,
-        recursoNombre: catalogoServicio.recurso.nombre,
-        formula: catalogoServicio.formula,
+        edtId: catalogoServicio.categoriaId || null,
+        unidadServicioNombre: unidadServicio?.nombre || 'Sin unidad',
+        recursoNombre: recurso?.nombre || 'Sin recurso',
+        formula: 'Escalonada', // Solo fórmula escalonada ahora
         horaBase: catalogoServicio.horaBase,
         horaRepetido: catalogoServicio.horaRepetido,
-        horaUnidad: catalogoServicio.horaUnidad,
-        horaFijo: catalogoServicio.horaFijo,
+        horaUnidad: null, // Ya no se usa
+        horaFijo: null, // Ya no se usa
         costoHora,
         cantidad,
         horaTotal,
@@ -97,6 +101,11 @@ export async function POST(
         costoCliente,
         unidadServicioId,
         recursoId,
+        orden: catalogoServicio.orden || 0,
+        updatedAt: new Date(),
+      },
+      include: {
+        edt: true
       }
     })
 
@@ -114,7 +123,8 @@ export async function POST(
       data: {
         totalInterno,
         totalCliente,
-        grandTotal
+        grandTotal,
+        updatedAt: new Date()
       }
     })
 

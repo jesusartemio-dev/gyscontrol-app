@@ -43,7 +43,7 @@ export default function PedidoEquipoForm({
   }
 
   const tieneItemsPendientes = listaSeleccionada
-    ? listaSeleccionada.items.some(
+    ? listaSeleccionada.listaEquipoItem.some(
         (item) => (item.cantidad - (item.cantidadPedida || 0)) > 0
       )
     : false
@@ -54,7 +54,7 @@ export default function PedidoEquipoForm({
       return
     }
 
-    const excedidos = listaSeleccionada?.items.some((item) => {
+    const excedidos = listaSeleccionada?.listaEquipoItem.some((item) => {
       const requerido = item.cantidad
       const yaPedido = item.cantidadPedida || 0
       const pendiente = requerido - yaPedido
@@ -84,7 +84,7 @@ export default function PedidoEquipoForm({
       if (!pedidoCreado?.id) throw new Error('No se pudo crear el pedido')
 
       // Crear ítems asociados
-      for (const item of listaSeleccionada!.items) {
+      for (const item of listaSeleccionada!.listaEquipoItem) {
         const cantidad = cantidades[item.id] || 0
         if (cantidad <= 0) continue
 
@@ -196,7 +196,7 @@ export default function PedidoEquipoForm({
               </tr>
             </thead>
             <tbody>
-              {listaSeleccionada.items.map((item) => {
+              {listaSeleccionada.listaEquipoItem.map((item) => {
                 const requerido = item.cantidad
                 const yaPedido = item.cantidadPedida || 0
                 const pendiente = requerido - yaPedido

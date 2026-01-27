@@ -74,9 +74,11 @@ export async function POST(
 
     // Crear nuevas exclusiones desde la plantilla
     const nuevasExclusiones = itemsAFiltrar.map((item, index) => ({
+      id: `cot-excl-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       cotizacionId: id,
       descripcion: item.descripcion,
-      orden: nextOrden + index
+      orden: nextOrden + index,
+      updatedAt: new Date()
     }))
 
     if (nuevasExclusiones.length === 0) {

@@ -84,12 +84,14 @@ export type OrigenListaItem =
 
 export type EstadoListaEquipo =
   | 'borrador'
+  | 'enviada'
   | 'por_revisar'
   | 'por_cotizar'
   | 'por_validar'
   | 'por_aprobar'
-  | 'aprobado'
-  | 'rechazado'
+  | 'aprobada'
+  | 'rechazada'
+  | 'completada'
 
 export type EstadoFase =
   | 'planificado'
@@ -211,6 +213,9 @@ export type EstadoOportunidad =
   | 'negociacion'
   | 'cerrada_ganada'
   | 'cerrada_perdida'
+
+// ✅ Simplificación: Eliminamos TipoFormula ya que solo usamos Escalonada
+// export type TipoFormula = 'Fijo' | 'Proporcional' | 'Escalonada'
 
 // ===================================================
 // 🆕 MODELOS CRM PARA PROYECTOS INDUSTRIALES
@@ -361,13 +366,17 @@ export interface NivelServicio {
   updatedAt: string
 }
 
-export interface CategoriaServicio {
+export interface Edt {
   id: string
   nombre: string
   descripcion?: string
   createdAt: string
   updatedAt: string
   servicios?: CatalogoServicio[] // 🔁 Relación real completa
+
+  // 🆕 RELACIÓN: Fase por defecto para esta categoría
+  faseDefaultId?: string
+  faseDefault?: FaseDefault
 }
 
 
@@ -390,7 +399,7 @@ export interface CatalogoEquipo {
   descripcion: string
   categoriaId: string
   unidadId: string
-  categoria: {
+  categoriaEquipo: {
     id: string
     nombre: string
   }
@@ -418,25 +427,33 @@ export interface CatalogoServicio {
   nombre: string
   descripcion: string
   formula: TipoFormula // 'Fijo' | 'Proporcional' | 'Escalonada'
+  cantidad: number
   horaBase?: number
   horaRepetido?: number
   horaUnidad?: number
   horaFijo?: number
+  orden?: number
+  nivelDificultad?: number
   categoriaId: string
   unidadServicioId: string
   recursoId: string
   createdAt: string
   updatedAt: string
   // Relaciones anidadas (incluidas desde API)
-  categoria: {
+  edt?: {
     id: string
     nombre: string
   }
-  unidadServicio: {
+  // Alias para compatibilidad (la API devuelve 'edt', no 'categoria')
+  categoria?: {
     id: string
     nombre: string
   }
-  recurso: {
+  unidadServicio?: {
+    id: string
+    nombre: string
+  }
+  recurso?: {
     id: string
     nombre: string
     costoHora: number
@@ -663,6 +680,10 @@ export interface Cotizacion {
 
    // ✅ NUEVA RELACIÓN CON OPORTUNIDAD CRM
    oportunidadCrm?: CrmOportunidad
+
+   // ✅ CALENDARIO LABORAL ASOCIADO
+   calendarioLaboralId?: string
+   calendarioLaboral?: CalendarioLaboral
 }
 
 
@@ -710,7 +731,8 @@ export interface CotizacionEquipoItem {
 export interface CotizacionServicio {
   id: string
   nombre: string
-  categoria: string
+  edtId: string
+  edt?: Edt
   subtotalInterno: number
   subtotalCliente: number
   createdAt: string
@@ -724,10 +746,11 @@ export interface CotizacionServicioItem {
   catalogoServicioId?: string
   unidadServicioId: string
   recursoId: string
+  edtId: string
+  edt?: Edt
   // 📋 Datos copiados desde catálogo / plantilla
   nombre: string
   descripcion: string
-  categoria: string
   unidadServicioNombre: string
   recursoNombre: string
   formula: TipoFormula // 'Fijo' | 'Proporcional' | 'Escalonada'
@@ -743,6 +766,8 @@ export interface CotizacionServicioItem {
   margen: number
   costoInterno: number
   costoCliente: number
+  nivelDificultad?: number
+  orden?: number
   // Auditoría
   createdAt: string
   updatedAt: string
@@ -814,7 +839,7 @@ export interface CotizacionCondicion {
 export interface CotizacionEdt {
   id: string
   cotizacionId: string
-  categoriaServicioId: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   zona?: string | null
   fechaInicioCom?: string | null
   fechaFinCom?: string | null
@@ -826,7 +851,7 @@ export interface CotizacionEdt {
   updatedAt: string
 
   // Relaciones
-  categoriaServicio: CategoriaServicio
+  edt: Edt // Refactored: categoriaServicio → edt
   responsable?: User
   tareas: CotizacionTarea[]
 }
@@ -865,6 +890,8 @@ export interface Proyecto {
   clienteId: string
   comercialId: string
   gestorId: string
+  supervisorId?: string
+  liderId?: string
   cotizacionId?: string
 
   nombre: string
@@ -889,7 +916,10 @@ export interface Proyecto {
   cliente: Cliente
   comercial: User
   gestor: User
+  supervisor?: User
+  lider?: User
   cotizacion?: Cotizacion
+  personalProyecto?: PersonalProyecto[]
 
   equipos: ProyectoEquipoCotizado[]
   servicios: ProyectoServicioCotizado[]
@@ -901,6 +931,25 @@ export interface Proyecto {
 
   // ✅ Nueva relación con cronogramas
   cronogramas: ProyectoCronograma[]
+}
+
+// ✅ Roles dinámicos del personal del proyecto
+export type RolPersonalProyecto = 'programador' | 'cadista' | 'ingeniero' | 'lider' | 'tecnico' | 'coordinador' | 'asistente'
+
+export interface PersonalProyecto {
+  id: string
+  proyectoId: string
+  userId: string
+  rol: RolPersonalProyecto
+  fechaAsignacion: string
+  fechaFin?: string
+  activo: boolean
+  notas?: string
+  createdAt: string
+  updatedAt: string
+
+  proyecto?: Proyecto
+  user?: User
 }
 
 export interface ProyectoEquipoCotizado {
@@ -982,6 +1031,17 @@ export interface ProyectoServicioCotizado {
   proyecto: Proyecto
   responsable: User
   items: ProyectoServicioCotizadoItem[]
+
+  // ✅ Relación opcional con EDT (incluida en consultas específicas)
+  proyectoEdt?: {
+    id: string
+    nombre: string
+    edtId: string // Refactored: categoriaServicioId → edtId
+    edt: { // Refactored: categoriaServicio → edt
+      id: string
+      nombre: string
+    }
+  }
 }
 
 export interface ProyectoServicioCotizadoItem {
@@ -1077,10 +1137,10 @@ export interface ListaEquipo {
   
   // ✅ Prisma count aggregation (opcional, disponible cuando se incluye en queries)
   _count?: {
-    items: number
+    listaEquipoItem: number
   }
   
-  items: ListaEquipoItem[]
+  listaEquipoItem: ListaEquipoItem[]
   proyecto?: Proyecto | null       // ✅ incluye info del proyecto si se hace include en la API
 }
 
@@ -1099,7 +1159,9 @@ export interface ListaEquipoItem {
 
   codigo: string
   descripcion: string
+  categoria: string // ✅ Campo agregado para consistencia con otras entidades
   unidad: string
+  marca: string // ✅ Campo agregado para exportación Excel
   cantidad: number
   verificado: boolean
   comentarioRevision?: string
@@ -1172,7 +1234,7 @@ export interface CotizacionProveedorItem {
   cotizacionId: string
   listaEquipoItemId?: string  // <- también opcional por si es null
   listaId?: string            // ✅ nuevo campo opcional
-  lista?: ListaEquipo         // ✅ relación opcional
+  listaEquipo?: ListaEquipo   // ✅ relación opcional
   // 📋 Copiados de ListaEquipoItem (para trazabilidad)
   codigo: string
   descripcion: string
@@ -1191,7 +1253,7 @@ export interface CotizacionProveedorItem {
   createdAt: string
   updatedAt: string
   // 🔗 Relaciones
-  cotizacion: CotizacionProveedor
+  cotizacionProveedor: CotizacionProveedor
   listaEquipoItem?: ListaEquipoItem
 }
 
@@ -1579,18 +1641,18 @@ export interface RegistroProgreso {
 // ===================================================
 
 // 🔧 Enums para el sistema EDT
-export type EstadoEdt = 'planificado' | 'en_progreso' | 'detenido' | 'completado' | 'cancelado'
+export type EstadoEdt = 'planificado' | 'en_progreso' | 'detenido' | 'completado' | 'cancelado' | 'pausado'
 export type PrioridadEdt = 'baja' | 'media' | 'alta' | 'critica'
 export type OrigenTrabajo = 'planificado' | 'adicional' | 'correctivo' | 'emergencia'
-export type ProyectoEstado = 'creado' | 'en_planificacion' | 'en_ejecucion' | 'pausado' | 'completado' | 'cancelado' | 'listas_pendientes' | 'listas_aprobadas' | 'pedidos_creados'
+// Flujo: creado → en_planificacion → listas → pedidos → en_ejecucion → en_cierre → cerrado
+export type ProyectoEstado = 'creado' | 'en_planificacion' | 'listas_pendientes' | 'listas_aprobadas' | 'pedidos_creados' | 'en_ejecucion' | 'en_cierre' | 'cerrado' | 'pausado' | 'cancelado'
 
 // 📋 Interface principal para ProyectoEdt
 export interface ProyectoEdt {
   id: string
   proyectoId: string
   nombre: string // Nombre descriptivo del EDT
-  categoriaServicioId: string
-  zona?: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -1602,9 +1664,10 @@ export interface ProyectoEdt {
   porcentajeAvance: number // 0-100
   descripcion?: string
   prioridad: PrioridadEdt
+  orden: number // ✅ Campo para ordenamiento drag & drop
   createdAt: string
   updatedAt: string
-  
+
   // 🔗 Relaciones
   proyecto: {
     id: string
@@ -1612,7 +1675,7 @@ export interface ProyectoEdt {
     codigo: string
     estado: ProyectoEstado
   }
-  categoriaServicio: {
+  edt: { // Refactored: categoriaServicio → edt
     id: string
     nombre: string
   }
@@ -1676,6 +1739,42 @@ export interface ResumenEdtProyecto {
 // ===================================================
 // 📋 SISTEMA DE CRONOGRAMA DE PROYECTOS - FASE 4
 // ===================================================
+
+// ✅ Nuevo enum para estados de actividad
+export type EstadoActividad =
+  | 'pendiente'
+  | 'en_progreso'
+  | 'completada'
+  | 'pausada'
+  | 'cancelada'
+
+// ✅ Nuevo modelo ProyectoActividad para jerarquía de 5 niveles
+export interface ProyectoActividad {
+  id: string
+  proyectoEdtId: string // ✅ Ahora obligatorio (sin zona intermedia)
+  proyectoCronogramaId: string
+  nombre: string
+  responsableId?: string
+  fechaInicioPlan: string
+  fechaFinPlan: string
+  fechaInicioReal?: string
+  fechaFinReal?: string
+  estado: EstadoActividad
+  porcentajeAvance: number
+  horasPlan?: number
+  horasReales: number
+  descripcion?: string
+  prioridad: PrioridadEdt
+  orden: number // ✅ Campo para ordenamiento drag & drop
+  createdAt: string
+  updatedAt: string
+
+  // Relaciones
+  responsable?: User
+  proyectoEdt: ProyectoEdt // ✅ Ahora obligatorio
+  proyectoCronograma: ProyectoCronograma
+  tareas: ProyectoTarea[]
+}
 
 // 🎯 Interface para control de tipos de cronograma
 export interface ProyectoCronograma {
@@ -1818,10 +1917,10 @@ export interface TendenciaMensual {
   promedioAvance: number
 }
 
-// 🎯 Interface para análisis de rendimiento por categoría
+// 🎯 Interface para análisis de rendimiento por EDT
 export interface AnalisisRendimiento {
-  categoriaServicioId: string
-  categoriaServicioNombre: string
+  edtId: string // Refactored: categoriaServicioId → edtId
+  edtNombre: string // Refactored: categoriaServicioNombre → edtNombre
   totalEdts: number
   horasPlan: number
   horasReales: number
@@ -1873,9 +1972,8 @@ export interface ResumenCronograma {
 
 // 📊 Interface para comparativo plan vs real
 export interface ComparativoPlanReal {
-  categoriaServicioId: string
-  categoriaServicioNombre: string
-  zona?: string | null
+  edtId: string // Refactored: categoriaServicioId → edtId
+  edtNombre: string // Refactored: categoriaServicioNombre → edtNombre
   horasPlan: number
   horasReales: number
   porcentajeAvance: number
@@ -1886,11 +1984,10 @@ export interface ComparativoPlanReal {
 // 🔍 Interface para filtros de cronograma
 export interface FiltrosCronogramaData {
   proyectoId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   responsableId?: string
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
-  zona?: string
   fechaDesde?: Date
   fechaHasta?: Date
   soloConRetrasos?: boolean
@@ -1902,9 +1999,8 @@ export interface CreateProyectoEdtData {
   proyectoId: string
   proyectoCronogramaId: string
   nombre: string
-  categoriaServicioId: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   responsableId?: string
-  zona?: string | null
   fechaInicioPlan?: Date | null
   fechaFinPlan?: Date | null
   horasPlan?: number | null
@@ -1917,7 +2013,6 @@ export interface UpdateProyectoEdtData {
   id?: string
   nombre?: string
   responsableId?: string
-  zona?: string | null
   fechaInicioPlan?: Date | null
   fechaFinPlan?: Date | null
   fechaInicioReal?: Date | null
@@ -1935,8 +2030,7 @@ export interface ProyectoEdtConRelaciones {
   id: string
   proyectoId: string
   nombre: string // Nombre descriptivo del EDT
-  categoriaServicioId: string
-  zona?: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -1948,6 +2042,7 @@ export interface ProyectoEdtConRelaciones {
   porcentajeAvance: number
   descripcion?: string
   prioridad: PrioridadEdt
+  orden: number // ✅ Campo para ordenamiento drag & drop
   createdAt: string
   updatedAt: string
   
@@ -1958,7 +2053,7 @@ export interface ProyectoEdtConRelaciones {
     codigo: string
     estado: ProyectoEstado
   }
-  categoriaServicio: {
+  edt: { // Refactored: categoriaServicio → edt
     id: string
     nombre: string
   }
@@ -1967,7 +2062,7 @@ export interface ProyectoEdtConRelaciones {
     name: string | null
     email: string
   }
-  registrosHoras: {
+  registroHoras: {
     id: string
     proyectoId: string
     proyectoServicioId: string
@@ -1982,12 +2077,12 @@ export interface ProyectoEdtConRelaciones {
     observaciones?: string
     aprobado: boolean
     proyectoEdtId: string
-    categoriaServicioId: string
+    edtId: string // Refactored: categoriaServicioId → edtId
     origen: string
     ubicacion: string
     createdAt: string
     updatedAt: string
-    usuario: {
+    user: {
       id: string
       name: string | null
       email: string
@@ -2126,4 +2221,39 @@ export interface AuditLog {
     name: string | null
     email: string
   }
+}
+
+// ✅ Interfaz para fases por defecto del sistema
+export interface FaseDefault {
+  id: string
+  nombre: string
+  descripcion?: string
+  orden: number
+  duracionDias: number
+  color?: string
+  activo: boolean
+  createdAt: string
+  updatedAt: string
+  Edt: Edt[]
+}
+
+// ===================================================
+// 🗓️ SISTEMA DE CALENDARIOS LABORALES
+// ===================================================
+
+export interface CalendarioLaboral {
+  id: string
+  nombre: string
+  descripcion?: string
+  pais?: string
+  empresa?: string
+  activo: boolean
+  horasPorDia: number
+  diasLaborables: string[]
+  horaInicioManana: string
+  horaFinManana: string
+  horaInicioTarde: string
+  horaFinTarde: string
+  createdAt: string
+  updatedAt: string
 }

@@ -30,7 +30,7 @@ export default function CrearProyectoDesdeCotizacionForm({ cotizacion }: Props) 
         cotizacionId: cotizacion.id,
         nombre,
         codigo,
-        estado: 'en_planificacion',
+        estado: 'creado',
         fechaInicio: new Date().toISOString(),
         totalEquiposInterno: cotizacion.totalEquiposInterno,
         totalServiciosInterno: cotizacion.totalServiciosInterno,

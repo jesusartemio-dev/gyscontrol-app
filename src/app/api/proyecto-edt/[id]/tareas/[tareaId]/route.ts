@@ -39,30 +39,30 @@ export async function GET(
         }
       },
       include: {
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
             email: true
           }
         },
-        dependencia: {
+        tareaPadre: {
           select: {
             id: true,
             nombre: true
           }
         },
-        tareasDependientes: {
+        tareasHijas: {
           select: {
             id: true,
             nombre: true,
             estado: true
           }
         },
-        registrosHoras: {
+        registroHoras: {
           orderBy: { fechaTrabajo: 'desc' },
           include: {
-            usuario: {
+            user: {
               select: {
                 id: true,
                 name: true
@@ -70,7 +70,7 @@ export async function GET(
             }
           }
         },
-        subtareas: {
+        proyectoSubtarea: {
           orderBy: { createdAt: 'asc' }
         }
       }
@@ -177,7 +177,7 @@ export async function PUT(
         dependenciaId: data.dependenciaId
       },
       include: {
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -239,7 +239,7 @@ export async function DELETE(
     }
 
     // Verificar si tiene dependencias
-    const dependencias = await prisma.proyectoDependenciaTarea.count({
+    const dependencias = await prisma.proyectoDependenciasTarea.count({
       where: {
         OR: [
           { tareaOrigenId: tareaId },

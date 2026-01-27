@@ -19,11 +19,11 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 
-import { getCategoriasServicio } from '@/lib/services/categoriaServicio'
+import { getEdts } from '@/lib/services/edt'
 import { getCatalogoServiciosByCategoriaId } from '@/lib/services/catalogoServicio'
 import { calcularHoras } from '@/lib/utils/formulas'
 
-import type { CatalogoServicio, CategoriaServicio, CotizacionServicioItem, CotizacionServicio } from '@/types'
+import type { CatalogoServicio, Edt, CotizacionServicioItem, CotizacionServicio } from '@/types'
 
 interface Props {
   open: boolean
@@ -38,32 +38,26 @@ export default function CotizacionServicioItemAddModal({
   servicio,
   onAgregarItems,
 }: Props) {
-  const [categorias, setCategorias] = useState<CategoriaServicio[]>([])
-  const [categoriaId, setCategoriaId] = useState('')
   const [catalogo, setCatalogo] = useState<CatalogoServicio[]>([])
   const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    getCategoriasServicio()
-      .then((cats) => {
-        setCategorias(cats)
-        if (cats.length > 0) setCategoriaId(cats[0].id)
-      })
-      .catch(() => toast.error('Error al cargar categorías'))
-  }, [])
-
-  useEffect(() => {
-    if (categoriaId) {
-      getCatalogoServiciosByCategoriaId(categoriaId)
-        .then((res) => {
-          const idsExistentes = new Set(servicio.items.map(i => i.catalogoServicioId))
-          const filtrado = res.filter(s => !idsExistentes.has(s.id))
-          setCatalogo(filtrado)
-        })
-        .catch(() => toast.error('Error al cargar servicios'))
+    // Find the EDT ID that matches the servicio's EDT
+    const edtId = servicio.edtId || servicio.edt?.id
+    if (!edtId) {
+      toast.error('No se encontró EDT para este servicio')
+      return
     }
-  }, [categoriaId, servicio.items])
+
+    getCatalogoServiciosByCategoriaId(edtId)
+      .then((res) => {
+        const idsExistentes = new Set((servicio.items || []).map(i => i.catalogoServicioId))
+        const filtrado = res.filter(s => !idsExistentes.has(s.id))
+        setCatalogo(filtrado)
+      })
+      .catch(() => toast.error('Error al cargar servicios del EDT'))
+  }, [servicio.edtId, servicio.edt?.id, servicio.items])
 
   const handleToggle = (id: string) => {
     setSeleccionados(prev => ({
@@ -95,7 +89,7 @@ export default function CotizacionServicioItemAddModal({
         horaFijo: s.horaFijo
       })
 
-      const costoHora = s.recurso.costoHora
+      const costoHora = s.recurso?.costoHora || 0
       const factorSeguridad = 1.0
       const margen = 1.35
       const costoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
@@ -105,11 +99,11 @@ export default function CotizacionServicioItemAddModal({
         catalogoServicioId: s.id,
         nombre: s.nombre,
         descripcion: s.descripcion,
-        categoria: s.categoria.nombre,
-        unidadServicioId: s.unidadServicio.id,
-        unidadServicioNombre: s.unidadServicio.nombre,
-        recursoId: s.recurso.id,
-        recursoNombre: s.recurso.nombre,
+        edtId: s.edt?.id || s.categoriaId,
+        unidadServicioId: s.unidadServicio?.id || '',
+        unidadServicioNombre: s.unidadServicio?.nombre || '',
+        recursoId: s.recurso?.id || '',
+        recursoNombre: s.recurso?.nombre || '',
         formula: s.formula,
         horaBase: s.horaBase ?? 0,
         horaRepetido: s.horaRepetido ?? 0,
@@ -134,24 +128,14 @@ export default function CotizacionServicioItemAddModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl z-50">
         <DialogHeader>
-          <DialogTitle>➕ Agregar Servicios desde Catálogo</DialogTitle>
+          <DialogTitle>➕ Agregar Servicios - {servicio.edt?.nombre || servicio.nombre}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-            <Select value={categoriaId} onValueChange={setCategoriaId}>
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Seleccionar" />
-              </SelectTrigger>
-              <SelectContent>
-                {categorias.map(c => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              Agregando servicios del EDT: <strong>{servicio.edt?.nombre || servicio.nombre}</strong>
+            </p>
           </div>
 
           <div className="max-h-[300px] overflow-y-auto border rounded">
@@ -173,7 +157,7 @@ export default function CotizacionServicioItemAddModal({
                       />
                     </td>
                     <td className="p-2">{item.nombre}</td>
-                    <td className="p-2">{item.recurso.nombre}</td>
+                    <td className="p-2">{item.recurso?.nombre || 'Sin recurso'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { createId } from '@paralleldrive/cuid2'
 
 // 📥 CatalogoEquipo Payload (importar desde tus types si quieres hacerlo aún más estricto)
 // O validar manualmente aquí.
@@ -8,7 +9,7 @@ export async function GET() {
   try {
     const equipos = await prisma.catalogoEquipo.findMany({
       include: {
-        categoria: true,
+        categoriaEquipo: true,
         unidad: true,
       },
       orderBy: { createdAt: 'desc' }
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
 
     const nuevo = await prisma.catalogoEquipo.create({
       data: {
+        id: createId(),
         codigo: data.codigo,
         descripcion: data.descripcion,
         marca: data.marca,
@@ -43,10 +45,11 @@ export async function POST(req: Request) {
         precioVenta: data.precioVenta,
         categoriaId: data.categoriaId,
         unidadId: data.unidadId,
-        estado: data.estado
+        estado: data.estado,
+        updatedAt: new Date(),
       },
       include: {
-        categoria: true,
+        categoriaEquipo: true,
         unidad: true,
       }
     })

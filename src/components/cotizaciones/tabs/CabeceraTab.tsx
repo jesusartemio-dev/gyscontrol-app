@@ -196,6 +196,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                 </Select>
               </div>
 
+
               {/* Validez de Oferta */}
               <div className="space-y-2">
                 <Label htmlFor="validezOferta" className="flex items-center gap-2">

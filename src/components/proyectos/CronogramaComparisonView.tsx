@@ -213,7 +213,7 @@ export function CronogramaComparisonView({
 
   // Procesar EDTs comerciales
   comercialEdts.forEach(edt => {
-    const categoria = edt.categoriaServicio?.nombre || 'Sin categoría';
+    const categoria = edt.edt?.nombre || 'Sin categoría';
     if (!categoriasMap.has(categoria)) {
       categoriasMap.set(categoria, { registros: [] });
     }
@@ -222,7 +222,7 @@ export function CronogramaComparisonView({
 
   // Procesar EDTs de proyecto
   proyectoEdts.forEach(edt => {
-    const categoria = edt.categoriaServicio?.nombre || 'Sin categoría';
+    const categoria = edt.edt?.nombre || 'Sin categoría';
     if (!categoriasMap.has(categoria)) {
       categoriasMap.set(categoria, { registros: [] });
     }

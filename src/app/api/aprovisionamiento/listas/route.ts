@@ -32,7 +32,7 @@ function calcularDatosGantt(lista: any) {
   // fechaFin = fechaNecesaria
   // montoProyectado = SUM(cantidad * precioElegido)
   
-  const items = lista.items || []
+  const items = lista.listaEquipoItem || []
   const maxTiempoEntrega = Math.max(...items.map((item: any) => item.tiempoEntregaDias || 0), 0)
   const fechaNecesaria = new Date(lista.fechaNecesaria)
   const fechaInicio = new Date(fechaNecesaria)
@@ -53,13 +53,13 @@ function calcularDatosGantt(lista: any) {
 
 // 🔁 Función para calcular coherencia con pedidos
 function calcularCoherencia(lista: any) {
-  const pedidos = lista.pedidos || []
-  const montoLista = lista.items?.reduce((total: number, item: any) => {
+  const pedidos = lista.pedidoEquipo || []
+  const montoLista = lista.listaEquipoItem?.reduce((total: number, item: any) => {
     return total + (item.cantidad * (item.precioElegido || 0))
   }, 0) || 0
-  
+
   const montoPedidos = pedidos.reduce((total: number, pedido: any) => {
-    return total + (pedido.items?.reduce((subtotal: number, item: any) => {
+    return total + (pedido.pedidoEquipoItem?.reduce((subtotal: number, item: any) => {
       return subtotal + (item.cantidadPedida * item.precioUnitario)
     }, 0) || 0)
   }, 0)
@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          items: {
+          listaEquipoItem: {
             select: {
               id: true,
               codigo: true,
@@ -192,9 +192,9 @@ export async function GET(request: NextRequest) {
               estado: true
             }
           },
-          pedidoEquipos: {
+          pedidoEquipo: {
             include: {
-              items: {
+              pedidoEquipoItem: {
                 select: {
                   cantidadPedida: true,
                   precioUnitario: true
@@ -237,8 +237,8 @@ export async function GET(request: NextRequest) {
         gantt: datosGantt,
         coherencia,
         estadisticas: {
-          totalItems: lista.items?.length || 0,
-          totalPedidos: lista.pedidoEquipos?.length || 0,
+          totalItems: lista.listaEquipoItem?.length || 0,
+          totalPedidos: lista.pedidoEquipo?.length || 0,
           montoTotal: datosGantt.montoProyectado,
           porcentajeEjecutado: coherencia.porcentajeEjecutado
         }

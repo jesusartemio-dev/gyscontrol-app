@@ -43,7 +43,7 @@ interface AsignarEdtAFaseModalProps {
   edts: Array<{
     id: string;
     nombre: string;
-    categoriaServicio?: { nombre: string };
+    edt?: { nombre: string };
     proyectoFaseId?: string;
     estado: string;
   }>;
@@ -164,7 +164,7 @@ export function AsignarEdtAFaseModal({
       let faseRecomendada = fases[0]; // Default: primera fase
 
       const edtOriginal = edts.find(e => e.id === asignacion.edtId);
-      const categoria = edtOriginal?.categoriaServicio?.nombre?.toLowerCase() || '';
+      const categoria = edtOriginal?.edt?.nombre?.toLowerCase() || '';
 
       if (categoria.includes('levantamiento') || categoria.includes('diseño') || categoria.includes('planificación')) {
         faseRecomendada = fases.find(f => f.nombre.toLowerCase().includes('planificación')) || fases[0];
@@ -356,7 +356,7 @@ export function AsignarEdtAFaseModal({
                         <div className="flex-1">
                           <div className="font-medium">{asignacion.edtNombre}</div>
                           <div className="text-sm text-muted-foreground">
-                            {edt?.categoriaServicio?.nombre || 'Sin categoría'}
+                            {edt?.edt?.nombre || 'Sin categoría'}
                           </div>
                         </div>
                         <Badge variant="outline" className="text-orange-600">
@@ -396,7 +396,7 @@ export function AsignarEdtAFaseModal({
                             <div className="flex-1">
                               <div className="font-medium">{asignacion.edtNombre}</div>
                               <div className="text-sm text-muted-foreground">
-                                {edt?.categoriaServicio?.nombre || 'Sin categoría'}
+                                {edt?.edt?.nombre || 'Sin categoría'}
                               </div>
                             </div>
                             {!previewMode && (

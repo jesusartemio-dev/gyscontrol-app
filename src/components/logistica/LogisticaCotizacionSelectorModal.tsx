@@ -77,7 +77,7 @@ export default function LogisticaCotizacionSelectorModal({
     // Filtrar por búsqueda (proveedor)
     if (searchTerm) {
       filtered = filtered.filter(cot => 
-        cot.cotizacion?.proveedor?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
+        cot.cotizacionProveedor?.proveedor?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -93,8 +93,8 @@ export default function LogisticaCotizacionSelectorModal({
         case 'tiempo-desc':
           return (b.tiempoEntregaDias ?? 0) - (a.tiempoEntregaDias ?? 0)
         case 'proveedor':
-          return (a.cotizacion?.proveedor?.nombre ?? '').localeCompare(
-            b.cotizacion?.proveedor?.nombre ?? ''
+          return (a.cotizacionProveedor?.proveedor?.nombre ?? '').localeCompare(
+            b.cotizacionProveedor?.proveedor?.nombre ?? ''
           )
         default:
           return 0
@@ -297,7 +297,7 @@ export default function LogisticaCotizacionSelectorModal({
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <h4 className="font-semibold text-gray-900">
-                            {cotizacion.cotizacion?.proveedor?.nombre || 'Proveedor no especificado'}
+                            {cotizacion.cotizacionProveedor?.proveedor?.nombre || 'Proveedor no especificado'}
                           </h4>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant={getEstadoBadgeVariant(cotizacion.estado)} className="text-xs">

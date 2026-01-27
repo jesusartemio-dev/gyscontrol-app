@@ -41,17 +41,21 @@ export async function POST(req: Request) {
     // Crear el nuevo ítem en la lista técnica
     const nuevo = await prisma.listaEquipoItem.create({
       data: {
+        id: `lista-equipo-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         listaId,
         proyectoEquipoItemId: item.id,
         responsableId: lista.responsableId,
         codigo: item.codigo,
         descripcion: item.descripcion,
+        marca: item.marca || '', // ✅ Copiar marca
+        categoria: item.categoria || '', // ✅ Copiar categoria
         unidad: item.unidad,
         cantidad: item.cantidad,
         presupuesto: item.precioCliente, // Se usa como presupuesto referencial
         estado: 'borrador',
         origen: 'cotizado',
         verificado: false,
+        updatedAt: new Date(),
       },
     })
 

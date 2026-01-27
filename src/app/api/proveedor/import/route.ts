@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { randomUUID } from 'crypto'
 
 // ✅ Validation schema for imported provider
 const proveedorImportSchema = z.object({
@@ -49,11 +50,13 @@ export async function POST(request: NextRequest) {
       try {
         const nuevoProveedor = await prisma.proveedor.create({
           data: {
+            id: randomUUID(),
             nombre: proveedorData.nombre,
             ruc: proveedorData.ruc || null,
             direccion: proveedorData.direccion || null,
             telefono: proveedorData.telefono || null,
-            correo: proveedorData.correo || null
+            correo: proveedorData.correo || null,
+            updatedAt: new Date()
           }
         })
         

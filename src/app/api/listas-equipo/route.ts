@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { randomUUID } from 'crypto'
 import { EstadoListaEquipo } from '@prisma/client'
 import type { PaginatedResponse, ListasEquipoPaginationParams } from '@/types/payloads'
 import { 
@@ -253,14 +254,14 @@ export async function GET(request: NextRequest) {
               codigo: true
             }
           },
-          responsable: {
+          user: {
             select: {
               id: true,
               name: true,
               email: true
             }
           },
-          items: {
+          listaEquipoItem: {
             select: {
               cantidad: true,
               precioElegido: true,
@@ -269,7 +270,7 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              items: true
+              listaEquipoItem: true
             }
           }
         },
@@ -368,12 +369,14 @@ export async function POST(request: NextRequest) {
     // ✅ Crear lista en la base de datos con Prisma
     const nuevaLista = await prisma.listaEquipo.create({
       data: {
+        id: randomUUID(),
         proyectoId: body.proyectoId,
         nombre: body.nombre,
         codigo: codigoLista,
         estado: 'borrador',
         numeroSecuencia: siguienteNumero,
         responsableId: responsableId, // ✅ Campo requerido y validado
+        updatedAt: new Date(),
         ...(body.fechaNecesaria && { fechaNecesaria: new Date(body.fechaNecesaria) })
       },
       include: {
@@ -384,10 +387,10 @@ export async function POST(request: NextRequest) {
             codigo: true
           }
         },
-        items: true,
+        listaEquipoItem: true,
         _count: {
           select: {
-            items: true
+            listaEquipoItem: true
           }
         }
       }

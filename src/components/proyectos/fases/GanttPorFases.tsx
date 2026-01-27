@@ -162,7 +162,7 @@ export function GanttPorFases({
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">
-                        {edt.categoriaServicio?.nombre || 'Sin categoría'}
+                        {edt.edt?.nombre || 'Sin categoría'}
                       </Badge>
                       <Progress value={edt.porcentajeAvance || 0} className="w-12 h-1.5" />
                       <span className="text-xs text-muted-foreground">{edt.porcentajeAvance || 0}%</span>

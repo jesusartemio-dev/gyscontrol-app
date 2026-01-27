@@ -20,10 +20,9 @@ export async function GET(
 
     const { searchParams } = new URL(request.url);
     const filtros: FiltrosCronogramaPayload = {
-      categoriaServicioId: searchParams.get('categoriaServicioId') || undefined,
+      edtId: searchParams.get('edtId') || searchParams.get('edtId') || undefined,
       estado: searchParams.get('estado') as any || undefined,
-      responsableId: searchParams.get('responsableId') || undefined,
-      zona: searchParams.get('zona') || undefined
+      responsableId: searchParams.get('responsableId') || undefined
     };
 
     // ✅ Add support for cronogramaId and faseId filtering
@@ -33,10 +32,9 @@ export async function GET(
     const edts = await prisma.proyectoEdt.findMany({
       where: {
         proyectoId: id,
-        ...(filtros.categoriaServicioId && { categoriaServicioId: filtros.categoriaServicioId }),
+        ...(filtros.edtId && { edtId: filtros.edtId }),
         ...(filtros.estado && { estado: filtros.estado }),
         ...(filtros.responsableId && { responsableId: filtros.responsableId }),
-        ...(filtros.zona && { zona: filtros.zona }),
         ...(cronogramaId && { proyectoCronogramaId: cronogramaId }),
         ...(faseId && { proyectoFaseId: faseId })
       },
@@ -48,20 +46,20 @@ export async function GET(
             codigo: true
           }
         },
-        categoriaServicio: {
+        edt: { // Prisma relation name
           select: {
             id: true,
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
             email: true
           }
         },
-        registrosHoras: {
+        registroHoras: { // Correct relation name
           select: {
             id: true,
             horasTrabajadas: true,
@@ -158,30 +156,29 @@ export async function POST(
       );
     }
 
-    // ✅ Verificar que la categoría de servicio existe
-    const categoria = await prisma.categoriaServicio.findUnique({
-      where: { id: data.categoriaServicioId }
+    // ✅ Verificar que el EDT del catálogo existe
+    const edtCatalogo = await prisma.edt.findUnique({
+      where: { id: data.edtId }
     });
 
-    if (!categoria) {
+    if (!edtCatalogo) {
       return NextResponse.json(
-        { error: 'Categoría de servicio no encontrada' },
+        { error: 'EDT no encontrado en catálogo' },
         { status: 404 }
       );
     }
 
-    // ✅ Verificar unicidad (proyecto + categoría + zona)
+    // ✅ Verificar unicidad (proyecto + EDT catálogo)
     const edtExistente = await prisma.proyectoEdt.findFirst({
       where: {
         proyectoId: id,
-        categoriaServicioId: data.categoriaServicioId,
-        zona: data.zona || null
+        edtId: data.edtId // DB field is still edtId
       }
     });
 
     if (edtExistente) {
       return NextResponse.json(
-        { error: 'Ya existe un EDT para esta combinación de proyecto, categoría y zona' },
+        { error: 'Ya existe un EDT para esta combinación de proyecto y EDT' },
         { status: 409 }
       );
     }
@@ -189,11 +186,11 @@ export async function POST(
     // 🏗️ Crear EDT
     const nuevoEdt = await prisma.proyectoEdt.create({
       data: {
+        id: crypto.randomUUID(),
         proyectoId: id,
         proyectoCronogramaId: data.proyectoCronogramaId,
         nombre: data.nombre,
-        categoriaServicioId: data.categoriaServicioId,
-        zona: data.zona,
+        edtId: data.edtId, // DB field is still edtId
         fechaInicioPlan: data.fechaInicio ? new Date(data.fechaInicio) : undefined,
         fechaFinPlan: data.fechaFin ? new Date(data.fechaFin) : undefined,
         horasPlan: data.horasEstimadas,
@@ -202,7 +199,8 @@ export async function POST(
         prioridad: data.prioridad,
         estado: 'planificado',
         porcentajeAvance: 0,
-        horasReales: 0
+        horasReales: 0,
+        updatedAt: new Date()
       },
       include: {
         proyecto: {
@@ -212,13 +210,13 @@ export async function POST(
             codigo: true
           }
         },
-        categoriaServicio: {
+        edt: { // Prisma relation name
           select: {
             id: true,
             nombre: true
           }
         },
-        responsable: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -347,7 +345,7 @@ export async function DELETE(
       where: {
         id: { in: edtIds },
         proyectoId: id,
-        registrosHoras: {
+        registroHoras: { // Correct relation name
           some: {}
         }
       },

@@ -29,11 +29,11 @@ export async function GET(request: Request) {
             nombre: true,
           },
         },
-        items: {
+        listaEquipoItem: {
           include: {
-            cotizaciones: {
+            cotizacionProveedorItems: {
               include: {
-                cotizacion: {
+                cotizacionProveedor: {
                   include: {
                     proveedor: {
                       select: {
@@ -54,10 +54,10 @@ export async function GET(request: Request) {
     })
 
     const listasConResumen = listas.map((lista) => {
-      const totalItems = lista.items.length
-      const cotizados = lista.items.filter(i => i.cotizaciones.length > 0).length
-      const respondidos = lista.items.filter(i =>
-        i.cotizaciones.some(c => c.estado === EstadoCotizacionProveedor.cotizado)
+      const totalItems = lista.listaEquipoItem.length
+      const cotizados = lista.listaEquipoItem.filter(i => i.cotizacionProveedorItems.length > 0).length
+      const respondidos = lista.listaEquipoItem.filter(i =>
+        i.cotizacionProveedorItems.some(c => c.estado === EstadoCotizacionProveedor.cotizado)
       ).length
       const pendientes = totalItems - cotizados
 

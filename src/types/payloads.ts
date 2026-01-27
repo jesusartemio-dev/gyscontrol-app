@@ -89,12 +89,13 @@ export interface NivelServicioPayload {
 }
 export interface NivelServicioUpdatePayload extends NivelServicioPayload {}
 
-// ✅ CategoriaServicio
-export interface CategoriaServicioPayload {
+// ✅ Edt
+export interface EdtPayload {
   nombre: string
   descripcion?: string
+  faseDefaultId?: string // 🆕 Fase por defecto para este EDT
 }
-export interface CategoriaServicioUpdatePayload extends CategoriaServicioPayload {}
+export interface EdtUpdatePayload extends EdtPayload {}
 
 // ✅ Recurso
 export interface RecursoPayload {
@@ -111,11 +112,11 @@ export interface RecursoUpdatePayload extends RecursoPayload {}
 export interface CatalogoServicioPayload {
   nombre: string
   descripcion: string
-  formula: TipoFormula
+  cantidad: number
   horaBase?: number
   horaRepetido?: number
-  horaUnidad?: number
-  horaFijo?: number
+  orden?: number
+  nivelDificultad?: number
   categoriaId: string
   unidadServicioId: string
   recursoId: string
@@ -291,7 +292,7 @@ export interface CotizacionEquipoPayload {
 export interface CotizacionServicioPayload {
   cotizacionId: string
   nombre: string
-  categoria: string
+  edtId: string
   subtotalInterno: number
   subtotalCliente: number
 }
@@ -323,10 +324,10 @@ export interface CotizacionServicioItemPayload {
   catalogoServicioId?: string
   unidadServicioId: string
   recursoId: string
+  edtId: string
   // Datos copiados desde plantilla/catalogo
   nombre: string
   descripcion: string
-  categoria: string
   unidadServicioNombre: string
   recursoNombre: string
   formula: TipoFormula
@@ -335,13 +336,15 @@ export interface CotizacionServicioItemPayload {
   horaUnidad?: number
   horaFijo?: number
   costoHora: number
-  // Datos personalizados  
+  // Datos personalizados
   cantidad: number
   horaTotal: number
   factorSeguridad: number
   margen: number
   costoInterno: number
   costoCliente: number
+  nivelDificultad?: number
+  orden?: number
 }
 
 export interface CotizacionServicioItemUpdatePayload
@@ -375,6 +378,8 @@ export interface ProyectoPayload {
   clienteId: string
   comercialId: string
   gestorId: string
+  supervisorId?: string
+  liderId?: string
   cotizacionId?: string
 
   nombre: string
@@ -393,6 +398,21 @@ export interface ProyectoPayload {
 }
 
 export interface ProyectoUpdatePayload extends Partial<ProyectoPayload> {}
+
+// ✅ Payloads para Personal del Proyecto
+import type { RolPersonalProyecto } from './modelos'
+
+export interface PersonalProyectoPayload {
+  proyectoId: string
+  userId: string
+  rol: RolPersonalProyecto
+  fechaAsignacion?: string
+  fechaFin?: string
+  activo?: boolean
+  notas?: string
+}
+
+export interface PersonalProyectoUpdatePayload extends Partial<PersonalProyectoPayload> {}
 
 export interface ProyectoEquipoCotizadoPayload {
   proyectoId: string
@@ -523,6 +543,7 @@ export interface ListaEquipoItemPayload {
   listaId: string
   proyectoEquipoItemId?: string
   proyectoEquipoId?: string
+  catalogoEquipoId?: string
   reemplazaProyectoEquipoCotizadoItemId?: string // 🆕 Nuevo campo claro
   responsableId?: string // 🆕 Campo para identificar quién registra el item
 
@@ -531,7 +552,9 @@ export interface ListaEquipoItemPayload {
 
   codigo: string
   descripcion: string
+  categoria?: string // ✅ Opcional - si hay catalogoEquipoId, se obtiene del catálogo
   unidad: string
+  marca?: string // ✅ Campo marca directo en el item
   cantidad: number
 
   verificado?: boolean
@@ -1152,8 +1175,7 @@ export interface GanttChartPayload {
 export interface ProyectoEdtPayload {
   proyectoId: string
   nombre: string
-  categoriaServicioId: string
-  zona?: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   fechaInicioReal?: string
@@ -1175,11 +1197,10 @@ export interface ProyectoEdtUpdatePayload extends Partial<ProyectoEdtPayload> {
 // 📊 Payload para filtros de búsqueda EDT
 export interface EdtPaginationParams extends PaginationParams {
   proyectoId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
   responsableId?: string
-  zona?: string
   fechaDesde?: string
   fechaHasta?: string
   porcentajeAvanceMin?: number
@@ -1191,7 +1212,7 @@ export interface EdtPaginationParams extends PaginationParams {
 // 📈 Payload para métricas EDT
 export interface MetricasEdtPayload {
   proyectoId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   responsableId?: string
   fechaInicio?: string
   fechaFin?: string
@@ -1232,13 +1253,12 @@ export interface ReporteEdtPayload {
   tipo: 'resumen' | 'detallado' | 'metricas' | 'progreso'
   filtros: {
     proyectoId?: string
-    categoriaServicioId?: string
+    edtId?: string // Refactored: categoriaServicioId → edtId
     estado?: EstadoEdt[]
     prioridad?: PrioridadEdt[]
     responsableId?: string
     fechaInicio?: string
     fechaFin?: string
-    zona?: string
   }
   formato: 'pdf' | 'excel' | 'csv'
   incluirGraficos?: boolean
@@ -1284,7 +1304,7 @@ export interface TendenciasMensualesPayload {
 export interface AnalisisRendimientoPayload {
   proyectoId?: string
   responsableId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   incluirRecomendaciones?: boolean
@@ -1334,11 +1354,10 @@ export interface CreateRegistroHorasPayload {
 // ✅ Filtros para Cronograma
 export interface FiltrosCronogramaPayload {
   proyectoId?: string
-  categoriaServicioId?: string
+  edtId?: string // Refactored: categoriaServicioId → edtId
   estado?: EstadoEdt
   prioridad?: PrioridadEdt
   responsableId?: string
-  zona?: string
   fechaDesde?: string
   fechaHasta?: string
   porcentajeAvanceMin?: number
@@ -1357,8 +1376,7 @@ export interface CreateProyectoEdtPayload {
   proyectoId: string
   proyectoCronogramaId: string
   nombre: string
-  categoriaServicioId: string
-  zona?: string
+  edtId: string // Refactored: categoriaServicioId → edtId
   fechaInicio?: string
   fechaFin?: string
   horasEstimadas: number

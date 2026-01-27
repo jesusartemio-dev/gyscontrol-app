@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import logger from '@/lib/logger'
 import { PedidoEquipoPayload } from '@/types'
+import { randomUUID } from 'crypto'
 
 // ✅ POST - Crear pedido desde lista contextual
 export async function POST(request: NextRequest) {
@@ -37,11 +38,11 @@ export async function POST(request: NextRequest) {
     const lista = await prisma.listaEquipo.findUnique({
       where: { id: payload.listaId },
       include: {
-        items: {
+        listaEquipoItem: {
           include: {
             cotizacionSeleccionada: {
               include: {
-                cotizacion: {
+                cotizacionProveedor: {
                   select: {
                     id: true,
                     codigo: true,
@@ -52,10 +53,9 @@ export async function POST(request: NextRequest) {
                 },
               },
             },
-            proyectoEquipo: true,
-            proyectoEquipoItem: true,
+            proyectoEquipoCotizado: true,
             proveedor: true,
-            responsable: true
+            user: true
           }
         }
       }
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // 🔍 Validar que todos los items seleccionados existen en la lista
     const itemsSeleccionadosIds = payload.itemsSeleccionados.map(item => item.listaEquipoItemId)
-    const itemsEncontrados = lista.items.filter(item => itemsSeleccionadosIds.includes(item.id))
+    const itemsEncontrados = lista.listaEquipoItem.filter(item => itemsSeleccionadosIds.includes(item.id))
     
     if (itemsEncontrados.length !== payload.itemsSeleccionados.length) {
       return NextResponse.json(
@@ -140,8 +140,10 @@ export async function POST(request: NextRequest) {
     // 🔄 Transacción para crear pedido e items
     const resultado = await prisma.$transaction(async (tx) => {
       // 1️⃣ Crear el pedido
+      const now = new Date()
       const nuevoPedido = await tx.pedidoEquipo.create({
         data: {
+          id: randomUUID(),
           proyectoId: payload.proyectoId,
           responsableId: payload.responsableId,
           listaId: payload.listaId,
@@ -152,7 +154,8 @@ export async function POST(request: NextRequest) {
           prioridad: payload.prioridad || 'media',
           esUrgente: payload.esUrgente || false,
           presupuestoTotal: costoTotal,
-          costoRealTotal: 0
+          costoRealTotal: 0,
+          updatedAt: now
         }
       })
 
@@ -164,6 +167,7 @@ export async function POST(request: NextRequest) {
           // Crear el item del pedido
           const pedidoItem = await tx.pedidoEquipoItem.create({
             data: {
+              id: randomUUID(),
               pedidoId: nuevoPedido.id,
               listaId: payload.listaId,
               listaEquipoItemId: item.listaEquipoItemId,
@@ -175,7 +179,8 @@ export async function POST(request: NextRequest) {
               precioUnitario: itemOriginal?.precioElegido || 0,
               costoTotal: (itemOriginal?.precioElegido || 0) * item.cantidad,
               tiempoEntrega: itemOriginal?.tiempoEntrega,
-              tiempoEntregaDias: itemOriginal?.tiempoEntregaDias
+              tiempoEntregaDias: itemOriginal?.tiempoEntregaDias,
+              updatedAt: now
             }
           })
 
@@ -199,12 +204,12 @@ export async function POST(request: NextRequest) {
       where: { id: resultado.pedido.id },
       include: {
         proyecto: true,
-        responsable: true,
-        lista: true,
-        items: {
+        user: true,
+        listaEquipo: true,
+        pedidoEquipoItem: {
           include: {
             listaEquipoItem: true,
-            responsable: true
+            user: true
           }
         }
       }

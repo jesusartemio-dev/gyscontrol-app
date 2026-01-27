@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ export async function POST(
     // Obtener datos del catálogo
     const catalogoEquipo = await prisma.catalogoEquipo.findUnique({
       where: { id: catalogoEquipoId },
-      include: { categoria: true, unidad: true }
+      include: { categoriaEquipo: true, unidad: true }
     })
 
     if (!catalogoEquipo) {
@@ -59,11 +60,12 @@ export async function POST(
     // Crear el item
     const nuevoItem = await prisma.plantillaEquipoItemIndependiente.create({
       data: {
+        id: randomUUID(),
         plantillaEquipoId: id,
         catalogoEquipoId,
         codigo: catalogoEquipo.codigo,
         descripcion: catalogoEquipo.descripcion,
-        categoria: catalogoEquipo.categoria.nombre,
+        categoria: catalogoEquipo.categoriaEquipo.nombre,
         unidad: catalogoEquipo.unidad.nombre,
         marca: catalogoEquipo.marca,
         precioInterno,
@@ -71,6 +73,7 @@ export async function POST(
         cantidad,
         costoInterno,
         costoCliente,
+        updatedAt: new Date(),
       }
     })
 

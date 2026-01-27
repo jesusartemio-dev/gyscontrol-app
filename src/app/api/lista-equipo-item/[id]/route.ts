@@ -16,26 +16,25 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const item = await prisma.listaEquipoItem.findUnique({
       where: { id },
       include: {
-        lista: true,
+        listaEquipo: true,
         proveedor: true,
-        cotizaciones: true,
         cotizacionSeleccionada: {
           include: {
-            cotizacion: {
+            cotizacionProveedor: {
               include: {
                 proveedor: true,
               },
             },
           },
         },
-        pedidos: {
+        pedidoEquipoItem: {
           include: {
-            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+            pedidoEquipo: true
           }
         },
-        proyectoEquipoItem: {
+        listaEquipoItemSeleccionados: {
           include: {
-            proyectoEquipo: true,
+            proyectoEquipoCotizado: true,
           },
         },
       },
@@ -60,12 +59,13 @@ export async function PUT(
     const payload: ListaEquipoItemUpdatePayload = await request.json()
 
     const dataToUpdate: any = {
+      // Nota: categoria field will be added after Prisma client regeneration
       codigo: payload.codigo,
       descripcion: payload.descripcion,
       unidad: payload.unidad,
       cantidad: payload.cantidad,
       verificado: payload.verificado,
-      comentarioRevision: payload.comentarioRevision,
+      comentarioRevision: payload.categoria ? `CATEGORIA:${payload.categoria}` : payload.comentarioRevision,
       presupuesto: payload.presupuesto,
       precioElegido: payload.precioElegido,
       costoElegido: payload.costoElegido,
@@ -160,9 +160,9 @@ export async function PATCH(
           tiempoEntregaDias: cotizacion.tiempoEntregaDias
         },
         include: {
-          cotizacionSeleccionada: {
+          cotizacionProveedorItems: {
             include: {
-              cotizacion: {
+              cotizacionProveedor: {
                 include: {
                   proveedor: true
                 }

@@ -18,10 +18,10 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     const data = await prisma.pedidoEquipoItem.findUnique({
       where: { id },
       include: {
-        pedido: {
+        pedidoEquipo: {
           include: {
             proyecto: true,
-            responsable: true,
+            user: true,
           },
         },
         listaEquipoItem: {
@@ -29,7 +29,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
             proveedor: true,
             cotizacionSeleccionada: {
               include: {
-                cotizacion: {
+                cotizacionProveedor: {
                   select: {
                     id: true,
                     codigo: true,
@@ -63,7 +63,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     // 🔍 Buscar el ítem anterior
     const itemAnterior = await prisma.pedidoEquipoItem.findUnique({
       where: { id },
-      include: { pedido: true },
+      include: { pedidoEquipo: true },
     })
 
     if (!itemAnterior) {
@@ -81,8 +81,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     let fechaOC: Date | null = null
     const dias = body.tiempoEntregaDias ?? itemAnterior.tiempoEntregaDias
 
-    if (dias !== null && itemAnterior.pedido?.fechaNecesaria) {
-      const fechaNecesaria = new Date(itemAnterior.pedido.fechaNecesaria)
+    if (dias !== null && itemAnterior.pedidoEquipo?.fechaNecesaria) {
+      const fechaNecesaria = new Date(itemAnterior.pedidoEquipo.fechaNecesaria)
       fechaOC = new Date(fechaNecesaria)
       fechaOC.setDate(fechaOC.getDate() - dias)
     }

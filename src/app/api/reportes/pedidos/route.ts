@@ -58,33 +58,40 @@ export async function GET(request: NextRequest) {
 
     // 🔍 Construir condiciones WHERE dinámicas
     const whereConditions: any = {};
-    
+
     if (validatedFiltros.proyectoId) {
-      whereConditions.pedido = {
+      whereConditions.pedidoEquipo = {
         proyectoId: validatedFiltros.proyectoId
       };
     }
-    
+
     if (validatedFiltros.proveedorId) {
-      whereConditions.pedido = {
-        ...whereConditions.pedido,
-        proyecto: {
-          id: validatedFiltros.proyectoId
-        }
+      whereConditions.listaEquipoItem = {
+        proveedorId: validatedFiltros.proveedorId
       };
     }
     
+    // Usar 'estado' en lugar de 'estadoEntrega' para ser consistente con el groupBy
     if (validatedFiltros.estadoEntrega) {
-      whereConditions.estadoEntrega = validatedFiltros.estadoEntrega;
+      whereConditions.estado = validatedFiltros.estadoEntrega;
     }
-    
-    if (validatedFiltros.fechaDesde || validatedFiltros.fechaHasta) {
-      whereConditions.createdAt = {};
-      if (validatedFiltros.fechaDesde) {
-        whereConditions.createdAt.gte = new Date(validatedFiltros.fechaDesde);
-      }
-      if (validatedFiltros.fechaHasta) {
-        whereConditions.createdAt.lte = new Date(validatedFiltros.fechaHasta);
+
+    // Filtrar por fecha del pedido padre (no por createdAt del item)
+    // Esto es más relevante para reportes de pedidos
+    if (validatedFiltros.fechaDesde && validatedFiltros.fechaHasta) {
+      const fechaDesde = new Date(validatedFiltros.fechaDesde);
+      const fechaHasta = new Date(validatedFiltros.fechaHasta);
+
+      // Verificar que las fechas son válidas
+      if (!isNaN(fechaDesde.getTime()) && !isNaN(fechaHasta.getTime())) {
+        // Filtrar por fechaPedido del pedido padre
+        whereConditions.pedidoEquipo = {
+          ...whereConditions.pedidoEquipo,
+          fechaPedido: {
+            gte: fechaDesde,
+            lte: fechaHasta
+          }
+        };
       }
     }
 
@@ -265,7 +272,7 @@ async function generarReporteDetallado(whereConditions: any, incluirDetalles: bo
   const items = await prisma.pedidoEquipoItem.findMany({
     where: whereConditions,
     include: {
-      pedido: {
+      pedidoEquipo: {
         include: {
           proyecto: {
             select: {
@@ -302,7 +309,7 @@ async function generarReporteDetallado(whereConditions: any, incluirDetalles: bo
       },
       pedido: {
           id: item.pedidoId,
-          proyecto: item.pedido.proyecto?.nombre,
+          proyecto: item.pedidoEquipo?.proyecto?.nombre,
           proveedor: item.listaEquipoItem?.proveedor?.nombre
         },
       cantidad: item.cantidadPedida,
@@ -345,17 +352,14 @@ export async function POST(request: NextRequest) {
 
     // 🔍 Construir condiciones WHERE
     const whereConditions: any = {};
-    
+
     if (validatedFiltros.proyectoId) {
-      whereConditions.pedido = { proyectoId: validatedFiltros.proyectoId };
+      whereConditions.pedidoEquipo = { proyectoId: validatedFiltros.proyectoId };
     }
-    
+
     if (validatedFiltros.proveedorId) {
-      whereConditions.pedido = {
-        ...whereConditions.pedido,
-        proyecto: {
-          id: validatedFiltros.proyectoId
-        }
+      whereConditions.listaEquipoItem = {
+        proveedorId: validatedFiltros.proveedorId
       };
     }
 

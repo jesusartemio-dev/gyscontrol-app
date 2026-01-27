@@ -15,10 +15,10 @@ export async function GET() {
   try {
     const items = await prisma.listaEquipoItem.findMany({
       include: {
-        lista: true,
+        listaEquipo: true,
         proyectoEquipoItem: true,
         proveedor: true,
-        cotizaciones: true,
+        cotizacionProveedorItems: true,
       },
     })
     return NextResponse.json(items)

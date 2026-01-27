@@ -18,10 +18,10 @@ export async function GET() {
       include: {
         proveedor: true,
         proyecto: true,
-        items: {
+        cotizacionProveedorItem: {
                 include: {
                   listaEquipoItem: true,
-                  lista: true,
+                  listaEquipo: true,
                 },
               },
       },
@@ -73,10 +73,12 @@ export async function POST(request: Request) {
 
     const nuevaCotizacion = await prisma.cotizacionProveedor.create({
       data: {
+        id: `cotprov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proveedorId: body.proveedorId,
         proyectoId: body.proyectoId,
         codigo: codigoGenerado,
         numeroSecuencia: nuevoNumero,
+        updatedAt: new Date(),
       },
     })
 

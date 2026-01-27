@@ -79,7 +79,7 @@ import type { EstadoListaEquipo } from '@/types/modelos';
 const filtrosSchema = z.object({
   busqueda: z.string().optional(),
   proyectoId: z.string().optional(),
-  estado: z.enum(['all', 'borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobado', 'rechazado']).optional(),
+  estado: z.enum(['all', 'borrador', 'enviada', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'rechazada', 'completada']).optional(),
   fechaCreacion: z.object({
     from: z.date().optional(),
     to: z.date().optional(),

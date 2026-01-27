@@ -29,12 +29,11 @@ export async function GET(request: NextRequest) {
     // 🔍 Filtros comunes
     const filtros: FiltrosCronogramaPayload = {
       proyectoId: searchParams.get('proyectoId') || undefined,
-      categoriaServicioId: searchParams.get('categoriaServicioId') || undefined,
+      edtId: searchParams.get('edtId') || searchParams.get('zona') || undefined,
       estado: searchParams.get('estado') as any || undefined,
       responsableId: searchParams.get('responsableId') || undefined,
       fechaDesde: searchParams.get('fechaDesde') || undefined,
-      fechaHasta: searchParams.get('fechaHasta') || undefined,
-      zona: searchParams.get('zona') || undefined
+      fechaHasta: searchParams.get('fechaHasta') || undefined
     };
 
     let reporte: any = {};
@@ -109,7 +108,7 @@ async function generarReporteResumen(filtros: any) {
   const distribucionEstado = estadisticas.reduce((acc, item) => {
     acc[item.estado] = item._count;
     return acc;
-  }, {} as Record<EstadoEdt, number>);
+  }, {} as Record<string, number>);
 
   // Top proyectos por horas
   const topProyectos = await prisma.proyectoEdt.groupBy({
@@ -172,7 +171,7 @@ async function generarReporteComparativo(filtros: any) {
           codigo: true
         }
       },
-      categoriaServicio: {
+      edt: {
         select: {
           id: true,
           nombre: true
@@ -202,8 +201,8 @@ async function generarReporteComparativo(filtros: any) {
     return {
       id: edt.id,
       proyecto: edt.proyecto,
-      categoriaServicio: edt.categoriaServicio,
-      zona: edt.zona,
+      edt: edt.edt,
+      nombre: edt.nombre,
       horasPlan,
       horasReales,
       variacion,
@@ -237,7 +236,7 @@ async function generarReporteEficiencia(filtros: any) {
 
   // Eficiencia por categoría de servicio
   const eficienciaPorCategoria = await prisma.proyectoEdt.groupBy({
-    by: ['categoriaServicioId'],
+    by: ['edtId'],
     where: {
       ...whereClause,
       horasPlan: { gt: 0 }
@@ -255,15 +254,15 @@ async function generarReporteEficiencia(filtros: any) {
   // Enriquecer con datos de categoría
   const categorias = await Promise.all(
     eficienciaPorCategoria.map(async (item) => {
-      const categoria = await prisma.categoriaServicio.findUnique({
-        where: { id: item.categoriaServicioId },
+      const categoria = await prisma.edt.findUnique({
+        where: { id: item.edtId },
         select: { nombre: true }
       });
       
       const eficiencia = Number(item._sum.horasReales || 0) / Number(item._sum.horasPlan || 1) * 100;
       
       return {
-        categoriaServicio: categoria,
+        edt: categoria,
         horasPlan: Number(item._sum.horasPlan || 0),
         horasReales: Number(item._sum.horasReales || 0),
         eficiencia,
@@ -333,8 +332,8 @@ async function generarReporteAlertas(filtros: any) {
     },
     include: {
       proyecto: { select: { nombre: true, codigo: true } },
-      categoriaServicio: { select: { nombre: true } },
-      responsable: { select: { name: true, email: true } }
+      edt: { select: { nombre: true } },
+      user: { select: { name: true, email: true } }
     }
   });
 
@@ -357,8 +356,8 @@ async function generarReporteAlertas(filtros: any) {
     },
     include: {
       proyecto: { select: { nombre: true, codigo: true } },
-      categoriaServicio: { select: { nombre: true } },
-      responsable: { select: { name: true, email: true } }
+      edt: { select: { nombre: true } },
+      user: { select: { name: true, email: true } }
     }
   });
 
@@ -386,7 +385,7 @@ async function generarReporteAlertas(filtros: any) {
     where: {
       ...whereClause,
       estado: 'en_progreso',
-      registrosHoras: {
+      registroHoras: {
         none: {
           fechaTrabajo: { gte: fechaLimite }
         }
@@ -394,8 +393,8 @@ async function generarReporteAlertas(filtros: any) {
     },
     include: {
       proyecto: { select: { nombre: true, codigo: true } },
-      categoriaServicio: { select: { nombre: true } },
-      responsable: { select: { name: true, email: true } }
+      edt: { select: { nombre: true } },
+      user: { select: { name: true, email: true } }
     }
   });
 
@@ -433,8 +432,8 @@ async function generarReporteTimeline(filtros: any) {
     where: whereClause,
     include: {
       proyecto: { select: { nombre: true, codigo: true } },
-      categoriaServicio: { select: { nombre: true } },
-      registrosHoras: {
+      edt: { select: { nombre: true } },
+      registroHoras: {
         select: {
           fechaTrabajo: true,
           horasTrabajadas: true
@@ -446,7 +445,7 @@ async function generarReporteTimeline(filtros: any) {
   });
 
   const timeline = edts.map(edt => {
-    const registrosPorFecha = edt.registrosHoras.reduce((acc, reg) => {
+    const registrosPorFecha = edt.registroHoras.reduce((acc, reg) => {
       const fecha = reg.fechaTrabajo.toISOString().split('T')[0];
       acc[fecha] = (acc[fecha] || 0) + Number(reg.horasTrabajadas);
       return acc;
@@ -455,8 +454,8 @@ async function generarReporteTimeline(filtros: any) {
     return {
       id: edt.id,
       proyecto: edt.proyecto,
-      categoriaServicio: edt.categoriaServicio,
-      zona: edt.zona,
+      edt: edt.edt,
+      nombre: edt.nombre,
       fechaInicioPlan: edt.fechaInicioPlan,
       fechaFinPlan: edt.fechaFinPlan,
       fechaInicioReal: edt.fechaInicioReal,
@@ -479,7 +478,7 @@ function construirWhereClause(filtros: any) {
   const where: any = {};
   
   if (filtros.proyectoId) where.proyectoId = filtros.proyectoId;
-  if (filtros.categoriaServicioId) where.categoriaServicioId = filtros.categoriaServicioId;
+  if (filtros.edtId) where.edtId = filtros.edtId;
   if (filtros.estado) where.estado = filtros.estado;
   if (filtros.responsableId) where.responsableId = filtros.responsableId;
   if (filtros.zona) where.zona = filtros.zona;

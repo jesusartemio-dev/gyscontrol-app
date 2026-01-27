@@ -16,52 +16,66 @@ export async function GET(_req: Request, { params }: { params: Promise<{ listaId
       return NextResponse.json({ error: 'listaId es obligatorio' }, { status: 400 })
     }
 
-    const data = await prisma.listaEquipoItem.findMany({
+    const rawData = await prisma.listaEquipoItem.findMany({
       where: { listaId },
       include: {
         proveedor: true,
-        cotizaciones: {
+        user: true, // ✅ Responsable del item
+        catalogoEquipo: {
           include: {
-            cotizacion: {
-              select: {
-                id: true,
-                codigo: true,
-                proveedor: {
-                  select: { nombre: true },
-                },
-              },
-            },
-          },
-        },
-        cotizacionSeleccionada: {
-          include: {
-            cotizacion: {
-              select: {
-                id: true,
-                codigo: true,
-                proveedor: {
-                  select: { nombre: true },
-                },
-              },
-            },
-          },
-        },
-        pedidos: {
-          include: {
-            pedido: true // ✅ Incluir relación al pedido padre para acceder al código
+            categoriaEquipo: true
           }
         },
-        proyectoEquipo: true, // ✅ Agregado: para equipos nuevos sin proyectoEquipoItem
-        proyectoEquipoItem: {
+        cotizacionProveedorItems: {
           include: {
-            proyectoEquipo: true, // ✅ para obtener nombre del equipo padre desde el item
+            cotizacionProveedor: {
+              select: {
+                id: true,
+                codigo: true,
+                proveedor: {
+                  select: { nombre: true },
+                },
+              },
+            },
           },
         },
-        lista: true, // ✅ Incluir información de la lista
-        responsable: true, // ✅ Incluir información del responsable
+        cotizacionSeleccionada: true,
+        pedidoEquipoItem: {
+          include: {
+            pedidoEquipo: true // ✅ Incluir relación al pedido padre para acceder al código
+          }
+        },
+        proyectoEquipoCotizado: true, // ✅ Agregado: para equipos nuevos sin proyectoEquipoItem
+        proyectoEquipoItem: {
+          include: {
+            proyectoEquipoCotizado: true, // ✅ para obtener nombre del equipo padre desde el item
+            catalogoEquipo: {
+              include: {
+                categoriaEquipo: true
+              }
+            }
+          },
+        },
+        listaEquipo: true, // ✅ Incluir información de la lista
       },
       orderBy: { createdAt: 'desc' },
     })
+
+    // 🔄 Frontend compatibility mapping
+    const data = rawData.map((item: any) => ({
+      ...item,
+      responsable: item.user,
+      lista: item.listaEquipo,
+      cotizaciones: item.cotizacionProveedorItems?.map((cot: any) => ({
+        ...cot,
+        cotizacion: cot.cotizacionProveedor
+      })),
+      pedidos: item.pedidoEquipoItem?.map((ped: any) => ({
+        ...ped,
+        pedido: ped.pedidoEquipo
+      })),
+      proyectoEquipo: item.proyectoEquipoCotizado
+    }))
 
     return NextResponse.json(data)
   } catch (error) {

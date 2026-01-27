@@ -15,9 +15,9 @@ export async function GET(
       include: {
         proveedor: true,
         proyecto: true,
-        items: {
+        cotizacionProveedorItem: {
           include: {
-            lista: true,
+            listaEquipo: true,
             listaEquipoItem: true,
           },
           orderBy: {

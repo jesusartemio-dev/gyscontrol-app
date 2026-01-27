@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createCotizacion } from '@/lib/services/cotizacion'
 import { useSession } from 'next-auth/react'
 import type { Cotizacion } from '@/types'
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function CotizacionForm({ onCreated }: Props) {
+  const router = useRouter()
   const [nombre, setNombre] = useState('')
   const [clienteId, setClienteId] = useState('')
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -67,9 +69,13 @@ export default function CotizacionForm({ onCreated }: Props) {
       onCreated(nueva)
       setNombre('')
       setClienteId('')
+      // Redirect to the detail page of the newly created cotización
+      router.push(`/comercial/cotizaciones/${nueva.id}`)
     } catch (err) {
       console.error('Error al crear cotización:', err)
-      setError('Ocurrió un error al crear la cotización.')
+      // Show specific error message from API if available
+      const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error al crear la cotización.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }

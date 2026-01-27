@@ -36,8 +36,10 @@ export async function POST(req: Request) {
 
     const nuevoItem = await prisma.proyectoEquipoCotizadoItem.create({
       data: {
+        id: `proyecto-equipo-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoEquipoId,
         catalogoEquipoId,
+        updatedAt: new Date(),
         listaId,
         listaEquipoSeleccionadoId,
         codigo,

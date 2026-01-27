@@ -175,8 +175,9 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
       setLoadingPermissions(true);
       const res = await fetch(buildApiUrl('/api/admin/permissions'));
       const data = await res.json();
-      setPermissions(data.permissions || []);
+      setPermissions(data || []);
     } catch (error) {
+      console.error('Error al cargar permisos:', error);
       toast.error('Error al cargar permisos');
     } finally {
       setLoadingPermissions(false);
@@ -306,17 +307,30 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
           type: type as 'grant' | 'deny'
         }));
 
-      // Aquí iría la lógica para guardar permisos
-      // await assignBulkPermissions(selectedUser.id, permissionUpdates);
+      // Llamar a la API para asignar permisos bulk
+      const res = await fetch(buildApiUrl('/api/admin/user-permissions'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          permissions: permissionUpdates
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Error al guardar permisos');
+      }
 
       toast.success('Permisos actualizados exitosamente');
       setPermissionForm({});
 
-      // Recargar permisos del usuario
-      // Note: useUserPermissions doesn't have a refetch method, so we rely on the useEffect to update when selectedUser changes
+      // Recargar permisos del usuario cambiando selectedUser para forzar re-render
+      setSelectedUser({ ...selectedUser });
 
     } catch (error) {
-      toast.error('Error al guardar permisos');
+      console.error('Error saving permissions:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al guardar permisos');
     } finally {
       setLoading(false);
     }
@@ -356,7 +370,21 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
       );
     }
 
-    const permissionsByResource = getPermissionsByResource('*'); // Todos los permisos
+    if (loadingPermissions) {
+      return (
+        <div className="text-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-500">Cargando permisos...</p>
+        </div>
+      );
+    }
+
+    // Group permissions by resource from database
+    const permissionsByResource = permissions.reduce((acc, perm) => {
+      if (!acc[perm.resource]) acc[perm.resource] = [];
+      acc[perm.resource].push(perm);
+      return acc;
+    }, {} as Record<string, Permission[]>);
 
     return (
       <div className="space-y-6">
@@ -372,6 +400,7 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
           <Button
             onClick={handleSavePermissions}
             disabled={loading || Object.keys(permissionForm).length === 0}
+            className={Object.keys(permissionForm).length > 0 ? 'bg-orange-600 hover:bg-orange-700' : ''}
           >
             {loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -379,18 +408,44 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
               <Save className="w-4 h-4 mr-2" />
             )}
             Guardar Cambios
+            {Object.keys(permissionForm).length > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-orange-100 text-orange-800">
+                {Object.keys(permissionForm).length}
+              </Badge>
+            )}
           </Button>
+        </div>
+
+        {/* Status Legend */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-blue-900 mb-3">Estado de Permisos</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-green-700 font-medium">ACTIVO</span>
+              <span className="text-gray-600">Permiso concedido</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              <span className="text-red-700 font-medium">BLOQUEADO</span>
+              <span className="text-gray-600">Permiso denegado</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-blue-700 font-medium">POR ROL</span>
+              <span className="text-gray-600">Heredado del rol</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+              <span className="text-gray-600 font-medium">INACTIVO</span>
+              <span className="text-gray-600">Sin configuración</span>
+            </div>
+          </div>
         </div>
 
         <ScrollArea className="h-96">
           <div className="space-y-4">
-            {Object.entries(
-              permissionsByResource.reduce((acc, perm) => {
-                if (!acc[perm.resource]) acc[perm.resource] = [];
-                acc[perm.resource].push(perm);
-                return acc;
-              }, {} as Record<string, BasePermission[]>)
-            ).map(([resource, resourcePermissions]) => (
+            {Object.entries(permissionsByResource).map(([resource, resourcePermissions]) => (
               <Card key={resource}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base capitalize">
@@ -404,58 +459,81 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
                       const pendingChange = permissionForm[permission.name];
 
                       return (
-                        <div key={permission.name} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div key={permission.name} className={`flex items-center justify-between p-4 border rounded-lg transition-all duration-200 ${
+                          status === 'grant' ? 'bg-green-50 border-green-200 shadow-sm' :
+                          status === 'deny' ? 'bg-red-50 border-red-200 shadow-sm' :
+                          status === 'role' ? 'bg-blue-50 border-blue-200 shadow-sm' :
+                          'bg-gray-50 border-gray-200'
+                        }`}>
                           <div className="flex-1">
-                            <div className="font-medium text-sm">{permission.action.replace('_', ' ')}</div>
-                            <div className="text-xs text-gray-500">{permission.description}</div>
+                            <div className="font-medium text-sm text-gray-900">{permission.action.replace('_', ' ')}</div>
+                            <div className="text-xs text-gray-600 mt-1">{permission.description}</div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {status === 'grant' && (
-                              <Badge variant="default" className="bg-green-100 text-green-800">
-                                <Check className="w-3 h-3 mr-1" />
-                                Otorgado
-                              </Badge>
-                            )}
-                            {status === 'deny' && (
-                              <Badge variant="destructive">
-                                <XIcon className="w-3 h-3 mr-1" />
-                                Denegado
-                              </Badge>
-                            )}
-                            {status === 'role' && (
-                              <Badge variant="secondary">
-                                <Shield className="w-3 h-3 mr-1" />
-                                Por Rol
-                              </Badge>
-                            )}
-                            {status === null && (
-                              <Badge variant="outline">
-                                Sin Permiso
-                              </Badge>
-                            )}
+                          <div className="flex items-center gap-3">
+                            {/* Status Indicator */}
+                            <div className="flex flex-col items-end gap-1">
+                              {status === 'grant' && (
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                  <span className="text-xs font-medium text-green-700">ACTIVO</span>
+                                </div>
+                              )}
+                              {status === 'deny' && (
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                  <span className="text-xs font-medium text-red-700">BLOQUEADO</span>
+                                </div>
+                              )}
+                              {status === 'role' && (
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <span className="text-xs font-medium text-blue-700">POR ROL</span>
+                                </div>
+                              )}
+                              {status === null && (
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                  <span className="text-xs font-medium text-gray-600">INACTIVO</span>
+                                </div>
+                              )}
 
+                              {/* Pending changes indicator */}
+                              {pendingChange && (
+                                <div className="text-xs text-orange-600 font-medium">
+                                  {pendingChange === 'grant' ? '→ ACTIVO' : '→ BLOQUEADO'}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
                             <div className="flex gap-1">
                               <Button
                                 size="sm"
-                                variant={pendingChange === 'grant' ? 'default' : 'outline'}
+                                variant={pendingChange === 'grant' ? 'default' : status === 'grant' ? 'default' : 'outline'}
                                 onClick={() => handlePermissionChange(
-                                  permission.name,
+                                  permission.id,
                                   pendingChange === 'grant' ? null : 'grant'
                                 )}
-                                className="h-6 w-6 p-0"
+                                className={`h-8 w-8 p-0 transition-all duration-200 ${
+                                  status === 'grant' && pendingChange !== 'grant' ? 'ring-2 ring-green-300' : ''
+                                }`}
+                                title="Otorgar permiso"
                               >
-                                <Check className="w-3 h-3" />
+                                <Check className="w-4 h-4" />
                               </Button>
                               <Button
                                 size="sm"
-                                variant={pendingChange === 'deny' ? 'destructive' : 'outline'}
+                                variant={pendingChange === 'deny' ? 'destructive' : status === 'deny' ? 'destructive' : 'outline'}
                                 onClick={() => handlePermissionChange(
-                                  permission.name,
+                                  permission.id,
                                   pendingChange === 'deny' ? null : 'deny'
                                 )}
-                                className="h-6 w-6 p-0"
+                                className={`h-8 w-8 p-0 transition-all duration-200 ${
+                                  status === 'deny' && pendingChange !== 'deny' ? 'ring-2 ring-red-300' : ''
+                                }`}
+                                title="Denegar permiso"
                               >
-                                <XIcon className="w-3 h-3" />
+                                <XIcon className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>

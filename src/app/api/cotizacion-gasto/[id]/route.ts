@@ -15,7 +15,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
     const data = await prisma.cotizacionGasto.findUnique({
       where: { id },
-      include: { items: true, cotizacion: true },
+      include: { cotizacionGastoItem: true, cotizacion: true },
     })
 
     if (!data) {
@@ -44,7 +44,10 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
     const data = await prisma.cotizacionGasto.update({
       where: { id },
-      data: payload,
+      data: {
+        ...payload,
+        updatedAt: new Date()
+      },
     })
 
     await recalcularTotalesCotizacion(existing.cotizacionId)

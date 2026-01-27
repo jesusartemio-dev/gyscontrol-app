@@ -14,7 +14,7 @@ import { plantillaServicioSchema } from '@/lib/validators/plantillaServicio'
 
 export async function GET() {
   const servicios = await prisma.plantillaServicio.findMany({
-    include: { items: true }
+    include: { plantillaServicioItem: true }
   })
   return NextResponse.json(servicios)
 }
@@ -27,9 +27,13 @@ export async function POST(req: Request) {
     const validatedData = plantillaServicioSchema.parse(body)
     
     // 📡 Crear registro en base de datos
-    const nuevo = await prisma.plantillaServicio.create({ 
-      data: validatedData,
-      include: { items: true }
+    const nuevo = await prisma.plantillaServicio.create({
+      data: {
+        ...validatedData,
+        id: `plantilla-servicio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        updatedAt: new Date()
+      },
+      include: { plantillaServicioItem: true }
     })
     
     return NextResponse.json(nuevo)

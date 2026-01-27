@@ -97,7 +97,7 @@ export default function PlantillaEquipoItemForm({ plantillaEquipoId, onCreated }
       return
     }
 
-    if (!equipo!.categoria?.nombre || !equipo!.unidad?.nombre) {
+    if (!equipo!.categoriaEquipo?.nombre || !equipo!.unidad?.nombre) {
       setError('Este equipo no tiene categoría o unidad asignada.')
       return
     }
@@ -197,7 +197,7 @@ export default function PlantillaEquipoItemForm({ plantillaEquipoId, onCreated }
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Badge variant="secondary" className="text-xs">
-                          {equipo.categoria?.nombre || 'Sin categoría'}
+                          {equipo.categoriaEquipo?.nombre || 'Sin categoría'}
                         </Badge>
                         <span>•</span>
                         <span>{equipo.unidad?.nombre || 'Sin unidad'}</span>

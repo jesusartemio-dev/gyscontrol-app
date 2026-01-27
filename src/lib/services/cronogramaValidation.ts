@@ -84,8 +84,8 @@ export class CronogramaValidationService {
           estado: true,
           _count: {
             select: {
-              proyectoEdts: true,
-              fases: true
+              proyectoEdt: true,
+              proyectoFase: true
             }
           }
         }
@@ -137,7 +137,7 @@ export class CronogramaValidationService {
       }
 
       // Validar que tenga fases o EDTs
-      if (proyecto._count.fases === 0 && proyecto._count.proyectoEdts === 0) {
+      if (proyecto._count.proyectoFase === 0 && proyecto._count.proyectoEdt === 0) {
         errores.push({
           severidad: 'warning',
           entidadTipo: 'proyecto',
@@ -172,7 +172,7 @@ export class CronogramaValidationService {
         where: { proyectoId },
         include: {
           _count: {
-            select: { edts: true }
+            select: { proyectoEdt: true }
           }
         },
         orderBy: { orden: 'asc' }
@@ -218,7 +218,7 @@ export class CronogramaValidationService {
         }
 
         // Validar que tenga EDTs
-        if (fase._count.edts === 0) {
+        if (fase._count.proyectoEdt === 0) {
           errores.push({
             severidad: 'warning',
             entidadTipo: 'fase',
@@ -253,9 +253,9 @@ export class CronogramaValidationService {
       const edts = await prisma.proyectoEdt.findMany({
         where: { proyectoId },
         include: {
-          categoriaServicio: true,
-          responsable: true,
-          registrosHoras: {
+          edt: true,
+          user: true,
+          registroHoras: {
             select: {
               horasTrabajadas: true,
               fechaTrabajo: true

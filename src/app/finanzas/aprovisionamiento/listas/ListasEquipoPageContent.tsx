@@ -1,299 +1,165 @@
 /**
- * 📄 Contenido de la Página de Listas de Equipo - Sistema GYS
- * 
- * Funcionalidades:
- * - ✅ Listado paginado de listas de equipo
- * - ✅ Filtros avanzados (proyecto, estado, fechas, montos)
- * - ✅ Búsqueda por texto
- * - ✅ Ordenamiento por columnas
- * - ✅ Estadísticas en tiempo real
- * - ✅ Exportación a PDF/Excel
- * - ✅ Navegación breadcrumb
- * - ✅ Estados de carga y error
- * - ✅ Responsive design
+ * Contenido de Listas de Equipo - Vista minimalista
  */
 
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { 
-  Package, 
-  ArrowLeft, 
-  Plus, 
-  Download, 
-  Upload,
-  Filter,
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Package,
+  Plus,
+  Download,
   AlertTriangle,
   CheckCircle,
   Clock,
   DollarSign,
-  Home
+  FileText,
+  Search,
+  Eye
 } from 'lucide-react'
+import Link from 'next/link'
 
-// ✅ Components
-import ListaEquipoFiltersClient from '@/components/aprovisionamiento/ListaEquipoFiltersClient'
-import ListaEquipoTableClient from '@/components/aprovisionamiento/ListaEquipoTableClient'
-
-// ✅ React Query Services
 import { useListasEquipo } from '@/lib/services/aprovisionamientoQuery'
-
-// 📝 Types
-import type { EstadoListaEquipo } from '@/types/modelos'
 import type { ListasEquipoPaginationParams } from '@/types/payloads'
 
 export default function ListasEquipoPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { data: session, status } = useSession()
-  
-  // ✅ React Query - No more manual state management
+  const { status } = useSession()
 
-  // 📋 Extract search params with memoization to prevent infinite loops
-  const searchParamsObj = useMemo(() => {
-    const params: Record<string, string | undefined> = {}
-    searchParams.forEach((value, key) => {
-      params[key] = value
-    })
-    return params
-  }, [searchParams])
-  
-  const page = parseInt(searchParamsObj.page || '1')
-  const limit = parseInt(searchParamsObj.limit || '10')
-  const proyecto = searchParamsObj.proyecto
-  const estado = searchParamsObj.estado
-  const fechaInicio = searchParamsObj.fechaInicio
-  const fechaFin = searchParamsObj.fechaFin
-  const montoMin = searchParamsObj.montoMin
-  const montoMax = searchParamsObj.montoMax
-  const coherencia = searchParamsObj.coherencia
-  const busqueda = searchParamsObj.busqueda
-  const sortBy = searchParamsObj.sortBy
-  const sortOrder = (searchParamsObj.sortOrder as 'asc' | 'desc') || 'desc'
+  const [busqueda, setBusqueda] = useState(searchParams.get('busqueda') || '')
 
-  // ✅ React Query params
+  // URL params
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '15')
+  const proyecto = searchParams.get('proyecto') || undefined
+  const estado = searchParams.get('estado') || undefined
+
+  // Query params
   const queryParams: ListasEquipoPaginationParams = useMemo(() => ({
     page,
     limit,
     ...(proyecto && { proyectoId: proyecto }),
     ...(estado && { estado }),
-    ...(fechaInicio && { fechaDesde: fechaInicio }),
-    ...(fechaFin && { fechaHasta: fechaFin }),
-    ...(montoMin && { montoMinimo: parseFloat(montoMin) }),
-    ...(montoMax && { montoMaximo: parseFloat(montoMax) }),
     ...(busqueda && { busqueda }),
-    ...(sortBy && { sortBy }),
-    ...(sortOrder && { sortOrder })
-  }), [page, limit, proyecto, estado, fechaInicio, fechaFin, montoMin, montoMax, busqueda, sortBy, sortOrder])
+  }), [page, limit, proyecto, estado, busqueda])
 
-  // ✅ React Query hook
-  const { 
-    data: listasResponse, 
-    isLoading: loading, 
-    error: queryError,
-    isError 
+  const {
+    data: listasResponse,
+    isLoading: loading,
+    isError
   } = useListasEquipo(queryParams, {
-    enabled: status !== 'loading' // Only fetch when session is ready
+    enabled: status !== 'loading'
   })
 
-  // ✅ Transform data for compatibility
+  // Transform data
   const listasData = useMemo(() => {
     if (!listasResponse) {
-      return {
-        items: [],
-        total: 0,
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 0,
-          pages: 0,
-          hasNext: false,
-          hasPrev: false
-        }
-      }
+      return { items: [], total: 0, pagination: { page: 1, limit: 15, total: 0, totalPages: 0 } }
     }
-
-    // 🔄 Transform ListaEquipo[] to ListaEquipoDetail[] with type assertion
-    const transformedItems = (listasResponse.data || []).map(lista => {
-      // ✅ Create a valid ListaEquipoDetail by ensuring proyecto is not null
-       const listaDetail = {
-         ...lista,
-         // ✅ Ensure proyecto is not null for ListaEquipoDetail compatibility
-         proyecto: lista.proyecto || {
-           id: lista.proyectoId,
-           clienteId: '',
-           comercialId: '',
-           gestorId: '',
-           nombre: 'Proyecto no encontrado',
-           totalEquiposInterno: 0,
-           totalServiciosInterno: 0,
-           totalGastosInterno: 0,
-           totalInterno: 0,
-           totalCliente: 0,
-           descuento: 0,
-           grandTotal: 0,
-           totalRealEquipos: 0,
-           totalRealServicios: 0,
-           totalRealGastos: 0,
-           totalReal: 0,
-           codigo: 'N/A',
-           estado: 'activo',
-           fechaInicio: '',
-           fechaFin: '',
-           createdAt: new Date().toISOString(),
-           updatedAt: new Date().toISOString(),
-           cliente: {} as any,
-           comercial: {} as any,
-           gestor: {} as any,
-           equipos: [],
-           servicios: [],
-           gastos: [],
-           ListaEquipo: [],
-           cotizaciones: [],
-           valorizaciones: [],
-           registrosHoras: [],
-           cronogramas: []
-         },
-         // ✅ Transform items to ListaEquipoItemDetail[]
-         items: (lista.items || []).map(item => ({
-           ...item,
-           calculated: {
-             costoTotal: item.precioElegido || item.presupuesto || 0,
-             tienePedidos: false,
-             cantidadPedida: item.cantidadPedida || 0,
-             cantidadPendiente: item.cantidad - (item.cantidadPedida || 0),
-             estadoPedido: undefined
-           }
-         })),
-         // ✅ Calculate stats from items
-         stats: {
-           totalItems: lista._count?.items || 0,
-           itemsVerificados: 0,
-           itemsAprobados: 0,
-           itemsRechazados: 0,
-           itemsPendientes: lista._count?.items || 0,
-           costoTotal: (lista.items || []).reduce((total, item) => {
-             const precio = item.precioElegido || item.presupuesto || 0;
-             const cantidad = item.cantidad || 0;
-             return total + (precio * cantidad);
-           }, 0),
-           costoAprobado: 0,
-           costoRechazado: 0,
-           costoPendiente: 0,
-           itemsPorOrigen: {
-             cotizado: 0,
-             nuevo: 0,
-             reemplazo: 0
-           },
-           itemsConPedido: 0,
-           itemsSinPedido: 0
-         }
-       };
-      
-      return listaDetail;
-    });
-
     return {
-      items: transformedItems,
+      items: listasResponse.data || [],
       total: listasResponse.meta?.total || 0,
-      pagination: listasResponse.meta || {
-        page: 1,
-        limit: 10,
-        total: 0,
-        totalPages: 0,
-        hasNextPage: false,
-        hasPrevPage: false
-      }
+      pagination: listasResponse.meta || { page: 1, limit: 15, total: 0, totalPages: 0 }
     }
   }, [listasResponse])
 
-  // ✅ Error handling
-  const error = isError ? (queryError?.message || 'Error al cargar las listas') : null
-
-  // 🔄 Handle filter changes
-  const handleFilterChange = (newFilters: Record<string, any>) => {
-    const params = new URLSearchParams()
-    
-    // Reset to page 1 when filters change
-    params.set('page', '1')
-    params.set('limit', limit.toString())
-    
-    Object.entries(newFilters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.set(key, value.toString())
-      }
-    })
-    
-    router.push(`/finanzas/aprovisionamiento/listas?${params.toString()}`)
-  }
-
-  // 📊 Calculate statistics
+  // Stats
   const stats = useMemo(() => {
     const items = listasData.items || []
-    
     return {
-      total: listasData.pagination.total, // Use pagination total instead of filtered items
+      total: listasData.pagination.total || items.length,
       pendientes: items.filter((item: any) => item.estado === 'pendiente').length,
       aprobadas: items.filter((item: any) => item.estado === 'aprobada').length,
       rechazadas: items.filter((item: any) => item.estado === 'rechazada').length,
-      montoTotal: items.reduce((sum: number, item: any) => sum + (item.montoTotal || 0), 0)
+      montoTotal: items.reduce((sum: number, item: any) => {
+        const itemTotal = (item.listaEquipoItem || []).reduce((s: number, i: any) => {
+          return s + ((i.precioElegido || i.presupuesto || 0) * (i.cantidad || 0))
+        }, 0)
+        return sum + itemTotal
+      }, 0)
     }
-  }, [listasData.items])
+  }, [listasData])
 
-  // 🎨 Render loading state
+  const handleSearch = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', '1')
+    if (busqueda) {
+      params.set('busqueda', busqueda)
+    } else {
+      params.delete('busqueda')
+    }
+    router.push(`/finanzas/aprovisionamiento/listas?${params.toString()}`)
+  }
+
+  const handleEstadoChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', '1')
+    if (value && value !== 'todos') {
+      params.set('estado', value)
+    } else {
+      params.delete('estado')
+    }
+    router.push(`/finanzas/aprovisionamiento/listas?${params.toString()}`)
+  }
+
+  const getEstadoBadge = (estado: string) => {
+    switch (estado) {
+      case 'aprobada':
+        return <Badge className="bg-green-100 text-green-700 text-[10px] h-5">Aprobada</Badge>
+      case 'rechazada':
+        return <Badge className="bg-red-100 text-red-700 text-[10px] h-5">Rechazada</Badge>
+      case 'pendiente':
+        return <Badge className="bg-yellow-100 text-yellow-700 text-[10px] h-5">Pendiente</Badge>
+      default:
+        return <Badge variant="secondary" className="text-[10px] h-5">{estado}</Badge>
+    }
+  }
+
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="space-y-6">
-          {/* Breadcrumb skeleton */}
-          <div className="h-4 bg-gray-200 rounded w-64 animate-pulse" />
-          
-          {/* Header skeleton */}
-          <div className="space-y-2">
-            <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
-            <div className="h-4 bg-gray-200 rounded w-96 animate-pulse" />
-          </div>
-          
-          {/* Stats skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded animate-pulse" />
-            ))}
-          </div>
-          
-          {/* Filters skeleton */}
-          <div className="h-32 bg-gray-200 rounded animate-pulse" />
-          
-          {/* Table skeleton */}
-          <div className="space-y-4">
-            <div className="h-12 bg-gray-200 rounded animate-pulse" />
-            <div className="h-64 bg-gray-200 rounded animate-pulse" />
-          </div>
+      <div className="p-4 space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-7 w-24" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-10 w-full" />
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
         </div>
       </div>
     )
   }
 
-  // 🚨 Render error state
-  if (error) {
+  if (isError) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-          <AlertTriangle className="h-12 w-12 text-red-500" />
-          <h2 className="text-xl font-semibold text-gray-900">Error al cargar las listas</h2>
-          <p className="text-gray-600 text-center max-w-md">{error}</p>
-          <Button 
-            onClick={() => window.location.reload()} 
-            variant="outline"
-            className="mt-4"
-          >
+      <div className="p-4">
+        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-white">
+          <AlertTriangle className="h-10 w-10 text-red-300 mb-3" />
+          <p className="text-sm text-muted-foreground">Error al cargar listas</p>
+          <Button variant="outline" size="sm" className="mt-3 h-7 text-xs" onClick={() => window.location.reload()}>
             Reintentar
           </Button>
         </div>
@@ -302,175 +168,179 @@ export default function ListasEquipoPageContent() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* 🧭 Breadcrumb Navigation */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/dashboard" className="flex items-center gap-2">
-              <Home className="h-4 w-4" />
-              Dashboard
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas/aprovisionamiento">Aprovisionamiento</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Listas de Equipo</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      {/* 📋 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Package className="h-6 w-6 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Listas de Equipo</h1>
-          </div>
-          <p className="text-gray-600">
-            Gestiona las listas de equipos y materiales para los proyectos
-          </p>
-        </div>
-        
+    <div className="p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
+          <FileText className="h-5 w-5 text-emerald-600" />
+          <h1 className="text-lg font-semibold">Listas de Equipo</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-7 text-xs">
+            <Download className="h-3 w-3 mr-1" />
             Exportar
           </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Lista
+          <Button size="sm" className="h-7 text-xs">
+            <Plus className="h-3 w-3 mr-1" />
+            Nueva
           </Button>
         </div>
       </div>
 
-      {/* 📊 Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Listas</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{listasData.total}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.total} en esta página
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Total</span>
+            <Package className="h-4 w-4 text-blue-500" />
+          </div>
+          <p className="text-lg font-bold">{stats.total}</p>
+        </div>
+
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Pendientes</span>
             <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendientes}</div>
-            <p className="text-xs text-muted-foreground">
-              Esperando aprobación
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aprobadas</CardTitle>
+          </div>
+          <p className="text-lg font-bold text-yellow-600">{stats.pendientes}</p>
+        </div>
+
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Aprobadas</span>
             <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.aprobadas}</div>
-            <p className="text-xs text-muted-foreground">
-              Listas para pedidos
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rechazadas</CardTitle>
+          </div>
+          <p className="text-lg font-bold text-green-600">{stats.aprobadas}</p>
+        </div>
+
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Rechazadas</span>
             <AlertTriangle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.rechazadas}</div>
-            <p className="text-xs text-muted-foreground">
-              Requieren revisión
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monto Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              USD {stats.montoTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Valor estimado
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-lg font-bold text-red-600">{stats.rechazadas}</p>
+        </div>
+
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Monto Total</span>
+            <DollarSign className="h-4 w-4 text-emerald-500" />
+          </div>
+          <p className="text-base font-bold">
+            ${stats.montoTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </p>
+        </div>
       </div>
 
-      {/* 🔍 Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filtros
-          </CardTitle>
-          <CardDescription>
-            Filtra las listas por proyecto, estado, fechas y montos
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ListaEquipoFiltersClient
-            filtros={{
-              busqueda,
-              proyecto,
-              estado,
-              fechaInicio,
-              fechaFin,
-              montoMin,
-              montoMax,
-              coherencia
-            }}
-            searchParams={searchParamsObj}
-            showQuickFilters={true}
+      {/* Filtros inline */}
+      <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar lista..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="h-7 pl-7 text-xs"
           />
-        </CardContent>
-      </Card>
+        </div>
+        <Select value={estado || 'todos'} onValueChange={handleEstadoChange}>
+          <SelectTrigger className="h-7 w-32 text-xs">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="pendiente">Pendiente</SelectItem>
+            <SelectItem value="aprobada">Aprobada</SelectItem>
+            <SelectItem value="rechazada">Rechazada</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSearch}>
+          Filtrar
+        </Button>
+      </div>
 
-      {/* 📋 Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Listas de Equipo</CardTitle>
-          <CardDescription>
-            {listasData.total > 0 
-              ? `Mostrando ${listasData.items.length} de ${listasData.total} listas`
-              : 'No se encontraron listas con los filtros aplicados'
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ListaEquipoTableClient
-            listas={listasData.items}
-            loading={loading}
-            allowEdit={true}
-            allowBulkActions={true}
-            showCoherenceIndicators={true}
-          />
-        </CardContent>
-      </Card>
+      {/* Tabla */}
+      {listasData.items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-white">
+          <Package className="h-10 w-10 text-gray-300 mb-3" />
+          <p className="text-sm text-muted-foreground">No hay listas</p>
+        </div>
+      ) : (
+        <div className="border rounded-lg bg-white overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-xs font-medium">Lista</TableHead>
+                <TableHead className="text-xs font-medium">Proyecto</TableHead>
+                <TableHead className="text-xs font-medium w-20">Estado</TableHead>
+                <TableHead className="text-xs font-medium text-center w-16">Items</TableHead>
+                <TableHead className="text-xs font-medium text-right">Monto</TableHead>
+                <TableHead className="text-xs font-medium w-24">Fecha</TableHead>
+                <TableHead className="text-xs font-medium w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {listasData.items.map((lista: any) => {
+                const montoLista = (lista.listaEquipoItem || []).reduce((s: number, i: any) => {
+                  return s + ((i.precioElegido || i.presupuesto || 0) * (i.cantidad || 0))
+                }, 0)
+
+                return (
+                  <TableRow key={lista.id} className="hover:bg-gray-50/50">
+                    <TableCell className="py-2">
+                      <div>
+                        <p className="text-xs font-medium truncate max-w-[180px]" title={lista.nombre}>
+                          {lista.nombre}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{lista.codigo || lista.id.slice(0, 8)}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <span className="text-xs truncate max-w-[150px] block" title={lista.proyecto?.nombre}>
+                        {lista.proyecto?.nombre || '-'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-2">{getEstadoBadge(lista.estado)}</TableCell>
+                    <TableCell className="py-2 text-center">
+                      <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                        {lista._count?.listaEquipoItem || lista.listaEquipoItem?.length || 0}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-2 text-right">
+                      <span className="text-xs font-medium">
+                        ${montoLista.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        {lista.createdAt ? new Date(lista.createdAt).toLocaleDateString('es-PE') : '-'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
+                        <Link href={`/proyectos/${lista.proyectoId}/equipos/listas/${lista.id}`}>
+                          <Eye className="h-3.5 w-3.5 text-blue-600" />
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+
+          {listasData.pagination && (
+            <div className="flex items-center justify-between px-4 py-2 border-t text-xs text-muted-foreground">
+              <span>
+                {((listasData.pagination.page - 1) * listasData.pagination.limit) + 1}-
+                {Math.min(listasData.pagination.page * listasData.pagination.limit, listasData.pagination.total)} de {listasData.pagination.total}
+              </span>
+              <span>Página {listasData.pagination.page} de {listasData.pagination.totalPages || 1}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
