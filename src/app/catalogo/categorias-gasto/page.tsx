@@ -10,6 +10,9 @@ import {
 } from '@/lib/services/categoriaGasto'
 import { toast } from 'sonner'
 import type { CategoriaGasto } from '@/types'
+import { exportarCategoriasGastoAExcel } from '@/lib/utils/categoriaGastoExcel'
+import { leerCategoriasGastoDesdeExcel, validarCategoriasGasto } from '@/lib/utils/categoriaGastoImportUtils'
+import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 
 // UI Components
 import { Button } from '@/components/ui/button'
@@ -36,6 +39,7 @@ export default function CategoriasGastoPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingCategoria, setEditingCategoria] = useState<CategoriaGasto | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importando, setImportando] = useState(false)
 
   // Form state
   const [nombre, setNombre] = useState('')
@@ -113,6 +117,54 @@ export default function CategoriasGastoPage() {
     } catch (error: any) {
       console.error('Error al eliminar categoría:', error)
       toast.error(error.message || 'Error al eliminar la categoría')
+    }
+  }
+
+  const handleExportar = () => {
+    try {
+      exportarCategoriasGastoAExcel(categorias)
+      toast.success('Categorías exportadas exitosamente')
+    } catch (err) {
+      toast.error('Error al exportar categorías')
+    }
+  }
+
+  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportando(true)
+
+    try {
+      const datos = await leerCategoriasGastoDesdeExcel(file)
+      const nombresExistentes = categorias.map(c => c.nombre)
+      const { nuevas, errores, duplicados } = validarCategoriasGasto(datos, nombresExistentes)
+
+      if (errores.length > 0) {
+        toast.error(`Errores: ${errores.join(', ')}`)
+        return
+      }
+
+      if (duplicados.length > 0) {
+        toast.warning(`Categorías duplicadas omitidas: ${duplicados.join(', ')}`)
+      }
+
+      if (nuevas.length === 0) {
+        toast.info('No hay categorías nuevas para importar')
+        return
+      }
+
+      await Promise.all(nuevas.map(c => createCategoriaGasto({
+        nombre: c.nombre,
+        descripcion: c.descripcion || null
+      })))
+      toast.success(`${nuevas.length} categorías importadas correctamente`)
+      cargarCategorias()
+    } catch (err) {
+      console.error('Error al importar categorías:', err)
+      toast.error('Error inesperado en la importación')
+    } finally {
+      setImportando(false)
+      e.target.value = ''
     }
   }
 
@@ -194,16 +246,22 @@ export default function CategoriasGastoPage() {
           </p>
         </div>
 
-        <Dialog open={modalOpen} onOpenChange={(open) => {
-          setModalOpen(open)
-          if (!open) resetForm()
-        }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Categoría
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-4">
+          <BotonesImportExport
+            onExportar={handleExportar}
+            onImportar={handleImportar}
+            importando={importando}
+          />
+          <Dialog open={modalOpen} onOpenChange={(open) => {
+            setModalOpen(open)
+            if (!open) resetForm()
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Categoría
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
@@ -248,7 +306,8 @@ export default function CategoriasGastoPage() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </motion.div>
 
       {/* Stats Card */}

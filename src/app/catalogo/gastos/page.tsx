@@ -11,6 +11,8 @@ import {
 import { getCategoriasGasto } from '@/lib/services/categoriaGasto'
 import { toast } from 'sonner'
 import type { CatalogoGasto, CategoriaGasto } from '@/types'
+import { exportarGastosAExcel, importarGastosDesdeExcel, parsearGastosImportados } from '@/lib/utils/catalogoGastoExcel'
+import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 
 // UI Components
 import { Button } from '@/components/ui/button'
@@ -48,6 +50,7 @@ export default function CatalogoGastosPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingGasto, setEditingGasto] = useState<CatalogoGasto | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importando, setImportando] = useState(false)
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -165,6 +168,69 @@ export default function CatalogoGastosPage() {
     }
   }
 
+  const handleExportar = () => {
+    try {
+      exportarGastosAExcel(gastos)
+      toast.success('Gastos exportados exitosamente')
+    } catch (err) {
+      toast.error('Error al exportar gastos')
+    }
+  }
+
+  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportando(true)
+
+    try {
+      const rows = await importarGastosDesdeExcel(file)
+      const { validos, errores } = parsearGastosImportados(rows, categorias)
+
+      if (errores.length > 0) {
+        toast.error(`Errores en importación:\n${errores.slice(0, 5).join('\n')}${errores.length > 5 ? `\n...y ${errores.length - 5} más` : ''}`)
+        if (validos.length === 0) return
+      }
+
+      // Filtrar gastos que ya existen por código
+      const codigosExistentes = gastos.map(g => g.codigo)
+      const gastosNuevos = validos.filter(g => !codigosExistentes.includes(g.codigo))
+
+      if (gastosNuevos.length === 0) {
+        toast.info('No hay gastos nuevos para importar')
+        return
+      }
+
+      // Crear gastos
+      let creados = 0
+      for (const gasto of gastosNuevos) {
+        try {
+          await createCatalogoGasto({
+            codigo: gasto.codigo,
+            descripcion: gasto.descripcion,
+            categoriaId: gasto.categoriaId,
+            cantidad: gasto.cantidad,
+            precioInterno: gasto.precioInterno,
+            margen: gasto.margen,
+            precioVenta: gasto.precioVenta,
+            estado: gasto.estado
+          })
+          creados++
+        } catch (err) {
+          console.error(`Error al crear ${gasto.codigo}:`, err)
+        }
+      }
+
+      toast.success(`${creados} gastos importados correctamente`)
+      cargarDatos()
+    } catch (err) {
+      console.error('Error al importar gastos:', err)
+      toast.error('Error inesperado en la importación')
+    } finally {
+      setImportando(false)
+      e.target.value = ''
+    }
+  }
+
   // Filtered gastos
   const gastosFiltrados = useMemo(() => {
     return gastos.filter(gasto => {
@@ -262,17 +328,23 @@ export default function CatalogoGastosPage() {
           </p>
         </div>
 
-        <Dialog open={modalOpen} onOpenChange={(open) => {
-          setModalOpen(open)
-          if (!open) resetForm()
-        }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Gasto
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
+        <div className="flex items-center gap-4">
+          <BotonesImportExport
+            onExportar={handleExportar}
+            onImportar={handleImportar}
+            importando={importando}
+          />
+          <Dialog open={modalOpen} onOpenChange={(open) => {
+            setModalOpen(open)
+            if (!open) resetForm()
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Gasto
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>
                 {editingGasto ? 'Editar Gasto' : 'Crear Nuevo Gasto'}
@@ -402,7 +474,8 @@ export default function CatalogoGastosPage() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </motion.div>
 
       {/* Stats Cards */}
