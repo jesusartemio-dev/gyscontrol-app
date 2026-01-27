@@ -1,351 +1,196 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import { TrendingUp, Users, Target, DollarSign, Activity, Clock, Award, Loader2 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Loader2 } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { getUsuarios, Usuario } from '@/lib/services/usuario'
 
 interface MetricasUsuario {
   usuarioId: string
-  usuario: Usuario
-  metaMensual: number | null
-  metaTrimestral: number | null
+  usuario: { id: string; name: string; email: string }
   metricas: {
     cotizacionesGeneradas: number
     cotizacionesAprobadas: number
     proyectosCerrados: number
     valorTotalVendido: number
-    margenTotalObtenido: number
-    tiempoPromedioCierre?: number
     tasaConversion?: number
-    valorPromedioProyecto?: number
     llamadasRealizadas: number
     reunionesAgendadas: number
-    propuestasEnviadas: number
-    emailsEnviados: number
   }
 }
 
+interface RendimientoData {
+  comerciales: MetricasUsuario[]
+  resumen: {
+    totalCotizaciones: number
+    totalProyectos: number
+    totalValor: number
+    promedioConversion: number
+    periodo: string
+  }
+  periodo: string
+}
+
 export default function RendimientoReportPage() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [metricas, setMetricas] = useState<MetricasUsuario[]>([])
+  const [data, setData] = useState<RendimientoData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        setLoading(true)
-
-        // Load rendimiento data from API
         const response = await fetch('/api/crm/reportes/rendimiento')
-        if (!response.ok) {
-          throw new Error('Error al cargar datos de rendimiento')
+        if (response.ok) {
+          setData(await response.json())
         }
-        const data = await response.json()
-
-        // Transform API data to match component interface
-        const metricasData: MetricasUsuario[] = data.comerciales.map((comercial: any) => ({
-          usuarioId: comercial.usuarioId,
-          usuario: comercial.usuario,
-          metaMensual: comercial.metaMensual,
-          metaTrimestral: comercial.metaTrimestral,
-          metricas: comercial.metricas
-        }))
-
-        setMetricas(metricasData)
       } catch (error) {
-        console.error('Error loading rendimiento data:', error)
+        console.error('Error loading rendimiento:', error)
       } finally {
         setLoading(false)
       }
     }
-
     loadData()
   }, [])
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    }).format(amount)
-  }
-
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('es-ES').format(num)
-  }
-
-  const getPerformanceColor = (value: number, thresholds: { good: number; medium: number }) => {
-    if (value >= thresholds.good) return 'text-green-600'
-    if (value >= thresholds.medium) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const getTopPerformer = (metric: keyof typeof metricas[0]['metricas']) => {
-    return metricas.reduce((prev, current) => {
-      const prevValue = typeof prev.metricas[metric] === 'number' ? prev.metricas[metric] as number : 0
-      const currentValue = typeof current.metricas[metric] === 'number' ? current.metricas[metric] as number : 0
-      return currentValue > prevValue ? current : prev
-    })
-  }
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Cargando reporte de rendimiento...</p>
-          </div>
-        </div>
+      <div className="p-4 flex items-center justify-center min-h-[300px]">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
-  const totalCotizaciones = metricas.reduce((sum, m) => sum + m.metricas.cotizacionesGeneradas, 0)
-  const totalValorVendido = metricas.reduce((sum, m) => sum + m.metricas.valorTotalVendido, 0)
-  const totalProyectos = metricas.reduce((sum, m) => sum + m.metricas.proyectosCerrados, 0)
-  const avgConversion = metricas.length > 0 ?
-    metricas.reduce((sum, m) => sum + (m.metricas.tasaConversion || 0), 0) / metricas.length : 0
+  if (!data || data.comerciales.length === 0) {
+    return (
+      <div className="p-4 space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Rendimiento</h1>
+          <p className="text-sm text-muted-foreground">Métricas por comercial</p>
+        </div>
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            No hay datos de rendimiento disponibles
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const { resumen, comerciales } = data
 
   return (
-    <motion.div
-      className="p-6 space-y-6"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
+    <div className="p-4 space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-100 rounded-lg">
-            <TrendingUp className="h-6 w-6 text-purple-600" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reporte de Rendimiento</h1>
-            <p className="text-gray-600 mt-1">Métricas de rendimiento por comercial</p>
-          </div>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Rendimiento</h1>
+        <p className="text-sm text-muted-foreground">Métricas por comercial - {resumen.periodo}</p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* KPIs generales */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Cotizaciones</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{formatNumber(totalCotizaciones)}</div>
-            <p className="text-xs text-muted-foreground">Generadas este período</p>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Cotizaciones</p>
+            <p className="text-2xl font-bold">{resumen.totalCotizaciones}</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total Vendido</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(totalValorVendido)}</div>
-            <p className="text-xs text-muted-foreground">En proyectos cerrados</p>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Proyectos</p>
+            <p className="text-2xl font-bold text-green-600">{resumen.totalProyectos}</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Proyectos Cerrados</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{formatNumber(totalProyectos)}</div>
-            <p className="text-xs text-muted-foreground">Éxitos comerciales</p>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Valor Vendido</p>
+            <p className="text-2xl font-bold text-blue-600">{formatCurrency(resumen.totalValor)}</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasa Conversión Promedio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{avgConversion.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">Cotizaciones → Proyectos</p>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Conversión Prom.</p>
+            <p className="text-2xl font-bold text-purple-600">{resumen.promedioConversion.toFixed(1)}%</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Top Performers */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5 text-yellow-600" />
-              Mayor Valor Vendido
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const topSeller = getTopPerformer('valorTotalVendido')
-              return (
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-yellow-100 text-yellow-600">
-                      {topSeller.usuario.name?.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{topSeller.usuario.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatCurrency(topSeller.metricas.valorTotalVendido)}
-                    </p>
-                  </div>
-                </div>
-              )
-            })()}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-blue-600" />
-              Más Cotizaciones
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const topGenerator = getTopPerformer('cotizacionesGeneradas')
-              return (
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-blue-100 text-blue-600">
-                      {topGenerator.usuario.name?.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{topGenerator.usuario.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {topGenerator.metricas.cotizacionesGeneradas} cotizaciones
-                    </p>
-                  </div>
-                </div>
-              )
-            })()}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-green-600" />
-              Más Activo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const mostActive = getTopPerformer('llamadasRealizadas')
-              return (
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-green-100 text-green-600">
-                      {mostActive.usuario.name?.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{mostActive.usuario.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {mostActive.metricas.llamadasRealizadas} llamadas
-                    </p>
-                  </div>
-                </div>
-              )
-            })()}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Performance Table */}
+      {/* Tabla de comerciales */}
       <Card>
-        <CardHeader>
-          <CardTitle>Rendimiento Detallado por Comercial</CardTitle>
-          <CardDescription>
-            Métricas individuales de cada miembro del equipo comercial
-          </CardDescription>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Por Comercial</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {metricas.map((metrica, index) => (
-              <motion.div
-                key={metrica.usuarioId}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-                className="border rounded-lg p-6"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {metrica.usuario.name?.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-semibold">{metrica.usuario.name}</h3>
-                      <p className="text-sm text-muted-foreground">{metrica.usuario.email}</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary">
-                    {metrica.metricas.tasaConversion?.toFixed(1)}% conversión
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.metricas.cotizacionesGeneradas, { good: 15, medium: 8 })}`}>
-                      {metrica.metricas.cotizacionesGeneradas}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Cotizaciones</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.metricas.proyectosCerrados, { good: 5, medium: 2 })}`}>
-                      {metrica.metricas.proyectosCerrados}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Proyectos</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.metricas.valorTotalVendido / 1000, { good: 300, medium: 150 })}`}>
-                      {formatCurrency(metrica.metricas.valorTotalVendido).replace('$', '')}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Valor Vendido</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${getPerformanceColor(metrica.metricas.llamadasRealizadas, { good: 150, medium: 75 })}`}>
-                      {metrica.metricas.llamadasRealizadas}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Llamadas</div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progreso vs. Objetivo</span>
-                    <span>{((metrica.metricas.proyectosCerrados / 10) * 100).toFixed(0)}%</span>
-                  </div>
-                  <Progress value={(metrica.metricas.proyectosCerrados / 10) * 100} className="h-2" />
-                  <div className="text-xs text-muted-foreground text-center">
-                    {metrica.metricas.proyectosCerrados} de 10 proyectos objetivo
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-3 font-medium">Comercial</th>
+                  <th className="text-right p-3 font-medium">Cotizaciones</th>
+                  <th className="text-right p-3 font-medium">Proyectos</th>
+                  <th className="text-right p-3 font-medium">Valor</th>
+                  <th className="text-right p-3 font-medium">Conversión</th>
+                  <th className="text-right p-3 font-medium">Actividad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {comerciales.map((c) => (
+                  <tr key={c.usuarioId} className="hover:bg-muted/30">
+                    <td className="p-3">
+                      <p className="font-medium">{c.usuario.name}</p>
+                      <p className="text-xs text-muted-foreground">{c.usuario.email}</p>
+                    </td>
+                    <td className="p-3 text-right">{c.metricas.cotizacionesGeneradas}</td>
+                    <td className="p-3 text-right font-medium text-green-600">{c.metricas.proyectosCerrados}</td>
+                    <td className="p-3 text-right">{formatCurrency(c.metricas.valorTotalVendido)}</td>
+                    <td className="p-3 text-right">
+                      <span className="font-medium text-blue-600">{(c.metricas.tasaConversion || 0).toFixed(1)}%</span>
+                    </td>
+                    <td className="p-3 text-right text-muted-foreground">
+                      {c.metricas.llamadasRealizadas + c.metricas.reunionesAgendadas}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+
+      {/* Detalle por comercial - compacto */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {comerciales.map((c) => (
+          <Card key={c.usuarioId}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">{c.usuario.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-lg font-bold">{c.metricas.cotizacionesGeneradas}</p>
+                  <p className="text-xs text-muted-foreground">Cotiz.</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-green-600">{c.metricas.proyectosCerrados}</p>
+                  <p className="text-xs text-muted-foreground">Proy.</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-blue-600">{(c.metricas.tasaConversion || 0).toFixed(0)}%</p>
+                  <p className="text-xs text-muted-foreground">Conv.</p>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Objetivo: 10 proyectos</span>
+                  <span>{c.metricas.proyectosCerrados}/10</span>
+                </div>
+                <Progress value={(c.metricas.proyectosCerrados / 10) * 100} className="h-1.5" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   )
 }

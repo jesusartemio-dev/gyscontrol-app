@@ -264,7 +264,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => router.push(`/crm/${cotizacion.oportunidadCrm?.id}`)}
+                    onClick={() => router.push(`/crm/oportunidades/${cotizacion.oportunidadCrm?.id}`)}
                     className="h-8 text-green-700 border-green-300 hover:bg-green-50"
                   >
                     <Target className="h-4 w-4 mr-1" />
@@ -325,7 +325,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                     <Badge
                       variant="outline"
                       className="text-xs bg-green-50 text-green-700 border-green-200 cursor-pointer hover:bg-green-100"
-                      onClick={() => router.push(`/crm/${cotizacion.oportunidadCrm?.id}`)}
+                      onClick={() => router.push(`/crm/oportunidades/${cotizacion.oportunidadCrm?.id}`)}
                     >
                       <Target className="h-3 w-3 mr-1" />
                       {cotizacion.oportunidadCrm.nombre}
@@ -414,7 +414,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
             isOpen={showCrearOportunidad}
             onClose={() => setShowCrearOportunidad(false)}
             onSuccess={(oportunidad) => {
-              router.push(`/crm/${oportunidad.id}`)
+              router.push(`/crm/oportunidades/${oportunidad.id}`)
             }}
           />
 

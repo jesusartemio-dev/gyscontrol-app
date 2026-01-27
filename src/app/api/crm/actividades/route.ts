@@ -1,10 +1,3 @@
-// ===================================================
-// 📁 Archivo: route.ts
-// 📌 Ubicación: /api/crm/actividades
-// 🔧 Descripción: API para gestionar actividades generales del CRM
-// ✅ GET: Obtener todas las actividades con filtros y paginación
-// ===================================================
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -12,7 +5,6 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-// ✅ GET /api/crm/actividades - Obtener todas las actividades del CRM
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -44,36 +36,43 @@ export async function GET(request: NextRequest) {
     if (oportunidadId) where.oportunidadId = oportunidadId
     if (usuarioId) where.usuarioId = usuarioId
 
-    // Filtros de fecha
     if (fechaDesde || fechaHasta) {
       where.fecha = {}
       if (fechaDesde) where.fecha.gte = new Date(fechaDesde)
       if (fechaHasta) where.fecha.lte = new Date(fechaHasta)
     }
 
-    // Obtener actividades con relaciones
-    const [actividades, total] = await Promise.all([
+    // Fechas para estadísticas temporales
+    const ahora = new Date()
+    const inicioSemana = new Date(ahora)
+    inicioSemana.setDate(ahora.getDate() - ahora.getDay())
+    inicioSemana.setHours(0, 0, 0, 0)
+
+    const inicioSemanaAnterior = new Date(inicioSemana)
+    inicioSemanaAnterior.setDate(inicioSemanaAnterior.getDate() - 7)
+
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1)
+
+    // Queries en paralelo
+    const [
+      actividades,
+      total,
+      estadisticasPorTipo,
+      estadisticasPorResultado,
+      actividadesEstaSemana,
+      actividadesSemanaAnterior,
+      actividadesPorUsuario
+    ] = await Promise.all([
+      // Lista paginada
       prisma.crmActividad.findMany({
         where,
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
+          user: { select: { id: true, name: true, email: true } },
           crmOportunidad: {
             select: {
               id: true,
               nombre: true,
-              cliente: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  codigo: true
-                }
-              }
+              cliente: { select: { id: true, nombre: true, codigo: true } }
             }
           }
         },
@@ -81,43 +80,88 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit
       }),
-      prisma.crmActividad.count({ where })
+
+      // Total
+      prisma.crmActividad.count({ where }),
+
+      // Por tipo
+      prisma.crmActividad.groupBy({
+        by: ['tipo'],
+        _count: { id: true },
+        where
+      }),
+
+      // Por resultado
+      prisma.crmActividad.groupBy({
+        by: ['resultado'],
+        _count: { id: true },
+        where
+      }),
+
+      // Esta semana
+      prisma.crmActividad.count({
+        where: { fecha: { gte: inicioSemana } }
+      }),
+
+      // Semana anterior
+      prisma.crmActividad.count({
+        where: {
+          fecha: { gte: inicioSemanaAnterior, lt: inicioSemana }
+        }
+      }),
+
+      // Por usuario (top 5)
+      prisma.crmActividad.groupBy({
+        by: ['usuarioId'],
+        _count: { id: true },
+        where: { fecha: { gte: inicioMes } },
+        orderBy: { _count: { id: 'desc' } },
+        take: 5
+      })
     ])
 
-    // Calcular estadísticas
-    const estadisticas = await prisma.crmActividad.groupBy({
-      by: ['tipo', 'resultado'],
-      _count: { id: true },
-      where
+    // Obtener nombres de usuarios
+    const usuarioIds = actividadesPorUsuario.map(a => a.usuarioId)
+    const usuarios = await prisma.user.findMany({
+      where: { id: { in: usuarioIds } },
+      select: { id: true, name: true }
     })
 
-    const estadisticasFormateadas: Record<string, number> = {}
+    const usuariosMap = new Map(usuarios.map(u => [u.id, u.name]))
 
-    estadisticas.forEach(stat => {
-      if (stat.tipo) {
-        estadisticasFormateadas[`tipo_${stat.tipo}`] = stat._count.id
-      }
-      if (stat.resultado) {
-        estadisticasFormateadas[`resultado_${stat.resultado}`] = stat._count.id
-      }
-    })
+    // Formatear estadísticas
+    const estadisticas: Record<string, any> = {
+      total,
+      estaSemana: actividadesEstaSemana,
+      semanaAnterior: actividadesSemanaAnterior,
+      cambioSemanal: actividadesSemanaAnterior > 0
+        ? Math.round(((actividadesEstaSemana - actividadesSemanaAnterior) / actividadesSemanaAnterior) * 100)
+        : actividadesEstaSemana > 0 ? 100 : 0,
 
-    estadisticasFormateadas.total = total
+      porTipo: estadisticasPorTipo.reduce((acc, stat) => {
+        acc[stat.tipo] = stat._count.id
+        return acc
+      }, {} as Record<string, number>),
 
-    const response = {
-      data: actividades,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      },
-      estadisticas: estadisticasFormateadas
+      porResultado: estadisticasPorResultado.reduce((acc, stat) => {
+        if (stat.resultado) acc[stat.resultado] = stat._count.id
+        return acc
+      }, {} as Record<string, number>),
+
+      porUsuario: actividadesPorUsuario.map(stat => ({
+        usuarioId: stat.usuarioId,
+        nombre: usuariosMap.get(stat.usuarioId) || 'Sin nombre',
+        cantidad: stat._count.id
+      }))
     }
 
-    return NextResponse.json(response)
+    return NextResponse.json({
+      data: actividades,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      estadisticas
+    })
   } catch (error) {
-    console.error('❌ Error al obtener actividades:', error)
+    console.error('Error al obtener actividades:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

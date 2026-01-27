@@ -1,29 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { motion } from 'framer-motion'
-import {
-  Target,
-  TrendingUp,
-  Users,
-  Activity,
-  Loader2,
-  AlertCircle,
-  BarChart3,
-  ExternalLink,
-  Calendar,
-  FileText
-} from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import MetricasCards from './MetricasCards'
 import EmbudoChart from './EmbudoChart'
 import ActividadesRecientes from './ActividadesRecientes'
-import { formatCurrency } from '@/lib/utils/plantilla-utils'
 
 interface DashboardData {
   resumen: {
@@ -62,7 +45,6 @@ interface CrmDashboardProps {
 }
 
 export default function CrmDashboard({ userId, userRole = 'comercial' }: CrmDashboardProps) {
-  const router = useRouter()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -97,29 +79,22 @@ export default function CrmDashboard({ userId, userRole = 'comercial' }: CrmDash
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Cargando dashboard CRM...</p>
-          </div>
-        </div>
+      <div className="p-4 flex items-center justify-center min-h-[300px]">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-4">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <div className="mt-4">
-          <Button onClick={loadDashboardData} variant="outline">
-            Intentar de nuevo
-          </Button>
-        </div>
+        <Button onClick={loadDashboardData} variant="outline" size="sm" className="mt-3">
+          Reintentar
+        </Button>
       </div>
     )
   }
@@ -127,118 +102,31 @@ export default function CrmDashboard({ userId, userRole = 'comercial' }: CrmDash
   if (!dashboardData) return null
 
   return (
-    <motion.div
-      className="p-6 space-y-6"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Target className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard CRM</h1>
-            <p className="text-gray-600 mt-1">Gestión integral de relaciones comerciales</p>
-          </div>
+    <div className="p-4 space-y-4">
+      {/* Header minimalista */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard CRM</h1>
+          <p className="text-sm text-muted-foreground">Resumen comercial</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="secondary" className="text-xs">
-            Última actualización: {new Date(dashboardData.fechaActualizacion).toLocaleTimeString('es-ES')}
-          </Badge>
-          <Button onClick={loadDashboardData} variant="outline" size="sm">
-            Actualizar
-          </Button>
-          <Button asChild variant="default" size="sm">
-            <Link href="/crm">
-              <ExternalLink className="h-4 w-4 mr-1" />
-              Gestionar Oportunidades
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      {/* Navigation Links */}
-      <div className="flex flex-wrap gap-2">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/crm/reportes">
-            <BarChart3 className="h-4 w-4 mr-1" />
-            Reportes
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/crm/actividades">
-            <Calendar className="h-4 w-4 mr-1" />
-            Actividades
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/crm/clientes">
-            <Users className="h-4 w-4 mr-1" />
-            Clientes
-          </Link>
+        <Button
+          onClick={loadDashboardData}
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+        >
+          <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
 
-      {/* Métricas Principales */}
+      {/* Métricas principales */}
       <MetricasCards resumen={dashboardData.resumen} />
 
       {/* Embudo y Actividades */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <EmbudoChart embudo={dashboardData.embudo} />
         <ActividadesRecientes actividades={dashboardData.actividadesRecientes} />
       </div>
-
-      {/* Acciones Rápidas */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-green-600" />
-            Acciones Rápidas
-          </CardTitle>
-          <CardDescription>
-            Accede rápidamente a las funciones más utilizadas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Button
-              className="h-20 flex flex-col items-center gap-2"
-              variant="outline"
-              onClick={() => router.push('/crm')}
-            >
-              <Target className="h-6 w-6 text-blue-600" />
-              <span className="text-sm font-medium">Nueva Oportunidad</span>
-            </Button>
-            <Button
-              className="h-20 flex flex-col items-center gap-2"
-              variant="outline"
-              onClick={() => router.push('/crm/actividades')}
-            >
-              <Calendar className="h-6 w-6 text-green-600" />
-              <span className="text-sm font-medium">Actividades</span>
-            </Button>
-            <Button
-              className="h-20 flex flex-col items-center gap-2"
-              variant="outline"
-              onClick={() => router.push('/crm/reportes')}
-            >
-              <BarChart3 className="h-6 w-6 text-purple-600" />
-              <span className="text-sm font-medium">Ver Reportes</span>
-            </Button>
-            <Button
-              className="h-20 flex flex-col items-center gap-2"
-              variant="outline"
-              onClick={() => router.push('/crm/reportes/embudo')}
-            >
-              <TrendingUp className="h-6 w-6 text-orange-600" />
-              <span className="text-sm font-medium">Embudo Detallado</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+    </div>
   )
 }

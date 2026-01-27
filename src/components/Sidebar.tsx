@@ -144,11 +144,11 @@ export default function Sidebar() {
       color: 'text-blue-400',
       roles: ['admin', 'gerente', 'comercial'],
       links: [
-        { href: '/comercial/crm', label: 'Dashboard CRM', icon: Target },
-        { href: '/crm', label: 'Oportunidades', icon: Target },
-        { href: '/crm/clientes', label: 'Gestión de Clientes', icon: Building2 },
+        { href: '/crm', label: 'Dashboard', icon: Target },
+        { href: '/crm/oportunidades', label: 'Oportunidades', icon: Target },
+        { href: '/crm/clientes', label: 'Clientes', icon: Building2 },
         { href: '/crm/actividades', label: 'Actividades', icon: Activity },
-        { href: '/crm/reportes', label: 'Reportes CRM', icon: BarChart3 },
+        { href: '/crm/reportes', label: 'Reportes', icon: BarChart3 },
       ],
     },
     // 2. Proyectos - Ejecución del negocio

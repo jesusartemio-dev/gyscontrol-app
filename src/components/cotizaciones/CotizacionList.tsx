@@ -5,8 +5,6 @@ import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Eye,
-  Trash2,
-  Edit3,
   DollarSign,
   User,
   Calendar,
@@ -27,7 +25,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { useToast } from '@/hooks/use-toast'
 import type { Cotizacion } from '@/types'
@@ -319,78 +316,101 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
 
       {/* Content based on view mode */}
       {viewMode === 'table' ? (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Total Cliente</TableHead>
-                  <TableHead className="text-right">Total Interno</TableHead>
-                  <TableHead className="text-right">Margen</TableHead>
-                  <TableHead className="text-center">Fecha</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <AnimatePresence>
-                  {filteredCotizaciones.map((cotizacion) => (
-                    <motion.tr
-                      key={cotizacion.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3 }}
-                      className="group"
-                    >
-                      <TableCell className="font-medium">{cotizacion.codigo || 'Sin código'}</TableCell>
-                      <TableCell>{cotizacion.nombre}</TableCell>
-                      <TableCell>{cotizacion.cliente?.nombre ?? 'Sin cliente'}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusVariant(cotizacion.estado ?? 'borrador')}>
-                          {cotizacion.estado ?? 'borrador'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-green-600">
+        <div className="bg-white border rounded-lg overflow-x-auto">
+          <table className="w-full table-fixed min-w-[850px]">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="w-[9%] px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                <th className="w-[17%] px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                <th className="w-[16%] px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th className="w-[10%] px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comercial</th>
+                <th className="w-[8%] px-3 py-2.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="w-[10%] px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Venta</th>
+                <th className="w-[10%] px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                <th className="w-[10%] px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Margen</th>
+                <th className="w-[10%] px-3 py-2.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredCotizaciones.map((cotizacion) => {
+                const margen = cotizacion.totalCliente - cotizacion.totalInterno
+                const margenPct = cotizacion.totalCliente > 0
+                  ? ((margen / cotizacion.totalCliente) * 100).toFixed(1)
+                  : '0'
+                return (
+                  <tr
+                    key={cotizacion.id}
+                    className="hover:bg-gray-50/80 transition-colors cursor-pointer group"
+                    onClick={() => window.location.href = `/comercial/cotizaciones/${cotizacion.id}`}
+                  >
+                    <td className="px-3 py-3">
+                      <span className="font-mono text-xs font-medium text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {cotizacion.codigo || '-'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-sm font-medium text-gray-900 truncate" title={cotizacion.nombre}>
+                        {cotizacion.nombre}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {cotizacion.createdAt ? formatDate(cotizacion.createdAt) : ''}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-sm text-gray-900 truncate" title={cotizacion.cliente?.nombre}>
+                        {cotizacion.cliente?.nombre ?? 'Sin cliente'}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-sm text-gray-600 truncate">
+                        {(cotizacion as any).user?.name ?? '-'}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <Badge variant={getStatusVariant(cotizacion.estado ?? 'borrador')} className="text-xs">
+                        {cotizacion.estado ?? 'borrador'}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className="text-sm font-medium text-gray-900">
                         {formatCurrency(cotizacion.totalCliente)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-blue-600">
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className="text-sm text-gray-600">
                         {formatCurrency(cotizacion.totalInterno)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-purple-600">
-                        {formatCurrency(cotizacion.totalCliente - cotizacion.totalInterno)}
-                      </TableCell>
-                      <TableCell className="text-center text-sm text-muted-foreground">
-                        {cotizacion.createdAt ? formatDate(cotizacion.createdAt) : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                          >
-                            <Link href={`/comercial/cotizaciones/${cotizacion.id}`}>
-                              <Eye className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <DeleteAlertDialog
-                            onConfirm={() => handleDelete(cotizacion.id)}
-                            title="¿Eliminar cotización?"
-                            description={`¿Estás seguro de eliminar la cotización "${cotizacion.nombre}"? Esta acción no se puede deshacer.`}
-                          />
-                        </div>
-                      </TableCell>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className={`text-sm font-semibold ${margen >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(margen)}
+                        </span>
+                        <span className={`text-xs ${margen >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {margenPct}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex gap-1 justify-center" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" asChild className="h-8 w-8 p-0">
+                          <Link href={`/comercial/cotizaciones/${cotizacion.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <DeleteAlertDialog
+                          onConfirm={() => handleDelete(cotizacion.id)}
+                          title="¿Eliminar cotización?"
+                          description={`¿Estás seguro de eliminar la cotización "${cotizacion.nombre}"? Esta acción no se puede deshacer.`}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         /* Cards View - Original implementation */
         <motion.div
@@ -450,6 +470,12 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                           <User className="h-4 w-4" />
                           <span>{cotizacion.cliente?.nombre ?? 'Sin cliente asignado'}</span>
                         </div>
+                        {(cotizacion as any).user?.name && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="text-xs">Comercial:</span>
+                            <span>{(cotizacion as any).user.name}</span>
+                          </div>
+                        )}
                         {cotizacion.createdAt && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-4 w-4" />

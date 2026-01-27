@@ -717,16 +717,17 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
           <EmptyState onCreate={onCreate} />
         ) : viewMode === 'table' ? (
           <div className="bg-white border rounded-lg overflow-x-auto">
-            <table className="w-full table-fixed min-w-[700px]">
+            <table className="w-full table-fixed min-w-[800px]">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="w-[18%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Oportunidad</th>
-                  <th className="w-[12%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-                  <th className="w-[9%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
-                  <th className="w-[6%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prob.</th>
-                  <th className="w-[12%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="w-[15%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cotización</th>
-                  <th className="w-[13%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proyecto</th>
+                  <th className="w-[16%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Oportunidad</th>
+                  <th className="w-[11%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                  <th className="w-[10%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Comercial</th>
+                  <th className="w-[8%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  <th className="w-[5%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prob.</th>
+                  <th className="w-[11%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="w-[13%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cotización</th>
+                  <th className="w-[11%] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proyecto</th>
                   <th className="w-[15%] px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
                 </tr>
               </thead>
@@ -749,6 +750,9 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
                     <td className="px-3 py-3">
                       <div className="text-sm text-gray-900 truncate">{oportunidad.cliente?.nombre || '-'}</div>
                       <div className="text-xs text-gray-500 truncate">{oportunidad.cliente?.ruc || ''}</div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-sm text-gray-900 truncate">{oportunidad.comercial?.name || '-'}</div>
                     </td>
                     <td className="px-3 py-3">
                       <div className="text-sm font-medium text-gray-900">

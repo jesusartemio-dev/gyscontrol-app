@@ -527,11 +527,18 @@ const safeText = (value: any): string => {
 }
 
 const formatCurrency = (amount: number, currency: string = 'USD'): string => {
-  if (isNaN(amount)) return '$0.00'
-  
+  if (isNaN(amount)) return currency === 'PEN' ? 'S/0.00' : '$0.00'
+
+  if (currency === 'PEN') {
+    return `S/${new Intl.NumberFormat('es-PE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount)}`
+  }
+
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency,
+    currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amount)
@@ -557,8 +564,12 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
   }
 
   const currentDate = new Date()
-  const validUntilDate = new Date()
-  validUntilDate.setDate(currentDate.getDate() + 15)
+
+  // Use dynamic validez or default to 15 days
+  const validezDias = (cotizacion as any).validezOferta || 15
+  const validUntilDate = (cotizacion as any).fechaValidezHasta
+    ? new Date((cotizacion as any).fechaValidezHasta)
+    : new Date(currentDate.getTime() + validezDias * 24 * 60 * 60 * 1000)
 
   // Safe data access with defaults
   const equipos = Array.isArray(cotizacion.equipos) ? cotizacion.equipos : []
@@ -568,13 +579,37 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
   const condiciones = Array.isArray(cotizacion.condiciones) ? cotizacion.condiciones : []
   const cronograma = Array.isArray(cotizacion.cronograma) ? cotizacion.cronograma : []
 
+  // Dynamic currency
+  const moneda = (cotizacion as any).moneda || 'USD'
+  const monedaLabel = moneda === 'PEN' ? 'Soles (PEN)' : 'Dólares Americanos (USD)'
+
+  // Dynamic IGV handling
+  const incluyeIGV = (cotizacion as any).incluyeIGV ?? false
+  const igvRate = 0.18
+
   // Calculate totals with safe access
   const equiposTotal = equipos.reduce((sum, equipo) => sum + (equipo.subtotalCliente || 0), 0)
   const serviciosTotal = servicios.reduce((sum, servicio) => sum + (servicio.subtotalCliente || 0), 0)
   const gastosTotal = gastos.reduce((sum, gasto) => sum + (gasto.subtotalCliente || 0), 0)
   const subtotal = equiposTotal + serviciosTotal + gastosTotal
-  const igv = subtotal * 0.18
+  const igv = incluyeIGV ? 0 : subtotal * igvRate
   const total = subtotal + igv
+
+  // Determine which sections have content
+  const hasEquipos = equipos.length > 0
+  const hasServicios = servicios.length > 0
+  const hasGastos = gastos.length > 0
+  const hasExclusionesCondiciones = exclusiones.length > 0 || condiciones.length > 0
+  const hasCronograma = cronograma.length > 0
+
+  // Get comercial info for contact
+  const comercial = (cotizacion as any).user || (cotizacion as any).comercial
+
+  // Dynamic forma de pago
+  const formaPago = (cotizacion as any).formaPago || '30% adelanto, 40% contra entrega, 30% contra conformidad'
+
+  // Dynamic referencia
+  const referencia = (cotizacion as any).referencia || safeText(cotizacion.nombre)
 
   return (
     <Document
@@ -637,27 +672,27 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
             </View>
             <View style={styles.clientRow}>
               <Text style={styles.clientLabel}>Referencia</Text>
-              <Text style={styles.clientValue}>Propuesta de Automatización Industrial</Text>
+              <Text style={styles.clientValue}>{referencia}</Text>
             </View>
             <View style={styles.clientRow}>
               <Text style={styles.clientLabel}>Moneda</Text>
-              <Text style={styles.clientValue}>Dólares Americanos (USD)</Text>
+              <Text style={styles.clientValue}>{monedaLabel}</Text>
             </View>
             <View style={styles.clientRow}>
               <Text style={styles.clientLabel}>Forma de Pago</Text>
-              <Text style={styles.clientValue}>Según términos comerciales acordados</Text>
+              <Text style={styles.clientValue}>{formaPago}</Text>
             </View>
             <View style={styles.clientRow}>
               <Text style={styles.clientLabel}>Tiempo Entrega</Text>
-              <Text style={styles.clientValue}>Según cronograma del proyecto</Text>
+              <Text style={styles.clientValue}>{(cotizacion as any).tiempoEntrega || 'Según cronograma del proyecto'}</Text>
             </View>
             <View style={styles.clientRow}>
               <Text style={styles.clientLabel}>Validez Oferta</Text>
-              <Text style={styles.clientValue}>15 días calendario - Hasta {formatDate(validUntilDate)}</Text>
+              <Text style={styles.clientValue}>{validezDias} días calendario - Hasta {formatDate(validUntilDate)}</Text>
             </View>
             <View style={[styles.clientRow, styles.clientRowLast]}>
               <Text style={styles.clientLabel}>IGV</Text>
-              <Text style={styles.clientValue}>No incluido en los precios mostrados</Text>
+              <Text style={styles.clientValue}>{incluyeIGV ? 'Incluido en los precios' : 'No incluido en los precios mostrados'}</Text>
             </View>
           </View>
         </View>
@@ -695,9 +730,10 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
             </Text>
           </View>
           <View style={styles.footerRight}>
-            <Text style={[styles.footerText, { textAlign: 'right' }]}>
-              Página 1 de 6
-            </Text>
+            <Text
+              style={[styles.footerText, { textAlign: 'right' }]}
+              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+            />
           </View>
         </View>
       </Page>
@@ -736,7 +772,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                 </Text>
                 <Text style={[styles.summaryCell, styles.summaryQtyCell]}>1</Text>
                 <Text style={[styles.summaryCell, styles.summaryPriceCell]}>
-                  {formatCurrency(equipo.subtotalCliente || 0)}
+                  {formatCurrency(equipo.subtotalCliente || 0, moneda)}
                 </Text>
               </View>
             ))}
@@ -753,7 +789,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                   </Text>
                   <Text style={[styles.summaryCell, styles.summaryQtyCell]}>1</Text>
                   <Text style={[styles.summaryCell, styles.summaryPriceCell]}>
-                    {formatCurrency(servicio.subtotalCliente || 0)}
+                    {formatCurrency(servicio.subtotalCliente || 0, moneda)}
                   </Text>
                 </View>
               )
@@ -771,7 +807,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                   </Text>
                   <Text style={[styles.summaryCell, styles.summaryQtyCell]}>1</Text>
                   <Text style={[styles.summaryCell, styles.summaryPriceCell]}>
-                    {formatCurrency(gasto.subtotalCliente || 0)}
+                    {formatCurrency(gasto.subtotalCliente || 0, moneda)}
                   </Text>
                 </View>
               )
@@ -783,15 +819,17 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
         <View style={styles.totalsContainer}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Subtotal:</Text>
-            <Text style={styles.totalValue}>{formatCurrency(subtotal)}</Text>
+            <Text style={styles.totalValue}>{formatCurrency(subtotal, moneda)}</Text>
           </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>IGV (18%):</Text>
-            <Text style={styles.totalValue}>{formatCurrency(igv)}</Text>
-          </View>
+          {!incluyeIGV && (
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>IGV (18%):</Text>
+              <Text style={styles.totalValue}>{formatCurrency(igv, moneda)}</Text>
+            </View>
+          )}
           <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>Total General:</Text>
-            <Text style={styles.grandTotalValue}>{formatCurrency(total)}</Text>
+            <Text style={styles.grandTotalLabel}>{incluyeIGV ? 'Total (inc. IGV):' : 'Total General:'}</Text>
+            <Text style={styles.grandTotalValue}>{formatCurrency(total, moneda)}</Text>
           </View>
         </View>
 
@@ -831,9 +869,10 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
             </Text>
           </View>
           <View style={styles.footerRight}>
-            <Text style={[styles.footerText, { textAlign: 'right' }]}>
-              Página 2 de 4
-            </Text>
+            <Text
+              style={[styles.footerText, { textAlign: 'right' }]}
+              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+            />
           </View>
         </View>
       </Page>
@@ -941,15 +980,233 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
               </Text>
             </View>
             <View style={styles.footerRight}>
-              <Text style={[styles.footerText, { textAlign: 'right' }]}>
-                Página 3 de 4
-              </Text>
+              <Text
+                style={[styles.footerText, { textAlign: 'right' }]}
+                render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+              />
             </View>
           </View>
         </Page>
       )}
 
-      {/* PÁGINA 4: TÉRMINOS Y CONDICIONES */}
+      {/* PÁGINA: DETALLE DE SERVICIOS */}
+      {hasServicios && (
+        <Page size="A4" style={styles.page}>
+          {/* Compact Header */}
+          <View style={styles.compactHeaderContainer}>
+            <View>
+              <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
+              <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
+            </View>
+          </View>
+
+          {/* Services Details */}
+          <View style={styles.detailSection}>
+            <View style={styles.detailHeader}>
+              <Text style={styles.detailTitle}>Detalle Técnico - Servicios</Text>
+            </View>
+            <View style={styles.detailTable}>
+              {/* Table Header */}
+              <View style={styles.detailTableHeader}>
+                <Text style={[styles.detailHeaderCell, styles.detailItemCell]}>Item</Text>
+                <Text style={[styles.detailHeaderCell, styles.detailDescCell]}>Descripción del Servicio</Text>
+                <Text style={[styles.detailHeaderCell, styles.detailUnitCell]}>Horas</Text>
+                <Text style={[styles.detailHeaderCell, styles.detailQtyCell]}>Valor</Text>
+              </View>
+
+              {/* Services Rows */}
+              {servicios.map((servicio, servicioIndex) => (
+                <View key={servicio.id || servicioIndex}>
+                  {/* Service Category Header */}
+                  <View style={[styles.detailRow, { backgroundColor: colors.accent, minHeight: 40 }]}>
+                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
+                      {servicioIndex + 1}
+                    </Text>
+                    <Text style={[styles.detailCell, { flex: 4, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
+                      {safeText(servicio.edt?.nombre || servicio.nombre).toUpperCase()}
+                    </Text>
+                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'center' }]}>
+                      {(servicio as any).horas || '-'}
+                    </Text>
+                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'right', paddingRight: 10 }]}>
+                      {formatCurrency(servicio.subtotalCliente || 0, moneda)}
+                    </Text>
+                  </View>
+
+                  {/* Service Items/Tasks */}
+                  {servicio.items?.map((item: any, itemIndex: number) => (
+                    <View key={item.id || itemIndex} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
+                      <Text style={[styles.detailCell, styles.detailItemCell]}>
+                        {servicioIndex + 1}.{itemIndex + 1}
+                      </Text>
+                      <Text style={[styles.detailCell, styles.detailDescCell]}>
+                        {safeText(item.descripcion || item.nombre)}
+                      </Text>
+                      <Text style={[styles.detailCell, styles.detailUnitCell]}>
+                        {item.horas || item.cantidad || '-'}
+                      </Text>
+                      <Text style={[styles.detailCell, styles.detailQtyCell]}>
+                        {item.precioCliente ? formatCurrency(item.precioCliente, moneda) : '-'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Services Notes */}
+          <View style={styles.contentSection}>
+            <View style={styles.contentHeader}>
+              <Text style={styles.contentTitle}>Notas de Servicios</Text>
+            </View>
+            <View style={styles.contentBody}>
+              <Text style={styles.contentText}>
+                • Los servicios incluyen mano de obra calificada y herramientas especializadas
+              </Text>
+              <Text style={styles.contentText}>
+                • Las horas indicadas son estimadas y pueden variar según condiciones de sitio
+              </Text>
+              <Text style={styles.contentText}>
+                • Incluye supervisión técnica durante la ejecución de los trabajos
+              </Text>
+              <Text style={styles.contentText}>
+                • Capacitación al personal operativo del cliente
+              </Text>
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <View style={styles.footerLeft}>
+              <Text style={styles.footerText}>
+                <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
+                RUC: 20545610672
+              </Text>
+            </View>
+            <View style={styles.footerCenter}>
+              <Text style={[styles.footerText, { textAlign: 'center' }]}>
+                Documento Confidencial - Uso Exclusivo del Cliente
+              </Text>
+            </View>
+            <View style={styles.footerRight}>
+              <Text
+                style={[styles.footerText, { textAlign: 'right' }]}
+                render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+              />
+            </View>
+          </View>
+        </Page>
+      )}
+
+      {/* PÁGINA: DETALLE DE GASTOS */}
+      {hasGastos && (
+        <Page size="A4" style={styles.page}>
+          {/* Compact Header */}
+          <View style={styles.compactHeaderContainer}>
+            <View>
+              <Text style={styles.compactCompanyName}>GYS CONTROL INDUSTRIAL SAC</Text>
+              <Text style={styles.compactTagline}>Soluciones Integrales en Automatización Industrial</Text>
+            </View>
+          </View>
+
+          {/* Expenses Details */}
+          <View style={styles.detailSection}>
+            <View style={styles.detailHeader}>
+              <Text style={styles.detailTitle}>Detalle de Gastos Adicionales</Text>
+            </View>
+            <View style={styles.detailTable}>
+              {/* Table Header */}
+              <View style={styles.detailTableHeader}>
+                <Text style={[styles.detailHeaderCell, styles.detailItemCell]}>Item</Text>
+                <Text style={[styles.detailHeaderCell, styles.detailDescCell]}>Descripción del Gasto</Text>
+                <Text style={[styles.detailHeaderCell, styles.detailUnitCell]}>Cant.</Text>
+                <Text style={[styles.detailHeaderCell, styles.detailQtyCell]}>Valor</Text>
+              </View>
+
+              {/* Gastos Rows */}
+              {gastos.map((gasto, gastoIndex) => (
+                <View key={gasto.id || gastoIndex}>
+                  {/* Gasto Category Header */}
+                  <View style={[styles.detailRow, { backgroundColor: colors.accent, minHeight: 40 }]}>
+                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
+                      {gastoIndex + 1}
+                    </Text>
+                    <Text style={[styles.detailCell, { flex: 4, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
+                      {safeText(gasto.nombre).toUpperCase()}
+                    </Text>
+                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'center' }]}>
+                      {(gasto as any).cantidad || 1}
+                    </Text>
+                    <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'right', paddingRight: 10 }]}>
+                      {formatCurrency(gasto.subtotalCliente || 0, moneda)}
+                    </Text>
+                  </View>
+
+                  {/* Gasto Items if any */}
+                  {gasto.items?.map((item: any, itemIndex: number) => (
+                    <View key={item.id || itemIndex} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
+                      <Text style={[styles.detailCell, styles.detailItemCell]}>
+                        {gastoIndex + 1}.{itemIndex + 1}
+                      </Text>
+                      <Text style={[styles.detailCell, styles.detailDescCell]}>
+                        {safeText(item.descripcion || item.nombre)}
+                      </Text>
+                      <Text style={[styles.detailCell, styles.detailUnitCell]}>
+                        {item.cantidad || 1}
+                      </Text>
+                      <Text style={[styles.detailCell, styles.detailQtyCell]}>
+                        {item.precioCliente ? formatCurrency(item.precioCliente, moneda) : '-'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Expenses Notes */}
+          <View style={styles.contentSection}>
+            <View style={styles.contentHeader}>
+              <Text style={styles.contentTitle}>Notas sobre Gastos</Text>
+            </View>
+            <View style={styles.contentBody}>
+              <Text style={styles.contentText}>
+                • Los gastos de viáticos incluyen transporte, alimentación y hospedaje del personal técnico
+              </Text>
+              <Text style={styles.contentText}>
+                • Los fletes se calculan según distancia y volumen de equipos a transportar
+              </Text>
+              <Text style={styles.contentText}>
+                • Los valores están sujetos a cambio según condiciones del proyecto
+              </Text>
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <View style={styles.footerLeft}>
+              <Text style={styles.footerText}>
+                <Text style={styles.footerBold}>GYS Control Industrial SAC</Text>{"\n"}
+                RUC: 20545610672
+              </Text>
+            </View>
+            <View style={styles.footerCenter}>
+              <Text style={[styles.footerText, { textAlign: 'center' }]}>
+                Documento Confidencial - Uso Exclusivo del Cliente
+              </Text>
+            </View>
+            <View style={styles.footerRight}>
+              <Text
+                style={[styles.footerText, { textAlign: 'right' }]}
+                render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+              />
+            </View>
+          </View>
+        </Page>
+      )}
+
+      {/* PÁGINA: TÉRMINOS Y CONDICIONES */}
       <Page size="A4" style={styles.page}>
         {/* Compact Header for Interior Pages */}
         <View style={styles.compactHeaderContainer}>
@@ -1003,11 +1260,11 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
           </View>
           <View style={styles.contentBody}>
             <Text style={styles.contentText}>
-              <Text style={{ fontWeight: 600 }}>Ing. Andrea Ortega</Text>{"\n"}
-              Gerente Comercial{"\n"}
-              📞 Cel: +51 962 375 309{"\n"}
-              📧 andrea.o@gyscontrol.com{"\n"}
-              🏢 Calle Los Geranios 486, Urb. San Eugenio Lince, Lima
+              <Text style={{ fontWeight: 600 }}>{comercial?.name || 'Departamento Comercial'}</Text>{"\n"}
+              {comercial?.cargo || 'Ejecutivo Comercial'}{"\n"}
+              {comercial?.telefono && `Cel: ${comercial.telefono}\n`}
+              {comercial?.email && `Email: ${comercial.email}\n`}
+              Calle Los Geranios 486, Urb. San Eugenio Lince, Lima
             </Text>
           </View>
         </View>
@@ -1043,14 +1300,16 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
             </Text>
           </View>
           <View style={styles.footerRight}>
-            <Text style={[styles.footerText, { textAlign: 'right' }]}>
-              Página 4 de 6
-            </Text>
+            <Text
+              style={[styles.footerText, { textAlign: 'right' }]}
+              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+            />
           </View>
         </View>
       </Page>
 
-      {/* PÁGINA 5: EXCLUSIONES Y CONDICIONES */}
+      {/* PÁGINA: EXCLUSIONES Y CONDICIONES */}
+      {hasExclusionesCondiciones && (
       <Page size="A4" style={styles.page}>
         {/* Compact Header for Interior Pages */}
         <View style={styles.compactHeaderContainer}>
@@ -1121,14 +1380,17 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
             </Text>
           </View>
           <View style={styles.footerRight}>
-            <Text style={[styles.footerText, { textAlign: 'right' }]}>
-              Página 5 de 6
-            </Text>
+            <Text
+              style={[styles.footerText, { textAlign: 'right' }]}
+              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+            />
           </View>
         </View>
       </Page>
+      )}
 
-      {/* PÁGINA 6: CRONOGRAMA COMERCIAL */}
+      {/* PÁGINA: CRONOGRAMA COMERCIAL */}
+      {hasCronograma && (
       <Page size="A4" style={styles.page}>
         {/* Compact Header for Interior Pages */}
         <View style={styles.compactHeaderContainer}>
@@ -1208,12 +1470,14 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
             </Text>
           </View>
           <View style={styles.footerRight}>
-            <Text style={[styles.footerText, { textAlign: 'right' }]}>
-              Página 6 de 6
-            </Text>
+            <Text
+              style={[styles.footerText, { textAlign: 'right' }]}
+              render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+            />
           </View>
         </View>
       </Page>
+      )}
     </Document>
   )
 }
