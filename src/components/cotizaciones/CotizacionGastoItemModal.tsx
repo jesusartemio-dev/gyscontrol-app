@@ -144,10 +144,10 @@ export default function CotizacionGastoItemModal({
       const nuevo = await createCotizacionGastoItem(payload)
 
       toast.success('Item de gasto agregado', {
-        description: `Se agregó "${nuevo.nombre}"`
+        description: `Se agregó "${nuevo?.nombre}"`
       })
 
-      onCreated(nuevo)
+      if (nuevo) onCreated(nuevo)
       handleOpenChange(false)
     } catch (err) {
       console.error('Error al crear item de gasto:', err)

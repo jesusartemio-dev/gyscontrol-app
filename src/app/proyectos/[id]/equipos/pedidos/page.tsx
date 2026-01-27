@@ -110,8 +110,8 @@ const PedidosTable = memo(function PedidosTable({
       const term = search.toLowerCase()
       result = result.filter(pedido =>
         pedido.codigo?.toLowerCase().includes(term) ||
-        pedido.proveedor?.toLowerCase().includes(term) ||
-        pedido.descripcion?.toLowerCase().includes(term)
+        (pedido as any).proveedor?.toLowerCase().includes(term) ||
+        (pedido as any).descripcion?.toLowerCase().includes(term)
       )
     }
 
@@ -297,10 +297,10 @@ const PedidosTable = memo(function PedidosTable({
                     </TableCell>
                     <TableCell className="py-2">
                       <div>
-                        <span className="text-sm font-medium line-clamp-1">{pedido.proveedor || 'Sin proveedor'}</span>
-                        {pedido.descripcion && (
+                        <span className="text-sm font-medium line-clamp-1">{(pedido as any).proveedor || 'Sin proveedor'}</span>
+                        {(pedido as any).descripcion && (
                           <span className="text-xs text-muted-foreground line-clamp-1 block">
-                            {pedido.descripcion}
+                            {(pedido as any).descripcion}
                           </span>
                         )}
                       </div>
@@ -312,7 +312,7 @@ const PedidosTable = memo(function PedidosTable({
                       {formatCurrency(montoTotal)}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground py-2">
-                      {formatDate(pedido.createdAt)}
+                      {formatDate((pedido as any).createdAt)}
                     </TableCell>
                     <TableCell className="py-2">
                       {getEstadoBadge(pedido.estado || 'pendiente')}

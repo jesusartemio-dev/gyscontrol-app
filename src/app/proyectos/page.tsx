@@ -457,10 +457,10 @@ export default function ProyectosPage() {
                         <td className="p-2 text-gray-600 truncate max-w-[100px] hidden md:table-cell" title={proyecto.cliente?.nombre}>
                           {proyecto.cliente?.nombre || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden lg:table-cell" title={proyecto.comercial?.name}>
+                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden lg:table-cell" title={proyecto.comercial?.name ?? undefined}>
                           {proyecto.comercial?.name || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden md:table-cell" title={proyecto.gestor?.name}>
+                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden md:table-cell" title={proyecto.gestor?.name ?? undefined}>
                           {proyecto.gestor?.name || '—'}
                         </td>
                         <td className="p-2 text-gray-600 truncate max-w-[80px] hidden xl:table-cell" title={(proyecto as any).supervisor?.name}>

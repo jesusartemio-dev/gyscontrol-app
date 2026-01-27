@@ -282,7 +282,7 @@ const ProyectoEquipoAccordion = memo(function ProyectoEquipoAccordion({
       <CrearListaMultipleModal
         isOpen={mostrarDistribucionAvanzada}
         onClose={() => setMostrarDistribucionAvanzada(false)}
-        proyectoEquipo={equipo}
+        proyectoEquipo={equipo as any}
         proyectoId={window.location.pathname.split('/')[2]}
         onDistribucionCompletada={handleDistribucionCompletada}
       />

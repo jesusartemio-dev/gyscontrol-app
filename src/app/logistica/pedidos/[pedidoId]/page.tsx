@@ -386,8 +386,8 @@ export default function PedidoLogisticaDetailPage() {
               <Building2 className="h-3.5 w-3.5 text-gray-400" />
               <div>
                 <span className="text-muted-foreground">Proyecto</span>
-                <p className="font-medium truncate max-w-[150px]" title={pedido.proyecto?.nombre}>
-                  {pedido.proyecto?.codigo || '—'}
+                <p className="font-medium truncate max-w-[150px]" title={(pedido as any).proyecto?.nombre}>
+                  {(pedido as any).proyecto?.codigo || '—'}
                 </p>
               </div>
             </div>
@@ -556,7 +556,7 @@ export default function PedidoLogisticaDetailPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-gray-700">{evento.descripcion}</p>
                           <p className="text-muted-foreground text-[10px]">
-                            {formatDate(evento.fecha)} • {(evento.usuario as any)?.nombre || (evento.usuario as any)?.name || (typeof evento.usuario === 'string' ? evento.usuario : 'Sistema')}
+                            {formatDate(evento.fecha)} • {((evento as any).usuario)?.nombre || ((evento as any).usuario)?.name || (typeof (evento as any).usuario === 'string' ? (evento as any).usuario : 'Sistema')}
                           </p>
                         </div>
                       </div>

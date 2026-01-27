@@ -91,10 +91,10 @@ export default function CotizacionGastoModal({
 
       // Success feedback
       toast.success('Sección de gasto creada exitosamente', {
-        description: `Se creó la sección "${nuevo.nombre}"`
+        description: `Se creó la sección "${nuevo?.nombre}"`
       })
 
-      onCreated({ ...nuevo, items: [] })
+      if (nuevo) onCreated({ ...nuevo, items: [] })
       handleOpenChange(false)
     } catch (err) {
       console.error('Error al crear sección de gasto:', err)

@@ -100,7 +100,7 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
   const stats = {
     total: pedidosData.total,
     pendientes: pedidosData.items.filter(p => p.estado === EstadoPedido.borrador || p.estado === EstadoPedido.enviado).length,
-    completados: pedidosData.items.filter(p => p.estado === EstadoPedido.recibido || p.estado === EstadoPedido.completado).length,
+    completados: pedidosData.items.filter(p => p.estado === EstadoPedido.entregado).length,
     montoTotal: pedidosData.items.reduce((sum, p) => {
       const pedidoTotal = p.items?.reduce((itemSum: number, item: any) =>
         itemSum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0) || 0

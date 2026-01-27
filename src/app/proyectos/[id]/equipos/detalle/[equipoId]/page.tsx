@@ -291,7 +291,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
         notFound()
         return
       }
-      setProyecto(proyectoData as Proyecto)
+      setProyecto(proyectoData as unknown as Proyecto)
       setEquipo(equipoData as unknown as ProyectoEquipoCotizadoWithItems)
     }).catch(console.error).finally(() => setLoading(false))
   }, [proyectoId, equipoId])

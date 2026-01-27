@@ -13,6 +13,7 @@ interface Props {
   description?: string | React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  trigger?: React.ReactNode
 }
 
 export function DeleteAlertDialog({
@@ -20,7 +21,8 @@ export function DeleteAlertDialog({
   title = "¿Eliminar ítem?",
   description = "Esta acción no se puede deshacer.",
   open,
-  onOpenChange
+  onOpenChange,
+  trigger
 }: Props) {
   const [internalOpen, setInternalOpen] = useState(false)
 
@@ -59,9 +61,11 @@ export function DeleteAlertDialog({
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <Trash2 className="w-4 h-4 text-red-500" />
-        </Button>
+        {trigger || (
+          <Button variant="ghost" size="icon">
+            <Trash2 className="w-4 h-4 text-red-500" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

@@ -29,7 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import type { PedidoEquipo, EstadoPedidoEquipo } from '@/types'
+import type { PedidoEquipo } from '@/types'
+
+type EstadoPedidoEquipo = 'borrador' | 'enviado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado'
 import { formatCurrency } from '@/lib/utils'
 
 type SortField = 'codigo' | 'responsable' | 'fechaPedido' | 'estado' | 'itemsCount' | 'progreso' | 'monto'
@@ -241,7 +243,7 @@ export default function LogisticaPedidosTable({ pedidos, loading = false, onDele
                 <TableCell className="py-2">
                   <div className="flex items-center gap-1.5">
                     <User className="h-3 w-3 text-gray-400" />
-                    <span className="text-xs truncate max-w-[150px]" title={pedido.responsable?.name}>
+                    <span className="text-xs truncate max-w-[150px]" title={pedido.responsable?.name ?? undefined}>
                       {pedido.responsable?.name || 'Sin asignar'}
                     </span>
                   </div>

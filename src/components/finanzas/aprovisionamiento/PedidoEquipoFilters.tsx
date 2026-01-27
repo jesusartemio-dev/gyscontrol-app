@@ -323,8 +323,9 @@ export const PedidoEquipoFilters: React.FC<PedidoEquipoFiltersProps> = ({
               <DatePickerWithRange
                 date={form.watch('fechaCreacion')}
                 onDateChange={(date) => {
-                  form.setValue('fechaCreacion', date)
-                  handleFieldChange('fechaCreacion', date)
+                  const validDate = date?.from ? { from: date.from, to: date.to } : undefined
+                  form.setValue('fechaCreacion', validDate)
+                  handleFieldChange('fechaCreacion', validDate)
                 }}
                 placeholder="Rango..."
               />
