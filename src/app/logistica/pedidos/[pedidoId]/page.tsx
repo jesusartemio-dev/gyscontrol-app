@@ -292,7 +292,7 @@ export default function PedidoLogisticaDetailPage() {
                 <div>
                   <h1 className="text-base font-semibold">{pedido.codigo}</h1>
                   <p className="text-[10px] text-muted-foreground">
-                    {pedido.proyecto?.nombre || 'Sin proyecto'}
+                    {(pedido as any).proyecto?.nombre || 'Sin proyecto'}
                   </p>
                 </div>
               </div>
