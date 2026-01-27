@@ -182,7 +182,7 @@ export default function PedidoLogisticaDetailPage() {
       setUpdating(true)
 
       // Determinar estado basado en cantidades
-      let nuevoEstado = editingItem.estado
+      let nuevoEstado: 'pendiente' | 'entregado' | 'parcial' = 'pendiente'
       if (editingItem.cantidadAtendida === 0) {
         nuevoEstado = 'pendiente'
       } else if (editingItem.cantidadAtendida >= editingItem.item.cantidadPedida) {
