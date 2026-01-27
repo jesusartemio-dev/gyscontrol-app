@@ -50,10 +50,14 @@ export interface CrmResponse<T> {
 
 // Constantes comunes
 export const CRM_ESTADOS_OPORTUNIDAD = {
-  PROSPECTO: 'prospecto',
-  CONTACTO_INICIAL: 'contacto_inicial',
-  PROPUESTA_ENVIADA: 'propuesta_enviada',
+  INICIO: 'inicio',
+  CONTACTO_CLIENTE: 'contacto_cliente',
+  VALIDACION_TECNICA: 'validacion_tecnica',
+  CONSOLIDACION_PRECIOS: 'consolidacion_precios',
+  VALIDACION_COMERCIAL: 'validacion_comercial',
+  SEGUIMIENTO_CLIENTE: 'seguimiento_cliente',
   NEGOCIACION: 'negociacion',
+  SEGUIMIENTO_PROYECTO: 'seguimiento_proyecto',
   CERRADA_GANADA: 'cerrada_ganada',
   CERRADA_PERDIDA: 'cerrada_perdida'
 } as const

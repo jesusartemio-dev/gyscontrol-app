@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Target, TrendingUp, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Target, CheckCircle, XCircle, Users, ClipboardCheck, DollarSign, FileCheck, Send, Handshake, FolderKanban } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -18,29 +18,56 @@ interface PipelineChartProps {
 export default function PipelineChart({ pipeline }: PipelineChartProps) {
   const getEstadoInfo = (estado: string) => {
     switch (estado) {
-      case 'prospecto':
+      case 'inicio':
+      case 'prospecto': // Legacy
         return {
-          nombre: 'Prospecto',
-          color: 'text-gray-600',
-          bgColor: 'bg-gray-50',
-          borderColor: 'border-gray-200',
+          nombre: 'Inicio',
+          color: 'text-purple-600',
+          bgColor: 'bg-purple-50',
+          borderColor: 'border-purple-200',
           icon: Target
         }
-      case 'contacto_inicial':
+      case 'contacto_cliente':
+      case 'contacto_inicial': // Legacy
         return {
-          nombre: 'Contacto Inicial',
+          nombre: 'Contacto Cliente',
           color: 'text-blue-600',
           bgColor: 'bg-blue-50',
           borderColor: 'border-blue-200',
-          icon: Target
+          icon: Users
         }
-      case 'propuesta_enviada':
+      case 'validacion_tecnica':
         return {
-          nombre: 'Propuesta Enviada',
+          nombre: 'Validación Técnica',
+          color: 'text-cyan-600',
+          bgColor: 'bg-cyan-50',
+          borderColor: 'border-cyan-200',
+          icon: ClipboardCheck
+        }
+      case 'consolidacion_precios':
+        return {
+          nombre: 'Consolidación Precios',
+          color: 'text-indigo-600',
+          bgColor: 'bg-indigo-50',
+          borderColor: 'border-indigo-200',
+          icon: DollarSign
+        }
+      case 'validacion_comercial':
+        return {
+          nombre: 'Validación Comercial',
+          color: 'text-violet-600',
+          bgColor: 'bg-violet-50',
+          borderColor: 'border-violet-200',
+          icon: FileCheck
+        }
+      case 'seguimiento_cliente':
+      case 'propuesta_enviada': // Legacy
+        return {
+          nombre: 'Seguimiento Cliente',
           color: 'text-yellow-600',
           bgColor: 'bg-yellow-50',
           borderColor: 'border-yellow-200',
-          icon: TrendingUp
+          icon: Send
         }
       case 'negociacion':
         return {
@@ -48,7 +75,15 @@ export default function PipelineChart({ pipeline }: PipelineChartProps) {
           color: 'text-orange-600',
           bgColor: 'bg-orange-50',
           borderColor: 'border-orange-200',
-          icon: Clock
+          icon: Handshake
+        }
+      case 'seguimiento_proyecto':
+        return {
+          nombre: 'Seguimiento Proyecto',
+          color: 'text-teal-600',
+          bgColor: 'bg-teal-50',
+          borderColor: 'border-teal-200',
+          icon: FolderKanban
         }
       case 'cerrada_ganada':
         return {

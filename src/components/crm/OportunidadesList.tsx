@@ -24,7 +24,10 @@ import {
   Handshake,
   List,
   Grid3X3,
-  FolderKanban
+  FolderKanban,
+  ClipboardCheck,
+  FileCheck,
+  Send
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -132,14 +135,22 @@ const EmptyState = ({ onCreate }: { onCreate?: () => void }) => (
 // ✅ Estados mejorados con iconos y colores
 const getEstadoAvanzado = (estado: string, cotizacion?: any) => {
   const estados = {
-    prospecto: { label: 'Prospecto', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: Users, iconColor: 'text-gray-500' },
-    contacto_inicial: { label: 'Contacto Inicial', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone, iconColor: 'text-blue-500' },
-    propuesta_enviada: { label: 'Propuesta Enviada', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Mail, iconColor: 'text-yellow-500' },
+    // Nuevos estados
+    inicio: { label: 'Inicio', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Target, iconColor: 'text-purple-500' },
+    contacto_cliente: { label: 'Contacto Cliente', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Users, iconColor: 'text-blue-500' },
+    validacion_tecnica: { label: 'Validación Técnica', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: ClipboardCheck, iconColor: 'text-cyan-500' },
+    consolidacion_precios: { label: 'Consolidación Precios', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: DollarSign, iconColor: 'text-indigo-500' },
+    validacion_comercial: { label: 'Validación Comercial', color: 'bg-violet-100 text-violet-800 border-violet-200', icon: FileCheck, iconColor: 'text-violet-500' },
+    seguimiento_cliente: { label: 'Seguimiento Cliente', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Send, iconColor: 'text-yellow-500' },
     negociacion: { label: 'En Negociación', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Handshake, iconColor: 'text-orange-500' },
+    seguimiento_proyecto: { label: 'Seguimiento Proyecto', color: 'bg-teal-100 text-teal-800 border-teal-200', icon: FolderKanban, iconColor: 'text-teal-500' },
     cerrada_ganada: { label: 'Cerrada - Ganada', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, iconColor: 'text-green-500' },
     cerrada_perdida: { label: 'Cerrada - Perdida', color: 'bg-red-100 text-red-800 border-red-200', icon: AlertCircle, iconColor: 'text-red-500' },
     // Legacy support for old state names
-    cotizacion: { label: 'Propuesta Enviada', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Mail, iconColor: 'text-yellow-500' },
+    prospecto: { label: 'Inicio', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Target, iconColor: 'text-purple-500' },
+    contacto_inicial: { label: 'Contacto Cliente', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Users, iconColor: 'text-blue-500' },
+    propuesta_enviada: { label: 'Seguimiento Cliente', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Send, iconColor: 'text-yellow-500' },
+    cotizacion: { label: 'Seguimiento Cliente', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Send, iconColor: 'text-yellow-500' },
     ganada: { label: 'Cerrada - Ganada', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, iconColor: 'text-green-500' },
     perdida: { label: 'Cerrada - Perdida', color: 'bg-red-100 text-red-800 border-red-200', icon: AlertCircle, iconColor: 'text-red-500' }
   }

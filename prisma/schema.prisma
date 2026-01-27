@@ -29,51 +29,51 @@ model Account {
 }
 
 model CatalogoEquipo {
-  id                                  String                                @id
-  categoriaId                         String
-  unidadId                            String
-  codigo                              String                                @unique
-  descripcion                         String
-  marca                               String
-  precioInterno                       Float
-  margen                              Float
-  precioVenta                         Float
-  estado                              String
-  precioReal                          Float?
-  fechaActualizacion                  DateTime?
-  createdAt                           DateTime                              @default(now())
-  updatedAt                           DateTime
-  categoriaEquipo                     CategoriaEquipo                       @relation(fields: [categoriaId], references: [id])
-  unidad                              Unidad                                @relation(fields: [unidadId], references: [id])
-  cotizacionEquipoItem                CotizacionEquipoItem[]
-  plantillaEquipoItem                 PlantillaEquipoItem[]
-  proyectoEquipoCotizadoItem          ProyectoEquipoCotizadoItem[]
+  id                               String                             @id
+  categoriaId                      String
+  unidadId                         String
+  codigo                           String                             @unique
+  descripcion                      String
+  marca                            String
+  precioInterno                    Float
+  margen                           Float
+  precioVenta                      Float
+  estado                           String
+  precioReal                       Float?
+  fechaActualizacion               DateTime?
+  createdAt                        DateTime                           @default(now())
+  updatedAt                        DateTime
+  categoriaEquipo                  CategoriaEquipo                    @relation(fields: [categoriaId], references: [id])
+  unidad                           Unidad                             @relation(fields: [unidadId], references: [id])
+  cotizacionEquipoItem             CotizacionEquipoItem[]
+  plantillaEquipoItem              PlantillaEquipoItem[]
+  proyectoEquipoCotizadoItem       ProyectoEquipoCotizadoItem[]
   plantillaEquipoItemIndependiente PlantillaEquipoItemIndependiente[]
-  listaEquipoItem                     ListaEquipoItem[]
+  listaEquipoItem                  ListaEquipoItem[]
 
   @@map("catalogo_equipo")
 }
 
 model CatalogoServicio {
-  id                                    String                                  @id
-  categoriaId                           String
-  unidadServicioId                      String
-  recursoId                             String
-  nombre                                String
-  descripcion                           String
-  horaBase                              Float?
-  horaRepetido                          Float?
-  createdAt                             DateTime                                @default(now())
-  updatedAt                             DateTime
-  orden                                 Int?                                    @default(0)
-  cantidad                              Float?
-  nivelDificultad                       Int?                                    @default(1)
-  edt                                   Edt                                     @relation(fields: [categoriaId], references: [id])
-  recurso                               Recurso                                 @relation(fields: [recursoId], references: [id])
-  unidadServicio                        UnidadServicio                          @relation(fields: [unidadServicioId], references: [id])
-  cotizacionServicioItem                CotizacionServicioItem[]
-  plantillaServicioItem                 PlantillaServicioItem[]
-  proyectoServicioCotizadoItem          ProyectoServicioCotizadoItem[]
+  id                                 String                               @id
+  categoriaId                        String
+  unidadServicioId                   String
+  recursoId                          String
+  nombre                             String
+  descripcion                        String
+  horaBase                           Float?
+  horaRepetido                       Float?
+  createdAt                          DateTime                             @default(now())
+  updatedAt                          DateTime
+  orden                              Int?                                 @default(0)
+  cantidad                           Float?
+  nivelDificultad                    Int?                                 @default(1)
+  edt                                Edt                                  @relation(fields: [categoriaId], references: [id])
+  recurso                            Recurso                              @relation(fields: [recursoId], references: [id])
+  unidadServicio                     UnidadServicio                       @relation(fields: [unidadServicioId], references: [id])
+  cotizacionServicioItem             CotizacionServicioItem[]
+  plantillaServicioItem              PlantillaServicioItem[]
+  proyectoServicioCotizadoItem       ProyectoServicioCotizadoItem[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
 
   @@map("catalogo_servicio")
@@ -102,35 +102,35 @@ model CategoriaGasto {
 }
 
 model CatalogoGasto {
-  id              String         @id @default(cuid())
-  codigo          String         @unique
-  descripcion     String
-  categoriaId     String
-  cantidad        Float          @default(1)
-  precioInterno   Float
-  margen          Float          @default(0.2)
-  precioVenta     Float
-  estado          String         @default("activo")
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  categoria       CategoriaGasto @relation(fields: [categoriaId], references: [id])
+  id            String         @id @default(cuid())
+  codigo        String         @unique
+  descripcion   String
+  categoriaId   String
+  cantidad      Float          @default(1)
+  precioInterno Float
+  margen        Float          @default(0.2)
+  precioVenta   Float
+  estado        String         @default("activo")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  categoria     CategoriaGasto @relation(fields: [categoriaId], references: [id])
 
   @@map("catalogo_gasto")
 }
 
 model Cliente {
-  id                       String                   @id
-  codigo                   String                   @unique
-  numeroSecuencia          Int?                     @default(1)
+  id                       String                 @id
+  codigo                   String                 @unique
+  numeroSecuencia          Int?                   @default(1)
   nombre                   String
   ruc                      String?
   direccion                String?
   telefono                 String?
   correo                   String?
-  createdAt                DateTime                 @default(now())
+  createdAt                DateTime               @default(now())
   updatedAt                DateTime
-  calificacion             Int?                     @default(3)
-  estadoRelacion           String                   @default("prospecto")
+  calificacion             Int?                   @default(3)
+  estadoRelacion           String                 @default("prospecto")
   frecuenciaCompra         String?
   linkedin                 String?
   potencialAnual           Float?
@@ -138,7 +138,7 @@ model Cliente {
   sitioWeb                 String?
   tamanoEmpresa            String?
   ultimoProyecto           DateTime?
-  calificacionSatisfaccion Int?                     @default(3)
+  calificacionSatisfaccion Int?                   @default(3)
   frecuenciaCompraMeses    Int?
   cotizacion               Cotizacion[]
   proyecto                 Proyecto[]
@@ -150,67 +150,67 @@ model Cliente {
 }
 
 model Cotizacion {
-  id                          String                        @id
-  clienteId                   String?
-  comercialId                 String?
-  plantillaId                 String?
-  codigo                      String                        @unique
-  numeroSecuencia             Int
-  nombre                      String
-  totalEquiposInterno         Float                         @default(0)
-  totalEquiposCliente         Float                         @default(0)
-  totalServiciosInterno       Float                         @default(0)
-  totalServiciosCliente       Float                         @default(0)
-  totalGastosInterno          Float                         @default(0)
-  totalGastosCliente          Float                         @default(0)
-  totalInterno                Float                         @default(0)
-  totalCliente                Float                         @default(0)
-  descuento                   Float                         @default(0)
-  grandTotal                  Float                         @default(0)
-  prioridad                   String?
-  probabilidad                Int?
-  fechaEnvio                  DateTime?
-  fechaCierreEstimada         DateTime?
-  notas                       String?
-  createdAt                   DateTime                      @default(now())
-  updatedAt                   DateTime
-  fechaValidezHasta           DateTime?
-  formaPago                   String?
-  incluyeIGV                  Boolean?                      @default(false)
-  moneda                      String?                       @default("USD")
-  referencia                  String?
-  revision                    String?                       @default("R01")
-  validezOferta               Int?                          @default(15)
-  competencia                 String?
-  fechaProximaAccion          DateTime?
-  fechaUltimoContacto         DateTime?
-  posicionVsCompetencia       String?
-  prioridadCrm                String?                       @default("media")
-  probabilidadCierre          Int?                          @default(0)
-  proximaAccion               String?
-  razonCierre                 String?
-  retroalimentacionCliente    String?
-  calendarioLaboralId         String?
-  fechaFin                    DateTime?
-  fechaInicio                 DateTime?
-  estado                      EstadoCotizacion              @default(borrador)
-  calendarioLaboral           CalendarioLaboral?           @relation(fields: [calendarioLaboralId], references: [id])
-  cliente                     Cliente?                      @relation(fields: [clienteId], references: [id])
-  user                        User?                         @relation(fields: [comercialId], references: [id])
-  plantilla                   Plantilla?                    @relation(fields: [plantillaId], references: [id])
-  cotizacionEquipo            CotizacionEquipo[]
-  cotizacionGasto             CotizacionGasto[]
-  cotizacionServicio          CotizacionServicio[]
-  proyecto                    Proyecto[]
-  cotizacionCondicion        CotizacionCondicion[]
-  cotizacionEdt              CotizacionEdt[]
-  cotizacionExclusion        CotizacionExclusion[]
-  cotizacionFase             CotizacionFase[]
-  cotizacionPlantillaImport  CotizacionPlantillaImport[]
-  cotizacionVersion          CotizacionVersion[]
-  crmCompetidorLicitacion     CrmCompetidorLicitacion[]
-  crmHistorialProyecto        CrmHistorialProyecto[]
-  crmOportunidad              CrmOportunidad?
+  id                        String                      @id
+  clienteId                 String?
+  comercialId               String?
+  plantillaId               String?
+  codigo                    String                      @unique
+  numeroSecuencia           Int
+  nombre                    String
+  totalEquiposInterno       Float                       @default(0)
+  totalEquiposCliente       Float                       @default(0)
+  totalServiciosInterno     Float                       @default(0)
+  totalServiciosCliente     Float                       @default(0)
+  totalGastosInterno        Float                       @default(0)
+  totalGastosCliente        Float                       @default(0)
+  totalInterno              Float                       @default(0)
+  totalCliente              Float                       @default(0)
+  descuento                 Float                       @default(0)
+  grandTotal                Float                       @default(0)
+  prioridad                 String?
+  probabilidad              Int?
+  fechaEnvio                DateTime?
+  fechaCierreEstimada       DateTime?
+  notas                     String?
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime
+  fechaValidezHasta         DateTime?
+  formaPago                 String?
+  incluyeIGV                Boolean?                    @default(false)
+  moneda                    String?                     @default("USD")
+  referencia                String?
+  revision                  String?                     @default("R01")
+  validezOferta             Int?                        @default(15)
+  competencia               String?
+  fechaProximaAccion        DateTime?
+  fechaUltimoContacto       DateTime?
+  posicionVsCompetencia     String?
+  prioridadCrm              String?                     @default("media")
+  probabilidadCierre        Int?                        @default(0)
+  proximaAccion             String?
+  razonCierre               String?
+  retroalimentacionCliente  String?
+  calendarioLaboralId       String?
+  fechaFin                  DateTime?
+  fechaInicio               DateTime?
+  estado                    EstadoCotizacion            @default(borrador)
+  calendarioLaboral         CalendarioLaboral?          @relation(fields: [calendarioLaboralId], references: [id])
+  cliente                   Cliente?                    @relation(fields: [clienteId], references: [id])
+  user                      User?                       @relation(fields: [comercialId], references: [id])
+  plantilla                 Plantilla?                  @relation(fields: [plantillaId], references: [id])
+  cotizacionEquipo          CotizacionEquipo[]
+  cotizacionGasto           CotizacionGasto[]
+  cotizacionServicio        CotizacionServicio[]
+  proyecto                  Proyecto[]
+  cotizacionCondicion       CotizacionCondicion[]
+  cotizacionEdt             CotizacionEdt[]
+  cotizacionExclusion       CotizacionExclusion[]
+  cotizacionFase            CotizacionFase[]
+  cotizacionPlantillaImport CotizacionPlantillaImport[]
+  cotizacionVersion         CotizacionVersion[]
+  crmCompetidorLicitacion   CrmCompetidorLicitacion[]
+  crmHistorialProyecto      CrmHistorialProyecto[]
+  crmOportunidad            CrmOportunidad?
 
   @@map("cotizacion")
 }
@@ -226,7 +226,7 @@ model CotizacionEquipo {
   updatedAt            DateTime
   plazoEntregaSemanas  Int?
   cotizacion           Cotizacion             @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  cotizacionEquipoItem                CotizacionEquipoItem[]
+  cotizacionEquipoItem CotizacionEquipoItem[]
 
   @@map("cotizacion_equipo")
 }
@@ -298,33 +298,33 @@ model CotizacionProveedor {
   estado                  EstadoCotizacionProveedor @default(pendiente)
   proveedor               Proveedor                 @relation(fields: [proveedorId], references: [id])
   proyecto                Proyecto                  @relation(fields: [proyectoId], references: [id])
-  cotizacionProveedorItem    CotizacionProveedorItem[]
+  cotizacionProveedorItem CotizacionProveedorItem[]
 
   @@map("cotizacion_proveedor")
 }
 
 model CotizacionProveedorItem {
-  id                                                                                String                    @id
-  cotizacionId                                                                      String
-  listaEquipoItemId                                                                 String?
-  codigo                                                                            String
-  descripcion                                                                       String
-  unidad                                                                            String
-  cantidadOriginal                                                                  Float
-  precioUnitario                                                                    Float?
-  cantidad                                                                          Float?
-  costoTotal                                                                        Float?
-  tiempoEntrega                                                                     String?
-  tiempoEntregaDias                                                                 Int?
-  estado                                                                            EstadoCotizacionProveedor @default(pendiente)
-  esSeleccionada                                                                    Boolean?                  @default(false)
-  createdAt                                                                         DateTime                  @default(now())
-  updatedAt                                                                         DateTime
-  listaId                                                                           String?
-  cotizacionProveedor            CotizacionProveedor  @relation(fields: [cotizacionId], references: [id])
-  listaEquipoItem                ListaEquipoItem?     @relation("cotizacionProveedorItemListaEquipoItem", fields: [listaEquipoItemId], references: [id])
-  listaEquipo                    ListaEquipo?         @relation(fields: [listaId], references: [id])
-  cotizacionSeleccionadaItems    ListaEquipoItem?     @relation("listaEquipoItemCotizacionSeleccionada")
+  id                          String                    @id
+  cotizacionId                String
+  listaEquipoItemId           String?
+  codigo                      String
+  descripcion                 String
+  unidad                      String
+  cantidadOriginal            Float
+  precioUnitario              Float?
+  cantidad                    Float?
+  costoTotal                  Float?
+  tiempoEntrega               String?
+  tiempoEntregaDias           Int?
+  estado                      EstadoCotizacionProveedor @default(pendiente)
+  esSeleccionada              Boolean?                  @default(false)
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime
+  listaId                     String?
+  cotizacionProveedor         CotizacionProveedor       @relation(fields: [cotizacionId], references: [id])
+  listaEquipoItem             ListaEquipoItem?          @relation("cotizacionProveedorItemListaEquipoItem", fields: [listaEquipoItemId], references: [id])
+  listaEquipo                 ListaEquipo?              @relation(fields: [listaId], references: [id])
+  cotizacionSeleccionadaItems ListaEquipoItem?          @relation("listaEquipoItemCotizacionSeleccionada")
 
   @@map("cotizacion_proveedor_item")
 }
@@ -400,9 +400,9 @@ model EntregaItem {
   updatedAt          DateTime
   listaEquipoItem    ListaEquipoItem?     @relation(fields: [listaEquipoItemId], references: [id])
   pedidoEquipoItem   PedidoEquipoItem     @relation(fields: [pedidoEquipoItemId], references: [id])
-  proyecto                    Proyecto             @relation(fields: [proyectoId], references: [id])
-  user                        User?                @relation(fields: [usuarioId], references: [id])
-  eventoTrazabilidad              EventoTrazabilidad[]
+  proyecto           Proyecto             @relation(fields: [proyectoId], references: [id])
+  user               User?                @relation(fields: [usuarioId], references: [id])
+  eventoTrazabilidad EventoTrazabilidad[]
 
   @@index([fechaEntrega])
   @@index([pedidoEquipoItemId])
@@ -424,8 +424,8 @@ model EventoTrazabilidad {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime
   entregaItem    EntregaItem?       @relation(fields: [entregaItemId], references: [id])
-  proyecto                    Proyecto?          @relation(fields: [proyectoId], references: [id])
-  user                        User               @relation(fields: [usuarioId], references: [id])
+  proyecto       Proyecto?          @relation(fields: [proyectoId], references: [id])
+  user           User               @relation(fields: [usuarioId], references: [id])
 
   @@index([entregaItemId])
   @@index([fechaEvento])
@@ -453,12 +453,12 @@ model ListaEquipo {
   fechaNecesaria             DateTime?
   fechaValidacion            DateTime?
   cotizacionProveedorItem    CotizacionProveedorItem[]
-  proyecto                    Proyecto                     @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  user                        User                         @relation(fields: [responsableId], references: [id])
+  proyecto                   Proyecto                     @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  user                       User                         @relation(fields: [responsableId], references: [id])
   listaEquipoItem            ListaEquipoItem[]
   pedidoEquipo               PedidoEquipo[]
   pedidoEquipoItem           PedidoEquipoItem[]
-  proyectoEquipoCotizadoItem          ProyectoEquipoCotizadoItem[]
+  proyectoEquipoCotizadoItem ProyectoEquipoCotizadoItem[]
 
   @@index([estado, fechaNecesaria, createdAt(sort: Desc)], map: "idx_lista_estado_necesaria_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_lista_proyecto_estado_fecha")
@@ -467,48 +467,48 @@ model ListaEquipo {
 }
 
 model ListaEquipoItem {
-  id                                                                                                           String                       @id @default(cuid())
-  listaId                                                                                                      String
-  proyectoEquipoId                                                                                             String?
-  proyectoEquipoItemId                                                                                         String?
-  proveedorId                                                                                                  String?
-  cotizacionSeleccionadaId                                                                                     String?                      @unique
-  catalogoEquipoId                                                                                             String?
-  codigo                                                                                                       String
-  descripcion                                                                                                  String
-  categoria                                                                                                    String                       @default("SIN-CATEGORIA")
-  unidad                                                                                                       String
-  marca                                                                                                        String                       @default("SIN-MARCA")
-  cantidad                                                                                                     Float
-  verificado                                                                                                   Boolean                      @default(false)
-  comentarioRevision                                                                                           String?
-  presupuesto                                                                                                  Float?
-  precioElegido                                                                                                Float?
-  costoElegido                                                                                                 Float?
-  costoPedido                                                                                                  Float?                       @default(0)
-  costoReal                                                                                                    Float?                       @default(0)
-  cantidadPedida                                                                                               Float?                       @default(0)
-  cantidadEntregada                                                                                            Float?                       @default(0)
-  estado                                                                                                       EstadoListaItem              @default(borrador)
-  createdAt                                                                                                    DateTime                     @default(now())
-  updatedAt                                                                                                    DateTime
-  origen                                                                                                       OrigenListaItem              @default(nuevo)
-  tiempoEntrega                                                                                                String?
-  tiempoEntregaDias                                                                                            Int?
-  responsableId                                                                                                String
-  reemplazaProyectoEquipoCotizadoItemId                                                                        String?
-  cotizacionProveedorItems                 CotizacionProveedorItem[]    @relation("cotizacionProveedorItemListaEquipoItem")
-  entregaItem                              EntregaItem[]
-  cotizacionSeleccionada                   CotizacionProveedorItem?     @relation("listaEquipoItemCotizacionSeleccionada", fields: [cotizacionSeleccionadaId], references: [id])
-  listaEquipo                              ListaEquipo                  @relation(fields: [listaId], references: [id], onDelete: Cascade)
-  proveedor                                Proveedor?                   @relation(fields: [proveedorId], references: [id])
-  proyectoEquipoCotizado                   ProyectoEquipoCotizado?      @relation(fields: [proyectoEquipoId], references: [id])
-  proyectoEquipoItem                       ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemProyectoEquipoItem", fields: [proyectoEquipoItemId], references: [id])
-  reemplazaProyectoEquipoCotizadoItem      ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemReemplazaProyectoEquipoItem", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
-  user                                     User                         @relation(fields: [responsableId], references: [id])
-  pedidoEquipoItem                         PedidoEquipoItem[]
-  listaEquipoItemSeleccionados             ProyectoEquipoCotizadoItem[] @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado")
-  catalogoEquipo                           CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
+  id                                    String                       @id @default(cuid())
+  listaId                               String
+  proyectoEquipoId                      String?
+  proyectoEquipoItemId                  String?
+  proveedorId                           String?
+  cotizacionSeleccionadaId              String?                      @unique
+  catalogoEquipoId                      String?
+  codigo                                String
+  descripcion                           String
+  categoria                             String                       @default("SIN-CATEGORIA")
+  unidad                                String
+  marca                                 String                       @default("SIN-MARCA")
+  cantidad                              Float
+  verificado                            Boolean                      @default(false)
+  comentarioRevision                    String?
+  presupuesto                           Float?
+  precioElegido                         Float?
+  costoElegido                          Float?
+  costoPedido                           Float?                       @default(0)
+  costoReal                             Float?                       @default(0)
+  cantidadPedida                        Float?                       @default(0)
+  cantidadEntregada                     Float?                       @default(0)
+  estado                                EstadoListaItem              @default(borrador)
+  createdAt                             DateTime                     @default(now())
+  updatedAt                             DateTime
+  origen                                OrigenListaItem              @default(nuevo)
+  tiempoEntrega                         String?
+  tiempoEntregaDias                     Int?
+  responsableId                         String
+  reemplazaProyectoEquipoCotizadoItemId String?
+  cotizacionProveedorItems              CotizacionProveedorItem[]    @relation("cotizacionProveedorItemListaEquipoItem")
+  entregaItem                           EntregaItem[]
+  cotizacionSeleccionada                CotizacionProveedorItem?     @relation("listaEquipoItemCotizacionSeleccionada", fields: [cotizacionSeleccionadaId], references: [id])
+  listaEquipo                           ListaEquipo                  @relation(fields: [listaId], references: [id], onDelete: Cascade)
+  proveedor                             Proveedor?                   @relation(fields: [proveedorId], references: [id])
+  proyectoEquipoCotizado                ProyectoEquipoCotizado?      @relation(fields: [proyectoEquipoId], references: [id])
+  proyectoEquipoItem                    ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemProyectoEquipoItem", fields: [proyectoEquipoItemId], references: [id])
+  reemplazaProyectoEquipoCotizadoItem   ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemReemplazaProyectoEquipoItem", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
+  user                                  User                         @relation(fields: [responsableId], references: [id])
+  pedidoEquipoItem                      PedidoEquipoItem[]
+  listaEquipoItemSeleccionados          ProyectoEquipoCotizadoItem[] @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado")
+  catalogoEquipo                        CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
 
   @@index([listaId, estado, createdAt(sort: Desc)], map: "idx_lista_item_lista_estado_fecha")
   @@index([proveedorId, estado, precioElegido], map: "idx_lista_item_proveedor_estado_precio")
@@ -536,8 +536,8 @@ model PedidoEquipo {
   presupuestoTotal     Float              @default(0)
   prioridad            String?            @default("media")
   listaEquipo          ListaEquipo?       @relation(fields: [listaId], references: [id])
-  proyecto                    Proyecto           @relation(fields: [proyectoId], references: [id])
-  user                        User               @relation(fields: [responsableId], references: [id])
+  proyecto             Proyecto           @relation(fields: [proyectoId], references: [id])
+  user                 User               @relation(fields: [responsableId], references: [id])
   pedidoEquipoItem     PedidoEquipoItem[]
 
   @@index([estado, prioridad, createdAt(sort: Desc)], map: "idx_pedido_estado_prioridad_fecha")
@@ -581,26 +581,26 @@ model PedidoEquipoItem {
 }
 
 model Plantilla {
-  id                          String                        @id
-  nombre                      String
-  estado                      String                        @default("borrador")
-  totalEquiposInterno         Float                         @default(0)
-  totalEquiposCliente         Float                         @default(0)
-  totalServiciosInterno       Float                         @default(0)
-  totalServiciosCliente       Float                         @default(0)
-  totalGastosInterno          Float                         @default(0)
-  totalGastosCliente          Float                         @default(0)
-  totalInterno                Float                         @default(0)
-  totalCliente                Float                         @default(0)
-  descuento                   Float                         @default(0)
-  grandTotal                  Float                         @default(0)
-  createdAt                   DateTime                      @default(now())
-  updatedAt                   DateTime
-  tipo                        PlantillaTipo                 @default(completa)
-  cotizacion                  Cotizacion[]
-  plantillaEquipo             PlantillaEquipo[]
-  plantillaGasto              PlantillaGasto[]
-  plantillaServicio           PlantillaServicio[]
+  id                        String                      @id
+  nombre                    String
+  estado                    String                      @default("borrador")
+  totalEquiposInterno       Float                       @default(0)
+  totalEquiposCliente       Float                       @default(0)
+  totalServiciosInterno     Float                       @default(0)
+  totalServiciosCliente     Float                       @default(0)
+  totalGastosInterno        Float                       @default(0)
+  totalGastosCliente        Float                       @default(0)
+  totalInterno              Float                       @default(0)
+  totalCliente              Float                       @default(0)
+  descuento                 Float                       @default(0)
+  grandTotal                Float                       @default(0)
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime
+  tipo                      PlantillaTipo               @default(completa)
+  cotizacion                Cotizacion[]
+  plantillaEquipo           PlantillaEquipo[]
+  plantillaGasto            PlantillaGasto[]
+  plantillaServicio         PlantillaServicio[]
   cotizacionPlantillaImport CotizacionPlantillaImport[]
 
   @@map("plantilla")
@@ -615,8 +615,8 @@ model PlantillaEquipo {
   subtotalCliente     Float
   createdAt           DateTime              @default(now())
   updatedAt           DateTime
-  plantilla                   Plantilla             @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
-  plantillaEquipoItem                 PlantillaEquipoItem[]
+  plantilla           Plantilla             @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  plantillaEquipoItem PlantillaEquipoItem[]
 
   @@map("plantilla_equipo")
 }
@@ -652,7 +652,7 @@ model PlantillaGasto {
   subtotalCliente    Float
   createdAt          DateTime             @default(now())
   updatedAt          DateTime
-  plantilla                   Plantilla            @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  plantilla          Plantilla            @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
   plantillaGastoItem PlantillaGastoItem[]
 
   @@map("plantilla_gasto")
@@ -686,8 +686,8 @@ model PlantillaServicio {
   subtotalCliente       Float
   createdAt             DateTime                @default(now())
   updatedAt             DateTime
-  plantilla                   Plantilla               @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
-  plantillaServicioItem                 PlantillaServicioItem[]
+  plantilla             Plantilla               @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  plantillaServicioItem PlantillaServicioItem[]
 
   @@map("plantilla_servicio")
 }
@@ -719,7 +719,7 @@ model PlantillaServicioItem {
   updatedAt            DateTime
   catalogoServicio     CatalogoServicio? @relation(fields: [catalogoServicioId], references: [id])
   plantillaServicio    PlantillaServicio @relation(fields: [plantillaServicioId], references: [id], onDelete: Cascade)
-  recurso                     Recurso           @relation(fields: [recursoId], references: [id])
+  recurso              Recurso           @relation(fields: [recursoId], references: [id])
   unidadServicio       UnidadServicio    @relation(fields: [unidadServicioId], references: [id])
 
   @@map("plantilla_servicio_item")
@@ -741,55 +741,55 @@ model Proveedor {
 }
 
 model Proyecto {
-  id                              String                     @id
-  clienteId                       String
-  comercialId                     String
-  gestorId                        String
-  supervisorId                    String?
-  liderId                         String?
-  cotizacionId                    String?
-  nombre                          String
-  totalEquiposInterno             Float                      @default(0)
-  totalServiciosInterno           Float                      @default(0)
-  totalGastosInterno              Float                      @default(0)
-  totalInterno                    Float                      @default(0)
-  totalCliente                    Float                      @default(0)
-  descuento                       Float                      @default(0)
-  grandTotal                      Float                      @default(0)
-  codigo                          String
-  estado                          ProyectoEstado             @default(creado)
-  fechaInicio                     DateTime
-  fechaFin                        DateTime?
-  totalRealEquipos                Float                      @default(0)
-  totalRealServicios              Float                      @default(0)
-  totalRealGastos                 Float                      @default(0)
-  totalReal                       Float                      @default(0)
-  createdAt                       DateTime                   @default(now())
-  updatedAt                       DateTime
-  deletedAt                       DateTime?
-  progresoGeneral                 Int                        @default(0)
-  cotizacionProveedor             CotizacionProveedor[]
-  entregaItem                     EntregaItem[]
-  eventoTrazabilidad              EventoTrazabilidad[]
-  listaEquipo                     ListaEquipo[]
-  pedidoEquipo                    PedidoEquipo[]
-  cliente                     Cliente                    @relation(fields: [clienteId], references: [id])
-  comercial                   User                       @relation("ProyectoComercial", fields: [comercialId], references: [id])
-  cotizacion                  Cotizacion?                @relation(fields: [cotizacionId], references: [id])
-  gestor                      User                       @relation("ProyectoGestor", fields: [gestorId], references: [id])
-  supervisor                  User?                      @relation("ProyectoSupervisor", fields: [supervisorId], references: [id])
-  lider                       User?                      @relation("ProyectoLider", fields: [liderId], references: [id])
-  personalProyecto            PersonalProyecto[]
-  proyectoEquipoCotizado          ProyectoEquipoCotizado[]
-  proyectoGastoCotizado           ProyectoGastoCotizado[]
-  proyectoServicioCotizado        ProyectoServicioCotizado[]
-  registroHoras                   RegistroHoras[]
-  valorizacion                    Valorizacion[]
-  crmHistorialProyecto            CrmHistorialProyecto[]
-  crmOportunidad                  CrmOportunidad[]
-  proyectoCronograma             ProyectoCronograma[]
-  proyectoEdt                    ProyectoEdt[]
-  proyectoFase                   ProyectoFase[]
+  id                       String                     @id
+  clienteId                String
+  comercialId              String
+  gestorId                 String
+  supervisorId             String?
+  liderId                  String?
+  cotizacionId             String?
+  nombre                   String
+  totalEquiposInterno      Float                      @default(0)
+  totalServiciosInterno    Float                      @default(0)
+  totalGastosInterno       Float                      @default(0)
+  totalInterno             Float                      @default(0)
+  totalCliente             Float                      @default(0)
+  descuento                Float                      @default(0)
+  grandTotal               Float                      @default(0)
+  codigo                   String
+  estado                   ProyectoEstado             @default(creado)
+  fechaInicio              DateTime
+  fechaFin                 DateTime?
+  totalRealEquipos         Float                      @default(0)
+  totalRealServicios       Float                      @default(0)
+  totalRealGastos          Float                      @default(0)
+  totalReal                Float                      @default(0)
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  deletedAt                DateTime?
+  progresoGeneral          Int                        @default(0)
+  cotizacionProveedor      CotizacionProveedor[]
+  entregaItem              EntregaItem[]
+  eventoTrazabilidad       EventoTrazabilidad[]
+  listaEquipo              ListaEquipo[]
+  pedidoEquipo             PedidoEquipo[]
+  cliente                  Cliente                    @relation(fields: [clienteId], references: [id])
+  comercial                User                       @relation("ProyectoComercial", fields: [comercialId], references: [id])
+  cotizacion               Cotizacion?                @relation(fields: [cotizacionId], references: [id])
+  gestor                   User                       @relation("ProyectoGestor", fields: [gestorId], references: [id])
+  supervisor               User?                      @relation("ProyectoSupervisor", fields: [supervisorId], references: [id])
+  lider                    User?                      @relation("ProyectoLider", fields: [liderId], references: [id])
+  personalProyecto         PersonalProyecto[]
+  proyectoEquipoCotizado   ProyectoEquipoCotizado[]
+  proyectoGastoCotizado    ProyectoGastoCotizado[]
+  proyectoServicioCotizado ProyectoServicioCotizado[]
+  registroHoras            RegistroHoras[]
+  valorizacion             Valorizacion[]
+  crmHistorialProyecto     CrmHistorialProyecto[]
+  crmOportunidad           CrmOportunidad[]
+  proyectoCronograma       ProyectoCronograma[]
+  proyectoEdt              ProyectoEdt[]
+  proyectoFase             ProyectoFase[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -802,19 +802,19 @@ model Proyecto {
 
 // Personal asignado al proyecto (roles dinámicos)
 model PersonalProyecto {
-  id              String               @id @default(cuid())
+  id              String              @id @default(cuid())
   proyectoId      String
   userId          String
   rol             RolPersonalProyecto
-  fechaAsignacion DateTime             @default(now())
+  fechaAsignacion DateTime            @default(now())
   fechaFin        DateTime?
-  activo          Boolean              @default(true)
+  activo          Boolean             @default(true)
   notas           String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
-  proyecto        Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  user            User                 @relation(fields: [userId], references: [id])
+  proyecto Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
 
   @@unique([proyectoId, userId, rol])
   @@index([proyectoId, activo])
@@ -844,44 +844,44 @@ model ProyectoEquipoCotizado {
   createdAt                  DateTime                     @default(now())
   updatedAt                  DateTime
   listaEquipoItem            ListaEquipoItem[]
-  proyecto                    Proyecto                     @relation(fields: [proyectoId], references: [id])
-  user                        User                         @relation(fields: [responsableId], references: [id])
-  proyectoEquipoCotizadoItem          ProyectoEquipoCotizadoItem[]
+  proyecto                   Proyecto                     @relation(fields: [proyectoId], references: [id])
+  user                       User                         @relation(fields: [responsableId], references: [id])
+  proyectoEquipoCotizadoItem ProyectoEquipoCotizadoItem[]
 
   @@map("proyecto_equipo_cotizado")
 }
 
 model ProyectoEquipoCotizadoItem {
-  id                                                                                                String                 @id
-  proyectoEquipoId                                                                                  String
-  catalogoEquipoId                                                                                  String?
-  listaId                                                                                           String?
-  codigo                                                                                            String
-  descripcion                                                                                       String
-  categoria                                                                                         String                 @default("SIN-CATEGORIA")
-  unidad                                                                                            String
-  marca                                                                                             String                 @default("SIN-MARCA")
-  precioInterno                                                                                     Float
-  precioCliente                                                                                     Float
-  cantidad                                                                                          Float
-  costoInterno                                                                                      Float
-  costoCliente                                                                                      Float
-  precioReal                                                                                        Float                  @default(0)
-  cantidadReal                                                                                      Float                  @default(0)
-  costoReal                                                                                         Float                  @default(0)
-  tiempoEntrega                                                                                     Int?
-  fechaEntregaEstimada                                                                              DateTime?
-  estado                                                                                            EstadoEquipoItem       @default(pendiente)
-  motivoCambio                                                                                      String?
-  createdAt                                                                                         DateTime               @default(now())
-  updatedAt                                                                                         DateTime
-  listaEquipoSeleccionadoId                                                                         String?
-  listaEquipoItemsAsociados      ListaEquipoItem[]      @relation("listaEquipoItemProyectoEquipoItem")
-  listaEquipoItemsReemplazo      ListaEquipoItem[]      @relation("listaEquipoItemReemplazaProyectoEquipoItem")
-  catalogoEquipo                 CatalogoEquipo?        @relation(fields: [catalogoEquipoId], references: [id])
-  listaEquipoSeleccionado        ListaEquipoItem?       @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado", fields: [listaEquipoSeleccionadoId], references: [id])
-  listaEquipo                    ListaEquipo?           @relation(fields: [listaId], references: [id])
-  proyectoEquipoCotizado         ProyectoEquipoCotizado @relation(fields: [proyectoEquipoId], references: [id], onDelete: Cascade)
+  id                        String                 @id
+  proyectoEquipoId          String
+  catalogoEquipoId          String?
+  listaId                   String?
+  codigo                    String
+  descripcion               String
+  categoria                 String                 @default("SIN-CATEGORIA")
+  unidad                    String
+  marca                     String                 @default("SIN-MARCA")
+  precioInterno             Float
+  precioCliente             Float
+  cantidad                  Float
+  costoInterno              Float
+  costoCliente              Float
+  precioReal                Float                  @default(0)
+  cantidadReal              Float                  @default(0)
+  costoReal                 Float                  @default(0)
+  tiempoEntrega             Int?
+  fechaEntregaEstimada      DateTime?
+  estado                    EstadoEquipoItem       @default(pendiente)
+  motivoCambio              String?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime
+  listaEquipoSeleccionadoId String?
+  listaEquipoItemsAsociados ListaEquipoItem[]      @relation("listaEquipoItemProyectoEquipoItem")
+  listaEquipoItemsReemplazo ListaEquipoItem[]      @relation("listaEquipoItemReemplazaProyectoEquipoItem")
+  catalogoEquipo            CatalogoEquipo?        @relation(fields: [catalogoEquipoId], references: [id])
+  listaEquipoSeleccionado   ListaEquipoItem?       @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado", fields: [listaEquipoSeleccionadoId], references: [id])
+  listaEquipo               ListaEquipo?           @relation(fields: [listaId], references: [id])
+  proyectoEquipoCotizado    ProyectoEquipoCotizado @relation(fields: [proyectoEquipoId], references: [id], onDelete: Cascade)
 
   @@map("proyecto_equipo_cotizado_item")
 }
@@ -896,7 +896,7 @@ model ProyectoGastoCotizado {
   subtotalReal              Float                       @default(0)
   createdAt                 DateTime                    @default(now())
   updatedAt                 DateTime
-  proyecto                    Proyecto                    @relation(fields: [proyectoId], references: [id])
+  proyecto                  Proyecto                    @relation(fields: [proyectoId], references: [id])
   proyectoGastoCotizadoItem ProyectoGastoCotizadoItem[]
 
   @@map("proyecto_gasto_cotizado")
@@ -932,11 +932,11 @@ model ProyectoServicioCotizado {
   subtotalReal                 Float                          @default(0)
   createdAt                    DateTime                       @default(now())
   updatedAt                    DateTime
-  proyecto                    Proyecto                       @relation(fields: [proyectoId], references: [id])
-  user                        User                           @relation(fields: [responsableId], references: [id])
-  edt                         Edt                            @relation("ProyectoServicioCotizadoEdt", fields: [edtId], references: [id])
-  proyectoServicioCotizadoItem          ProyectoServicioCotizadoItem[]
-  registroHoras                   RegistroHoras[]
+  proyecto                     Proyecto                       @relation(fields: [proyectoId], references: [id])
+  user                         User                           @relation(fields: [responsableId], references: [id])
+  edt                          Edt                            @relation("ProyectoServicioCotizadoEdt", fields: [edtId], references: [id])
+  proyectoServicioCotizadoItem ProyectoServicioCotizadoItem[]
+  registroHoras                RegistroHoras[]
   tareas                       Tarea[]
 
   @@map("proyecto_servicio_cotizado")
@@ -967,15 +967,15 @@ model ProyectoServicioCotizadoItem {
 }
 
 model Recurso {
-  id                                    String                                  @id @default(cuid())
-  nombre                                String                                  @unique
-  costoHora                             Float
-  createdAt                             DateTime                                @default(now())
-  updatedAt                             DateTime                                @updatedAt
-  catalogoServicio                      CatalogoServicio[]
-  cotizacionServicioItem                CotizacionServicioItem[]
-  plantillaServicioItem                 PlantillaServicioItem[]
-  registroHoras                   RegistroHoras[]
+  id                                 String                               @id @default(cuid())
+  nombre                             String                               @unique
+  costoHora                          Float
+  createdAt                          DateTime                             @default(now())
+  updatedAt                          DateTime                             @updatedAt
+  catalogoServicio                   CatalogoServicio[]
+  cotizacionServicioItem             CotizacionServicioItem[]
+  plantillaServicioItem              PlantillaServicioItem[]
+  registroHoras                      RegistroHoras[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
 
   @@map("recurso")
@@ -1003,12 +1003,12 @@ model RegistroHoras {
   updatedAt                DateTime
   proyectoTareaId          String?
   edt                      Edt?                     @relation(fields: [edtId], references: [id])
-  proyectoEdt             ProyectoEdt?            @relation(fields: [proyectoEdtId], references: [id])
+  proyectoEdt              ProyectoEdt?             @relation(fields: [proyectoEdtId], references: [id])
   proyecto                 Proyecto                 @relation(fields: [proyectoId], references: [id])
   proyectoServicioCotizado ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id])
-  proyectoTarea           ProyectoTarea?          @relation(fields: [proyectoTareaId], references: [id])
-  recurso                     Recurso                  @relation(fields: [recursoId], references: [id])
-  user                        User                     @relation(fields: [usuarioId], references: [id])
+  proyectoTarea            ProyectoTarea?           @relation(fields: [proyectoTareaId], references: [id])
+  recurso                  Recurso                  @relation(fields: [recursoId], references: [id])
+  user                     User                     @relation(fields: [usuarioId], references: [id])
 
   @@index([edtId, fechaTrabajo])
   @@index([origen, fechaTrabajo])
@@ -1022,7 +1022,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
 }
@@ -1038,65 +1038,65 @@ model Unidad {
 }
 
 model UnidadServicio {
-  id                                     String                                  @id
-  nombre                                 String                                  @unique
-  createdAt                              DateTime                                @default(now())
-  updatedAt                              DateTime
-  catalogoServicio                       CatalogoServicio[]
-  cotizacionServicioItem                 CotizacionServicioItem[]
-  plantillaServicioItem                  PlantillaServicioItem[]
-  plantillaServicioItemIndependiente     PlantillaServicioItemIndependiente[]
+  id                                 String                               @id
+  nombre                             String                               @unique
+  createdAt                          DateTime                             @default(now())
+  updatedAt                          DateTime
+  catalogoServicio                   CatalogoServicio[]
+  cotizacionServicioItem             CotizacionServicioItem[]
+  plantillaServicioItem              PlantillaServicioItem[]
+  plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
 
   @@map("unidad_servicio")
 }
 
 model User {
-  id                                                  String                        @id
-  name                                                String?
-  email                                               String                        @unique
-  emailVerified                                       DateTime?
-  password                                            String
-  role                                                Role                          @default(colaborador)
-  image                                               String?
-  metaMensual                                         Float?
-  metaTrimestral                                      Float?
-  Account                                             Account[]
-  cotizacion                  Cotizacion[]
-  entregaItem                                         EntregaItem[]
-  eventoTrazabilidad              EventoTrazabilidad[]
-  listaEquipo                                         ListaEquipo[]
-  listaEquipoItem                                     ListaEquipoItem[]
-  pedidoEquipo                                        PedidoEquipo[]
-  pedidoEquipoItem                                    PedidoEquipoItem[]
-  proyectosComoComercial                              Proyecto[]                    @relation("ProyectoComercial")
-  proyectosComoGestor                                 Proyecto[]                    @relation("ProyectoGestor")
-  proyectosComoSupervisor                             Proyecto[]                    @relation("ProyectoSupervisor")
-  proyectosComoLider                                  Proyecto[]                    @relation("ProyectoLider")
-  personalProyecto                                    PersonalProyecto[]
-  proyectoEquipoCotizado                              ProyectoEquipoCotizado[]
-  proyectoServicioCotizado                            ProyectoServicioCotizado[]
-  registroHoras                   RegistroHoras[]
-  Session                                             Session[]
-  asignacionesRecurso                                AsignacionRecurso[]
-  auditLog                                           AuditLog[]
-  cotizacionEdt                                      CotizacionEdt[]
-  cotizacionPlantillaImport                         CotizacionPlantillaImport[]
-  cotizacionTarea                                    CotizacionTarea[]
-  cotizacionVersion                                  CotizacionVersion[]
-  crmActividad                                        CrmActividad[]
-  crmMetricaComercial                                 CrmMetricaComercial[]
-  crmOportunidadComercial                             CrmOportunidad[]             @relation("CrmOportunidadComercial")
-  crmOportunidadResponsable                           CrmOportunidad[]             @relation("CrmOportunidadResponsable")
-  metricaComercial                                   MetricaComercial[]
-  notificaciones                                      Notificacion[]
-  proyectoActividad                                  ProyectoActividad[]
-  proyectoEdt                                        ProyectoEdt[]
-  proyectoSubtarea                                   ProyectoSubtarea[]
-  proyectoTarea                                      ProyectoTarea[]
-  registrosProgreso                                  RegistroProgreso[]
-  subtareas                                           Subtarea[]
-  tareas                                              Tarea[]
-  userPermissions                                    UserPermission[]
+  id                        String                      @id
+  name                      String?
+  email                     String                      @unique
+  emailVerified             DateTime?
+  password                  String
+  role                      Role                        @default(colaborador)
+  image                     String?
+  metaMensual               Float?
+  metaTrimestral            Float?
+  Account                   Account[]
+  cotizacion                Cotizacion[]
+  entregaItem               EntregaItem[]
+  eventoTrazabilidad        EventoTrazabilidad[]
+  listaEquipo               ListaEquipo[]
+  listaEquipoItem           ListaEquipoItem[]
+  pedidoEquipo              PedidoEquipo[]
+  pedidoEquipoItem          PedidoEquipoItem[]
+  proyectosComoComercial    Proyecto[]                  @relation("ProyectoComercial")
+  proyectosComoGestor       Proyecto[]                  @relation("ProyectoGestor")
+  proyectosComoSupervisor   Proyecto[]                  @relation("ProyectoSupervisor")
+  proyectosComoLider        Proyecto[]                  @relation("ProyectoLider")
+  personalProyecto          PersonalProyecto[]
+  proyectoEquipoCotizado    ProyectoEquipoCotizado[]
+  proyectoServicioCotizado  ProyectoServicioCotizado[]
+  registroHoras             RegistroHoras[]
+  Session                   Session[]
+  asignacionesRecurso       AsignacionRecurso[]
+  auditLog                  AuditLog[]
+  cotizacionEdt             CotizacionEdt[]
+  cotizacionPlantillaImport CotizacionPlantillaImport[]
+  cotizacionTarea           CotizacionTarea[]
+  cotizacionVersion         CotizacionVersion[]
+  crmActividad              CrmActividad[]
+  crmMetricaComercial       CrmMetricaComercial[]
+  crmOportunidadComercial   CrmOportunidad[]            @relation("CrmOportunidadComercial")
+  crmOportunidadResponsable CrmOportunidad[]            @relation("CrmOportunidadResponsable")
+  metricaComercial          MetricaComercial[]
+  notificaciones            Notificacion[]
+  proyectoActividad         ProyectoActividad[]
+  proyectoEdt               ProyectoEdt[]
+  proyectoSubtarea          ProyectoSubtarea[]
+  proyectoTarea             ProyectoTarea[]
+  registrosProgreso         RegistroProgreso[]
+  subtareas                 Subtarea[]
+  tareas                    Tarea[]
+  userPermissions           UserPermission[]
 
   @@map("user")
 }
@@ -1112,7 +1112,7 @@ model Valorizacion {
   montoTotal    Float
   createdAt     DateTime @default(now())
   updatedAt     DateTime
-  proyecto                    Proyecto @relation(fields: [proyectoId], references: [id])
+  proyecto      Proyecto @relation(fields: [proyectoId], references: [id])
 
   @@map("valorizacion")
 }
@@ -1155,8 +1155,8 @@ model AsignacionRecurso {
   usuarioId      String
   createdAt      DateTime @default(now())
   updatedAt      DateTime
-  tarea         Tarea   @relation(fields: [tareaId], references: [id], onDelete: Cascade)
-  user                        User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tarea          Tarea    @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@unique([tareaId, usuarioId])
   @@map("asignaciones_recurso")
@@ -1181,21 +1181,21 @@ model AuditLog {
 }
 
 model CalendarioLaboral {
-  id                       String                     @id
-  nombre                   String                     @unique
-  descripcion              String?
-  pais                     String?
-  empresa                  String?
-  activo                   Boolean                    @default(true)
-  horasPorDia              Float                      @default(8.0)
-  diasLaborables           DiaSemana[]
-  horaInicioManana         String                     @default("08:00")
-  horaFinManana            String                     @default("12:00")
-  horaInicioTarde          String                     @default("13:00")
-  horaFinTarde             String                     @default("17:00")
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime
-  cotizacion               Cotizacion[]
+  id                      String                    @id
+  nombre                  String                    @unique
+  descripcion             String?
+  pais                    String?
+  empresa                 String?
+  activo                  Boolean                   @default(true)
+  horasPorDia             Float                     @default(8.0)
+  diasLaborables          DiaSemana[]
+  horaInicioManana        String                    @default("08:00")
+  horaFinManana           String                    @default("12:00")
+  horaInicioTarde         String                    @default("13:00")
+  horaFinTarde            String                    @default("17:00")
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  cotizacion              Cotizacion[]
   configuracionCalendario ConfiguracionCalendario[]
   diaCalendario           DiaCalendario[]
   excepcionCalendario     ExcepcionCalendario[]
@@ -1204,32 +1204,32 @@ model CalendarioLaboral {
 }
 
 model ConfiguracionCalendario {
-  id                       String             @id
+  id                       String            @id
   calendarioLaboralId      String
   entidadTipo              String
   entidadId                String
-  calendarioPredeterminado Boolean            @default(false)
-  calendarioLaboral       CalendarioLaboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
+  calendarioPredeterminado Boolean           @default(false)
+  calendarioLaboral        CalendarioLaboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
 
   @@unique([entidadTipo, entidadId])
   @@map("configuracion_calendario")
 }
 
 model CotizacionActividad {
-  id                   String             @id
+  id                   String            @id
   cotizacionEdtId      String
   nombre               String
-  orden                Int                @default(0)
+  orden                Int               @default(0)
   fechaInicioComercial DateTime?
   fechaFinComercial    DateTime?
-  estado               EstadoActividad    @default(pendiente)
-  porcentajeAvance     Int                @default(0)
-  horasEstimadas       Decimal?           @db.Decimal(10, 2)
+  estado               EstadoActividad   @default(pendiente)
+  porcentajeAvance     Int               @default(0)
+  horasEstimadas       Decimal?          @db.Decimal(10, 2)
   descripcion          String?
-  prioridad            PrioridadEdt       @default(media)
-  createdAt            DateTime           @default(now())
+  prioridad            PrioridadEdt      @default(media)
+  createdAt            DateTime          @default(now())
   updatedAt            DateTime
-  cotizacionEdt        CotizacionEdt      @relation(fields: [cotizacionEdtId], references: [id], onDelete: Cascade)
+  cotizacionEdt        CotizacionEdt     @relation(fields: [cotizacionEdtId], references: [id], onDelete: Cascade)
   cotizacionTarea      CotizacionTarea[]
 
   @@index([cotizacionEdtId, orden])
@@ -1244,50 +1244,50 @@ model CotizacionCondicion {
   orden        Int?       @default(0)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime
-  cotizacion                  Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 
   @@index([cotizacionId, orden])
   @@map("cotizacion_condicion")
 }
 
 model CotizacionDependenciasTarea {
-  id                 String           @id
+  id                 String          @id
   tareaOrigenId      String
   tareaDependienteId String
-  tipo               TipoDependencia  @default(finish_to_start)
-  lagMinutos         Int              @default(0)
-  createdAt          DateTime         @default(now())
+  tipo               TipoDependencia @default(finish_to_start)
+  lagMinutos         Int             @default(0)
+  createdAt          DateTime        @default(now())
   updatedAt          DateTime
-  tareaDependiente   CotizacionTarea  @relation("dependenciasCotizacionTareaDependiente", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
-  tareaOrigen        CotizacionTarea  @relation("dependenciasCotizacionTareaOrigen", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
+  tareaDependiente   CotizacionTarea @relation("dependenciasCotizacionTareaDependiente", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
+  tareaOrigen        CotizacionTarea @relation("dependenciasCotizacionTareaOrigen", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
 
   @@unique([tareaOrigenId, tareaDependienteId])
   @@map("cotizacion_dependencias_tarea")
 }
 
 model CotizacionEdt {
-  id                   String                  @id
+  id                   String                @id
   cotizacionId         String
   cotizacionServicioId String?
   edtId                String?
   fechaInicioComercial DateTime?
   fechaFinComercial    DateTime?
-  horasEstimadas       Decimal?                @default(0) @db.Decimal(10, 2)
-  estado               EstadoEdt               @default(planificado)
+  horasEstimadas       Decimal?              @default(0) @db.Decimal(10, 2)
+  estado               EstadoEdt             @default(planificado)
   responsableId        String?
   descripcion          String?
-  prioridad            PrioridadEdt            @default(media)
-  createdAt            DateTime                @default(now())
+  prioridad            PrioridadEdt          @default(media)
+  createdAt            DateTime              @default(now())
   updatedAt            DateTime
   cotizacionFaseId     String?
   nombre               String
-  orden                Int                     @default(0)
+  orden                Int                   @default(0)
   cotizacionActividad  CotizacionActividad[]
-  edt                  Edt?                    @relation(fields: [edtId], references: [id])
-  cotizacionFase       CotizacionFase?         @relation(fields: [cotizacionFaseId], references: [id])
-  cotizacion           Cotizacion              @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  cotizacionServicio   CotizacionServicio?     @relation(fields: [cotizacionServicioId], references: [id])
-  user                        User?                   @relation(fields: [responsableId], references: [id])
+  edt                  Edt?                  @relation(fields: [edtId], references: [id])
+  cotizacionFase       CotizacionFase?       @relation(fields: [cotizacionFaseId], references: [id])
+  cotizacion           Cotizacion            @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacionServicio   CotizacionServicio?   @relation(fields: [cotizacionServicioId], references: [id])
+  user                 User?                 @relation(fields: [responsableId], references: [id])
 
   @@unique([cotizacionId, nombre])
   @@index([cotizacionId, cotizacionServicioId])
@@ -1304,27 +1304,27 @@ model CotizacionExclusion {
   orden        Int?       @default(0)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime
-  cotizacion                  Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 
   @@index([cotizacionId, orden])
   @@map("cotizacion_exclusion")
 }
 
 model CotizacionFase {
-  id               String            @id
+  id               String          @id
   cotizacionId     String
   nombre           String
   descripcion      String?
-  orden            Int               @default(0)
+  orden            Int             @default(0)
   fechaInicioPlan  DateTime?
   fechaFinPlan     DateTime?
-  estado           EstadoFase        @default(planificado)
-  porcentajeAvance Int               @default(0)
-  horasEstimadas   Decimal?          @db.Decimal(10, 2)
-  createdAt        DateTime          @default(now())
+  estado           EstadoFase      @default(planificado)
+  porcentajeAvance Int             @default(0)
+  horasEstimadas   Decimal?        @db.Decimal(10, 2)
+  createdAt        DateTime        @default(now())
   updatedAt        DateTime
   cotizacionEdt    CotizacionEdt[]
-  cotizacion                  Cotizacion        @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacion       Cotizacion      @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 
   @@unique([cotizacionId, nombre])
   @@index([cotizacionId, orden])
@@ -1338,9 +1338,9 @@ model CotizacionPlantillaImport {
   tipoImportacion  String
   fechaImportacion DateTime   @default(now())
   usuarioId        String
-  cotizacion                  Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  plantilla                   Plantilla  @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
-  user                        User       @relation(fields: [usuarioId], references: [id])
+  cotizacion       Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  plantilla        Plantilla  @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  user             User       @relation(fields: [usuarioId], references: [id])
 
   @@index([cotizacionId, fechaImportacion])
   @@index([plantillaId, tipoImportacion])
@@ -1348,30 +1348,30 @@ model CotizacionPlantillaImport {
 }
 
 model CotizacionTarea {
-  id                           String                        @id
-  nombre                       String
-  descripcion                  String?
-  fechaInicio                  DateTime
-  fechaFin                     DateTime
-  horasEstimadas               Decimal?                      @db.Decimal(10, 2)
-  estado                       EstadoTarea                   @default(pendiente)
-  prioridad                    PrioridadTarea                @default(media)
-  dependenciaId                String?
-  responsableId                String?
-  createdAt                    DateTime                      @default(now())
-  updatedAt                    DateTime
-  cotizacionServicioItemId     String?
-  cotizacionActividadId        String
-  duracionHoras                Decimal?                      @db.Decimal(10, 2)
-  esHito                       Boolean                       @default(false)
-  orden                        Int                           @default(0)
-  dependenciasComoDependiente  CotizacionDependenciasTarea[] @relation("dependenciasCotizacionTareaDependiente")
-  dependenciasComoOrigen       CotizacionDependenciasTarea[] @relation("dependenciasCotizacionTareaOrigen")
-  cotizacionActividad          CotizacionActividad           @relation(fields: [cotizacionActividadId], references: [id], onDelete: Cascade)
-  cotizacionServicioItem       CotizacionServicioItem?       @relation(fields: [cotizacionServicioItemId], references: [id])
-  tareaPadre                   CotizacionTarea?              @relation("cotizacionTareaHijas", fields: [dependenciaId], references: [id])
-  tareasHijas                  CotizacionTarea[]             @relation("cotizacionTareaHijas")
-  user                         User?                         @relation(fields: [responsableId], references: [id])
+  id                          String                        @id
+  nombre                      String
+  descripcion                 String?
+  fechaInicio                 DateTime
+  fechaFin                    DateTime
+  horasEstimadas              Decimal?                      @db.Decimal(10, 2)
+  estado                      EstadoTarea                   @default(pendiente)
+  prioridad                   PrioridadTarea                @default(media)
+  dependenciaId               String?
+  responsableId               String?
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime
+  cotizacionServicioItemId    String?
+  cotizacionActividadId       String
+  duracionHoras               Decimal?                      @db.Decimal(10, 2)
+  esHito                      Boolean                       @default(false)
+  orden                       Int                           @default(0)
+  dependenciasComoDependiente CotizacionDependenciasTarea[] @relation("dependenciasCotizacionTareaDependiente")
+  dependenciasComoOrigen      CotizacionDependenciasTarea[] @relation("dependenciasCotizacionTareaOrigen")
+  cotizacionActividad         CotizacionActividad           @relation(fields: [cotizacionActividadId], references: [id], onDelete: Cascade)
+  cotizacionServicioItem      CotizacionServicioItem?       @relation(fields: [cotizacionServicioItemId], references: [id])
+  tareaPadre                  CotizacionTarea?              @relation("cotizacionTareaHijas", fields: [dependenciaId], references: [id])
+  tareasHijas                 CotizacionTarea[]             @relation("cotizacionTareaHijas")
+  user                        User?                         @relation(fields: [responsableId], references: [id])
 
   @@index([cotizacionActividadId, estado])
   @@index([cotizacionServicioItemId])
@@ -1393,8 +1393,8 @@ model CotizacionVersion {
   usuarioId    String
   createdAt    DateTime   @default(now())
   updatedAt    DateTime
-  cotizacion                  Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  user                        User       @relation(fields: [usuarioId], references: [id])
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [usuarioId], references: [id])
 
   @@unique([cotizacionId, version])
   @@index([cotizacionId, version])
@@ -1403,18 +1403,18 @@ model CotizacionVersion {
 }
 
 model CrmActividad {
-  id              String          @id
-  oportunidadId   String
-  tipo            String
-  descripcion     String
-  fecha           DateTime
-  resultado       String?
-  notas           String?
-  usuarioId       String
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime
-  crmOportunidad  CrmOportunidad  @relation(fields: [oportunidadId], references: [id], onDelete: Cascade)
-  user                        User            @relation(fields: [usuarioId], references: [id])
+  id             String         @id
+  oportunidadId  String
+  tipo           String
+  descripcion    String
+  fecha          DateTime
+  resultado      String?
+  notas          String?
+  usuarioId      String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime
+  crmOportunidad CrmOportunidad @relation(fields: [oportunidadId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [usuarioId], references: [id])
 
   @@index([oportunidadId, fecha])
   @@map("crm_actividad")
@@ -1436,7 +1436,7 @@ model CrmCompetidorLicitacion {
   razonPerdida       String?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime
-  cotizacion                  Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  cotizacion         Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 
   @@index([cotizacionId])
   @@map("crm_competidor_licitacion")
@@ -1457,7 +1457,7 @@ model CrmContactoCliente {
   notas               String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime
-  cliente                     Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente             Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 
   @@index([clienteId, esDecisionMaker])
   @@map("crm_contacto_cliente")
@@ -1485,9 +1485,9 @@ model CrmHistorialProyecto {
   recomendaciones     String?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime
-  cliente                     Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente             Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   cotizacion          Cotizacion? @relation(fields: [cotizacionId], references: [id])
-  proyecto                    Proyecto?   @relation(fields: [proyectoId], references: [id])
+  proyecto            Proyecto?   @relation(fields: [proyectoId], references: [id])
 
   @@index([clienteId, fechaInicio])
   @@index([tipoProyecto, sector])
@@ -1512,7 +1512,7 @@ model CrmMetricaComercial {
   emailsEnviados        Int      @default(0)
   createdAt             DateTime @default(now())
   updatedAt             DateTime
-  user                        User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  user                  User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@unique([usuarioId, periodo])
   @@index([periodo])
@@ -1520,31 +1520,31 @@ model CrmMetricaComercial {
 }
 
 model CrmOportunidad {
-  id                                       String             @id
-  clienteId                                String
-  nombre                                   String
-  descripcion                              String?
-  valorEstimado                            Float?
-  probabilidad                             Int                @default(0)
-  fechaCierreEstimada                      DateTime?
-  fuente                                   String?
-  prioridad                                String             @default("media")
-  comercialId                              String?
-  responsableId                            String?
-  fechaUltimoContacto                      DateTime?
-  notas                                    String?
-  competencia                              String?
-  createdAt                                DateTime           @default(now())
-  updatedAt                                DateTime
-  cotizacionId                             String?            @unique
-  proyectoId                               String?
-  estado                                   EstadoOportunidad  @default(prospecto)
-  crmActividad                             CrmActividad[]
-  cliente                     Cliente            @relation(fields: [clienteId], references: [id])
-  comercial                                User?              @relation("CrmOportunidadComercial", fields: [comercialId], references: [id])
-  cotizacion                  Cotizacion?        @relation(fields: [cotizacionId], references: [id])
-  proyecto                    Proyecto?          @relation(fields: [proyectoId], references: [id])
-  responsable                              User?              @relation("CrmOportunidadResponsable", fields: [responsableId], references: [id])
+  id                  String            @id
+  clienteId           String
+  nombre              String
+  descripcion         String?
+  valorEstimado       Float?
+  probabilidad        Int               @default(0)
+  fechaCierreEstimada DateTime?
+  fuente              String?
+  prioridad           String            @default("media")
+  comercialId         String?
+  responsableId       String?
+  fechaUltimoContacto DateTime?
+  notas               String?
+  competencia         String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime
+  cotizacionId        String?           @unique
+  proyectoId          String?
+  estado              EstadoOportunidad @default(inicio)
+  crmActividad        CrmActividad[]
+  cliente             Cliente           @relation(fields: [clienteId], references: [id])
+  comercial           User?             @relation("CrmOportunidadComercial", fields: [comercialId], references: [id])
+  cotizacion          Cotizacion?       @relation(fields: [cotizacionId], references: [id])
+  proyecto            Proyecto?         @relation(fields: [proyectoId], references: [id])
+  responsable         User?             @relation("CrmOportunidadResponsable", fields: [responsableId], references: [id])
 
   @@index([clienteId, estado])
   @@index([comercialId, fechaCierreEstimada])
@@ -1565,45 +1565,45 @@ model DependenciasTarea {
 }
 
 model DiaCalendario {
-  id                  String             @id
+  id                  String            @id
   calendarioLaboralId String
   diaSemana           DiaSemana
-  esLaborable         Boolean            @default(true)
+  esLaborable         Boolean           @default(true)
   horaInicioManana    String?
   horaFinManana       String?
   horaInicioTarde     String?
   horaFinTarde        String?
   horasTotales        Float?
-  calendarioLaboral  CalendarioLaboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
+  calendarioLaboral   CalendarioLaboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
 
   @@unique([calendarioLaboralId, diaSemana])
   @@map("dia_calendario")
 }
 
 model Edt {
-  id                                  String                               @id(map: "CategoriaServicio_pkey") @default(cuid())
-  nombre                              String                               @unique(map: "CategoriaServicio_nombre_key")
-  createdAt                           DateTime                             @default(now())
-  updatedAt                           DateTime                             @updatedAt
-  descripcion                         String?
-  faseDefaultId                       String?
-  catalogoServicio                    CatalogoServicio[]
-  cotizacionServicio                  CotizacionServicio[]                 @relation("CotizacionServicioEdt")
-  cotizacionServicioItem              CotizacionServicioItem[]             @relation("CotizacionServicioItemEdt")
-  registroHoras                       RegistroHoras[]
-  cotizacionEdt                       CotizacionEdt[]
-  faseDefault                         FaseDefault?                         @relation(fields: [faseDefaultId], references: [id], map: "CategoriaServicio_faseDefaultId_fkey")
-  proyectoEdt                         ProyectoEdt[]
-  proyectoServicioCotizado            ProyectoServicioCotizado[]           @relation("ProyectoServicioCotizadoEdt")
-  proyectoServicioCotizadoItem        ProyectoServicioCotizadoItem[]       @relation("ProyectoServicioCotizadoItemEdt")
-  plantillaServicioIndependiente      PlantillaServicioIndependiente[]     @relation("PlantillaServicioIndependienteEdt")
-  plantillaServicioItemIndependiente  PlantillaServicioItemIndependiente[] @relation("PlantillaServicioItemIndependienteEdt")
+  id                                 String                               @id(map: "CategoriaServicio_pkey") @default(cuid())
+  nombre                             String                               @unique(map: "CategoriaServicio_nombre_key")
+  createdAt                          DateTime                             @default(now())
+  updatedAt                          DateTime                             @updatedAt
+  descripcion                        String?
+  faseDefaultId                      String?
+  catalogoServicio                   CatalogoServicio[]
+  cotizacionServicio                 CotizacionServicio[]                 @relation("CotizacionServicioEdt")
+  cotizacionServicioItem             CotizacionServicioItem[]             @relation("CotizacionServicioItemEdt")
+  registroHoras                      RegistroHoras[]
+  cotizacionEdt                      CotizacionEdt[]
+  faseDefault                        FaseDefault?                         @relation(fields: [faseDefaultId], references: [id], map: "CategoriaServicio_faseDefaultId_fkey")
+  proyectoEdt                        ProyectoEdt[]
+  proyectoServicioCotizado           ProyectoServicioCotizado[]           @relation("ProyectoServicioCotizadoEdt")
+  proyectoServicioCotizadoItem       ProyectoServicioCotizadoItem[]       @relation("ProyectoServicioCotizadoItemEdt")
+  plantillaServicioIndependiente     PlantillaServicioIndependiente[]     @relation("PlantillaServicioIndependienteEdt")
+  plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[] @relation("PlantillaServicioItemIndependienteEdt")
 
   @@map("edt")
 }
 
 model ExcepcionCalendario {
-  id                  String             @id
+  id                  String            @id
   calendarioLaboralId String
   fecha               DateTime
   tipo                TipoExcepcion
@@ -1612,7 +1612,7 @@ model ExcepcionCalendario {
   horaInicio          String?
   horaFin             String?
   horasTotales        Float?
-  calendarioLaboral  CalendarioLaboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
+  calendarioLaboral   CalendarioLaboral @relation(fields: [calendarioLaboralId], references: [id], onDelete: Cascade)
 
   @@unique([calendarioLaboralId, fecha])
   @@map("excepcion_calendario")
@@ -1658,7 +1658,7 @@ model MetricaComercial {
   actividadesRealizadas Int      @default(0)
   createdAt             DateTime @default(now())
   updatedAt             DateTime
-  user                        User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  user                  User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@unique([usuarioId, periodo, tipo])
   @@index([periodo, tipo])
@@ -1681,7 +1681,7 @@ model Notificacion {
   accionTexto  String?
   createdAt    DateTime              @default(now())
   updatedAt    DateTime
-  user                        User                  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  user         User                  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([entidadTipo, entidadId])
   @@index([usuarioId, leida, createdAt(sort: Desc)])
@@ -1689,46 +1689,46 @@ model Notificacion {
 }
 
 model Permission {
-  id                 String             @id
-  name               String             @unique
+  id                 String           @id
+  name               String           @unique
   description        String?
   resource           String
   action             String
-  isSystemPermission Boolean            @default(true)
-  createdAt          DateTime           @default(now())
+  isSystemPermission Boolean          @default(true)
+  createdAt          DateTime         @default(now())
   updatedAt          DateTime
-  userPermissions   UserPermission[]
+  userPermissions    UserPermission[]
 
   @@index([resource, action])
   @@map("permissions")
 }
 
 model PlantillaCondicion {
-  id                       String                     @id
-  nombre                   String
-  descripcion              String?
-  categoria                String?
-  tipo                     String?
-  activo                   Boolean                    @default(true)
-  orden                    Int                        @default(0)
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime
-  plantillaCondicionItem   PlantillaCondicionItem[]
+  id                     String                   @id
+  nombre                 String
+  descripcion            String?
+  categoria              String?
+  tipo                   String?
+  activo                 Boolean                  @default(true)
+  orden                  Int                      @default(0)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime
+  plantillaCondicionItem PlantillaCondicionItem[]
 
   @@index([categoria, tipo, activo])
   @@map("plantilla_condicion")
 }
 
 model PlantillaCondicionItem {
-  id                   String               @id
+  id                   String             @id
   plantillaCondicionId String
   descripcion          String
   tipo                 String?
-  orden                Int                  @default(0)
-  activo               Boolean              @default(true)
-  createdAt            DateTime             @default(now())
+  orden                Int                @default(0)
+  activo               Boolean            @default(true)
+  createdAt            DateTime           @default(now())
   updatedAt            DateTime
-  plantillaCondicion   PlantillaCondicion   @relation(fields: [plantillaCondicionId], references: [id], onDelete: Cascade)
+  plantillaCondicion   PlantillaCondicion @relation(fields: [plantillaCondicionId], references: [id], onDelete: Cascade)
 
   @@index([plantillaCondicionId, orden])
   @@map("plantilla_condicion_item")
@@ -1748,76 +1748,111 @@ model PlantillaDuracionCronograma {
 }
 
 model PlantillaEquipoIndependiente {
-  id                                  String                                @id
-  nombre                              String
-  descripcion                         String?
-  estado                              String                                @default("borrador")
-  totalInterno                        Float                                 @default(0)
-  totalCliente                        Float                                 @default(0)
-  descuento                           Float                                 @default(0)
-  grandTotal                          Float                                 @default(0)
-  createdAt                           DateTime                              @default(now())
-  updatedAt                           DateTime
-  plantillaEquipoItemIndependiente    PlantillaEquipoItemIndependiente[]
+  id                               String                             @id
+  nombre                           String
+  descripcion                      String?
+  estado                           String                             @default("borrador")
+  totalInterno                     Float                              @default(0)
+  totalCliente                     Float                              @default(0)
+  descuento                        Float                              @default(0)
+  grandTotal                       Float                              @default(0)
+  createdAt                        DateTime                           @default(now())
+  updatedAt                        DateTime
+  plantillaEquipoItemIndependiente PlantillaEquipoItemIndependiente[]
 
   @@map("plantilla_equipo_independiente")
 }
 
 model PlantillaEquipoItemIndependiente {
-  id                             String                         @id
-  plantillaEquipoId              String
-  catalogoEquipoId               String?
-  codigo                         String
-  descripcion                    String
-  categoria                      String
-  unidad                         String
-  marca                          String
-  precioInterno                  Float
-  precioCliente                  Float
-  cantidad                       Float
-  costoInterno                   Float
-  costoCliente                   Float
-  createdAt                      DateTime                       @default(now())
-  updatedAt                      DateTime
-  catalogoEquipo                 CatalogoEquipo?                @relation(fields: [catalogoEquipoId], references: [id])
-  plantillaEquipoIndependiente   PlantillaEquipoIndependiente   @relation(fields: [plantillaEquipoId], references: [id], onDelete: Cascade)
+  id                           String                       @id
+  plantillaEquipoId            String
+  catalogoEquipoId             String?
+  codigo                       String
+  descripcion                  String
+  categoria                    String
+  unidad                       String
+  marca                        String
+  precioInterno                Float
+  precioCliente                Float
+  cantidad                     Float
+  costoInterno                 Float
+  costoCliente                 Float
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime
+  catalogoEquipo               CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
+  plantillaEquipoIndependiente PlantillaEquipoIndependiente @relation(fields: [plantillaEquipoId], references: [id], onDelete: Cascade)
 
   @@map("plantilla_equipo_item_independiente")
 }
 
 model PlantillaExclusion {
-  id                       String                     @id
-  nombre                   String
-  descripcion              String?
-  categoria                String?
-  activo                   Boolean                    @default(true)
-  orden                    Int                        @default(0)
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime
-  plantillaExclusionItem   PlantillaExclusionItem[]
+  id                     String                   @id
+  nombre                 String
+  descripcion            String?
+  categoria              String?
+  activo                 Boolean                  @default(true)
+  orden                  Int                      @default(0)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime
+  plantillaExclusionItem PlantillaExclusionItem[]
 
   @@index([categoria, activo])
   @@map("plantilla_exclusion")
 }
 
 model PlantillaExclusionItem {
-  id                   String               @id
+  id                   String             @id
   plantillaExclusionId String
   descripcion          String
-  orden                Int                  @default(0)
-  activo               Boolean              @default(true)
-  createdAt            DateTime             @default(now())
+  orden                Int                @default(0)
+  activo               Boolean            @default(true)
+  createdAt            DateTime           @default(now())
   updatedAt            DateTime
-  plantillaExclusion   PlantillaExclusion   @relation(fields: [plantillaExclusionId], references: [id], onDelete: Cascade)
+  plantillaExclusion   PlantillaExclusion @relation(fields: [plantillaExclusionId], references: [id], onDelete: Cascade)
 
   @@index([plantillaExclusionId, orden])
   @@map("plantilla_exclusion_item")
 }
 
 model PlantillaGastoIndependiente {
+  id                              String                            @id
+  nombre                          String
+  descripcion                     String?
+  estado                          String                            @default("borrador")
+  totalInterno                    Float                             @default(0)
+  totalCliente                    Float                             @default(0)
+  descuento                       Float                             @default(0)
+  grandTotal                      Float                             @default(0)
+  createdAt                       DateTime                          @default(now())
+  updatedAt                       DateTime
+  plantillaGastoItemIndependiente PlantillaGastoItemIndependiente[]
+
+  @@map("plantilla_gasto_independiente")
+}
+
+model PlantillaGastoItemIndependiente {
+  id                          String                      @id
+  plantillaGastoId            String
+  nombre                      String
+  descripcion                 String?
+  cantidad                    Float
+  precioUnitario              Float
+  factorSeguridad             Float                       @default(1.0)
+  margen                      Float                       @default(1.0)
+  costoInterno                Float
+  costoCliente                Float
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime
+  plantillaGastoIndependiente PlantillaGastoIndependiente @relation(fields: [plantillaGastoId], references: [id], onDelete: Cascade)
+
+  @@map("plantilla_gasto_item_independiente")
+}
+
+model PlantillaServicioIndependiente {
   id                                 String                               @id
   nombre                             String
   descripcion                        String?
+  edtId                              String?
   estado                             String                               @default("borrador")
   totalInterno                       Float                                @default(0)
   totalCliente                       Float                                @default(0)
@@ -1825,104 +1860,69 @@ model PlantillaGastoIndependiente {
   grandTotal                         Float                                @default(0)
   createdAt                          DateTime                             @default(now())
   updatedAt                          DateTime
-  plantillaGastoItemIndependiente    PlantillaGastoItemIndependiente[]
-
-  @@map("plantilla_gasto_independiente")
-}
-
-model PlantillaGastoItemIndependiente {
-  id                            String                        @id
-  plantillaGastoId              String
-  nombre                        String
-  descripcion                   String?
-  cantidad                      Float
-  precioUnitario                Float
-  factorSeguridad               Float                         @default(1.0)
-  margen                        Float                         @default(1.0)
-  costoInterno                  Float
-  costoCliente                  Float
-  createdAt                     DateTime                      @default(now())
-  updatedAt                     DateTime
-  plantillaGastoIndependiente   PlantillaGastoIndependiente   @relation(fields: [plantillaGastoId], references: [id], onDelete: Cascade)
-
-  @@map("plantilla_gasto_item_independiente")
-}
-
-model PlantillaServicioIndependiente {
-  id                                    String                                  @id
-  nombre                                String
-  descripcion                           String?
-  edtId                                 String?
-  estado                                String                                  @default("borrador")
-  totalInterno                          Float                                   @default(0)
-  totalCliente                          Float                                   @default(0)
-  descuento                             Float                                   @default(0)
-  grandTotal                            Float                                   @default(0)
-  createdAt                             DateTime                                @default(now())
-  updatedAt                             DateTime
-  edt                                   Edt?                                    @relation("PlantillaServicioIndependienteEdt", fields: [edtId], references: [id])
-  plantillaServicioItemIndependiente    PlantillaServicioItemIndependiente[]
+  edt                                Edt?                                 @relation("PlantillaServicioIndependienteEdt", fields: [edtId], references: [id])
+  plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
 
   @@map("plantilla_servicio_independiente")
 }
 
 model PlantillaServicioItemIndependiente {
-  id                               String                           @id
-  plantillaServicioId              String
-  catalogoServicioId               String?
-  unidadServicioId                 String
-  recursoId                        String
-  edtId                            String?
-  nombre                           String
-  descripcion                      String
-  unidadServicioNombre             String
-  recursoNombre                    String
-  formula                          String
-  horaBase                         Float?
-  horaRepetido                     Float?
-  horaUnidad                       Float?
-  horaFijo                         Float?
-  costoHora                        Float
-  cantidad                         Int
-  horaTotal                        Float
-  factorSeguridad                  Float
-  margen                           Float
-  costoInterno                     Float
-  costoCliente                     Float
-  orden                            Int?                             @default(0)
-  createdAt                        DateTime                         @default(now())
-  updatedAt                        DateTime
-  catalogoServicio                 CatalogoServicio?                @relation(fields: [catalogoServicioId], references: [id])
-  edt                              Edt?                             @relation("PlantillaServicioItemIndependienteEdt", fields: [edtId], references: [id])
-  plantillaServicioIndependiente   PlantillaServicioIndependiente   @relation(fields: [plantillaServicioId], references: [id], onDelete: Cascade)
-  recurso                          Recurso                          @relation(fields: [recursoId], references: [id])
-  unidadServicio                   UnidadServicio                   @relation(fields: [unidadServicioId], references: [id])
+  id                             String                         @id
+  plantillaServicioId            String
+  catalogoServicioId             String?
+  unidadServicioId               String
+  recursoId                      String
+  edtId                          String?
+  nombre                         String
+  descripcion                    String
+  unidadServicioNombre           String
+  recursoNombre                  String
+  formula                        String
+  horaBase                       Float?
+  horaRepetido                   Float?
+  horaUnidad                     Float?
+  horaFijo                       Float?
+  costoHora                      Float
+  cantidad                       Int
+  horaTotal                      Float
+  factorSeguridad                Float
+  margen                         Float
+  costoInterno                   Float
+  costoCliente                   Float
+  orden                          Int?                           @default(0)
+  createdAt                      DateTime                       @default(now())
+  updatedAt                      DateTime
+  catalogoServicio               CatalogoServicio?              @relation(fields: [catalogoServicioId], references: [id])
+  edt                            Edt?                           @relation("PlantillaServicioItemIndependienteEdt", fields: [edtId], references: [id])
+  plantillaServicioIndependiente PlantillaServicioIndependiente @relation(fields: [plantillaServicioId], references: [id], onDelete: Cascade)
+  recurso                        Recurso                        @relation(fields: [recursoId], references: [id])
+  unidadServicio                 UnidadServicio                 @relation(fields: [unidadServicioId], references: [id])
 
   @@map("plantilla_servicio_item_independiente")
 }
 
 model ProyectoActividad {
-  id                   String              @id
+  id                   String             @id
   proyectoEdtId        String
   proyectoCronogramaId String
   nombre               String
-  orden                Int                 @default(0)
+  orden                Int                @default(0)
   responsableId        String?
   fechaInicioPlan      DateTime
   fechaFinPlan         DateTime
   fechaInicioReal      DateTime?
   fechaFinReal         DateTime?
-  estado               EstadoActividad     @default(pendiente)
-  porcentajeAvance     Int                 @default(0)
-  horasPlan            Decimal?            @db.Decimal(10, 2)
-  horasReales          Decimal             @default(0) @db.Decimal(10, 2)
+  estado               EstadoActividad    @default(pendiente)
+  porcentajeAvance     Int                @default(0)
+  horasPlan            Decimal?           @db.Decimal(10, 2)
+  horasReales          Decimal            @default(0) @db.Decimal(10, 2)
   descripcion          String?
-  prioridad            PrioridadEdt        @default(media)
-  createdAt            DateTime            @default(now())
+  prioridad            PrioridadEdt       @default(media)
+  createdAt            DateTime           @default(now())
   updatedAt            DateTime
   proyectoCronograma   ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
   proyectoEdt          ProyectoEdt        @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
-  user                        User?               @relation(fields: [responsableId], references: [id])
+  user                 User?              @relation(fields: [responsableId], references: [id])
   proyectoTarea        ProyectoTarea[]
 
   @@index([proyectoEdtId, proyectoCronogramaId])
@@ -1931,17 +1931,17 @@ model ProyectoActividad {
 }
 
 model ProyectoCronograma {
-  id                       String               @id
+  id                       String              @id
   proyectoId               String
   tipo                     String
   nombre                   String
-  copiadoDesdeCotizacionId String?              @unique
-  esBaseline               Boolean              @default(false)
-  version                  Int                  @default(1)
-  createdAt                DateTime             @default(now())
+  copiadoDesdeCotizacionId String?             @unique
+  esBaseline               Boolean             @default(false)
+  version                  Int                 @default(1)
+  createdAt                DateTime            @default(now())
   updatedAt                DateTime
   proyectoActividad        ProyectoActividad[]
-  proyecto                 Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyecto                 Proyecto            @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   proyectoEdt              ProyectoEdt[]
   proyectoFase             ProyectoFase[]
   proyectoTarea            ProyectoTarea[]
@@ -1965,33 +1965,33 @@ model ProyectoDependenciasTarea {
 }
 
 model ProyectoEdt {
-  id                   String               @id
+  id                   String              @id
   proyectoId           String
   edtId                String
   fechaInicioPlan      DateTime?
   fechaFinPlan         DateTime?
-  horasPlan            Decimal?             @default(0) @db.Decimal(10, 2)
+  horasPlan            Decimal?            @default(0) @db.Decimal(10, 2)
   fechaInicioReal      DateTime?
   fechaFinReal         DateTime?
-  horasReales          Decimal              @default(0) @db.Decimal(10, 2)
-  estado               EstadoEdt            @default(planificado)
+  horasReales          Decimal             @default(0) @db.Decimal(10, 2)
+  estado               EstadoEdt           @default(planificado)
   responsableId        String?
-  porcentajeAvance     Int                  @default(0)
+  porcentajeAvance     Int                 @default(0)
   descripcion          String?
-  prioridad            PrioridadEdt         @default(media)
-  createdAt            DateTime             @default(now())
+  prioridad            PrioridadEdt        @default(media)
+  createdAt            DateTime            @default(now())
   updatedAt            DateTime
   nombre               String
-  orden                Int                  @default(0)
+  orden                Int                 @default(0)
   proyectoCronogramaId String
   proyectoFaseId       String?
-  registroHoras                   RegistroHoras[]
+  registroHoras        RegistroHoras[]
   proyectoActividad    ProyectoActividad[]
-  edt                  Edt                  @relation(fields: [edtId], references: [id])
+  edt                  Edt                 @relation(fields: [edtId], references: [id])
   proyectoCronograma   ProyectoCronograma  @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
   proyectoFase         ProyectoFase?       @relation(fields: [proyectoFaseId], references: [id])
-  proyecto                    Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  user                        User?                @relation(fields: [responsableId], references: [id])
+  proyecto             Proyecto            @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  user                 User?               @relation(fields: [responsableId], references: [id])
   proyectoTarea        ProyectoTarea[]
 
   @@unique([proyectoId, proyectoCronogramaId, nombre])
@@ -2002,23 +2002,23 @@ model ProyectoEdt {
 }
 
 model ProyectoFase {
-  id                   String              @id
+  id                   String             @id
   proyectoId           String
   proyectoCronogramaId String
   nombre               String
   descripcion          String?
-  orden                Int                 @default(0)
+  orden                Int                @default(0)
   fechaInicioPlan      DateTime?
   fechaFinPlan         DateTime?
   fechaInicioReal      DateTime?
   fechaFinReal         DateTime?
-  estado               EstadoFase          @default(planificado)
-  porcentajeAvance     Int                 @default(0)
-  createdAt            DateTime            @default(now())
+  estado               EstadoFase         @default(planificado)
+  porcentajeAvance     Int                @default(0)
+  createdAt            DateTime           @default(now())
   updatedAt            DateTime
   proyectoEdt          ProyectoEdt[]
   proyectoCronograma   ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  proyecto                    Proyecto            @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyecto             Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
 
   @@unique([proyectoId, proyectoCronogramaId, nombre])
   @@index([proyectoId, proyectoCronogramaId, orden])
@@ -2026,58 +2026,58 @@ model ProyectoFase {
 }
 
 model ProyectoSubtarea {
-  id                   String         @id
+  id                   String        @id
   nombre               String
   descripcion          String?
   fechaInicio          DateTime
   fechaFin             DateTime
   fechaInicioReal      DateTime?
   fechaFinReal         DateTime?
-  estado               EstadoTarea    @default(pendiente)
-  porcentajeCompletado Int            @default(0)
-  horasEstimadas       Decimal?       @db.Decimal(10, 2)
-  horasReales          Decimal?       @default(0) @db.Decimal(10, 2)
+  estado               EstadoTarea   @default(pendiente)
+  porcentajeCompletado Int           @default(0)
+  horasEstimadas       Decimal?      @db.Decimal(10, 2)
+  horasReales          Decimal?      @default(0) @db.Decimal(10, 2)
   proyectoTareaId      String
   asignadoId           String?
-  createdAt            DateTime       @default(now())
+  createdAt            DateTime      @default(now())
   updatedAt            DateTime
-  user                        User?          @relation(fields: [asignadoId], references: [id])
+  user                 User?         @relation(fields: [asignadoId], references: [id])
   proyectoTarea        ProyectoTarea @relation(fields: [proyectoTareaId], references: [id], onDelete: Cascade)
 
   @@map("proyecto_subtarea")
 }
 
 model ProyectoTarea {
-  id                                                                                         String                        @id
-  proyectoEdtId                                                                              String
-  proyectoCronogramaId                                                                       String
-  nombre                                                                                     String
-  descripcion                                                                                String?
-  orden                                                                                      Int                           @default(0)
-  fechaInicio                                                                                DateTime
-  fechaFin                                                                                   DateTime
-  fechaInicioReal                                                                            DateTime?
-  fechaFinReal                                                                               DateTime?
-  horasEstimadas                                                                             Decimal?                      @db.Decimal(10, 2)
-  horasReales                                                                                Decimal                       @default(0) @db.Decimal(10, 2)
-  estado                                                                                     EstadoTarea                   @default(pendiente)
-  prioridad                                                                                  PrioridadTarea                @default(media)
-  porcentajeCompletado                                                                       Int                           @default(0)
-  dependenciaId                                                                              String?
-  responsableId                                                                              String?
-  proyectoActividadId                                                                        String?
-  createdAt                                                                                  DateTime                      @default(now())
-  updatedAt                                                                                  DateTime
-  registroHoras                RegistroHoras[]
-  dependenciasComoDependiente  ProyectoDependenciasTarea[]  @relation("dependenciasTareaDependiente")
-  dependenciasComoOrigen       ProyectoDependenciasTarea[]  @relation("dependenciasTareaOrigen")
-  proyectoSubtarea             ProyectoSubtarea[]
-  tareaPadre                   ProyectoTarea?               @relation("proyectoTareaHijas", fields: [dependenciaId], references: [id])
-  tareasHijas                  ProyectoTarea[]              @relation("proyectoTareaHijas")
-  proyectoActividad            ProyectoActividad?           @relation(fields: [proyectoActividadId], references: [id])
-  proyectoCronograma           ProyectoCronograma           @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  proyectoEdt                  ProyectoEdt                  @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
-  user                         User?                        @relation(fields: [responsableId], references: [id])
+  id                          String                      @id
+  proyectoEdtId               String
+  proyectoCronogramaId        String
+  nombre                      String
+  descripcion                 String?
+  orden                       Int                         @default(0)
+  fechaInicio                 DateTime
+  fechaFin                    DateTime
+  fechaInicioReal             DateTime?
+  fechaFinReal                DateTime?
+  horasEstimadas              Decimal?                    @db.Decimal(10, 2)
+  horasReales                 Decimal                     @default(0) @db.Decimal(10, 2)
+  estado                      EstadoTarea                 @default(pendiente)
+  prioridad                   PrioridadTarea              @default(media)
+  porcentajeCompletado        Int                         @default(0)
+  dependenciaId               String?
+  responsableId               String?
+  proyectoActividadId         String?
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime
+  registroHoras               RegistroHoras[]
+  dependenciasComoDependiente ProyectoDependenciasTarea[] @relation("dependenciasTareaDependiente")
+  dependenciasComoOrigen      ProyectoDependenciasTarea[] @relation("dependenciasTareaOrigen")
+  proyectoSubtarea            ProyectoSubtarea[]
+  tareaPadre                  ProyectoTarea?              @relation("proyectoTareaHijas", fields: [dependenciaId], references: [id])
+  tareasHijas                 ProyectoTarea[]             @relation("proyectoTareaHijas")
+  proyectoActividad           ProyectoActividad?          @relation(fields: [proyectoActividadId], references: [id])
+  proyectoCronograma          ProyectoCronograma          @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  proyectoEdt                 ProyectoEdt                 @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
+  user                        User?                       @relation(fields: [responsableId], references: [id])
 
   @@index([dependenciaId])
   @@index([proyectoActividadId])
@@ -2089,41 +2089,41 @@ model ProyectoTarea {
 }
 
 model RegistroProgreso {
-  id                   String     @id
-  fecha                DateTime   @default(now())
-  horasTrabajadas      Decimal    @db.Decimal(10, 2)
+  id                   String    @id
+  fecha                DateTime  @default(now())
+  horasTrabajadas      Decimal   @db.Decimal(10, 2)
   descripcion          String?
   porcentajeCompletado Int?
   tareaId              String?
   subtareaId           String?
   usuarioId            String
-  createdAt            DateTime   @default(now())
-  subtarea            Subtarea? @relation(fields: [subtareaId], references: [id], onDelete: Cascade)
-  tarea               Tarea?    @relation(fields: [tareaId], references: [id], onDelete: Cascade)
-  user                        User       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  createdAt            DateTime  @default(now())
+  subtarea             Subtarea? @relation(fields: [subtareaId], references: [id], onDelete: Cascade)
+  tarea                Tarea?    @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  user                 User      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("registros_progreso")
 }
 
 model Subtarea {
-  id                   String               @id
+  id                   String             @id
   nombre               String
   descripcion          String?
   fechaInicio          DateTime
   fechaFin             DateTime
   fechaInicioReal      DateTime?
   fechaFinReal         DateTime?
-  estado               EstadoTarea          @default(pendiente)
-  porcentajeCompletado Int                  @default(0)
-  horasEstimadas       Decimal?             @db.Decimal(10, 2)
-  horasReales          Decimal?             @default(0) @db.Decimal(10, 2)
+  estado               EstadoTarea        @default(pendiente)
+  porcentajeCompletado Int                @default(0)
+  horasEstimadas       Decimal?           @db.Decimal(10, 2)
+  horasReales          Decimal?           @default(0) @db.Decimal(10, 2)
   tareaId              String
   asignadoId           String?
-  createdAt            DateTime             @default(now())
+  createdAt            DateTime           @default(now())
   updatedAt            DateTime
   registrosProgreso    RegistroProgreso[]
-  user                        User?                @relation(fields: [asignadoId], references: [id])
-  tarea                Tarea               @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  user                 User?              @relation(fields: [asignadoId], references: [id])
+  tarea                Tarea              @relation(fields: [tareaId], references: [id], onDelete: Cascade)
 
   @@map("subtareas")
 }
@@ -2157,15 +2157,15 @@ model Tarea {
 }
 
 model UserPermission {
-  id           String      @id
+  id           String     @id
   userId       String
   permissionId String
   type         String
   createdBy    String?
-  createdAt    DateTime    @default(now())
+  createdAt    DateTime   @default(now())
   updatedAt    DateTime
-  permission  Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  user                        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, permissionId])
   @@index([permissionId])
@@ -2273,10 +2273,14 @@ enum EstadoListaItem {
 }
 
 enum EstadoOportunidad {
-  prospecto
-  contacto_inicial
-  propuesta_enviada
+  inicio
+  contacto_cliente
+  validacion_tecnica
+  consolidacion_precios
+  validacion_comercial
+  seguimiento_cliente
   negociacion
+  seguimiento_proyecto
   cerrada_ganada
   cerrada_perdida
 }
@@ -2345,16 +2349,16 @@ enum PrioridadTarea {
 }
 
 enum ProyectoEstado {
-  creado              // 1. Creado por Comercial (desde cotización aprobada)
-  en_planificacion    // 2. Elaboración del cronograma
-  listas_pendientes   // 3. Elaboración de listas técnicas
-  listas_aprobadas    // 4. Listas aprobadas
-  pedidos_creados     // 5. Pedidos de compra creados
-  en_ejecucion        // 6. En campo / ejecución
-  en_cierre           // 7. Proceso de cierre
-  cerrado             // 8. Proyecto cerrado
-  pausado             // Estado especial: pausado
-  cancelado           // Estado especial: cancelado
+  creado // 1. Creado por Comercial (desde cotización aprobada)
+  en_planificacion // 2. Elaboración del cronograma
+  listas_pendientes // 3. Elaboración de listas técnicas
+  listas_aprobadas // 4. Listas aprobadas
+  pedidos_creados // 5. Pedidos de compra creados
+  en_ejecucion // 6. En campo / ejecución
+  en_cierre // 7. Proceso de cierre
+  cerrado // 8. Proyecto cerrado
+  pausado // Estado especial: pausado
+  cancelado // Estado especial: cancelado
 }
 
 enum Role {

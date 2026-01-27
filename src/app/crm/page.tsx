@@ -235,10 +235,17 @@ export default function CrmDashboardPage() {
 
   const getEstadoBadgeVariant = (estado: string) => {
     switch (estado) {
+      case 'inicio':
       case 'prospecto': return 'secondary'
+      case 'contacto_cliente':
       case 'contacto_inicial': return 'outline'
+      case 'validacion_tecnica': return 'outline'
+      case 'consolidacion_precios': return 'outline'
+      case 'validacion_comercial': return 'outline'
+      case 'seguimiento_cliente':
       case 'cotizacion': return 'default'
       case 'negociacion': return 'warning'
+      case 'seguimiento_proyecto': return 'default'
       case 'cerrada_ganada': return 'default'
       case 'cerrada_perdida': return 'destructive'
       default: return 'outline'
@@ -247,10 +254,17 @@ export default function CrmDashboardPage() {
 
   const getEstadoLabel = (estado: string) => {
     switch (estado) {
-      case 'prospecto': return 'Prospecto'
-      case 'contacto_inicial': return 'Contacto Inicial'
-      case 'cotizacion': return 'Cotización'
+      case 'inicio':
+      case 'prospecto': return 'Inicio'
+      case 'contacto_cliente':
+      case 'contacto_inicial': return 'Contacto Cliente'
+      case 'validacion_tecnica': return 'V. Técnica'
+      case 'consolidacion_precios': return 'C. Precios'
+      case 'validacion_comercial': return 'V. Comercial'
+      case 'seguimiento_cliente':
+      case 'cotizacion': return 'Seguimiento'
       case 'negociacion': return 'Negociación'
+      case 'seguimiento_proyecto': return 'Proyecto'
       case 'cerrada_ganada': return 'Ganada'
       case 'cerrada_perdida': return 'Perdida'
       default: return estado

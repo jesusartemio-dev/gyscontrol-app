@@ -207,10 +207,14 @@ export type EstadoCotizacion =
 
 // ✅ Nuevo tipo para estados de oportunidad CRM
 export type EstadoOportunidad =
-  | 'prospecto'
-  | 'contacto_inicial'
-  | 'propuesta_enviada'
+  | 'inicio'
+  | 'contacto_cliente'
+  | 'validacion_tecnica'
+  | 'consolidacion_precios'
+  | 'validacion_comercial'
+  | 'seguimiento_cliente'
   | 'negociacion'
+  | 'seguimiento_proyecto'
   | 'cerrada_ganada'
   | 'cerrada_perdida'
 

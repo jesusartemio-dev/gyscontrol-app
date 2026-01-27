@@ -20,10 +20,14 @@ export async function GET(req: NextRequest) {
 
     // Definir las etapas del pipeline
     const etapas = [
-      { nombre: 'Prospecto', estado: 'prospecto' },
-      { nombre: 'Contacto Inicial', estado: 'contacto_inicial' },
-      { nombre: 'Propuesta Enviada', estado: 'propuesta_enviada' },
+      { nombre: 'Inicio', estado: 'inicio' },
+      { nombre: 'Contacto Cliente', estado: 'contacto_cliente' },
+      { nombre: 'Validación Técnica', estado: 'validacion_tecnica' },
+      { nombre: 'Consolidación Precios', estado: 'consolidacion_precios' },
+      { nombre: 'Validación Comercial', estado: 'validacion_comercial' },
+      { nombre: 'Seguimiento Cliente', estado: 'seguimiento_cliente' },
       { nombre: 'Negociación', estado: 'negociacion' },
+      { nombre: 'Seguimiento Proyecto', estado: 'seguimiento_proyecto' },
       { nombre: 'Cerrada Ganada', estado: 'cerrada_ganada' },
       { nombre: 'Cerrada Perdida', estado: 'cerrada_perdida' }
     ]

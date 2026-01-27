@@ -13,7 +13,12 @@ import {
   Handshake,
   Trophy,
   X,
-  Loader2
+  Loader2,
+  ClipboardCheck,
+  DollarSign,
+  FileCheck,
+  Users,
+  FolderKanban
 } from 'lucide-react'
 
 interface Props {
@@ -22,10 +27,14 @@ interface Props {
 }
 
 const etapasConfig = {
-  prospecto: { icon: Target, color: 'bg-purple-500', label: 'Prospecto' },
-  contacto_inicial: { icon: Send, color: 'bg-blue-500', label: 'Contacto Inicial' },
-  propuesta_enviada: { icon: Clock, color: 'bg-yellow-500', label: 'Propuesta Enviada' },
+  inicio: { icon: Target, color: 'bg-purple-500', label: 'Inicio' },
+  contacto_cliente: { icon: Users, color: 'bg-blue-500', label: 'Contacto Cliente' },
+  validacion_tecnica: { icon: ClipboardCheck, color: 'bg-cyan-500', label: 'Validación Técnica' },
+  consolidacion_precios: { icon: DollarSign, color: 'bg-indigo-500', label: 'Consolidación Precios' },
+  validacion_comercial: { icon: FileCheck, color: 'bg-violet-500', label: 'Validación Comercial' },
+  seguimiento_cliente: { icon: Send, color: 'bg-yellow-500', label: 'Seguimiento Cliente' },
   negociacion: { icon: Handshake, color: 'bg-orange-500', label: 'Negociación' },
+  seguimiento_proyecto: { icon: FolderKanban, color: 'bg-teal-500', label: 'Seguimiento Proyecto' },
   cerrada_ganada: { icon: Trophy, color: 'bg-green-500', label: 'Cerrada Ganada' },
   cerrada_perdida: { icon: X, color: 'bg-red-500', label: 'Cerrada Perdida' }
 }

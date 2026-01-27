@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         descripcion: descripcion || `Oportunidad creada automáticamente desde la cotización ${cotizacion.codigo}`,
         valorEstimado: cotizacion.grandTotal,
         probabilidad: 50, // Probabilidad inicial por defecto
-        estado: 'contacto_inicial',
+        estado: 'contacto_cliente',
         fuente: 'cotizacion_existente',
         comercialId: comercialId || cotizacion.user?.id,
         responsableId: comercialId || cotizacion.user?.id,

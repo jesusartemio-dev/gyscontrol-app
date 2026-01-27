@@ -243,7 +243,7 @@ export async function POST(
       where: { id },
       data: {
         cotizacionId: nuevaCotizacion.id,
-        estado: 'propuesta_enviada'
+        estado: 'seguimiento_cliente'
       }
     })
 

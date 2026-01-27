@@ -31,10 +31,14 @@ interface PipelineStage {
 }
 
 const pipelineStages = [
-  { id: 'prospecto', name: 'Prospecto', color: 'text-gray-600', bgColor: 'bg-gray-50' },
-  { id: 'contacto_inicial', name: 'Contacto Inicial', color: 'text-blue-600', bgColor: 'bg-blue-50' },
-  { id: 'cotizacion', name: 'Cotización', color: 'text-yellow-600', bgColor: 'bg-yellow-50' },
+  { id: 'inicio', name: 'Inicio', color: 'text-purple-600', bgColor: 'bg-purple-50' },
+  { id: 'contacto_cliente', name: 'Contacto Cliente', color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  { id: 'validacion_tecnica', name: 'Validación Técnica', color: 'text-cyan-600', bgColor: 'bg-cyan-50' },
+  { id: 'consolidacion_precios', name: 'Consolidación Precios', color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
+  { id: 'validacion_comercial', name: 'Validación Comercial', color: 'text-violet-600', bgColor: 'bg-violet-50' },
+  { id: 'seguimiento_cliente', name: 'Seguimiento Cliente', color: 'text-yellow-600', bgColor: 'bg-yellow-50' },
   { id: 'negociacion', name: 'Negociación', color: 'text-orange-600', bgColor: 'bg-orange-50' },
+  { id: 'seguimiento_proyecto', name: 'Seguimiento Proyecto', color: 'text-teal-600', bgColor: 'bg-teal-50' },
   { id: 'cerrada_ganada', name: 'Cerrada Ganada', color: 'text-green-600', bgColor: 'bg-green-50' },
   { id: 'cerrada_perdida', name: 'Cerrada Perdida', color: 'text-red-600', bgColor: 'bg-red-50' }
 ]
@@ -176,10 +180,17 @@ export default function PipelineReportPage() {
             // Define colors based on stage state
             const getStageColors = (estado: string) => {
               switch (estado) {
-                case 'prospecto': return { bgColor: 'bg-gray-50', color: 'text-gray-600' }
+                case 'inicio':
+                case 'prospecto': return { bgColor: 'bg-purple-50', color: 'text-purple-600' }
+                case 'contacto_cliente':
                 case 'contacto_inicial': return { bgColor: 'bg-blue-50', color: 'text-blue-600' }
+                case 'validacion_tecnica': return { bgColor: 'bg-cyan-50', color: 'text-cyan-600' }
+                case 'consolidacion_precios': return { bgColor: 'bg-indigo-50', color: 'text-indigo-600' }
+                case 'validacion_comercial': return { bgColor: 'bg-violet-50', color: 'text-violet-600' }
+                case 'seguimiento_cliente':
                 case 'propuesta_enviada': return { bgColor: 'bg-yellow-50', color: 'text-yellow-600' }
                 case 'negociacion': return { bgColor: 'bg-orange-50', color: 'text-orange-600' }
+                case 'seguimiento_proyecto': return { bgColor: 'bg-teal-50', color: 'text-teal-600' }
                 case 'cerrada_ganada': return { bgColor: 'bg-green-50', color: 'text-green-600' }
                 case 'cerrada_perdida': return { bgColor: 'bg-red-50', color: 'text-red-600' }
                 default: return { bgColor: 'bg-gray-50', color: 'text-gray-600' }

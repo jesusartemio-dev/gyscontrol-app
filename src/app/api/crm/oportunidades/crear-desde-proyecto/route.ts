@@ -62,29 +62,29 @@ export async function POST(req: NextRequest) {
     // Determinar el tipo de oportunidad y valor estimado
     let valorEstimado = proyecto.grandTotal
     let nombreOportunidad = proyecto.nombre
-    let estadoInicial: 'prospecto' | 'contacto_inicial' | 'propuesta_enviada' | 'negociacion' | 'cerrada_ganada' | 'cerrada_perdida' = 'contacto_inicial'
+    let estadoInicial: 'inicio' | 'contacto_cliente' | 'validacion_tecnica' | 'consolidacion_precios' | 'validacion_comercial' | 'seguimiento_cliente' | 'negociacion' | 'seguimiento_proyecto' | 'cerrada_ganada' | 'cerrada_perdida' = 'contacto_cliente'
 
     switch (tipo) {
       case 'upselling':
         nombreOportunidad = `Upselling - ${proyecto.nombre}`
-        estadoInicial = 'contacto_inicial'
+        estadoInicial = 'contacto_cliente'
         // Para upselling, estimar un 20-30% adicional
         valorEstimado = proyecto.grandTotal * 0.25
         break
       case 'mantenimiento':
         nombreOportunidad = `Mantenimiento - ${proyecto.nombre}`
-        estadoInicial = 'contacto_inicial'
+        estadoInicial = 'contacto_cliente'
         // Para mantenimiento, estimar basado en servicios
         valorEstimado = proyecto.totalServiciosInterno * 0.3 // 30% de servicios por año
         break
       case 'seguimiento':
         nombreOportunidad = `Seguimiento - ${proyecto.nombre}`
-        estadoInicial = 'contacto_inicial'
+        estadoInicial = 'seguimiento_proyecto'
         valorEstimado = proyecto.grandTotal * 0.1 // 10% adicional
         break
       default:
         nombreOportunidad = `Oportunidad desde proyecto ${proyecto.nombre}`
-        estadoInicial = 'contacto_inicial'
+        estadoInicial = 'contacto_cliente'
     }
 
     // Crear la oportunidad
