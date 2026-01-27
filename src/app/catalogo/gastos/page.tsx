@@ -33,9 +33,9 @@ import { motion } from 'framer-motion'
 
 // Utils
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-PE', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'PEN',
+    currency: 'USD',
     minimumFractionDigits: 2
   }).format(value)
 }
