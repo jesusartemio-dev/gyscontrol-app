@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         nombre: true,
-        categoria: true // Campo string que contiene la categoría
+        edtId: true,
+        edt: { select: { nombre: true } }
       }
     });
 
@@ -108,11 +109,11 @@ export async function POST(request: NextRequest) {
     // Determinar la categoría en orden de prioridad:
     // 1. Nombre del ProyectoEdt (proyectoEdt.nombre)
     // 2. Nombre del catálogo Edt (proyectoEdt.edt.nombre)
-    // 3. Categoría del servicio cotizado (proyectoServicio.categoria)
+    // 3. EDT del servicio cotizado (proyectoServicio.edt.nombre)
     // 4. 'general' como fallback
     const categoriaFinal = proyectoEdt?.nombre ||
                            proyectoEdt?.edt?.nombre ||
-                           proyectoServicio.categoria ||
+                           proyectoServicio.edt?.nombre ||
                            'general';
 
     const registroHoras = await prisma.registroHoras.create({

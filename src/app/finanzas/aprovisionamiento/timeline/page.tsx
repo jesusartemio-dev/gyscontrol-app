@@ -1,86 +1,56 @@
 /**
- * Página de Timeline de Aprovisionamiento
- * 
- * Vista Gantt interactiva que muestra la línea temporal completa del aprovisionamiento:
- * - Gantt de listas y pedidos
- * - Filtros temporales avanzados
- * - Alertas de coherencia y retrasos
- * - Exportación de reportes
- * 
- * @author GYS Team
- * @version 2.0.0
+ * Página de Timeline de Aprovisionamiento - Vista minimalista
  */
 
-import React, { Suspense } from 'react'
-import { Metadata } from 'next'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Suspense } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { 
-  Calendar, 
-  ArrowLeft, 
-  Download, 
-  Settings, 
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Calendar,
+  Download,
   AlertTriangle,
   CheckCircle,
-  Clock,
-  Filter,
-  Home
+  Clock
 } from 'lucide-react'
 import Link from 'next/link'
 
-// ✅ Components
 import { TimelineView } from '@/components/finanzas/aprovisionamiento/TimelineView'
-import { TimelineFiltersWrapper } from '@/components/finanzas/aprovisionamiento/TimelineFiltersWrapper'
-
-// 📡 Services
 import { getTimelineData } from '@/lib/services/aprovisionamiento'
 
-export const metadata: Metadata = {
-  title: 'Timeline de Aprovisionamiento | GYS',
-  description: 'Vista Gantt interactiva del aprovisionamiento financiero de equipos'
+export const metadata = {
+  title: 'Timeline | Finanzas | GYS',
+  description: 'Vista Gantt de aprovisionamiento'
 }
 
 interface PageProps {
-  searchParams: {
+  searchParams: Promise<{
     proyecto?: string
     fechaInicio?: string
     fechaFin?: string
     vista?: 'gantt' | 'lista' | 'calendario'
     agrupacion?: 'proyecto' | 'estado' | 'proveedor' | 'fecha'
-    coherencia?: string
     alertas?: string
-    minimal?: string
-    hideFilters?: string
-    fullscreen?: string
-  }
+  }>
 }
 
-export default async function TimelinePage({ searchParams: searchParamsPromise }: { searchParams: Promise<PageProps['searchParams']> }) {
+export default async function TimelinePage({ searchParams: searchParamsPromise }: PageProps) {
   const searchParams = await searchParamsPromise
-  
-  // ✅ View mode flags - minimal is true by default
-  const isMinimal = searchParams.minimal !== 'false' // Default to true unless explicitly set to false
-  const hideFilters = searchParams.hideFilters === 'true'
-  const isFullscreen = searchParams.fullscreen === 'true'
-  
-  // 📡 Fetch timeline data
+
+  // Fetch timeline data
   const timelineData = await getTimelineData({
     proyectoId: searchParams.proyecto,
     fechaInicio: searchParams.fechaInicio,
     fechaFin: searchParams.fechaFin,
     vista: searchParams.vista || 'gantt',
     agrupacion: searchParams.agrupacion || 'proyecto',
-    soloCoherencia: searchParams.coherencia === 'true',
     soloAlertas: searchParams.alertas === 'true'
   })
 
-  // 🔁 Calculate timeline stats
+  // Stats
   const stats = {
     totalItems: timelineData.items.length,
-    itemsEnRiesgo: timelineData.items.filter(item => 
+    itemsEnRiesgo: timelineData.items.filter(item =>
       item.estado === 'enviado' || item.estado === 'atendido' || item.estado === 'parcial'
     ).length,
     itemsRetrasados: timelineData.items.filter(item => item.diasRetraso && item.diasRetraso > 0).length,
@@ -88,348 +58,128 @@ export default async function TimelinePage({ searchParams: searchParamsPromise }
   }
 
   return (
-    <div className={`${isFullscreen ? 'h-screen overflow-hidden' : 'container mx-auto'} ${isMinimal ? 'p-2' : 'p-6'} space-y-6`}>
-      {/* 🧭 Breadcrumb Navigation - Hidden in minimal mode */}
-      {!isMinimal && (
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/" className="flex items-center gap-1">
-                <Home className="h-3 w-3" />
-                Inicio
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/finanzas/aprovisionamiento">Aprovisionamiento</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Timeline</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      )}
+    <div className="p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-emerald-600" />
+          <h1 className="text-lg font-semibold">Timeline de Aprovisionamiento</h1>
+        </div>
+        <Button variant="outline" size="sm" className="h-7 text-xs">
+          <Download className="h-3 w-3 mr-1" />
+          Exportar
+        </Button>
+      </div>
 
-      {/* 🎨 Header Section - Simplified in minimal mode */}
-      <div className={`flex flex-col ${isMinimal ? 'space-y-2' : 'space-y-4'}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            {!isMinimal && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/finanzas/aprovisionamiento">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver
-                </Link>
-              </Button>
-            )}
-            <div>
-              <h1 className={`${isMinimal ? 'text-xl' : 'text-3xl'} font-bold tracking-tight`}>
-                {isMinimal ? 'Timeline Gantt' : 'Timeline de Aprovisionamiento'}
-              </h1>
-              {!isMinimal && (
-                <p className="text-muted-foreground mt-2">
-                  Vista Gantt interactiva con seguimiento temporal completo
-                </p>
-              )}
-            </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Total Items</span>
+            <Calendar className="h-4 w-4 text-blue-500" />
           </div>
-          <div className="flex items-center space-x-2">
-            {/* 🔄 View Toggle Buttons */}
-            <Button 
-              variant={isMinimal ? "default" : "outline"} 
-              size="sm" 
-              asChild
-            >
-              <Link href={`?${new URLSearchParams({...searchParams, minimal: isMinimal ? 'false' : 'true'}).toString()}`}>
-                {isMinimal ? 'Vista Completa' : 'Vista Minimal'}
-              </Link>
-            </Button>
-            {!isMinimal && (
-              <>
-                <Button variant="outline" size="sm">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Configurar Vista
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
-              </>
-            )}
-          </div>
+          <p className="text-lg font-bold">{stats.totalItems}</p>
+          <p className="text-[10px] text-muted-foreground">Listas y pedidos</p>
         </div>
 
-        {/* 📊 Timeline Stats - Hidden in minimal mode */}
-        {!isMinimal && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalItems}</div>
-                <p className="text-xs text-muted-foreground">
-                  Listas y pedidos
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">En Riesgo</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{stats.itemsEnRiesgo}</div>
-                <p className="text-xs text-muted-foreground">
-                  Requieren atención
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Retrasados</CardTitle>
-                <Clock className="h-4 w-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-destructive">{stats.itemsRetrasados}</div>
-                <p className="text-xs text-muted-foreground">
-                  Fuera de cronograma
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Alertas</CardTitle>
-                {stats.alertasActivas > 0 ? (
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                ) : (
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                )}
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {stats.alertasActivas > 0 ? (
-                    <Badge variant="destructive">{stats.alertasActivas}</Badge>
-                  ) : (
-                    <Badge variant="default" className="bg-green-600">0</Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Alertas activas
-                </p>
-              </CardContent>
-            </Card>
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">En Riesgo</span>
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
           </div>
-        )}
-      </div>
-
-      {!isMinimal && <Separator />}
-
-      {/* 📅 Main Timeline View - Prioritized Layout */}
-      <div className={`grid grid-cols-1 ${(isMinimal || hideFilters) ? 'xl:grid-cols-1' : 'xl:grid-cols-5'} gap-6`}>
-        {/* 🎯 Compact Filters Sidebar - Collapsible */}
-        {!(isMinimal || hideFilters) && (
-          <div className="xl:col-span-1">
-            <Card className="sticky top-6">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Filter className="h-4 w-4" />
-                    <span>Filtros</span>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    asChild
-                    className="h-6 w-6 p-0"
-                  >
-                    <Link href={`?${new URLSearchParams({...searchParams, hideFilters: 'true'}).toString()}`}>
-                      ×
-                    </Link>
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Suspense fallback={<div className="h-48 bg-muted animate-pulse rounded" />}>
-                  <TimelineFiltersWrapper 
-                    filtros={{
-                      fechaInicio: searchParams.fechaInicio ? new Date(searchParams.fechaInicio).toISOString() : undefined,
-                      fechaFin: searchParams.fechaFin ? new Date(searchParams.fechaFin).toISOString() : undefined,
-                      proyectoIds: searchParams.proyecto ? [searchParams.proyecto] : [],
-                      tipoVista: (searchParams.vista as 'gantt' | 'lista' | 'calendario') || 'gantt',
-                      agrupacion: (searchParams.agrupacion as 'proyecto' | 'estado' | 'proveedor' | 'fecha') || 'proyecto',
-                      validarCoherencia: searchParams.coherencia === 'true',
-                      soloAlertas: searchParams.alertas === 'true',
-                      incluirSugerencias: false,
-                      margenDias: 7,
-                      alertaAnticipacion: 15
-                    }}
-                    loading={false}
-                    compact={true}
-                  />
-                </Suspense>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* 📊 Timeline Chart - Main Content */}
-        <div className={`${(isMinimal || hideFilters) ? 'xl:col-span-1' : 'xl:col-span-4'}`}>
-          <Card className={`${isFullscreen ? 'h-screen' : isMinimal ? 'min-h-[85vh]' : 'min-h-[700px]'}`}>
-            {/* 🔄 Floating Filters Toggle - Only show when hidden */}
-            {(isMinimal || hideFilters) && (
-              <div className="absolute top-4 right-4 z-10">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  asChild
-                >
-                  <Link href={`?${new URLSearchParams({...searchParams, hideFilters: 'false'}).toString()}`}>
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filtros
-                  </Link>
-                </Button>
-              </div>
-            )}
-            <CardContent className={`${isMinimal ? 'p-2' : 'p-0'}`}>
-              <Suspense fallback={
-                <div className={`${isFullscreen ? 'h-screen' : isMinimal ? 'h-[75vh]' : 'h-[600px]'} bg-muted animate-pulse rounded-b-lg flex items-center justify-center`}>
-                  <div className="text-center">
-                    <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">Cargando timeline...</p>
-                  </div>
-                </div>
-              }>
-                <TimelineView 
-                  proyectoId={searchParams.proyecto}
-                  allowEdit={false}
-                  showFilters={false}
-                  showCoherencePanel={false}
-                  className={`${isFullscreen ? 'h-screen' : isMinimal ? 'h-[75vh]' : 'h-[600px]'}`}
-                  defaultFilters={{
-                    fechaInicio: searchParams.fechaInicio ? new Date(searchParams.fechaInicio).toISOString() : undefined,
-                    fechaFin: searchParams.fechaFin ? new Date(searchParams.fechaFin).toISOString() : undefined,
-                    proyectoIds: searchParams.proyecto ? [searchParams.proyecto] : [],
-                    tipoVista: (searchParams.vista as 'gantt' | 'lista' | 'calendario') || 'gantt', // ✅ Use URL parameter
-                    agrupacion: (searchParams.agrupacion as 'proyecto' | 'estado' | 'proveedor' | 'fecha') || 'proyecto',
-                    soloAlertas: searchParams.alertas === 'true'
-                  }}
-                />
-              </Suspense>
-            </CardContent>
-          </Card>
+          <p className="text-lg font-bold text-orange-600">{stats.itemsEnRiesgo}</p>
+          <p className="text-[10px] text-muted-foreground">Requieren atención</p>
         </div>
-      </div>
 
-      {/* 🚨 Alertas Section (if any) - Hidden in minimal mode */}
-      {!isMinimal && stats.alertasActivas > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardHeader>
-            <CardTitle className="text-orange-800 flex items-center">
-              <AlertTriangle className="h-5 w-5 mr-2" />
-              Alertas Activas ({stats.alertasActivas})
-            </CardTitle>
-            <CardDescription className="text-orange-700">
-              Situaciones que requieren atención inmediata
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {timelineData.alertas?.slice(0, 3).map((alerta, index) => (
-                <div key={index} className="flex items-start justify-between p-3 bg-white border border-orange-200 rounded-lg">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-orange-900">{alerta.mensaje}</p>
-                    <p className="text-xs text-orange-700">
-                      {alerta.tipo === 'error' ? '🔴 Error' : alerta.tipo === 'warning' ? '🟡 Advertencia' : '🔵 Información'}
-                    </p>
-                  </div>
-                  <Badge variant={alerta.prioridad === 'alta' ? 'destructive' : 'secondary'}>
-                    {alerta.prioridad}
-                  </Badge>
-                </div>
-              ))}
-              {timelineData.alertas && timelineData.alertas.length > 3 && (
-                <div className="text-center pt-2">
-                  <Button variant="outline" size="sm">
-                    Ver todas las alertas ({timelineData.alertas.length})
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
-}
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Retrasados</span>
+            <Clock className="h-4 w-4 text-red-500" />
+          </div>
+          <p className="text-lg font-bold text-red-600">{stats.itemsRetrasados}</p>
+          <p className="text-[10px] text-muted-foreground">Fuera de cronograma</p>
+        </div>
 
-// 🔄 Loading Component
-function Loading() {
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="space-y-4">
-        <div className="h-4 bg-muted animate-pulse rounded w-1/4" />
-        <div className="h-8 bg-muted animate-pulse rounded w-1/3" />
-        <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-32 bg-muted animate-pulse rounded" />
-        ))}
-      </div>
-      
-      <div className="h-32 bg-muted animate-pulse rounded" />
-      <div className="h-96 bg-muted animate-pulse rounded" />
-    </div>
-  )
-}
-
-// ❌ Error Component
-function Error({ 
-  error, 
-  reset 
-}: { 
-  error: Error & { digest?: string }
-  reset: () => void 
-}) {
-  return (
-    <div className="container mx-auto p-6">
-      <Card className="border-destructive">
-        <CardHeader>
-          <CardTitle className="text-destructive flex items-center">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            Error en Timeline
-          </CardTitle>
-          <CardDescription>
-            Ha ocurrido un error al cargar el timeline de aprovisionamiento
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {error.message || 'Error desconocido al cargar los datos del timeline'}
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Alertas</span>
+            {stats.alertasActivas > 0 ? (
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+            ) : (
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            )}
+          </div>
+          <p className={`text-lg font-bold ${stats.alertasActivas > 0 ? 'text-red-600' : 'text-green-600'}`}>
+            {stats.alertasActivas}
           </p>
-          <div className="flex space-x-2">
-            <Button onClick={reset}>
-              Reintentar
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/finanzas/aprovisionamiento">
-                Volver a Aprovisionamiento
-              </Link>
-            </Button>
+          <p className="text-[10px] text-muted-foreground">Alertas activas</p>
+        </div>
+      </div>
+
+      {/* Timeline View */}
+      <div className="border rounded-lg bg-white overflow-hidden min-h-[500px]">
+        <Suspense fallback={
+          <div className="h-[500px] flex items-center justify-center">
+            <div className="text-center">
+              <Calendar className="h-10 w-10 mx-auto text-gray-300 mb-3" />
+              <p className="text-sm text-muted-foreground">Cargando timeline...</p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        }>
+          <TimelineView
+            proyectoId={searchParams.proyecto}
+            allowEdit={false}
+            showFilters={false}
+            showCoherencePanel={false}
+            className="h-[500px]"
+            defaultFilters={{
+              fechaInicio: searchParams.fechaInicio,
+              fechaFin: searchParams.fechaFin,
+              proyectoIds: searchParams.proyecto ? [searchParams.proyecto] : [],
+              tipoVista: searchParams.vista || 'gantt',
+              agrupacion: searchParams.agrupacion || 'proyecto',
+              soloAlertas: searchParams.alertas === 'true'
+            }}
+          />
+        </Suspense>
+      </div>
+
+      {/* Alertas */}
+      {stats.alertasActivas > 0 && timelineData.alertas && (
+        <div className="border border-orange-200 rounded-lg bg-orange-50 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <span className="text-xs font-medium text-orange-800">
+              Alertas Activas ({stats.alertasActivas})
+            </span>
+          </div>
+          <div className="space-y-2">
+            {timelineData.alertas.slice(0, 3).map((alerta, index) => (
+              <div key={index} className="flex items-start justify-between p-2 bg-white border border-orange-200 rounded">
+                <div>
+                  <p className="text-xs font-medium text-orange-900">{alerta.mensaje}</p>
+                  <p className="text-[10px] text-orange-700">
+                    {alerta.tipo === 'error' ? '🔴 Error' : alerta.tipo === 'warning' ? '🟡 Advertencia' : '🔵 Info'}
+                  </p>
+                </div>
+                <Badge
+                  variant={alerta.prioridad === 'alta' ? 'destructive' : 'secondary'}
+                  className="text-[10px] h-5"
+                >
+                  {alerta.prioridad}
+                </Badge>
+              </div>
+            ))}
+            {timelineData.alertas.length > 3 && (
+              <p className="text-[10px] text-orange-700 text-center">
+                +{timelineData.alertas.length - 3} alertas más
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
+export const dynamic = 'force-dynamic'

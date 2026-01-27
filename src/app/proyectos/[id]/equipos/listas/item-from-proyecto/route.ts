@@ -47,6 +47,8 @@ export async function POST(req: Request) {
         responsableId: lista.responsableId,
         codigo: item.codigo,
         descripcion: item.descripcion,
+        marca: item.marca || '', // ✅ Copiar marca
+        categoria: item.categoria || '', // ✅ Copiar categoria
         unidad: item.unidad,
         cantidad: item.cantidad,
         presupuesto: item.precioCliente, // Se usa como presupuesto referencial

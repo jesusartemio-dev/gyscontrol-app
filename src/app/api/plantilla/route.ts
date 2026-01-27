@@ -253,7 +253,6 @@ export async function POST(req: NextRequest) {
         data: {
           id: `plantilla-servicio-ind-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           nombre,
-          categoria: 'General', // Default category
           estado: 'borrador',
           totalInterno: 0,
           totalCliente: 0,

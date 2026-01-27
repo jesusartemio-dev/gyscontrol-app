@@ -176,16 +176,12 @@ export async function generarReportePedidos(
     if (filtros.proyectoId) queryParams.set('proyectoId', filtros.proyectoId);
     if (filtros.proveedorId) queryParams.set('proveedorId', filtros.proveedorId);
     if (filtros.estadoEntrega) queryParams.set('estadoEntrega', filtros.estadoEntrega);
-    if (filtros.fechaDesde) {
-      if (isNaN(filtros.fechaDesde.getTime())) {
-        throw new Error('Invalid time value');
-      }
+
+    // Solo enviar fechas si son objetos Date válidos
+    if (filtros.fechaDesde instanceof Date && !isNaN(filtros.fechaDesde.getTime())) {
       queryParams.set('fechaDesde', filtros.fechaDesde.toISOString());
     }
-    if (filtros.fechaHasta) {
-      if (isNaN(filtros.fechaHasta.getTime())) {
-        throw new Error('Invalid time value');
-      }
+    if (filtros.fechaHasta instanceof Date && !isNaN(filtros.fechaHasta.getTime())) {
       queryParams.set('fechaHasta', filtros.fechaHasta.toISOString());
     }
     if (filtros.incluirDetalles) queryParams.set('incluirDetalles', 'true');
@@ -287,9 +283,15 @@ export async function obtenerDashboardMetricas(
     if (filtros.proyectoId) queryParams.set('proyectoId', filtros.proyectoId);
     if (filtros.proveedorId) queryParams.set('proveedorId', filtros.proveedorId);
     if (filtros.estadoEntrega) queryParams.set('estadoEntrega', filtros.estadoEntrega);
-    if (filtros.fechaDesde) queryParams.set('fechaDesde', filtros.fechaDesde.toISOString());
-    if (filtros.fechaHasta) queryParams.set('fechaHasta', filtros.fechaHasta.toISOString());
-    
+
+    // Solo enviar fechas si son objetos Date válidos
+    if (filtros.fechaDesde instanceof Date && !isNaN(filtros.fechaDesde.getTime())) {
+      queryParams.set('fechaDesde', filtros.fechaDesde.toISOString());
+    }
+    if (filtros.fechaHasta instanceof Date && !isNaN(filtros.fechaHasta.getTime())) {
+      queryParams.set('fechaHasta', filtros.fechaHasta.toISOString());
+    }
+
     queryParams.set('tipoReporte', 'metricas');
 
     // 📡 Realizar petición a la API

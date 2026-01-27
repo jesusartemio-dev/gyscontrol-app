@@ -12,6 +12,20 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
+// Helper para normalizar fechas a mediodía UTC y evitar problemas de timezone
+// Cuando el frontend hace new Date("2026-04-28"), JavaScript crea UTC midnight
+// que en Peru (UTC-5) aparece como April 27 7pm. Usando mediodía UTC evitamos esto.
+function toNoonUTC(date: Date | null | undefined): string | null {
+  if (!date) return null
+  const d = new Date(date)
+  return new Date(Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
+    12, 0, 0
+  )).toISOString()
+}
+
 // ✅ GET /api/cotizaciones/[id]/cronograma/tree - Obtener jerarquía completa
 export async function GET(
   request: NextRequest,
@@ -117,8 +131,8 @@ export async function GET(
        data: {
          descripcion: fase.descripcion,
          orden: fase.orden,
-         fechaInicioPlan: fase.fechaInicioPlan?.toISOString().split('T')[0],
-         fechaFinPlan: fase.fechaFinPlan?.toISOString().split('T')[0],
+         fechaInicioPlan: toNoonUTC(fase.fechaInicioPlan),
+         fechaFinPlan: toNoonUTC(fase.fechaFinPlan),
          horasEstimadas: fase.horasEstimadas
        },
        children: [] as any[]
@@ -140,8 +154,8 @@ export async function GET(
           descripcion: edt.descripcion,
           horasEstimadas: edt.horasEstimadas,
           prioridad: edt.prioridad,
-          fechaInicioComercial: edt.fechaInicioComercial?.toISOString().split('T')[0],
-          fechaFinComercial: edt.fechaFinComercial?.toISOString().split('T')[0]
+          fechaInicioComercial: toNoonUTC(edt.fechaInicioComercial),
+          fechaFinComercial: toNoonUTC(edt.fechaFinComercial)
         },
         children: [] as any[]
       }
@@ -161,8 +175,8 @@ export async function GET(
              data: {
                descripcion: actividad.descripcion,
                prioridad: actividad.prioridad,
-               fechaInicioComercial: actividad.fechaInicioComercial?.toISOString().split('T')[0],
-               fechaFinComercial: actividad.fechaFinComercial?.toISOString().split('T')[0],
+               fechaInicioComercial: toNoonUTC(actividad.fechaInicioComercial),
+               fechaFinComercial: toNoonUTC(actividad.fechaFinComercial),
                horasEstimadas: actividad.horasEstimadas
              },
              children: actividad.cotizacionTarea?.map((tarea: any) => ({
@@ -177,8 +191,8 @@ export async function GET(
                status: tarea.estado || 'pendiente',
                data: {
                  descripcion: tarea.descripcion,
-                 fechaInicio: tarea.fechaInicio?.toISOString().split('T')[0],
-                 fechaFin: tarea.fechaFin?.toISOString().split('T')[0],
+                 fechaInicio: toNoonUTC(tarea.fechaInicio),
+                 fechaFin: toNoonUTC(tarea.fechaFin),
                  horasEstimadas: tarea.horasEstimadas
                },
                children: []
@@ -210,8 +224,8 @@ export async function GET(
             descripcion: edt.descripcion,
             horasEstimadas: edt.horasEstimadas,
             prioridad: edt.prioridad,
-            fechaInicioComercial: edt.fechaInicioComercial?.toISOString().split('T')[0],
-            fechaFinComercial: edt.fechaFinComercial?.toISOString().split('T')[0]
+            fechaInicioComercial: toNoonUTC(edt.fechaInicioComercial),
+            fechaFinComercial: toNoonUTC(edt.fechaFinComercial)
           },
           children: [] as any[]
         }
@@ -231,8 +245,8 @@ export async function GET(
            data: {
              descripcion: actividad.descripcion,
              prioridad: actividad.prioridad,
-             fechaInicioComercial: actividad.fechaInicioComercial?.toISOString().split('T')[0],
-             fechaFinComercial: actividad.fechaFinComercial?.toISOString().split('T')[0],
+             fechaInicioComercial: toNoonUTC(actividad.fechaInicioComercial),
+             fechaFinComercial: toNoonUTC(actividad.fechaFinComercial),
              horasEstimadas: actividad.horasEstimadas
            },
            children: actividad.cotizacionTarea?.map((tarea: any) => ({
@@ -247,8 +261,8 @@ export async function GET(
              status: tarea.estado || 'pendiente',
              data: {
                descripcion: tarea.descripcion,
-               fechaInicio: tarea.fechaInicio?.toISOString().split('T')[0],
-               fechaFin: tarea.fechaFin?.toISOString().split('T')[0],
+               fechaInicio: toNoonUTC(tarea.fechaInicio),
+               fechaFin: toNoonUTC(tarea.fechaFin),
                horasEstimadas: tarea.horasEstimadas
              },
              children: []

@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dialog,
   DialogContent,
@@ -11,11 +10,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { toast } from 'sonner'
@@ -27,12 +23,10 @@ import {
   Plus,
   Search,
   Package,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  Filter,
   X,
-  ShoppingCart,
+  Loader2,
+  ChevronUp,
+  ChevronDown,
   Layers
 } from 'lucide-react'
 import type {
@@ -49,6 +43,9 @@ interface Props {
   onSuccess?: () => void
   onCreated?: () => Promise<void>
 }
+
+type SortField = 'codigo' | 'descripcion'
+type SortOrder = 'asc' | 'desc'
 
 export default function ModalAgregarItemDesdeCatalogo({
   isOpen,
@@ -68,8 +65,12 @@ export default function ModalAgregarItemDesdeCatalogo({
   const [proyectoEquipoId, setProyectoEquipoId] = useState('')
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
+  const [sortField, setSortField] = useState<SortField>('codigo')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
 
   useEffect(() => {
+    if (!isOpen) return
+
     const fetchData = async () => {
       try {
         setInitialLoading(true)
@@ -82,14 +83,24 @@ export default function ModalAgregarItemDesdeCatalogo({
         setCategorias(categoriasData)
         setSecciones(seccionesData)
       } catch (error) {
-        console.error('❌ Error al cargar datos:', error)
-        toast.error('❌ Error al cargar los datos del catálogo')
+        console.error('Error al cargar datos:', error)
+        toast.error('Error al cargar el catálogo')
       } finally {
         setInitialLoading(false)
       }
     }
     fetchData()
-  }, [proyectoId])
+  }, [proyectoId, isOpen])
+
+  // Reset on close
+  useEffect(() => {
+    if (!isOpen) {
+      setSeleccionados([])
+      setProyectoEquipoId('')
+      setSearch('')
+      setCategoriaFiltro('todas')
+    }
+  }, [isOpen])
 
   const toggleSeleccion = (id: string) => {
     setSeleccionados((prev) =>
@@ -97,14 +108,31 @@ export default function ModalAgregarItemDesdeCatalogo({
     )
   }
 
+  const toggleSelectAll = () => {
+    if (seleccionados.length === equiposFiltrados.length) {
+      setSeleccionados([])
+    } else {
+      setSeleccionados(equiposFiltrados.map(e => e.id))
+    }
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortOrder('asc')
+    }
+  }
+
   const handleAgregar = async () => {
     if (!session?.user?.id) {
-      toast.error('❌ No se pudo identificar el usuario. Inicia sesión nuevamente.')
+      toast.error('No se pudo identificar el usuario')
       return
     }
 
     if (seleccionados.length === 0 || !proyectoEquipoId) {
-      toast.warning('Selecciona al menos un equipo y el grupo del proyecto')
+      toast.warning('Selecciona equipos y un grupo del proyecto')
       return
     }
 
@@ -117,11 +145,13 @@ export default function ModalAgregarItemDesdeCatalogo({
         await createListaEquipoItem({
           listaId,
           proyectoEquipoId,
-          catalogoEquipoId: equipo.id, // ✅ Relacionar con el catálogo para exportar categoría/marca
+          catalogoEquipoId: equipo.id,
           responsableId: session.user.id,
           codigo: equipo.codigo,
           descripcion: equipo.descripcion,
           unidad: equipo.unidad?.nombre || 'UND',
+          marca: equipo.marca || '',
+          categoria: equipo.categoriaEquipo?.nombre || '',
           cantidad: 1,
           presupuesto: equipo.precioVenta ?? 0,
           origen: 'nuevo',
@@ -129,325 +159,254 @@ export default function ModalAgregarItemDesdeCatalogo({
         })
       }
 
-      toast.success('✅ Equipos agregados correctamente')
+      toast.success(`${seleccionados.length} equipo(s) agregado(s)`)
       onSuccess?.()
       await onCreated?.()
       onClose()
     } catch (error) {
-      console.error('❌ Error al agregar los equipos:', error)
-      toast.error('❌ No se pudo agregar los equipos')
+      console.error('Error al agregar equipos:', error)
+      toast.error('Error al agregar los equipos')
     } finally {
       setLoading(false)
     }
   }
 
-  const equiposFiltrados = equipos.filter((e) => {
-    const matchCategoria = categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro
-    const matchSearch = e.codigo.toLowerCase().includes(search.toLowerCase()) || e.descripcion.toLowerCase().includes(search.toLowerCase())
-    return matchCategoria && matchSearch
-  })
+  const equiposFiltrados = useMemo(() => {
+    let filtered = equipos.filter((e) => {
+      const matchCategoria = categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro
+      const matchSearch = !search ||
+        e.codigo.toLowerCase().includes(search.toLowerCase()) ||
+        e.descripcion.toLowerCase().includes(search.toLowerCase())
+      return matchCategoria && matchSearch
+    })
 
-  const seleccionadosPreview = equipos.filter((e) => seleccionados.includes(e.id))
+    // Sort
+    filtered.sort((a, b) => {
+      const aVal = sortField === 'codigo' ? a.codigo : a.descripcion
+      const bVal = sortField === 'codigo' ? b.codigo : b.descripcion
+      const compare = aVal.localeCompare(bVal)
+      return sortOrder === 'asc' ? compare : -compare
+    })
+
+    return filtered
+  }, [equipos, categoriaFiltro, search, sortField, sortOrder])
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null
+    return sortOrder === 'asc'
+      ? <ChevronUp className="h-3 w-3 inline ml-0.5" />
+      : <ChevronDown className="h-3 w-3 inline ml-0.5" />
+  }
 
   if (!isOpen) return null
 
   return (
-    <AnimatePresence>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-[98vw] w-full h-[90vh] flex flex-col p-0">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full"
-          >
-            <DialogHeader className="pb-3 pt-6 px-6 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Package className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <DialogTitle className="text-xl font-semibold text-gray-900">
-                    Agregar Equipos desde Catálogo
-                  </DialogTitle>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Selecciona equipos del catálogo para agregar a la lista técnica
-                  </p>
-                </div>
-              </div>
-            </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl w-full max-h-[85vh] flex flex-col p-0 gap-0">
+        {/* Header */}
+        <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-blue-600" />
+            <DialogTitle className="text-sm font-semibold">
+              Agregar desde Catálogo
+            </DialogTitle>
+            <Badge variant="secondary" className="text-[10px] h-5 ml-auto">
+              {seleccionados.length} seleccionados
+            </Badge>
+          </div>
+        </DialogHeader>
 
-            <ScrollArea className="flex-1 h-0 px-6">
-              {/* 🔍 Filtros y Búsqueda */}
-              <Card className="mb-4">
-                <CardHeader className="pb-2 pt-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Filter className="h-4 w-4" />
-                    Filtros y Búsqueda
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 pb-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* Búsqueda */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-gray-700">Buscar equipo</label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                        <Input
-                          placeholder="Buscar por código o descripción..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          className="pl-10 h-8"
-                        />
-                        {search && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                            onClick={() => setSearch('')}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+        {/* Filtros inline */}
+        <div className="px-4 py-2 border-b bg-gray-50/50 flex items-center gap-2 flex-shrink-0">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar código o descripción..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-7 pl-7 text-xs"
+            />
+            {search && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 p-0"
+                onClick={() => setSearch('')}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+          <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+            <SelectTrigger className="h-7 w-44 text-xs">
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas las categorías</SelectItem>
+              {categorias.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id} className="text-xs">
+                  {cat.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="text-[10px] text-muted-foreground ml-auto">
+            {equiposFiltrados.length} de {equipos.length}
+          </div>
+        </div>
 
-                    {/* Filtro por categoría */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-gray-700">Filtrar por categoría</label>
-                      <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Todas las categorías" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todas">Todas las categorías</SelectItem>
-                          {categorias.map((categoria) => (
-                            <SelectItem key={categoria.id} value={categoria.id}>
-                              {categoria.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Estadísticas rápidas */}
-                  <div className="flex justify-between items-center text-xs text-gray-600 pt-2">
-                    <div className="flex items-center gap-1">
-                      <Package className="h-3 w-3" />
-                      <span>Total: {equipos.length} equipos</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Search className="h-3 w-3" />
-                      <span>Filtrados: {equiposFiltrados.length} equipos</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3" />
-                      <span>Seleccionados: {seleccionadosPreview.length} equipos</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 📋 Tabla de Equipos */}
-              <Card>
-                <CardHeader className="pb-2 pt-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    Equipos Disponibles
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {initialLoading ? (
-                    <div className="p-6 space-y-3">
-                      {[...Array(5)].map((_, i) => (
-                        <div key={i} className="flex items-center space-x-4">
-                          <Skeleton className="h-4 w-4" />
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-4 flex-1" />
-                          <Skeleton className="h-4 w-16" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : equiposFiltrados.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        No se encontraron equipos
-                      </h3>
-                      <p className="text-sm text-gray-500 mb-4">
-                        {search || categoriaFiltro !== 'todas'
-                          ? 'Intenta ajustar los filtros de búsqueda'
-                          : 'No hay equipos disponibles en el catálogo'}
-                      </p>
-                      {(search || categoriaFiltro !== 'todas') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSearch('')
-                            setCategoriaFiltro('todas')
-                          }}
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Limpiar filtros
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-[400px] w-full border rounded-md overflow-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 sticky top-0 z-10">
-                          <tr className="border-b">
-                            <th className="text-left py-3 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '4%'}}>
-                              <CheckCircle className="h-4 w-4" />
-                            </th>
-                            <th className="text-left py-3 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '20%'}}>
-                              Código
-                            </th>
-                            <th className="text-left py-3 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '60%'}}>
-                              Descripción
-                            </th>
-                            <th className="text-left py-3 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '16%'}}>
-                              Unidad
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {equiposFiltrados.map((equipo, index) => (
-                            <motion.tr
-                              key={equipo.id}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: index * 0.05 }}
-                              className="hover:bg-gray-50 transition-colors cursor-pointer"
-                              onClick={() => toggleSeleccion(equipo.id)}
-                            >
-                              <td className="py-3 px-1 whitespace-nowrap" style={{width: '4%'}}>
-                                 <Checkbox
-                                   checked={seleccionados.includes(equipo.id)}
-                                   onCheckedChange={() => toggleSeleccion(equipo.id)}
-                                   className="mx-auto"
-                                 />
-                               </td>
-                              <td className="py-3 px-3 whitespace-nowrap text-sm font-medium text-gray-900" style={{width: '20%'}}>
-                                {equipo.codigo}
-                              </td>
-                              <td className="py-3 px-3 text-sm text-gray-700" style={{width: '60%'}}>
-                                {equipo.descripcion}
-                              </td>
-                              <td className="py-3 px-3 whitespace-nowrap text-sm text-gray-500" style={{width: '16%'}}>
-                                <Badge variant="outline" className="text-xs">
-                                  {equipo.unidad?.nombre || 'UND'}
-                                </Badge>
-                              </td>
-                            </motion.tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* 🎯 Selección de Grupo */}
-              {seleccionadosPreview.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4"
-                >
-                  <Card>
-                    <CardHeader className="pb-2 pt-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Layers className="h-4 w-4" />
-                        Asignar a Grupo del Proyecto
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="text-xs text-gray-600">
-                        <strong>Equipos seleccionados ({seleccionadosPreview.length}):</strong>
-                      </div>
-                      <div className="max-h-20 overflow-y-auto">
-                        <div className="flex flex-wrap gap-1">
-                          {seleccionadosPreview.map((equipo) => (
-                            <Badge key={equipo.id} variant="secondary" className="text-xs">
-                              {equipo.codigo}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <Select value={proyectoEquipoId} onValueChange={setProyectoEquipoId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona grupo del proyecto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {secciones.map((seccion) => (
-                            <SelectItem key={seccion.id} value={seccion.id}>
-                              {seccion.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-            </ScrollArea>
-
-            {/* 🎯 Botones de Acción */}
-            <div className="flex-shrink-0 px-6 pb-6">
-              <Separator className="mb-4" />
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  {seleccionadosPreview.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="flex items-center gap-2"
-                    >
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>{seleccionadosPreview.length} equipo{seleccionadosPreview.length !== 1 ? 's' : ''} seleccionado{seleccionadosPreview.length !== 1 ? 's' : ''}</span>
-                    </motion.div>
-                  )}
-                </div>
-                
-                <div className="flex gap-3">
-                  <Button 
-                    variant="outline" 
-                    onClick={onClose}
-                    disabled={loading}
-                    className="min-w-[100px]"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </Button>
-                  
-                  <Button 
-                    onClick={handleAgregar} 
-                    disabled={loading || seleccionadosPreview.length === 0 || !proyectoEquipoId}
-                    className="min-w-[140px] bg-blue-600 hover:bg-blue-700"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Agregando...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Agregar {seleccionadosPreview.length > 0 ? `(${seleccionadosPreview.length})` : ''}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
+        {/* Tabla */}
+        <div className="flex-1 min-h-0">
+          {initialLoading ? (
+            <div className="p-4 space-y-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
-          </motion.div>
-        </DialogContent>
-      </Dialog>
-    </AnimatePresence>
+          ) : equiposFiltrados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Package className="h-10 w-10 text-gray-300 mb-3" />
+              <p className="text-sm text-muted-foreground">No se encontraron equipos</p>
+              {(search || categoriaFiltro !== 'todas') && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="text-xs mt-2"
+                  onClick={() => { setSearch(''); setCategoriaFiltro('todas') }}
+                >
+                  Limpiar filtros
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="max-h-[50vh] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0 z-10">
+                  <tr className="border-b">
+                    <th className="py-2 px-2 w-8">
+                      <Checkbox
+                        checked={seleccionados.length === equiposFiltrados.length && equiposFiltrados.length > 0}
+                        onCheckedChange={toggleSelectAll}
+                        className="h-3.5 w-3.5"
+                      />
+                    </th>
+                    <th
+                      className="py-2 px-2 text-left font-medium text-muted-foreground cursor-pointer hover:text-foreground w-40"
+                      onClick={() => handleSort('codigo')}
+                    >
+                      Código <SortIcon field="codigo" />
+                    </th>
+                    <th
+                      className="py-2 px-2 text-left font-medium text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => handleSort('descripcion')}
+                    >
+                      Descripción <SortIcon field="descripcion" />
+                    </th>
+                    <th className="py-2 px-2 text-left font-medium text-muted-foreground w-16">
+                      Unidad
+                    </th>
+                    <th className="py-2 px-2 text-right font-medium text-muted-foreground w-20">
+                      Precio
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {equiposFiltrados.map((equipo) => {
+                    const isSelected = seleccionados.includes(equipo.id)
+                    return (
+                      <tr
+                        key={equipo.id}
+                        className={`border-b cursor-pointer transition-colors ${
+                          isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => toggleSeleccion(equipo.id)}
+                      >
+                        <td className="py-1.5 px-2">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSeleccion(equipo.id)}
+                            className="h-3.5 w-3.5"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 font-mono text-[11px]">
+                          {equipo.codigo}
+                        </td>
+                        <td className="py-1.5 px-2 truncate max-w-md" title={equipo.descripcion}>
+                          {equipo.descripcion}
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <Badge variant="outline" className="text-[10px] h-4 px-1">
+                            {equipo.unidad?.nombre || 'UND'}
+                          </Badge>
+                        </td>
+                        <td className="py-1.5 px-2 text-right font-medium">
+                          {equipo.precioVenta ? `$${equipo.precioVenta.toLocaleString()}` : '-'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t bg-gray-50/50 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            {/* Grupo selector */}
+            <div className="flex items-center gap-2 flex-1">
+              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+              <Select value={proyectoEquipoId} onValueChange={setProyectoEquipoId}>
+                <SelectTrigger className="h-7 w-56 text-xs">
+                  <SelectValue placeholder="Seleccionar grupo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {secciones.map((seccion) => (
+                    <SelectItem key={seccion.id} value={seccion.id} className="text-xs">
+                      {seccion.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {seleccionados.length > 0 && !proyectoEquipoId && (
+                <span className="text-[10px] text-orange-600">← Requerido</span>
+              )}
+            </div>
+
+            {/* Acciones */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                disabled={loading}
+                className="h-7 text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleAgregar}
+                disabled={loading || seleccionados.length === 0 || !proyectoEquipoId}
+                className="h-7 text-xs min-w-[100px]"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Agregando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Agregar ({seleccionados.length})
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

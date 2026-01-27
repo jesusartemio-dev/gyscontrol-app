@@ -79,18 +79,18 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
     // Buscar un servicio del proyecto para asociar
     let proyectoServicio = null
     if (edtId) {
-      // Buscar el EDT para obtener su categoría
+      // Buscar el EDT para obtener su edtId del catálogo
       const edtInfo = await prisma.proyectoEdt.findUnique({
         where: { id: edtId },
-        select: { nombre: true }
+        select: { nombre: true, edtId: true }
       })
 
-      // Buscar servicios del proyecto que coincidan con el nombre del EDT
-      if (edtInfo) {
+      // Buscar servicios del proyecto que coincidan con el EDT
+      if (edtInfo && edtInfo.edtId) {
         proyectoServicio = await prisma.proyectoServicioCotizado.findFirst({
           where: {
             proyectoId,
-            categoria: edtInfo.nombre
+            edtId: edtInfo.edtId
           },
           select: { id: true, nombre: true }
         })

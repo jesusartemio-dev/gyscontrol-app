@@ -335,12 +335,18 @@ export function ProyectoCronogramaTreeView({
               {selectedCronograma && (
                 <p className="text-sm text-muted-foreground mt-1">
                   Trabajando en: <span className="font-medium text-blue-600">{selectedCronograma.nombre}</span>
-                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                    {selectedCronograma.tipo}
+                  <span className={`ml-2 text-xs px-2 py-1 rounded ${
+                    selectedCronograma.tipo === 'comercial' ? 'bg-blue-100 text-blue-800' :
+                    selectedCronograma.tipo === 'planificacion' ? 'bg-purple-100 text-purple-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {selectedCronograma.tipo === 'comercial' ? 'Comercial' :
+                     selectedCronograma.tipo === 'planificacion' ? 'Línea Base' :
+                     'Ejecución'}
                   </span>
-                  {selectedCronograma.esBaseline && selectedCronograma.tipo === 'planificacion' && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                      Línea Base
+                  {selectedCronograma.tipo === 'comercial' && (
+                    <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                      Solo lectura
                     </span>
                   )}
                 </p>
@@ -374,40 +380,39 @@ export function ProyectoCronogramaTreeView({
       </CardHeader>
 
       <CardContent>
-        {/* Toolbar de acciones globales */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {/* Generación automática - Solo para cronograma comercial (planificación y ejecución tienen el botón en el header) */}
-          {selectedCronograma?.tipo === 'comercial' && (
-            <div className="flex gap-2 border-r pr-4 mr-4">
-              <Button
-                size="sm"
-                variant="default"
-                onClick={async () => {
-                  try {
-                    await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
-                    onRefresh?.()
-                  } catch (error) {
-                    console.error('Error generating cronograma:', error)
-                  }
-                }}
-                disabled={state.loadingNodes.has('root')}
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
-              </Button>
-            </div>
-          )}
+        {/* Toolbar de acciones globales - Solo para cronogramas editables (no comercial) */}
+        {selectedCronograma?.tipo !== 'comercial' && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {/* Generación automática - Solo para cronograma de planificación (Línea Base) */}
+            {selectedCronograma?.tipo === 'planificacion' && (
+              <div className="flex gap-2 border-r pr-4 mr-4">
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={async () => {
+                    try {
+                      await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
+                      onRefresh?.()
+                    } catch (error) {
+                      console.error('Error generating cronograma:', error)
+                    }
+                  }}
+                  disabled={state.loadingNodes.has('root')}
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
+                </Button>
+              </div>
+            )}
 
-          {/* Creación manual */}
-          <Button
-            size="sm"
-            onClick={() => handleAddChild('root', 'fase')}
-            disabled={selectedCronograma?.tipo === 'comercial'}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Fase
-          </Button>
-          {selectedCronograma?.tipo !== 'comercial' && (
+            {/* Creación manual */}
+            <Button
+              size="sm"
+              onClick={() => handleAddChild('root', 'fase')}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Fase
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -467,16 +472,16 @@ export function ProyectoCronogramaTreeView({
               <Download className="h-4 w-4 mr-2" />
               Importar Fases
             </Button>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleAddChild('root', 'edt')}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar EDT Global
-          </Button>
-        </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleAddChild('root', 'edt')}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar EDT Global
+            </Button>
+          </div>
+        )}
 
         {/* Árbol jerárquico */}
         <div className="tree-container border rounded-lg">

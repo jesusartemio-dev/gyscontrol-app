@@ -89,7 +89,8 @@ export async function GET(request: NextRequest) {
           id: true,
           proyectoServicioId: true,
           nombre: true,
-          categoria: true,
+          edtId: true,
+          edt: { select: { nombre: true } },
           horasEjecutadas: true,
           cantidadHoras: true
         }

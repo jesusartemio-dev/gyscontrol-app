@@ -137,7 +137,8 @@ export async function GET(request: NextRequest) {
               proyectoServicioCotizado: {
                 select: {
                   id: true,
-                  categoria: true,
+                  edtId: true,
+                  edt: { select: { nombre: true } },
                   proyecto: {
                     select: {
                       id: true,
@@ -159,7 +160,8 @@ export async function GET(request: NextRequest) {
               proyectoServicioCotizado: {
                 select: {
                   id: true,
-                  categoria: true,
+                  edtId: true,
+                  edt: { select: { nombre: true } },
                   proyecto: {
                     select: {
                       id: true,
@@ -323,7 +325,8 @@ export async function POST(request: NextRequest) {
             proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edtId: true,
+                edt: { select: { nombre: true } },
                 proyecto: {
                   select: {
                     id: true,
@@ -345,7 +348,8 @@ export async function POST(request: NextRequest) {
             proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edtId: true,
+                edt: { select: { nombre: true } },
                 proyecto: {
                   select: {
                     id: true,

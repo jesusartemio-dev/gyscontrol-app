@@ -203,12 +203,10 @@ export default function Sidebar() {
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
-        { href: '/gestion/reportes/pedidos', label: 'Dashboard de Pedidos', icon: BarChart3 },
-        { href: '/gestion/reportes/trazabilidad', label: 'Trazabilidad', icon: Activity },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
       ],
     },
-    // 4. Finanzas - Control financiero y flujo de caja
+    // 4. Finanzas - Control financiero y aprovisionamiento
     {
       key: 'finanzas',
       title: 'Finanzas',
@@ -217,23 +215,10 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'gestor'],
       links: [
         { href: '/finanzas/dashboard', label: 'Dashboard', icon: BarChart3 },
-        { 
-          href: '/finanzas/aprovisionamiento', 
-          label: 'Aprovisionamiento', 
-          icon: Clock,
-          submenu: [
-            { href: '/finanzas/aprovisionamiento', label: 'Dashboard', icon: BarChart3 },
-            { href: '/finanzas/aprovisionamiento/proyectos', label: 'Proyectos', icon: FolderOpen },
-            { href: '/finanzas/aprovisionamiento/listas', label: 'Listas de Equipo', icon: FileText },
-            { href: '/finanzas/aprovisionamiento/pedidos', label: 'Pedidos', icon: Package },
-            { href: '/finanzas/aprovisionamiento/timeline', label: 'Timeline Gantt', icon: Clock }
-          ]
-        },
-        { href: '/finanzas/flujo-caja', label: 'Flujo de Caja', icon: TrendingUp },
-        { href: '/finanzas/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: DollarSign },
-        { href: '/finanzas/cuentas-pagar', label: 'Cuentas por Pagar', icon: CreditCard },
-        { href: '/finanzas/presupuestos', label: 'Presupuestos', icon: PieChart },
-        { href: '/finanzas/rentabilidad', label: 'Análisis Rentabilidad', icon: BarChart3 },
+        { href: '/finanzas/aprovisionamiento/proyectos', label: 'Proyectos', icon: FolderOpen },
+        { href: '/finanzas/aprovisionamiento/listas', label: 'Listas', icon: FileText },
+        { href: '/finanzas/aprovisionamiento/pedidos', label: 'Pedidos', icon: Package },
+        { href: '/finanzas/aprovisionamiento/timeline', label: 'Timeline', icon: Clock },
       ],
     },
     // 5. Gestión - Análisis y control
@@ -244,20 +229,10 @@ export default function Sidebar() {
       color: 'text-cyan-400',
       roles: ['admin', 'gerente', 'gestor'],
       links: [
-        { href: '/gestion/valorizaciones', label: 'Valorizaciones', icon: Calculator },
-        { 
-          href: '/gestion/reportes', 
-          label: 'Reportes', 
-          icon: BarChart3,
-          submenu: [
-            { href: '/gestion/reportes', label: 'Dashboard Reportes', icon: BarChart3 },
-            { href: '/gestion/reportes/pedidos', label: 'Reportes Pedidos', icon: Package },
-            { href: '/gestion/reportes/trazabilidad', label: 'Trazabilidad', icon: Activity },
-            { href: '/gestion/reportes/performance', label: 'Performance', icon: TrendingUp },
-            { href: '/gestion/reportes/financiero', label: 'Financiero', icon: DollarSign }
-          ]
-        },
-        { href: '/gestion/indicadores', label: 'Indicadores', icon: BarChart3 },
+        { href: '/gestion/reportes', label: 'Reportes', icon: BarChart3 },
+        { href: '/gestion/reportes/pedidos', label: 'Pedidos', icon: Package },
+        { href: '/gestion/reportes/performance', label: 'Performance', icon: TrendingUp },
+        { href: '/gestion/reportes/financiero', label: 'Financiero', icon: DollarSign },
       ],
     },
     // 6. Configuración - Administración del sistema y catálogos

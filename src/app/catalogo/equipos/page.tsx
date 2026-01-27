@@ -1,79 +1,81 @@
-// ===================================================
-// 📁 Archivo: page.tsx
-// 📌 Ubicación: src/app/catalogo/equipos/
-// 🔧 Descripción: Gestión de catálogo de equipos con UX/UI mejorada
-//
-// 🎨 Mejoras UX/UI aplicadas:
-// - Diseño moderno con Framer Motion
-// - Header mejorado con navegación breadcrumb
-// - Estados de carga y error optimizados
-// - Layout responsivo con estadísticas
-// - Componentes shadcn/ui consistentes
-// ===================================================
+/**
+ * 📦 Catálogo de Equipos - Minimalist Version
+ * Clean, professional design focused on data
+ */
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
-import CatalogoEquipoCrearAcordeon from '@/components/catalogo/CatalogoEquipoCrearAcordeon'
 import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
-import CatalogoEquipoList from '@/components/catalogo/CatalogoEquipoList'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { exportarEquiposAExcel, importarEquiposDesdeExcel } from '@/lib/utils/equiposExcel'
 import { importarEquiposDesdeExcelValidado } from '@/lib/utils/equiposImportUtils'
 import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
-import { createCatalogoEquipo, updateCatalogoEquipo, getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
+import { createCatalogoEquipo, updateCatalogoEquipo, deleteCatalogoEquipo, getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
 import type { CatalogoEquipo, CatalogoEquipoPayload } from '@/types'
 
-// UI Components
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-
-// Icons
 import {
-  ChevronRight,
-  Settings,
-  TrendingUp,
-  AlertCircle,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  ArrowLeft,
+  Plus,
+  Search,
   Package,
-  Upload,
-  Download,
-  Share2,
-  Edit,
+  Pencil,
+  Save,
+  Trash2,
+  X,
   Loader2,
-  Plus
+  AlertCircle
 } from 'lucide-react'
 
 type CatalogoEquipoConId = CatalogoEquipoPayload & { id: string }
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      duration: 0.6,
-      staggerChildren: 0.1
-    }
-  }
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5 }
-  }
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
 }
 
 export default function CatalogoEquipoPage() {
@@ -87,14 +89,25 @@ export default function CatalogoEquipoPage() {
   const [mostrarModal, setMostrarModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
 
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
+  const [estadoFiltro, setEstadoFiltro] = useState('__ALL__')
+
+  // Edit state
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [nuevoPrecio, setNuevoPrecio] = useState<number | null>(null)
+  const [nuevoMargen, setNuevoMargen] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
   const cargarEquipos = async () => {
     try {
       setLoading(true)
       const data = await getCatalogoEquipos()
       setEquipos(data)
     } catch (err) {
-      console.error('❌ Error al cargar equipos:', err)
-      toast.error('Error al cargar equipos.')
+      console.error('Error al cargar equipos:', err)
+      toast.error('Error al cargar equipos')
     } finally {
       setLoading(false)
     }
@@ -104,20 +117,38 @@ export default function CatalogoEquipoPage() {
     cargarEquipos()
   }, [])
 
+  // Memoized values
+  const categorias = useMemo(() =>
+    [...new Set(equipos.map(eq => eq.categoriaEquipo?.nombre).filter(Boolean))] as string[],
+    [equipos]
+  )
+
+  const stats = useMemo(() => ({
+    total: equipos.length,
+    activos: equipos.filter(e => e.estado === 'activo' || e.estado === 'aprobado').length,
+    categorias: new Set(equipos.map(e => e.categoriaId)).size
+  }), [equipos])
+
+  const equiposFiltrados = useMemo(() => {
+    return equipos.filter(eq =>
+      (categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro) &&
+      (estadoFiltro === '__ALL__' || eq.estado === estadoFiltro) &&
+      (searchTerm === '' ||
+        `${eq.codigo} ${eq.descripcion} ${eq.marca}`.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+  }, [equipos, categoriaFiltro, estadoFiltro, searchTerm])
+
   const handleCreated = () => {
     cargarEquipos()
     setShowCreateModal(false)
   }
-  const handleUpdated = () => cargarEquipos()
-  const handleDeleted = () => cargarEquipos()
 
   const handleExportar = async () => {
     try {
       await exportarEquiposAExcel(equipos)
-      toast.success('Equipos exportados exitosamente.')
+      toast.success('Equipos exportados')
     } catch (err) {
-      console.error('❌ Error al exportar:', err)
-      toast.error('Error al exportar equipos.')
+      toast.error('Error al exportar')
     }
   }
 
@@ -126,7 +157,6 @@ export default function CatalogoEquipoPage() {
     if (!file) return
     setImportando(true)
     setErrores([])
-    setMostrarModal(false)
 
     try {
       const datos = await importarEquiposDesdeExcel(file)
@@ -143,15 +173,12 @@ export default function CatalogoEquipoPage() {
       }, {} as Record<string, string>)
 
       const { equiposValidos, errores } = await importarEquiposDesdeExcelValidado(
-        datos,
-        categorias,
-        unidades,
-        codigosExistentes
+        datos, categorias, unidades, codigosExistentes
       )
 
       if (errores.length > 0) {
         setErrores(errores)
-        toast.error('Errores encontrados en la importación.')
+        toast.error('Errores en la importación')
         return
       }
 
@@ -186,11 +213,10 @@ export default function CatalogoEquipoPage() {
       } else if (nuevos.length > 0) {
         await crearEquiposNuevos(nuevos)
       } else {
-        toast('No se encontraron nuevos equipos para importar.')
+        toast('No hay equipos nuevos para importar')
       }
     } catch (err) {
-      console.error('❌ Error general al importar:', err)
-      toast.error('Error inesperado en la importación.')
+      toast.error('Error en la importación')
     } finally {
       setImportando(false)
       e.target.value = ''
@@ -199,12 +225,9 @@ export default function CatalogoEquipoPage() {
 
   const sobrescribirDuplicados = async () => {
     try {
-      // Create new equipment
       if (equiposNuevos.length > 0) {
         await crearEquiposNuevos(equiposNuevos)
       }
-
-      // Update duplicate equipment
       if (equiposDuplicados.length > 0) {
         const actualizados = await Promise.all(
           equiposDuplicados.map(eq => {
@@ -212,351 +235,437 @@ export default function CatalogoEquipoPage() {
             return updateCatalogoEquipo(id, recalcularCatalogoEquipo(data))
           })
         )
-
         setEquipos(prev => {
           const actualizadosIds = new Set(actualizados.map(e => e.id))
-          const equiposFiltrados = prev.filter(e => !actualizadosIds.has(e.id))
-          return [...equiposFiltrados, ...actualizados]
+          return [...prev.filter(e => !actualizadosIds.has(e.id)), ...actualizados]
         })
       }
-
-      toast.success('Equipos procesados exitosamente.')
+      toast.success('Equipos procesados')
       setMostrarModal(false)
       setEquiposNuevos([])
       setEquiposDuplicados([])
     } catch (err) {
-      console.error('❌ Error al procesar equipos:', err)
-      toast.error('Error al procesar equipos.')
+      toast.error('Error al procesar')
     }
   }
 
   const crearEquiposNuevos = async (nuevos: CatalogoEquipoPayload[]) => {
+    const equiposParaCrear = nuevos.map(eq => recalcularCatalogoEquipo(eq))
+    const creados = await Promise.all(equiposParaCrear.map(eq => createCatalogoEquipo(eq)))
+    setEquipos(prev => [...prev, ...creados])
+    toast.success(`${creados.length} equipos importados`)
+  }
+
+  const guardarEdicion = async (equipo: CatalogoEquipo) => {
+    if (nuevoPrecio === null || nuevoMargen === null) return
+    if (nuevoPrecio === equipo.precioInterno && nuevoMargen === equipo.margen) {
+      cancelarEdicion()
+      return
+    }
+    const precioVenta = parseFloat((nuevoPrecio * (1 + nuevoMargen)).toFixed(2))
     try {
-      // ✅ Mapear CatalogoEquipoPayload al formato correcto para la API
-      const equiposParaCrear = nuevos.map(eq => {
-        const equipoRecalculado = recalcularCatalogoEquipo(eq)
-        return {
-          codigo: equipoRecalculado.codigo,
-          descripcion: equipoRecalculado.descripcion,
-          marca: equipoRecalculado.marca,
-          precioInterno: equipoRecalculado.precioInterno,
-          margen: equipoRecalculado.margen,
-          precioVenta: equipoRecalculado.precioVenta,
-          categoriaId: equipoRecalculado.categoriaId,
-          unidadId: equipoRecalculado.unidadId,
-          estado: equipoRecalculado.estado
-        }
+      const actualizado = await updateCatalogoEquipo(equipo.id, {
+        precioInterno: nuevoPrecio,
+        margen: nuevoMargen,
+        precioVenta,
       })
-      const creados = await Promise.all(equiposParaCrear.map(eq => createCatalogoEquipo(eq)))
-      setEquipos(prev => [...prev, ...creados])
-      toast.success(`${creados.length} equipos importados exitosamente.`)
-    } catch (error) {
-      console.error('❌ Error al crear equipos nuevos:', error)
-      toast.error('Error al crear equipos nuevos.')
-      throw error
+      setEquipos(prev => prev.map(eq => eq.id === equipo.id ? actualizado : eq))
+      toast.success('Equipo actualizado')
+      cancelarEdicion()
+    } catch (err) {
+      toast.error('Error al guardar')
     }
   }
 
-  const cancelarImportacion = () => {
-    setMostrarModal(false)
-    setEquiposNuevos([])
-    setEquiposDuplicados([])
-    toast('Importación cancelada.')
+  const cancelarEdicion = () => {
+    setEditandoId(null)
+    setNuevoPrecio(null)
+    setNuevoMargen(null)
+  }
+
+  const handleEditField = async (id: string, field: keyof CatalogoEquipo, value: string | number) => {
+    try {
+      const updated = await updateCatalogoEquipo(id, { [field]: value })
+      setEquipos(prev => prev.map(eq => eq.id === id ? updated : eq))
+    } catch (err) {
+      toast.error('Error al actualizar')
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await deleteCatalogoEquipo(deleteTarget)
+      setEquipos(prev => prev.filter(eq => eq.id !== deleteTarget))
+      toast.success('Equipo eliminado')
+    } catch (err) {
+      toast.error('Error al eliminar')
+    } finally {
+      setDeleteTarget(null)
+    }
   }
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        {/* Header Skeleton */}
-        <div className="space-y-4">
+      <div className="p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-5 w-24" />
           <Skeleton className="h-6 w-48" />
-          <div className="flex justify-between items-center">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-10 w-32" />
-          </div>
         </div>
-
-        {/* Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-12 w-12 rounded-lg" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-6 w-16" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <Skeleton className="h-10 w-full" />
+        <div className="border rounded-lg">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex gap-4 p-3 border-b last:border-0">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-20" />
+            </div>
           ))}
         </div>
-
-        {/* Form Skeleton */}
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-32 w-full" />
-          </CardContent>
-        </Card>
-
-        {/* Table Skeleton */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     )
   }
 
   return (
-    <motion.div 
-      className="p-6 space-y-6"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Breadcrumb Navigation */}
-      <motion.nav 
-        variants={itemVariants}
-        className="flex items-center space-x-2 text-sm text-muted-foreground mb-6"
-      >
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => router.push('/catalogo')}
-          className="p-0 h-auto font-normal text-muted-foreground hover:text-foreground"
-        >
-          Catálogo
-        </Button>
-        <ChevronRight className="h-4 w-4" />
-        <span className="font-medium text-foreground">Equipos</span>
-      </motion.nav>
+    <div className="p-6 space-y-4">
+      {/* Header compacto */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          {/* Breadcrumb */}
+          <button
+            onClick={() => router.push('/catalogo')}
+            className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3 mr-1" />
+            Catálogo
+          </button>
 
-      {/* Header with Actions */}
-      <motion.div 
-        variants={itemVariants}
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-      >
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Catálogo de Equipos</h1>
-          <p className="text-muted-foreground mt-1">
-            Gestiona el inventario completo de equipos técnicos
-          </p>
+          {/* Título con stats inline */}
+          <div className="flex items-center gap-3">
+            <Package className="h-5 w-5 text-blue-600" />
+            <h1 className="text-lg font-semibold">Equipos</h1>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{stats.total} equipos</span>
+              <span>•</span>
+              <span className="text-green-600">{stats.activos} activos</span>
+              <span>•</span>
+              <span>{stats.categorias} categorías</span>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
+
+        {/* Acciones */}
+        <div className="flex items-center gap-2">
           <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Equipo
+              <Button size="sm" className="h-8">
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Nuevo
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Crear Nuevo Equipo</DialogTitle>
+                <DialogTitle>Nuevo Equipo</DialogTitle>
                 <DialogDescription>
-                  Agrega un nuevo equipo al catálogo con toda su configuración
+                  Agrega un equipo al catálogo
                 </DialogDescription>
               </DialogHeader>
               <CatalogoEquipoForm onCreated={handleCreated} />
             </DialogContent>
           </Dialog>
-          <Button variant="outline" size="sm">
-            <Share2 className="h-4 w-4 mr-2" />
-            Compartir
-          </Button>
           <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
         </div>
-      </motion.div>
+      </div>
 
-      {/* Statistics Cards */}
-      <motion.div 
-        variants={itemVariants}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-      >
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Package className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Equipos</p>
-                <p className="text-2xl font-bold">{equipos.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Equipos Activos</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {equipos.filter(e => e.estado === 'activo').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Settings className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Categorías</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {new Set(equipos.map(e => e.categoriaId)).size}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <AlertCircle className="h-6 w-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Valor Promedio</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  ${equipos.length > 0 ? 
-                    (equipos.reduce((sum, e) => sum + (e.precioVenta || 0), 0) / equipos.length).toFixed(0) 
-                    : '0'
-                  }
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      {/* Filtros inline */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por código, descripción o marca..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
 
-      <Separator />
+        <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+          <SelectTrigger className="w-[160px] h-9">
+            <SelectValue placeholder="Categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__ALL__">Todas</SelectItem>
+            {categorias.map(cat => (
+              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
+        <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
+          <SelectTrigger className="w-[130px] h-9">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__ALL__">Todos</SelectItem>
+            <SelectItem value="activo">Activo</SelectItem>
+            <SelectItem value="aprobado">Aprobado</SelectItem>
+            <SelectItem value="pendiente">Pendiente</SelectItem>
+            <SelectItem value="rechazado">Rechazado</SelectItem>
+          </SelectContent>
+        </Select>
 
-      {/* Equipment List */}
-      <motion.div variants={itemVariants}>
-        {equipos.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="p-4 bg-muted rounded-full mb-4">
-                <Package className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No hay equipos registrados</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Comienza agregando tu primer equipo al catálogo para gestionar tu inventario técnico.
-              </p>
-              <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Importar Equipos
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <CatalogoEquipoList data={equipos} onUpdate={handleUpdated} onDelete={handleDeleted} />
+        {(searchTerm || categoriaFiltro !== '__ALL__' || estadoFiltro !== '__ALL__') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchTerm('')
+              setCategoriaFiltro('__ALL__')
+              setEstadoFiltro('__ALL__')
+            }}
+            className="h-9 px-2 text-muted-foreground"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         )}
-      </motion.div>
 
-      {/* Loading State for Import */}
+        <Badge variant="secondary" className="ml-auto">
+          {equiposFiltrados.length} resultados
+        </Badge>
+      </div>
+
+      {/* Loading de importación */}
       {importando && (
-        <motion.div 
-          variants={itemVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <Alert>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <AlertDescription>
-              Importando datos, por favor espere...
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Importando equipos...
+        </div>
       )}
 
-      {/* Error Messages */}
+      {/* Errores */}
       {errores.length > 0 && (
-        <motion.div 
-          variants={itemVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <Alert variant="destructive">
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2 text-sm font-medium text-red-700 mb-2">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-1">
-                <p className="font-semibold">Errores al importar:</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  {errores.map((err, idx) => (
-                    <li key={idx} className="text-sm">{err}</li>
-                  ))}
-                </ul>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+            Errores de importación:
+          </div>
+          <ul className="text-xs text-red-600 space-y-1 ml-6 list-disc">
+            {errores.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
+            {errores.length > 5 && <li>... y {errores.length - 5} más</li>}
+          </ul>
+        </div>
       )}
 
-      {/* Duplicate Equipment Modal */}
+      {/* Tabla */}
+      {equiposFiltrados.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Package className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">
+            {equipos.length === 0 ? 'No hay equipos' : 'Sin resultados'}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            {equipos.length === 0
+              ? 'Comienza agregando equipos al catálogo'
+              : 'Ajusta los filtros para encontrar equipos'}
+          </p>
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50/80">
+                  <TableHead className="w-[100px] font-semibold">Código</TableHead>
+                  <TableHead className="min-w-[200px] font-semibold">Descripción</TableHead>
+                  <TableHead className="font-semibold">Categoría</TableHead>
+                  <TableHead className="font-semibold">Marca</TableHead>
+                  <TableHead className="text-right font-semibold">P. Interno</TableHead>
+                  <TableHead className="text-center font-semibold">Margen</TableHead>
+                  <TableHead className="text-right font-semibold">P. Venta</TableHead>
+                  <TableHead className="font-semibold">Estado</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {equiposFiltrados.map((eq) => (
+                  <TableRow key={eq.id} className="group hover:bg-gray-50/50">
+                    <TableCell className="font-mono text-xs">
+                      {eq.codigo}
+                    </TableCell>
+                    <TableCell>
+                      <div className="max-w-[250px] truncate text-sm" title={eq.descripcion}>
+                        {eq.descripcion}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        {eq.categoriaEquipo?.nombre || '—'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {eq.marca || '—'}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {editandoId === eq.id ? (
+                        <Input
+                          type="number"
+                          value={nuevoPrecio ?? ''}
+                          onChange={e => setNuevoPrecio(parseFloat(e.target.value))}
+                          className="w-24 h-7 text-right text-xs"
+                          step="0.01"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {formatCurrency(eq.precioInterno)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {editandoId === eq.id ? (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={nuevoMargen ?? ''}
+                          onChange={e => setNuevoMargen(parseFloat(e.target.value))}
+                          className="w-16 h-7 text-center text-xs"
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {(eq.margen * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">
+                      {formatCurrency(eq.precioVenta)}
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={eq.estado}
+                        onValueChange={(value) => handleEditField(eq.id, 'estado', value)}
+                      >
+                        <SelectTrigger className="h-7 w-[100px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="activo">Activo</SelectItem>
+                          <SelectItem value="aprobado">Aprobado</SelectItem>
+                          <SelectItem value="pendiente">Pendiente</SelectItem>
+                          <SelectItem value="rechazado">Rechazado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {editandoId === eq.id ? (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => guardarEdicion(eq)}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Save className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={cancelarEdicion}
+                              className="h-7 w-7 p-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditandoId(eq.id)
+                                setNuevoPrecio(eq.precioInterno)
+                                setNuevoMargen(eq.margen)
+                              }}
+                              className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteTarget(eq.id)}
+                              className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar equipo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Duplicate modal */}
       <Dialog open={mostrarModal} onOpenChange={setMostrarModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              Equipos Duplicados
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Equipos duplicados
             </DialogTitle>
             <DialogDescription>
-              Se encontraron códigos ya existentes. ¿Desea sobreescribir los equipos duplicados?
+              Se encontraron {equiposDuplicados.length} códigos existentes. ¿Sobrescribir?
             </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="bg-muted p-3 rounded-lg max-h-40 overflow-y-auto">
-              <p className="text-sm font-medium mb-2">Equipos encontrados:</p>
-              <ul className="space-y-1">
-                {equiposDuplicados.map((eq, idx) => (
-                  <li key={idx} className="text-sm font-mono">
-                    <Badge variant="outline">{eq.codigo}</Badge>
-                  </li>
-                ))}
-              </ul>
+          <div className="bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">
+            <div className="flex flex-wrap gap-1">
+              {equiposDuplicados.map((eq, i) => (
+                <Badge key={i} variant="outline" className="text-xs font-mono">
+                  {eq.codigo}
+                </Badge>
+              ))}
             </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button
-                onClick={sobrescribirDuplicados}
-                className="flex-1"
-              >
-                Sobreescribir
-              </Button>
-              <Button
-                variant="outline"
-                onClick={cancelarImportacion}
-                className="flex-1"
-              >
-                Cancelar
-              </Button>
-            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={sobrescribirDuplicados} className="flex-1">
+              Sobrescribir
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setMostrarModal(false)
+                setEquiposNuevos([])
+                setEquiposDuplicados([])
+              }}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
-    </motion.div>
+    </div>
   )
 }

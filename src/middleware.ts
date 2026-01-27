@@ -52,7 +52,7 @@ async function getUserRole(userId: string): Promise<RolUsuario> {
 // ✅ Función helper para obtener permisos por rol
 function getRolePermissions(role: RolUsuario): PermissionAction[] {
   const permissions: Record<RolUsuario, PermissionAction[]> = {
-    admin: ['view', 'view_all', 'create', 'edit', 'delete', 'manage_roles', 'manage_permissions', 'system'],
+    admin: ['view', 'view_all', 'create', 'edit', 'delete', 'manage_roles', 'manage_permissions', 'manage_team', 'approve', 'export', 'manage_items', 'convert_to_orders', 'track_delivery', 'system'],
     gerente: ['view', 'view_all', 'create', 'edit', 'delete', 'manage_team', 'approve', 'export'],
     comercial: ['view', 'create', 'edit'],
     presupuestos: ['view', 'create', 'edit', 'manage_items'],
@@ -136,7 +136,7 @@ const protectedRoutes = withAuth(
       return NextResponse.redirect(new URL('/denied', req.url));
     }
 
-    if (path.startsWith('/gestion') && !['admin', 'gerente', 'gestor'].includes(role || '')) {
+    if (path.startsWith('/gestion') && !['admin', 'gerente', 'gestor', 'logistico'].includes(role || '')) {
       return NextResponse.redirect(new URL('/denied', req.url));
     }
 

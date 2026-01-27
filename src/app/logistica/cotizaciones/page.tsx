@@ -1,21 +1,27 @@
+/**
+ * 📦 Cotizaciones Proveedores - Logística
+ * Diseño minimalista y compacto
+ * @author GYS Team
+ */
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import {
   Plus,
   Package,
-  TrendingUp,
   Clock,
   CheckCircle,
-  AlertCircle,
   FileText,
-  Users,
-  Loader2,
-  Grid3X3,
-  Table
+  RefreshCw,
+  Search,
+  Filter,
+  X,
+  Table as TableIcon,
+  LayoutGrid,
+  TrendingUp
 } from 'lucide-react'
 
 import { CotizacionProveedor, Proyecto, Proveedor } from '@/types'
@@ -27,15 +33,28 @@ import {
 import { getProyectos } from '@/lib/services/proyecto'
 import { getProveedores } from '@/lib/services/proveedor'
 
-import CotizacionProveedorAccordion from '@/components/logistica/CotizacionProveedorAccordion'
 import ModalCrearCotizacionProveedor from '@/components/logistica/ModalCrearCotizacionProveedor'
 import ModalCrearCotizacionCompleta from '@/components/logistica/ModalCrearCotizacionCompleta'
-import CotizacionesProveedorTableView from '@/components/logistica/CotizacionesProveedorTableView'
-import CotizacionesProveedorCardView from '@/components/logistica/CotizacionesProveedorCardView'
+import LogisticaCotizacionesTable from '@/components/logistica/LogisticaCotizacionesTable'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+const ESTADOS_COTIZACION = [
+  { value: 'all', label: 'Todos' },
+  { value: 'pendiente', label: 'Pendiente' },
+  { value: 'solicitado', label: 'Solicitado' },
+  { value: 'cotizado', label: 'Cotizado' },
+  { value: 'rechazado', label: 'Rechazado' },
+  { value: 'seleccionado', label: 'Seleccionado' },
+]
 
 export default function CotizacionesPage() {
   const { data: session } = useSession()
@@ -45,427 +64,299 @@ export default function CotizacionesPage() {
   const [openModal, setOpenModal] = useState(false)
   const [openModalCompleta, setOpenModalCompleta] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [loadingAction, setLoadingAction] = useState(false)
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+  const [refreshing, setRefreshing] = useState(false)
 
-  const cargarCotizaciones = async () => {
+  // Filters
+  const [search, setSearch] = useState('')
+  const [estado, setEstado] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+
+  const fetchData = async () => {
     try {
-      setLoading(true)
-      const data = await getCotizacionesProveedor()
-      setCotizaciones(data || [])
-    } catch {
-      toast.error('Error al cargar cotizaciones')
+      setRefreshing(true)
+      const [cotData, proyData, provData] = await Promise.all([
+        getCotizacionesProveedor(),
+        getProyectos(),
+        getProveedores(),
+      ])
+      setCotizaciones(cotData || [])
+      setProyectos(proyData || [])
+      setProveedores(provData || [])
+    } catch (error) {
+      console.error('Error fetching data:', error)
+      toast.error('Error al cargar datos')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
-  // ✅ Nueva función para actualización local más eficiente
-  const handleCotizacionUpdated = async (cotizacionId: string) => {
-    try {
-      // Solo refetch la cotización específica, no toda la lista
-      const { getCotizacionProveedorById } = await import('@/lib/services/cotizacionProveedor')
-      const updatedCotizacion = await getCotizacionProveedorById(cotizacionId)
-      
-      if (updatedCotizacion) {
-        setCotizaciones(prev => 
-          prev.map(cot => 
-            cot.id === cotizacionId ? updatedCotizacion : cot
-          )
-        )
-      }
-    } catch (error) {
-      console.error('Error al actualizar cotización específica:', error)
-      // Fallback: recargar toda la lista solo si falla la actualización local
-      await cargarCotizaciones()
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  // Filter cotizaciones
+  const cotizacionesFiltradas = cotizaciones.filter((cot) => {
+    if (search) {
+      const s = search.toLowerCase()
+      const match =
+        cot.codigo?.toLowerCase().includes(s) ||
+        cot.proveedor?.nombre?.toLowerCase().includes(s) ||
+        cot.proyecto?.nombre?.toLowerCase().includes(s)
+      if (!match) return false
+    }
+    if (estado !== 'all' && cot.estado !== estado) return false
+    return true
+  })
+
+  // Stats
+  const stats = {
+    total: cotizaciones.length,
+    pendientes: cotizaciones.filter(c => c.estado === 'pendiente').length,
+    cotizados: cotizaciones.filter(c => c.estado === 'cotizado').length,
+    seleccionados: cotizaciones.filter(c => c.estado === 'seleccionado').length,
+  }
+
+  const hasFilters = search || estado !== 'all'
+
+  const clearFilters = () => {
+    setSearch('')
+    setEstado('all')
+  }
+
+  const handleDelete = async (id: string) => {
+    const ok = await deleteCotizacionProveedor(id)
+    if (ok) {
+      toast.success('Cotización eliminada')
+      fetchData()
+    } else {
+      toast.error('Error al eliminar cotización')
     }
   }
 
-  // ✅ Nueva función para actualización local de estado sin refetch
   const handleEstadoUpdated = async (cotizacionId: string, nuevoEstado: CotizacionProveedor['estado']) => {
     try {
-      // Buscar la cotización para obtener el estado anterior
-      const cotizacion = cotizaciones.find(c => c.id === cotizacionId);
-      const estadoAnterior = cotizacion?.estado;
+      const cotizacion = cotizaciones.find(c => c.id === cotizacionId)
+      const estadoAnterior = cotizacion?.estado
 
-      // Actualizar estado local inmediatamente
       setCotizaciones(prev =>
         prev.map(cot =>
           cot.id === cotizacionId ? { ...cot, estado: nuevoEstado } : cot
         )
-      );
+      )
 
-      // Llamar al servicio para persistir el cambio
-      await updateCotizacionProveedor(cotizacionId, { estado: nuevoEstado });
+      await updateCotizacionProveedor(cotizacionId, { estado: nuevoEstado })
 
-      // ✅ Registrar auditoría del cambio de estado
       if (estadoAnterior && estadoAnterior !== nuevoEstado) {
         try {
           await fetch('/api/audit/log-status-change', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              userId: (session?.user as any)?.id || '',
+              userId: (session?.user as { id?: string })?.id || '',
               entityType: 'COTIZACION',
               entityId: cotizacionId,
               oldStatus: estadoAnterior,
               newStatus: nuevoEstado,
               description: cotizacion?.codigo || `Cotización ${cotizacionId}`
             })
-          });
+          })
         } catch (auditError) {
-          console.warn('Error al registrar auditoría:', auditError);
-          // No fallar la operación por error de auditoría
+          console.warn('Error al registrar auditoría:', auditError)
         }
       }
     } catch (error) {
-      console.error('Error al actualizar estado:', error);
-      // Revertir cambio local en caso de error
-      setCotizaciones(prev =>
-        prev.map(cot => {
-          if (cot.id === cotizacionId) {
-            // Buscar el estado original
-            const originalCotizacion = cotizaciones.find(c => c.id === cotizacionId);
-            return originalCotizacion ? { ...cot, estado: originalCotizacion.estado } : cot;
-          }
-          return cot;
-        })
-      );
-      throw error; // Re-throw para que el componente maneje el error
+      console.error('Error al actualizar estado:', error)
+      fetchData()
+      throw error
     }
-  };
-
-  const cargarDatosIniciales = async () => {
-    try {
-      const [proyectosData, proveedoresData] = await Promise.all([
-        getProyectos(),
-        getProveedores(),
-      ])
-      setProyectos(proyectosData)
-      setProveedores(proveedoresData)
-    } catch {
-      toast.error('Error al cargar proyectos o proveedores')
-    }
-  }
-
-  useEffect(() => {
-    const loadData = async () => {
-      await Promise.all([
-        cargarCotizaciones(),
-        cargarDatosIniciales()
-      ])
-    }
-    loadData()
-  }, [])
-
-  const handleUpdate = async (id: string, payload: any) => {
-    try {
-      setLoadingAction(true)
-      const actualizado = await updateCotizacionProveedor(id, payload)
-      if (actualizado) {
-        toast.success('✅ Cotización actualizada')
-        await cargarCotizaciones()
-      } else {
-        toast.error('❌ Error al actualizar cotización')
-      }
-    } catch {
-      toast.error('❌ Error al actualizar cotización')
-    } finally {
-      setLoadingAction(false)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    try {
-      setLoadingAction(true)
-      const ok = await deleteCotizacionProveedor(id)
-      if (ok) {
-        toast.success('🗑️ Cotización eliminada')
-        await cargarCotizaciones()
-      } else {
-        toast.error('❌ Error al eliminar cotización')
-      }
-    } catch {
-      toast.error('❌ Error al eliminar cotización')
-    } finally {
-      setLoadingAction(false)
-    }
-  }
-
-  // Función para obtener estadísticas
-  const getEstadisticas = () => {
-    const total = cotizaciones.length
-    const pendientes = cotizaciones.filter(c => c.estado === 'pendiente').length
-    const cotizados = cotizaciones.filter(c => c.estado === 'cotizado').length
-    const seleccionados = cotizaciones.filter(c => c.estado === 'seleccionado').length
-    
-    return { total, pendientes, cotizados, seleccionados }
-  }
-
-  const estadisticas = getEstadisticas()
-
-  // ✅ Wrapper functions for table/card views
-  const handleEditCotizacion = (cotizacion: CotizacionProveedor) => {
-    // For now, just show a placeholder - could open edit modal
-    console.log('Edit cotizacion:', cotizacion);
-  }
-
-  const handleDeleteCotizacion = async (cotizacion: CotizacionProveedor) => {
-    await handleDelete(cotizacion.id);
   }
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        {/* Header Skeleton */}
-        <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <div className="h-8 w-80 bg-gray-200 rounded animate-pulse" />
-            <div className="h-4 w-60 bg-gray-100 rounded animate-pulse" />
-          </div>
-          <div className="h-10 w-40 bg-gray-200 rounded animate-pulse" />
-        </div>
-
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="p-6 border rounded-lg">
-              <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-2" />
-              <div className="h-8 w-16 bg-gray-100 rounded animate-pulse" />
-            </div>
+      <div className="p-4 space-y-4">
+        <Skeleton className="h-10 w-48" />
+        <div className="grid grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-16" />
           ))}
         </div>
-
-        {/* Content Skeleton */}
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="p-6 border rounded-lg">
-              <div className="h-6 w-full bg-gray-200 rounded animate-pulse mb-4" />
-              <div className="space-y-2">
-                <div className="h-4 w-3/4 bg-gray-100 rounded animate-pulse" />
-                <div className="h-4 w-1/2 bg-gray-100 rounded animate-pulse" />
-              </div>
-            </div>
-          ))}
-        </div>
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     )
   }
 
   return (
-    <motion.div 
-      className="p-6 space-y-6"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      {/* Header Section */}
-      <motion.div 
-        className="space-y-4"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-      >
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <Package className="h-8 w-8 text-blue-600" />
-              Cotizaciones de Proveedores
-            </h1>
-            <p className="text-gray-600">
-              Gestiona y supervisa todas las cotizaciones de proveedores
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 border rounded-lg p-1">
-              <Button
-                variant={viewMode === 'table' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('table')}
-                className="h-8"
-              >
-                <Table className="h-4 w-4 mr-2" />
-                Tabla
-              </Button>
-              <Button
-                variant={viewMode === 'card' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('card')}
-                className="h-8"
-              >
-                <Grid3X3 className="h-4 w-4 mr-2" />
-                Cards
-              </Button>
+    <div className="min-h-screen bg-gray-50/50">
+      {/* Header sticky */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                <Package className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <h1 className="text-base font-semibold">Cotizaciones Proveedores</h1>
+                <p className="text-[10px] text-muted-foreground">Gestión de solicitudes a proveedores</p>
+              </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {/* View toggle */}
+              <div className="flex items-center border rounded-md p-0.5">
+                <Button
+                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="h-6 px-2"
+                >
+                  <TableIcon className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('cards')}
+                  className="h-6 px-2"
+                >
+                  <LayoutGrid className="h-3 w-3" />
+                </Button>
+              </div>
+
               <Button
-                onClick={() => setOpenModalCompleta(true)}
-                disabled={loadingAction}
-                className="bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                variant="outline"
+                size="sm"
+                onClick={fetchData}
+                disabled={refreshing}
+                className="h-7 text-xs"
               >
-                {loadingAction ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Cotización
-                  </>
-                )}
+                <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => setOpenModalCompleta(true)}
+                className="h-7 text-xs bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Nueva
               </Button>
 
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setOpenModal(true)}
-                disabled={loadingAction}
-                className="hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
+                className="h-7 text-xs"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Cotización Rápida
+                <Plus className="h-3 w-3 mr-1" />
+                Rápida
               </Button>
             </div>
           </div>
         </div>
+      </div>
 
-        <Separator />
-      </motion.div>
+      <div className="p-4 space-y-4">
+        {/* Stats compactos */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Total</span>
+              <FileText className="h-3.5 w-3.5 text-blue-500" />
+            </div>
+            <p className="text-xl font-bold mt-1">{stats.total}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Pendientes</span>
+              <Clock className="h-3.5 w-3.5 text-amber-500" />
+            </div>
+            <p className="text-xl font-bold mt-1 text-amber-600">{stats.pendientes}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Cotizados</span>
+              <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
+            </div>
+            <p className="text-xl font-bold mt-1 text-blue-600">{stats.cotizados}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Seleccionados</span>
+              <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+            </div>
+            <p className="text-xl font-bold mt-1 text-green-600">{stats.seleccionados}</p>
+          </div>
+        </div>
 
-      {/* Statistics Cards */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <Card className="hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Total Cotizaciones
-            </CardTitle>
-            <FileText className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{estadisticas.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Pendientes
-            </CardTitle>
-            <Clock className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{estadisticas.pendientes}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Cotizados
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{estadisticas.cotizados}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Seleccionados
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{estadisticas.seleccionados}</div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Content Section */}
-      <motion.div
-        className="space-y-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-      >
-        {cotizaciones.length > 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            {viewMode === 'table' ? (
-              <CotizacionesProveedorTableView
-                cotizaciones={cotizaciones}
-                onEdit={handleEditCotizacion}
-                onDelete={handleDeleteCotizacion}
+        {/* Filtros en línea */}
+        <div className="bg-white rounded-lg border p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <Input
+                placeholder="Buscar por código, proveedor, proyecto..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 pl-8 text-xs"
               />
-            ) : (
-              <CotizacionesProveedorCardView
-                cotizaciones={cotizaciones}
-                onEdit={handleEditCotizacion}
-                onDelete={handleDeleteCotizacion}
-              />
+            </div>
+
+            <Select value={estado} onValueChange={setEstado}>
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <Filter className="h-3 w-3 mr-1.5 text-gray-400" />
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                {ESTADOS_COTIZACION.map((e) => (
+                  <SelectItem key={e.value} value={e.value} className="text-xs">
+                    {e.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs text-red-600">
+                <X className="h-3 w-3 mr-1" />
+                Limpiar
+              </Button>
             )}
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Card className="p-12 text-center">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="p-4 bg-gray-100 rounded-full">
-                  <Package className="h-12 w-12 text-gray-400" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    No hay cotizaciones registradas
-                  </h3>
-                  <p className="text-gray-600 max-w-md">
-                    Comienza creando tu primera cotización de proveedor para gestionar tus solicitudes de manera eficiente.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setOpenModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Primera Cotización
-                </Button>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </motion.div>
 
-      {/* Modal para crear cotización rápida */}
+            <div className="ml-auto text-xs text-muted-foreground">
+              {cotizacionesFiltradas.length} de {cotizaciones.length}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabla */}
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <LogisticaCotizacionesTable
+            cotizaciones={cotizacionesFiltradas}
+            onRefresh={fetchData}
+            onDelete={handleDelete}
+          />
+        </div>
+      </div>
+
+      {/* Modales */}
       <ModalCrearCotizacionProveedor
         open={openModal}
         onClose={() => setOpenModal(false)}
         proyectos={proyectos}
         proveedores={proveedores}
-        onCreated={cargarCotizaciones}
+        onCreated={fetchData}
       />
 
-      {/* Modal para crear cotización completa */}
       <ModalCrearCotizacionCompleta
         open={openModalCompleta}
         onClose={() => setOpenModalCompleta(false)}
         proyectos={proyectos}
         proveedores={proveedores}
-        onCreated={cargarCotizaciones}
+        onCreated={fetchData}
       />
-    </motion.div>
+    </div>
   )
 }

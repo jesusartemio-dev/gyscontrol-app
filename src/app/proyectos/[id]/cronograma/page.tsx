@@ -4,7 +4,6 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { ProyectoCronogramaTab } from '@/components/proyectos/cronograma/ProyectoCronogramaTab';
 import type { Proyecto } from '@/types/modelos';
 import { getProyectoForCronograma } from '@/lib/server/cronograma';
@@ -147,38 +146,7 @@ export default async function CronogramaPage({ params }: CronogramaPageProps) {
 
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
-      {/* ✅ Breadcrumb navigation */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/proyectos">Proyectos</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={`/proyectos/${id}`}>
-                {proyecto.nombre}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Cronograma</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      {/* ✅ Header compacto de la página */}
-      <div className="flex items-center justify-between py-2">
-        <h1 className="text-xl font-semibold text-gray-900">
-          Cronograma - {proyecto.nombre}
-        </h1>
-      </div>
-
-      {/* ✅ Contenedor principal del cronograma */}
+    <div className="space-y-2">
       <Suspense fallback={<CronogramaSkeleton />}>
         <ProyectoCronogramaTab
           proyectoId={id}

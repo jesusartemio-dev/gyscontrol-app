@@ -316,10 +316,10 @@ export async function DELETE(
       );
     }
 
-    // 🚫 No permitir eliminar proyectos completados
-    if (proyecto.estado === 'completado') {
+    // 🚫 No permitir eliminar proyectos cerrados
+    if (proyecto.estado === 'cerrado') {
       return NextResponse.json(
-        { error: 'No se pueden eliminar proyectos completados' },
+        { error: 'No se pueden eliminar proyectos cerrados' },
         { status: 400 }
       );
     }

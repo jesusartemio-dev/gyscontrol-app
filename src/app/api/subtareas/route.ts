@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
               proyectoServicioCotizado: {
                 select: {
                   id: true,
-                  categoria: true,
+                  edt: true,
                   proyecto: {
                     select: {
                       id: true,
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
             proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edt: true,
                 proyecto: {
                   select: {
                     id: true,

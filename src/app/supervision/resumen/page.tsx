@@ -345,8 +345,13 @@ export default function ResumenProyectosPage() {
                 >
                   <option value="">Todos los estados</option>
                   <option value="creado">Creado</option>
-                  <option value="en_ejecucion">En ejecucion</option>
-                  <option value="completado">Completado</option>
+                  <option value="en_planificacion">Planificación</option>
+                  <option value="listas_pendientes">Listas Pend.</option>
+                  <option value="listas_aprobadas">Listas Aprob.</option>
+                  <option value="pedidos_creados">Pedidos</option>
+                  <option value="en_ejecucion">Ejecución</option>
+                  <option value="en_cierre">Cierre</option>
+                  <option value="cerrado">Cerrado</option>
                   <option value="pausado">Pausado</option>
                   <option value="cancelado">Cancelado</option>
                 </select>

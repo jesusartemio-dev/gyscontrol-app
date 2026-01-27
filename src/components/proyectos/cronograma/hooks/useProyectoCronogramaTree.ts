@@ -119,8 +119,11 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
         generarEdts: true,
         generarActividades: true,
         generarTareas: true,
+        cronogramaId, // ✅ Pasar el cronograma actual
         ...options
       }
+
+      console.log('🚀 [HOOK] Generando cronograma con ID:', cronogramaId)
 
       // ✅ Usar API específica de proyectos
       const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/generar`, {

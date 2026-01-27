@@ -448,7 +448,9 @@ model ListaEquipoItem {
   catalogoEquipoId                                                                                             String?
   codigo                                                                                                       String
   descripcion                                                                                                  String
+  categoria                                                                                                    String                       @default("SIN-CATEGORIA")
   unidad                                                                                                       String
+  marca                                                                                                        String                       @default("SIN-MARCA")
   cantidad                                                                                                     Float
   verificado                                                                                                   Boolean                      @default(false)
   comentarioRevision                                                                                           String?
@@ -715,6 +717,8 @@ model Proyecto {
   clienteId                       String
   comercialId                     String
   gestorId                        String
+  supervisorId                    String?
+  liderId                         String?
   cotizacionId                    String?
   nombre                          String
   totalEquiposInterno             Float                      @default(0)
@@ -725,7 +729,7 @@ model Proyecto {
   descuento                       Float                      @default(0)
   grandTotal                      Float                      @default(0)
   codigo                          String
-  estado                          ProyectoEstado             @default(en_ejecucion)
+  estado                          ProyectoEstado             @default(creado)
   fechaInicio                     DateTime
   fechaFin                        DateTime?
   totalRealEquipos                Float                      @default(0)
@@ -734,6 +738,7 @@ model Proyecto {
   totalReal                       Float                      @default(0)
   createdAt                       DateTime                   @default(now())
   updatedAt                       DateTime
+  deletedAt                       DateTime?
   progresoGeneral                 Int                        @default(0)
   cotizacionProveedor             CotizacionProveedor[]
   entregaItem                     EntregaItem[]
@@ -744,6 +749,9 @@ model Proyecto {
   comercial                   User                       @relation("ProyectoComercial", fields: [comercialId], references: [id])
   cotizacion                  Cotizacion?                @relation(fields: [cotizacionId], references: [id])
   gestor                      User                       @relation("ProyectoGestor", fields: [gestorId], references: [id])
+  supervisor                  User?                      @relation("ProyectoSupervisor", fields: [supervisorId], references: [id])
+  lider                       User?                      @relation("ProyectoLider", fields: [liderId], references: [id])
+  personalProyecto            PersonalProyecto[]
   proyectoEquipoCotizado          ProyectoEquipoCotizado[]
   proyectoGastoCotizado           ProyectoGastoCotizado[]
   proyectoServicioCotizado        ProyectoServicioCotizado[]
@@ -759,7 +767,41 @@ model Proyecto {
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
   @@index([estado, fechaInicio, createdAt(sort: Desc)], map: "idx_proyecto_estado_inicio_fecha")
   @@index([gestorId, estado, fechaFin], map: "idx_proyecto_gestor_estado_fin")
+  @@index([supervisorId], map: "idx_proyecto_supervisor")
+  @@index([liderId], map: "idx_proyecto_lider")
   @@map("proyecto")
+}
+
+// Personal asignado al proyecto (roles dinámicos)
+model PersonalProyecto {
+  id              String               @id @default(cuid())
+  proyectoId      String
+  userId          String
+  rol             RolPersonalProyecto
+  fechaAsignacion DateTime             @default(now())
+  fechaFin        DateTime?
+  activo          Boolean              @default(true)
+  notas           String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  proyecto        Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  user            User                 @relation(fields: [userId], references: [id])
+
+  @@unique([proyectoId, userId, rol])
+  @@index([proyectoId, activo])
+  @@index([userId, activo])
+  @@map("personal_proyecto")
+}
+
+enum RolPersonalProyecto {
+  programador
+  cadista
+  ingeniero
+  lider
+  tecnico
+  coordinador
+  asistente
 }
 
 model ProyectoEquipoCotizado {
@@ -856,7 +898,7 @@ model ProyectoServicioCotizado {
   proyectoId                   String
   responsableId                String
   nombre                       String
-  categoria                    String
+  edtId                        String
   subtotalInterno              Float
   subtotalCliente              Float
   subtotalReal                 Float                          @default(0)
@@ -864,6 +906,7 @@ model ProyectoServicioCotizado {
   updatedAt                    DateTime
   proyecto                    Proyecto                       @relation(fields: [proyectoId], references: [id])
   user                        User                           @relation(fields: [responsableId], references: [id])
+  edt                         Edt                            @relation("ProyectoServicioCotizadoEdt", fields: [edtId], references: [id])
   proyectoServicioCotizadoItem          ProyectoServicioCotizadoItem[]
   registroHoras                   RegistroHoras[]
   tareas                       Tarea[]
@@ -875,7 +918,7 @@ model ProyectoServicioCotizadoItem {
   id                       String                   @id
   proyectoServicioId       String
   catalogoServicioId       String?
-  categoria                String
+  edtId                    String
   costoHoraInterno         Float
   costoHoraCliente         Float
   nombre                   String
@@ -890,16 +933,17 @@ model ProyectoServicioCotizadoItem {
   updatedAt                DateTime
   catalogoServicio         CatalogoServicio?        @relation(fields: [catalogoServicioId], references: [id])
   proyectoServicioCotizado ProyectoServicioCotizado @relation(fields: [proyectoServicioId], references: [id])
+  edt                      Edt                      @relation("ProyectoServicioCotizadoItemEdt", fields: [edtId], references: [id])
 
   @@map("proyecto_servicio_cotizado_item")
 }
 
 model Recurso {
-  id                                    String                                  @id
+  id                                    String                                  @id @default(cuid())
   nombre                                String                                  @unique
   costoHora                             Float
   createdAt                             DateTime                                @default(now())
-  updatedAt                             DateTime
+  updatedAt                             DateTime                                @updatedAt
   catalogoServicio                      CatalogoServicio[]
   cotizacionServicioItem                CotizacionServicioItem[]
   plantillaServicioItem                 PlantillaServicioItem[]
@@ -998,6 +1042,9 @@ model User {
   pedidoEquipoItem                                    PedidoEquipoItem[]
   proyectosComoComercial                              Proyecto[]                    @relation("ProyectoComercial")
   proyectosComoGestor                                 Proyecto[]                    @relation("ProyectoGestor")
+  proyectosComoSupervisor                             Proyecto[]                    @relation("ProyectoSupervisor")
+  proyectosComoLider                                  Proyecto[]                    @relation("ProyectoLider")
+  personalProyecto                                    PersonalProyecto[]
   proyectoEquipoCotizado                              ProyectoEquipoCotizado[]
   proyectoServicioCotizado                            ProyectoServicioCotizado[]
   registroHoras                   RegistroHoras[]
@@ -1506,19 +1553,23 @@ model DiaCalendario {
 }
 
 model Edt {
-  id                      String                   @id(map: "CategoriaServicio_pkey")
-  nombre                  String                   @unique(map: "CategoriaServicio_nombre_key")
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime
-  descripcion             String?
-  faseDefaultId           String?
-  catalogoServicio        CatalogoServicio[]
-  cotizacionServicio      CotizacionServicio[]     @relation("CotizacionServicioEdt")
-  cotizacionServicioItem  CotizacionServicioItem[] @relation("CotizacionServicioItemEdt")
-  registroHoras           RegistroHoras[]
-  cotizacionEdt           CotizacionEdt[]
-  faseDefault             FaseDefault?             @relation(fields: [faseDefaultId], references: [id], map: "CategoriaServicio_faseDefaultId_fkey")
-  proyectoEdt             ProyectoEdt[]
+  id                                  String                               @id(map: "CategoriaServicio_pkey") @default(cuid())
+  nombre                              String                               @unique(map: "CategoriaServicio_nombre_key")
+  createdAt                           DateTime                             @default(now())
+  updatedAt                           DateTime                             @updatedAt
+  descripcion                         String?
+  faseDefaultId                       String?
+  catalogoServicio                    CatalogoServicio[]
+  cotizacionServicio                  CotizacionServicio[]                 @relation("CotizacionServicioEdt")
+  cotizacionServicioItem              CotizacionServicioItem[]             @relation("CotizacionServicioItemEdt")
+  registroHoras                       RegistroHoras[]
+  cotizacionEdt                       CotizacionEdt[]
+  faseDefault                         FaseDefault?                         @relation(fields: [faseDefaultId], references: [id], map: "CategoriaServicio_faseDefaultId_fkey")
+  proyectoEdt                         ProyectoEdt[]
+  proyectoServicioCotizado            ProyectoServicioCotizado[]           @relation("ProyectoServicioCotizadoEdt")
+  proyectoServicioCotizadoItem        ProyectoServicioCotizadoItem[]       @relation("ProyectoServicioCotizadoItemEdt")
+  plantillaServicioIndependiente      PlantillaServicioIndependiente[]     @relation("PlantillaServicioIndependienteEdt")
+  plantillaServicioItemIndependiente  PlantillaServicioItemIndependiente[] @relation("PlantillaServicioItemIndependienteEdt")
 
   @@map("edt")
 }
@@ -1773,7 +1824,7 @@ model PlantillaServicioIndependiente {
   id                                    String                                  @id
   nombre                                String
   descripcion                           String?
-  categoria                             String
+  edtId                                 String?
   estado                                String                                  @default("borrador")
   totalInterno                          Float                                   @default(0)
   totalCliente                          Float                                   @default(0)
@@ -1781,6 +1832,7 @@ model PlantillaServicioIndependiente {
   grandTotal                            Float                                   @default(0)
   createdAt                             DateTime                                @default(now())
   updatedAt                             DateTime
+  edt                                   Edt?                                    @relation("PlantillaServicioIndependienteEdt", fields: [edtId], references: [id])
   plantillaServicioItemIndependiente    PlantillaServicioItemIndependiente[]
 
   @@map("plantilla_servicio_independiente")
@@ -1792,9 +1844,9 @@ model PlantillaServicioItemIndependiente {
   catalogoServicioId               String?
   unidadServicioId                 String
   recursoId                        String
+  edtId                            String?
   nombre                           String
   descripcion                      String
-  categoria                        String
   unidadServicioNombre             String
   recursoNombre                    String
   formula                          String
@@ -1813,8 +1865,9 @@ model PlantillaServicioItemIndependiente {
   createdAt                        DateTime                         @default(now())
   updatedAt                        DateTime
   catalogoServicio                 CatalogoServicio?                @relation(fields: [catalogoServicioId], references: [id])
+  edt                              Edt?                             @relation("PlantillaServicioItemIndependienteEdt", fields: [edtId], references: [id])
   plantillaServicioIndependiente   PlantillaServicioIndependiente   @relation(fields: [plantillaServicioId], references: [id], onDelete: Cascade)
-  recurso                     Recurso                          @relation(fields: [recursoId], references: [id])
+  recurso                          Recurso                          @relation(fields: [recursoId], references: [id])
   unidadServicio                   UnidadServicio                   @relation(fields: [unidadServicioId], references: [id])
 
   @@map("plantilla_servicio_item_independiente")
@@ -1913,7 +1966,7 @@ model ProyectoEdt {
   user                        User?                @relation(fields: [responsableId], references: [id])
   proyectoTarea        ProyectoTarea[]
 
-  @@unique([proyectoId, proyectoCronogramaId, edtId])
+  @@unique([proyectoId, proyectoCronogramaId, nombre])
   @@index([estado, fechaFinPlan])
   @@index([proyectoId, proyectoCronogramaId, orden])
   @@index([responsableId, estado])
@@ -2264,15 +2317,16 @@ enum PrioridadTarea {
 }
 
 enum ProyectoEstado {
-  creado
-  listas_pendientes
-  listas_aprobadas
-  pedidos_creados
-  en_ejecucion
-  completado
-  pausado
-  cancelado
-  en_planificacion
+  creado              // 1. Creado por Comercial (desde cotización aprobada)
+  en_planificacion    // 2. Elaboración del cronograma
+  listas_pendientes   // 3. Elaboración de listas técnicas
+  listas_aprobadas    // 4. Listas aprobadas
+  pedidos_creados     // 5. Pedidos de compra creados
+  en_ejecucion        // 6. En campo / ejecución
+  en_cierre           // 7. Proceso de cierre
+  cerrado             // 8. Proyecto cerrado
+  pausado             // Estado especial: pausado
+  cancelado           // Estado especial: cancelado
 }
 
 enum Role {

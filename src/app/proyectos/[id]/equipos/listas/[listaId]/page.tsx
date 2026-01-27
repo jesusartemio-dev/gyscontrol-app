@@ -16,7 +16,6 @@ import DetailErrorBoundary from '@/components/common/DetailErrorBoundary';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { validateRouteParams, RouteValidationError } from '@/lib/validators/routeParams';
-import { ListaEquipoItem } from '@/types/modelos';
 import { getListaEquipoDetail } from '@/lib/server/lista-equipo';
 
 interface ListaEquipoDetailPageProps {
@@ -131,17 +130,15 @@ const ListaEquipoDetailPage: React.FC<ListaEquipoDetailPageProps> = async ({ par
 
     return (
       <DetailErrorBoundary>
-        <div className="container mx-auto py-6">
-          <Suspense fallback={<DetailViewSkeleton />}>
-            <ListaEquipoDetailView
-              proyectoId={proyectoId}
-              listaId={listaId}
-              initialLista={transformedLista as any}
-              initialItems={transformedItems as any}
-              initialProyecto={proyecto as any}
-            />
-          </Suspense>
-        </div>
+        <Suspense fallback={<DetailViewSkeleton />}>
+          <ListaEquipoDetailView
+            proyectoId={proyectoId}
+            listaId={listaId}
+            initialLista={transformedLista as any}
+            initialItems={transformedItems as any}
+            initialProyecto={proyecto as any}
+          />
+        </Suspense>
       </DetailErrorBoundary>
     );
   } catch (error) {

@@ -97,7 +97,8 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         nombre: true,
-        categoria: true
+        edtId: true,
+        edt: { select: { nombre: true } }
       }
     })
 

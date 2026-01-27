@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import {
   Package,
@@ -23,7 +25,10 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  Info
+  Info,
+  Plus,
+  X,
+  ListPlus
 } from 'lucide-react'
 import type { Plantilla } from '@/types'
 
@@ -35,6 +40,13 @@ interface ImportarPlantillaModalProps {
   onSuccess: () => void
 }
 
+interface PlantillaSeleccionada {
+  id: string
+  nombre: string
+  totalItems: number
+  totalValue: number
+}
+
 export default function ImportarPlantillaModal({
   open,
   onOpenChange,
@@ -43,7 +55,7 @@ export default function ImportarPlantillaModal({
   onSuccess
 }: ImportarPlantillaModalProps) {
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
-  const [selectedPlantilla, setSelectedPlantilla] = useState<string>('')
+  const [selectedPlantillas, setSelectedPlantillas] = useState<PlantillaSeleccionada[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -51,6 +63,8 @@ export default function ImportarPlantillaModal({
   useEffect(() => {
     if (open) {
       loadPlantillas()
+      setSelectedPlantillas([])
+      setError(null)
     }
   }, [open, tipo])
 
@@ -68,9 +82,75 @@ export default function ImportarPlantillaModal({
     }
   }
 
+  const calcularTotales = (plantilla: Plantilla) => {
+    let totalItems = 0
+    let totalValue = 0
+    const p = plantilla as any
+
+    if (tipo === 'equipos') {
+      if (p.plantillaEquipoItemIndependiente && Array.isArray(p.plantillaEquipoItemIndependiente)) {
+        totalItems = p.plantillaEquipoItemIndependiente.length
+        totalValue = p.totalCliente || p.grandTotal || p.plantillaEquipoItemIndependiente.reduce((sum: number, item: any) =>
+          sum + (item.costoCliente || item.precioCliente || 0), 0
+        )
+      } else if (p.plantillaEquipo && Array.isArray(p.plantillaEquipo)) {
+        totalItems = p.plantillaEquipo.reduce((acc: number, e: any) => acc + (e.plantillaEquipoItem?.length || 0), 0)
+        totalValue = p.totalEquiposCliente || 0
+      }
+    } else if (tipo === 'servicios') {
+      if (p.plantillaServicioItemIndependiente && Array.isArray(p.plantillaServicioItemIndependiente)) {
+        totalItems = p.plantillaServicioItemIndependiente.length
+        totalValue = p.totalCliente || p.grandTotal || p.plantillaServicioItemIndependiente.reduce((sum: number, item: any) =>
+          sum + (item.costoCliente || item.precioCliente || 0), 0
+        )
+      } else if (p.plantillaServicio && Array.isArray(p.plantillaServicio)) {
+        totalItems = p.plantillaServicio.reduce((acc: number, s: any) => acc + (s.plantillaServicioItem?.length || 0), 0)
+        totalValue = p.totalServiciosCliente || 0
+      }
+    } else if (tipo === 'gastos') {
+      if (p.plantillaGastoItemIndependiente && Array.isArray(p.plantillaGastoItemIndependiente)) {
+        totalItems = p.plantillaGastoItemIndependiente.length
+        totalValue = p.totalCliente || p.grandTotal || p.plantillaGastoItemIndependiente.reduce((sum: number, item: any) =>
+          sum + (item.costoCliente || item.precioCliente || 0), 0
+        )
+      } else if (p.plantillaGasto && Array.isArray(p.plantillaGasto)) {
+        totalItems = p.plantillaGasto.reduce((acc: number, g: any) => acc + (g.plantillaGastoItem?.length || 0), 0)
+        totalValue = p.totalGastosCliente || 0
+      }
+    }
+
+    if (totalItems === 0 && p._count) {
+      totalItems = p._count.plantillaServicioItemIndependiente ||
+                   p._count.plantillaEquipoItemIndependiente ||
+                   p._count.plantillaGastoItemIndependiente || 0
+    }
+
+    return { totalItems, totalValue }
+  }
+
+  const togglePlantillaSelection = (plantilla: Plantilla) => {
+    const isSelected = selectedPlantillas.some(p => p.id === plantilla.id)
+
+    if (isSelected) {
+      setSelectedPlantillas(prev => prev.filter(p => p.id !== plantilla.id))
+    } else {
+      const { totalItems, totalValue } = calcularTotales(plantilla)
+      setSelectedPlantillas(prev => [...prev, {
+        id: plantilla.id,
+        nombre: plantilla.nombre,
+        totalItems,
+        totalValue
+      }])
+    }
+  }
+
+  const removeFromSelection = (plantillaId: string) => {
+    setSelectedPlantillas(prev => prev.filter(p => p.id !== plantillaId))
+  }
+
   const handleImportar = async () => {
-    if (!selectedPlantilla) {
-      setError('Debe seleccionar una plantilla.')
+    if (selectedPlantillas.length === 0) {
+      setError('Debe seleccionar al menos una plantilla.')
       return
     }
 
@@ -78,33 +158,40 @@ export default function ImportarPlantillaModal({
       setLoading(true)
       setError(null)
 
-      const response = await fetch(`/api/cotizaciones/${cotizacionId}/importar-plantilla`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plantillaId: selectedPlantilla,
-          tipo: tipo
-        }),
-      })
+      let totalElementosImportados = 0
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al importar plantilla')
+      // Import each selected plantilla sequentially
+      for (const plantilla of selectedPlantillas) {
+        const response = await fetch(`/api/cotizaciones/${cotizacionId}/importar-plantilla`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            plantillaId: plantilla.id,
+            tipo: tipo
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || `Error al importar plantilla "${plantilla.nombre}"`)
+        }
+
+        const result = await response.json()
+        totalElementosImportados += result.equiposImportados || result.serviciosImportados || result.gastosImportados || 0
       }
 
-      const result = await response.json()
-      toast.success(`Plantilla importada exitosamente. Se agregaron ${result.equiposImportados || result.serviciosImportados || result.gastosImportados || 0} elementos.`)
+      toast.success(`${selectedPlantillas.length} plantilla(s) importada(s) exitosamente. Se agregaron ${totalElementosImportados} elementos.`)
 
       await onSuccess()
       onOpenChange(false)
-      setSelectedPlantilla('')
+      setSelectedPlantillas([])
 
     } catch (error: any) {
-      console.error('Error al importar plantilla:', error)
-      setError(error?.message || 'No se pudo importar la plantilla.')
-      toast.error('Error al importar la plantilla')
+      console.error('Error al importar plantillas:', error)
+      setError(error?.message || 'No se pudieron importar las plantillas.')
+      toast.error('Error al importar las plantillas')
     } finally {
       setLoading(false)
     }
@@ -149,29 +236,29 @@ export default function ImportarPlantillaModal({
     switch (tipo) {
       case 'equipos':
         return {
-          titulo: 'Importar Plantilla de Equipos',
-          descripcion: 'Selecciona una plantilla de equipos para agregar a esta cotización',
+          titulo: 'Importar Plantillas de Equipos',
+          descripcion: 'Selecciona las plantillas de equipos para agregar a esta cotización',
           icono: Wrench,
           color: 'text-orange-600'
         }
       case 'servicios':
         return {
-          titulo: 'Importar Plantilla de Servicios',
-          descripcion: 'Selecciona una plantilla de servicios para agregar a esta cotización',
+          titulo: 'Importar Plantillas de Servicios',
+          descripcion: 'Selecciona las plantillas de servicios para agregar a esta cotización',
           icono: Truck,
           color: 'text-green-600'
         }
       case 'gastos':
         return {
-          titulo: 'Importar Plantilla de Gastos',
-          descripcion: 'Selecciona una plantilla de gastos para agregar a esta cotización',
+          titulo: 'Importar Plantillas de Gastos',
+          descripcion: 'Selecciona las plantillas de gastos para agregar a esta cotización',
           icono: DollarSign,
           color: 'text-purple-600'
         }
       default:
         return {
-          titulo: 'Importar Plantilla',
-          descripcion: 'Selecciona una plantilla para importar',
+          titulo: 'Importar Plantillas',
+          descripcion: 'Selecciona las plantillas para importar',
           icono: Package,
           color: 'text-blue-600'
         }
@@ -189,9 +276,12 @@ export default function ImportarPlantillaModal({
     }).format(amount)
   }
 
+  const totalSeleccionado = selectedPlantillas.reduce((sum, p) => sum + p.totalValue, 0)
+  const totalItemsSeleccionados = selectedPlantillas.reduce((sum, p) => sum + p.totalItems, 0)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <SeccionIcono className={`h-5 w-5 ${seccionInfo.color}`} />
@@ -202,12 +292,7 @@ export default function ImportarPlantillaModal({
           </DialogDescription>
         </DialogHeader>
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
-          className="space-y-6"
-        >
+        <div className="flex-1 overflow-hidden flex flex-col gap-4">
           {/* Error Alert */}
           <AnimatePresence>
             {error && (
@@ -229,120 +314,164 @@ export default function ImportarPlantillaModal({
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              Los elementos importados se agregarán como nuevas secciones a esta cotización.
-              Puedes modificarlos después de la importación.
+              Selecciona múltiples plantillas y haz clic en "Agregar" para añadirlas a la lista.
+              Luego importa todas con el botón "Importar Seleccionadas".
             </AlertDescription>
           </Alert>
 
-          {/* Plantillas List */}
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {plantillas.map((plantilla) => {
-              const tipoInfo = getTipoInfo(plantilla.tipo || 'completa')
-              const TipoIcon = tipoInfo.icon
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
+            {/* Plantillas disponibles */}
+            <div className="flex flex-col min-h-0">
+              <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Plantillas Disponibles
+              </h4>
+              <ScrollArea className="flex-1 border rounded-lg p-2">
+                <div className="space-y-2">
+                  {plantillas.map((plantilla) => {
+                    const tipoInfo = getTipoInfo(plantilla.tipo || 'completa')
+                    const TipoIcon = tipoInfo.icon
+                    const isSelected = selectedPlantillas.some(p => p.id === plantilla.id)
+                    const { totalItems, totalValue } = calcularTotales(plantilla)
 
-              // Calculate totals based on tipo and plantilla structure
-              let totalItems = 0
-              let totalValue = 0
+                    return (
+                      <Card
+                        key={plantilla.id}
+                        className={`transition-all ${
+                          isSelected
+                            ? 'border-green-500 bg-green-50 opacity-60'
+                            : 'hover:border-blue-300 cursor-pointer'
+                        }`}
+                        onClick={() => !isSelected && togglePlantillaSelection(plantilla)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <TipoIcon className="h-4 w-4 text-blue-600 shrink-0" />
+                                <h5 className="font-medium text-sm truncate">{plantilla.nombre}</h5>
+                                {isSelected && (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Package className="h-3 w-3" />
+                                  {totalItems} items
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="h-3 w-3" />
+                                  {formatCurrency(totalValue)}
+                                </span>
+                              </div>
+                            </div>
+                            {!isSelected && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  togglePlantillaSelection(plantilla)
+                                }}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
 
-              const p = plantilla as any
-
-              // Check for independent templates first (they have specific item arrays)
-              if (tipo === 'equipos') {
-                if (p.plantillaEquipoItemIndependiente && Array.isArray(p.plantillaEquipoItemIndependiente)) {
-                  // Independent equipment template
-                  totalItems = p.plantillaEquipoItemIndependiente.length
-                  totalValue = p.totalCliente || p.grandTotal || p.plantillaEquipoItemIndependiente.reduce((sum: number, item: any) =>
-                    sum + (item.costoCliente || item.precioCliente || 0), 0
-                  )
-                } else if (p.plantillaEquipo && Array.isArray(p.plantillaEquipo)) {
-                  // Complete template with equipment sections
-                  totalItems = p.plantillaEquipo.reduce((acc: number, e: any) => acc + (e.plantillaEquipoItem?.length || 0), 0)
-                  totalValue = p.totalEquiposCliente || 0
-                }
-              } else if (tipo === 'servicios') {
-                if (p.plantillaServicioItemIndependiente && Array.isArray(p.plantillaServicioItemIndependiente)) {
-                  // Independent service template
-                  totalItems = p.plantillaServicioItemIndependiente.length
-                  totalValue = p.totalCliente || p.grandTotal || p.plantillaServicioItemIndependiente.reduce((sum: number, item: any) =>
-                    sum + (item.costoCliente || item.precioCliente || 0), 0
-                  )
-                } else if (p.plantillaServicio && Array.isArray(p.plantillaServicio)) {
-                  // Complete template with service sections
-                  totalItems = p.plantillaServicio.reduce((acc: number, s: any) => acc + (s.plantillaServicioItem?.length || 0), 0)
-                  totalValue = p.totalServiciosCliente || 0
-                }
-              } else if (tipo === 'gastos') {
-                if (p.plantillaGastoItemIndependiente && Array.isArray(p.plantillaGastoItemIndependiente)) {
-                  // Independent expense template
-                  totalItems = p.plantillaGastoItemIndependiente.length
-                  totalValue = p.totalCliente || p.grandTotal || p.plantillaGastoItemIndependiente.reduce((sum: number, item: any) =>
-                    sum + (item.costoCliente || item.precioCliente || 0), 0
-                  )
-                } else if (p.plantillaGasto && Array.isArray(p.plantillaGasto)) {
-                  // Complete template with expense sections
-                  totalItems = p.plantillaGasto.reduce((acc: number, g: any) => acc + (g.plantillaGastoItem?.length || 0), 0)
-                  totalValue = p.totalGastosCliente || 0
-                }
-              }
-
-              // Fallback: use _count if available
-              if (totalItems === 0 && p._count) {
-                totalItems = p._count.plantillaServicioItemIndependiente ||
-                             p._count.plantillaEquipoItemIndependiente ||
-                             p._count.plantillaGastoItemIndependiente || 0
-              }
-
-              return (
-                <Card
-                  key={plantilla.id}
-                  className={`cursor-pointer transition-all ${
-                    selectedPlantilla === plantilla.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'hover:border-gray-300'
-                  }`}
-                  onClick={() => setSelectedPlantilla(plantilla.id)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <TipoIcon className="h-4 w-4 text-blue-600" />
-                          <h5 className="font-medium">{plantilla.nombre}</h5>
-                          {selectedPlantilla === plantilla.id && (
-                            <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Package className="h-3 w-3" />
-                            {totalItems} items
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
-                            {formatCurrency(totalValue)}
-                          </span>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {tipoInfo.label}
-                      </Badge>
+                  {plantillas.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <SeccionIcono className={`h-8 w-8 mx-auto mb-2 ${seccionInfo.color} opacity-50`} />
+                      <p className="text-sm">No hay plantillas disponibles para {tipo}</p>
+                      <p className="text-xs mt-1">Crea plantillas especializadas primero</p>
                     </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
 
-            {plantillas.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <SeccionIcono className={`h-8 w-8 mx-auto mb-2 ${seccionInfo.color} opacity-50`} />
-                <p className="text-sm">No hay plantillas disponibles para {tipo}</p>
-                <p className="text-xs mt-1">Crea plantillas especializadas primero</p>
-              </div>
-            )}
+            {/* Plantillas seleccionadas */}
+            <div className="flex flex-col min-h-0">
+              <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                <ListPlus className="h-4 w-4" />
+                Plantillas a Importar
+                {selectedPlantillas.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {selectedPlantillas.length}
+                  </Badge>
+                )}
+              </h4>
+              <ScrollArea className="flex-1 border rounded-lg p-2 bg-muted/30">
+                <div className="space-y-2">
+                  <AnimatePresence mode="popLayout">
+                    {selectedPlantillas.map((plantilla) => (
+                      <motion.div
+                        key={plantilla.id}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <Card className="border-blue-200 bg-blue-50/50">
+                          <CardContent className="p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-medium text-sm truncate">{plantilla.nombre}</h5>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                  <span>{plantilla.totalItems} items</span>
+                                  <span>{formatCurrency(plantilla.totalValue)}</span>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => removeFromSelection(plantilla.id)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+
+                  {selectedPlantillas.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <ListPlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No hay plantillas seleccionadas</p>
+                      <p className="text-xs mt-1">Haz clic en una plantilla para agregarla</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+
+              {/* Resumen de selección */}
+              {selectedPlantillas.length > 0 && (
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total items:</span>
+                    <span className="font-medium">{totalItemsSeleccionados}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-muted-foreground">Valor total:</span>
+                    <span className="font-medium text-blue-600">{formatCurrency(totalSeleccionado)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </motion.div>
+        </div>
 
-        <DialogFooter className="flex items-center justify-between pt-6">
+        <Separator className="my-2" />
+
+        <DialogFooter className="flex items-center justify-between">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -353,8 +482,8 @@ export default function ImportarPlantillaModal({
 
           <Button
             onClick={handleImportar}
-            disabled={!selectedPlantilla || loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white min-w-[140px]"
+            disabled={selectedPlantillas.length === 0 || loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white min-w-[180px]"
           >
             {loading ? (
               <>
@@ -364,7 +493,7 @@ export default function ImportarPlantillaModal({
             ) : (
               <>
                 <SeccionIcono className="w-4 h-4 mr-2" />
-                Importar Plantilla
+                Importar {selectedPlantillas.length > 0 ? `(${selectedPlantillas.length})` : ''} Seleccionadas
               </>
             )}
           </Button>

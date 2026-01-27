@@ -1,190 +1,115 @@
-// ===================================================
-// 📁 Archivo: page.tsx
-// 📌 Ubicación: src/app/finanzas/aprovisionamiento/pedidos/page.tsx
-// 🔧 Descripción: Página de gestión de pedidos de equipos con UX/UI mejorada
-// 🎨 Mejoras aplicadas: Framer Motion, Shadcn/UI, Estados de carga, Breadcrumb navigation
-// ✍️ Autor: Jesús Artemio + IA GYS
-// 📅 Última actualización: 2025-01-27
-// ===================================================
+/**
+ * Página de Pedidos de Equipo - Vista minimalista
+ */
 
 'use client'
 
-import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useState, useMemo, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { 
-  ShoppingCart, 
-  ArrowLeft, 
-  Plus, 
-  Download, 
-  Upload,
-  Filter,
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  ShoppingCart,
+  Plus,
+  Download,
   AlertTriangle,
   CheckCircle,
   Clock,
   DollarSign,
-  Truck,
-  Users,
-  Home,
-  BarChart3,
-  Calendar,
-  Target,
-  Activity,
+  Package,
+  Search,
+  Eye,
   TrendingUp,
-  Package
+  Calendar
 } from 'lucide-react'
 
-// ✅ Import components
-import PedidoEquipoFiltersClient from '@/components/aprovisionamiento/PedidoEquipoFiltersClient'
-import PedidoEquipoTableClient from '@/components/aprovisionamiento/PedidoEquipoTableClient'
 import PedidoEquipoGanttClient from '@/components/aprovisionamiento/PedidoEquipoGanttClient'
-import PedidoEquipoCoherenciaClient from '@/components/aprovisionamiento/PedidoEquipoCoherenciaClient'
-
-// ✅ Import React Query services
 import { usePedidosEquipo } from '@/lib/services/aprovisionamientoQuery'
+import type { EstadoPedido } from '@/types/modelos'
 
-// ✅ Import types
-import type { EstadoPedido, PedidoEquipo } from '@/types/modelos'
-
-// 🔧 Main component
 function PedidosEquipoContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { data: session } = useSession()
+  const { status } = useSession()
 
-  // 📡 URL params
-  const proyecto = searchParams.get('proyecto') || ''
-  const proveedor = searchParams.get('proveedor') || ''
-  const estado = searchParams.get('estado') || ''
-  const fechaInicio = searchParams.get('fechaInicio') || ''
-  const fechaFin = searchParams.get('fechaFin') || ''
-  const montoMin = searchParams.get('montoMin') || ''
-  const montoMax = searchParams.get('montoMax') || ''
-  const coherencia = searchParams.get('coherencia') || ''
-  const lista = searchParams.get('lista') || ''
+  const [busqueda, setBusqueda] = useState(searchParams.get('busqueda') || '')
+  const [viewMode, setViewMode] = useState<'table' | 'gantt'>('table')
+
+  // URL params
   const page = parseInt(searchParams.get('page') || '1')
-  const limit = parseInt(searchParams.get('limit') || '10')
-  const sortBy = searchParams.get('sortBy') || 'createdAt'
-  const sortOrder = searchParams.get('sortOrder') || 'desc'
+  const limit = parseInt(searchParams.get('limit') || '15')
+  const proyecto = searchParams.get('proyecto') || ''
+  const estado = searchParams.get('estado') || ''
 
-  // 🔁 State
-  const [viewMode, setViewMode] = useState<'table' | 'gantt' | 'coherencia'>('table')
-  
-  // 📡 React Query - Fetch pedidos with optimized cache
+  // Query
   const {
     data: pedidosResponse,
     isLoading: loading,
-    error,
-    refetch
+    isError
   } = usePedidosEquipo({
     proyectoId: proyecto || undefined,
-    proveedorId: proveedor || undefined,
     estado: estado ? [estado as EstadoPedido] : undefined,
-    fechaDesde: fechaInicio || undefined,
-    fechaHasta: fechaFin || undefined,
-    montoMinimo: montoMin ? parseFloat(montoMin) : undefined,
-    montoMaximo: montoMax ? parseFloat(montoMax) : undefined,
-    busqueda: coherencia || undefined,
+    busqueda: busqueda || undefined,
     page,
     limit
   })
-  
-  // 🔄 Transform data for compatibility
+
+  // Transform data
   const pedidosData = useMemo(() => {
     if (!pedidosResponse?.data) {
-      return {
-        items: [],
-        total: 0,
-        pagination: { page: 1, limit: 10, total: 0, pages: 0, hasNext: false, hasPrev: false }
-      }
+      return { items: [], total: 0, pagination: { page: 1, limit: 15, total: 0, totalPages: 0 } }
     }
-    
     return {
       items: pedidosResponse.data || [],
       total: pedidosResponse.meta?.total || 0,
-      pagination: pedidosResponse.meta || {
-        page: 1, limit: 10, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false
-      }
+      pagination: pedidosResponse.meta || { page: 1, limit: 15, total: 0, totalPages: 0 }
     }
   }, [pedidosResponse])
 
-  // ✅ Set dynamic page title
-  useEffect(() => {
-    document.title = 'Pedidos de Equipos | Aprovisionamiento | GYS'
-  }, [])
-
-  // 🔄 Handle error display
-  const errorMessage = error ? 'Error al cargar los pedidos' : null
-
-  // 📊 Stats calculation
+  // Stats
   const stats = useMemo(() => {
     const items = pedidosData.items || []
-    const totalPedidos = items.length
+    const totalPedidos = pedidosData.pagination.total || items.length
     const pedidosEnviados = items.filter(p => p.estado === 'enviado').length
     const pedidosRecibidos = items.filter(p => p.estado === 'entregado').length
     const pedidosRetrasados = items.filter(p => {
       if (!p.fechaEntregaEstimada) return false
-      const fechaEstimada = new Date(p.fechaEntregaEstimada)
-      const hoy = new Date()
-      return fechaEstimada < hoy && p.estado !== 'entregado'
+      return new Date(p.fechaEntregaEstimada) < new Date() && p.estado !== 'entregado'
     }).length
-    
+
     const totalItems = items.reduce((sum, p) => sum + (p.items?.length || 0), 0)
     const itemsEntregados = items.reduce((sum, p) => {
       return sum + (p.items?.filter(item => (item.cantidadAtendida || 0) >= item.cantidadPedida).length || 0)
     }, 0)
-    const itemsEnProgreso = totalItems - itemsEntregados
-    
     const progresoEntrega = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0
-    
-    const montoTotal = items.reduce((sum, p) => {
-      // Calcular monto total basado en items del pedido
-      const montoPedido = p.items?.reduce((itemSum, item) => 
-        itemSum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0
-      ) || 0
-      return sum + montoPedido
-    }, 0)
-    
-    const coherenciaPromedio = items.length > 0 
-      ? items.reduce((sum, p) => sum + (p.coherencia || 0), 0) / items.length 
-      : 0
 
-    return {
-      totalPedidos,
-      pedidosEnviados,
-      pedidosRecibidos,
-      pedidosRetrasados,
-      totalItems,
-      itemsEntregados,
-      itemsEnProgreso,
-      progresoEntrega,
-      montoTotal,
-      coherenciaPromedio
-    }
+    const montoTotal = items.reduce((sum, p) => {
+      return sum + (p.items?.reduce((s, i) => s + (i.costoTotal || (i.cantidadPedida * (i.precioUnitario || 0))), 0) || 0)
+    }, 0)
+
+    return { totalPedidos, pedidosEnviados, pedidosRecibidos, pedidosRetrasados, progresoEntrega, montoTotal }
   }, [pedidosData])
 
-
-
-  // 📊 Gantt data transformation
+  // Gantt data
   const ganttData = useMemo(() => {
     return pedidosData.items.map(pedido => {
-      // Calcular progreso basado en items entregados
-      const itemsEntregados = pedido.items?.filter(item => 
-        item.estado === 'entregado'
-      ).length || 0
+      const itemsEntregados = pedido.items?.filter(i => i.estado === 'entregado').length || 0
       const totalItems = pedido.items?.length || 0
       const progreso = totalItems > 0 ? Math.round((itemsEntregados / totalItems) * 100) : 0
-
-      // Calcular monto real basado en cantidades atendidas
-      const montoReal = pedido.items?.reduce((sum, item) => 
-        sum + ((item.cantidadAtendida || 0) * (item.precioUnitario || 0)), 0
-      ) || 0
 
       return {
         id: pedido.id,
@@ -198,422 +123,320 @@ function PedidosEquipoContent() {
         progreso,
         estado: pedido.estado,
         coherencia: pedido.coherencia || 0,
-        proveedor: pedido.items?.[0]?.listaEquipoItem?.proveedor ? {
-          id: pedido.items[0].listaEquipoItem.proveedor.id,
-          nombre: pedido.items[0].listaEquipoItem.proveedor.nombre
-        } : undefined,
-        monto: pedido.items?.reduce((sum, item) => sum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0) || 0,
-        montoReal,
-        items: pedido.items?.map(item => ({
-          id: item.id,
-          cantidad: item.cantidadPedida,
-          cantidadRecibida: item.cantidadAtendida || 0,
-          precioUnitario: item.precioUnitario,
-          subtotal: item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))
+        proveedor: pedido.items?.[0]?.listaEquipoItem?.proveedor,
+        monto: pedido.items?.reduce((s, i) => s + (i.costoTotal || 0), 0) || 0,
+        items: pedido.items?.map(i => ({
+          id: i.id,
+          cantidad: i.cantidadPedida,
+          cantidadRecibida: i.cantidadAtendida || 0,
+          precioUnitario: i.precioUnitario,
+          subtotal: i.costoTotal || 0
         })) || []
       }
     })
   }, [pedidosData])
 
-  // 📊 Table data transformation
-  const tableData = useMemo(() => {
-    return pedidosData.items.map(pedido => {
-      // Calcular costo total basado en items
-      const costoTotal = pedido.items?.reduce((sum, item) => 
-        sum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0
-      ) || 0
+  const handleSearch = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', '1')
+    if (busqueda) params.set('busqueda', busqueda)
+    else params.delete('busqueda')
+    router.push(`/finanzas/aprovisionamiento/pedidos?${params.toString()}`)
+  }
 
-      // Calcular progreso
-      const itemsAtendidos = pedido.items?.filter(item => 
-        (item.cantidadAtendida || 0) >= item.cantidadPedida
-      ).length || 0
-      const totalItems = pedido.items?.length || 0
-      const progreso = totalItems > 0 ? Math.round((itemsAtendidos / totalItems) * 100) : 0
+  const handleEstadoChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', '1')
+    if (value && value !== 'todos') params.set('estado', value)
+    else params.delete('estado')
+    router.push(`/finanzas/aprovisionamiento/pedidos?${params.toString()}`)
+  }
 
-      // Calcular coherencia
-      const coherenciaData = {
-        esCoherente: (pedido.coherencia || 0) >= 80,
-        itemsCoherentes: itemsAtendidos,
-        preciosCoherentes: totalItems,
-        totalItems,
-        alertas: {
-          cantidadesExcedidas: false,
-          preciosDesviados: false,
-          itemsFaltantes: itemsAtendidos < totalItems,
-          sinLista: !pedido.lista
-        }
-      }
+  const getEstadoBadge = (estado: string) => {
+    switch (estado) {
+      case 'entregado':
+        return <Badge className="bg-green-100 text-green-700 text-[10px] h-5">Entregado</Badge>
+      case 'enviado':
+        return <Badge className="bg-blue-100 text-blue-700 text-[10px] h-5">Enviado</Badge>
+      case 'pendiente':
+        return <Badge className="bg-yellow-100 text-yellow-700 text-[10px] h-5">Pendiente</Badge>
+      case 'cancelado':
+        return <Badge className="bg-red-100 text-red-700 text-[10px] h-5">Cancelado</Badge>
+      default:
+        return <Badge variant="secondary" className="text-[10px] h-5">{estado}</Badge>
+    }
+  }
 
-      return {
-        id: pedido.id,
-        codigo: pedido.codigo || `PED-${String(pedido.numeroSecuencia).padStart(3, '0')}`,
-        descripcion: pedido.observacion || 'Pedido de equipos',
-        estado: pedido.estado,
-        fechaCreacion: new Date(pedido.fechaPedido),
-        fechaNecesaria: pedido.fechaNecesaria ? new Date(pedido.fechaNecesaria) : undefined,
-        fechaEntregaEstimada: pedido.fechaEntregaEstimada ? new Date(pedido.fechaEntregaEstimada) : undefined,
-        fechaEntregaReal: pedido.fechaEntregaReal ? new Date(pedido.fechaEntregaReal) : undefined,
-        montoTotal: costoTotal,
-        observaciones: pedido.observacion,
-        urgente: false, // TODO: Implementar lógica de urgencia
-        coherencia: coherenciaData,
-        proyecto: undefined, // TODO: Incluir datos del proyecto si es necesario
-        proveedor: pedido.items?.[0]?.listaEquipoItem?.proveedor ? {
-          id: pedido.items[0].listaEquipoItem.proveedor.id,
-          nombre: pedido.items[0].listaEquipoItem.proveedor.nombre,
-          ruc: pedido.items[0].listaEquipoItem.proveedor.ruc
-        } : undefined,
-        lista: pedido.lista ? {
-          id: pedido.lista.id,
-          nombre: pedido.lista.nombre
-        } : undefined,
-        responsable: pedido.responsable ? {
-          id: pedido.responsable.id,
-          nombre: pedido.responsable.name || 'Sin nombre',
-          email: pedido.responsable.email
-        } : undefined,
-        items: pedido.items?.map(item => ({
-          id: item.id,
-          cantidad: item.cantidadPedida,
-          cantidadRecibida: item.cantidadAtendida || 0,
-          precioUnitario: item.precioUnitario,
-          subtotal: item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))
-        })) || []
-      }
-    })
-  }, [pedidosData])
-
-  // 🚨 Loading state
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="space-y-6">
-          <div className="h-4 bg-gray-200 rounded w-64 animate-pulse" />
-          <div className="space-y-2">
-            <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
-            <div className="h-4 bg-gray-200 rounded w-96 animate-pulse" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded animate-pulse" />
-            ))}
-          </div>
-          <div className="h-32 bg-gray-200 rounded animate-pulse" />
-          <div className="h-64 bg-gray-200 rounded animate-pulse" />
+      <div className="p-4 space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-7 w-24" />
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
     )
   }
 
-  // 🚨 Error state
-  if (error) {
+  if (isError) {
     return (
-      <div className="container mx-auto p-6">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive flex items-center">
-              <AlertTriangle className="h-5 w-5 mr-2" />
-              Error en Pedidos de Equipos
-            </CardTitle>
-            <CardDescription>
-              Ha ocurrido un error al cargar los pedidos de equipos
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {error?.message || 'Error desconocido al cargar los pedidos'}
-            </p>
-            <div className="flex space-x-2">
-              <Button onClick={() => window.location.reload()}>
-                Reintentar
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/finanzas/aprovisionamiento">
-                  Volver a Aprovisionamiento
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="p-4">
+        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-white">
+          <AlertTriangle className="h-10 w-10 text-red-300 mb-3" />
+          <p className="text-sm text-muted-foreground">Error al cargar pedidos</p>
+          <Button variant="outline" size="sm" className="mt-3 h-7 text-xs" onClick={() => window.location.reload()}>
+            Reintentar
+          </Button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Breadcrumb */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/" className="flex items-center gap-1">
-              <Home className="h-3 w-3" />
-              Inicio
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas/aprovisionamiento">Aprovisionamiento</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Pedidos de Equipos</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
+    <div className="p-4 space-y-4">
       {/* Header */}
-      <div className="flex flex-col space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/finanzas/aprovisionamiento">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Pedidos de Equipos</h1>
-              <p className="text-muted-foreground mt-2">
-                Gestión y seguimiento de pedidos con timeline de ejecución
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant={viewMode === 'table' ? 'default' : 'outline'} 
-              size="sm"
-              onClick={() => setViewMode('table')}
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Tabla
-            </Button>
-            <Button 
-              variant={viewMode === 'gantt' ? 'default' : 'outline'} 
-              size="sm"
-              onClick={() => setViewMode('gantt')}
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Gantt
-            </Button>
-            <Button 
-              variant={viewMode === 'coherencia' ? 'default' : 'outline'} 
-              size="sm"
-              onClick={() => setViewMode('coherencia')}
-            >
-              <Target className="h-4 w-4 mr-2" />
-              Coherencia
-            </Button>
-            <Separator orientation="vertical" className="h-6" />
-            <Button variant="outline" size="sm">
-              <Upload className="h-4 w-4 mr-2" />
-              Importar
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Pedido
-            </Button>
-          </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Package className="h-5 w-5 text-emerald-600" />
+          <h1 className="text-lg font-semibold">Pedidos de Equipo</h1>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Pedidos</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalPedidos}</div>
-              <p className="text-xs text-muted-foreground">
-                Pedidos registrados
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Progreso Entrega</CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.progresoEntrega}%</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.itemsEntregados} de {stats.totalItems} items
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En Progreso</CardTitle>
-              <Activity className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.itemsEnProgreso}</div>
-              <p className="text-xs text-muted-foreground">
-                Items en tránsito
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completados</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.pedidosRecibidos}</div>
-              <p className="text-xs text-muted-foreground">
-                Pedidos entregados
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monto Total</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ${stats.montoTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Valor total pedidos
-              </p>
-            </CardContent>
-          </Card>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-7 text-xs">
+            <Download className="h-3 w-3 mr-1" />
+            Exportar
+          </Button>
+          <Button size="sm" className="h-7 text-xs">
+            <Plus className="h-3 w-3 mr-1" />
+            Nuevo
+          </Button>
         </div>
       </div>
 
-      <Separator />
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Total</span>
+            <ShoppingCart className="h-4 w-4 text-blue-500" />
+          </div>
+          <p className="text-lg font-bold">{stats.totalPedidos}</p>
+        </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros y Búsqueda</span>
-          </CardTitle>
-          <CardDescription>
-            Filtra pedidos por proyecto, proveedor, estado, fechas, montos y coherencia
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PedidoEquipoFiltersClient
-            filtros={{
-              busqueda: undefined,
-              proyectoId: proyecto,
-              proveedorId: proveedor,
-              estado: estado as EstadoPedido,
-              fechaCreacion: fechaInicio || fechaFin ? {
-                from: fechaInicio ? new Date(fechaInicio) : undefined,
-                to: fechaFin ? new Date(fechaFin) : undefined
-              } : undefined,
-              fechaEntrega: undefined,
-              montoMinimo: montoMin ? parseFloat(montoMin) : undefined,
-              montoMaximo: montoMax ? parseFloat(montoMax) : undefined,
-              tieneObservaciones: undefined,
-              soloVencidos: undefined,
-              soloSinRecibir: undefined,
-              soloUrgentes: undefined,
-              coherenciaMinima: coherencia === 'true' ? 80 : undefined,
-              listaId: lista
-            }}
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Progreso</span>
+            <TrendingUp className="h-4 w-4 text-indigo-500" />
+          </div>
+          <p className="text-lg font-bold text-indigo-600">{stats.progresoEntrega}%</p>
+        </div>
+
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Enviados</span>
+            <Clock className="h-4 w-4 text-blue-500" />
+          </div>
+          <p className="text-lg font-bold text-blue-600">{stats.pedidosEnviados}</p>
+        </div>
+
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Entregados</span>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </div>
+          <p className="text-lg font-bold text-green-600">{stats.pedidosRecibidos}</p>
+        </div>
+
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Retrasados</span>
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          </div>
+          <p className="text-lg font-bold text-red-600">{stats.pedidosRetrasados}</p>
+        </div>
+
+        <div className="bg-white border rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Monto</span>
+            <DollarSign className="h-4 w-4 text-emerald-500" />
+          </div>
+          <p className="text-base font-bold">
+            ${stats.montoTotal.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+          </p>
+        </div>
+      </div>
+
+      {/* Filtros + Toggle Vista */}
+      <div className="flex items-center justify-between gap-2 bg-white border rounded-lg p-2">
+        <div className="flex items-center gap-2 flex-1">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar pedido..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="h-7 pl-7 text-xs"
+            />
+          </div>
+          <Select value={estado || 'todos'} onValueChange={handleEstadoChange}>
+            <SelectTrigger className="h-7 w-32 text-xs">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="pendiente">Pendiente</SelectItem>
+              <SelectItem value="enviado">Enviado</SelectItem>
+              <SelectItem value="entregado">Entregado</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSearch}>
+            Filtrar
+          </Button>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs px-2"
+            onClick={() => setViewMode('table')}
+          >
+            <ShoppingCart className="h-3 w-3 mr-1" />
+            Tabla
+          </Button>
+          <Button
+            variant={viewMode === 'gantt' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-7 text-xs px-2"
+            onClick={() => setViewMode('gantt')}
+          >
+            <Calendar className="h-3 w-3 mr-1" />
+            Gantt
+          </Button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {viewMode === 'table' ? (
+        pedidosData.items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-white">
+            <Package className="h-10 w-10 text-gray-300 mb-3" />
+            <p className="text-sm text-muted-foreground">No hay pedidos</p>
+          </div>
+        ) : (
+          <div className="border rounded-lg bg-white overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-xs font-medium">Pedido</TableHead>
+                  <TableHead className="text-xs font-medium">Proveedor</TableHead>
+                  <TableHead className="text-xs font-medium w-20">Estado</TableHead>
+                  <TableHead className="text-xs font-medium text-center w-16">Items</TableHead>
+                  <TableHead className="text-xs font-medium text-right">Monto</TableHead>
+                  <TableHead className="text-xs font-medium w-24">F. Entrega</TableHead>
+                  <TableHead className="text-xs font-medium w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pedidosData.items.map((pedido: any) => {
+                  const montoPedido = (pedido.items || []).reduce((s: number, i: any) =>
+                    s + (i.costoTotal || (i.cantidadPedida * (i.precioUnitario || 0))), 0
+                  )
+                  const proveedor = pedido.items?.[0]?.listaEquipoItem?.proveedor
+
+                  return (
+                    <TableRow key={pedido.id} className="hover:bg-gray-50/50">
+                      <TableCell className="py-2">
+                        <div>
+                          <p className="text-xs font-medium">
+                            {pedido.codigo || `PED-${String(pedido.numeroSecuencia).padStart(3, '0')}`}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(pedido.fechaPedido).toLocaleDateString('es-PE')}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <span className="text-xs truncate max-w-[150px] block" title={proveedor?.nombre}>
+                          {proveedor?.nombre || '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2">{getEstadoBadge(pedido.estado)}</TableCell>
+                      <TableCell className="py-2 text-center">
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                          {pedido.items?.length || 0}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-2 text-right">
+                        <span className="text-xs font-medium">
+                          ${montoPedido.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <span className="text-[10px] text-muted-foreground">
+                          {pedido.fechaEntregaEstimada
+                            ? new Date(pedido.fechaEntregaEstimada).toLocaleDateString('es-PE')
+                            : '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
+                          <Link href={`/proyectos/${pedido.lista?.proyectoId}/equipos/pedidos/${pedido.id}`}>
+                            <Eye className="h-3.5 w-3.5 text-blue-600" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+
+            {pedidosData.pagination && (
+              <div className="flex items-center justify-between px-4 py-2 border-t text-xs text-muted-foreground">
+                <span>
+                  {((pedidosData.pagination.page - 1) * pedidosData.pagination.limit) + 1}-
+                  {Math.min(pedidosData.pagination.page * pedidosData.pagination.limit, pedidosData.pagination.total)} de {pedidosData.pagination.total}
+                </span>
+                <span>Página {pedidosData.pagination.page} de {pedidosData.pagination.totalPages || 1}</span>
+              </div>
+            )}
+          </div>
+        )
+      ) : (
+        <div className="border rounded-lg bg-white overflow-hidden min-h-[400px]">
+          <PedidoEquipoGanttClient
+            data={ganttData}
+            showCoherenceIndicators={true}
           />
-        </CardContent>
-      </Card>
-
-      {/* Main Content */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Pedidos de Equipos - Vista {viewMode === 'table' ? 'Tabla' : viewMode === 'gantt' ? 'Gantt' : 'Coherencia'}</span>
-            <div className="flex items-center space-x-2">
-              <Badge variant="outline">
-                {pedidosData.items.length} de {pedidosData.total}
-              </Badge>
-              {lista && (
-                <Badge variant="secondary">
-                  Lista: {lista}
-                </Badge>
-              )}
-              {coherencia === 'true' && (
-                <Badge variant="secondary">
-                  Solo coherentes
-                </Badge>
-              )}
-            </div>
-          </CardTitle>
-          <CardDescription>
-            {viewMode === 'table' 
-              ? 'Gestiona pedidos con seguimiento de proveedores y entregas'
-              : viewMode === 'gantt'
-              ? 'Timeline de ejecución de pedidos con fechas críticas y coherencia'
-              : 'Análisis de coherencia entre listas de equipos y pedidos realizados'
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {viewMode === 'table' && (
-            <PedidoEquipoTableClient 
-              data={tableData}
-              pagination={{
-                page,
-                limit,
-                total: pedidosData.total,
-                totalPages: Math.ceil(pedidosData.total / limit)
-              }}
-              sorting={{
-                sortBy,
-                sortOrder: sortOrder as 'asc' | 'desc'
-              }}
-            />
-          )}
-          
-          {viewMode === 'gantt' && (
-            <PedidoEquipoGanttClient 
-              data={ganttData}
-              dateRange={fechaInicio && fechaFin ? {
-                start: new Date(fechaInicio),
-                end: new Date(fechaFin)
-              } : undefined}
-              showCoherenceIndicators={true}
-            />
-          )}
-          
-          {viewMode === 'coherencia' && (
-            <PedidoEquipoCoherenciaClient
-              proyectoId={proyecto}
-              listaEquipoId={lista}
-              modo="completo"
-              autoRefresh={true}
-              refreshInterval={30000}
-            />
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   )
 }
 
-// 🔧 Main page component with Suspense
 export default function PedidosEquipoPage() {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Cargando pedidos de equipos...</p>
+      <div className="p-4 space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-7 w-24" />
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
     }>
       <PedidosEquipoContent />

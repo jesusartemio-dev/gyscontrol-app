@@ -76,7 +76,8 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             nombre: true,
-            categoria: true
+            edtId: true,
+            edt: { select: { nombre: true } }
           }
         }
       }
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
 
     // Buscar servicio relacionado con el EDT
     const servicioRelacionado = proyecto.proyectoServicioCotizado.find(servicio =>
-      servicio.categoria === proyectoEdt.edt?.nombre
+      servicio.edt?.nombre === proyectoEdt.edt?.nombre || servicio.edtId === proyectoEdt.edtId
     )
 
     if (!servicioRelacionado) {

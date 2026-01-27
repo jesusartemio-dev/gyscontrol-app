@@ -84,7 +84,7 @@ export async function POST(
         catalogoServicioId,
         nombre: catalogoServicio.nombre,
         descripcion: catalogoServicio.descripcion,
-        categoria: catalogoServicio.edt?.nombre || 'Sin categoría',
+        edtId: catalogoServicio.categoriaId || null,
         unidadServicioNombre: unidadServicio?.nombre || 'Sin unidad',
         recursoNombre: recurso?.nombre || 'Sin recurso',
         formula: 'Escalonada', // Solo fórmula escalonada ahora
@@ -103,6 +103,9 @@ export async function POST(
         recursoId,
         orden: catalogoServicio.orden || 0,
         updatedAt: new Date(),
+      },
+      include: {
+        edt: true
       }
     })
 

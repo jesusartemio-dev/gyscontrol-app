@@ -10,6 +10,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import {
+  obtenerCalendarioLaboral,
+  obtenerCalendarioLaboralPorId,
+  calcularFechaFinConCalendario,
+  ajustarFechaADiaLaborable
+} from '@/lib/utils/calendarioLaboral'
 
 const generateSchema = z.object({
   generarFases: z.boolean().optional().default(true),
@@ -17,8 +23,70 @@ const generateSchema = z.object({
   generarActividades: z.boolean().optional().default(true),
   generarTareas: z.boolean().optional().default(true),
   fechaInicioProyecto: z.string().optional(),
-  cronogramaId: z.string().optional()
+  cronogramaId: z.string().optional(),
+  calendarioId: z.string().optional()
 })
+
+// Función auxiliar para parsear fecha a mediodía UTC (evita offset de timezone)
+function parseDateAtNoonUTC(dateString: string): Date {
+  const datePart = dateString.split('T')[0]
+  const [year, month, day] = datePart.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+}
+
+// Función auxiliar para obtener configuración de duraciones
+async function obtenerDuracionesConfig() {
+  try {
+    const duraciones = await prisma.plantillaDuracionCronograma.findMany({
+      where: { activo: true }
+    })
+
+    const config: { [key: string]: { duracionDias: number; horasPorDia: number; bufferPorcentaje: number } } = {}
+
+    duraciones.forEach(duracion => {
+      config[duracion.nivel] = {
+        duracionDias: duracion.duracionDias,
+        horasPorDia: duracion.horasPorDia,
+        bufferPorcentaje: duracion.bufferPorcentaje
+      }
+    })
+
+    return {
+      edt: config.edt || { duracionDias: 45, horasPorDia: 8, bufferPorcentaje: 10 },
+      actividad: config.actividad || { duracionDias: 7, horasPorDia: 8, bufferPorcentaje: 10 },
+      tarea: config.tarea || { duracionDias: 2, horasPorDia: 8, bufferPorcentaje: 10 },
+      horasPorDia: 8,
+      diasHabiles: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
+      bufferPorcentaje: 10
+    }
+  } catch (error) {
+    return {
+      edt: { duracionDias: 45, horasPorDia: 8, bufferPorcentaje: 10 },
+      actividad: { duracionDias: 7, horasPorDia: 8, bufferPorcentaje: 10 },
+      tarea: { duracionDias: 2, horasPorDia: 8, bufferPorcentaje: 10 },
+      horasPorDia: 8,
+      diasHabiles: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
+      bufferPorcentaje: 10
+    }
+  }
+}
+
+// Función auxiliar para obtener configuración de fases con duraciones
+async function obtenerFasesConfigConDuraciones() {
+  const fasesDefault = await prisma.faseDefault.findMany({
+    where: { activo: true },
+    orderBy: { orden: 'asc' }
+  })
+
+  return fasesDefault.map(fase => ({
+    id: fase.id,
+    nombre: fase.nombre,
+    descripcion: fase.descripcion,
+    orden: fase.orden,
+    duracionDias: fase.duracionDias,
+    color: fase.color
+  }))
+}
 
 export async function POST(
   request: NextRequest,
@@ -36,24 +104,25 @@ export async function POST(
     const body = await request.json()
     const validatedData = generateSchema.parse(body)
 
-    console.log('🚀 [GENERAR CRONOGRAMA] Iniciando generación para proyecto:', proyectoId)
-    console.log('📋 [GENERAR CRONOGRAMA] Opciones:', validatedData)
+    console.log('🚀 [GENERAR CRONOGRAMA PROYECTO] Iniciando para proyecto:', proyectoId)
+    console.log('📋 [GENERAR CRONOGRAMA PROYECTO] Opciones:', validatedData)
 
-    // Verificar que el proyecto existe
+    // Verificar que el proyecto existe con su cotización y servicios
     const proyecto = await prisma.proyecto.findUnique({
       where: { id: proyectoId },
       include: {
-        proyectoServicioCotizado: {
-          include: {
-            user: true
-          }
-        },
         cotizacion: {
           include: {
+            calendarioLaboral: {
+              include: {
+                diaCalendario: true,
+                excepcionCalendario: true
+              }
+            },
             cotizacionServicio: {
               include: {
                 cotizacionServicioItem: true,
-                cotizacionEdt: true
+                edt: true
               }
             }
           }
@@ -73,67 +142,127 @@ export async function POST(
       return NextResponse.json({ error: 'No tiene permisos para generar cronograma' }, { status: 403 })
     }
 
-    // Obtener o crear cronograma de ejecución
-    let cronograma = validatedData.cronogramaId
-      ? await prisma.proyectoCronograma.findUnique({ where: { id: validatedData.cronogramaId } })
-      : await prisma.proyectoCronograma.findFirst({
-          where: {
-            proyectoId,
-            tipo: 'ejecucion'
-          }
-        })
+    // ✅ Obtener el cronograma especificado o buscar uno existente
+    let cronograma = null
 
-    if (!cronograma) {
-      // Verificar si existe baseline para crear ejecución
-      const baseline = await prisma.proyectoCronograma.findFirst({
-        where: {
-          proyectoId,
-          esBaseline: true
-        }
+    if (validatedData.cronogramaId) {
+      cronograma = await prisma.proyectoCronograma.findUnique({
+        where: { id: validatedData.cronogramaId }
       })
 
-      if (!baseline) {
+      if (!cronograma) {
+        return NextResponse.json({ error: 'Cronograma no encontrado' }, { status: 404 })
+      }
+
+      if (cronograma.tipo === 'comercial') {
         return NextResponse.json({
-          error: 'Debe existir un cronograma de planificación (baseline) antes de generar uno de ejecución'
+          error: 'No se puede generar contenido en un cronograma comercial (solo lectura)'
         }, { status: 400 })
       }
 
-      // Crear cronograma de ejecución
-      cronograma = await prisma.proyectoCronograma.create({
-        data: {
-          id: crypto.randomUUID(),
-          proyectoId,
-          tipo: 'ejecucion',
-          nombre: 'Cronograma de Ejecución',
-          esBaseline: false,
-          version: 1,
-          updatedAt: new Date()
-        }
+      console.log(`✅ [GENERAR] Usando cronograma existente: ${cronograma.nombre} (${cronograma.tipo})`)
+    } else {
+      cronograma = await prisma.proyectoCronograma.findFirst({
+        where: { proyectoId, tipo: 'planificacion' }
       })
 
-      console.log('✅ [GENERAR CRONOGRAMA] Cronograma de ejecución creado:', cronograma.id)
+      if (!cronograma) {
+        cronograma = await prisma.proyectoCronograma.create({
+          data: {
+            id: crypto.randomUUID(),
+            proyectoId,
+            tipo: 'planificacion',
+            nombre: 'Línea Base',
+            esBaseline: true,
+            version: 1,
+            updatedAt: new Date()
+          }
+        })
+        console.log('✅ [GENERAR] Cronograma Línea Base creado:', cronograma.id)
+      }
     }
 
-    // Determinar fuente de datos: servicios del proyecto o cotización
-    const serviciosFuente = proyecto.proyectoServicioCotizado.length > 0
-      ? proyecto.proyectoServicioCotizado
-      : proyecto.cotizacion?.cotizacionServicio || []
+    // Obtener servicios de la cotización
+    const servicios = proyecto.cotizacion?.cotizacionServicio || []
 
-    if (serviciosFuente.length === 0) {
+    if (servicios.length === 0) {
       return NextResponse.json({
-        error: 'No hay servicios disponibles para generar el cronograma. Agregue servicios al proyecto o cotización primero.'
+        error: 'No hay servicios en la cotización del proyecto para generar el cronograma'
       }, { status: 400 })
     }
 
-    console.log(`📊 [GENERAR CRONOGRAMA] Servicios encontrados: ${serviciosFuente.length}`)
+    console.log(`📊 [GENERAR] Servicios encontrados: ${servicios.length}`)
+
+    // Obtener todas las categorías EDT con su fase por defecto
+    const categorias = await prisma.edt.findMany({
+      include: {
+        catalogoServicio: true,
+        faseDefault: true
+      }
+    })
+    const categoriasMap = new Map(categorias.map(cat => [cat.id, cat.nombre]))
+
+    // Crear mapa de nombres de EDTs por servicio
+    const categoriaNombresMap = new Map()
+    servicios.forEach(servicio => {
+      if (servicio.edtId && !categoriaNombresMap.has(servicio.edtId)) {
+        categoriaNombresMap.set(servicio.edtId, {
+          id: servicio.edtId,
+          nombre: servicio.edt?.nombre || categoriasMap.get(servicio.edtId) || 'Sin EDT'
+        })
+      }
+    })
+
+    // Obtener fecha de inicio
+    const fechaInicioProyecto = validatedData.fechaInicioProyecto
+      ? parseDateAtNoonUTC(validatedData.fechaInicioProyecto)
+      : proyecto.fechaInicio
+        ? parseDateAtNoonUTC(proyecto.fechaInicio.toISOString())
+        : new Date()
+
+    // Obtener configuraciones
+    const duracionesConfig = await obtenerDuracionesConfig()
+    const fasesConfigConDuraciones = await obtenerFasesConfigConDuraciones()
+
+    // Obtener calendario laboral
+    let calendarioLaboral = null
+
+    if (validatedData.calendarioId && validatedData.calendarioId !== 'default') {
+      calendarioLaboral = await obtenerCalendarioLaboralPorId(validatedData.calendarioId)
+    }
+
+    // Obtener calendario desde la cotización del proyecto
+    if (!calendarioLaboral && proyecto.cotizacion?.calendarioLaboral) {
+      calendarioLaboral = proyecto.cotizacion.calendarioLaboral
+    }
+
+    // Fallback a calendario por defecto
+    if (!calendarioLaboral) {
+      calendarioLaboral = await obtenerCalendarioLaboral('empresa', 'default')
+    }
+
+    if (!calendarioLaboral) {
+      return NextResponse.json({
+        error: 'No hay calendario laboral configurado para el proyecto.'
+      }, { status: 400 })
+    }
+
+    if (!calendarioLaboral.horasPorDia || calendarioLaboral.horasPorDia <= 0) {
+      calendarioLaboral.horasPorDia = 8
+    }
 
     // Generar estructura del cronograma
-    const result = await generarEstructuraCronograma({
+    const result = await generarCronogramaDesdeServicios({
       proyectoId,
       cronogramaId: cronograma.id,
-      servicios: serviciosFuente,
-      opciones: validatedData,
-      fechaInicio: validatedData.fechaInicioProyecto ? new Date(validatedData.fechaInicioProyecto) : new Date()
+      servicios,
+      duracionesConfig,
+      fasesConfigConDuraciones,
+      fechaInicioProyecto,
+      categoriaNombresMap,
+      categorias,
+      calendarioLaboral,
+      options: validatedData
     })
 
     return NextResponse.json({
@@ -161,19 +290,29 @@ export async function POST(
   }
 }
 
-// Función principal para generar estructura del cronograma
-async function generarEstructuraCronograma({
+// Función principal para generar cronograma
+async function generarCronogramaDesdeServicios({
   proyectoId,
   cronogramaId,
   servicios,
-  opciones,
-  fechaInicio
+  duracionesConfig,
+  fasesConfigConDuraciones,
+  fechaInicioProyecto,
+  categoriaNombresMap,
+  categorias,
+  calendarioLaboral,
+  options
 }: {
   proyectoId: string
   cronogramaId: string
   servicios: any[]
-  opciones: z.infer<typeof generateSchema>
-  fechaInicio: Date
+  duracionesConfig: any
+  fasesConfigConDuraciones: any[]
+  fechaInicioProyecto: Date
+  categoriaNombresMap: Map<string, any>
+  categorias: any[]
+  calendarioLaboral: any
+  options: any
 }) {
   const result = {
     fasesGeneradas: 0,
@@ -183,243 +322,328 @@ async function generarEstructuraCronograma({
     totalElements: 0
   }
 
-  console.log('🚀 [GENERAR] Iniciando generación de estructura')
+  console.log('🚀 [PROYECTO] INICIANDO GENERACIÓN CRONOGRAMA')
 
-  // 1. Crear fases por defecto si se solicita
-  const fasesCreadas: any[] = []
+  // 1. Preparar fases con fechas secuenciales
+  let fasesConfig: any[] = []
 
-  if (opciones.generarFases) {
-    const fasesDefault = [
-      { nombre: 'Ingeniería', descripcion: 'Fase de diseño e ingeniería', orden: 1 },
-      { nombre: 'Procura', descripcion: 'Fase de adquisición de materiales y equipos', orden: 2 },
-      { nombre: 'Construcción', descripcion: 'Fase de construcción y montaje', orden: 3 },
-      { nombre: 'Pruebas', descripcion: 'Fase de pruebas y puesta en marcha', orden: 4 }
-    ]
+  if (options.generarFases) {
+    console.log(`📋 [PROYECTO] GENERACIÓN FASES`)
+    let currentDate = ajustarFechaADiaLaborable(new Date(fechaInicioProyecto), calendarioLaboral)
 
-    let fechaFase = new Date(fechaInicio)
+    // Buscar fases existentes o crearlas desde configuración
+    const fasesExistentes = await prisma.proyectoFase.findMany({
+      where: { proyectoId, proyectoCronogramaId: cronogramaId },
+      orderBy: { orden: 'asc' }
+    })
 
-    for (const faseData of fasesDefault) {
-      // Verificar si ya existe la fase
-      const faseExistente = await prisma.proyectoFase.findFirst({
-        where: {
-          proyectoId,
-          proyectoCronogramaId: cronogramaId,
-          nombre: faseData.nombre
-        }
-      })
+    if (fasesExistentes.length === 0 && fasesConfigConDuraciones.length > 0) {
+      // Crear fases desde configuración
+      for (const faseDefault of fasesConfigConDuraciones) {
+        const duracionDias = faseDefault.duracionDias || 30
 
-      if (!faseExistente) {
-        const fechaFinFase = new Date(fechaFase)
-        fechaFinFase.setDate(fechaFinFase.getDate() + 30) // 30 días por fase
+        const fechaInicio = new Date(currentDate)
+        const fechaFin = calcularFechaFinConCalendario(fechaInicio, duracionDias * calendarioLaboral.horasPorDia, calendarioLaboral)
 
-        const fase = await prisma.proyectoFase.create({
+        await prisma.proyectoFase.create({
           data: {
             id: crypto.randomUUID(),
             proyectoId,
             proyectoCronogramaId: cronogramaId,
-            nombre: faseData.nombre,
-            descripcion: faseData.descripcion,
-            orden: faseData.orden,
+            nombre: faseDefault.nombre,
+            descripcion: faseDefault.descripcion,
+            orden: faseDefault.orden,
+            fechaInicioPlan: fechaInicio,
+            fechaFinPlan: fechaFin,
             estado: 'planificado',
-            fechaInicioPlan: fechaFase,
-            fechaFinPlan: fechaFinFase,
             updatedAt: new Date()
           }
         })
-        fasesCreadas.push(fase)
         result.fasesGeneradas++
-        console.log(`📅 [GENERAR] Fase creada: ${fase.nombre}`)
+        console.log(`📅 Fase creada: ${faseDefault.nombre} (${fechaInicio.toISOString().split('T')[0]} - ${fechaFin.toISOString().split('T')[0]})`)
 
-        fechaFase = new Date(fechaFinFase)
-        fechaFase.setDate(fechaFase.getDate() + 1) // Siguiente día
-      } else {
-        fasesCreadas.push(faseExistente)
-        console.log(`📅 [GENERAR] Fase existente: ${faseExistente.nombre}`)
+        currentDate = new Date(fechaFin)
+        currentDate.setDate(currentDate.getDate() + 1)
+        currentDate = ajustarFechaADiaLaborable(currentDate, calendarioLaboral)
+      }
+    }
+
+    fasesConfig = await prisma.proyectoFase.findMany({
+      where: { proyectoId, proyectoCronogramaId: cronogramaId },
+      orderBy: { orden: 'asc' }
+    })
+  }
+
+  // 2. Generar EDTs
+  if (options.generarEdts) {
+    console.log('🏗️ [PROYECTO] GENERACIÓN EDTS')
+
+    // Agrupar servicios por EDT
+    const serviciosPorCategoria = new Map()
+    servicios.forEach(servicio => {
+      const edtId = servicio.edtId || 'Sin EDT'
+      if (!serviciosPorCategoria.has(edtId)) {
+        serviciosPorCategoria.set(edtId, [])
+      }
+      serviciosPorCategoria.get(edtId).push(servicio)
+    })
+
+    // Crear mapa de EDTs por fase
+    const edtsPorFase = new Map<string, Array<{categoriaId: string, categoriaNombre: string, horasTotales: number, servicios: any[]}>>()
+
+    for (const [categoriaId, serviciosCategoria] of serviciosPorCategoria.entries()) {
+      const categoriaObj = categorias.find((cat: any) => cat.id === categoriaId)
+      const categoriaInfo = categoriaNombresMap.get(categoriaId)
+      const categoriaNombre = categoriaInfo?.nombre || categoriaId
+
+      const horasTotales = serviciosCategoria.reduce((sum: number, servicio: any) =>
+        sum + servicio.cotizacionServicioItem.reduce((itemSum: number, item: any) => itemSum + (item.horaTotal || 0), 0), 0
+      )
+
+      let faseAsignadaId: string | null = null
+
+      if (categoriaObj?.faseDefault) {
+        const faseCronograma = fasesConfig.find(f =>
+          f.nombre.toLowerCase() === categoriaObj.faseDefault.nombre.toLowerCase()
+        )
+        if (faseCronograma) {
+          faseAsignadaId = faseCronograma.id
+          console.log(`🎯 EDT "${categoriaNombre}" asignado a fase "${faseCronograma.nombre}"`)
+        }
+      }
+
+      if (!faseAsignadaId && fasesConfig.length > 0) {
+        faseAsignadaId = fasesConfig[0].id
+      }
+
+      if (faseAsignadaId) {
+        if (!edtsPorFase.has(faseAsignadaId)) {
+          edtsPorFase.set(faseAsignadaId, [])
+        }
+        edtsPorFase.get(faseAsignadaId)!.push({
+          categoriaId,
+          categoriaNombre,
+          horasTotales,
+          servicios: serviciosCategoria
+        })
+      }
+    }
+
+    // Generar EDTs por fase
+    for (const fase of fasesConfig) {
+      const edtsDeFase = edtsPorFase.get(fase.id) || []
+      if (edtsDeFase.length === 0) continue
+
+      console.log(`🏗️ Generando ${edtsDeFase.length} EDTs para fase: ${fase.nombre}`)
+
+      const faseInicio = new Date(fase.fechaInicioPlan)
+      let currentEdtStart = ajustarFechaADiaLaborable(new Date(faseInicio), calendarioLaboral)
+
+      for (const edtInfo of edtsDeFase) {
+        const duracionDias = edtInfo.horasTotales > 0
+          ? Math.ceil(edtInfo.horasTotales / calendarioLaboral.horasPorDia)
+          : duracionesConfig.edt.duracionDias
+
+        const fechaInicioEdt = new Date(currentEdtStart)
+        const fechaFinEdt = calcularFechaFinConCalendario(fechaInicioEdt, duracionDias * calendarioLaboral.horasPorDia, calendarioLaboral)
+
+        const existingEdt = await prisma.proyectoEdt.findFirst({
+          where: { proyectoId, proyectoCronogramaId: cronogramaId, nombre: edtInfo.categoriaNombre }
+        })
+
+        let edtId: string
+
+        if (existingEdt) {
+          await prisma.proyectoEdt.update({
+            where: { id: existingEdt.id },
+            data: {
+              proyectoFaseId: fase.id,
+              horasPlan: edtInfo.horasTotales,
+              fechaInicioPlan: fechaInicioEdt,
+              fechaFinPlan: fechaFinEdt
+            }
+          })
+          edtId = existingEdt.id
+          console.log(`📅 EDT actualizado: ${edtInfo.categoriaNombre}`)
+        } else {
+          const newEdt = await prisma.proyectoEdt.create({
+            data: {
+              id: crypto.randomUUID(),
+              proyectoId,
+              proyectoCronogramaId: cronogramaId,
+              proyectoFaseId: fase.id,
+              nombre: edtInfo.categoriaNombre,
+              edtId: edtInfo.categoriaId,
+              descripcion: `EDT generado automáticamente`,
+              horasPlan: edtInfo.horasTotales,
+              fechaInicioPlan: fechaInicioEdt,
+              fechaFinPlan: fechaFinEdt,
+              estado: 'planificado',
+              updatedAt: new Date()
+            }
+          })
+          edtId = newEdt.id
+          result.edtsGenerados++
+          console.log(`📅 EDT creado: ${edtInfo.categoriaNombre} (${fechaInicioEdt.toISOString().split('T')[0]} - ${fechaFinEdt.toISOString().split('T')[0]}) - ${edtInfo.horasTotales}h`)
+        }
+
+        // 3. Generar Actividades para este EDT
+        if (options.generarActividades) {
+          let currentActividadStart = new Date(fechaInicioEdt)
+
+          for (const servicio of edtInfo.servicios) {
+            const horasServicio = servicio.cotizacionServicioItem.reduce((sum: number, item: any) => sum + (item.horaTotal || 0), 0)
+
+            const duracionDiasAct = horasServicio > 0
+              ? Math.ceil(horasServicio / calendarioLaboral.horasPorDia)
+              : duracionesConfig.actividad.duracionDias
+
+            const fechaInicioActividad = new Date(currentActividadStart)
+            const fechaFinActividad = calcularFechaFinConCalendario(fechaInicioActividad, duracionDiasAct * calendarioLaboral.horasPorDia, calendarioLaboral)
+
+            const existingActividad = await prisma.proyectoActividad.findFirst({
+              where: { proyectoEdtId: edtId, nombre: servicio.nombre }
+            })
+
+            let actividadId: string
+
+            if (existingActividad) {
+              await prisma.proyectoActividad.update({
+                where: { id: existingActividad.id },
+                data: {
+                  horasPlan: horasServicio,
+                  fechaInicioPlan: fechaInicioActividad,
+                  fechaFinPlan: fechaFinActividad
+                }
+              })
+              actividadId = existingActividad.id
+              console.log(`📅 Actividad actualizada: ${servicio.nombre}`)
+            } else {
+              const newActividad = await prisma.proyectoActividad.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  proyectoEdtId: edtId,
+                  proyectoCronogramaId: cronogramaId,
+                  nombre: servicio.nombre,
+                  descripcion: `Actividad generada desde servicio ${servicio.nombre}`,
+                  horasPlan: horasServicio,
+                  fechaInicioPlan: fechaInicioActividad,
+                  fechaFinPlan: fechaFinActividad,
+                  estado: 'pendiente',
+                  prioridad: 'media',
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                }
+              })
+              actividadId = newActividad.id
+              result.actividadesGeneradas++
+              console.log(`📅 Actividad creada: ${servicio.nombre} (${fechaInicioActividad.toISOString().split('T')[0]} - ${fechaFinActividad.toISOString().split('T')[0]}) - ${horasServicio}h`)
+            }
+
+            // 4. Generar Tareas para esta Actividad
+            if (options.generarTareas && servicio.cotizacionServicioItem.length > 0) {
+              // Eliminar tareas existentes para regenerar
+              await prisma.proyectoTarea.deleteMany({
+                where: { proyectoActividadId: actividadId }
+              })
+
+              let currentTareaStart = new Date(fechaInicioActividad)
+
+              const itemsOrdenados = servicio.cotizacionServicioItem.sort((a: any, b: any) => (a.orden ?? 0) - (b.orden ?? 0))
+
+              for (const item of itemsOrdenados) {
+                const duracionDiasTarea = item.horaTotal > 0
+                  ? Math.ceil(item.horaTotal / calendarioLaboral.horasPorDia)
+                  : duracionesConfig.tarea.duracionDias
+
+                const fechaInicioTarea = new Date(currentTareaStart)
+                const fechaFinTarea = calcularFechaFinConCalendario(fechaInicioTarea, duracionDiasTarea * calendarioLaboral.horasPorDia, calendarioLaboral)
+
+                await prisma.proyectoTarea.create({
+                  data: {
+                    id: crypto.randomUUID(),
+                    proyectoEdtId: edtId,
+                    proyectoActividadId: actividadId,
+                    proyectoCronogramaId: cronogramaId,
+                    nombre: item.nombre,
+                    descripcion: item.descripcion || `Tarea generada desde item ${item.nombre}`,
+                    fechaInicio: fechaInicioTarea,
+                    fechaFin: fechaFinTarea,
+                    horasEstimadas: item.horaTotal,
+                    estado: 'pendiente',
+                    prioridad: 'media',
+                    updatedAt: new Date()
+                  }
+                })
+                result.tareasGeneradas++
+                console.log(`📅 Tarea creada: ${item.nombre} (${fechaInicioTarea.toISOString().split('T')[0]} - ${fechaFinTarea.toISOString().split('T')[0]}) - ${item.horaTotal}h`)
+
+                currentTareaStart = new Date(fechaFinTarea)
+              }
+            }
+
+            currentActividadStart = new Date(fechaFinActividad)
+          }
+        }
+
+        currentEdtStart = new Date(fechaFinEdt)
+        currentEdtStart.setDate(currentEdtStart.getDate() + 1)
+        currentEdtStart = ajustarFechaADiaLaborable(currentEdtStart, calendarioLaboral)
       }
     }
   }
 
-  // 2. Agrupar servicios por EDT/categoría
-  if (opciones.generarEdts) {
-    // 2.1 Extraer todos los IDs de EDT únicos de los servicios
-    const edtIdsUnicos = new Set<string>()
-    for (const servicio of servicios) {
-      const edtId = servicio.edtId || servicio.categoria || (servicio.cotizacionEdt?.edtId)
-      if (edtId) {
-        edtIdsUnicos.add(edtId)
+  // 5. Roll-up final: Actualizar fechas de padres basado en hijos
+  console.log('🔄 [PROYECTO] ROLL-UP FINAL')
+
+  // Roll-up EDTs por actividades
+  const allEdts = await prisma.proyectoEdt.findMany({
+    where: { proyectoId, proyectoCronogramaId: cronogramaId },
+    include: { proyectoActividad: true }
+  })
+
+  for (const edt of allEdts) {
+    if (edt.proyectoActividad.length > 0) {
+      const fechasActividades = edt.proyectoActividad
+        .map(act => act.fechaFinPlan)
+        .filter(f => f) as Date[]
+
+      if (fechasActividades.length > 0) {
+        const maxFechaFin = new Date(Math.max(...fechasActividades.map(f => f.getTime())))
+        const edtFechaFinActual = edt.fechaFinPlan ? new Date(edt.fechaFinPlan) : new Date()
+
+        if (maxFechaFin > edtFechaFinActual) {
+          await prisma.proyectoEdt.update({
+            where: { id: edt.id },
+            data: { fechaFinPlan: maxFechaFin }
+          })
+          console.log(`📅 EDT extendido: ${edt.nombre} -> ${maxFechaFin.toISOString().split('T')[0]}`)
+        }
       }
     }
+  }
 
-    // 2.2 Obtener nombres de EDT desde el catálogo
-    const edtsCatalogo = await prisma.edt.findMany({
-      where: {
-        id: { in: Array.from(edtIdsUnicos) }
-      },
-      select: {
-        id: true,
-        nombre: true,
-        descripcion: true
-      }
+  // Roll-up fases por EDTs
+  for (const fase of fasesConfig) {
+    const edtsDeFase = await prisma.proyectoEdt.findMany({
+      where: { proyectoFaseId: fase.id }
     })
 
-    // Crear mapa de ID -> nombre del catálogo
-    const edtNombresMap = new Map<string, string>()
-    for (const edt of edtsCatalogo) {
-      edtNombresMap.set(edt.id, edt.nombre)
-    }
+    if (edtsDeFase.length > 0) {
+      const fechasEdts = edtsDeFase
+        .map(edt => edt.fechaFinPlan)
+        .filter(f => f) as Date[]
 
-    console.log(`📊 [GENERAR] EDTs encontrados en catálogo: ${edtsCatalogo.length}`)
-    edtsCatalogo.forEach(e => console.log(`   - ${e.id}: ${e.nombre}`))
+      if (fechasEdts.length > 0) {
+        const maxFechaFin = new Date(Math.max(...fechasEdts.map(f => f.getTime())))
+        const faseFechaFinActual = fase.fechaFinPlan ? new Date(fase.fechaFinPlan) : new Date()
 
-    // 2.3 Agrupar servicios por EDT
-    const serviciosPorEdt = new Map<string, { edtId: string, edtNombre: string, servicios: any[] }>()
-
-    for (const servicio of servicios) {
-      // Obtener EDT del servicio
-      const edtId = servicio.edtId || servicio.categoria || (servicio.cotizacionEdt?.edtId) || 'sin-categoria'
-      // ✅ Obtener nombre SIEMPRE del catálogo EDT, NO del servicio
-      const edtNombre = edtNombresMap.get(edtId) || `EDT ${edtId}`
-
-      if (!serviciosPorEdt.has(edtId)) {
-        serviciosPorEdt.set(edtId, { edtId, edtNombre, servicios: [] })
-      }
-      serviciosPorEdt.get(edtId)!.servicios.push(servicio)
-    }
-
-    console.log(`📊 [GENERAR] EDTs a generar: ${serviciosPorEdt.size}`)
-
-    // Asignar EDTs a fases de forma balanceada
-    const fasesDisponibles = fasesCreadas.length > 0 ? fasesCreadas : [null]
-    let faseIndex = 0
-
-    for (const [edtId, edtData] of serviciosPorEdt.entries()) {
-      // Verificar si el EDT ya existe
-      const edtExistente = await prisma.proyectoEdt.findFirst({
-        where: {
-          proyectoId,
-          proyectoCronogramaId: cronogramaId,
-          edtId: edtId
-        }
-      })
-
-      let edt = edtExistente
-
-      if (!edtExistente) {
-        // Calcular horas totales de los servicios
-        const horasTotales = edtData.servicios.reduce((sum: number, s: any) => {
-          const items = s.cotizacionServicioItem || s.items || []
-          return sum + items.reduce((itemSum: number, item: any) => itemSum + (item.horaTotal || item.horas || 0), 0)
-        }, 0)
-
-        const faseAsignada = fasesDisponibles[faseIndex % fasesDisponibles.length]
-        faseIndex++
-
-        const fechaInicioEdt = faseAsignada?.fechaInicioPlan || fechaInicio
-        const diasEstimados = Math.max(7, Math.ceil(horasTotales / 8))
-        const fechaFinEdt = new Date(fechaInicioEdt)
-        fechaFinEdt.setDate(fechaFinEdt.getDate() + diasEstimados)
-
-        edt = await prisma.proyectoEdt.create({
-          data: {
-            id: crypto.randomUUID(),
-            proyectoId,
-            proyectoCronogramaId: cronogramaId,
-            proyectoFaseId: faseAsignada?.id || null,
-            nombre: edtData.edtNombre,
-            edtId: edtId,
-            fechaInicioPlan: fechaInicioEdt,
-            fechaFinPlan: fechaFinEdt,
-            horasPlan: horasTotales,
-            estado: 'planificado',
-            descripcion: `EDT generado automáticamente`,
-            updatedAt: new Date()
-          }
-        })
-
-        result.edtsGenerados++
-        console.log(`🏗️ [GENERAR] EDT creado: ${edt.nombre} (${horasTotales}h)`)
-      } else {
-        console.log(`🏗️ [GENERAR] EDT existente: ${edtExistente.nombre}`)
-      }
-
-      // 3. Crear actividades desde servicios
-      if (opciones.generarActividades && edt) {
-        for (const servicio of edtData.servicios) {
-          const items = servicio.cotizacionServicioItem || servicio.items || []
-          const horasServicio = items.reduce((sum: number, item: any) => sum + (item.horaTotal || item.horas || 0), 0)
-
-          // Verificar si la actividad ya existe
-          const actividadExistente = await prisma.proyectoActividad.findFirst({
-            where: {
-              proyectoEdtId: edt.id,
-              nombre: servicio.nombre || servicio.descripcion || 'Servicio'
-            }
+        if (maxFechaFin > faseFechaFinActual) {
+          await prisma.proyectoFase.update({
+            where: { id: fase.id },
+            data: { fechaFinPlan: maxFechaFin }
           })
-
-          if (!actividadExistente) {
-            const fechaInicioAct = edt.fechaInicioPlan || fechaInicio
-            const diasAct = Math.max(1, Math.ceil(horasServicio / 8))
-            const fechaFinAct = new Date(fechaInicioAct)
-            fechaFinAct.setDate(fechaFinAct.getDate() + diasAct)
-
-            const actividad = await prisma.proyectoActividad.create({
-              data: {
-                id: crypto.randomUUID(),
-                proyectoEdtId: edt.id,
-                proyectoCronogramaId: cronogramaId,
-                nombre: servicio.nombre || servicio.descripcion || 'Servicio',
-                descripcion: `Actividad generada desde servicio`,
-                fechaInicioPlan: fechaInicioAct,
-                fechaFinPlan: fechaFinAct,
-                horasPlan: horasServicio,
-                estado: 'pendiente',
-                prioridad: 'media',
-                createdAt: new Date(),
-                updatedAt: new Date()
-              }
-            })
-
-            result.actividadesGeneradas++
-            console.log(`⚙️ [GENERAR] Actividad creada: ${actividad.nombre}`)
-
-            // 4. Crear tareas desde items del servicio
-            if (opciones.generarTareas && items.length > 0) {
-              for (const item of items) {
-                const tareaExistente = await prisma.proyectoTarea.findFirst({
-                  where: {
-                    proyectoActividadId: actividad.id,
-                    nombre: item.nombre || item.descripcion || 'Item'
-                  }
-                })
-
-                if (!tareaExistente) {
-                  const horasItem = item.horaTotal || item.horas || 0
-                  const diasItem = Math.max(1, Math.ceil(horasItem / 8))
-                  const fechaFinItem = new Date(fechaInicioAct)
-                  fechaFinItem.setDate(fechaFinItem.getDate() + diasItem)
-
-                  await prisma.proyectoTarea.create({
-                    data: {
-                      id: crypto.randomUUID(),
-                      proyectoEdtId: edt.id,
-                      proyectoActividadId: actividad.id,
-                      proyectoCronogramaId: cronogramaId,
-                      nombre: item.nombre || item.descripcion || 'Item',
-                      descripcion: item.descripcion || `Tarea generada`,
-                      fechaInicio: fechaInicioAct,
-                      fechaFin: fechaFinItem,
-                      horasEstimadas: horasItem,
-                      estado: 'pendiente',
-                      prioridad: 'media',
-                      updatedAt: new Date()
-                    }
-                  })
-
-                  result.tareasGeneradas++
-                }
-              }
-            }
-          }
+          console.log(`📅 Fase extendida: ${fase.nombre} -> ${maxFechaFin.toISOString().split('T')[0]}`)
         }
       }
     }
@@ -427,7 +651,7 @@ async function generarEstructuraCronograma({
 
   result.totalElements = result.fasesGeneradas + result.edtsGenerados + result.actividadesGeneradas + result.tareasGeneradas
 
-  console.log('✅ [GENERAR] Generación completada:', result)
+  console.log('✅ [PROYECTO] Generación completada:', result)
 
   return result
 }

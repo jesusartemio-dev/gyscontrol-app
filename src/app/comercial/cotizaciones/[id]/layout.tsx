@@ -1,0 +1,440 @@
+'use client'
+
+import { useEffect, useState, createContext, useContext } from 'react'
+import { useParams, useRouter, usePathname } from 'next/navigation'
+import { motion } from 'framer-motion'
+import {
+  Building,
+  User,
+  Target,
+  Eye,
+  AlertCircle,
+  ArrowLeft,
+  PanelRightClose,
+  PanelRightOpen
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { getCotizacionById } from '@/lib/services/cotizacion'
+
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+
+import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
+import CrearOportunidadDesdeCotizacion from '@/components/crm/CrearOportunidadDesdeCotizacion'
+import CrmIntegrationNotification from '@/components/crm/CrmIntegrationNotification'
+import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
+import EstadoCotizacionStepper from '@/components/cotizaciones/EstadoCotizacionStepper'
+import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
+
+import type { Cotizacion, EstadoCotizacion } from '@/types'
+
+// Context para compartir datos de cotizacion con sub-páginas
+interface CotizacionContextType {
+  cotizacion: Cotizacion | null
+  setCotizacion: (cotizacion: Cotizacion) => void
+  refreshCotizacion: () => Promise<void>
+  loading: boolean
+}
+
+const CotizacionContext = createContext<CotizacionContextType | null>(null)
+
+export function useCotizacionContext() {
+  const context = useContext(CotizacionContext)
+  if (!context) {
+    throw new Error('useCotizacionContext must be used within CotizacionLayout')
+  }
+  return context
+}
+
+// Utility functions
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
+
+interface CotizacionLayoutProps {
+  children: React.ReactNode
+}
+
+export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
+  const { id } = useParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [showCrearOportunidad, setShowCrearOportunidad] = useState(false)
+  const [showCrmNotification, setShowCrmNotification] = useState(false)
+
+  // Determinar si estamos en el hub o en una sub-página
+  const isHubPage = pathname === `/comercial/cotizaciones/${id}`
+
+  // Páginas que necesitan ancho completo (sin sidebar)
+  const fullWidthPages = ['cronograma', 'preview']
+  const currentPageSegment = pathname.split('/').pop() || ''
+  const needsFullWidth = fullWidthPages.includes(currentPageSegment)
+
+  // Estado para mostrar/ocultar sidebar en páginas full-width
+  const [showSidebar, setShowSidebar] = useState(!needsFullWidth)
+
+  // Actualizar visibilidad del sidebar cuando cambia la página
+  useEffect(() => {
+    setShowSidebar(!needsFullWidth)
+  }, [needsFullWidth])
+
+  // Obtener nombre de la sub-página actual
+  const getSubPageName = () => {
+    if (isHubPage) return null
+    const segments = pathname.split('/')
+    const lastSegment = segments[segments.length - 1]
+    const subPageNames: Record<string, string> = {
+      'equipos': 'Equipos',
+      'servicios': 'Servicios',
+      'gastos': 'Gastos',
+      'cronograma': 'Cronograma',
+      'configuracion': 'Configuración',
+      'preview': 'Vista Previa',
+      'vista': 'Vista'
+    }
+    return subPageNames[lastSegment] || lastSegment
+  }
+  const currentSubPage = getSubPageName()
+
+  const refreshCotizacion = async () => {
+    if (typeof id === 'string') {
+      try {
+        const data = await getCotizacionById(id)
+        setCotizacion(data)
+      } catch {
+        toast.error('Error al actualizar cotización')
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (typeof id === 'string') {
+      setLoading(true)
+      getCotizacionById(id)
+        .then(setCotizacion)
+        .catch(() => setError('Error al cargar cotización.'))
+        .finally(() => setLoading(false))
+    }
+  }, [id])
+
+  // Mostrar notificación CRM cuando la cotización está aprobada y no tiene oportunidad
+  useEffect(() => {
+    if (cotizacion && cotizacion.estado === 'aprobada' && !cotizacion.oportunidadCrm) {
+      const timer = setTimeout(() => setShowCrmNotification(true), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [cotizacion])
+
+  const handleDataUpdate = (updatedCotizacion: Cotizacion) => {
+    setCotizacion(updatedCotizacion)
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="container mx-auto p-4 sm:p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-8 w-48" />
+            </div>
+            <div className="flex flex-col xl:flex-row gap-4">
+              <div className="flex-1">
+                <Skeleton className="h-[600px] w-full rounded-lg" />
+              </div>
+              <div className="xl:w-80">
+                <Skeleton className="h-64 w-full rounded-lg" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <Card className="border-destructive max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+            <h2 className="text-xl font-semibold text-destructive mb-2">Error al cargar cotización</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()} variant="outline">
+              Intentar nuevamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!cotizacion) return null
+
+  const puedeRenderizarPDF =
+    cotizacion.cliente &&
+    Array.isArray(cotizacion.equipos) &&
+    cotizacion.equipos.every(e => Array.isArray(e.items)) &&
+    Array.isArray(cotizacion.servicios) &&
+    cotizacion.servicios.every(s => Array.isArray(s.items)) &&
+    Array.isArray(cotizacion.gastos) &&
+    cotizacion.gastos.every(g => Array.isArray(g.items))
+
+  return (
+    <CotizacionContext.Provider value={{ cotizacion, setCotizacion: handleDataUpdate, refreshCotizacion, loading }}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="container mx-auto p-4 sm:p-6">
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="mb-4"
+          >
+            {/* Breadcrumb + Info Principal */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2 flex-wrap text-sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push('/comercial/cotizaciones')}
+                  className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Cotizaciones
+                </Button>
+                <span className="text-muted-foreground">/</span>
+                {currentSubPage ? (
+                  // En sub-página: mostrar jerarquía completa clickeable
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push(`/comercial/cotizaciones/${id}`)}
+                      className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      <span className="font-mono">{cotizacion.codigo || 'Sin código'}</span>
+                      <span className="mx-1">:</span>
+                      <span className="truncate max-w-[150px]">{cotizacion.nombre}</span>
+                    </Button>
+                    <span className="text-muted-foreground">/</span>
+                    <span className="font-medium text-foreground">{currentSubPage}</span>
+                  </>
+                ) : (
+                  // En hub: mostrar código + nombre de cotización (no clickeable, es la página actual)
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono bg-muted px-2 py-0.5 rounded border">
+                      {cotizacion.codigo || 'Sin código'}
+                    </span>
+                    <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate max-w-[300px]">
+                      {cotizacion.nombre}
+                    </h1>
+                  </div>
+                )}
+              </div>
+
+              {/* Acciones Principales */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {puedeRenderizarPDF && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/comercial/cotizaciones/${id}/preview`)}
+                      className="h-8"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Vista Previa</span>
+                    </Button>
+                    <DescargarPDFButton cotizacion={cotizacion} />
+                  </>
+                )}
+                {cotizacion.oportunidadCrm ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/crm/${cotizacion.oportunidadCrm?.id}`)}
+                    className="h-8 text-green-700 border-green-300 hover:bg-green-50"
+                  >
+                    <Target className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">Oportunidad</span>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCrearOportunidad(true)}
+                    className="h-8 text-blue-700 border-blue-300 hover:bg-blue-50"
+                  >
+                    <Target className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">+ CRM</span>
+                  </Button>
+                )}
+                {cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada') && (
+                  <CrearProyectoDesdeCotizacionModal
+                    cotizacion={cotizacion}
+                    buttonVariant="outline"
+                    buttonSize="sm"
+                    buttonClassName="h-8 text-purple-700 border-purple-300 hover:bg-purple-50"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Status Flow + Metadata */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              {/* Estado Stepper - Visual Flow */}
+              <EstadoCotizacionStepper
+                cotizacion={cotizacion}
+                onUpdated={(nuevoEstado) =>
+                  handleDataUpdate({ ...cotizacion, estado: nuevoEstado as EstadoCotizacion })
+                }
+              />
+
+              <span className="hidden sm:block text-muted-foreground">|</span>
+
+              {/* Metadata compacta */}
+              <div className="flex items-center gap-2 flex-wrap text-sm">
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Building className="h-3.5 w-3.5" />
+                  {cotizacion.cliente?.nombre || 'Sin cliente'}
+                </span>
+                <span className="text-muted-foreground">|</span>
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <User className="h-3.5 w-3.5" />
+                  {cotizacion.comercial?.nombre || 'Sin comercial'}
+                </span>
+                <span className="text-muted-foreground">|</span>
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(cotizacion.grandTotal || 0)}
+                </span>
+                {cotizacion.oportunidadCrm && (
+                  <>
+                    <span className="text-muted-foreground">|</span>
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-green-50 text-green-700 border-green-200 cursor-pointer hover:bg-green-100"
+                      onClick={() => router.push(`/crm/${cotizacion.oportunidadCrm?.id}`)}
+                    >
+                      <Target className="h-3 w-3 mr-1" />
+                      {cotizacion.oportunidadCrm.nombre}
+                    </Badge>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Layout de 2 Columnas (o 1 columna en páginas full-width) */}
+          <div className="flex flex-col xl:flex-row gap-4">
+            {/* Columna Principal - Children */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="flex-1 min-w-0"
+            >
+              {children}
+            </motion.div>
+
+            {/* Sidebar - Resumen Financiero y Estado */}
+            {showSidebar && (
+              <motion.aside
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="xl:w-80 xl:flex-shrink-0"
+              >
+                <div className="xl:sticky xl:top-4 space-y-4">
+                  {/* Botón para ocultar sidebar en páginas full-width */}
+                  {needsFullWidth && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSidebar(false)}
+                      className="w-full text-muted-foreground hover:text-foreground"
+                    >
+                      <PanelRightClose className="h-4 w-4 mr-2" />
+                      Ocultar panel
+                    </Button>
+                  )}
+
+                  {/* Resumen Financiero */}
+                  <ResumenTotalesCotizacion cotizacion={cotizacion} />
+
+                  {/* Botón volver al hub si estamos en sub-página */}
+                  {!isHubPage && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push(`/comercial/cotizaciones/${id}`)}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Volver al Resumen
+                    </Button>
+                  )}
+                </div>
+              </motion.aside>
+            )}
+
+            {/* Botón flotante para mostrar sidebar cuando está oculto */}
+            {!showSidebar && needsFullWidth && (
+              <div className="fixed bottom-4 right-4 z-50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSidebar(true)}
+                  className="shadow-lg bg-white hover:bg-gray-50"
+                >
+                  <PanelRightOpen className="h-4 w-4 mr-2" />
+                  Resumen
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Modal para crear oportunidad desde cotización */}
+          <CrearOportunidadDesdeCotizacion
+            cotizacionId={cotizacion.id}
+            cotizacionNombre={cotizacion.nombre}
+            cotizacionCodigo={cotizacion.codigo || 'Sin código'}
+            clienteNombre={cotizacion.cliente?.nombre || 'Cliente no especificado'}
+            valorCotizacion={cotizacion.grandTotal || 0}
+            isOpen={showCrearOportunidad}
+            onClose={() => setShowCrearOportunidad(false)}
+            onSuccess={(oportunidad) => {
+              router.push(`/crm/${oportunidad.id}`)
+            }}
+          />
+
+          {/* Notificación de integración CRM */}
+          {showCrmNotification && (
+            <CrmIntegrationNotification
+              entityType="cotizacion"
+              entityId={cotizacion.id}
+              entityNombre={cotizacion.nombre}
+              clienteNombre={cotizacion.cliente?.nombre || 'Cliente no especificado'}
+              valor={cotizacion.grandTotal || 0}
+              onCreateOportunidad={() => {
+                setShowCrmNotification(false)
+                refreshCotizacion()
+              }}
+              onDismiss={() => setShowCrmNotification(false)}
+            />
+          )}
+        </div>
+      </div>
+    </CotizacionContext.Provider>
+  )
+}

@@ -79,7 +79,8 @@ export async function GET(request: NextRequest) {
         where: { proyectoId },
         select: {
           id: true,
-          categoria: true,
+          edtId: true,
+          edt: { select: { id: true, nombre: true } },
           user: {
             select: { name: true }
           }
@@ -88,8 +89,8 @@ export async function GET(request: NextRequest) {
 
       console.log('🔍 EDTS SIMPLE: Servicios del proyecto:', proyectoServicios.length);
 
-      // Crear EDTs basados en las categorías de servicios (campo categoria directo)
-      const categoriasEdt = [...new Set(proyectoServicios.map(s => s.categoria).filter(Boolean))];
+      // Crear EDTs basados en los EDTs de servicios
+      const categoriasEdt = [...new Set(proyectoServicios.map(s => s.edtId).filter(Boolean))];
 
       // Obtener nombres de los EDTs desde la tabla Edt
       const edtsInfo = await Promise.all(
@@ -107,7 +108,7 @@ export async function GET(request: NextRequest) {
         nombre: nombre, // ✅ Usar el nombre real del EDT
         edtId: categoriaId,
         edt: null, // No hay relación a catálogo Edt en este caso
-        user: proyectoServicios.find(s => s.categoria === categoriaId)?.user || { name: 'Sin responsable' },
+        user: proyectoServicios.find(s => s.edtId === categoriaId)?.user || { name: 'Sin responsable' },
         horasPlan: 0,
         horasReales: 0,
         estado: 'planificado',

@@ -133,9 +133,12 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
             proyectoEquipoItemId: item.id,
             codigo: item.codigo, // ✅ Usar código original del catálogo
             descripcion: item.descripcion,
+            marca: item.marca || '', // ✅ Copiar marca
+            categoria: item.categoria || '', // ✅ Copiar categoria
             unidad: item.unidad || 'UND',
             cantidad: item.cantidad,
             cantidadPedida: 0,
+            presupuesto: item.precioCliente || 0, // ✅ Copiar presupuesto
             estado: 'borrador',
             origen: 'cotizado' as const,
             responsableId: session.user.id,

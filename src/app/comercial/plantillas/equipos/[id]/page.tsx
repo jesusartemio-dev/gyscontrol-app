@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import PlantillaEquipoIndependienteMultiAddModal from '@/components/plantillas/equipos/PlantillaEquipoIndependienteMultiAddModal'
 import PlantillaEquiposView from '@/components/plantillas/equipos/PlantillaEquiposView'
@@ -14,17 +14,15 @@ import { useEquipmentPermissions } from '@/hooks/usePermissions'
 
 import {
   Plus,
-  ChevronRight,
-  Share2,
-  Download,
   AlertCircle,
-  Loader2,
-  Wrench,
-  DollarSign,
-  Edit
+  Package,
+  Edit,
+  ArrowLeft,
+  Download,
+  TrendingUp
 } from 'lucide-react'
 
-// Types for independent equipment templates
+// Types
 interface PlantillaEquipoIndependiente {
   id: string
   nombre: string
@@ -65,23 +63,6 @@ interface PlantillaEquipoItemIndependiente {
   }
 }
 
-
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-}
-
 // Format currency helper
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('es-PE', {
@@ -91,6 +72,33 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
+// Loading skeleton
+function LoadingSkeleton() {
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-4" />
+        <Skeleton className="h-4 w-24" />
+      </div>
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-8 w-32" />
+      </div>
+      <Skeleton className="h-10 w-full" />
+      <div className="border rounded-lg">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex gap-4 p-3 border-b last:border-0">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function PlantillaEquiposIndependientePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -101,8 +109,7 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
   const [showMultiAddModal, setShowMultiAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
 
-  // Check permissions for editing
-  const { canEdit, loading: permissionsLoading } = useEquipmentPermissions()
+  const { canEdit } = useEquipmentPermissions()
 
   useEffect(() => {
     const unwrapParams = async () => {
@@ -113,9 +120,7 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
   }, [params])
 
   useEffect(() => {
-    if (id) {
-      loadPlantilla()
-    }
+    if (id) loadPlantilla()
   }, [id])
 
   const loadPlantilla = async () => {
@@ -133,12 +138,23 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
     }
   }
 
+  // Stats memoized
+  const stats = useMemo(() => {
+    if (!plantilla) return { items: 0, totalInterno: 0, totalCliente: 0, margen: 0, margenPct: 0 }
+    const items = plantilla.plantillaEquipoItemIndependiente?.length || 0
+    const margen = plantilla.totalCliente - plantilla.totalInterno
+    const margenPct = plantilla.totalInterno > 0 ? (margen / plantilla.totalInterno) * 100 : 0
+    return {
+      items,
+      totalInterno: plantilla.totalInterno,
+      totalCliente: plantilla.totalCliente,
+      margen,
+      margenPct
+    }
+  }, [plantilla])
 
-
-  // ✅ Handle multiple items creation
   const handleMultipleItemsCreated = (items: PlantillaEquipoItemIndependiente[]) => {
     items.forEach(item => {
-      // Update the plantilla state to include new items
       setPlantilla(prev => prev ? {
         ...prev,
         plantillaEquipoItemIndependiente: [...(prev.plantillaEquipoItemIndependiente || []), item],
@@ -150,205 +166,133 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
     setShowMultiAddModal(false)
   }
 
-  // Handle plantilla update
   const handlePlantillaUpdated = (updatedPlantilla: PlantillaEquipoIndependiente) => {
     setPlantilla(updatedPlantilla)
     setShowEditModal(false)
   }
 
-  // Handle item update (optimistic update)
   const handleItemUpdated = (itemId: string, updates: Partial<PlantillaEquipoItemIndependiente>) => {
     setPlantilla(prev => {
       if (!prev) return prev
-
       const updatedItems = prev.plantillaEquipoItemIndependiente?.map(item =>
         item.id === itemId ? { ...item, ...updates } : item
       ) || []
-
-      // Recalculate totals
       const totalInterno = updatedItems.reduce((sum, item) => sum + item.costoInterno, 0)
       const totalCliente = updatedItems.reduce((sum, item) => sum + item.costoCliente, 0)
-      const grandTotal = totalCliente - (prev.descuento || 0)
-
       return {
         ...prev,
         plantillaEquipoItemIndependiente: updatedItems,
         totalInterno,
         totalCliente,
-        grandTotal
+        grandTotal: totalCliente - (prev.descuento || 0)
       }
     })
   }
 
-  if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Cargando plantilla...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <LoadingSkeleton />
 
   if (error || !plantilla) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-            <h3 className="text-lg font-semibold text-red-600">Error</h3>
-            <p className="text-muted-foreground">{error || 'Plantilla no encontrada'}</p>
-            <Button onClick={() => router.back()}>
-              Volver
-            </Button>
-          </div>
-        </div>
+      <div className="flex flex-col items-center justify-center py-16">
+        <AlertCircle className="h-10 w-10 text-red-500 mb-3" />
+        <h3 className="text-base font-medium text-gray-900 mb-1">Error</h3>
+        <p className="text-sm text-muted-foreground mb-4">{error || 'Plantilla no encontrada'}</p>
+        <Button variant="outline" size="sm" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Volver
+        </Button>
       </div>
     )
   }
 
   return (
-    <motion.div
-      className="p-6 space-y-6"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Header */}
-      <motion.div variants={itemVariants} className="space-y-4">
-        {/* Breadcrumb Navigation */}
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/comercial')}
-            className="p-0 h-auto font-normal"
-          >
-            Comercial
-          </Button>
-          <ChevronRight className="h-4 w-4" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/comercial/plantillas')}
-            className="p-0 h-auto font-normal"
-          >
+    <div className="p-4 space-y-4">
+      {/* Header minimalista */}
+      <div className="space-y-2">
+        {/* Breadcrumb compacto */}
+        <nav className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Link href="/comercial/plantillas" className="hover:text-foreground transition-colors inline-flex items-center">
+            <ArrowLeft className="h-3 w-3 mr-1" />
             Plantillas
-          </Button>
-          <ChevronRight className="h-4 w-4" />
-          <span className="font-medium text-foreground">Equipos</span>
+          </Link>
+          <span>/</span>
+          <span className="text-foreground font-medium">Equipos</span>
         </nav>
 
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="space-y-1">
+        {/* Título + Acciones */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2">
-              <Wrench className="h-6 w-6 text-orange-600" />
-              <h1 className="text-2xl font-bold tracking-tight">{plantilla.nombre}</h1>
+              <Package className="h-5 w-5 text-orange-600 flex-shrink-0" />
+              <h1 className="text-lg font-semibold truncate">{plantilla.nombre}</h1>
+              <Badge variant="outline" className="text-xs flex-shrink-0">
+                {stats.items} items
+              </Badge>
             </div>
-            <p className="text-muted-foreground">
-              Plantilla independiente especializada en equipos y maquinaria
-            </p>
+
+            {/* Stats inline */}
+            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+              <span>Interno: <span className="font-mono text-gray-700">{formatCurrency(stats.totalInterno)}</span></span>
+              <span className="text-gray-300">|</span>
+              <span>Cliente: <span className="font-mono text-green-600 font-medium">{formatCurrency(stats.totalCliente)}</span></span>
+              <span className="text-gray-300">|</span>
+              <span className="flex items-center gap-1">
+                <TrendingUp className="h-3 w-3 text-emerald-500" />
+                Margen: <span className={`font-mono font-medium ${stats.margen >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {formatCurrency(stats.margen)} ({stats.margenPct.toFixed(1)}%)
+                </span>
+              </span>
+            </div>
           </div>
 
-          <div className="flex gap-2">
+          {/* Acciones */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             {canEdit && (
-              <Button variant="default" size="sm" onClick={() => setShowEditModal(true)} className="bg-blue-600 hover:bg-blue-700">
-                <Edit className="h-4 w-4 mr-2" />
-                Editar Plantilla
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEditModal(true)}
+                className="h-8"
+              >
+                <Edit className="h-3.5 w-3.5 mr-1" />
+                Editar
               </Button>
             )}
-            <Button variant="outline" size="sm">
-              <Share2 className="h-4 w-4 mr-2" />
-              Compartir
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+            >
+              <Download className="h-3.5 w-3.5 mr-1" />
               Exportar
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setShowMultiAddModal(true)}
+              className="h-8 bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Agregar
             </Button>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      <Separator />
+      {/* Lista de equipos - El foco principal */}
+      <PlantillaEquiposView
+        items={plantilla.plantillaEquipoItemIndependiente || []}
+        plantillaId={id}
+        onDeleteItem={(itemId) => {
+          setPlantilla(prev => prev ? {
+            ...prev,
+            plantillaEquipoItemIndependiente: prev.plantillaEquipoItemIndependiente?.filter(item => item.id !== itemId) || []
+          } : null)
+        }}
+        onRefresh={loadPlantilla}
+        onUpdateItem={handleItemUpdated}
+      />
 
-      {/* Financial Summary */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              Resumen de Costos - Equipos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(plantilla.totalInterno)}
-                </div>
-                <div className="text-sm text-blue-600">Costo Interno</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {formatCurrency(plantilla.totalCliente)}
-                </div>
-                <div className="text-sm text-green-600">Precio Cliente</div>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">
-                  {((plantilla.totalCliente - plantilla.totalInterno) > 0 ?
-                    `+${formatCurrency(plantilla.totalCliente - plantilla.totalInterno)}` :
-                    formatCurrency(plantilla.totalCliente - plantilla.totalInterno))}
-                </div>
-                <div className="text-sm text-purple-600">Margen</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Equipment Items Section */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Wrench className="h-5 w-5 text-orange-600" />
-                  Equipos en la Plantilla
-                </CardTitle>
-                <CardDescription>
-                  Lista de equipos incluidos en esta plantilla independiente
-                </CardDescription>
-              </div>
-              <Button onClick={() => setShowMultiAddModal(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Equipos
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <PlantillaEquiposView
-              items={plantilla.plantillaEquipoItemIndependiente || []}
-              plantillaId={id}
-              onDeleteItem={(itemId) => {
-                setPlantilla(prev => prev ? {
-                  ...prev,
-                  plantillaEquipoItemIndependiente: prev.plantillaEquipoItemIndependiente?.filter(item => item.id !== itemId) || []
-                } : null)
-              }}
-              onRefresh={loadPlantilla}
-              onUpdateItem={handleItemUpdated}
-            />
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* ✅ Multi-add modal */}
+      {/* Modals */}
       <PlantillaEquipoIndependienteMultiAddModal
         isOpen={showMultiAddModal}
         onClose={() => setShowMultiAddModal(false)}
@@ -356,13 +300,12 @@ export default function PlantillaEquiposIndependientePage({ params }: { params: 
         onItemsCreated={handleMultipleItemsCreated}
       />
 
-      {/* Edit modal */}
       <PlantillaEquipoEditModal
         plantilla={plantilla}
         open={showEditModal}
         onOpenChange={setShowEditModal}
         onUpdated={handlePlantillaUpdated}
       />
-    </motion.div>
+    </div>
   )
 }

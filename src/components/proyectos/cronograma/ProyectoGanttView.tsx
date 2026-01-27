@@ -44,6 +44,7 @@ interface GanttItem {
   color: string;
   expandable: boolean;
   expanded?: boolean;
+  horasEstimadas?: number;
 }
 
 interface ProyectoGanttViewProps {
@@ -153,7 +154,8 @@ export function ProyectoGanttView({
         color: '#10b981',
         expandable: true,
         expanded: false,
-        hijos: []
+        hijos: [],
+        horasEstimadas: undefined // Fases don't have hours in schema - will be calculated from children
       })) || [];
 
       // Agregar EDTs a fases
@@ -172,7 +174,8 @@ export function ProyectoGanttView({
           color: '#f59e0b',
           expandable: true,
           expanded: false,
-          hijos: []
+          hijos: [],
+          horasEstimadas: edt.horasPlan ? Number(edt.horasPlan) : undefined
         }));
 
         // Agregar EDTs a fases (5 niveles: Proyecto > Fase > EDT > Actividad > Tarea)
@@ -192,7 +195,8 @@ export function ProyectoGanttView({
             color: '#ef4444',
             expandable: true,
             expanded: false,
-            hijos: []
+            hijos: [],
+            horasEstimadas: actividad.horasPlan ? Number(actividad.horasPlan) : undefined
           }));
 
           // Agregar tareas a actividades
@@ -210,7 +214,8 @@ export function ProyectoGanttView({
               padreId: actividad.id,
               color: '#6b7280',
               expandable: false,
-              hijos: []
+              hijos: [],
+              horasEstimadas: tarea.horasEstimadas ? Number(tarea.horasEstimadas) : undefined
             }));
           });
         });
@@ -234,7 +239,8 @@ export function ProyectoGanttView({
           color: '#f59e0b',
           expandable: true,
           expanded: false,
-          hijos: []
+          hijos: [],
+          horasEstimadas: edt.horasPlan ? Number(edt.horasPlan) : undefined
         }));
 
         // Agregar EDTs sin fase (5 niveles: EDT > Actividad > Tarea)
@@ -254,7 +260,8 @@ export function ProyectoGanttView({
             color: '#ef4444',
             expandable: true,
             expanded: false,
-            hijos: []
+            hijos: [],
+            horasEstimadas: actividad.horasPlan ? Number(actividad.horasPlan) : undefined
           }));
 
           // Agregar tareas a actividades
@@ -272,7 +279,8 @@ export function ProyectoGanttView({
               padreId: actividad.id,
               color: '#6b7280',
               expandable: false,
-              hijos: []
+              hijos: [],
+              horasEstimadas: tarea.horasEstimadas ? Number(tarea.horasEstimadas) : undefined
             }));
           });
         });
@@ -280,6 +288,82 @@ export function ProyectoGanttView({
         // Agregar los EDTs virtuales al proyecto
         proyectoItem.hijos = [...(proyectoItem.hijos || []), ...edtsVirtuales];
       }
+
+      // Calcular fechas reales del proyecto basadas en sus hijos recursivamente
+      const calculateDatesFromChildren = (item: GanttItem): { minStart: Date | null, maxEnd: Date | null } => {
+        let minStart: Date | null = null;
+        let maxEnd: Date | null = null;
+
+        // Si tiene hijos, calcular fechas desde ellos
+        if (item.hijos && item.hijos.length > 0) {
+          for (const hijo of item.hijos) {
+            const childDates = calculateDatesFromChildren(hijo);
+
+            // Usar las fechas calculadas del hijo o sus propias fechas si no tiene hijos
+            const childStart = childDates.minStart || hijo.fechaInicio;
+            const childEnd = childDates.maxEnd || hijo.fechaFin;
+
+            if (childStart && (!minStart || childStart < minStart)) {
+              minStart = childStart;
+            }
+            if (childEnd && (!maxEnd || childEnd > maxEnd)) {
+              maxEnd = childEnd;
+            }
+          }
+
+          // Actualizar las fechas del item actual basado en sus hijos
+          if (minStart) item.fechaInicio = minStart;
+          if (maxEnd) item.fechaFin = maxEnd;
+        }
+
+        return { minStart, maxEnd };
+      };
+
+      // Aplicar cálculo de fechas recursivo al proyecto
+      const calculatedDates = calculateDatesFromChildren(proyectoItem);
+
+      // Actualizar fechas del timeline si se calcularon desde los hijos
+      if (calculatedDates.minStart) {
+        setFechaInicio(calculatedDates.minStart);
+      }
+      if (calculatedDates.maxEnd) {
+        setFechaFin(calculatedDates.maxEnd);
+      }
+
+      // Calcular horas totales desde los hijos (para fases que no tienen horas propias)
+      const calculateHoursFromChildren = (item: GanttItem): number => {
+        let totalHours = item.horasEstimadas || 0;
+
+        if (item.hijos && item.hijos.length > 0) {
+          // Calcular horas de todos los hijos recursivamente
+          const childrenHours = item.hijos.reduce((sum, hijo) => {
+            return sum + calculateHoursFromChildren(hijo);
+          }, 0);
+
+          // Si el item no tiene horas propias, usar las de los hijos
+          if (!item.horasEstimadas && childrenHours > 0) {
+            item.horasEstimadas = childrenHours;
+          }
+
+          return item.horasEstimadas || childrenHours;
+        }
+
+        return totalHours;
+      };
+
+      // Aplicar cálculo de horas recursivo al proyecto
+      calculateHoursFromChildren(proyectoItem);
+
+      // Auto-expand niveles 0 (proyecto) y 1 (fases) por defecto
+      const autoExpandLevels = (item: GanttItem, maxLevel: number = 1) => {
+        if (item.nivel <= maxLevel) {
+          item.expanded = true;
+          if (item.hijos) {
+            item.hijos.forEach(hijo => autoExpandLevels(hijo, maxLevel));
+          }
+        }
+      };
+      autoExpandLevels(proyectoItem, 1);
 
       ganttItems.push(proyectoItem);
       setItems(ganttItems);
@@ -323,7 +407,7 @@ export function ProyectoGanttView({
       totalDias,
       diasVisibles,
       pixelsPorDia,
-      alturaFila: 40,
+      alturaFila: 36, // Reduced from 40 for compact layout
       margenIzquierdo: 300, // Espacio para nombres
     };
   }, [fechaInicio, fechaFin, zoom]);
@@ -337,11 +421,12 @@ export function ProyectoGanttView({
 
     if (!esVisible) return null;
 
-    // Calcular posición de la barra
+    // Calcular posición de la barra usando porcentajes
+    const totalDias = ganttConfig.totalDias || 1;
     const diasDesdeInicio = differenceInDays(item.fechaInicio, ganttConfig.fechaInicio);
-    const duracionDias = differenceInDays(item.fechaFin, item.fechaInicio);
-    const left = Math.max(0, diasDesdeInicio * ganttConfig.pixelsPorDia);
-    const width = Math.max(2, duracionDias * ganttConfig.pixelsPorDia);
+    const duracionDias = Math.max(1, differenceInDays(item.fechaFin, item.fechaInicio));
+    const leftPercent = Math.max(0, (diasDesdeInicio / totalDias) * 100);
+    const widthPercent = Math.max(2, (duracionDias / totalDias) * 100);
 
     // Obtener color según tipo
     const getTipoColor = (tipo: string) => {
@@ -402,20 +487,25 @@ export function ProyectoGanttView({
               {/* Aquí se podrían agregar líneas verticales para meses/semanas */}
             </div>
 
-            {/* Barra de progreso */}
+            {/* Barra de progreso - compact height */}
             <div
-              className={`absolute top-1/2 transform -translate-y-1/2 h-6 rounded ${getTipoColor(item.tipo)} cursor-pointer hover:opacity-80 transition-opacity`}
+              className={`absolute top-1/2 transform -translate-y-1/2 h-5 rounded-md shadow-sm ${getTipoColor(item.tipo)} cursor-pointer hover:opacity-80 transition-opacity overflow-hidden`}
               style={{
-                left: ganttConfig.margenIzquierdo + left,
-                width: width,
+                left: `${leftPercent}%`,
+                width: `${Math.max(widthPercent, 2)}%`,
+                minWidth: '60px',
               }}
-              title={`${item.nombre} (${item.porcentajeAvance}% completo)`}
+              title={`${item.nombre} - ${duracionDias} días${item.horasEstimadas ? `, ${item.horasEstimadas} Hrs` : ''} (${item.porcentajeAvance}% completo)`}
             >
               {/* Progreso interno */}
               <div
-                className="h-full bg-black bg-opacity-30 rounded"
+                className="absolute h-full bg-black bg-opacity-30 rounded-md"
                 style={{ width: `${item.porcentajeAvance}%` }}
               />
+              {/* Texto con días y horas (nombre ya está en columna izquierda) */}
+              <span className="relative z-10 px-1.5 text-[10px] text-white font-medium truncate flex items-center h-full">
+                {duracionDias}d{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}
+              </span>
             </div>
           </div>
         </div>

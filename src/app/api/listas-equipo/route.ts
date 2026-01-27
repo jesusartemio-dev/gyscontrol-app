@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { randomUUID } from 'crypto'
 import { EstadoListaEquipo } from '@prisma/client'
 import type { PaginatedResponse, ListasEquipoPaginationParams } from '@/types/payloads'
 import { 
@@ -368,12 +369,14 @@ export async function POST(request: NextRequest) {
     // ✅ Crear lista en la base de datos con Prisma
     const nuevaLista = await prisma.listaEquipo.create({
       data: {
+        id: randomUUID(),
         proyectoId: body.proyectoId,
         nombre: body.nombre,
         codigo: codigoLista,
         estado: 'borrador',
         numeroSecuencia: siguienteNumero,
         responsableId: responsableId, // ✅ Campo requerido y validado
+        updatedAt: new Date(),
         ...(body.fechaNecesaria && { fechaNecesaria: new Date(body.fechaNecesaria) })
       },
       include: {

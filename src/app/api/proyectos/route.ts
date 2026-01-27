@@ -8,6 +8,8 @@ export async function GET() {
         cliente: true,
         comercial: true,
         gestor: true,
+        supervisor: true,
+        lider: true,
         proyectoEquipoCotizado: true,
         proyectoServicioCotizado: true,
         proyectoGastoCotizado: true,

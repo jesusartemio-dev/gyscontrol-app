@@ -6,39 +6,43 @@ import { useSession } from 'next-auth/react'
 import { getProyectos, deleteProyecto, createProyecto } from '@/lib/services/proyecto'
 import type { Proyecto, ProyectoPayload } from '@/types'
 import { toast } from 'sonner'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  DollarSign, 
-  Users, 
-  Building2, 
-  Trash2, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  Plus,
+  Search,
+  Calendar,
+  DollarSign,
+  Users,
+  UserCog,
+  Building2,
+  Trash2,
   Eye,
   FolderOpen,
   TrendingUp,
-  BarChart3
+  CheckCircle2,
+  Loader2,
+  List,
+  LayoutGrid,
+  HardHat,
+  Settings
 } from 'lucide-react'
 import ConfirmDialog from '@/components/ConfirmDialog'
 
-// Roles permitidos para acceder a la página de Proyectos
-const ALLOWED_ROLES = [
-  'proyectos',
-  'coordinador',
-  'gestor',
-  'gerente',
-  'admin',
-]
+const ALLOWED_ROLES = ['proyectos', 'coordinador', 'gestor', 'gerente', 'admin']
 
 type ViewMode = 'cards' | 'table'
-type FilterStatus = 'all' | 'activo' | 'pausado' | 'completado' | 'cancelado'
-type SortOption = 'nombre' | 'codigo' | 'fecha' | 'total'
+type FilterStatus = 'all' | 'activo' | 'pausado' | 'cerrado' | 'cancelado'
 
 export default function ProyectosPage() {
   const { data: session, status } = useSession()
@@ -48,17 +52,14 @@ export default function ProyectosPage() {
   const [nombre, setNombre] = useState('')
   const [codigo, setCodigo] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
-  const [sortBy, setSortBy] = useState<SortOption>('fecha')
-  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; proyecto?: Proyecto }>({
-    show: false
-  })
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; proyecto?: Proyecto }>({ show: false })
 
-  // 🔐 Protección de ruta por rol
   useEffect(() => {
     if (status === 'loading') return
     const role = session?.user.role
@@ -67,49 +68,28 @@ export default function ProyectosPage() {
     }
   }, [session, status, router])
 
-  // 🔄 Cargar proyectos
   useEffect(() => {
     getProyectos()
       .then(setProyectos)
       .catch(() => toast.error('Error al cargar proyectos.'))
+      .finally(() => setPageLoading(false))
   }, [])
 
-  // 🔍 Filtrar y ordenar proyectos
   useEffect(() => {
     let filtered = [...proyectos]
-
-    // Filtrar por búsqueda
     if (searchTerm) {
-      filtered = filtered.filter(p => 
+      filtered = filtered.filter(p =>
         p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.cliente?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
-
-    // Filtrar por estado
     if (filterStatus !== 'all') {
       filtered = filtered.filter(p => p.estado === filterStatus)
     }
-
-    // Ordenar
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'nombre':
-          return a.nombre.localeCompare(b.nombre)
-        case 'codigo':
-          return a.codigo.localeCompare(b.codigo)
-        case 'fecha':
-          return new Date(b.fechaInicio || 0).getTime() - new Date(a.fechaInicio || 0).getTime()
-        case 'total':
-          return b.totalCliente - a.totalCliente
-        default:
-          return 0
-      }
-    })
-
+    filtered.sort((a, b) => new Date(b.fechaInicio || 0).getTime() - new Date(a.fechaInicio || 0).getTime())
     setFilteredProyectos(filtered)
-  }, [proyectos, searchTerm, filterStatus, sortBy])
+  }, [proyectos, searchTerm, filterStatus])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,7 +97,6 @@ export default function ProyectosPage() {
       setError('Todos los campos son obligatorios.')
       return
     }
-
     setLoading(true)
     setError(null)
     try {
@@ -137,17 +116,16 @@ export default function ProyectosPage() {
         estado: 'activo',
         fechaInicio: new Date().toISOString(),
       }
-
       const nuevo = await createProyecto(payload)
       if (nuevo) {
         setProyectos([...proyectos, nuevo])
         setNombre('')
         setCodigo('')
-        setShowCreateForm(false)
-        toast.success('✅ Proyecto creado exitosamente')
+        setShowCreateDialog(false)
+        toast.success('Proyecto creado exitosamente')
       }
     } catch {
-      toast.error('❌ Error al crear proyecto.')
+      toast.error('Error al crear proyecto.')
     } finally {
       setLoading(false)
     }
@@ -157,239 +135,208 @@ export default function ProyectosPage() {
     try {
       await deleteProyecto(proyecto.id)
       setProyectos((prev) => prev.filter((p) => p.id !== proyecto.id))
-      toast.success('🗑️ Proyecto eliminado correctamente')
+      toast.success('Proyecto eliminado')
       setDeleteConfirm({ show: false })
-    } catch {
-      toast.error('❌ Error al eliminar proyecto.')
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : 'Error al eliminar proyecto'
+      toast.error(mensaje)
     }
   }
 
   const getEstadoBadgeVariant = (estado: string) => {
     switch (estado) {
       case 'activo': return 'default'
-      case 'pausado': return 'outline'
-      case 'completado': return 'outline'
-      case 'cancelado': return 'outline'
       default: return 'outline'
     }
   }
 
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'activo': return 'text-green-600'
-      case 'pausado': return 'text-yellow-600'
-      case 'completado': return 'text-blue-600'
-      case 'cancelado': return 'text-red-600'
-      default: return 'text-gray-600'
-    }
-  }
-
-  // 📊 Estadísticas
+  // Stats
   const stats = {
     total: proyectos.length,
     activos: proyectos.filter(p => p.estado === 'activo').length,
-    completados: proyectos.filter(p => p.estado === 'completado').length,
+    cerrados: proyectos.filter(p => p.estado === 'cerrado').length,
     totalValor: proyectos.reduce((sum, p) => sum + p.totalCliente, 0)
   }
 
-  return (
-    <div className="space-y-6">
-      {/* 📊 Header con estadísticas */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <FolderOpen className="h-8 w-8 text-blue-600" />
-            Gestión de Proyectos
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Administra y supervisa todos los proyectos de la empresa
-          </p>
-        </div>
-        
-        <div className="flex flex-wrap gap-4">
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-blue-600" />
-              <div>
-                <p className="text-xs text-gray-600">Total Proyectos</p>
-                <p className="font-bold text-lg">{stats.total}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-600" />
-              <div>
-                <p className="text-xs text-gray-600">Activos</p>
-                <p className="font-bold text-lg text-green-600">{stats.activos}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-purple-600" />
-              <div>
-                <p className="text-xs text-gray-600">Valor Total</p>
-                <p className="font-bold text-lg">$ {stats.totalValor.toLocaleString()}</p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
+  const formatCurrency = (amount: number): string => {
+    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`
+    if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`
+    return `$${amount.toFixed(0)}`
+  }
 
-      {/* 🔧 Controles y filtros */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-3 flex-1">
-              {/* Búsqueda */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar proyectos, códigos o clientes..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              
-              {/* Filtros */}
-              <Select value={filterStatus} onValueChange={(value: FilterStatus) => setFilterStatus(value)}>
-                <SelectTrigger className="w-[140px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="activo">Activos</SelectItem>
-                  <SelectItem value="pausado">Pausados</SelectItem>
-                  <SelectItem value="completado">Completados</SelectItem>
-                  <SelectItem value="cancelado">Cancelados</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fecha">Por Fecha</SelectItem>
-                  <SelectItem value="nombre">Por Nombre</SelectItem>
-                  <SelectItem value="codigo">Por Código</SelectItem>
-                  <SelectItem value="total">Por Valor</SelectItem>
-                </SelectContent>
-              </Select>
+  if (pageLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <FolderOpen className="h-6 w-6 text-blue-600" />
+          <h1 className="text-xl font-bold">Proyectos</h1>
+          <Badge variant="secondary" className="text-xs">
+            {stats.total}
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Inline Stats */}
+          <div className="hidden md:flex items-center gap-3 mr-4 text-xs">
+            <div className="flex items-center gap-1 text-green-600" title="Activos">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span className="font-medium">{stats.activos}</span>
             </div>
-            
-            {/* Controles de vista */}
-            <div className="flex gap-2">
-              <Button
-                variant={viewMode === 'cards' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('cards')}
-              >
-                Cards
-              </Button>
-              <Button
-                variant={viewMode === 'table' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('table')}
-              >
-                Tabla
-              </Button>
-              <Button
-                onClick={() => setShowCreateForm(!showCreateForm)}
-                className="ml-2"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Proyecto
-              </Button>
+            <div className="flex items-center gap-1 text-emerald-600" title="Cerrados">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span className="font-medium">{stats.cerrados}</span>
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex items-center gap-1 text-emerald-600" title="Valor Total">
+              <DollarSign className="h-3.5 w-3.5" />
+              <span className="font-semibold">{formatCurrency(stats.totalValor)}</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* 📝 Formulario de creación */}
-      {showCreateForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Crear Nuevo Proyecto
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="h-8">
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Nuevo
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Nombre del Proyecto</label>
+                  <label className="block text-sm font-medium mb-1">Nombre</label>
                   <Input
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
-                    placeholder="Ingresa el nombre del proyecto"
+                    placeholder="Nombre del proyecto"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Código</label>
+                  <label className="block text-sm font-medium mb-1">Código</label>
                   <Input
                     value={codigo}
                     onChange={(e) => setCodigo(e.target.value)}
-                    placeholder="Código único del proyecto"
+                    placeholder="Código único"
                     required
                   />
                 </div>
-              </div>
-              
-              {error && (
-                <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">
-                  {error}
+                {error && (
+                  <div className="text-red-600 text-sm bg-red-50 p-2 rounded">
+                    {error}
+                  </div>
+                )}
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? 'Creando...' : 'Crear'}
+                  </Button>
                 </div>
-              )}
-              
-              <div className="flex gap-2">
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Creando...' : 'Crear Proyecto'}
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowCreateForm(false)
-                    setError(null)
-                    setNombre('')
-                    setCodigo('')
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
 
-      {/* 📋 Lista de proyectos */}
+      {/* Mobile Stats */}
+      <div className="md:hidden grid grid-cols-3 gap-2">
+        <div className="bg-green-50 rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-green-600">{stats.activos}</div>
+          <div className="text-[10px] text-green-700">Activos</div>
+        </div>
+        <div className="bg-emerald-50 rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-emerald-600">{stats.cerrados}</div>
+          <div className="text-[10px] text-emerald-700">Cerrados</div>
+        </div>
+        <div className="bg-emerald-50 rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-emerald-600">{formatCurrency(stats.totalValor)}</div>
+          <div className="text-[10px] text-emerald-700">Total</div>
+        </div>
+      </div>
+
+      {/* Filters Row */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          <Input
+            placeholder="Buscar..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+
+        <Select value={filterStatus} onValueChange={(value: FilterStatus) => setFilterStatus(value)}>
+          <SelectTrigger className="w-32 h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="activo">Activos</SelectItem>
+            <SelectItem value="pausado">Pausados</SelectItem>
+            <SelectItem value="cerrado">Cerrados</SelectItem>
+            <SelectItem value="cancelado">Cancelados</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="flex border rounded-md">
+          <Button
+            variant={viewMode === 'cards' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('cards')}
+            className="h-8 rounded-r-none px-2"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+            className="h-8 rounded-l-none px-2"
+          >
+            <List className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        <span className="text-xs text-muted-foreground ml-auto">
+          {filteredProyectos.length} de {proyectos.length}
+        </span>
+      </div>
+
+      {/* Projects List */}
       {viewMode === 'cards' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProyectos.length === 0 ? (
             <div className="col-span-full">
               <Card>
-                <CardContent className="p-12 text-center">
-                  <FolderOpen className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                    {searchTerm || filterStatus !== 'all' ? 'No se encontraron proyectos' : 'No hay proyectos registrados'}
+                <CardContent className="py-12 text-center">
+                  <FolderOpen className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-600 mb-2">
+                    {searchTerm || filterStatus !== 'all' ? 'No se encontraron proyectos' : 'No hay proyectos'}
                   </h3>
-                  <p className="text-gray-500 mb-4">
-                    {searchTerm || filterStatus !== 'all' 
-                      ? 'Intenta ajustar los filtros de búsqueda'
+                  <p className="text-sm text-gray-500 mb-4">
+                    {searchTerm || filterStatus !== 'all'
+                      ? 'Ajusta los filtros de búsqueda'
                       : 'Comienza creando tu primer proyecto'
                     }
                   </p>
                   {!searchTerm && filterStatus === 'all' && (
-                    <Button onClick={() => setShowCreateForm(true)}>
+                    <Button onClick={() => setShowCreateDialog(true)} size="sm">
                       <Plus className="h-4 w-4 mr-2" />
-                      Crear Primer Proyecto
+                      Crear Proyecto
                     </Button>
                   )}
                 </CardContent>
@@ -397,59 +344,68 @@ export default function ProyectosPage() {
             </div>
           ) : (
             filteredProyectos.map((proyecto) => (
-              <Card key={proyecto.id} className="hover:shadow-lg transition-shadow cursor-pointer group">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-1 group-hover:text-blue-600 transition-colors">
-                        {proyecto.nombre}
-                      </CardTitle>
-                      <p className="text-sm text-gray-600 font-mono">{proyecto.codigo}</p>
+              <Card key={proyecto.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm truncate">{proyecto.nombre}</h3>
+                      <p className="text-xs text-gray-500 font-mono">{proyecto.codigo}</p>
                     </div>
-                    <Badge variant={getEstadoBadgeVariant(proyecto.estado)}>
+                    <Badge variant={getEstadoBadgeVariant(proyecto.estado)} className="text-[10px] ml-2">
                       {proyecto.estado}
                     </Badge>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Building2 className="h-4 w-4 text-gray-400" />
-                      <span>{proyecto.cliente?.nombre || 'Sin cliente asignado'}</span>
+
+                  <div className="space-y-1 text-xs text-gray-600 mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <Building2 className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">{proyecto.cliente?.nombre || 'Sin cliente'}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 text-gray-400" />
-                      <span>{proyecto.comercial?.name || 'Sin comercial asignado'}</span>
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                      <div className="flex items-center gap-1" title="Comercial">
+                        <Users className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{proyecto.comercial?.name || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-1" title="Gestor">
+                        <UserCog className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{proyecto.gestor?.name || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-1" title="Supervisor">
+                        <HardHat className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{(proyecto as any).supervisor?.name || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-1" title="Líder">
+                        <Settings className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{(proyecto as any).lider?.name || '—'}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-gray-400" />
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3 text-gray-400 flex-shrink-0" />
                       <span>{proyecto.fechaInicio ? new Date(proyecto.fechaInicio).toLocaleDateString() : 'Sin fecha'}</span>
                     </div>
                   </div>
-                  
-                  <div className="pt-3 border-t">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm text-gray-600">Valor Total</span>
-                      <span className="text-lg font-bold text-green-600">
-                        $ {proyecto.totalCliente.toLocaleString()}
-                      </span>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        className="flex-1"
+
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <span className="text-sm font-bold text-green-600">
+                      $ {proyecto.totalCliente.toLocaleString()}
+                    </span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
                         onClick={() => router.push(`/proyectos/${proyecto.id}`)}
                       >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Ver Detalles
+                        <Eye className="h-3 w-3 mr-1" />
+                        Ver
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
                         onClick={() => setDeleteConfirm({ show: true, proyecto })}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
@@ -462,75 +418,82 @@ export default function ProyectosPage() {
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-xs">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left p-4 font-semibold">Código</th>
-                    <th className="text-left p-4 font-semibold">Nombre</th>
-                    <th className="text-left p-4 font-semibold">Cliente</th>
-                    <th className="text-left p-4 font-semibold">Comercial</th>
-                    <th className="text-left p-4 font-semibold">Estado</th>
-                    <th className="text-left p-4 font-semibold">Inicio</th>
-                    <th className="text-right p-4 font-semibold">Total Cliente</th>
-                    <th className="text-center p-4 font-semibold">Acciones</th>
+                    <th className="text-left p-2 font-medium w-20">Código</th>
+                    <th className="text-left p-2 font-medium">Nombre</th>
+                    <th className="text-left p-2 font-medium hidden md:table-cell">Cliente</th>
+                    <th className="text-left p-2 font-medium hidden lg:table-cell">Comercial</th>
+                    <th className="text-left p-2 font-medium hidden md:table-cell">Gestor</th>
+                    <th className="text-left p-2 font-medium hidden xl:table-cell">Supervisor</th>
+                    <th className="text-left p-2 font-medium hidden xl:table-cell">Líder</th>
+                    <th className="text-left p-2 font-medium w-20">Estado</th>
+                    <th className="text-right p-2 font-medium w-20">Total</th>
+                    <th className="text-center p-2 font-medium w-14"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredProyectos.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-12 text-gray-500">
-                        <FolderOpen className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                        <p className="text-lg font-semibold mb-2">
-                          {searchTerm || filterStatus !== 'all' ? 'No se encontraron proyectos' : 'No hay proyectos registrados'}
-                        </p>
-                        <p className="text-sm">
-                          {searchTerm || filterStatus !== 'all' 
-                            ? 'Intenta ajustar los filtros de búsqueda'
-                            : 'Comienza creando tu primer proyecto'
-                          }
-                        </p>
+                      <td colSpan={10} className="text-center py-8 text-gray-500">
+                        <FolderOpen className="h-10 w-10 mx-auto text-gray-300 mb-2" />
+                        <p>No se encontraron proyectos</p>
                       </td>
                     </tr>
                   ) : (
                     filteredProyectos.map((proyecto) => (
-                      <tr key={proyecto.id} className="border-b hover:bg-gray-50 transition-colors">
-                        <td className="p-4 font-mono text-sm">{proyecto.codigo}</td>
-                        <td className="p-4">
+                      <tr key={proyecto.id} className="border-b hover:bg-gray-50">
+                        <td className="p-2 font-mono text-[10px] text-gray-500">{proyecto.codigo}</td>
+                        <td className="p-2">
                           <button
-                            className="text-blue-600 hover:text-blue-800 font-semibold hover:underline text-left"
+                            className="text-blue-600 hover:underline font-medium text-left truncate max-w-[180px] block"
                             onClick={() => router.push(`/proyectos/${proyecto.id}`)}
+                            title={proyecto.nombre}
                           >
                             {proyecto.nombre}
                           </button>
                         </td>
-                        <td className="p-4 text-sm">{proyecto.cliente?.nombre || '—'}</td>
-                        <td className="p-4 text-sm">{proyecto.comercial?.name || '—'}</td>
-                        <td className="p-4">
-                          <Badge variant={getEstadoBadgeVariant(proyecto.estado)}>
+                        <td className="p-2 text-gray-600 truncate max-w-[100px] hidden md:table-cell" title={proyecto.cliente?.nombre}>
+                          {proyecto.cliente?.nombre || '—'}
+                        </td>
+                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden lg:table-cell" title={proyecto.comercial?.name}>
+                          {proyecto.comercial?.name || '—'}
+                        </td>
+                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden md:table-cell" title={proyecto.gestor?.name}>
+                          {proyecto.gestor?.name || '—'}
+                        </td>
+                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden xl:table-cell" title={(proyecto as any).supervisor?.name}>
+                          {(proyecto as any).supervisor?.name || '—'}
+                        </td>
+                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden xl:table-cell" title={(proyecto as any).lider?.name}>
+                          {(proyecto as any).lider?.name || '—'}
+                        </td>
+                        <td className="p-2">
+                          <Badge variant={getEstadoBadgeVariant(proyecto.estado)} className="text-[9px] px-1.5">
                             {proyecto.estado}
                           </Badge>
                         </td>
-                        <td className="p-4 text-sm">
-                          {proyecto.fechaInicio ? new Date(proyecto.fechaInicio).toLocaleDateString() : '—'}
+                        <td className="p-2 text-right font-medium text-green-600 whitespace-nowrap">
+                          ${proyecto.totalCliente.toLocaleString()}
                         </td>
-                        <td className="p-4 text-right font-semibold">
-                          $ {proyecto.totalCliente.toLocaleString()}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex gap-2 justify-center">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
+                        <td className="p-2">
+                          <div className="flex gap-0.5 justify-center">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
                               onClick={() => router.push(`/proyectos/${proyecto.id}`)}
                             >
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-3 w-3" />
                             </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
                               onClick={() => setDeleteConfirm({ show: true, proyecto })}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </td>
@@ -544,12 +507,11 @@ export default function ProyectosPage() {
         </Card>
       )}
 
-      {/* 🗑️ Diálogo de confirmación para eliminar */}
       <ConfirmDialog
         open={deleteConfirm.show}
         onOpenChange={(open) => setDeleteConfirm({ show: open })}
         title="Eliminar Proyecto"
-        description={`¿Estás seguro de que deseas eliminar el proyecto "${deleteConfirm.proyecto?.nombre}"? Esta acción no se puede deshacer.`}
+        description={`¿Eliminar "${deleteConfirm.proyecto?.nombre}"? Esta acción no se puede deshacer.`}
         onConfirm={() => deleteConfirm.proyecto && handleDelete(deleteConfirm.proyecto)}
         confirmText="Eliminar"
         cancelText="Cancelar"

@@ -41,17 +41,19 @@ export async function deleteProyecto(id: string): Promise<void> {
   })
 
   if (!res.ok) {
-    // ✅ Intentar obtener el mensaje específico del error
+    // ✅ Obtener el mensaje específico del error
+    let errorMessage = `Error al eliminar proyecto: ${res.statusText}`
+
     try {
       const errorData = await res.json()
       if (errorData?.error) {
-        throw new Error(errorData.error)
+        errorMessage = errorData.error
       }
-    } catch (parseError) {
+    } catch {
       // Si no se puede parsear el JSON, usar el mensaje genérico
     }
 
-    throw new Error(`Error al eliminar proyecto: ${res.statusText}`)
+    throw new Error(errorMessage)
   }
 }
 

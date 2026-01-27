@@ -1,31 +1,23 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  Calendar,
   Clock,
   AlertCircle,
   ChevronRight,
   ChevronDown,
   Search,
-  Filter,
   ZoomIn,
   ZoomOut,
   RotateCcw,
   Download,
-  Settings,
-  Eye,
-  EyeOff,
   BarChart3,
-  Users,
   Target,
   TrendingUp,
   FileDown,
@@ -44,7 +36,7 @@ interface CronogramaGanttViewProProps {
 interface GanttTask {
   id: string
   nombre: string
-  tipo: 'fase' | 'edt' | 'zona' | 'actividad' | 'tarea'
+  tipo: 'cotizacion' | 'proyecto' | 'fase' | 'edt' | 'zona' | 'actividad' | 'tarea'
   fechaInicio: Date | null
   fechaFin: Date | null
   progreso: number
@@ -89,14 +81,11 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
     totalWidth: 0
   })
 
-  // Filtros y búsqueda - start with all filters enabled to show everything initially
+  // Búsqueda y configuración de vista
   const [searchTerm, setSearchTerm] = useState('')
-  const [typeFilters, setTypeFilters] = useState<Set<string>>(new Set(['fase', 'edt', 'zona', 'actividad', 'tarea']))
-  const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set(['pendiente', 'en_progreso', 'completada', 'planificado']))
-  const [showCriticalPath, setShowCriticalPath] = useState(false)
-  const [showDependencies, setShowDependencies] = useState(true)
-  const [dependencyFilter, setDependencyFilter] = useState<'all' | 'with-dependencies' | 'without-dependencies'>('all')
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [showDependencies, setShowDependencies] = useState(true)
+  const [timeRangeMonths, setTimeRangeMonths] = useState(6) // Meses a mostrar
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,10 +95,10 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
   const timelineRef = useRef<HTMLDivElement>(null)
   const tasksContainerRef = useRef<HTMLDivElement>(null)
 
-  // Constantes para dimensiones
-  const ROW_HEIGHT = 60
-  const BAR_TOP_OFFSET = 8 // top-2 = 8px
-  const BAR_HEIGHT = 32 // h-8 = 32px
+  // Constantes para dimensiones - Medium size for compact display
+  const ROW_HEIGHT = 44
+  const BAR_TOP_OFFSET = 6 // top-1.5
+  const BAR_HEIGHT = 20 // h-5 = 20px
   const TASK_COLUMN_WIDTH = 320 // w-80 = 320px
 
   useEffect(() => {
@@ -177,86 +166,149 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
   useEffect(() => {
     applyFilters()
-    console.log('🔍 [GANTT PRO] Applying filters - tasks:', tasks.length, 'filtered:', filteredTasks.length)
-  }, [tasks, searchTerm, typeFilters, statusFilters, dependencyFilter])
+  }, [tasks, searchTerm])
 
   useEffect(() => {
     calculateTimeline()
-  }, [filteredTasks, zoomLevel])
+  }, [filteredTasks, zoomLevel, timeRangeMonths])
 
   const loadGanttData = async () => {
     try {
       setLoading(true)
-      console.log('🔍 [GANTT PRO] Starting loadGanttData for cotizacionId:', cotizacionId)
 
-      // Skip cotizacion data loading for now - calendarioLaboral not critical
-      console.log('ℹ️ Skipping cotización data load - not critical for dependencies display')
-      setCalendarioLaboral(null)
-
-      // Load tasks - try project API first, fallback to quote API
       let response;
       let apiPath = 'proyectos';
+      let entityData: any = null;
+      let entityType: 'proyecto' | 'cotizacion' = 'proyecto';
 
-      // Construir URL con cronogramaId si está disponible
+      const entityResponse = await fetch(`/api/proyectos/${cotizacionId}`)
+
+      if (entityResponse.ok) {
+        const entityJson = await entityResponse.json()
+        entityData = entityJson.data
+        entityType = 'proyecto'
+      } else {
+        const cotizacionResponse = await fetch(`/api/cotizacion/${cotizacionId}`)
+        if (cotizacionResponse.ok) {
+          const cotizacionJson = await cotizacionResponse.json()
+          entityData = cotizacionJson.data
+          apiPath = 'cotizaciones'
+          entityType = 'cotizacion'
+        }
+      }
+
+      if (entityData?.calendarioLaboralId) {
+        try {
+          const calResponse = await fetch(`/api/configuracion/calendario-laboral/${entityData.calendarioLaboralId}`)
+          if (calResponse.ok) {
+            const calData = await calResponse.json()
+            setCalendarioLaboral(calData.data)
+          }
+        } catch {
+          // Calendar not critical
+        }
+      }
+
       const cronogramaParam = cronogramaId ? `?cronogramaId=${cronogramaId}` : ''
-      console.log('🔍 [GANTT PRO] Trying project API first:', `/api/proyectos/${cotizacionId}/cronograma/tree${cronogramaParam}`)
       response = await fetch(`/api/proyectos/${cotizacionId}/cronograma/tree${cronogramaParam}`)
 
       if (!response.ok && response.status === 404) {
-        console.log('⚠️ [GANTT PRO] Project API not found, trying quote API:', `/api/cotizaciones/${cotizacionId}/cronograma/tree${cronogramaParam}`)
         apiPath = 'cotizaciones'
         response = await fetch(`/api/cotizaciones/${cotizacionId}/cronograma/tree${cronogramaParam}`)
       }
 
       if (!response.ok) {
-        console.error('❌ ERROR: No se pudo cargar el árbol del cronograma:', response.status, response.statusText)
-        console.error('❌ [GANTT PRO] Tried both project and quote APIs for ID:', cotizacionId)
         throw new Error('Error cargando datos del cronograma')
       }
       const data = await response.json()
-      console.log('✅ TREE DATA LOADED:', data.data?.tree?.length || 0, 'tasks')
-      console.log('🔍 [GANTT PRO] Raw tree data:', data.data?.tree)
 
-      const processedTasks = processTreeData(data.data.tree)
-      console.log('✅ PROCESSED TASKS:', processedTasks.length)
-      console.log('🔍 [GANTT PRO] Processed tasks sample:', processedTasks.slice(0, 3))
+      const processedChildren = processTreeData(data.data.tree, true)
+      let processedTasks: GanttTask[] = processedChildren
+
+      let projectFechaInicio: Date | null = null
+      let projectFechaFin: Date | null = null
+
+      const collectDates = (tasks: GanttTask[]): { starts: Date[], ends: Date[] } => {
+        const starts: Date[] = []
+        const ends: Date[] = []
+        for (const task of tasks) {
+          if (task.fechaInicio instanceof Date && !isNaN(task.fechaInicio.getTime())) {
+            starts.push(task.fechaInicio)
+          }
+          if (task.fechaFin instanceof Date && !isNaN(task.fechaFin.getTime())) {
+            ends.push(task.fechaFin)
+          }
+          if (task.children?.length) {
+            const childDates = collectDates(task.children)
+            starts.push(...childDates.starts)
+            ends.push(...childDates.ends)
+          }
+        }
+        return { starts, ends }
+      }
+
+      const allDates = collectDates(processedChildren)
+
+      if (allDates.starts.length > 0) {
+        projectFechaInicio = new Date(Math.min(...allDates.starts.map(d => d.getTime())))
+      } else if (entityData?.fechaInicio) {
+        projectFechaInicio = new Date(entityData.fechaInicio)
+      }
+
+      if (allDates.ends.length > 0) {
+        projectFechaFin = new Date(Math.max(...allDates.ends.map(d => d.getTime())))
+      } else if (entityData?.fechaFin) {
+        projectFechaFin = new Date(entityData.fechaFin)
+      }
+
+      const rootNode: GanttTask = {
+        id: entityData?.id || cotizacionId,
+        nombre: entityData?.nombre || (entityType === 'proyecto' ? 'Proyecto' : 'Cotización'),
+        tipo: entityType,
+        fechaInicio: projectFechaInicio,
+        fechaFin: projectFechaFin,
+        progreso: entityData?.progresoGeneral || 0,
+        estado: entityData?.estado || 'en_progreso',
+        nivel: 0,
+        color: entityType === 'proyecto' ? '#1e40af' : '#4f46e5',
+        children: processedChildren
+      }
+      processedTasks = [rootNode]
       setTasks(processedTasks)
 
-      // Load dependencies - try project API first, fallback to quote API
-      let dependenciesResponse;
-      console.log('🔍 [GANTT PRO] Loading dependencies from:', `/api/${apiPath}/${cotizacionId}/cronograma/dependencias`)
-      dependenciesResponse = await fetch(`/api/${apiPath}/${cotizacionId}/cronograma/dependencias`)
+      const initialExpanded = new Set<string>()
+      const expandLevels = (tasks: GanttTask[], maxLevel: number = 1) => {
+        for (const task of tasks) {
+          if (task.nivel <= maxLevel) {
+            initialExpanded.add(task.id)
+            if (task.children?.length) {
+              expandLevels(task.children, maxLevel)
+            }
+          }
+        }
+      }
+      expandLevels(processedTasks, 1)
+      setExpandedTasks(initialExpanded)
+
+      const dependenciesResponse = await fetch(`/api/${apiPath}/${cotizacionId}/cronograma/dependencias`)
 
       if (dependenciesResponse.ok) {
         const dependenciesData = await dependenciesResponse.json()
-        console.log('✅ DEPENDENCIES RAW DATA:', dependenciesData.data?.length || 0, 'dependencies')
-        console.log('🔍 [GANTT PRO] Raw dependencies data:', dependenciesData.data)
         const processedDependencies = processDependenciesData(dependenciesData.data || [], processedTasks)
-        console.log('✅ PROCESSED DEPENDENCIES:', processedDependencies.length)
-        console.log('🔍 [GANTT PRO] Processed dependencies sample:', processedDependencies.slice(0, 3))
         setDependencies(processedDependencies)
-      } else {
-        console.error('❌ ERROR: No se pudieron cargar las dependencias:', dependenciesResponse.status, dependenciesResponse.statusText)
-        console.log('⚠️ [GANTT PRO] Dependencies not available for this entity type')
       }
 
-      console.log('✅ [GANTT PRO] loadGanttData completed successfully')
-
     } catch (err) {
-      console.error('❌ [GANTT PRO] Error in loadGanttData:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
       setLoading(false)
     }
   }
 
-  const processTreeData = (treeData: any[]): GanttTask[] => {
-    console.log('🔍 [GANTT PRO] Processing tree data:', treeData?.length || 0, 'nodes')
+  const processTreeData = (treeData: any[], adjustLevels: boolean = false): GanttTask[] => {
+    const levelOffset = adjustLevels ? 1 : 0
 
     const processNode = (node: any, parentId?: string): GanttTask => {
-      console.log('🔍 [GANTT PRO] Processing node:', node.id, node.type, node.nombre)
-
-      // Extraer fechas según el tipo de nodo
       let fechaInicio: string | null = null
       let fechaFin: string | null = null
 
@@ -270,42 +322,24 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
         fechaInicio = node.data?.fechaInicioComercial || node.data?.fechaInicio
         fechaFin = node.data?.fechaFinComercial || node.data?.fechaFin
       } else if (node.type === 'tarea') {
-        // Para tareas, las fechas están directamente en data.fechaInicio y data.fechaFin
         fechaInicio = node.data?.fechaInicio
         fechaFin = node.data?.fechaFin
       }
 
-      console.log('🔍 [GANTT PRO] Node dates - inicio:', fechaInicio, 'fin:', fechaFin)
-
-      // Validar y convertir fechas de manera segura
       let fechaInicioDate: Date | null = null
       let fechaFinDate: Date | null = null
 
       if (fechaInicio) {
         const date = new Date(fechaInicio)
-        if (!isNaN(date.getTime())) {
-          fechaInicioDate = date
-          console.log('✅ [GANTT PRO] Valid fechaInicio:', fechaInicioDate.toISOString())
-        } else {
-          console.log('❌ [GANTT PRO] Invalid fechaInicio:', fechaInicio)
-        }
-      } else {
-        console.log('⚠️ [GANTT PRO] No fechaInicio found for node:', node.id)
+        if (!isNaN(date.getTime())) fechaInicioDate = date
       }
 
       if (fechaFin) {
         const date = new Date(fechaFin)
-        if (!isNaN(date.getTime())) {
-          fechaFinDate = date
-          console.log('✅ [GANTT PRO] Valid fechaFin:', fechaFinDate.toISOString())
-        } else {
-          console.log('❌ [GANTT PRO] Invalid fechaFin:', fechaFin)
-        }
-      } else {
-        console.log('⚠️ [GANTT PRO] No fechaFin found for node:', node.id)
+        if (!isNaN(date.getTime())) fechaFinDate = date
       }
 
-      const task: GanttTask = {
+      return {
         id: node.id,
         nombre: node.nombre,
         tipo: node.type,
@@ -313,27 +347,20 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
         fechaFin: fechaFinDate,
         progreso: node.metadata?.progressPercentage || 0,
         estado: node.metadata?.status || 'pendiente',
-        nivel: node.level,
+        nivel: node.level + levelOffset,
         parentId,
         horasEstimadas: node.data?.horasEstimadas,
-        // responsable puede ser un objeto {id, name, email} o un string
         responsable: typeof node.data?.responsable === 'object' && node.data?.responsable !== null
           ? (node.data.responsable.name || node.data.responsable.nombre || node.data.responsable.email || 'Sin nombre')
           : node.data?.responsable,
         descripcion: node.data?.descripcion,
-        dependenciaId: node.data?.dependenciaId, // Para dependencias entre tareas
+        dependenciaId: node.data?.dependenciaId,
         color: getTaskColor(node.type),
         children: node.children?.map((child: any) => processNode(child, node.id)) || []
       }
-
-      console.log('✅ [GANTT PRO] Processed task:', task.id, task.nombre, 'dates:', task.fechaInicio?.toISOString(), task.fechaFin?.toISOString())
-
-      return task
     }
 
-    const result = treeData.map(node => processNode(node))
-    console.log('✅ [GANTT PRO] Final processed tasks:', result.length)
-    return result
+    return treeData.map(node => processNode(node))
   }
 
   const processDependenciesData = (dependenciesData: any[], tasks: GanttTask[]): Dependency[] => {
@@ -379,6 +406,8 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
   const getTaskColor = (tipo: string): string => {
     switch (tipo) {
+      case 'cotizacion': return '#4f46e5' // indigo-600
+      case 'proyecto': return '#1e40af' // blue-800
       case 'fase': return '#3b82f6' // blue-500
       case 'edt': return '#10b981' // emerald-500
       case 'zona': return '#f59e0b' // amber-500
@@ -405,114 +434,98 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
   }
 
   const applyFilters = useCallback(() => {
-    console.log('🔍 [GANTT PRO] applyFilters called with:', {
-      tasksCount: tasks.length,
-      searchTerm,
-      typeFilters: Array.from(typeFilters),
-      statusFilters: Array.from(statusFilters),
-      dependencyFilter
-    })
-
     let filtered = tasks
-    console.log('🔍 [GANTT PRO] Starting with', filtered.length, 'tasks')
 
-    // Filtro de búsqueda
     if (searchTerm) {
-      const beforeSearch = filtered.length
       filtered = filtered.filter(task =>
         task.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
       )
-      console.log('🔍 [GANTT PRO] After search filter:', filtered.length, 'of', beforeSearch)
     }
-
-    // Filtro de tipos
-    const beforeType = filtered.length
-    filtered = filtered.filter(task => typeFilters.has(task.tipo))
-    console.log('🔍 [GANTT PRO] After type filter:', filtered.length, 'of', beforeType, 'types allowed:', Array.from(typeFilters))
-
-    // Filtro de estados - allow tasks without estado or with matching estado
-    const beforeStatus = filtered.length
-    const statusCounts = filtered.reduce((acc, task) => {
-      const status = task.estado || 'undefined'
-      acc[status] = (acc[status] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-    console.log('🔍 [GANTT PRO] Task status distribution:', statusCounts)
-    console.log('🔍 [GANTT PRO] Sample task statuses:', filtered.slice(0, 3).map(t => ({ nombre: t.nombre, estado: t.estado })))
-
-    filtered = filtered.filter(task => !task.estado || statusFilters.has(task.estado))
-    console.log('🔍 [GANTT PRO] After status filter:', filtered.length, 'of', beforeStatus, 'statuses allowed:', Array.from(statusFilters))
-
-    // Filtro de dependencias
-    if (dependencyFilter === 'with-dependencies') {
-      const beforeDep = filtered.length
-      const taskIdsWithDependencies = new Set([
-        ...dependencies.map(dep => dep.tareaOrigen.id),
-        ...dependencies.map(dep => dep.tareaDependiente.id)
-      ])
-      filtered = filtered.filter(task => taskIdsWithDependencies.has(task.id))
-      console.log('🔍 [GANTT PRO] After dependency filter (with):', filtered.length, 'of', beforeDep)
-    } else if (dependencyFilter === 'without-dependencies') {
-      const beforeDep = filtered.length
-      const taskIdsWithDependencies = new Set([
-        ...dependencies.map(dep => dep.tareaOrigen.id),
-        ...dependencies.map(dep => dep.tareaDependiente.id)
-      ])
-      filtered = filtered.filter(task => !taskIdsWithDependencies.has(task.id))
-      console.log('🔍 [GANTT PRO] After dependency filter (without):', filtered.length, 'of', beforeDep)
-    }
-
-    console.log('🔍 [GANTT PRO] Final filtered tasks:', filtered.length)
-    console.log('🔍 [GANTT PRO] Sample filtered tasks:', filtered.slice(0, 3).map(t => ({ id: t.id, nombre: t.nombre, tipo: t.tipo })))
 
     setFilteredTasks(filtered)
-  }, [tasks, searchTerm, typeFilters, statusFilters, dependencyFilter, dependencies])
+  }, [tasks, searchTerm])
 
   const calculateTimeline = useCallback(() => {
-    console.log('🔍 [GANTT PRO] Calculating timeline for', filteredTasks.length, 'tasks')
+    if (filteredTasks.length === 0) return
 
-    if (filteredTasks.length === 0) {
-      console.log('⚠️ [GANTT PRO] No tasks to calculate timeline')
-      return
+    const collectAllTasks = (tasks: GanttTask[]): GanttTask[] => {
+      const result: GanttTask[] = []
+      for (const task of tasks) {
+        result.push(task)
+        if (task.children?.length) {
+          result.push(...collectAllTasks(task.children))
+        }
+      }
+      return result
     }
 
-    const validTasks = filteredTasks.filter(task =>
+    const allTasks = collectAllTasks(filteredTasks)
+    const validTasks = allTasks.filter(task =>
       task.fechaInicio instanceof Date && !isNaN(task.fechaInicio.getTime()) &&
       task.fechaFin instanceof Date && !isNaN(task.fechaFin.getTime())
     )
 
-    console.log('🔍 [GANTT PRO] Valid tasks with dates:', validTasks.length, 'of', filteredTasks.length)
-
     if (validTasks.length === 0) {
-      console.log('❌ [GANTT PRO] No valid dates found in tasks')
+      const today = new Date()
+      const endDate = new Date(today)
+      const effectiveMonths = timeRangeMonths === 0 ? 6 : timeRangeMonths
+      endDate.setMonth(endDate.getMonth() + effectiveMonths)
+      setTimeline({
+        startDate: today,
+        endDate: endDate,
+        unit: 'weeks',
+        unitWidth: 40 * zoomLevel,
+        totalWidth: effectiveMonths * 30 * (40 * zoomLevel / 7)
+      })
       return
     }
 
     const dates = validTasks.flatMap(task => [task.fechaInicio!, task.fechaFin!])
-    console.log('🔍 [GANTT PRO] All dates:', dates.map(d => d.toISOString()))
+    const projectMinDate = new Date(Math.min(...dates.map(d => d.getTime())))
+    const projectMaxDate = new Date(Math.max(...dates.map(d => d.getTime())))
 
-    const minDate = new Date(Math.min(...dates.map(d => d.getTime())))
-    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
+    let minDate: Date, maxDate: Date
 
-    console.log('🔍 [GANTT PRO] Date range:', minDate.toISOString(), 'to', maxDate.toISOString())
+    // Si timeRangeMonths es 0 ("Completo"), mostrar todo el proyecto
+    if (timeRangeMonths === 0) {
+      // Usar las fechas reales del proyecto con un pequeño buffer
+      minDate = new Date(projectMinDate)
+      maxDate = new Date(projectMaxDate)
+      // Buffer de 7 días a cada lado
+      minDate.setDate(minDate.getDate() - 7)
+      maxDate.setDate(maxDate.getDate() + 7)
+    } else {
+      // Calcular el rango basado en timeRangeMonths centrado en el proyecto
+      const projectDuration = projectMaxDate.getTime() - projectMinDate.getTime()
+      const requestedDuration = timeRangeMonths * 30 * 24 * 60 * 60 * 1000
 
-    // Agregar buffer
-    minDate.setDate(minDate.getDate() - 7)
-    maxDate.setDate(maxDate.getDate() + 7)
+      if (requestedDuration >= projectDuration) {
+        // Si el rango solicitado es mayor que el proyecto, centrar el proyecto
+        const buffer = (requestedDuration - projectDuration) / 2
+        minDate = new Date(projectMinDate.getTime() - buffer)
+        maxDate = new Date(projectMaxDate.getTime() + buffer)
+      } else {
+        // Si el rango es menor, mostrar desde el inicio del proyecto
+        minDate = new Date(projectMinDate)
+        maxDate = new Date(projectMinDate.getTime() + requestedDuration)
+      }
+
+      // Buffer mínimo
+      minDate.setDate(minDate.getDate() - 7)
+      maxDate.setDate(maxDate.getDate() + 7)
+    }
 
     const diffTime = maxDate.getTime() - minDate.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-    console.log('🔍 [GANTT PRO] Days difference:', diffDays)
-
     let unit: 'days' | 'weeks' | 'months' = 'weeks'
     let unitWidth = 40 * zoomLevel
 
-    if (diffDays <= 90) {
+    if (diffDays <= 60) {
       unit = 'days'
       unitWidth = 30 * zoomLevel
-    } else if (diffDays <= 365) {
+    } else if (diffDays <= 180) {
       unit = 'weeks'
       unitWidth = 40 * zoomLevel
     } else {
@@ -522,8 +535,6 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
     const totalWidth = diffDays * (unitWidth / (unit === 'days' ? 1 : unit === 'weeks' ? 7 : 30))
 
-    console.log('🔍 [GANTT PRO] Timeline config:', { unit, unitWidth, totalWidth, diffDays })
-
     setTimeline({
       startDate: minDate,
       endDate: maxDate,
@@ -531,9 +542,7 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
       unitWidth,
       totalWidth
     })
-
-    console.log('✅ [GANTT PRO] Timeline calculated successfully')
-  }, [filteredTasks, zoomLevel])
+  }, [filteredTasks, zoomLevel, timeRangeMonths])
 
   const toggleTaskExpansion = (taskId: string) => {
     setExpandedTasks(prev => {
@@ -636,10 +645,7 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
       }
 
       // Si alguna tarea no está visible, no dibujar la línea
-      if (sourceIndex === undefined || targetIndex === undefined) {
-        console.log('⚠️ Dependencia no visible:', dep.id, 'source:', sourceTask.id, sourceIndex, 'target:', targetTask.id, targetIndex)
-        return
-      }
+      if (sourceIndex === undefined || targetIndex === undefined) return
 
       // Calcular posiciones X (0-100 para viewBox)
       let startX: number, endX: number
@@ -672,11 +678,10 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
       // Calcular control points para curva bezier suave
       const deltaY = endY - startY
-      const deltaX = endX - startX
 
       // Tipo de curva según dirección
       let pathD: string
-      const curveOffset = 3 // Offset horizontal para el inicio de la curva
+      const curveOffset = 3
 
       if (Math.abs(deltaY) < ROW_HEIGHT) {
         // Tareas en filas cercanas - línea más directa
@@ -825,41 +830,45 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
     // Background colors based on hierarchy level
     const levelBackgrounds = [
-      'bg-blue-50/70 border-l-4 border-l-blue-500',     // Level 0: Fase
-      'bg-green-50/50 border-l-4 border-l-green-400',   // Level 1: EDT
-      'bg-amber-50/40 border-l-4 border-l-amber-300',   // Level 2: Actividad
-      'bg-gray-50/30 border-l-4 border-l-gray-300',     // Level 3: Tarea
+      'bg-indigo-50/90 border-l-4 border-l-indigo-600', // Level 0: Proyecto
+      'bg-blue-50/70 border-l-4 border-l-blue-500',     // Level 1: Fase
+      'bg-green-50/50 border-l-4 border-l-green-400',   // Level 2: EDT
+      'bg-amber-50/40 border-l-4 border-l-amber-300',   // Level 3: Actividad
+      'bg-gray-50/30 border-l-4 border-l-gray-300',     // Level 4: Tarea
     ]
     const levelBackground = levelBackgrounds[level] || levelBackgrounds[3]
 
+    // Level 0 gets more height for better visibility
+    const rowHeight = level === 0 ? ROW_HEIGHT + 12 : ROW_HEIGHT
+
     return (
       <React.Fragment key={task.id}>
-        <div className={`flex items-center border-b border-gray-100 hover:bg-gray-100/50 transition-colors ${levelBackground}`}>
+        <div className={`flex items-center border-b border-gray-100 hover:bg-gray-100/50 transition-colors ${levelBackground}`} style={{ height: `${rowHeight}px` }}>
           {/* Task info column */}
-          <div className="w-80 flex-shrink-0 p-3 border-r border-gray-200">
+          <div className={`w-80 flex-shrink-0 px-2 border-r border-gray-200 ${level === 0 ? 'py-3' : 'py-1.5'}`}>
             <div
-              className="flex items-center gap-2"
-              style={{ paddingLeft: `${level * 16}px` }}
+              className="flex items-center gap-1.5"
+              style={{ paddingLeft: `${level * 12}px` }}
             >
               {/* Hierarchy connector lines */}
               {level > 0 && (
                 <div className="relative flex items-center">
                   {/* Vertical line */}
                   <div
-                    className="absolute border-l-2 border-gray-300"
+                    className="absolute border-l border-gray-300"
                     style={{
-                      left: '-8px',
-                      top: '-30px',
-                      height: '38px'
+                      left: '-6px',
+                      top: '-22px',
+                      height: '28px'
                     }}
                   />
                   {/* Horizontal line */}
                   <div
-                    className="absolute border-t-2 border-gray-300"
+                    className="absolute border-t border-gray-300"
                     style={{
-                      left: '-8px',
-                      width: '8px',
-                      top: '8px'
+                      left: '-6px',
+                      width: '6px',
+                      top: '6px'
                     }}
                   />
                 </div>
@@ -879,68 +888,46 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
                 )}
               </div>
 
-              {/* Task details */}
+              {/* Task details - compact layout */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-1.5">
                   <Badge
-                    className={`text-xs px-2 py-0.5 ${level === 0 ? 'font-semibold' : ''}`}
+                    className={`text-[10px] px-1.5 py-0 leading-tight ${level === 0 ? 'font-semibold' : ''}`}
                     style={{
                       backgroundColor: task.color + (level === 0 ? '30' : '20'),
                       color: task.color,
-                      borderColor: task.color,
-                      fontSize: level === 0 ? '0.75rem' : level === 1 ? '0.7rem' : '0.65rem'
+                      borderColor: task.color
                     }}
                   >
                     {task.tipo}
                   </Badge>
                   <span
-                    className={`truncate ${level === 0 ? 'font-semibold text-sm' : level === 1 ? 'font-medium text-sm' : 'font-normal text-xs'}`}
+                    className={`truncate ${level === 0 ? 'font-semibold text-xs' : level === 1 ? 'font-medium text-xs' : 'font-normal text-[11px]'}`}
                     title={task.nombre}
                     style={{ color: level === 0 ? '#1f2937' : level === 1 ? '#374151' : '#6b7280' }}
                   >
                     {task.nombre}
                   </span>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs text-gray-500">
                   {task.horasEstimadas && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
+                    <span className="flex items-center gap-0.5 text-[10px] text-gray-400 flex-shrink-0">
+                      <Clock className="h-2.5 w-2.5" />
                       {task.horasEstimadas}h
                     </span>
                   )}
-                  {task.responsable && (
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      {typeof task.responsable === 'string'
-                        ? task.responsable
-                        : (task.responsable as any)?.name || (task.responsable as any)?.nombre || 'Sin asignar'}
-                    </span>
-                  )}
-                  <Badge
-                    variant="outline"
-                    className="text-xs px-1.5 py-0.5"
-                    style={{
-                      borderColor: getStatusColor(task.estado),
-                      color: getStatusColor(task.estado)
-                    }}
-                  >
-                    {task.estado}
-                  </Badge>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Timeline column */}
-          <div className="flex-1 relative" style={{ height: '60px' }}>
+          <div className="flex-1 relative" style={{ height: level === 0 ? '56px' : '44px' }}>
             {task.fechaInicio instanceof Date && !isNaN(task.fechaInicio.getTime()) &&
              task.fechaFin instanceof Date && !isNaN(task.fechaFin.getTime()) && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="absolute top-2 h-8 rounded-md shadow-sm border-2 cursor-pointer hover:shadow-md transition-shadow"
+                      className={`absolute rounded-md shadow-sm border cursor-pointer hover:shadow-md transition-shadow ${level === 0 ? 'top-4 h-6' : 'top-3 h-5'}`}
                       style={{
                         left: `${((task.fechaInicio.getTime() - timeline.startDate.getTime()) / (timeline.endDate.getTime() - timeline.startDate.getTime())) * 100}%`,
                         width: `${((task.fechaFin.getTime() - task.fechaInicio.getTime()) / (timeline.endDate.getTime() - timeline.startDate.getTime())) * 100}%`,
@@ -957,9 +944,12 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
                         }}
                       />
 
-                      {/* Task label */}
+                      {/* Task label with days and hours (name already in left column) */}
                       <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-gray-700 px-2">
-                        <span className="truncate">{task.nombre}</span>
+                        <span className="truncate">
+                          {Math.max(1, Math.ceil((task.fechaFin.getTime() - task.fechaInicio.getTime()) / (1000 * 60 * 60 * 24)))}d
+                          {task.horasEstimadas ? ` · ${task.horasEstimadas}h` : ''}
+                        </span>
                       </div>
                     </div>
                   </TooltipTrigger>
@@ -1043,12 +1033,11 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
+      <Card className="border-indigo-100">
+        <CardContent className="flex items-center justify-center py-8">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p>Cargando diagrama de Gantt profesional...</p>
-            <p className="text-sm text-muted-foreground mt-2">cotizacionId: {cotizacionId}</p>
+            <BarChart3 className="h-6 w-6 animate-pulse text-indigo-500 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Cargando Gantt Pro...</p>
           </div>
         </CardContent>
       </Card>
@@ -1058,10 +1047,10 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
   if (error) {
     return (
       <Card className="border-red-200">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-          <p className="text-red-600 text-center mb-4">{error}</p>
-          <Button onClick={loadGanttData} variant="outline">
+        <CardContent className="flex flex-col items-center justify-center py-8">
+          <AlertCircle className="h-8 w-8 text-red-500 mb-3" />
+          <p className="text-sm text-red-600 text-center mb-3">{error}</p>
+          <Button onClick={loadGanttData} variant="outline" size="sm">
             Reintentar
           </Button>
         </CardContent>
@@ -1070,145 +1059,78 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
   }
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <BarChart3 className="h-6 w-6 text-blue-600" />
-              Diagrama de Gantt Profesional
-              <Badge variant="secondary" className="ml-2">
-                {filteredTasks.length} tareas
-              </Badge>
-            </CardTitle>
-            <p className="text-sm text-gray-600 mt-1">
-              Vista avanzada con filtros, zoom y análisis de dependencias
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleZoomOut}>
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleResetZoom}>
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleZoomIn}>
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportToMSProject} title="Exportar a Microsoft Project">
-              <FileDown className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportToImage}>
-              <Download className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-
+    <Card className="border-indigo-100">
       <CardContent className="p-0">
-        {/* Toolbar */}
-        <div className="p-4 border-b bg-gray-50">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Search */}
-            <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Buscar tareas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-64"
-              />
-            </div>
+        {/* Single compact toolbar row */}
+        <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50/50">
+          {/* Left: Title + Stats */}
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-indigo-600" />
+            <span className="text-sm font-semibold">Gantt Pro</span>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              {filteredTasks.length}
+            </Badge>
+            {dependencies.length > 0 && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-600">
+                {dependencies.length} deps
+              </Badge>
+            )}
+          </div>
 
-            {/* Type filters */}
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium">Tipos:</span>
-              {['fase', 'edt', 'actividad', 'tarea'].map(type => (
-                <label key={type} className="flex items-center gap-1 text-sm">
-                  <Checkbox
-                    checked={typeFilters.has(type)}
-                    onCheckedChange={(checked) => {
-                      setTypeFilters(prev => {
-                        const newSet = new Set(prev)
-                        if (checked) {
-                          newSet.add(type)
-                        } else {
-                          newSet.delete(type)
-                        }
-                        return newSet
-                      })
-                    }}
-                  />
-                  {type}
-                </label>
-              ))}
-            </div>
+          {/* Center: Search */}
+          <div className="flex items-center gap-1">
+            <Search className="h-3 w-3 text-muted-foreground" />
+            <Input
+              placeholder="Buscar..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-6 w-32 text-xs"
+            />
+          </div>
 
-            {/* Status filters */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Estados:</span>
-              {['pendiente', 'en_progreso', 'completada', 'planificado'].map(status => (
-                <label key={status} className="flex items-center gap-1 text-sm">
-                  <Checkbox
-                    checked={statusFilters.has(status)}
-                    onCheckedChange={(checked) => {
-                      setStatusFilters(prev => {
-                        const newSet = new Set(prev)
-                        if (checked) {
-                          newSet.add(status)
-                        } else {
-                          newSet.delete(status)
-                        }
-                        return newSet
-                      })
-                    }}
-                  />
-                  {status}
-                </label>
-              ))}
-            </div>
-
-            {/* Critical path toggle */}
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={showCriticalPath}
-                onCheckedChange={(checked) => setShowCriticalPath(checked === true)}
-              />
-              <Target className="h-4 w-4" />
-              Camino crítico
-            </label>
-
-            {/* Dependencies toggle */}
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={showDependencies}
-                onCheckedChange={(checked) => setShowDependencies(checked === true)}
-              />
-              <ArrowRight className="h-4 w-4" />
-              Mostrar dependencias ({dependencies.length})
-              {dependencies.length > 0 && (
-                <Badge variant="secondary" className="text-xs ml-1">
-                  {dependencies.length} activas
-                </Badge>
-              )}
-            </label>
-
-            {/* Dependency filter */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Dependencias:</span>
-              <Select value={dependencyFilter} onValueChange={(value: 'all' | 'with-dependencies' | 'without-dependencies') => setDependencyFilter(value)}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las tareas</SelectItem>
-                  <SelectItem value="with-dependencies">Con dependencias</SelectItem>
-                  <SelectItem value="without-dependencies">Sin dependencias</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Right: Controls */}
+          <div className="flex items-center gap-1">
+            {dependencies.length > 0 && (
+              <label className="flex items-center gap-1 text-[10px] cursor-pointer mr-1" title="Mostrar dependencias">
+                <input
+                  type="checkbox"
+                  checked={showDependencies}
+                  onChange={(e) => setShowDependencies(e.target.checked)}
+                  className="h-3 w-3 rounded border-gray-300"
+                />
+                <ArrowRight className="h-3 w-3" />
+              </label>
+            )}
+            <Select value={timeRangeMonths.toString()} onValueChange={(v) => setTimeRangeMonths(parseInt(v))}>
+              <SelectTrigger className="h-6 w-24 text-[10px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Completo</SelectItem>
+                <SelectItem value="1">1 mes</SelectItem>
+                <SelectItem value="3">3 meses</SelectItem>
+                <SelectItem value="6">6 meses</SelectItem>
+                <SelectItem value="12">1 año</SelectItem>
+                <SelectItem value="24">2 años</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="w-px h-4 bg-gray-200 mx-0.5" />
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomOut} title="Alejar">
+              <ZoomOut className="h-3 w-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleResetZoom} title="Restablecer">
+              <RotateCcw className="h-3 w-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomIn} title="Acercar">
+              <ZoomIn className="h-3 w-3" />
+            </Button>
+            <div className="w-px h-4 bg-gray-200 mx-0.5" />
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportToMSProject} title="Exportar MS Project">
+              <FileDown className="h-3 w-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={exportToImage} title="Descargar imagen">
+              <Download className="h-3 w-3" />
+            </Button>
           </div>
         </div>
 
@@ -1216,7 +1138,7 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
         <div className="border-b bg-white sticky top-0 z-10">
           <div className="flex">
             {/* Task column header */}
-            <div className="w-80 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50">
+            <div className="w-80 flex-shrink-0 py-2 px-2 border-r border-gray-200 bg-gray-50">
               <span className="font-medium text-sm">Tareas</span>
             </div>
 
@@ -1364,56 +1286,36 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
           )}
         </div>
 
-        {/* Footer with statistics */}
-        <div className="p-4 border-t bg-gray-50 space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-600" />
-                <span>Progreso general: {Math.round(filteredTasks.reduce((sum, task) => sum + task.progreso, 0) / Math.max(filteredTasks.length, 1))}%</span>
+        {/* Compact Footer */}
+        <div className="px-3 py-2 border-t bg-gray-50/50">
+          <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <TrendingUp className="h-3 w-3 text-green-600" />
+                <span>{Math.round(filteredTasks.reduce((sum, task) => sum + task.progreso, 0) / Math.max(filteredTasks.length, 1))}%</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                <span>Horas totales: {filteredTasks.reduce((sum, task) => sum + (task.horasEstimadas || 0), 0)}</span>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Clock className="h-3 w-3 text-blue-600" />
+                <span>{filteredTasks.reduce((sum, task) => sum + (task.horasEstimadas || 0), 0)}h</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-orange-600" />
-                <span>Tareas críticas: {filteredTasks.filter(task => task.estado === 'en_progreso').length}</span>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Target className="h-3 w-3 text-orange-600" />
+                <span>{filteredTasks.filter(task => task.estado === 'en_progreso').length} activas</span>
               </div>
-              <div className="flex items-center gap-2">
-                <ArrowRight className="h-4 w-4 text-blue-600" />
-                <span>Dependencias activas: {dependencies.length}</span>
-              </div>
+              {showDependencies && dependencies.length > 0 && (
+                <>
+                  <div className="w-px h-3 bg-gray-200" />
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="text-muted-foreground">Deps:</span>
+                    <div className="flex items-center gap-0.5"><div className="w-3 h-0.5 bg-blue-500"></div><span>FS</span></div>
+                    <div className="flex items-center gap-0.5"><div className="w-3 h-0.5 bg-emerald-500 border-dashed border-t"></div><span>SS</span></div>
+                    <div className="flex items-center gap-0.5"><div className="w-3 h-0.5 bg-amber-500 border-dashed border-t"></div><span>FF</span></div>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="text-gray-500">
-              Zoom: {Math.round(zoomLevel * 100)}%
-            </div>
+            <span className="text-muted-foreground">Zoom: {Math.round(zoomLevel * 100)}%</span>
           </div>
-
-          {/* Leyenda de tipos de dependencia */}
-          {showDependencies && dependencies.length > 0 && (
-            <div className="flex items-center gap-6 pt-2 border-t border-gray-200">
-              <span className="text-xs font-medium text-gray-600">Tipos de dependencia:</span>
-              <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-0.5 bg-blue-500"></div>
-                  <span className="text-gray-600">Fin → Inicio (FS)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-0.5 bg-emerald-500" style={{ borderStyle: 'dashed', borderWidth: '1px', height: 0 }}></div>
-                  <span className="text-gray-600">Inicio → Inicio (SS)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-0.5 bg-amber-500" style={{ borderStyle: 'dashed', borderWidth: '1px', height: 0 }}></div>
-                  <span className="text-gray-600">Fin → Fin (FF)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-0.5 bg-red-500" style={{ borderStyle: 'dashed', borderWidth: '1px', height: 0 }}></div>
-                  <span className="text-gray-600">Inicio → Fin (SF)</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>

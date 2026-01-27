@@ -1,87 +1,236 @@
-// ===================================================
-// 📁 Archivo: layout.tsx
-// 📌 Ubicación: src/app/proyectos/[id]/layout.tsx
-// 🔧 Descripción: Layout compartido para todas las páginas del proyecto
-// 🎨 Proporciona navegación consistente y estructura común
-// ✍️ Autor: Sistema de IA
-// 📅 Última actualización: 2025-09-20
-// ===================================================
-
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, usePathname } from 'next/navigation'
+import { motion } from 'framer-motion'
+import {
+  Building,
+  Calendar,
+  AlertCircle,
+  ArrowLeft,
+  PanelRightClose,
+  PanelRightOpen,
+  FileText,
+  ExternalLink
+} from 'lucide-react'
+import { toast } from 'sonner'
 import { getProyectoById } from '@/lib/services/proyecto'
-import { Suspense } from 'react'
-import type { Proyecto } from '@/types'
+
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  ArrowLeft,
-  Calendar,
-  Building,
-  User,
-  TrendingUp,
-  AlertCircle,
-  Eye
-} from 'lucide-react'
 
-interface ProjectLayoutProps {
+import EstadoProyectoStepper from '@/components/proyectos/EstadoProyectoStepper'
+import ResumenTotalesProyecto from '@/components/proyectos/ResumenTotalesProyecto'
+
+import type { Proyecto, ProyectoCronograma } from '@/types'
+import { ProyectoContext, CronogramaStats } from './ProyectoContext'
+
+// Utility functions
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
+
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
+interface ProyectoLayoutProps {
   children: React.ReactNode
 }
 
-export default function ProjectLayout({ children }: ProjectLayoutProps) {
+export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   const { id } = useParams()
   const router = useRouter()
+  const pathname = usePathname()
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [cronogramaStats, setCronogramaStats] = useState<CronogramaStats>({
+    cronogramas: 0,
+    fases: 0,
+    edts: 0,
+    tareas: 0,
+    activeCronograma: null
+  })
+
+  // Determinar si estamos en el hub o en una sub-página
+  const isHubPage = pathname === `/proyectos/${id}`
+
+  // Páginas que necesitan ancho completo (sin sidebar)
+  // Includes specific page names AND path patterns for detail views
+  const fullWidthPages = ['cronograma']
+  const fullWidthPatterns = [
+    '/equipos/listas/', // Lista detail view (e.g., /equipos/listas/[listaId])
+    '/equipos/pedidos/', // Pedido detail view
+    '/equipos/detalle/' // Equipo detail view
+  ]
+  const currentPageSegment = pathname.split('/').pop() || ''
+  const isDetailView = fullWidthPatterns.some(pattern => pathname.includes(pattern))
+  const needsFullWidth = fullWidthPages.includes(currentPageSegment) || isDetailView
+
+  // Estado para mostrar/ocultar sidebar en páginas full-width
+  const [showSidebar, setShowSidebar] = useState(!needsFullWidth)
+
+  // Actualizar visibilidad del sidebar cuando cambia la página
+  useEffect(() => {
+    setShowSidebar(!needsFullWidth)
+  }, [needsFullWidth])
+
+  // Obtener nombre de la sub-página actual
+  const getSubPageName = () => {
+    if (isHubPage) return null
+    const segments = pathname.split('/')
+    const lastSegment = segments[segments.length - 1]
+    const subPageNames: Record<string, string> = {
+      'equipos': 'Equipos',
+      'servicios': 'Servicios',
+      'gastos': 'Gastos',
+      'cronograma': 'Cronograma',
+      'listas': 'Listas',
+      'pedidos': 'Pedidos'
+    }
+    return subPageNames[lastSegment] || lastSegment
+  }
+  const currentSubPage = getSubPageName()
+
+  const refreshProyecto = async () => {
+    if (typeof id === 'string') {
+      try {
+        const data = await getProyectoById(id)
+        if (data) {
+          setProyecto(data)
+          await fetchCronogramaStats(id)
+        }
+      } catch {
+        toast.error('Error al actualizar proyecto')
+      }
+    }
+  }
+
+  const fetchCronogramaStats = async (projectId: string) => {
+    try {
+      const cronogramaResponse = await fetch(`/api/proyectos/${projectId}/cronograma`)
+      let cronogramasList: ProyectoCronograma[] = []
+
+      if (cronogramaResponse.ok) {
+        const cronogramaData = await cronogramaResponse.json()
+        if (cronogramaData.success) {
+          cronogramasList = cronogramaData.data
+        }
+      }
+
+      const [fasesResponse, edtsResponse, tareasResponse] = await Promise.all([
+        fetch(`/api/proyectos/${projectId}/cronograma/fases`),
+        fetch(`/api/proyectos/${projectId}/cronograma/edts`),
+        fetch(`/api/proyectos/${projectId}/cronograma/tareas`)
+      ])
+
+      let fasesCount = 0
+      let edtsCount = 0
+      let tareasCount = 0
+
+      if (fasesResponse.ok) {
+        const fasesData = await fasesResponse.json()
+        if (fasesData.success) fasesCount = fasesData.data.length
+      }
+
+      if (edtsResponse.ok) {
+        const edtsData = await edtsResponse.json()
+        if (edtsData.success) edtsCount = edtsData.data.length
+      }
+
+      if (tareasResponse.ok) {
+        const tareasData = await tareasResponse.json()
+        if (tareasData.success) tareasCount = tareasData.data.length
+      }
+
+      if (cronogramasList.length === 0) {
+        try {
+          const createResponse = await fetch(`/api/proyectos/${projectId}/cronograma/generar-desde-cotizacion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'comercial',
+              nombre: 'Cronograma Comercial',
+              esBaseline: false
+            })
+          })
+
+          if (createResponse.ok) {
+            const updatedCronogramaResponse = await fetch(`/api/proyectos/${projectId}/cronograma`)
+            if (updatedCronogramaResponse.ok) {
+              const updatedData = await updatedCronogramaResponse.json()
+              if (updatedData.success) {
+                cronogramasList = updatedData.data
+              }
+            }
+          }
+        } catch (createError) {
+          console.warn('Error creando cronograma:', createError)
+        }
+      }
+
+      const activeCronograma = cronogramasList.find(c => c.esBaseline) || cronogramasList[0] || null
+
+      setCronogramaStats({
+        cronogramas: cronogramasList.length,
+        fases: fasesCount,
+        edts: edtsCount,
+        tareas: tareasCount,
+        activeCronograma
+      })
+    } catch (error) {
+      console.warn('Error fetching cronograma stats:', error)
+    }
+  }
 
   useEffect(() => {
-    if (!id) return
-    getProyectoById(id as string)
-      .then((data) => {
-        if (!data) {
-          router.push('/proyectos')
-          return
-        }
-        setProyecto(data)
-      })
-      .catch(() => {
-        router.push('/proyectos')
-      })
-      .finally(() => setLoading(false))
-  }, [id, router])
+    if (typeof id === 'string') {
+      setLoading(true)
+      getProyectoById(id)
+        .then(async (data) => {
+          if (data) {
+            setProyecto(data)
+            await fetchCronogramaStats(id)
+          } else {
+            setError('Proyecto no encontrado')
+          }
+        })
+        .catch(() => setError('Error al cargar proyecto.'))
+        .finally(() => setLoading(false))
+    }
+  }, [id])
 
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount)
+  const handleDataUpdate = (updatedProyecto: Proyecto) => {
+    setProyecto(updatedProyecto)
   }
 
-  const formatDate = (date: string) => {
-    return new Intl.DateTimeFormat('es-PE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }).format(new Date(date))
-  }
-
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="space-y-6">
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <Skeleton className="h-12 w-full rounded-lg" />
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-24 rounded-lg" />
-              ))}
+        <div className="container mx-auto p-4 sm:p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-8 w-48" />
+            </div>
+            <div className="flex flex-col xl:flex-row gap-4">
+              <div className="flex-1">
+                <Skeleton className="h-[600px] w-full rounded-lg" />
+              </div>
+              <div className="xl:w-80">
+                <Skeleton className="h-64 w-full rounded-lg" />
+              </div>
             </div>
           </div>
         </div>
@@ -89,15 +238,16 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
     )
   }
 
-  if (!proyecto) {
+  // Error state
+  if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <Card className="border-red-200 bg-red-50 max-w-md">
+        <Card className="border-destructive max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-            <h3 className="text-lg font-semibold text-red-800 mb-2">Proyecto no encontrado</h3>
-            <p className="text-red-600 mb-4 text-center">El proyecto que buscas no existe.</p>
-            <Button onClick={() => router.push('/proyectos')} className="bg-red-600 hover:bg-red-700">
+            <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+            <h2 className="text-xl font-semibold text-destructive mb-2">Error al cargar proyecto</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => router.push('/proyectos')} variant="outline">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Volver a Proyectos
             </Button>
@@ -107,31 +257,170 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
     )
   }
 
+  if (!proyecto) return null
+
   return (
-    <Suspense fallback={
+    <ProyectoContext.Provider value={{ proyecto, setProyecto: handleDataUpdate, refreshProyecto, loading, cronogramaStats }}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="space-y-6">
-            <div className="animate-pulse">
-              <div className="h-16 bg-gray-200 rounded-xl mb-6"></div>
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
-                ))}
+        <div className="container mx-auto p-4 sm:p-6">
+          {/* Header - Hidden on detail views for maximum content space */}
+          {!isDetailView && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="mb-4"
+            >
+              {/* Breadcrumb + Info Principal */}
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2 flex-wrap text-sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push('/proyectos')}
+                    className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Proyectos
+                  </Button>
+                  <span className="text-muted-foreground">/</span>
+                  {currentSubPage ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push(`/proyectos/${id}`)}
+                        className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                      >
+                        <span className="font-mono">{proyecto.codigo}</span>
+                        <span className="mx-1">:</span>
+                        <span className="truncate max-w-[150px]">{proyecto.nombre}</span>
+                      </Button>
+                      <span className="text-muted-foreground">/</span>
+                      <span className="font-medium text-foreground">{currentSubPage}</span>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono bg-muted px-2 py-0.5 rounded border">
+                        {proyecto.codigo}
+                      </span>
+                      <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate max-w-[300px]">
+                        {proyecto.nombre}
+                      </h1>
+                    </div>
+                  )}
+                </div>
+
+                {/* Acciones Principales */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {proyecto.cotizacionId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/comercial/cotizaciones/${proyecto.cotizacionId}`)}
+                      className="h-8 text-blue-700 border-blue-300 hover:bg-blue-50"
+                    >
+                      <FileText className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Cotización</span>
+                      <ExternalLink className="h-3 w-3 ml-1" />
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
+
+              {/* Status Flow + Metadata */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <EstadoProyectoStepper
+                  proyecto={proyecto}
+                  onUpdated={(nuevoEstado) =>
+                    handleDataUpdate({ ...proyecto, estado: nuevoEstado })
+                  }
+                />
+
+                <span className="hidden sm:block text-muted-foreground">|</span>
+
+                <div className="flex items-center gap-2 flex-wrap text-sm">
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Building className="h-3.5 w-3.5" />
+                    {proyecto.cliente?.nombre || 'Sin cliente'}
+                  </span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatDate(proyecto.fechaInicio)}
+                  </span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="font-semibold text-gray-900">
+                    {formatCurrency(proyecto.grandTotal || 0)}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Layout de 2 Columnas */}
+          <div className="flex flex-col xl:flex-row gap-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="flex-1 min-w-0"
+            >
+              {children}
+            </motion.div>
+
+            {showSidebar && (
+              <motion.aside
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="xl:w-80 xl:flex-shrink-0"
+              >
+                <div className="xl:sticky xl:top-4 space-y-4">
+                  {needsFullWidth && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSidebar(false)}
+                      className="w-full text-muted-foreground hover:text-foreground"
+                    >
+                      <PanelRightClose className="h-4 w-4 mr-2" />
+                      Ocultar panel
+                    </Button>
+                  )}
+
+                  <ResumenTotalesProyecto proyecto={proyecto} />
+
+                  {!isHubPage && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push(`/proyectos/${id}`)}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Volver al Resumen
+                    </Button>
+                  )}
+                </div>
+              </motion.aside>
+            )}
+
+            {!showSidebar && needsFullWidth && (
+              <div className="fixed bottom-4 right-4 z-50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSidebar(true)}
+                  className="shadow-lg bg-white hover:bg-gray-50"
+                >
+                  <PanelRightOpen className="h-4 w-4 mr-2" />
+                  Resumen
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    }>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="max-w-7xl mx-auto p-6 space-y-6">
-          {/* Page Content */}
-          <div className="space-y-6">
-            {children}
-          </div>
-        </div>
-      </div>
-    </Suspense>
+    </ProyectoContext.Provider>
   )
 }

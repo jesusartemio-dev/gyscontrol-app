@@ -15,7 +15,7 @@ import { ProyectoDependenciaTarea } from '@/types/modelos'
 interface GanttTask {
   id: string
   nombre: string
-  tipo: 'fase' | 'edt' | 'zona' | 'actividad' | 'tarea'
+  tipo: 'cotizacion' | 'proyecto' | 'fase' | 'edt' | 'zona' | 'actividad' | 'tarea'
   fechaInicio: Date | null
   fechaFin: Date | null
   progreso: number

@@ -64,6 +64,8 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
             responsableId: session.user.id,
             codigo: item.codigo,
             descripcion: item.descripcion || '',
+            marca: item.marca || '', // ✅ Copiar marca
+            categoria: item.categoria || '', // ✅ Copiar categoria
             unidad: item.unidad || 'UND',
             cantidad: item.cantidad,
             presupuesto: item.precioCliente || 0,

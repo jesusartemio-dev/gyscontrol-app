@@ -890,6 +890,8 @@ export interface Proyecto {
   clienteId: string
   comercialId: string
   gestorId: string
+  supervisorId?: string
+  liderId?: string
   cotizacionId?: string
 
   nombre: string
@@ -914,7 +916,10 @@ export interface Proyecto {
   cliente: Cliente
   comercial: User
   gestor: User
+  supervisor?: User
+  lider?: User
   cotizacion?: Cotizacion
+  personalProyecto?: PersonalProyecto[]
 
   equipos: ProyectoEquipoCotizado[]
   servicios: ProyectoServicioCotizado[]
@@ -926,6 +931,25 @@ export interface Proyecto {
 
   // ✅ Nueva relación con cronogramas
   cronogramas: ProyectoCronograma[]
+}
+
+// ✅ Roles dinámicos del personal del proyecto
+export type RolPersonalProyecto = 'programador' | 'cadista' | 'ingeniero' | 'lider' | 'tecnico' | 'coordinador' | 'asistente'
+
+export interface PersonalProyecto {
+  id: string
+  proyectoId: string
+  userId: string
+  rol: RolPersonalProyecto
+  fechaAsignacion: string
+  fechaFin?: string
+  activo: boolean
+  notas?: string
+  createdAt: string
+  updatedAt: string
+
+  proyecto?: Proyecto
+  user?: User
 }
 
 export interface ProyectoEquipoCotizado {
@@ -1137,6 +1161,7 @@ export interface ListaEquipoItem {
   descripcion: string
   categoria: string // ✅ Campo agregado para consistencia con otras entidades
   unidad: string
+  marca: string // ✅ Campo agregado para exportación Excel
   cantidad: number
   verificado: boolean
   comentarioRevision?: string
@@ -1619,7 +1644,8 @@ export interface RegistroProgreso {
 export type EstadoEdt = 'planificado' | 'en_progreso' | 'detenido' | 'completado' | 'cancelado' | 'pausado'
 export type PrioridadEdt = 'baja' | 'media' | 'alta' | 'critica'
 export type OrigenTrabajo = 'planificado' | 'adicional' | 'correctivo' | 'emergencia'
-export type ProyectoEstado = 'creado' | 'en_planificacion' | 'en_ejecucion' | 'pausado' | 'completado' | 'cancelado' | 'listas_pendientes' | 'listas_aprobadas' | 'pedidos_creados'
+// Flujo: creado → en_planificacion → listas → pedidos → en_ejecucion → en_cierre → cerrado
+export type ProyectoEstado = 'creado' | 'en_planificacion' | 'listas_pendientes' | 'listas_aprobadas' | 'pedidos_creados' | 'en_ejecucion' | 'en_cierre' | 'cerrado' | 'pausado' | 'cancelado'
 
 // 📋 Interface principal para ProyectoEdt
 export interface ProyectoEdt {

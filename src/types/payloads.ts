@@ -378,6 +378,8 @@ export interface ProyectoPayload {
   clienteId: string
   comercialId: string
   gestorId: string
+  supervisorId?: string
+  liderId?: string
   cotizacionId?: string
 
   nombre: string
@@ -396,6 +398,21 @@ export interface ProyectoPayload {
 }
 
 export interface ProyectoUpdatePayload extends Partial<ProyectoPayload> {}
+
+// ✅ Payloads para Personal del Proyecto
+import type { RolPersonalProyecto } from './modelos'
+
+export interface PersonalProyectoPayload {
+  proyectoId: string
+  userId: string
+  rol: RolPersonalProyecto
+  fechaAsignacion?: string
+  fechaFin?: string
+  activo?: boolean
+  notas?: string
+}
+
+export interface PersonalProyectoUpdatePayload extends Partial<PersonalProyectoPayload> {}
 
 export interface ProyectoEquipoCotizadoPayload {
   proyectoId: string
@@ -537,6 +554,7 @@ export interface ListaEquipoItemPayload {
   descripcion: string
   categoria?: string // ✅ Opcional - si hay catalogoEquipoId, se obtiene del catálogo
   unidad: string
+  marca?: string // ✅ Campo marca directo en el item
   cantidad: number
 
   verificado?: boolean

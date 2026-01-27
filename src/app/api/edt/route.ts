@@ -9,6 +9,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 
 export async function GET() {
   try {
@@ -31,7 +32,11 @@ export async function POST(req: Request) {
   try {
     const data = await req.json()
     const nueva = await prisma.edt.create({
-      data,
+      data: {
+        id: randomUUID(),
+        updatedAt: new Date(),
+        ...data,
+      },
     })
     return NextResponse.json(nueva)
   } catch (error) {

@@ -56,6 +56,8 @@ export async function POST(req: Request) {
         responsableId: session.user.id,
         codigo: item.codigo,
         descripcion: item.descripcion || '',
+        marca: item.marca || '', // ✅ Copiar marca
+        categoria: item.categoria || '', // ✅ Copiar categoria
         unidad: item.unidad || '',
         cantidad: item.cantidad,
         presupuesto: item.precioInterno,

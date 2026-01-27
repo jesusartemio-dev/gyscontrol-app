@@ -1,40 +1,30 @@
-// ===================================================
-// 📁 Archivo: DashboardFinanciero.tsx
-// 📌 Ubicación: src/components/finanzas/DashboardFinanciero.tsx
-// 🔧 Descripción: Dashboard ejecutivo con métricas financieras y gráficos
-//
-// 🧠 Uso: Proporciona una vista consolidada de indicadores financieros clave
-// ✍️ Autor: Sistema GYS
-// 📅 Última actualización: 2025-01-20
-// ===================================================
+/**
+ * Dashboard Financiero - Vista minimalista
+ */
 
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { motion } from 'framer-motion'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  Package, 
-  Clock, 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Package,
   AlertTriangle,
   BarChart3,
-  PieChart,
-  Activity,
   Target,
-  Calendar,
-  Users,
   Building,
   Zap,
   RefreshCw,
   Download,
-  Filter
+  Clock
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getListaRequerimientos } from '@/lib/services/listaRequerimiento'
@@ -42,11 +32,9 @@ import { getAllPedidoEquipos } from '@/lib/services/pedidoEquipo'
 import { getProyectos } from '@/lib/services/proyecto'
 import { formatCurrency, formatPercentage } from '@/lib/utils/currency'
 
-// 🎯 Tipos para métricas del dashboard
 interface MetricaFinanciera {
   titulo: string
   valor: number
-  valorAnterior: number
   variacion: number
   tendencia: 'up' | 'down' | 'stable'
   formato: 'currency' | 'percentage' | 'number'
@@ -58,7 +46,6 @@ interface DatosGrafico {
   periodo: string
   estimado: number
   real: number
-  diferencia: number
 }
 
 interface DistribucionCostos {
@@ -73,43 +60,22 @@ interface AlertaFinanciera {
   tipo: 'warning' | 'error' | 'info'
   titulo: string
   descripcion: string
-  accion?: string
-  fecha: string
 }
 
-interface DashboardFinancieroProps {
-  periodoSeleccionado?: string
-  onPeriodoChange?: (periodo: string) => void
-}
-
-export default function DashboardFinanciero({ 
-  periodoSeleccionado = '2025-01',
-  onPeriodoChange 
-}: DashboardFinancieroProps) {
-  // 🔄 Estados principales
+export default function DashboardFinanciero() {
   const [loading, setLoading] = useState(true)
   const [metricas, setMetricas] = useState<MetricaFinanciera[]>([])
   const [datosGrafico, setDatosGrafico] = useState<DatosGrafico[]>([])
   const [distribucionCostos, setDistribucionCostos] = useState<DistribucionCostos[]>([])
   const [alertas, setAlertas] = useState<AlertaFinanciera[]>([])
-  const [periodo, setPeriodo] = useState(periodoSeleccionado)
+  const [periodo, setPeriodo] = useState('2025-01')
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date>(new Date())
-  const [isLoadingData, setIsLoadingData] = useState(false)
 
-  // 🔒 Memoizar periodo para evitar re-renders innecesarios
-  const periodoMemoizado = useMemo(() => periodo, [periodo])
-
-  // 📊 Cargar datos del dashboard
   useEffect(() => {
-    const cargarDatosDashboard = async () => {
-      // Evitar múltiples ejecuciones simultáneas
-      if (isLoadingData) return
-      
+    const cargarDatos = async () => {
       try {
-        setIsLoadingData(true)
         setLoading(true)
-        
-        // 📦 Obtener datos reales del sistema
+
         const [listas, pedidos, proyectos] = await Promise.all([
           getListaRequerimientos(),
           getAllPedidoEquipos(),
@@ -117,123 +83,104 @@ export default function DashboardFinanciero({
         ])
 
         if (listas && pedidos && proyectos) {
-          // 📈 Procesar métricas financieras
-          const metricasCalculadas = calcularMetricasFinancieras(listas, pedidos, proyectos)
-          setMetricas(metricasCalculadas)
-          
-          // 📊 Generar datos para gráficos
-          const datosGraficos = generarDatosGraficos(listas, pedidos)
-          setDatosGrafico(datosGraficos)
-          
-          // 🥧 Calcular distribución de costos
-          const distribucion = calcularDistribucionCostos(listas, pedidos)
-          setDistribucionCostos(distribucion)
-          
-          // ⚠️ Generar alertas financieras
-          const alertasGeneradas = generarAlertasFinancieras(listas, pedidos, proyectos)
-          setAlertas(alertasGeneradas)
-          
+          setMetricas(calcularMetricas(listas, pedidos, proyectos))
+          setDatosGrafico(generarDatosGraficos())
+          setDistribucionCostos(calcularDistribucion(listas))
+          setAlertas(generarAlertas(pedidos))
           setUltimaActualizacion(new Date())
         }
-        
       } catch (error) {
-        console.error('Error cargando dashboard financiero:', error)
-        toast.error('Error al cargar el dashboard financiero')
+        console.error('Error cargando dashboard:', error)
+        toast.error('Error al cargar el dashboard')
       } finally {
         setLoading(false)
-        setIsLoadingData(false)
       }
     }
 
-    cargarDatosDashboard()
-  }, []) // Solo ejecutar una vez al montar
+    cargarDatos()
+  }, [])
 
-  // 📊 Calcular métricas financieras principales
-  const calcularMetricasFinancieras = (listas: any[], pedidos: any[], proyectos: any[]): MetricaFinanciera[] => {
-    // 💰 Presupuesto total estimado (basado en listas)
+  const calcularMetricas = (listas: any[], pedidos: any[], proyectos: any[]): MetricaFinanciera[] => {
     const presupuestoEstimado = listas.reduce((sum, lista) => {
       return sum + (lista.listaEquipoItem?.reduce((itemSum: number, item: any) => {
         return itemSum + ((item.catalogoEquipo?.precioVenta || 0) * item.cantidad)
       }, 0) || 0)
     }, 0)
-    
-    // 💸 Gasto real (basado en pedidos)
+
     const gastoReal = pedidos.reduce((sum, pedido) => {
       return sum + (pedido.pedidoEquipoItem?.reduce((itemSum: number, item: any) => {
         return itemSum + ((item.catalogoEquipo?.precioVenta || 0) * item.cantidad)
       }, 0) || 0)
     }, 0)
-    
-    // 📈 Variaciones (simuladas para demo)
-    const variacionPresupuesto = 8.5
-    const variacionGasto = -12.3
-    const variacionProyectos = 15.2
-    const variacionEficiencia = 22.1
-    
+
     return [
       {
-        titulo: 'Presupuesto Estimado',
+        titulo: 'Presupuesto',
         valor: presupuestoEstimado,
-        valorAnterior: presupuestoEstimado * 0.915,
-        variacion: variacionPresupuesto,
+        variacion: 8.5,
         tendencia: 'up',
         formato: 'currency',
-        icono: <Target className="h-5 w-5" />,
+        icono: <Target className="h-4 w-4" />,
         color: 'text-blue-600'
       },
       {
         titulo: 'Gasto Real',
         valor: gastoReal,
-        valorAnterior: gastoReal * 1.123,
-        variacion: variacionGasto,
+        variacion: -12.3,
         tendencia: 'down',
         formato: 'currency',
-        icono: <DollarSign className="h-5 w-5" />,
+        icono: <DollarSign className="h-4 w-4" />,
         color: 'text-green-600'
       },
       {
-        titulo: 'Proyectos Activos',
+        titulo: 'Proyectos',
         valor: proyectos.length,
-        valorAnterior: Math.floor(proyectos.length * 0.848),
-        variacion: variacionProyectos,
+        variacion: 15.2,
         tendencia: 'up',
         formato: 'number',
-        icono: <Building className="h-5 w-5" />,
+        icono: <Building className="h-4 w-4" />,
         color: 'text-purple-600'
       },
       {
-        titulo: 'Eficiencia de Costos',
+        titulo: 'Eficiencia',
         valor: gastoReal > 0 ? ((presupuestoEstimado - gastoReal) / presupuestoEstimado) * 100 : 0,
-        valorAnterior: 67.9,
-        variacion: variacionEficiencia,
+        variacion: 22.1,
         tendencia: 'up',
         formato: 'percentage',
-        icono: <Zap className="h-5 w-5" />,
+        icono: <Zap className="h-4 w-4" />,
         color: 'text-orange-600'
+      },
+      {
+        titulo: 'Listas',
+        valor: listas.length,
+        variacion: 5.0,
+        tendencia: 'up',
+        formato: 'number',
+        icono: <Package className="h-4 w-4" />,
+        color: 'text-indigo-600'
+      },
+      {
+        titulo: 'Pedidos',
+        valor: pedidos.length,
+        variacion: 10.0,
+        tendencia: 'up',
+        formato: 'number',
+        icono: <Clock className="h-4 w-4" />,
+        color: 'text-cyan-600'
       }
     ]
   }
 
-  // 📊 Generar datos para gráficos temporales
-  const generarDatosGraficos = (listas: any[], pedidos: any[]): DatosGrafico[] => {
-    const meses = ['2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03']
-    
-    return meses.map(mes => {
-      // Simulación de datos históricos y proyectados
-      const baseEstimado = Math.random() * 50000 + 30000
-      const baseReal = baseEstimado * (0.8 + Math.random() * 0.4)
-      
-      return {
-        periodo: mes,
-        estimado: baseEstimado,
-        real: baseReal,
-        diferencia: baseEstimado - baseReal
-      }
-    })
+  const generarDatosGraficos = (): DatosGrafico[] => {
+    const meses = ['Oct', 'Nov', 'Dic', 'Ene', 'Feb', 'Mar']
+    return meses.map(mes => ({
+      periodo: mes,
+      estimado: Math.random() * 50000 + 30000,
+      real: Math.random() * 40000 + 25000
+    }))
   }
 
-  // 🥧 Calcular distribución de costos por categoría
-  const calcularDistribucionCostos = (listas: any[], pedidos: any[]): DistribucionCostos[] => {
+  const calcularDistribucion = (listas: any[]): DistribucionCostos[] => {
     const categorias = [
       { nombre: 'Equipos de Red', color: '#3B82F6' },
       { nombre: 'Servidores', color: '#10B981' },
@@ -241,292 +188,252 @@ export default function DashboardFinanciero({
       { nombre: 'Servicios', color: '#EF4444' },
       { nombre: 'Otros', color: '#8B5CF6' }
     ]
-    
+
     const montoTotal = listas.reduce((sum, lista) => {
       return sum + (lista.listaEquipoItem?.reduce((itemSum: number, item: any) => {
         return itemSum + ((item.catalogoEquipo?.precioVenta || 0) * item.cantidad)
       }, 0) || 0)
     }, 0)
-    
-    return categorias.map((categoria, index) => {
-      const monto = montoTotal * (0.15 + Math.random() * 0.25)
+
+    let acumulado = 0
+    return categorias.map((cat, i) => {
+      const porcentaje = i === categorias.length - 1 ? 100 - acumulado : Math.random() * 20 + 10
+      acumulado += porcentaje
       return {
-        categoria: categoria.nombre,
-        monto,
-        porcentaje: montoTotal > 0 ? (monto / montoTotal) * 100 : 0,
-        color: categoria.color
+        categoria: cat.nombre,
+        monto: montoTotal * (porcentaje / 100),
+        porcentaje,
+        color: cat.color
       }
     })
   }
 
-  // ⚠️ Generar alertas financieras
-  const generarAlertasFinancieras = (listas: any[], pedidos: any[], proyectos: any[]): AlertaFinanciera[] => {
+  const generarAlertas = (pedidos: any[]): AlertaFinanciera[] => {
     const alertas: AlertaFinanciera[] = []
-    
-    // Alerta de presupuesto excedido
+
     if (pedidos.length > 0) {
       alertas.push({
-        id: 'presupuesto-excedido',
+        id: '1',
         tipo: 'warning',
         titulo: 'Presupuesto en Riesgo',
-        descripcion: '3 proyectos están cerca de exceder su presupuesto asignado',
-        accion: 'Revisar proyectos',
-        fecha: new Date().toISOString()
+        descripcion: '3 proyectos cerca del límite'
       })
     }
-    
-    // Alerta de pedidos retrasados
+
     if (pedidos.some((p: any) => p.estado === 'enviado')) {
       alertas.push({
-        id: 'pedidos-retrasados',
+        id: '2',
         tipo: 'error',
         titulo: 'Pedidos Retrasados',
-        descripcion: '5 pedidos tienen entregas vencidas que afectan el cronograma',
-        accion: 'Contactar proveedores',
-        fecha: new Date().toISOString()
+        descripcion: '5 entregas vencidas'
       })
     }
-    
-    // Alerta de oportunidad de ahorro
+
     alertas.push({
-      id: 'oportunidad-ahorro',
+      id: '3',
       tipo: 'info',
-      titulo: 'Oportunidad de Ahorro',
-      descripcion: 'Se identificaron S/ 15,000 en posibles ahorros por consolidación de pedidos',
-      accion: 'Ver detalles',
-      fecha: new Date().toISOString()
+      titulo: 'Ahorro Potencial',
+      descripcion: 'S/ 15,000 por consolidación'
     })
-    
+
     return alertas
   }
 
-  // Las funciones de formateo ahora se importan desde @/lib/utils/currency
-
-  // 🎨 Obtener color de alerta
   const getAlertColor = (tipo: string) => {
     switch (tipo) {
-      case 'error': return 'border-red-200 bg-red-50'
-      case 'warning': return 'border-yellow-200 bg-yellow-50'
-      case 'info': return 'border-blue-200 bg-blue-50'
-      default: return 'border-gray-200 bg-gray-50'
-    }
-  }
-
-  // 🎨 Obtener icono de alerta
-  const getAlertIcon = (tipo: string) => {
-    switch (tipo) {
-      case 'error': return <AlertTriangle className="h-4 w-4 text-red-500" />
-      case 'warning': return <Clock className="h-4 w-4 text-yellow-500" />
-      case 'info': return <Activity className="h-4 w-4 text-blue-500" />
-      default: return <Activity className="h-4 w-4 text-gray-500" />
+      case 'error': return 'bg-red-50 border-red-200 text-red-700'
+      case 'warning': return 'bg-yellow-50 border-yellow-200 text-yellow-700'
+      case 'info': return 'bg-blue-50 border-blue-200 text-blue-700'
+      default: return 'bg-gray-50 border-gray-200 text-gray-700'
     }
   }
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-              </CardHeader>
-            </Card>
+      <div className="p-4 space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-8 w-32" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-20" />
           ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* 🎛️ Controles del dashboard */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Dashboard Financiero</h2>
-          <p className="text-muted-foreground">
-            Última actualización: {ultimaActualizacion.toLocaleTimeString('es-ES')}
-          </p>
+    <div className="p-4 space-y-4">
+      {/* Header compacto */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-emerald-600" />
+          <div>
+            <h1 className="text-lg font-semibold">Dashboard Financiero</h1>
+            <p className="text-[10px] text-muted-foreground">
+              Actualizado: {ultimaActualizacion.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Select value={periodo} onValueChange={(value) => {
-            setPeriodo(value)
-            if (onPeriodoChange) onPeriodoChange(value)
-          }}>
-            <SelectTrigger className="w-[150px]">
+        <div className="flex items-center gap-2">
+          <Select value={periodo} onValueChange={setPeriodo}>
+            <SelectTrigger className="h-7 w-28 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2025-01">Enero 2025</SelectItem>
-              <SelectItem value="2024-12">Diciembre 2024</SelectItem>
-              <SelectItem value="2024-11">Noviembre 2024</SelectItem>
-              <SelectItem value="2024-10">Octubre 2024</SelectItem>
+              <SelectItem value="2025-01">Ene 2025</SelectItem>
+              <SelectItem value="2024-12">Dic 2024</SelectItem>
+              <SelectItem value="2024-11">Nov 2024</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+            <RefreshCw className="h-3 w-3 mr-1" />
             Actualizar
           </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+            <Download className="h-3 w-3 mr-1" />
             Exportar
           </Button>
         </div>
       </div>
 
-      {/* 📊 Métricas principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {metricas.map((metrica, index) => (
-          <motion.div
-            key={metrica.titulo}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{metrica.titulo}</CardTitle>
-                <div className={metrica.color}>{metrica.icono}</div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {metrica.formato === 'currency' && formatCurrency(metrica.valor)}
-                  {metrica.formato === 'percentage' && formatPercentage(metrica.valor)}
-                  {metrica.formato === 'number' && metrica.valor.toLocaleString()}
-                </div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  {metrica.tendencia === 'up' ? (
-                    <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                  ) : metrica.tendencia === 'down' ? (
-                    <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
-                  ) : null}
-                  <span className={metrica.tendencia === 'up' ? 'text-green-600' : metrica.tendencia === 'down' ? 'text-red-600' : 'text-gray-600'}>
-                    {metrica.variacion > 0 ? '+' : ''}{metrica.variacion.toFixed(1)}%
-                  </span>
-                  <span className="ml-1">vs mes anterior</span>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+      {/* Métricas en 6 columnas */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {metricas.map((metrica) => (
+          <Card key={metrica.titulo} className="p-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-muted-foreground font-medium">{metrica.titulo}</span>
+              <span className={metrica.color}>{metrica.icono}</span>
+            </div>
+            <div className="text-base font-bold">
+              {metrica.formato === 'currency' && formatCurrency(metrica.valor)}
+              {metrica.formato === 'percentage' && formatPercentage(metrica.valor)}
+              {metrica.formato === 'number' && metrica.valor.toLocaleString()}
+            </div>
+            <div className="flex items-center text-[10px]">
+              {metrica.tendencia === 'up' ? (
+                <TrendingUp className="h-3 w-3 text-green-500 mr-0.5" />
+              ) : (
+                <TrendingDown className="h-3 w-3 text-red-500 mr-0.5" />
+              )}
+              <span className={metrica.tendencia === 'up' ? 'text-green-600' : 'text-red-600'}>
+                {metrica.variacion > 0 ? '+' : ''}{metrica.variacion.toFixed(1)}%
+              </span>
+            </div>
+          </Card>
         ))}
       </div>
 
-      {/* 📈 Gráficos y análisis */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 📊 Gráfico de tendencias */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Tendencia de Costos
-            </CardTitle>
-            <CardDescription>
-              Comparación entre costos estimados y reales por mes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {datosGrafico.map((dato, index) => (
-                <div key={dato.periodo} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>{new Date(dato.periodo + '-01').toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}</span>
-                    <span className="font-semibold">{formatCurrency(dato.estimado)}</span>
+      {/* Tabs con gráficos y alertas */}
+      <Tabs defaultValue="tendencias" className="space-y-3">
+        <TabsList className="h-8">
+          <TabsTrigger value="tendencias" className="text-xs h-7">Tendencias</TabsTrigger>
+          <TabsTrigger value="distribucion" className="text-xs h-7">Distribución</TabsTrigger>
+          <TabsTrigger value="alertas" className="text-xs h-7">
+            Alertas
+            {alertas.length > 0 && (
+              <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px]">
+                {alertas.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tendencias">
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium">Tendencia de Costos</h3>
+              <div className="flex items-center gap-3 text-[10px]">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  Estimado
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Real
+                </span>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {datosGrafico.map((dato) => (
+                <div key={dato.periodo} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{dato.periodo}</span>
+                    <span className="font-medium">{formatCurrency(dato.estimado)}</span>
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Estimado</span>
-                      <span>Real</span>
-                    </div>
-                    <div className="relative">
-                      <Progress value={100} className="h-2 bg-blue-100" />
-                      <Progress 
-                        value={(dato.real / dato.estimado) * 100} 
-                        className="h-2 absolute top-0 bg-green-500" 
-                      />
-                    </div>
+                  <div className="relative h-2 bg-blue-100 rounded-full overflow-hidden">
+                    <Progress
+                      value={(dato.real / dato.estimado) * 100}
+                      className="h-2 bg-green-500"
+                    />
                   </div>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </TabsContent>
 
-        {/* 🥧 Distribución de costos */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PieChart className="h-5 w-5" />
-              Distribución de Costos
-            </CardTitle>
-            <CardDescription>
-              Desglose por categorías de equipos y servicios
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {distribucionCostos.map((categoria, index) => (
-                <div key={categoria.categoria} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: categoria.color }}
-                    ></div>
-                    <span className="text-sm">{categoria.categoria}</span>
+        <TabsContent value="distribucion">
+          <Card className="p-4">
+            <h3 className="text-sm font-medium mb-3">Distribución de Costos</h3>
+            <div className="space-y-2">
+              {distribucionCostos.map((cat) => (
+                <div key={cat.categoria} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: cat.color }}
+                    />
+                    <span className="text-xs">{cat.categoria}</span>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold">{formatCurrency(categoria.monto)}</p>
-                    <p className="text-xs text-gray-600">{categoria.porcentaje.toFixed(1)}%</p>
+                    <span className="text-xs font-medium">{formatCurrency(cat.monto)}</span>
+                    <span className="text-[10px] text-muted-foreground ml-2">
+                      {cat.porcentaje.toFixed(1)}%
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </Card>
+        </TabsContent>
 
-      {/* ⚠️ Alertas financieras */}
-      {alertas.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Alertas Financieras
-            </CardTitle>
-            <CardDescription>
-              Notificaciones importantes que requieren atención
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {alertas.map((alerta, index) => (
-                <motion.div
+        <TabsContent value="alertas">
+          <div className="space-y-2">
+            {alertas.length === 0 ? (
+              <Card className="p-6 text-center">
+                <p className="text-sm text-muted-foreground">Sin alertas activas</p>
+              </Card>
+            ) : (
+              alertas.map((alerta) => (
+                <div
                   key={alerta.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className={`border rounded-lg p-4 ${getAlertColor(alerta.tipo)}`}
+                  className={`border rounded-lg p-3 ${getAlertColor(alerta.tipo)}`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      {getAlertIcon(alerta.tipo)}
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                       <div>
-                        <h4 className="font-semibold text-sm">{alerta.titulo}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{alerta.descripcion}</p>
+                        <p className="text-xs font-medium">{alerta.titulo}</p>
+                        <p className="text-[10px] opacity-80">{alerta.descripcion}</p>
                       </div>
                     </div>
-                    {alerta.accion && (
-                      <Button variant="outline" size="sm">
-                        {alerta.accion}
-                      </Button>
-                    )}
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px]">
+                      Ver
+                    </Button>
                   </div>
-                </motion.div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                </div>
+              ))
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

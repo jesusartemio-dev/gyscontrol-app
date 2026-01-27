@@ -21,7 +21,7 @@ import { z } from 'zod'
 const actualizarProyectoSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').optional(),
   codigo: z.string().min(1, 'El código es requerido').optional(),
-  estado: z.enum(['creado', 'en_planificacion', 'en_ejecucion', 'pausado', 'completado', 'cancelado', 'listas_pendientes', 'listas_aprobadas', 'pedidos_creados']).optional(),
+  estado: z.enum(['creado', 'en_planificacion', 'listas_pendientes', 'listas_aprobadas', 'pedidos_creados', 'en_ejecucion', 'en_cierre', 'cerrado', 'pausado', 'cancelado']).optional(),
   fechaInicio: z.string().datetime().optional(),
   fechaFin: z.string().datetime().optional(),
   presupuesto: z.number().min(0, 'El presupuesto debe ser positivo').optional(),
@@ -264,7 +264,7 @@ export async function GET(
     const fechaFin = proyecto.fechaFin ? new Date(proyecto.fechaFin) : null
     
     const alertas = {
-      proyectoRetrasado: fechaFin ? fechaActual > fechaFin && proyecto.estado !== 'completado' : false,
+      proyectoRetrasado: fechaFin ? fechaActual > fechaFin && proyecto.estado !== 'cerrado' : false,
       sinAprovisionamiento: kpis.cantidadListas === 0,
       desviacionPresupuesto: Math.abs(kpis.porcentajeDesviacion) > 10,
       pedidosRetrasados: kpis.alertas.pedidosRetrasados > 0,
@@ -355,13 +355,22 @@ export async function PUT(
       }
     }
 
+    // 📝 Construir datos de actualización (solo campos definidos)
+    const updateData: Record<string, unknown> = { updatedAt: new Date() }
+    if (datosValidados.nombre !== undefined) updateData.nombre = datosValidados.nombre
+    if (datosValidados.codigo !== undefined) updateData.codigo = datosValidados.codigo
+    if (datosValidados.estado !== undefined) updateData.estado = datosValidados.estado
+    if (datosValidados.fechaInicio !== undefined) updateData.fechaInicio = datosValidados.fechaInicio
+    if (datosValidados.fechaFin !== undefined) updateData.fechaFin = datosValidados.fechaFin
+    if (datosValidados.presupuesto !== undefined) updateData.presupuesto = datosValidados.presupuesto
+    if (datosValidados.descripcion !== undefined) updateData.descripcion = datosValidados.descripcion
+    if (datosValidados.comercialId !== undefined) updateData.comercialId = datosValidados.comercialId
+    if (datosValidados.gestorId !== undefined) updateData.gestorId = datosValidados.gestorId
+
     // 📝 Actualizar proyecto
     const proyectoActualizado = await prisma.proyecto.update({
       where: { id: proyectoId },
-      data: {
-        ...datosValidados,
-        updatedAt: new Date()
-      },
+      data: updateData,
       include: {
         comercial: {
           select: {

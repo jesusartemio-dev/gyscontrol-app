@@ -70,8 +70,11 @@ export async function PATCH(
         id: `lista-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         codigo: nuevo.codigo,
         descripcion: nuevo.descripcion,
+        marca: nuevo.marca || proyectoItem.marca || '', // ✅ Copiar marca
+        categoria: nuevo.categoria || proyectoItem.categoria || '', // ✅ Copiar categoria
         unidad: nuevo.unidad,
         cantidad: nuevo.cantidad,
+        presupuesto: nuevo.presupuesto || proyectoItem.precioCliente || 0, // ✅ Copiar presupuesto
         listaId: original.listaId,
         responsableId: session.user.id,
         estado: 'borrador',

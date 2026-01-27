@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
         proyectoServicioCotizado: {
           select: {
             id: true,
-            categoria: true
+            edt: true
           }
         },
         subtareas: queryParams.includeSubtareas ? {

@@ -18,9 +18,11 @@ export async function GET() {
   try {
     const plantillas = await prisma.plantillaServicioIndependiente.findMany({
       include: {
+        edt: true,
         plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
+            edt: true,
             recurso: true,
             unidadServicio: true
           },
@@ -47,7 +49,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
-    const { nombre, descripcion, categoria } = data
+    const { nombre, descripcion, edtId } = data
 
     if (!nombre || typeof nombre !== 'string') {
       return NextResponse.json({ error: 'Nombre es requerido' }, { status: 400 })
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
         id: randomUUID(),
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
-        categoria: categoria || 'General',
+        edtId: edtId || null,
         estado: 'borrador',
         totalInterno: 0,
         totalCliente: 0,
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest) {
         updatedAt: new Date(),
       },
       include: {
+        edt: true,
         plantillaServicioItemIndependiente: true,
         _count: {
           select: { plantillaServicioItemIndependiente: true }

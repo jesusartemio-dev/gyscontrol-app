@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       fechaInicio,
       fechaFin,
       gestorId,
-      estado = 'en_planificacion',
+      estado = 'creado',
       totalEquiposInterno,
       totalServiciosInterno,
       totalGastosInterno,
@@ -268,58 +268,28 @@ export async function POST(request: NextRequest) {
         },
 
         proyectoServicioCotizado: {
-          create: await Promise.all(cotizacion.cotizacionServicio.map(async (grupo: any) => {
-            // ✅ Obtener o crear EDT basado en la categoría del servicio
-            let edtId: string
-            try {
-              const categoriaEdt = await prisma.edt.findFirst({
-                where: { nombre: grupo.categoria }
-              })
-              
-              if (categoriaEdt) {
-                edtId = categoriaEdt.id
-                console.log(`✅ EDT encontrado para categoría "${grupo.categoria}": ${edtId}`)
-              } else {
-                // Si no existe, buscar una EDT por defecto
-                const edtDefault = await prisma.edt.findFirst({
-                  where: { nombre: { contains: 'General' } }
-                }) || await prisma.edt.findFirst()
-                
-                if (edtDefault) {
-                  edtId = edtDefault.id
-                  console.log(`⚠️ Usando EDT por defecto "${edtDefault.nombre}" para categoría "${grupo.categoria}": ${edtId}`)
-                } else {
-                  throw new Error(`No se pudo encontrar EDT para la categoría "${grupo.categoria}"`)
-                }
-              }
-            } catch (edtError) {
-              console.error(`❌ Error obteniendo EDT para categoría "${grupo.categoria}":`, edtError)
-              throw new Error(`Error al obtener EDT para categoría "${grupo.categoria}"`)
-            }
-
-            return {
-              id: randomUUID(),
-              nombre: grupo.nombre,
-              categoria: grupo.categoria,
-              subtotalInterno: grupo.subtotalInterno,
-              subtotalCliente: grupo.subtotalCliente,
-              responsableId: gestorId,
-              updatedAt: new Date(),
-              proyectoServicioCotizadoItem: {
-                create: (grupo.cotizacionServicioItem || []).map((item: any) => ({
-                  id: randomUUID(),
-                  catalogoServicioId: item.catalogoServicioId,
-                  categoria: item.categoria,
-                  costoHoraInterno: item.costoHora,
-                  costoHoraCliente: item.costoHora * item.margen,
-                  nombre: item.nombre,
-                  cantidadHoras: item.horaTotal,
-                  costoInterno: item.costoInterno,
-                  costoCliente: item.costoCliente,
-                  updatedAt: new Date(),
-                })),
-              },
-            }
+          create: cotizacion.cotizacionServicio.map((grupo: any) => ({
+            id: randomUUID(),
+            nombre: grupo.nombre,
+            edtId: grupo.edtId,
+            subtotalInterno: grupo.subtotalInterno,
+            subtotalCliente: grupo.subtotalCliente,
+            responsableId: gestorId,
+            updatedAt: new Date(),
+            proyectoServicioCotizadoItem: {
+              create: (grupo.cotizacionServicioItem || []).map((item: any) => ({
+                id: randomUUID(),
+                catalogoServicioId: item.catalogoServicioId,
+                edtId: item.edtId,
+                costoHoraInterno: item.costoHora,
+                costoHoraCliente: item.costoHora * item.margen,
+                nombre: item.nombre,
+                cantidadHoras: item.horaTotal,
+                costoInterno: item.costoInterno,
+                costoCliente: item.costoCliente,
+                updatedAt: new Date(),
+              })),
+            },
           })),
         },
 
@@ -470,7 +440,7 @@ export async function POST(request: NextRequest) {
           for (const faseCotizacion of cotizacion.cotizacionFase) {
             console.log(`📋 [CRONOGRAMA] Procesando fase: ${faseCotizacion.nombre} (ID: ${faseCotizacion.id})`)
 
-            // Crear fase en CRONOGRAMA COMERCIAL (fechas originales)
+            // Crear fase en CRONOGRAMA COMERCIAL (fechas ajustadas según nueva fecha inicio)
             console.log('📋 [CRONOGRAMA] Creando fase comercial...')
             const nuevaFaseComercial = await (prisma as any).proyectoFase.create({
               data: {
@@ -482,8 +452,8 @@ export async function POST(request: NextRequest) {
                 orden: faseCotizacion.orden,
                 estado: EstadoFase.planificado,
                 porcentajeAvance: 0,
-                fechaInicioPlan: faseCotizacion.fechaInicioPlan ? new Date(faseCotizacion.fechaInicioPlan) : undefined,
-                fechaFinPlan: faseCotizacion.fechaFinPlan ? new Date(faseCotizacion.fechaFinPlan) : undefined,
+                fechaInicioPlan: ajustarFecha(faseCotizacion.fechaInicioPlan),
+                fechaFinPlan: ajustarFecha(faseCotizacion.fechaFinPlan),
                 updatedAt: new Date()
               }
             })
@@ -570,7 +540,7 @@ export async function POST(request: NextRequest) {
 
           try {
             console.log(`🔧 [CRONOGRAMA] Creando EDT comercial...`)
-            // Crear EDT en CRONOGRAMA COMERCIAL (fechas originales)
+            // Crear EDT en CRONOGRAMA COMERCIAL (fechas ajustadas según nueva fecha inicio)
             const edtComercialProyecto = await (prisma as any).proyectoEdt.create({
               data: {
                 id: crypto.randomUUID(),
@@ -580,8 +550,8 @@ export async function POST(request: NextRequest) {
                 nombre: edtComercial.nombre || `EDT ${edtComercial.id}`,
                 edtId: edtId,
                 zona: undefined,
-                fechaInicioPlan: edtComercial.fechaInicioComercial,
-                fechaFinPlan: edtComercial.fechaFinComercial,
+                fechaInicioPlan: ajustarFecha(edtComercial.fechaInicioComercial),
+                fechaFinPlan: ajustarFecha(edtComercial.fechaFinComercial),
                 horasPlan: new Prisma.Decimal(edtComercial.horasEstimadas || 0),
                 responsableId: edtComercial.responsableId,
                 descripcion: edtComercial.descripcion,
@@ -619,15 +589,15 @@ export async function POST(request: NextRequest) {
             for (const actividadComercial of actividadesComerciales) {
               console.log(`⚙️ [CRONOGRAMA] Procesando actividad: ${actividadComercial.nombre}`)
 
-              // Create ProyectoActividad en CRONOGRAMA COMERCIAL (fechas originales)
+              // Create ProyectoActividad en CRONOGRAMA COMERCIAL (fechas ajustadas según nueva fecha inicio)
               const actividadComercialProyecto = await (prisma as any).proyectoActividad.create({
                 data: {
                   id: crypto.randomUUID(),
                   proyectoEdtId: edtComercialProyecto.id,
                   proyectoCronogramaId: cronogramaComercial.id,
                   nombre: actividadComercial.nombre,
-                  fechaInicioPlan: actividadComercial.fechaInicioComercial,
-                  fechaFinPlan: actividadComercial.fechaFinComercial,
+                  fechaInicioPlan: ajustarFecha(actividadComercial.fechaInicioComercial),
+                  fechaFinPlan: ajustarFecha(actividadComercial.fechaFinComercial),
                   estado: EstadoTarea.pendiente,
                   porcentajeAvance: 0,
                   horasPlan: new Prisma.Decimal(actividadComercial.horasEstimadas || 0),
@@ -665,11 +635,14 @@ export async function POST(request: NextRequest) {
                 console.log(`📝 Procesando tarea: ${tareaComercial.nombre}`)
 
                 // Crear tarea incluso si no tiene fechas específicas
-                const fechaInicio = tareaComercial.fechaInicio || actividadComercial.fechaInicioComercial || new Date()
-                const fechaFin = tareaComercial.fechaFin || actividadComercial.fechaFinComercial || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // +7 días por defecto
+                // Aplicar ajustarFecha para desplazar según nueva fecha de inicio del proyecto
+                const fechaInicioOriginal = tareaComercial.fechaInicio || actividadComercial.fechaInicioComercial || new Date()
+                const fechaFinOriginal = tareaComercial.fechaFin || actividadComercial.fechaFinComercial || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // +7 días por defecto
+                const fechaInicioAjustada = ajustarFecha(fechaInicioOriginal)
+                const fechaFinAjustada = ajustarFecha(fechaFinOriginal)
 
                 try {
-                  // Crear tarea en CRONOGRAMA COMERCIAL (fechas originales)
+                  // Crear tarea en CRONOGRAMA COMERCIAL (fechas ajustadas según nueva fecha inicio)
                   const tareaComercialProyecto = await prisma.proyectoTarea.create({
                     data: {
                       id: randomUUID(),
@@ -678,8 +651,8 @@ export async function POST(request: NextRequest) {
                       proyectoCronogramaId: cronogramaComercial.id,
                       nombre: tareaComercial.nombre || `Tarea ${tareaComercial.id}`,
                       descripcion: tareaComercial.descripcion,
-                      fechaInicio: fechaInicio,
-                      fechaFin: fechaFin,
+                      fechaInicio: fechaInicioAjustada ?? new Date(),
+                      fechaFin: fechaFinAjustada ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                       fechaInicioReal: null,
                       fechaFinReal: null,
                       horasEstimadas: tareaComercial.horasEstimadas,

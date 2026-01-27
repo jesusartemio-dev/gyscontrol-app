@@ -1,337 +1,487 @@
 /**
- * 🎯 Equipment Lists Master View Page - Enhanced UX/UI
- * 
- * Modern Master-Detail pattern implementation with enhanced UX/UI:
- * - Professional design with Framer Motion animations
- * - Responsive layout with modern components
- * - Enhanced breadcrumb navigation
- * - Real-time statistics with visual indicators
- * - Professional loading states and error handling
- * - Accessibility and performance optimizations
- * 
- * @author GYS Team
- * @version 3.0.0 - UX/UI Enhanced
+ * 🎯 Equipment Lists Page - Minimalist Version
+ * Focuses on showing equipment lists clearly
  */
 
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import { getProyectoById } from '@/lib/services/proyecto';
-import { getListaEquiposPorProyecto } from '@/lib/services/listaEquipo';
-import { transformToMasterList, calculateMasterListStats } from '@/lib/transformers/master-detail-transformers';
-import { ListaEquipoMasterView } from '@/components/proyectos/ListaEquipoMasterView';
-import { MasterStatsHeader } from '@/components/proyectos/MasterStatsHeader';
+import { getListaEquiposPorProyecto, deleteListaEquipo } from '@/lib/services/listaEquipo';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  ChevronRight, 
-  Package, 
-  Settings,
-  Download,
-  Share2,
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  ArrowLeft,
   List,
-  Grid3X3,
-  Home,
-  Building2,
-  Loader2,
+  Search,
+  RefreshCw,
+  CheckCircle2,
+  Clock,
   AlertCircle,
-  RefreshCw
+  FileText,
+  Eye,
+  Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
+import ModalCrearListaEquipo from '@/components/equipos/ModalCrearListaEquipo';
 import type { Proyecto } from '@/types';
 
-// ✅ Animation variants for Framer Motion
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.5,
-      ease: [0.25, 0.46, 0.45, 0.94] as const
-    }
-  }
-};
-
-
-
-// ✅ Page props interface
 interface PageProps {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
 }
 
-// ✅ Enhanced loading skeleton component
-const EnhancedSkeleton = () => (
-  <div className="space-y-6">
-    <div className="flex items-center gap-2">
-      <Skeleton className="h-4 w-20" />
-      <Skeleton className="h-4 w-4" />
-      <Skeleton className="h-4 w-32" />
-    </div>
+// Skeleton minimalista
+function LoadingSkeleton() {
+  return (
     <div className="space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-96" />
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-5 w-5" />
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-5 w-32 ml-auto" />
+      </div>
+      <div className="flex gap-3">
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-9 w-32" />
+      </div>
+      <div className="border rounded-lg">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex gap-4 p-3 border-b last:border-0">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+        ))}
+      </div>
     </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i}>
-          <CardContent className="p-6">
-            <Skeleton className="h-16 w-full" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  </div>
-);
+  );
+}
 
-// ✅ Error component
-const ErrorState = ({ onRetry }: { onRetry: () => void }) => (
-  <motion.div 
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{ opacity: 1, scale: 1 }}
-    className="flex flex-col items-center justify-center py-12 space-y-4"
-  >
-    <AlertCircle className="h-12 w-12 text-red-500" />
-    <h3 className="text-lg font-semibold">Error al cargar los datos</h3>
-    <p className="text-muted-foreground text-center max-w-md">
-      No se pudieron cargar los datos del proyecto. Por favor, verifica tu conexión e intenta nuevamente.
-    </p>
-    <Button onClick={onRetry} variant="outline">
-      <RefreshCw className="h-4 w-4 mr-2" />
-      Reintentar
-    </Button>
-  </motion.div>
-);
-
-// ✅ Main page component
-export default function EquipmentListsPage({ params }: PageProps) {
+// Componente de tabla de listas
+const ListasTable = memo(function ListasTable({
+  listas,
+  proyectoId,
+  onDelete,
+  onRefresh,
+  loading
+}: {
+  listas: any[];
+  proyectoId: string;
+  onDelete: (lista: any) => void;
+  onRefresh: () => void;
+  loading: boolean;
+}) {
   const router = useRouter();
+  const [search, setSearch] = useState('');
+  const [filterEstado, setFilterEstado] = useState('all');
+  const [sortField, setSortField] = useState<string>('createdAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const filteredListas = useMemo(() => {
+    let result = listas;
+
+    if (search) {
+      const term = search.toLowerCase();
+      result = result.filter(lista =>
+        lista.codigo?.toLowerCase().includes(term) ||
+        lista.nombre?.toLowerCase().includes(term) ||
+        lista.descripcion?.toLowerCase().includes(term)
+      );
+    }
+
+    if (filterEstado !== 'all') {
+      result = result.filter(lista => lista.estado === filterEstado);
+    }
+
+    return result;
+  }, [listas, search, filterEstado]);
+
+  const sortedListas = useMemo(() => {
+    return [...filteredListas].sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      if (sortField === 'createdAt' || sortField === 'updatedAt') {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      }
+
+      if (aVal == null || bVal == null) return 0;
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredListas, sortField, sortDir]);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="h-3 w-3 ml-1" />
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
+  const getEstadoBadge = (estado: string) => {
+    const estados: Record<string, { icon: any; className: string; label: string }> = {
+      borrador: { icon: FileText, className: 'bg-gray-100 text-gray-700', label: 'Borrador' },
+      por_revisar: { icon: Clock, className: 'bg-yellow-100 text-yellow-700', label: 'Por Revisar' },
+      por_cotizar: { icon: Clock, className: 'bg-orange-100 text-orange-700', label: 'Por Cotizar' },
+      por_validar: { icon: AlertCircle, className: 'bg-blue-100 text-blue-700', label: 'Por Validar' },
+      por_aprobar: { icon: AlertCircle, className: 'bg-purple-100 text-purple-700', label: 'Por Aprobar' },
+      aprobado: { icon: CheckCircle2, className: 'bg-green-100 text-green-700', label: 'Aprobado' },
+      rechazado: { icon: AlertCircle, className: 'bg-red-100 text-red-700', label: 'Rechazado' }
+    };
+
+    const config = estados[estado] || estados.borrador;
+    const Icon = config.icon;
+
+    return (
+      <Badge className={`${config.className} text-xs font-normal`}>
+        <Icon className="h-3 w-3 mr-1" />
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const formatDate = (date: string) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Filtros compactos */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar lista..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+
+        <Select value={filterEstado} onValueChange={setFilterEstado}>
+          <SelectTrigger className="w-36 h-9 text-sm">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="borrador">Borrador</SelectItem>
+            <SelectItem value="por_revisar">Por Revisar</SelectItem>
+            <SelectItem value="por_cotizar">Por Cotizar</SelectItem>
+            <SelectItem value="por_validar">Por Validar</SelectItem>
+            <SelectItem value="por_aprobar">Por Aprobar</SelectItem>
+            <SelectItem value="aprobado">Aprobado</SelectItem>
+            <SelectItem value="rechazado">Rechazado</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRefresh}
+          disabled={loading}
+          className="h-9"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+
+        <span className="text-xs text-muted-foreground ml-auto">
+          {sortedListas.length} de {listas.length} listas
+        </span>
+      </div>
+
+      {/* Tabla */}
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="w-[140px]">
+                <button
+                  onClick={() => handleSort('codigo')}
+                  className="flex items-center text-xs font-medium"
+                >
+                  Código<SortIcon field="codigo" />
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  onClick={() => handleSort('nombre')}
+                  className="flex items-center text-xs font-medium"
+                >
+                  Nombre<SortIcon field="nombre" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[80px] text-right">
+                <button
+                  onClick={() => handleSort('totalItems')}
+                  className="flex items-center justify-end w-full text-xs font-medium"
+                >
+                  Items<SortIcon field="totalItems" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[100px] text-right text-xs font-medium">Total</TableHead>
+              <TableHead className="w-[90px]">
+                <button
+                  onClick={() => handleSort('createdAt')}
+                  className="flex items-center text-xs font-medium"
+                >
+                  Fecha<SortIcon field="createdAt" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[110px] text-xs font-medium">Estado</TableHead>
+              <TableHead className="w-[80px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedListas.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
+                  {search || filterEstado !== 'all' ? 'No se encontraron listas' : 'Sin listas de equipos'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              sortedListas.map((lista) => (
+                <TableRow
+                  key={lista.id}
+                  className="group cursor-pointer hover:bg-muted/50"
+                  onClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`)}
+                >
+                  <TableCell className="font-mono text-xs text-muted-foreground py-2">
+                    {lista.codigo || '-'}
+                  </TableCell>
+                  <TableCell className="py-2">
+                    <div>
+                      <span className="text-sm font-medium line-clamp-1">{lista.nombre}</span>
+                      {lista.descripcion && (
+                        <span className="text-xs text-muted-foreground line-clamp-1 block">
+                          {lista.descripcion}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm py-2">
+                    {lista.totalItems || lista.items?.length || 0}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
+                    ${(lista.totalPresupuesto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground py-2">
+                    {formatDate(lista.createdAt)}
+                  </TableCell>
+                  <TableCell className="py-2">
+                    {getEstadoBadge(lista.estado)}
+                  </TableCell>
+                  <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => onDelete(lista)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+});
+
+export default function EquipmentListsPage({ params }: PageProps) {
   const [proyectoId, setProyectoId] = useState<string>('');
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
-  const [listasEquipo, setListasEquipo] = useState<any[]>([]);
+  const [listas, setListas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [listaToDelete, setListaToDelete] = useState<{ id: string; nombre: string; codigo?: string } | null>(null);
 
-  // ✅ Initialize params
   useEffect(() => {
-    const initParams = async () => {
-      const resolvedParams = await params;
-      setProyectoId(resolvedParams.id);
-    };
-    initParams();
+    params.then(p => setProyectoId(p.id));
   }, [params]);
 
-  // ✅ Fetch data
   const fetchData = async () => {
     if (!proyectoId) return;
-    
+
     try {
       setLoading(true);
-      setError(null);
-      
       const [proyectoData, listasData] = await Promise.all([
         getProyectoById(proyectoId),
         getListaEquiposPorProyecto(proyectoId)
       ]);
-      
+
       setProyecto(proyectoData);
-      setListasEquipo(listasData || []);
+      setListas(listasData || []);
     } catch (err) {
       console.error('Error fetching data:', err);
-      setError('Error al cargar los datos');
+      toast.error('Error al cargar los datos');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (proyectoId) {
-      fetchData();
-    }
+    if (proyectoId) fetchData();
   }, [proyectoId]);
 
-  // ✅ Loading state
-  if (loading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <EnhancedSkeleton />
-      </div>
-    );
-  }
+  const handleDeleteClick = (lista: any) => {
+    setListaToDelete({ id: lista.id, nombre: lista.nombre, codigo: lista.codigo });
+    setDeleteDialogOpen(true);
+  };
 
-  // ✅ Error state
-  if (error || !proyecto) {
-    return <ErrorState onRetry={fetchData} />;
-  }
+  const handleConfirmDelete = async () => {
+    if (!listaToDelete) return;
 
-  // 🔄 Transform data to Master format
-  const masterLists = transformToMasterList(listasEquipo);
-  const masterStats = calculateMasterListStats(masterLists);
+    try {
+      const success = await deleteListaEquipo(listaToDelete.id);
+      if (success) {
+        toast.success('Lista eliminada');
+        fetchData();
+      } else {
+        toast.error('Error al eliminar');
+      }
+    } catch (error) {
+      toast.error('Error al eliminar');
+    } finally {
+      setDeleteDialogOpen(false);
+      setListaToDelete(null);
+    }
+  };
+
+  if (loading && !proyecto) return <LoadingSkeleton />;
+
+  // Stats calculados
+  const totalListas = listas.length;
+  const listasAprobadas = listas.filter(l => l.estado === 'aprobado').length;
+  const totalItems = listas.reduce((sum, l) => sum + (l.totalItems || l.items?.length || 0), 0);
+  const totalPresupuesto = listas.reduce((sum, l) => sum + (l.totalPresupuesto || 0), 0);
 
   return (
-    <motion.div 
-      className="space-y-6"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* 🧭 Enhanced Breadcrumb Navigation */}
-      <motion.nav 
-        variants={itemVariants}
-        className="flex items-center gap-2 text-sm bg-muted/30 rounded-lg px-4 py-3 border"
-      >
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => router.push('/proyectos')}
-          className="h-auto p-1 hover:bg-background/80"
-        >
-          <Home className="h-4 w-4 mr-1" />
-          Proyectos
-        </Button>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => router.push(`/proyectos/${proyectoId}`)}
-          className="h-auto p-1 hover:bg-background/80"
-        >
-          <Building2 className="h-4 w-4 mr-1" />
-          {proyecto.nombre}
-        </Button>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => router.push(`/proyectos/${proyectoId}/equipos`)}
-          className="h-auto p-1 hover:bg-background/80"
-        >
-          <Package className="h-4 w-4 mr-1" />
-          Equipos
-        </Button>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium text-foreground flex items-center gap-1">
-          <List className="h-4 w-4" />
-          Listas Técnicas
-        </span>
-      </motion.nav>
+    <div className="space-y-4">
+      {/* Header compacto */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          {/* Navegación mínima */}
+          <Link
+            href={`/proyectos/${proyectoId}/equipos`}
+            className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3 mr-1" />
+            Equipos
+          </Link>
 
-      {/* 📋 Enhanced Header Section */}
-      <motion.div 
-        variants={itemVariants}
-        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-xl p-6 border"
-      >
-        <div className="space-y-2">
-          <motion.h1 
-            className="text-3xl font-bold tracking-tight flex items-center gap-3"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <List className="h-6 w-6 text-white" />
-            </div>
-            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              {proyecto.codigo} - Listas de Equipos
-            </span>
-          </motion.h1>
-          <motion.p
-            className="text-muted-foreground text-lg"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            Gestión centralizada de listas técnicas para{' '}
-            <span className="font-semibold text-foreground">{proyecto.nombre}</span>
-          </motion.p>
+          {/* Título con icono */}
+          <div className="flex items-center gap-2">
+            <List className="h-5 w-5 text-blue-600" />
+            <h1 className="text-lg font-semibold">Listas de Equipos</h1>
+          </div>
+
+          {/* Stats inline */}
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span>{totalListas} listas</span>
+            <span className="text-green-600">{listasAprobadas} aprobadas</span>
+            <span>{totalItems} items</span>
+            <span className="font-mono">${totalPresupuesto.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+          </div>
         </div>
-        
-        <motion.div 
-          className="flex flex-wrap gap-2"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="hover:bg-green-50 hover:border-green-200 transition-all duration-200"
-          >
-            <Share2 className="h-4 w-4 mr-2" />
-            Compartir
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="hover:bg-purple-50 hover:border-purple-200 transition-all duration-200"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
-          <Button 
-            size="sm"
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Configurar
-          </Button>
-        </motion.div>
-      </motion.div>
 
-
-
-      {/* 📊 Consolidated Master Statistics */}
-      <motion.div variants={itemVariants}>
-        <MasterStatsHeader 
-          stats={masterStats}
-          loading={loading}
-          showProgress={true}
-          className="mb-6"
+        {/* Acción principal */}
+        <ModalCrearListaEquipo
+          proyectoId={proyectoId}
+          onCreated={() => {
+            fetchData();
+            toast.success('Lista creada');
+          }}
+          triggerClassName="h-8"
         />
-      </motion.div>
+      </div>
 
-      <motion.div variants={itemVariants}>
-        <Separator className="my-8" />
-      </motion.div>
+      {/* Tabla de listas - El foco principal */}
+      <ListasTable
+        listas={listas}
+        proyectoId={proyectoId}
+        onDelete={handleDeleteClick}
+        onRefresh={fetchData}
+        loading={loading}
+      />
 
-      {/* 🎯 Enhanced Master View Component */}
-      <motion.div variants={itemVariants}>
-        <Suspense
-          fallback={
-            <div className="p-8 space-y-4">
-              <div className="flex items-center gap-2 mb-6">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                <span className="text-sm text-muted-foreground">Cargando vista maestra...</span>
-              </div>
-              <EnhancedSkeleton />
-            </div>
-          }
-        >
-          <ListaEquipoMasterView
-            proyectoId={proyectoId}
-            proyectoCodigo={proyecto.codigo}
-            initialLists={masterLists}
-            initialStats={masterStats}
-          />
-        </Suspense>
-      </motion.div>
-    </motion.div>
+      {/* Modal de confirmación de eliminación */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Eliminar Lista de Equipos
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>¿Estás seguro de que deseas eliminar esta lista?</p>
+              {listaToDelete && (
+                <div className="bg-muted/50 rounded-md p-3 mt-2">
+                  <p className="font-medium text-foreground">{listaToDelete.nombre}</p>
+                  {listaToDelete.codigo && (
+                    <p className="text-xs text-muted-foreground font-mono">{listaToDelete.codigo}</p>
+                  )}
+                </div>
+              )}
+              <p className="text-red-600 text-sm font-medium mt-2">
+                Esta acción no se puede deshacer.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-9">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="h-9 bg-red-600 hover:bg-red-700 text-white"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

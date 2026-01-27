@@ -1,23 +1,10 @@
 /**
- * 📄 Página de Listas de Equipo - Sistema GYS
- * 
- * Funcionalidades:
- * - ✅ Listado paginado de listas de equipo
- * - ✅ Filtros avanzados (proyecto, estado, fechas, montos)
- * - ✅ Búsqueda por texto
- * - ✅ Ordenamiento por columnas
- * - ✅ Estadísticas en tiempo real
- * - ✅ Exportación a PDF/Excel
- * - ✅ Navegación breadcrumb
- * - ✅ Estados de carga y error
- * - ✅ Responsive design
+ * Página de Listas de Equipo - Vista minimalista
  */
 
 import { Suspense } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 import ListasEquipoPageContent from './ListasEquipoPageContent'
-
-// 📝 Types
-import type { EstadoListaEquipo } from '@/types/modelos'
 
 export default function ListasEquipoPage() {
   return (
@@ -29,25 +16,21 @@ export default function ListasEquipoPage() {
 
 function Loading() {
   return (
-    <div className="container mx-auto p-6">
-      <div className="space-y-6">
-        {/* Breadcrumb skeleton */}
-        <div className="h-4 bg-gray-200 rounded w-64 animate-pulse" />
-        
-        {/* Header skeleton */}
-        <div className="space-y-2">
-          <div className="h-8 bg-gray-200 rounded w-48 animate-pulse" />
-          <div className="h-4 bg-gray-200 rounded w-96 animate-pulse" />
-        </div>
-        
-        {/* Filters skeleton */}
-        <div className="h-32 bg-gray-200 rounded animate-pulse" />
-        
-        {/* Table skeleton */}
-        <div className="space-y-4">
-          <div className="h-12 bg-gray-200 rounded animate-pulse" />
-          <div className="h-64 bg-gray-200 rounded animate-pulse" />
-        </div>
+    <div className="p-4 space-y-4">
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-7 w-24" />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-20" />
+        ))}
+      </div>
+      <Skeleton className="h-10 w-full" />
+      <div className="space-y-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-10 w-full" />
+        ))}
       </div>
     </div>
   )

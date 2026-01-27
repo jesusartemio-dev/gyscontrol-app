@@ -1,9 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, X, Pencil, Trash2, Filter } from 'lucide-react'
+import { Save, X, Edit, Trash2, Search } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import type { CotizacionEquipoItem } from '@/types'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
 
 interface Props {
   items: CotizacionEquipoItem[]
@@ -51,142 +62,188 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
 
   const filteredItems = items.filter(i =>
     i.descripcion.toLowerCase().includes(filter.toLowerCase()) ||
-    i.codigo.toLowerCase().includes(filter.toLowerCase())
+    i.codigo.toLowerCase().includes(filter.toLowerCase()) ||
+    i.marca?.toLowerCase().includes(filter.toLowerCase())
   )
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Filter className="w-4 h-4 text-gray-500" />
-        <input
-          type="text"
-          placeholder="Filtrar por código o descripción..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="border rounded px-2 py-1 text-sm w-full max-w-sm"
-        />
-      </div>
+    <div className="space-y-2">
+      {/* Search filter - only show if more than 3 items */}
+      {items.length > 3 && (
+        <div className="relative max-w-xs">
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
+          <Input
+            type="text"
+            placeholder="Buscar..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="pl-7 h-7 text-xs"
+          />
+        </div>
+      )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border rounded shadow-sm">
-          <thead className="bg-gray-100 text-gray-700">
-            <tr>
-              <th className="p-2">Código</th>
-              <th className="p-2">Descripción</th>
-              <th className="p-2 text-center">Cantidad</th>
-              <th className="p-2 text-center">Unidad</th>
-              <th className="p-2 text-right">P. Interno (USD)</th>
-              <th className="p-2 text-right">P. Cliente (USD)</th>
-              <th className="p-2 text-right text-blue-700">Costo Interno</th>
-              <th className="p-2 text-right text-green-700">Costo Cliente</th>
-              <th className="p-2 text-right">% Margen</th>
-              <th className="p-2 text-center">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map(item => {
-              const isEdit = editModeId === item.id
-              const margen = item.costoInterno > 0
-                ? ((item.costoCliente - item.costoInterno) / item.costoInterno) * 100
-                : 0
+      <div className="border rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50/80 border-b">
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-20">Código</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-700">Descripción</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-24">Marca</th>
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16">Cant.</th>
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-12">Und.</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-20">P.Int</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-20">P.Cli</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">Interno</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">Cliente</th>
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">%</th>
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filteredItems.map((item, idx) => {
+                const isEdit = editModeId === item.id
+                const margen = item.costoInterno > 0
+                  ? ((item.costoCliente - item.costoInterno) / item.costoInterno) * 100
+                  : 0
 
-              return (
-                <tr key={item.id} className="border-t hover:bg-gray-50">
-                  <td className="p-2">{item.codigo}</td>
-                  <td className="p-2">{item.descripcion}</td>
-                  <td className="p-2 text-center">
-                    {isEdit ? (
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={editCantidad}
-                        onChange={(e) => setEditCantidad(parseFloat(e.target.value))}
-                        className="border rounded px-1 w-16 text-right"
-                      />
-                    ) : (
-                      item.cantidad
+                return (
+                  <tr
+                    key={item.id}
+                    className={cn(
+                      'hover:bg-orange-50/50 transition-colors',
+                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                     )}
-                  </td>
-                  <td className="p-2 text-center">{item.unidad}</td>
-                  <td className="p-2 text-right">USD {item.precioInterno.toFixed(2)}</td>
-                  <td className="p-2 text-right">USD {item.precioCliente.toFixed(2)}</td>
-                  <td className="p-2 text-right text-blue-700 font-medium">
-                    USD {item.costoInterno.toFixed(2)}
-                  </td>
-                  <td className="p-2 text-right text-green-700 font-medium">
-                    USD {item.costoCliente.toFixed(2)}
-                  </td>
-                  <td className="p-2 text-right text-purple-700">
-                    {margen.toFixed(1)}%
-                  </td>
-                  <td className="p-2 text-center space-x-1">
-                    {isEdit ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            guardarCambios(item)
-                          }}
-                          className="p-1 hover:bg-blue-50 rounded"
+                  >
+                    <td className="px-2 py-1.5">
+                      <span className="font-mono text-gray-600">{item.codigo}</span>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <span className="line-clamp-1" title={item.descripcion}>{item.descripcion}</span>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <span className="line-clamp-1 text-gray-600" title={item.marca}>{item.marca || '-'}</span>
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      {isEdit ? (
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={editCantidad}
+                          onChange={(e) => setEditCantidad(parseFloat(e.target.value))}
+                          className="w-12 h-5 text-xs text-center border rounded"
+                          autoFocus
+                        />
+                      ) : (
+                        <div
+                          className="flex items-center justify-center gap-1 cursor-pointer group"
+                          onClick={() => iniciarEdicion(item)}
                         >
-                          <Save className="w-5 h-5 text-blue-600" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            cancelarEdicion()
-                          }}
-                          className="p-1 hover:bg-gray-50 rounded"
-                        >
-                          <X className="w-5 h-5 text-gray-500" />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            iniciarEdicion(item)
-                          }}
-                          className="p-1 hover:bg-yellow-50 rounded"
-                        >
-                          <Pencil className="w-5 h-5 text-yellow-600" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            onDeleted?.(item.id)
-                          }}
-                          className="p-1 hover:bg-red-50 rounded"
-                        >
-                          <Trash2 className="w-5 h-5 text-red-500" />
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-          <tfoot className="bg-gray-100 font-semibold">
-            <tr>
-              <td className="p-2" colSpan={6}>Totales</td>
-              <td className="p-2 text-right text-blue-700">USD {totalInterno.toFixed(2)}</td>
-              <td className="p-2 text-right text-green-700">USD {totalCliente.toFixed(2)}</td>
-              <td />
-              <td />
-            </tr>
-          </tfoot>
-        </table>
+                          <span className="font-medium">{item.cantidad}</span>
+                          <Edit className="h-2.5 w-2.5 text-gray-400 opacity-0 group-hover:opacity-100" />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-center text-gray-500">{item.unidad}</td>
+                    <td className="px-2 py-1.5 text-right font-mono text-gray-500">
+                      {formatCurrency(item.precioInterno)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-gray-500">
+                      {formatCurrency(item.precioCliente)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-gray-700">
+                      {formatCurrency(item.costoInterno)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono font-medium text-green-600">
+                      {formatCurrency(item.costoCliente)}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <span className={cn(
+                        'font-medium',
+                        margen >= 20 ? 'text-emerald-600' : margen >= 10 ? 'text-amber-600' : 'text-red-500'
+                      )}>
+                        {margen.toFixed(0)}%
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      {isEdit ? (
+                        <div className="flex items-center justify-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              guardarCambios(item)
+                            }}
+                            className="h-5 w-5 p-0"
+                          >
+                            <Save className="h-3 w-3 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              cancelarEdicion()
+                            }}
+                            className="h-5 w-5 p-0"
+                          >
+                            <X className="h-3 w-3 text-gray-500" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              iniciarEdicion(item)
+                            }}
+                            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
+                          >
+                            <Edit className="h-3 w-3 text-gray-500" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onDeleted?.(item.id)
+                            }}
+                            className="h-5 w-5 p-0 hover:bg-red-100"
+                          >
+                            <Trash2 className="h-3 w-3 text-gray-500" />
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gray-100/80 border-t-2">
+                <td colSpan={7} className="px-2 py-1.5 text-right font-medium text-gray-700">
+                  Total ({filteredItems.length} items):
+                </td>
+                <td className="px-2 py-1.5 text-right font-mono font-medium text-gray-700">
+                  {formatCurrency(totalInterno)}
+                </td>
+                <td className="px-2 py-1.5 text-right font-mono font-bold text-green-700">
+                  {formatCurrency(totalCliente)}
+                </td>
+                <td></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
     </div>
   )

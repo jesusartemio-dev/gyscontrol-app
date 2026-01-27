@@ -168,9 +168,12 @@ export async function POST(req: Request) {
               proyectoEquipoItemId: proyectoItem.id,
               codigo: proyectoItem.codigo, // ✅ Usar código original del catálogo
               descripcion: proyectoItem.descripcion,
+              marca: proyectoItem.marca || '', // ✅ Copiar marca
+              categoria: proyectoItem.categoria || '', // ✅ Copiar categoria
               unidad: proyectoItem.unidad || 'UND',
               cantidad: proyectoItem.cantidad,
               cantidadPedida: 0,
+              presupuesto: proyectoItem.precioCliente || 0, // ✅ Copiar presupuesto
               estado: 'borrador',
               origen: 'cotizado' as const,
               responsableId: session.user.id,

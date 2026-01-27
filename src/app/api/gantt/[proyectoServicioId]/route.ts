@@ -51,7 +51,7 @@ export async function GET(
       where: { id: proyectoServicioId },
       select: {
         id: true,
-        categoria: true,
+        edt: true,
         proyecto: {
           select: {
             id: true,

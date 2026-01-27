@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import {
@@ -11,13 +10,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 import {
   Upload,
   FileSpreadsheet,
@@ -27,9 +24,10 @@ import {
   X,
   Package,
   Download,
-  Target,
   Layers,
-  TrendingUp
+  TrendingUp,
+  ChevronRight,
+  ArrowLeft
 } from 'lucide-react'
 import { importarEquiposDesdeExcel } from '@/lib/utils/equiposExcel'
 import * as XLSX from 'xlsx'
@@ -38,7 +36,6 @@ import {
   crearEquiposEnCatalogo,
   importarDesdeCotizacion,
   importarDesdeCatalogo,
-  type ItemExcelImportado,
   type ResumenImportacionExcel
 } from '@/lib/services/listaEquipoImportExcel'
 import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
@@ -52,6 +49,14 @@ interface Props {
   onSuccess: () => void
 }
 
+type Step = 'upload' | 'verify' | 'summary' | 'importing'
+
+const steps: { key: Step; label: string }[] = [
+  { key: 'upload', label: 'Subir' },
+  { key: 'verify', label: 'Verificar' },
+  { key: 'summary', label: 'Importar' },
+]
+
 export default function ModalImportarExcelLista({
   isOpen,
   proyectoId,
@@ -60,7 +65,7 @@ export default function ModalImportarExcelLista({
   onSuccess
 }: Props) {
   const { data: session } = useSession()
-  const [step, setStep] = useState<'upload' | 'verify' | 'summary' | 'importing'>('upload')
+  const [step, setStep] = useState<Step>('upload')
   const [file, setFile] = useState<File | null>(null)
   const [excelData, setExcelData] = useState<any[]>([])
   const [resumen, setResumen] = useState<ResumenImportacionExcel | null>(null)
@@ -69,7 +74,6 @@ export default function ModalImportarExcelLista({
   const [proyectoEquipos, setProyectoEquipos] = useState<ProyectoEquipoCotizado[]>([])
   const [selectedProyectoEquipoId, setSelectedProyectoEquipoId] = useState('')
 
-  // ✅ Reset modal state
   const resetModal = useCallback(() => {
     setStep('upload')
     setFile(null)
@@ -81,7 +85,6 @@ export default function ModalImportarExcelLista({
     setSelectedProyectoEquipoId('')
   }, [])
 
-  // ✅ Fetch equipment groups when modal opens
   useEffect(() => {
     const fetchProyectoEquipos = async () => {
       if (isOpen && proyectoId) {
@@ -96,13 +99,11 @@ export default function ModalImportarExcelLista({
     fetchProyectoEquipos()
   }, [isOpen, proyectoId])
 
-  // ✅ Handle close
   const handleClose = useCallback(() => {
     resetModal()
     onClose()
   }, [resetModal, onClose])
 
-  // ✅ Handle file upload
   const handleFileUpload = async (file: File) => {
     try {
       setLoading(true)
@@ -111,7 +112,6 @@ export default function ModalImportarExcelLista({
       const data = await importarEquiposDesdeExcel(file)
       setExcelData(data)
 
-      // Transform Excel data to expected format
       const itemsExcel = data.map((row: any) => ({
         codigo: row['Código'] || '',
         descripcion: row['Descripción'] || '',
@@ -121,34 +121,31 @@ export default function ModalImportarExcelLista({
         cantidad: parseFloat(row['Cantidad']) || 1
       }))
 
-      // Verify existence
       const resumenData = await verificarExistenciaEquipos(itemsExcel, proyectoId)
       setResumen(resumenData)
       setStep('verify')
 
-      toast.success(`${data.length} items importados desde Excel`)
+      toast.success(`${data.length} items procesados`)
     } catch (error) {
       console.error('Error procesando archivo:', error)
-      toast.error('Error al procesar el archivo Excel')
+      toast.error('Error al procesar el archivo')
     } finally {
       setLoading(false)
     }
   }
 
-  // ✅ Handle file input change
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      toast.error('Por favor seleccione un archivo Excel (.xlsx o .xls)')
+      toast.error('Solo archivos Excel (.xlsx o .xls)')
       return
     }
 
     await handleFileUpload(file)
   }
 
-  // ✅ Create missing items in catalog
   const handleCrearEnCatalogo = async () => {
     if (!resumen) return
 
@@ -156,18 +153,17 @@ export default function ModalImportarExcelLista({
       setLoading(true)
       if (resumen.equiposNuevosParaCatalogo.length > 0) {
         await crearEquiposEnCatalogo(resumen.equiposNuevosParaCatalogo)
-        toast.success(`${resumen.equiposNuevosParaCatalogo.length} equipos creados en catálogo`)
+        toast.success(`${resumen.equiposNuevosParaCatalogo.length} equipos creados`)
       }
       setStep('summary')
     } catch (error) {
       console.error('Error creando equipos:', error)
-      toast.error('Error al crear equipos en catálogo')
+      toast.error('Error al crear equipos')
     } finally {
       setLoading(false)
     }
   }
 
-  // ✅ Execute imports
   const handleEjecutarImportacion = async () => {
     if (!resumen) return
 
@@ -179,21 +175,23 @@ export default function ModalImportarExcelLista({
       const itemsCotizacion = resumen.items.filter(item => item.estado === 'en_cotizacion')
       const itemsCatalogo = resumen.items.filter(item => item.estado === 'solo_catalogo' || item.estado === 'nuevo')
 
-      // Import from quotation
       if (itemsCotizacion.length > 0) {
         const itemIdsCotizacion = itemsCotizacion
           .map(item => item.proyectoEquipoItemId)
           .filter((id): id is string => id !== undefined)
 
         if (itemIdsCotizacion.length > 0) {
-          await importarDesdeCotizacion(listaId, itemIdsCotizacion)
-          setImportProgress(33)
+          // Pasar datos del Excel para actualizar cantidades si ya existen
+          const itemsExcelData = itemsCotizacion.map(item => ({
+            codigo: item.codigo,
+            cantidad: item.cantidad
+          }))
+          await importarDesdeCotizacion(listaId, itemIdsCotizacion, itemsExcelData)
+          setImportProgress(50)
         }
       }
 
-      // Import from catalog
       if (itemsCatalogo.length > 0) {
-        // Get updated catalog data after potential new items were created
         const resumenActualizado = await verificarExistenciaEquipos(
           excelData.map(row => ({
             codigo: row['Código'] || '',
@@ -205,10 +203,6 @@ export default function ModalImportarExcelLista({
           })),
           proyectoId
         )
-
-        const itemCatalogoIds = itemsCatalogo
-          .map(item => item.codigo)
-          .filter(codigo => codigo)
 
         const catalogoIds: string[] = []
         const cantidades: Record<string, number> = {}
@@ -225,12 +219,9 @@ export default function ModalImportarExcelLista({
 
         if (catalogoIds.length > 0) {
           const responsableId = session?.user?.id
-          if (!responsableId) {
-            throw new Error('No se pudo obtener el usuario actual')
-          }
-          if (!selectedProyectoEquipoId) {
-            throw new Error('Debe seleccionar un grupo de equipo para la importación')
-          }
+          if (!responsableId) throw new Error('Usuario no identificado')
+          if (!selectedProyectoEquipoId) throw new Error('Seleccione un grupo de equipo')
+
           await importarDesdeCatalogo(
             listaId,
             selectedProyectoEquipoId,
@@ -238,159 +229,163 @@ export default function ModalImportarExcelLista({
             cantidades,
             responsableId
           )
-          setImportProgress(100)
         }
       }
 
-    toast.success('Importación completada exitosamente')
+      setImportProgress(100)
+      toast.success('Importación completada')
       onSuccess()
       handleClose()
     } catch (error) {
-      console.error('Error ejecutando importación:', error)
+      console.error('Error importando:', error)
       toast.error('Error durante la importación')
+      setStep('summary')
     } finally {
       setLoading(false)
     }
   }
 
-  // ✅ Render upload step
+  const downloadTemplate = () => {
+    const templateData = [
+      { 'Código': 'EQ001', 'Descripción': 'Ejemplo de Equipo', 'Categoría': 'Eléctricos', 'Unidad': 'UND', 'Marca': 'Siemens', 'Cantidad': 1 },
+      { 'Código': 'EQ002', 'Descripción': 'Otro Equipo', 'Categoría': 'Mecánicos', 'Unidad': 'KG', 'Marca': 'ABB', 'Cantidad': 2 }
+    ]
+    const ws = XLSX.utils.json_to_sheet(templateData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla')
+    XLSX.writeFile(wb, 'plantilla_importacion.xlsx')
+  }
+
+  // Step indicator
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center gap-1 mb-4">
+      {steps.map((s, idx) => {
+        const isActive = step === s.key || (step === 'importing' && s.key === 'summary')
+        const isPast = steps.findIndex(st => st.key === step) > idx || step === 'importing'
+
+        return (
+          <div key={s.key} className="flex items-center">
+            <div className={cn(
+              'flex items-center gap-1.5 px-2 py-1 rounded-full text-xs transition-colors',
+              isActive ? 'bg-orange-100 text-orange-700 font-medium' :
+              isPast ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            )}>
+              {isPast && !isActive ? (
+                <CheckCircle className="h-3 w-3" />
+              ) : (
+                <span className="w-4 h-4 rounded-full bg-current/20 flex items-center justify-center text-[10px] font-bold">
+                  {idx + 1}
+                </span>
+              )}
+              {s.label}
+            </div>
+            {idx < steps.length - 1 && (
+              <ChevronRight className="h-3 w-3 mx-1 text-gray-300" />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  // Upload step
   const renderUploadStep = () => (
-    <div className="space-y-6">
-      <div className="text-center space-y-4">
-        <div className="p-4 bg-blue-100 rounded-full w-fit mx-auto">
-          <FileSpreadsheet className="h-8 w-8 text-blue-600" />
+    <div className="space-y-4">
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-100 mb-3">
+          <FileSpreadsheet className="h-6 w-6 text-orange-600" />
         </div>
-        <div>
-          <h3 className="text-lg font-semibold">Importar Lista desde Excel</h3>
-          <p className="text-sm text-muted-foreground">
-            Selecciona un archivo Excel con las columnas: Código, Descripción, Categoría, Unidad, Marca, Cantidad
-          </p>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Columnas: Código, Descripción, Categoría, Unidad, Marca, Cantidad
+        </p>
       </div>
 
-      <div className="space-y-4">
-        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            <Upload className="w-8 h-8 mb-2 text-gray-500" />
-            <p className="text-sm text-gray-500">
-              <span className="font-semibold">Haz clic para subir</span> o arrastra el archivo
-            </p>
-            <p className="text-xs text-gray-500">Solo archivos .xlsx o .xls</p>
-          </div>
-          <input
-            type="file"
-            className="hidden"
-            accept=".xlsx,.xls"
-            onChange={handleFileInputChange}
-            disabled={loading}
-          />
-        </label>
-
-        <div className="text-center">
-          <Button variant="outline" onClick={() => {
-            // Download template as proper Excel file
-            const templateData = [
-              { 'Código': 'EQ001', 'Descripción': 'Ejemplo de Equipo', 'Categoría': 'Categoría Ejemplo', 'Unidad': 'UND', 'Marca': 'Marca Ejemplo', 'Cantidad': 1 },
-              { 'Código': 'EQ002', 'Descripción': 'Otro Equipo', 'Categoría': 'Otra Categoría', 'Unidad': 'KG', 'Marca': 'Otra Marca', 'Cantidad': 2 }
-            ]
-
-            const ws = XLSX.utils.json_to_sheet(templateData)
-            const wb = XLSX.utils.book_new()
-            XLSX.utils.book_append_sheet(wb, ws, 'Plantilla')
-
-            // Generate Excel file
-            XLSX.writeFile(wb, 'plantilla_importacion_lista.xlsx')
-          }}>
-            <Download className="w-4 h-4 mr-2" />
-            Descargar Plantilla
-          </Button>
+      <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-orange-300 hover:bg-orange-50/30 transition-all">
+        <div className="flex flex-col items-center justify-center py-4">
+          <Upload className="w-6 h-6 mb-2 text-gray-400" />
+          <p className="text-sm text-gray-600">
+            <span className="font-medium text-orange-600">Clic para subir</span> o arrastra
+          </p>
+          <p className="text-[10px] text-gray-400">.xlsx o .xls</p>
         </div>
+        <input
+          type="file"
+          className="hidden"
+          accept=".xlsx,.xls"
+          onChange={handleFileInputChange}
+          disabled={loading}
+        />
+      </label>
+
+      <div className="flex justify-center">
+        <Button variant="ghost" size="sm" onClick={downloadTemplate} className="h-7 text-xs text-gray-500">
+          <Download className="w-3 h-3 mr-1" />
+          Descargar plantilla
+        </Button>
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="h-6 w-6 animate-spin mr-2" />
-          <span>Procesando archivo...</span>
+        <div className="flex items-center justify-center gap-2 py-2">
+          <Loader2 className="h-4 w-4 animate-spin text-orange-600" />
+          <span className="text-sm text-gray-600">Procesando...</span>
         </div>
       )}
     </div>
   )
 
-  // ✅ Render verification step
+  // Verification step
   const renderVerificationStep = () => {
     if (!resumen) return null
 
     return (
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <div className="p-4 bg-green-100 rounded-full w-fit mx-auto">
-            <CheckCircle className="h-8 w-8 text-green-600" />
+      <div className="space-y-4">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-2">
+            <CheckCircle className="h-6 w-6 text-green-600" />
           </div>
-          <h3 className="text-lg font-semibold">Archivo Procesado</h3>
-          <p className="text-sm text-muted-foreground">
-            Se encontraron {resumen.totalItems} items en el archivo
-          </p>
+          <p className="text-sm font-medium">{resumen.totalItems} items encontrados</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{resumen.enCotizacion}</div>
-              <div className="text-sm text-muted-foreground">En Cotización</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-purple-600">{resumen.soloCatalogo}</div>
-              <div className="text-sm text-muted-foreground">Solo en Catálogo</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-orange-600">{resumen.nuevos}</div>
-              <div className="text-sm text-muted-foreground">Nuevos</div>
-            </CardContent>
-          </Card>
+        {/* Stats compactos */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="text-center p-2 rounded-lg bg-blue-50">
+            <div className="text-lg font-bold text-blue-600">{resumen.enCotizacion}</div>
+            <div className="text-[10px] text-blue-600/70">En Cotización</div>
+          </div>
+          <div className="text-center p-2 rounded-lg bg-purple-50">
+            <div className="text-lg font-bold text-purple-600">{resumen.soloCatalogo}</div>
+            <div className="text-[10px] text-purple-600/70">En Catálogo</div>
+          </div>
+          <div className="text-center p-2 rounded-lg bg-orange-50">
+            <div className="text-lg font-bold text-orange-600">{resumen.nuevos}</div>
+            <div className="text-[10px] text-orange-600/70">Nuevos</div>
+          </div>
         </div>
 
         {resumen.nuevos > 0 && (
-          <Card className="border-orange-200 bg-orange-50">
-            <CardContent className="p-4">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-orange-900">
-                    Items Nuevos Detectados
-                  </p>
-                  <p className="text-sm text-orange-700 mt-1">
-                    Se crearán {resumen.nuevos} nuevos equipos en el catálogo antes de importar.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-700">
+              Se crearán <strong>{resumen.nuevos}</strong> nuevos equipos en el catálogo.
+            </p>
+          </div>
         )}
 
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setStep('upload')} disabled={loading}>
-            <X className="w-4 h-4 mr-2" />
-            Cancelar
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setStep('upload')} disabled={loading} className="h-8">
+            <ArrowLeft className="w-3 h-3 mr-1" />
+            Atrás
           </Button>
           <Button
+            size="sm"
             onClick={handleCrearEnCatalogo}
             disabled={loading}
-            className="flex-1"
+            className="flex-1 h-8 bg-orange-600 hover:bg-orange-700"
           >
             {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Procesando...
-              </>
+              <Loader2 className="w-3 h-3 animate-spin" />
             ) : (
-              <>
-                <Package className="w-4 h-4 mr-2" />
-                Continuar
-              </>
+              <>Continuar<ChevronRight className="w-3 h-3 ml-1" /></>
             )}
           </Button>
         </div>
@@ -398,136 +393,111 @@ export default function ModalImportarExcelLista({
     )
   }
 
-  // ✅ Render summary step
+  // Summary step
   const renderSummaryStep = () => {
     if (!resumen) return null
 
     const itemsCotizacion = resumen.items.filter(item => item.estado === 'en_cotizacion')
     const itemsCatalogo = resumen.items.filter(item => item.estado === 'solo_catalogo' || item.estado === 'nuevo')
+    const canImport = (itemsCotizacion.length > 0 || itemsCatalogo.length > 0) && selectedProyectoEquipoId
 
     return (
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <div className="p-4 bg-purple-100 rounded-full w-fit mx-auto">
-            <Target className="h-8 w-8 text-purple-600" />
+      <div className="space-y-3">
+        {/* Items desde cotización */}
+        {itemsCotizacion.length > 0 && (
+          <div className="border rounded-lg overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border-b">
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+              <span className="text-xs font-medium text-blue-700">
+                Desde Cotización ({itemsCotizacion.length})
+              </span>
+            </div>
+            <ScrollArea className="max-h-24">
+              <div className="p-2 space-y-1">
+                {itemsCotizacion.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono shrink-0">
+                        {item.codigo}
+                      </Badge>
+                      <span className="text-xs text-gray-600 truncate">{item.descripcion}</span>
+                    </div>
+                    <Badge className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 shrink-0">
+                      {item.cantidad}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
-          <h3 className="text-lg font-semibold">Resumen de Importación</h3>
-          <p className="text-sm text-muted-foreground">
-            Configura las opciones de importación
-          </p>
+        )}
+
+        {/* Items desde catálogo */}
+        {itemsCatalogo.length > 0 && (
+          <div className="border rounded-lg overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 border-b">
+              <Package className="h-4 w-4 text-purple-600" />
+              <span className="text-xs font-medium text-purple-700">
+                Desde Catálogo ({itemsCatalogo.length})
+              </span>
+            </div>
+            <ScrollArea className="max-h-24">
+              <div className="p-2 space-y-1">
+                {itemsCatalogo.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono shrink-0">
+                        {item.codigo}
+                      </Badge>
+                      <span className="text-xs text-gray-600 truncate">{item.descripcion}</span>
+                    </div>
+                    <Badge className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 shrink-0">
+                      {item.cantidad}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {/* Selector de grupo */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center gap-1.5">
+            <Layers className="h-3.5 w-3.5 text-gray-500" />
+            <span className="text-xs font-medium text-gray-700">Asignar a grupo</span>
+          </div>
+          <Select value={selectedProyectoEquipoId} onValueChange={setSelectedProyectoEquipoId}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Selecciona un grupo del proyecto" />
+            </SelectTrigger>
+            <SelectContent>
+              {proyectoEquipos.map((equipo) => (
+                <SelectItem key={equipo.id} value={equipo.id} className="text-xs">
+                  {equipo.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Items from Quotation */}
-        {itemsCotizacion.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
-                Importar desde Cotización ({itemsCotizacion.length} items)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-32">
-                <div className="space-y-2">
-                  {itemsCotizacion.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between py-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">{item.codigo}</Badge>
-                        <span className="text-sm">{item.descripcion}</span>
-                      </div>
-                      <Badge variant="secondary">{item.cantidad}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Items from Catalog */}
-        {itemsCatalogo.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Package className="h-5 w-5 text-purple-600" />
-                Importar desde Catálogo ({itemsCatalogo.length} items)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-32">
-                <div className="space-y-2">
-                  {itemsCatalogo.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between py-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">{item.codigo}</Badge>
-                        <span className="text-sm">{item.descripcion}</span>
-                      </div>
-                      <Badge variant="secondary">{item.cantidad}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 🎯 Selección de Grupo de Equipo */}
-        {(itemsCotizacion.length > 0 || itemsCatalogo.length > 0) && (
-          <Card>
-            <CardHeader className="pb-2 pt-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Asignar a Grupo del Proyecto
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-xs text-gray-600">
-                <strong>Items a importar ({itemsCotizacion.length + itemsCatalogo.length}):</strong>
-              </div>
-              <div className="max-h-20 overflow-y-auto">
-                <div className="flex flex-wrap gap-1">
-                  {[...itemsCotizacion, ...itemsCatalogo].map((item, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {item.codigo}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <Select value={selectedProyectoEquipoId} onValueChange={setSelectedProyectoEquipoId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona grupo del proyecto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {proyectoEquipos.map((equipo) => (
-                    <SelectItem key={equipo.id} value={equipo.id}>
-                      {equipo.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setStep('verify')} disabled={loading}>
-            <X className="w-4 h-4 mr-2" />
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setStep('verify')} disabled={loading} className="h-8">
+            <ArrowLeft className="w-3 h-3 mr-1" />
             Atrás
           </Button>
           <Button
+            size="sm"
             onClick={handleEjecutarImportacion}
-            disabled={loading || itemsCotizacion.length === 0 && itemsCatalogo.length === 0 || !selectedProyectoEquipoId}
-            className="flex-1"
+            disabled={loading || !canImport}
+            className="flex-1 h-8 bg-orange-600 hover:bg-orange-700"
           >
             {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Importando...
-              </>
+              <Loader2 className="w-3 h-3 animate-spin" />
             ) : (
               <>
-                <Layers className="w-4 h-4 mr-2" />
-                Ejecutar Importación
+                <Package className="w-3 h-3 mr-1" />
+                Importar {itemsCotizacion.length + itemsCatalogo.length} items
               </>
             )}
           </Button>
@@ -536,23 +506,21 @@ export default function ModalImportarExcelLista({
     )
   }
 
-  // ✅ Render importing step
+  // Importing step
   const renderImportingStep = () => (
-    <div className="space-y-6 text-center">
-      <div className="p-4 bg-blue-100 rounded-full w-fit mx-auto">
-        <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+    <div className="space-y-4 py-6 text-center">
+      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-100">
+        <Loader2 className="h-6 w-6 text-orange-600 animate-spin" />
       </div>
       <div>
-        <h3 className="text-lg font-semibold">Importando Items</h3>
-        <p className="text-sm text-muted-foreground">
-          Procesando importación de equipos a la lista...
+        <p className="text-sm font-medium">Importando equipos...</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Esto puede tardar unos segundos
         </p>
       </div>
-      <div className="space-y-2">
-        <Progress value={importProgress} className="w-full" />
-        <p className="text-sm text-muted-foreground">
-          {importProgress}% completado
-        </p>
+      <div className="space-y-1 px-8">
+        <Progress value={importProgress} className="h-1.5" />
+        <p className="text-[10px] text-muted-foreground">{importProgress}%</p>
       </div>
     </div>
   )
@@ -560,26 +528,39 @@ export default function ModalImportarExcelLista({
   if (!isOpen) return null
 
   return (
-    <AnimatePresence>
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="space-y-3">
-            <DialogTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5" />
-              Importar Lista desde Excel
-            </DialogTitle>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-3 border-b">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <FileSpreadsheet className="h-4 w-4 text-orange-600" />
+            Importar desde Excel
+          </DialogTitle>
+        </DialogHeader>
 
-          <Separator />
+        <div className="p-4">
+          {step !== 'importing' && <StepIndicator />}
 
-          <div className="min-h-[400px]">
-            {step === 'upload' && renderUploadStep()}
-            {step === 'verify' && renderVerificationStep()}
-            {step === 'summary' && renderSummaryStep()}
-            {step === 'importing' && renderImportingStep()}
+          {step === 'upload' && renderUploadStep()}
+          {step === 'verify' && renderVerificationStep()}
+          {step === 'summary' && renderSummaryStep()}
+          {step === 'importing' && renderImportingStep()}
+        </div>
+
+        {/* Footer con botón cerrar */}
+        {step !== 'importing' && (
+          <div className="px-4 pb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClose}
+              className="w-full h-7 text-xs text-gray-500"
+            >
+              <X className="w-3 h-3 mr-1" />
+              Cancelar
+            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
-    </AnimatePresence>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }

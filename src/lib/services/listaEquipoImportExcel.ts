@@ -9,11 +9,12 @@
 import { getCatalogoEquipos } from './catalogoEquipo'
 import { getProyectoEquipos } from './proyectoEquipo'
 import { createCatalogoEquipo } from './catalogoEquipo'
-import { createListaEquipoItem } from './listaEquipoItem'
+import { createListaEquipoItem, updateListaEquipoItem, getListaEquipoItemsByLista } from './listaEquipoItem'
 import { createListaEquipoItemFromProyecto } from './listaEquipoItem'
 import { getCategoriasEquipo, createCategoriaEquipo } from './categoriaEquipo'
 import { getUnidades, createUnidad } from './unidad'
-import type { CatalogoEquipo, CatalogoEquipoPayload, CategoriaEquipo, Unidad } from '@/types'
+import { buildApiUrl } from '@/lib/utils'
+import type { CatalogoEquipo, CatalogoEquipoPayload, CategoriaEquipo, Unidad, ListaEquipoItem } from '@/types'
 
 export interface ItemExcelImportado {
   codigo: string
@@ -231,14 +232,50 @@ export async function crearEquiposEnCatalogo(
   }
 }
 
-// ✅ Importar items desde cotización
+// ✅ Importar items desde cotización (actualiza si ya existe el código)
 export async function importarDesdeCotizacion(
   listaId: string,
-  proyectoEquipoItemIds: string[]
+  proyectoEquipoItemIds: string[],
+  itemsExcel?: Array<{ codigo: string; cantidad: number }>
 ): Promise<void> {
   try {
+    // Obtener items existentes en la lista para detectar duplicados
+    const itemsExistentes = await getListaEquipoItemsByLista(listaId)
+    const itemsPorCodigo = new Map<string, ListaEquipoItem>(
+      itemsExistentes.map(item => [item.codigo, item])
+    )
+
+    // Crear mapa de cantidades del Excel
+    const cantidadesExcel = new Map<string, number>()
+    if (itemsExcel) {
+      for (const item of itemsExcel) {
+        cantidadesExcel.set(item.codigo, item.cantidad)
+      }
+    }
+
     for (const itemId of proyectoEquipoItemIds) {
-      await createListaEquipoItemFromProyecto(listaId, itemId)
+      // Obtener datos del ProyectoEquipoItem para verificar código
+      const res = await fetch(buildApiUrl(`/api/proyecto-equipo-item/${itemId}`))
+      if (!res.ok) continue
+
+      const proyectoItem = await res.json()
+      const existente = itemsPorCodigo.get(proyectoItem.codigo)
+
+      if (existente) {
+        // ✅ Actualizar item existente con nueva cantidad del Excel
+        const nuevaCantidad = cantidadesExcel.get(proyectoItem.codigo) || proyectoItem.cantidad
+        await updateListaEquipoItem(existente.id, {
+          cantidad: nuevaCantidad,
+          descripcion: proyectoItem.descripcion || existente.descripcion,
+          marca: proyectoItem.marca || existente.marca,
+          categoria: proyectoItem.categoria || existente.categoria,
+        })
+        console.log(`🔄 Item ${proyectoItem.codigo} actualizado en lista`)
+      } else {
+        // ✅ Crear nuevo item
+        await createListaEquipoItemFromProyecto(listaId, itemId)
+        console.log(`✅ Item ${proyectoItem.codigo} creado en lista`)
+      }
     }
   } catch (error) {
     console.error('Error importando desde cotización:', error)
@@ -246,7 +283,7 @@ export async function importarDesdeCotizacion(
   }
 }
 
-// ✅ Importar items desde catálogo
+// ✅ Importar items desde catálogo (actualiza si ya existe el código)
 export async function importarDesdeCatalogo(
   listaId: string,
   proyectoEquipoId: string,
@@ -255,6 +292,11 @@ export async function importarDesdeCatalogo(
   responsableId: string
 ): Promise<void> {
   try {
+    // Obtener items existentes en la lista para detectar duplicados
+    const itemsExistentes = await getListaEquipoItemsByLista(listaId)
+    const itemsPorCodigo = new Map<string, ListaEquipoItem>(
+      itemsExistentes.map(item => [item.codigo, item])
+    )
 
     // Obtener datos del catálogo
     const catalogoEquipos = await getCatalogoEquipos()
@@ -267,21 +309,37 @@ export async function importarDesdeCatalogo(
       if (!equipo) continue
 
       const cantidad = cantidades[catalogoId] || 1
+      const existente = itemsPorCodigo.get(equipo.codigo)
 
-      await createListaEquipoItem({
-        listaId,
-        proyectoEquipoId,
-        responsableId,
-        catalogoEquipoId: equipo.id,
-        codigo: equipo.codigo,
-        descripcion: equipo.descripcion,
-        categoria: equipo.categoriaEquipo?.nombre || 'SIN-CATEGORIA',
-        unidad: equipo.unidad?.nombre || 'UND',
-        cantidad,
-        presupuesto: equipo.precioVenta ?? 0,
-        origen: 'nuevo',
-        estado: 'borrador'
-      })
+      if (existente) {
+        // ✅ Actualizar item existente con nuevos datos del Excel
+        await updateListaEquipoItem(existente.id, {
+          cantidad,
+          descripcion: equipo.descripcion || existente.descripcion,
+          marca: equipo.marca || existente.marca || 'SIN-MARCA',
+          categoria: equipo.categoriaEquipo?.nombre || existente.categoria || 'SIN-CATEGORIA',
+          catalogoEquipoId: equipo.id,
+        })
+        console.log(`🔄 Item ${equipo.codigo} actualizado en lista`)
+      } else {
+        // ✅ Crear nuevo item
+        await createListaEquipoItem({
+          listaId,
+          proyectoEquipoId,
+          responsableId,
+          catalogoEquipoId: equipo.id,
+          codigo: equipo.codigo,
+          descripcion: equipo.descripcion,
+          marca: equipo.marca || 'SIN-MARCA',
+          categoria: equipo.categoriaEquipo?.nombre || 'SIN-CATEGORIA',
+          unidad: equipo.unidad?.nombre || 'UND',
+          cantidad,
+          presupuesto: equipo.precioVenta ?? 0,
+          origen: 'nuevo',
+          estado: 'borrador'
+        })
+        console.log(`✅ Item ${equipo.codigo} creado en lista`)
+      }
     }
   } catch (error) {
     console.error('Error importando desde catálogo:', error)

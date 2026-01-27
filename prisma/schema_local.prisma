@@ -24,6 +24,9 @@ model User {
   pedidoEquipoItems           PedidoEquipoItem[]
   proyectosComercial          Proyecto[]            @relation("ComercialProyecto")
   proyectosGestor             Proyecto[]            @relation("GestorProyecto")
+  proyectosSupervisor         Proyecto[]            @relation("SupervisorProyecto")
+  proyectosLider              Proyecto[]            @relation("LiderProyecto")
+  personalProyecto            PersonalProyecto[]
   ProyectoEquipo              ProyectoEquipo[]
   ProyectoServicio            ProyectoServicio[]
   registrosHoras              RegistroHoras[]
@@ -573,6 +576,8 @@ model Proyecto {
   clienteId             String
   comercialId           String
   gestorId              String
+  supervisorId          String?
+  liderId               String?
   cotizacionId          String?
   nombre                String
   totalEquiposInterno   Float                  @default(0)
@@ -583,7 +588,7 @@ model Proyecto {
   descuento             Float                  @default(0)
   grandTotal            Float                  @default(0)
   codigo                String
-  estado                ProyectoEstado         @default(en_ejecucion)
+  estado                ProyectoEstado         @default(creado)
   fechaInicio           DateTime
   fechaFin              DateTime?
   totalRealEquipos      Float                  @default(0)
@@ -599,6 +604,9 @@ model Proyecto {
   comercial             User                   @relation("ComercialProyecto", fields: [comercialId], references: [id])
   cotizacion            Cotizacion?            @relation(fields: [cotizacionId], references: [id])
   gestor                User                   @relation("GestorProyecto", fields: [gestorId], references: [id])
+  supervisor            User?                  @relation("SupervisorProyecto", fields: [supervisorId], references: [id])
+  lider                 User?                  @relation("LiderProyecto", fields: [liderId], references: [id])
+  personalProyecto      PersonalProyecto[]
   ProyectoEquipo        ProyectoEquipo[]
   ProyectoGasto         ProyectoGasto[]
   ProyectoServicio      ProyectoServicio[]
@@ -611,7 +619,41 @@ model Proyecto {
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
   @@index([gestorId, estado, fechaFin], map: "idx_proyecto_gestor_estado_fin")
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
+  @@index([supervisorId], map: "idx_proyecto_supervisor")
+  @@index([liderId], map: "idx_proyecto_lider")
   @@map("Proyecto")
+}
+
+// Personal asignado al proyecto (roles dinámicos)
+model PersonalProyecto {
+  id              String               @id @default(cuid())
+  proyectoId      String
+  userId          String
+  rol             RolPersonalProyecto
+  fechaAsignacion DateTime             @default(now())
+  fechaFin        DateTime?
+  activo          Boolean              @default(true)
+  notas           String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  proyecto        Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  user            User                 @relation(fields: [userId], references: [id])
+
+  @@unique([proyectoId, userId, rol])
+  @@index([proyectoId, activo])
+  @@index([userId, activo])
+  @@map("personal_proyecto")
+}
+
+enum RolPersonalProyecto {
+  programador
+  cadista
+  ingeniero
+  lider
+  tecnico
+  coordinador
+  asistente
 }
 
 model ProyectoEdt {
@@ -1445,11 +1487,16 @@ enum Role {
 }
 
 enum ProyectoEstado {
-  en_planificacion
-  en_ejecucion
-  en_pausa
-  cerrado
-  cancelado
+  creado              // 1. Creado por Comercial (desde cotización aprobada)
+  en_planificacion    // 2. Elaboración del cronograma
+  listas_pendientes   // 3. Elaboración de listas técnicas
+  listas_aprobadas    // 4. Listas aprobadas
+  pedidos_creados     // 5. Pedidos de compra creados
+  en_ejecucion        // 6. En campo / ejecución
+  en_cierre           // 7. Proceso de cierre
+  cerrado             // 8. Proyecto cerrado
+  pausado             // Estado especial: pausado
+  cancelado           // Estado especial: cancelado
 }
 
 enum EstadoEdt {

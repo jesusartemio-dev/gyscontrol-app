@@ -1,20 +1,14 @@
-// ===================================================
-// 📁 Archivo: page.tsx
-// 📌 Ubicación: src/app/proyectos/[id]/equipos/pedidos/page.tsx
-// 🔧 Descripción: Página de gestión de pedidos de equipos con UX/UI mejorada
-// 🎨 Mejoras aplicadas: Framer Motion, Shadcn/UI, Estados de carga, Breadcrumb navigation
-// ✍️ Autor: Jesús Artemio + IA GYS
-// 📅 Última actualización: 2025-01-27
-// ===================================================
+/**
+ * 🎯 Equipment Orders Page - Minimalist Version
+ * Focuses on showing orders clearly
+ */
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, memo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
-
 import {
   PedidoEquipo,
   PedidoEquipoPayload,
@@ -24,79 +18,335 @@ import {
   ListaEquipo,
   Proyecto,
 } from '@/types'
-
 import {
   getPedidoEquipos,
   createPedidoEquipo,
   updatePedidoEquipo,
   deletePedidoEquipo,
 } from '@/lib/services/pedidoEquipo'
-
 import {
   createPedidoEquipoItem,
   updatePedidoEquipoItem,
   deletePedidoEquipoItem,
 } from '@/lib/services/pedidoEquipoItem'
-
 import { getListaEquiposPorProyecto } from '@/lib/services/listaEquipo'
 import { getProyectoById } from '@/lib/services/proyecto'
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  ChevronRight,
+  ArrowLeft,
   Package,
-  Calendar,
-  TrendingUp,
-  AlertCircle,
-  FileText,
-  Clock,
-  DollarSign,
+  Search,
   RefreshCw,
-  Plus,
-  Home,
-  FolderOpen,
-  BarChart3,
-  Activity,
-  Target,
-  Grid3X3,
-  Table
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Truck,
+  Eye,
+  Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ShoppingCart
 } from 'lucide-react'
-
+import Link from 'next/link'
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
-import PedidoEquiposTableView from '@/components/equipos/PedidoEquiposTableView'
-import PedidoEquiposCardView from '@/components/equipos/PedidoEquiposCardView'
 
-// Helper functions for UI enhancements
-const getStatusVariant = (estado: string): "default" | "outline" => {
-  switch (estado?.toLowerCase()) {
-    case 'pendiente': return 'default'
-    case 'completado': return 'default'
-    case 'pausado': return 'outline'
-    case 'cancelado': return 'outline'
-    default: return 'outline'
+// Skeleton minimalista
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-5 w-5" />
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-5 w-32 ml-auto" />
+      </div>
+      <div className="flex gap-3">
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-9 w-32" />
+      </div>
+      <div className="border rounded-lg">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex gap-4 p-3 border-b last:border-0">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Componente de tabla de pedidos
+const PedidosTable = memo(function PedidosTable({
+  pedidos,
+  proyectoId,
+  onDelete,
+  onRefresh,
+  loading
+}: {
+  pedidos: PedidoEquipo[]
+  proyectoId: string
+  onDelete: (id: string) => void
+  onRefresh: () => void
+  loading: boolean
+}) {
+  const router = useRouter()
+  const [search, setSearch] = useState('')
+  const [filterEstado, setFilterEstado] = useState('all')
+  const [sortField, setSortField] = useState<string>('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const filteredPedidos = useMemo(() => {
+    let result = pedidos
+
+    if (search) {
+      const term = search.toLowerCase()
+      result = result.filter(pedido =>
+        pedido.codigo?.toLowerCase().includes(term) ||
+        pedido.proveedor?.toLowerCase().includes(term) ||
+        pedido.descripcion?.toLowerCase().includes(term)
+      )
+    }
+
+    if (filterEstado !== 'all') {
+      result = result.filter(pedido => pedido.estado === filterEstado)
+    }
+
+    return result
+  }, [pedidos, search, filterEstado])
+
+  const sortedPedidos = useMemo(() => {
+    return [...filteredPedidos].sort((a, b) => {
+      let aVal: any = a[sortField as keyof PedidoEquipo]
+      let bVal: any = b[sortField as keyof PedidoEquipo]
+
+      if (sortField === 'createdAt' || sortField === 'fechaEstimada') {
+        aVal = aVal ? new Date(aVal).getTime() : 0
+        bVal = bVal ? new Date(bVal).getTime() : 0
+      }
+
+      if (sortField === 'montoTotal') {
+        aVal = a.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0
+        bVal = b.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0
+      }
+
+      if (aVal == null || bVal == null) return 0
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [filteredPedidos, sortField, sortDir])
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('asc')
+    }
   }
-}
 
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(amount)
-}
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />
+    return sortDir === 'asc'
+      ? <ArrowUp className="h-3 w-3 ml-1" />
+      : <ArrowDown className="h-3 w-3 ml-1" />
+  }
 
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('es-ES', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
+  const getEstadoBadge = (estado: string) => {
+    const estados: Record<string, { icon: any; className: string; label: string }> = {
+      pendiente: { icon: Clock, className: 'bg-yellow-100 text-yellow-700', label: 'Pendiente' },
+      en_proceso: { icon: Truck, className: 'bg-blue-100 text-blue-700', label: 'En Proceso' },
+      parcial: { icon: AlertCircle, className: 'bg-orange-100 text-orange-700', label: 'Parcial' },
+      completado: { icon: CheckCircle2, className: 'bg-green-100 text-green-700', label: 'Completado' },
+      cancelado: { icon: AlertCircle, className: 'bg-red-100 text-red-700', label: 'Cancelado' }
+    }
+
+    const config = estados[estado?.toLowerCase()] || estados.pendiente
+    const Icon = config.icon
+
+    return (
+      <Badge className={`${config.className} text-xs font-normal`}>
+        <Icon className="h-3 w-3 mr-1" />
+        {config.label}
+      </Badge>
+    )
+  }
+
+  const formatDate = (date: string | Date | null | undefined) => {
+    if (!date) return '-'
+    return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+  }
+
+  const formatCurrency = (amount: number) => {
+    return `$${amount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Filtros compactos */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar pedido..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+
+        <Select value={filterEstado} onValueChange={setFilterEstado}>
+          <SelectTrigger className="w-36 h-9 text-sm">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="pendiente">Pendiente</SelectItem>
+            <SelectItem value="en_proceso">En Proceso</SelectItem>
+            <SelectItem value="parcial">Parcial</SelectItem>
+            <SelectItem value="completado">Completado</SelectItem>
+            <SelectItem value="cancelado">Cancelado</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRefresh}
+          disabled={loading}
+          className="h-9"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+
+        <span className="text-xs text-muted-foreground ml-auto">
+          {sortedPedidos.length} de {pedidos.length} pedidos
+        </span>
+      </div>
+
+      {/* Tabla */}
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="w-[120px]">
+                <button
+                  onClick={() => handleSort('codigo')}
+                  className="flex items-center text-xs font-medium"
+                >
+                  Código<SortIcon field="codigo" />
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  onClick={() => handleSort('proveedor')}
+                  className="flex items-center text-xs font-medium"
+                >
+                  Proveedor<SortIcon field="proveedor" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[70px] text-right text-xs font-medium">Items</TableHead>
+              <TableHead className="w-[100px] text-right">
+                <button
+                  onClick={() => handleSort('montoTotal')}
+                  className="flex items-center justify-end w-full text-xs font-medium"
+                >
+                  Monto<SortIcon field="montoTotal" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[90px]">
+                <button
+                  onClick={() => handleSort('createdAt')}
+                  className="flex items-center text-xs font-medium"
+                >
+                  Fecha<SortIcon field="createdAt" />
+                </button>
+              </TableHead>
+              <TableHead className="w-[100px] text-xs font-medium">Estado</TableHead>
+              <TableHead className="w-[80px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedPedidos.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
+                  {search || filterEstado !== 'all' ? 'No se encontraron pedidos' : 'Sin pedidos registrados'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              sortedPedidos.map((pedido) => {
+                const montoTotal = pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0
+                const totalItems = pedido.items?.length || 0
+
+                return (
+                  <TableRow
+                    key={pedido.id}
+                    className="group cursor-pointer hover:bg-muted/50"
+                    onClick={() => router.push(`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`)}
+                  >
+                    <TableCell className="font-mono text-xs text-muted-foreground py-2">
+                      {pedido.codigo || '-'}
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <div>
+                        <span className="text-sm font-medium line-clamp-1">{pedido.proveedor || 'Sin proveedor'}</span>
+                        {pedido.descripcion && (
+                          <span className="text-xs text-muted-foreground line-clamp-1 block">
+                            {pedido.descripcion}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm py-2">
+                      {totalItems}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm font-medium py-2">
+                      {formatCurrency(montoTotal)}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground py-2">
+                      {formatDate(pedido.createdAt)}
+                    </TableCell>
+                    <TableCell className="py-2">
+                      {getEstadoBadge(pedido.estado || 'pendiente')}
+                    </TableCell>
+                    <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => router.push(`/proyectos/${proyectoId}/equipos/pedidos/${pedido.id}`)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => onDelete(pedido.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+})
 
 export default function PedidosProyectoPage() {
   const { id: proyectoId } = useParams<{ id: string }>()
@@ -107,25 +357,19 @@ export default function PedidosProyectoPage() {
   const [listas, setListas] = useState<ListaEquipo[]>([])
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
   const cargarDatos = async () => {
     try {
       setLoading(true)
-      setError(null)
-      
       const [proyectoData, pedidosData, listasData] = await Promise.all([
         getProyectoById(proyectoId),
         getPedidoEquipos(proyectoId),
         getListaEquiposPorProyecto(proyectoId)
       ])
-      
       setProyecto(proyectoData)
       setPedidos(pedidosData || [])
       setListas(listasData || [])
     } catch (err) {
-      setError('Error al cargar los datos')
       toast.error('Error al cargar los datos')
     } finally {
       setLoading(false)
@@ -151,9 +395,7 @@ export default function PedidosProyectoPage() {
   }
 
   useEffect(() => {
-    if (proyectoId) {
-      cargarDatos()
-    }
+    if (proyectoId) cargarDatos()
   }, [proyectoId])
 
   const handleCreatePedido = async (payload: PedidoEquipoPayload) => {
@@ -169,36 +411,8 @@ export default function PedidosProyectoPage() {
     }
   }
 
-  const handleCreateItem = async (payload: PedidoEquipoItemPayload) => {
-    const nuevo = await createPedidoEquipoItem(payload)
-    if (nuevo) {
-      toast.success('Ítem registrado')
-      // 🔄 Actualizar tanto pedidos como listas para refrescar cantidadPedida
-      await Promise.all([
-        cargarPedidos(),
-        cargarListas()
-      ])
-    } else {
-      toast.error('Error al registrar ítem')
-    }
-  }
-
-  const handleUpdate = async (id: string, payload: PedidoEquipoUpdatePayload) => {
-    const actualizado = await updatePedidoEquipo(id, payload)
-    if (actualizado) {
-      toast.success('Pedido actualizado')
-      cargarPedidos()
-    } else {
-      toast.error('Error al actualizar pedido')
-    }
-  }
-
-  const handleEditPedido = (pedido: PedidoEquipo) => {
-    // TODO: Implementar modal de edición de pedido
-    toast.info('Funcionalidad de edición próximamente')
-  }
-
   const handleDelete = async (id: string) => {
+    if (!confirm('¿Eliminar este pedido?')) return
     const ok = await deletePedidoEquipo(id)
     if (ok) {
       toast.success('Pedido eliminado')
@@ -208,342 +422,75 @@ export default function PedidosProyectoPage() {
     }
   }
 
-  const handleUpdateItem = async (id: string, payload: PedidoEquipoItemUpdatePayload) => {
-    const actualizado = await updatePedidoEquipoItem(id, payload)
-    if (actualizado) {
-      toast.success('Ítem actualizado')
-      // 🔄 Actualizar tanto pedidos como listas para refrescar cantidadPedida
-      await Promise.all([
-        cargarPedidos(),
-        cargarListas()
-      ])
-    } else {
-      toast.error('Error al actualizar ítem')
-    }
-  }
+  if (loading && !proyecto) return <LoadingSkeleton />
 
-  const handleDeleteItem = async (id: string) => {
-    const ok = await deletePedidoEquipoItem(id)
-    if (ok) {
-      toast.success('Ítem eliminado')
-      // 🔄 Actualizar tanto pedidos como listas para refrescar cantidadPedida
-      await Promise.all([
-        cargarPedidos(),
-        cargarListas()
-      ])
-    } else {
-      toast.error('Error al eliminar ítem')
-    }
-  }
-
-  // Loading state
-  if (loading) {
+  if (!proyecto) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="space-y-4">
-          <Skeleton className="h-6 w-64" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-20" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full" />
-          ))}
-        </div>
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <Package className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold mb-2">Proyecto no encontrado</h3>
+        <Button variant="outline" onClick={() => router.push('/proyectos')}>
+          Volver a Proyectos
+        </Button>
       </div>
     )
   }
 
-  // Error state
-  if (error) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="container mx-auto p-6"
-      >
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-            <h3 className="text-lg font-semibold text-red-800 mb-2">Error al cargar los datos</h3>
-            <p className="text-red-600 mb-4 text-center">{error}</p>
-            <Button onClick={cargarDatos} variant="outline" className="border-red-300 text-red-700">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reintentar
-            </Button>
-          </CardContent>
-        </Card>
-      </motion.div>
-    )
-  }
-
-  // Project not found state
-  if (!proyecto) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="container mx-auto p-6"
-      >
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Proyecto no encontrado</h3>
-            <p className="text-gray-600 mb-4">No se pudo encontrar el proyecto solicitado.</p>
-            <Button onClick={() => router.push('/proyectos')} variant="outline">
-              Volver a Proyectos
-            </Button>
-          </CardContent>
-        </Card>
-      </motion.div>
-    )
-  }
-
-  // Calculate quick stats
+  // Stats calculados
   const totalPedidos = pedidos.length
-  const pedidosPendientes = pedidos.filter(p => p.estado?.toLowerCase() === 'pendiente').length
   const pedidosCompletados = pedidos.filter(p => p.estado?.toLowerCase() === 'completado').length
-  const pedidosEnProgreso = pedidos.filter(p => ['en_proceso', 'parcial'].includes(p.estado?.toLowerCase() || '')).length
-  const montoTotal = pedidos.reduce((total, pedido) => {
-    const montoPedido = pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0
-    return total + montoPedido
+  const totalItems = pedidos.reduce((total, p) => total + (p.items?.length || 0), 0)
+  const montoTotal = pedidos.reduce((total, p) => {
+    return total + (p.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0)
   }, 0)
-  
-  // 📊 Calcular progreso de trazabilidad
-  const progresoGeneral = totalPedidos > 0 ? Math.round((pedidosCompletados / totalPedidos) * 100) : 0
-  const itemsEntregados = pedidos.reduce((total, pedido) => {
-    return total + (pedido.items?.filter(item => item.estado === 'entregado').length || 0)
-  }, 0)
-  const totalItems = pedidos.reduce((total, pedido) => total + (pedido.items?.length || 0), 0)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="container mx-auto p-6 space-y-6"
-    >
-      {/* Breadcrumb Navigation */}
-      <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/proyectos')}>
-          Proyectos
-        </Button>
-        <ChevronRight className="h-4 w-4" />
-        <Button variant="ghost" size="sm" onClick={() => router.push(`/proyectos/${proyectoId}`)}>
-          {proyecto.nombre}
-        </Button>
-        <ChevronRight className="h-4 w-4" />
-        <Button variant="ghost" size="sm" onClick={() => router.push(`/proyectos/${proyectoId}/equipos`)}>
-          Equipos
-        </Button>
-        <ChevronRight className="h-4 w-4" />
-        <span className="font-medium text-foreground">Pedidos</span>
-      </nav>
+    <div className="space-y-4">
+      {/* Header compacto */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          {/* Navegación mínima */}
+          <Link
+            href={`/proyectos/${proyectoId}/equipos`}
+            className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3 mr-1" />
+            Equipos
+          </Link>
 
-      {/* Header Section */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Package className="h-8 w-8 text-blue-600" />
-            Pedidos de Equipos
-          </h1>
-          <div className="flex items-center gap-4 mt-2">
-            <Badge variant={getStatusVariant(proyecto.estado || '')}>
-              {proyecto.estado || 'Sin estado'}
-            </Badge>
-            <span className="text-sm text-gray-600 flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              Inicio: {formatDate(proyecto.fechaInicio)}
-            </span>
+          {/* Título con icono */}
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-blue-600" />
+            <h1 className="text-lg font-semibold">Pedidos de Equipos</h1>
+          </div>
+
+          {/* Stats inline */}
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span>{totalPedidos} pedidos</span>
+            <span className="text-green-600">{pedidosCompletados} completados</span>
+            <span>{totalItems} items</span>
+            <span className="font-mono">${montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
           </div>
         </div>
-        <div className="flex gap-2">
-          <div className="flex items-center gap-1 border rounded-lg p-1">
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('table')}
-              className="h-8"
-            >
-              <Table className="h-4 w-4 mr-2" />
-              Tabla
-            </Button>
-            <Button
-              variant={viewMode === 'card' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('card')}
-              className="h-8"
-            >
-              <Grid3X3 className="h-4 w-4 mr-2" />
-              Cards
-            </Button>
-          </div>
-          <Button
-            onClick={() => router.push('/gestion/reportes/pedidos')}
-            variant="default"
-            size="sm"
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Ver Reportes
-          </Button>
-          <Button onClick={cargarDatos} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualizar
-          </Button>
-        </div>
-      </motion.div>
 
-      {/* Quick Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6"
-      >
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pedidos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalPedidos}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">En Progreso</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{pedidosEnProgreso}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completados</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{pedidosCompletados}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Progreso General</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{progresoGeneral}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {itemsEntregados}/{totalItems} items entregados
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monto Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{formatCurrency(montoTotal)}</div>
-          </CardContent>
-        </Card>
-      </motion.div>
+        {/* Acción principal */}
+        <PedidoEquipoModalCrear
+          listas={listas}
+          proyectoId={proyectoId}
+          responsableId={session?.user.id || ''}
+          onCreated={handleCreatePedido}
+          onRefresh={cargarListas}
+        />
+      </div>
 
-      <Separator />
-
-      {/* Create New Order Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Crear Nuevo Pedido
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PedidoEquipoModalCrear
-              listas={listas}
-              proyectoId={proyectoId}
-              responsableId={session?.user.id || ''}
-              onCreated={handleCreatePedido}
-              onRefresh={cargarListas}
-            />
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Orders Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Pedidos Realizados
-          </h2>
-          <Badge variant="secondary" className="px-3 py-1">
-            {viewMode === 'table' ? 'Vista Tabla' : 'Vista Cards'}
-          </Badge>
-        </div>
-
-        {pedidos.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Package className="h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">No hay pedidos registrados</h3>
-              <p className="text-gray-600 mb-4 text-center">
-                Comienza creando tu primer pedido de equipos para este proyecto.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            {viewMode === 'table' ? (
-              <PedidoEquiposTableView
-                pedidos={pedidos}
-                proyectoId={proyectoId}
-                onEdit={handleEditPedido}
-                onDelete={handleDelete}
-              />
-            ) : (
-              <PedidoEquiposCardView
-                pedidos={pedidos}
-                proyectoId={proyectoId}
-                onEdit={handleEditPedido}
-                onDelete={handleDelete}
-              />
-            )}
-          </motion.div>
-        )}
-      </motion.div>
-    </motion.div>
+      {/* Tabla de pedidos - El foco principal */}
+      <PedidosTable
+        pedidos={pedidos}
+        proyectoId={proyectoId}
+        onDelete={handleDelete}
+        onRefresh={cargarDatos}
+        loading={loading}
+      />
+    </div>
   )
 }

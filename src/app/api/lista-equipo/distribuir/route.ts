@@ -117,11 +117,14 @@ export async function POST(req: Request) {
             id: `lista-item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
             listaId: lista.id,
             proyectoEquipoItemId: proyectoItem.id,
-            codigo: `${lista.codigo}-${index + 1}`,
+            codigo: proyectoItem.codigo || `${lista.codigo}-${index + 1}`, // ✅ Usar código original
             descripcion: proyectoItem.descripcion,
+            marca: proyectoItem.marca || '', // ✅ Copiar marca
+            categoria: proyectoItem.categoria || '', // ✅ Copiar categoria
             unidad: proyectoItem.unidad || 'UND',
             cantidad: proyectoItem.cantidad,
             cantidadPedida: 0,
+            presupuesto: proyectoItem.precioCliente || 0, // ✅ Copiar presupuesto
             estado: 'borrador',
             origen: 'cotizado' as const,
             responsableId: session.user.id,

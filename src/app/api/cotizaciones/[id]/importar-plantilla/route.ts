@@ -318,12 +318,25 @@ export async function POST(
           const subtotalInterno = plantilla.items.reduce((sum: number, item: any) => sum + (item.costoInterno || 0), 0)
           const subtotalCliente = plantilla.items.reduce((sum: number, item: any) => sum + (item.costoCliente || 0), 0)
 
+          // Usar edtId directo de la plantilla o buscar uno por defecto
+          let edtId = plantilla.edtId
+          if (!edtId) {
+            // Buscar primer EDT disponible como fallback
+            const defaultEdt = await tx.edt.findFirst({
+              orderBy: { nombre: 'asc' }
+            })
+            edtId = defaultEdt?.id
+          }
+          if (!edtId) {
+            throw new Error('No se encontró ningún EDT disponible. Por favor, cree al menos un EDT antes de importar servicios.')
+          }
+
           const nuevoServicio = await tx.cotizacionServicio.create({
             data: {
               id: randomUUID(),
               cotizacionId: id,
               nombre: nombreFinal,
-              categoria: plantilla.categoria || 'General',
+              edtId: edtId,
               subtotalInterno,
               subtotalCliente,
               updatedAt: new Date(),
@@ -332,7 +345,7 @@ export async function POST(
                   create: plantilla.items.map((item: any) => ({
                     id: randomUUID(),
                     catalogoServicioId: item.catalogoServicioId || null,
-                    edtId: item.edtId || null,
+                    edtId: item.edtId || edtId,
                     unidadServicioId: item.unidadServicioId,
                     recursoId: item.recursoId,
                     unidadServicioNombre: item.unidadServicioNombre || '',

@@ -208,14 +208,10 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
                           {item.estado || 'pendiente'}
                         </Badge>
 
-                        {/* Estado de conexión */}
-                        {item.listaEquipoItemId ? (
-                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                            Conectado
-                          </Badge>
-                        ) : (
+                        {/* Advertencia: item huérfano (lista eliminada) */}
+                        {!item.listaEquipoItemId && (
                           <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
-                            Eliminado
+                            ⚠ Huérfano
                           </Badge>
                         )}
 

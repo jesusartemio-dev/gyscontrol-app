@@ -14,11 +14,18 @@ import { z } from 'zod'
 // ✅ Schema de validación para crear cronograma
 const createCronogramaSchema = z.object({
   tipo: z.enum(['comercial', 'planificacion', 'ejecucion']),
-  nombre: z.string().min(1, 'El nombre es requerido'),
+  nombre: z.string().optional(), // Nombre automático según tipo
   copiadoDesdeCotizacionId: z.string().optional(),
   copiarDesdeId: z.string().optional(), // ID de cronograma origen para copiar
-  esBaseline: z.boolean().optional().default(false), // ✅ Agregar campo esBaseline
+  esBaseline: z.boolean().optional().default(false),
 })
+
+// ✅ Nombres automáticos por tipo
+const NOMBRES_CRONOGRAMA: Record<string, string> = {
+  comercial: 'Comercial',
+  planificacion: 'Línea Base',
+  ejecucion: 'Ejecución'
+}
 
 // ✅ GET /api/proyectos/[id]/cronograma - Obtener cronogramas del proyecto
 export async function GET(
@@ -190,15 +197,16 @@ export async function POST(
         tareas: cronogramaOrigen.proyectoFase.reduce((acc: number, f: any) => acc + f.proyectoEdt.reduce((acc2: number, e: any) => acc2 + e.proyectoActividad.reduce((acc3: number, a: any) => acc3 + a.proyectoTarea.length, 0), 0), 0)
       })
 
-      // Crear el nuevo cronograma
+      // Crear el nuevo cronograma con nombre automático
+      const nombreAutomatico = NOMBRES_CRONOGRAMA[validatedData.tipo] || validatedData.tipo
       const nuevoCronograma = await prisma.proyectoCronograma.create({
         data: {
           id: crypto.randomUUID(),
           proyectoId: id,
           tipo: validatedData.tipo,
-          nombre: validatedData.nombre,
+          nombre: nombreAutomatico,
           copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId,
-          esBaseline: false,
+          esBaseline: validatedData.tipo === 'planificacion', // Línea Base es baseline automáticamente
           version: 1,
           updatedAt: new Date()
         }
@@ -259,7 +267,7 @@ export async function POST(
               console.log('Creando actividad:', actividadOrigen.nombre)
 
               const nuevaActividad = await prisma.$queryRaw`
-                INSERT INTO "proyectoActividad" (
+                INSERT INTO "proyecto_actividad" (
                   "id",
                   "proyectoEdtId",
                   "proyectoCronogramaId",
@@ -368,12 +376,13 @@ export async function POST(
       esBaseline = existingPlanificacion === 0 // Solo el primero es baseline
     }
 
-    // ✅ Crear el cronograma
+    // ✅ Crear el cronograma con nombre automático
+    const nombreAutomatico = NOMBRES_CRONOGRAMA[validatedData.tipo] || validatedData.tipo
     const createData = {
       id: crypto.randomUUID(),
       proyectoId: id,
       tipo: validatedData.tipo,
-      nombre: validatedData.nombre,
+      nombre: nombreAutomatico,
       // Solo incluir copiadoDesdeCotizacionId si tiene valor (evitar undefined)
       ...(validatedData.copiadoDesdeCotizacionId ? { copiadoDesdeCotizacionId: validatedData.copiadoDesdeCotizacionId } : {}),
       esBaseline: esBaseline,

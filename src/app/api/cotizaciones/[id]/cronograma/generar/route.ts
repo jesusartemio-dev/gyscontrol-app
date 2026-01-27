@@ -42,6 +42,15 @@ const generateSchema = z.object({
   }).optional()
 })
 
+// Función auxiliar para parsear fecha a mediodía UTC (evita offset de timezone)
+function parseDateAtNoonUTC(dateString: string): Date {
+  // Si es una fecha ISO completa, extraer solo la parte de fecha
+  const datePart = dateString.split('T')[0]
+  const [year, month, day] = datePart.split('-').map(Number)
+  // Crear fecha a mediodía UTC para evitar que cambie de día por timezone
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+}
+
 // Función auxiliar para obtener configuración de duraciones
 async function obtenerDuracionesConfig() {
   try {
@@ -272,12 +281,13 @@ export async function POST(
     }
 
     // Obtener fecha de inicio del proyecto desde la cotización o desde opciones del modal
+    // Usar parseDateAtNoonUTC para evitar offset de timezone (midnight UTC → día anterior en Peru)
     const fechaInicioProyecto = validatedData.opciones?.fechaInicio
-      ? new Date(validatedData.opciones.fechaInicio)
+      ? parseDateAtNoonUTC(validatedData.opciones.fechaInicio)
       : validatedData.fechaInicioProyecto
-        ? new Date(validatedData.fechaInicioProyecto)
+        ? parseDateAtNoonUTC(validatedData.fechaInicioProyecto)
         : cotizacion.fechaInicio
-          ? new Date(cotizacion.fechaInicio)
+          ? parseDateAtNoonUTC(cotizacion.fechaInicio.toISOString())
           : new Date()
 
     // Obtener configuración de duraciones desde BD
@@ -392,13 +402,22 @@ async function generarCronogramaDesdeServicios({
 
   console.log('🚀 INICIANDO GENERACIÓN CRONOGRAMA - GYS-GEN-01 (FS+1 obligatorio)')
 
+  // Log de configuración de FaseDefault disponibles
+  console.log('📋 Duraciones configuradas en FaseDefault:')
+  fasesConfigConDuraciones.forEach(f => {
+    console.log(`   - ${f.nombre}: ${f.duracionDias} días`)
+  })
+
   // 1. Preparar fases con fechas secuenciales FS+0
   if (options.generarFases && fasesConfig.length > 0) {
     console.log(`📋 GENERACIÓN FASES - FS+0 entre fases`)
     let currentDate = ajustarFechaADiaLaborable(new Date(fechaInicioProyecto), calendarioLaboral)
 
     for (const faseConfig of fasesConfig) {
-      const faseDuracion = fasesConfigConDuraciones.find(f => f.nombre === faseConfig.nombre)
+      // Búsqueda case-insensitive para mayor robustez
+      const faseDuracion = fasesConfigConDuraciones.find(f =>
+        f.nombre.toLowerCase().trim() === faseConfig.nombre.toLowerCase().trim()
+      )
       const duracionDias = faseDuracion?.duracionDias || 30
 
       const fechaInicio = new Date(currentDate)
@@ -616,10 +635,16 @@ async function generarCronogramaDesdeServicios({
       if (serviciosDeEdt.length === 0) continue
 
       // ✅ GYS-GEN-02: Las actividades deben iniciar cuando inicia el EDT padre
+      // El EDT ya tiene fecha ajustada a día laborable, no re-ajustar
+      console.log(`📊 DEBUG EDT: ${edt.nombre} fechaInicioComercial = ${edt.fechaInicioComercial}`)
+      const usandoFallbackEdt = !edt.fechaInicioComercial
       const edtInicio = new Date(edt.fechaInicioComercial || fechaInicioProyecto)
-      let currentActividadStart = ajustarFechaADiaLaborable(new Date(edtInicio), calendarioLaboral)
+      let currentActividadStart = new Date(edtInicio)
 
-      console.log(`⚙️ EDT ${edt.nombre} inicia: ${edtInicio.toISOString().split('T')[0]}, actividades iniciarán: ${currentActividadStart.toISOString().split('T')[0]}`)
+      if (usandoFallbackEdt) {
+        console.log(`   ⚠️ ALERTA: EDT "${edt.nombre}" NO tiene fechaInicioComercial, usando fechaInicioProyecto`)
+      }
+      console.log(`⚙️ EDT ${edt.nombre} inicia: ${edtInicio.toISOString().split('T')[0]}, primera actividad iniciará: ${currentActividadStart.toISOString().split('T')[0]}`)
 
       // ✅ Ordenar servicios por el campo 'orden' antes de generar actividades
       const serviciosOrdenados = serviciosDeEdt.sort((a: any, b: any) => {
@@ -680,9 +705,8 @@ async function generarCronogramaDesdeServicios({
           console.log(`📅 Actividad creada: ${servicio.nombre} (${fechaInicioActividad.toISOString().split('T')[0]} - ${fechaFinLimitada.toISOString().split('T')[0]}) - ${horasServicio}h`)
         }
 
-        // ✅ GYS-GEN-01: FS+0 entre actividades hermanas (mismo día)
-        // Para actividades del mismo EDT, inician el mismo día (FS+0)
-        // Esto permite paralelismo dentro del EDT
+        // ✅ GYS-GEN-01: FS (Finish-to-Start) entre actividades hermanas
+        // Cada actividad inicia cuando termina la anterior (secuencial)
         currentActividadStart = new Date(fechaFinLimitada)
       }
 
@@ -706,7 +730,7 @@ async function generarCronogramaDesdeServicios({
 
   // 4. Generar Tareas con FS+0 y roll-up de horas exacto
   if (options.generarTareas) {
-    console.log('🔧 GENERACIÓN TAREAS - FS+0 entre tareas hermanas, horas = suma exacta de items')
+    console.log('🔧 GENERACIÓN TAREAS - FS (Finish-to-Start) entre tareas hermanas')
 
     // Obtener actividades existentes con sus fechas actualizadas
     const actividades = await prisma.cotizacionActividad.findMany({
@@ -714,21 +738,37 @@ async function generarCronogramaDesdeServicios({
         cotizacionEdt: {
           cotizacionId
         }
+      },
+      include: {
+        cotizacionEdt: true
       }
     })
 
+    // DEBUG: Verificar fechas de actividades recién cargadas
+    console.log('📊 DEBUG: Actividades cargadas para generar tareas:')
+    for (const act of actividades) {
+      console.log(`   - ${act.nombre} (EDT: ${act.cotizacionEdt?.nombre}): inicio=${act.fechaInicioComercial?.toISOString?.() || act.fechaInicioComercial || 'NULL'}`)
+    }
+
     for (const actividad of actividades) {
       console.log(`🔧 Generando tareas para actividad: ${actividad.nombre}`)
+      console.log(`   📊 DEBUG: actividad.fechaInicioComercial = ${actividad.fechaInicioComercial}`)
+      console.log(`   📊 DEBUG: fechaInicioProyecto = ${fechaInicioProyecto.toISOString()}`)
 
       // Obtener items del servicio correspondiente a esta actividad
       const servicioCorrespondiente = servicios.find(s => s.nombre === actividad.nombre)
       if (!servicioCorrespondiente || !servicioCorrespondiente.cotizacionServicioItem) continue
 
       // ✅ GYS-GEN-02: Las tareas deben iniciar cuando inicia la actividad padre
+      // La actividad ya tiene fecha ajustada a día laborable, no re-ajustar
+      const usandoFallback = !actividad.fechaInicioComercial
       const actividadInicio = new Date(actividad.fechaInicioComercial || fechaInicioProyecto)
-      let currentTareaStart = ajustarFechaADiaLaborable(new Date(actividadInicio), calendarioLaboral)
+      let currentTareaStart = new Date(actividadInicio)
 
-      console.log(`🔧 Actividad ${actividad.nombre} inicia: ${actividadInicio.toISOString().split('T')[0]}, tareas iniciarán: ${currentTareaStart.toISOString().split('T')[0]}`)
+      if (usandoFallback) {
+        console.log(`   ⚠️ ALERTA: Actividad "${actividad.nombre}" NO tiene fechaInicioComercial, usando fechaInicioProyecto`)
+      }
+      console.log(`🔧 Actividad ${actividad.nombre} inicia: ${actividadInicio.toISOString().split('T')[0]}, primera tarea iniciará: ${currentTareaStart.toISOString().split('T')[0]}`)
 
       // ✅ Ordenar items por el campo 'orden' antes de generar tareas
       const itemsOrdenados = servicioCorrespondiente.cotizacionServicioItem.sort((a: any, b: any) => {
@@ -737,7 +777,28 @@ async function generarCronogramaDesdeServicios({
         return ordenA - ordenB
       })
 
-      for (const item of itemsOrdenados) {
+      // ✅ Deduplicar items por nombre (mantener el primero de cada nombre)
+      const itemsUnicos = itemsOrdenados.filter((item: any, index: number, self: any[]) =>
+        index === self.findIndex((t: any) => t.nombre === item.nombre)
+      )
+
+      if (itemsUnicos.length !== itemsOrdenados.length) {
+        console.log(`   ⚠️ ALERTA: Se encontraron ${itemsOrdenados.length - itemsUnicos.length} items duplicados en "${actividad.nombre}", usando solo ${itemsUnicos.length} items únicos`)
+      }
+
+      // ✅ IMPORTANTE: Eliminar tareas existentes de esta actividad para regenerar desde cero
+      // Esto evita problemas de orden y fechas incorrectas de generaciones anteriores
+      const tareasExistentes = await prisma.cotizacionTarea.findMany({
+        where: { cotizacionActividadId: actividad.id }
+      })
+      if (tareasExistentes.length > 0) {
+        await prisma.cotizacionTarea.deleteMany({
+          where: { cotizacionActividadId: actividad.id }
+        })
+        console.log(`   🗑️ Eliminadas ${tareasExistentes.length} tareas existentes para regenerar`)
+      }
+
+      for (const item of itemsUnicos) {
         // Calcular duración basada en horas del item
         const duracionDias = item.horaTotal > 0
           ? Math.ceil(item.horaTotal / calendarioLaboral.horasPorDia)
@@ -750,46 +811,27 @@ async function generarCronogramaDesdeServicios({
         // ✅ No limitar inicialmente - dejar que el roll-up extienda la actividad
         const fechaFinLimitada = fechaFinTarea
 
-        const existingTarea = await prisma.cotizacionTarea.findFirst({
-          where: {
+        // Crear tarea nueva (las existentes ya fueron eliminadas arriba)
+        await prisma.cotizacionTarea.create({
+          data: {
+            id: crypto.randomUUID(),
             cotizacionActividadId: actividad.id,
-            nombre: item.nombre
+            cotizacionServicioItemId: item.id,
+            nombre: item.nombre,
+            descripcion: item.descripcion || `Tarea generada desde item ${item.nombre}`,
+            fechaInicio: fechaInicioTarea.toISOString(),
+            fechaFin: fechaFinLimitada.toISOString(),
+            horasEstimadas: item.horaTotal,
+            estado: 'pendiente',
+            prioridad: 'media',
+            updatedAt: new Date()
           }
         })
+        result.tareasGeneradas++
+        console.log(`📅 Tarea creada: ${item.nombre} (${fechaInicioTarea.toISOString().split('T')[0]} - ${fechaFinLimitada.toISOString().split('T')[0]}) - ${item.horaTotal}h`)
 
-        if (existingTarea) {
-          await prisma.cotizacionTarea.update({
-            where: { id: existingTarea.id },
-            data: {
-              fechaInicio: fechaInicioTarea.toISOString(),
-              fechaFin: fechaFinLimitada.toISOString(),
-              horasEstimadas: item.horaTotal
-            }
-          })
-          console.log(`📅 Tarea actualizada: ${item.nombre} (${fechaInicioTarea.toISOString().split('T')[0]} - ${fechaFinLimitada.toISOString().split('T')[0]}) - ${item.horaTotal}h`)
-        } else {
-          await prisma.cotizacionTarea.create({
-            data: {
-              id: crypto.randomUUID(),
-              cotizacionActividadId: actividad.id,
-              cotizacionServicioItemId: item.id,
-              nombre: item.nombre,
-              descripcion: item.descripcion || `Tarea generada desde item ${item.nombre}`,
-              fechaInicio: fechaInicioTarea.toISOString(),
-              fechaFin: fechaFinLimitada.toISOString(),
-              horasEstimadas: item.horaTotal,
-              estado: 'pendiente',
-              prioridad: 'media',
-              updatedAt: new Date()
-            }
-          })
-          result.tareasGeneradas++
-          console.log(`📅 Tarea creada: ${item.nombre} (${fechaInicioTarea.toISOString().split('T')[0]} - ${fechaFinLimitada.toISOString().split('T')[0]}) - ${item.horaTotal}h`)
-        }
-
-        // ✅ GYS-GEN-01: FS+0 entre tareas hermanas (mismo día para paralelismo)
-        // Para tareas de la misma actividad, inician el mismo día (FS+0)
-        // Esto permite paralelismo dentro de la actividad
+        // ✅ GYS-GEN-01: FS (Finish-to-Start) entre tareas hermanas
+        // Cada tarea inicia cuando termina la anterior (secuencial)
         currentTareaStart = new Date(fechaFinLimitada)
       }
 
@@ -951,9 +993,20 @@ async function generarCronogramaDesdeServicios({
       const nuevaFechaInicioFase = new Date(currentStartDate)
 
       if (edtsDeFase.length === 0) {
-        // Fase sin EDTs: usar duración por defecto
-        const faseDuracion = fasesConfigConDuraciones.find(f => f.nombre === fase.nombre)
+        // Fase sin EDTs: usar duración de FaseDefault configurada
+        // Buscar coincidencia case-insensitive para mayor robustez
+        const faseDuracion = fasesConfigConDuraciones.find(f =>
+          f.nombre.toLowerCase().trim() === fase.nombre.toLowerCase().trim()
+        )
         const duracionDias = faseDuracion?.duracionDias || 30
+
+        if (faseDuracion) {
+          console.log(`📋 Fase "${fase.nombre}": usando duración configurada de FaseDefault = ${duracionDias} días`)
+        } else {
+          console.log(`⚠️ Fase "${fase.nombre}": NO encontrada en FaseDefault, usando default = ${duracionDias} días`)
+          console.log(`   Fases disponibles en FaseDefault: ${fasesConfigConDuraciones.map(f => f.nombre).join(', ')}`)
+        }
+
         const nuevaFechaFinFase = calcularFechaFinConCalendario(nuevaFechaInicioFase, duracionDias * calendarioLaboral.horasPorDia, calendarioLaboral)
 
         await prisma.cotizacionFase.update({
@@ -1198,6 +1251,28 @@ async function generarCronogramaDesdeServicios({
   }
 
   result.totalElements = result.fasesGeneradas + result.edtsGenerados + result.actividadesGeneradas + result.tareasGeneradas
+
+  // ✅ GYS-GEN-17: Actualizar Cotizacion.fechaFin con la fecha fin máxima de las fases
+  console.log('📅 GYS-GEN-17: Calculando y guardando fechaFin de la cotización')
+
+  const fasesFinales = await prisma.cotizacionFase.findMany({
+    where: { cotizacionId },
+    orderBy: { fechaFinPlan: 'desc' },
+    take: 1
+  })
+
+  if (fasesFinales.length > 0 && fasesFinales[0].fechaFinPlan) {
+    const fechaFinCotizacion = new Date(fasesFinales[0].fechaFinPlan)
+
+    await prisma.cotizacion.update({
+      where: { id: cotizacionId },
+      data: { fechaFin: fechaFinCotizacion }
+    })
+
+    console.log(`✅ Cotizacion.fechaFin actualizada: ${fechaFinCotizacion.toISOString().split('T')[0]} (desde fase "${fasesFinales[0].nombre}")`)
+  } else {
+    console.warn('⚠️ No se pudo calcular fechaFin - no hay fases con fechaFinPlan')
+  }
 
   return result
 }

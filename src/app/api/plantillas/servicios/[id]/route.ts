@@ -22,9 +22,11 @@ export async function GET(
     const plantilla = await prisma.plantillaServicioIndependiente.findUnique({
       where: { id },
       include: {
+        edt: true,
         plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
+            edt: true,
             recurso: true,
             unidadServicio: true
           },
@@ -38,24 +40,6 @@ export async function GET(
 
     console.log('📋 Items encontrados:', plantilla?.plantillaServicioItemIndependiente?.length || 0)
     console.log('📋 Items IDs:', plantilla?.plantillaServicioItemIndependiente?.map(i => i.id))
-
-    if (plantilla) {
-      // Get categoria name if categoria is an ID
-      let categoriaNombre = plantilla.categoria
-      if (plantilla.categoria) {
-        const categoriaServicio = await prisma.edt.findUnique({
-          where: { id: plantilla.categoria }
-        })
-        if (categoriaServicio) {
-          categoriaNombre = categoriaServicio.nombre
-        }
-      }
-
-      return NextResponse.json({
-        ...plantilla,
-        categoriaNombre
-      })
-    }
 
     if (!plantilla) {
       return NextResponse.json(
@@ -82,7 +66,7 @@ export async function PUT(
     const { id } = await params
     const data = await req.json()
 
-    const { nombre, descripcion } = data
+    const { nombre, descripcion, edtId } = data
 
     if (!nombre || typeof nombre !== 'string' || nombre.trim().length < 3) {
       return NextResponse.json(
@@ -96,12 +80,15 @@ export async function PUT(
       data: {
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
+        edtId: edtId || null,
         updatedAt: new Date()
       },
       include: {
+        edt: true,
         plantillaServicioItemIndependiente: {
           include: {
             catalogoServicio: true,
+            edt: true,
             recurso: true,
             unidadServicio: true
           },
@@ -113,21 +100,7 @@ export async function PUT(
       }
     })
 
-    // Get categoria name for the updated plantilla
-    let categoriaNombre = plantillaActualizada.categoria
-    if (plantillaActualizada.categoria) {
-      const categoriaServicio = await prisma.edt.findUnique({
-        where: { id: plantillaActualizada.categoria }
-      })
-      if (categoriaServicio) {
-        categoriaNombre = categoriaServicio.nombre
-      }
-    }
-
-    return NextResponse.json({
-      ...plantillaActualizada,
-      categoriaNombre
-    })
+    return NextResponse.json(plantillaActualizada)
   } catch (error) {
     console.error('❌ Error al actualizar plantilla de servicios:', error)
     return NextResponse.json(

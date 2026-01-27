@@ -125,6 +125,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   
   const [visibleColumns, setVisibleColumns] = useState({
     codigoDescripcion: true, // ✅ Combined column
+    marca: true, // ✅ Nueva columna marca
     unidad: false, // ✅ Oculta cuando está activa la unificada
     cantidad: false, // ✅ Oculta cuando está activa la unificada
     cantidadUnidad: true, // ✅ Nueva columna unificada (activada por defecto)
@@ -134,8 +135,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     entrega: false,
     origen: true,
     estado: true,
-    verificado: true,
-    comentario: true, // ✅ Visible by default
+    verificadoComentario: true, // ✅ Combined verificado + comentario column
     pedidosLinks: true, // ✅ Nueva columna de pedidos (links)
     equipo: false,
     acciones: true
@@ -172,9 +172,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     
     // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(item => 
-        item.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+      const term = searchTerm.toLowerCase()
+      filtered = filtered.filter(item =>
+        item.codigo.toLowerCase().includes(term) ||
+        item.descripcion.toLowerCase().includes(term) ||
+        item.marca?.toLowerCase().includes(term)
       )
     }
     
@@ -320,175 +322,173 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
 
   // 🎨 Render header with search and actions only
   const renderHeader = () => (
-    <div className="mb-6">
+    <div className="mb-3">
+      {/* Compact toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Search - only show if more than 3 items */}
+        {items.length > 3 && (
+          <div className="relative max-w-xs">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+            <Input
+              placeholder="Buscar..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-7 h-7 text-xs w-48"
+            />
+          </div>
+        )}
 
-      {/* Search, Filter and View Toggle */}
-       <div className="flex flex-col sm:flex-row gap-4">
-         <div className="relative flex-1">
-           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-           <Input
-             placeholder="Buscar por código o descripción..."
-             value={searchTerm}
-             onChange={(e) => setSearchTerm(e.target.value)}
-             className="pl-10"
-           />
-         </div>
-         
+        {/* Stats */}
+        <div className="text-[10px] text-muted-foreground">
+          {filteredItems.length} de {items.length}
+        </div>
 
-         
-         {/* Add Items Buttons */}
-         {editable && (
-           <div className="flex gap-2">
-             <Button
-               variant="default"
-               size="sm"
-               onClick={() => setShowModalAgregarCatalogo(true)}
-               className="h-8 px-3"
-             >
-               <Plus className="h-4 w-4 mr-1" />
-               Desde Catálogo
-             </Button>
-             <Button
-               variant="outline"
-               size="sm"
-               onClick={() => setShowModalAgregarEquipo(true)}
-               className="h-8 px-3"
-             >
-               <ShoppingCart className="h-4 w-4 mr-1" />
-               + Desde Cotización
-             </Button>
-             <Button
-               variant="default"
-               size="sm"
-               onClick={() => setShowModalImportarExcel(true)}
-               className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
-             >
-               <FileText className="h-4 w-4 mr-2" />
-               Importar Excel
-             </Button>
-             <Button
-               variant="default"
-               size="sm"
-               onClick={handleExportExcel}
-               disabled={items.length === 0}
-               className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white"
-             >
-               <Download className="h-4 w-4 mr-2" />
-               Exportar Excel
-             </Button>
-           </div>
-         )}
-         
-         {/* View Mode Toggle */}
-         <div className="flex gap-2">
-           <div className="flex gap-1 border rounded-md p-1">
-             <Button
-               variant={viewMode === 'cards' ? 'default' : 'ghost'}
-               size="sm"
-               onClick={() => setViewMode('cards')}
-               className="h-8 px-3"
-             >
-               <Grid3X3 className="h-4 w-4 mr-1" />
-               Cards
-             </Button>
-             <Button
-               variant={viewMode === 'list' ? 'default' : 'ghost'}
-               size="sm"
-               onClick={() => setViewMode('list')}
-               className="h-8 px-3"
-             >
-               <List className="h-4 w-4 mr-1" />
-               Lista
-             </Button>
-           </div>
+        <div className="flex-1" />
 
-           {/* Column Visibility Toggle */}
-           {viewMode === 'list' && (
-             <Popover>
-               <PopoverTrigger asChild>
-                 <Button variant="outline" size="sm" className="h-8 px-2">
-                   <Settings className="h-3 w-3" />
-                 </Button>
-               </PopoverTrigger>
-               <PopoverContent className="w-48 p-3" align="end">
-                 <div className="space-y-2">
-                   {/* ✅ Toggle para columnas unificadas vs separadas */}
-                   <div className="flex items-center justify-between py-1">
-                     <Label className="text-xs font-medium">Unificadas</Label>
-                      <Switch 
-                        checked={visibleColumns.cantidadUnidad} 
-                        onCheckedChange={(checked) => { 
-                          setVisibleColumns(prev => ({ 
-                            ...prev, 
-                            cantidadUnidad: checked, 
-                            unidad: !checked, 
-                            cantidad: !checked 
-                          })) 
-                        }} 
+        {/* Add Items Buttons */}
+        {editable && (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowModalAgregarCatalogo(true)}
+              className="h-7 px-2 text-xs bg-orange-600 hover:bg-orange-700"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Catálogo
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowModalAgregarEquipo(true)}
+              className="h-7 px-2 text-xs"
+            >
+              <ShoppingCart className="h-3 w-3 mr-1" />
+              Cotización
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowModalImportarExcel(true)}
+              className="h-7 px-2 text-xs"
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Importar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportExcel}
+              disabled={items.length === 0}
+              className="h-7 px-2 text-xs"
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Exportar
+            </Button>
+          </div>
+        )}
+
+        {/* View Mode Toggle */}
+        <div className="flex items-center border rounded-md">
+          <Button
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('list')}
+            className="h-6 px-2 rounded-r-none"
+          >
+            <List className="h-3 w-3" />
+          </Button>
+          <Button
+            variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('cards')}
+            className="h-6 px-2 rounded-l-none"
+          >
+            <Grid3X3 className="h-3 w-3" />
+          </Button>
+        </div>
+
+        {/* Column Visibility Toggle */}
+        {viewMode === 'list' && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                <Settings className="h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-2" align="end">
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between py-0.5">
+                  <Label className="text-[10px] font-medium">Columnas unificadas</Label>
+                   <Switch
+                     checked={visibleColumns.cantidadUnidad}
+                     onCheckedChange={(checked) => {
+                       setVisibleColumns(prev => ({
+                         ...prev,
+                         cantidadUnidad: checked,
+                         unidad: !checked,
+                         cantidad: !checked
+                       }))
+                     }}
+                   />
+                </div>
+                <div className="h-px bg-border" />
+                {Object.entries({
+                  codigoDescripcion: 'Código',
+                  marca: 'Marca',
+                  unidad: 'Unidad',
+                  cantidad: 'Cantidad',
+                  cantidadUnidad: 'Cant./Unidad',
+                  pedidos: 'Pedidos',
+                  cotizacion: 'Cotización',
+                  costo: 'Costo',
+                  entrega: 'Entrega',
+                  origen: 'Origen',
+                  estado: 'Estado',
+                  verificadoComentario: 'Verif./Comentario'
+                }).map(([key, label]) => {
+                  if (visibleColumns.cantidadUnidad && (key === 'unidad' || key === 'cantidad')) {
+                    return null
+                  }
+                  if (!visibleColumns.cantidadUnidad && key === 'cantidadUnidad') {
+                    return null
+                  }
+
+                  return (
+                    <div key={key} className="flex items-center justify-between py-0.5">
+                      <Label htmlFor={key} className="text-[10px]">{label}</Label>
+                      <Switch
+                        id={key}
+                        checked={visibleColumns[key as keyof typeof visibleColumns]}
+                        onCheckedChange={(checked) =>
+                          setVisibleColumns(prev => ({ ...prev, [key]: checked }))
+                        }
+                        disabled={key === 'codigoDescripcion'}
                       />
-                   </div>
-                   <div className="h-px bg-border" />
-                   {Object.entries({
-                     codigoDescripcion: 'Código',
-                     unidad: 'Unidad',
-                     cantidad: 'Cantidad',
-                     cantidadUnidad: 'Cant./Unidad',
-                     pedidos: 'Pedidos',
-                     cotizacion: 'Cotización',
-                     costo: 'Costo',
-                     entrega: 'Entrega',
-                     origen: 'Origen',
-                     estado: 'Estado',
-                     verificado: 'Verificado'
-                   }).map(([key, label]) => {
-                     // ✅ Ocultar columnas individuales cuando está activa la unificada
-                     if (visibleColumns.cantidadUnidad && (key === 'unidad' || key === 'cantidad')) {
-                       return null
-                     }
-                     // ✅ Ocultar columna unificada cuando están activas las individuales
-                     if (!visibleColumns.cantidadUnidad && key === 'cantidadUnidad') {
-                       return null
-                     }
-                     
-                     return (
-                       <div key={key} className="flex items-center justify-between py-0.5">
-                         <Label htmlFor={key} className="text-xs">{label}</Label>
-                         <Switch
-                           id={key}
-                           checked={visibleColumns[key as keyof typeof visibleColumns]}
-                           onCheckedChange={(checked) => 
-                             setVisibleColumns(prev => ({ ...prev, [key]: checked }))
-                           }
-                           disabled={key === 'codigoDescripcion'}
-                         />
-                       </div>
-                     )
-                   })}
-                 </div>
-               </PopoverContent>
-             </Popover>
-           )}
-         </div>
-       </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
     </div>
   )
 
   // 🎨 Render empty state
   const renderEmptyState = () => (
-    <div className="text-center py-12">
-      <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-      <h3 className="text-lg font-semibold mb-2">No hay ítems técnicos</h3>
-      <p className="text-muted-foreground mb-4">
-        {searchTerm 
-          ? 'No se encontraron ítems que coincidan con la búsqueda.'
-          : 'Comienza agregando ítems técnicos a esta lista de equipos.'}
+    <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed rounded-lg bg-muted/30">
+      <Package className="h-10 w-10 text-gray-300 mb-2" />
+      <p className="text-sm text-muted-foreground mb-1">
+        {searchTerm ? 'No se encontraron ítems' : 'Sin ítems técnicos'}
       </p>
       {searchTerm && (
-        <Button 
-          variant="outline" 
-          onClick={() => {
-            setSearchTerm('')
-          }}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSearchTerm('')}
+          className="h-7 text-xs"
         >
           Limpiar búsqueda
         </Button>
@@ -498,17 +498,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
 
   // 🎨 Render loading skeleton
   const renderLoadingSkeleton = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <Card key={i} className="p-4">
-          <Skeleton className="h-4 w-20 mb-2" />
-          <Skeleton className="h-6 w-full mb-4" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-20" />
-          </div>
-        </Card>
+    <div className="border rounded-lg">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex gap-3 p-2 border-b last:border-0">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-12" />
+        </div>
       ))}
     </div>
   )
@@ -521,6 +518,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     // ✅ Define optimized column widths for compact layout
     const columnWidths = {
       codigoDescripcion: 'w-48',
+      marca: 'w-28',
       unidad: 'w-16',
       cantidad: 'w-20',
       cantidadUnidad: 'w-28',
@@ -531,92 +529,92 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       origen: 'w-20',
       estado: 'w-24',
       pedidosLinks: 'w-32',
-      verificado: 'w-12',
-      comentario: 'w-56',
+      verificadoComentario: 'w-40',
       equipo: 'w-24',
       acciones: 'w-24'
     }
-    
+
     return (
-      <div className="border rounded-lg overflow-hidden shadow-sm">
+      <div className="border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className={`w-full ${textSize} table-fixed`}>
             <thead>
-              <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <tr className="bg-gray-50 border-b">
                 {visibleColumns.codigoDescripcion && (
-                  <th className={`${cellPadding} ${columnWidths.codigoDescripcion} text-left font-semibold text-gray-900 tracking-tight`}>
+                  <th className={`${cellPadding} ${columnWidths.codigoDescripcion} text-left font-semibold text-gray-700`}>
                     Código / Descripción
                   </th>
                 )}
+                {visibleColumns.marca && (
+                  <th className={`${cellPadding} ${columnWidths.marca} text-left font-semibold text-gray-700`}>
+                    Marca
+                  </th>
+                )}
                 {visibleColumns.unidad && (
-                  <th className={`${cellPadding} ${columnWidths.unidad} text-center font-semibold text-gray-900 tracking-tight`}>
-                    Unidad
+                  <th className={`${cellPadding} ${columnWidths.unidad} text-center font-semibold text-gray-700`}>
+                    Und
                   </th>
                 )}
                 {visibleColumns.cantidad && (
-                  <th className={`${cellPadding} ${columnWidths.cantidad} text-center font-semibold text-gray-900 tracking-tight`}>
-                    Cantidad
+                  <th className={`${cellPadding} ${columnWidths.cantidad} text-center font-semibold text-gray-700`}>
+                    Cant.
                   </th>
                 )}
                 {visibleColumns.cantidadUnidad && (
-                  <th className={`${cellPadding} ${columnWidths.cantidadUnidad} text-center font-semibold text-gray-900 tracking-tight`}>
-                    Cant./Unidad
+                  <th className={`${cellPadding} ${columnWidths.cantidadUnidad} text-center font-semibold text-gray-700`}>
+                    Cant./Und
                   </th>
                 )}
                 {visibleColumns.pedidos && (
-                  <th className={`${cellPadding} ${columnWidths.pedidos} text-center font-semibold text-gray-900 tracking-tight`}>
+                  <th className={`${cellPadding} ${columnWidths.pedidos} text-center font-semibold text-gray-700`}>
                     Pedidos
                   </th>
                 )}
                 {visibleColumns.cotizacion && (
-                  <th className={`${cellPadding} ${columnWidths.cotizacion} text-center font-semibold text-gray-900 tracking-tight`}>
+                  <th className={`${cellPadding} ${columnWidths.cotizacion} text-center font-semibold text-gray-700`}>
                     Cotización
                   </th>
                 )}
                 {visibleColumns.costo && (
-                  <th className={`${cellPadding} ${columnWidths.costo} text-right font-semibold text-gray-900 tracking-tight`}>
-                    Costo USD
+                  <th className={`${cellPadding} ${columnWidths.costo} text-right font-semibold text-gray-700`}>
+                    Costo
                   </th>
                 )}
                 {visibleColumns.entrega && (
-                  <th className={`${cellPadding} ${columnWidths.entrega} text-center font-semibold text-gray-900 tracking-tight`}>
+                  <th className={`${cellPadding} ${columnWidths.entrega} text-center font-semibold text-gray-700`}>
                     Entrega
                   </th>
                 )}
                 {visibleColumns.origen && (
-                  <th className={`${cellPadding} ${columnWidths.origen} text-center font-semibold text-gray-900 tracking-tight`}>
+                  <th className={`${cellPadding} ${columnWidths.origen} text-center font-semibold text-gray-700`}>
                     Origen
                   </th>
                 )}
                 {visibleColumns.estado && (
-                  <th className={`${cellPadding} ${columnWidths.estado} text-center font-semibold text-gray-900 tracking-tight`}>
+                  <th className={`${cellPadding} ${columnWidths.estado} text-center font-semibold text-gray-700`}>
                     Estado
                   </th>
                 )}
                 {visibleColumns.pedidos && (
-                  <th className={`${cellPadding} ${columnWidths.pedidos} text-center font-semibold text-gray-900 tracking-tight`}>
+                  <th className={`${cellPadding} ${columnWidths.pedidos} text-center font-semibold text-gray-700`}>
                     Pedidos
                   </th>
                 )}
-                {visibleColumns.verificado && (
-                  <th className={`${cellPadding} ${columnWidths.verificado} text-center font-semibold text-gray-900 tracking-tight`}>
-                    <CheckCircle className="h-4 w-4 mx-auto" />
-                  </th>
-                )}
-                {visibleColumns.comentario && (
-                  <th className={`${cellPadding} ${columnWidths.comentario} text-left font-semibold text-gray-900 tracking-tight`}>
-                    Comentario
+                {visibleColumns.verificadoComentario && (
+                  <th className={`${cellPadding} ${columnWidths.verificadoComentario} text-left font-semibold text-gray-700`}>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      <span>Comentario</span>
+                    </div>
                   </th>
                 )}
                 {visibleColumns.equipo && (
-                  <th className={`${cellPadding} ${columnWidths.equipo} text-center font-semibold text-gray-900 tracking-tight`}>
+                  <th className={`${cellPadding} ${columnWidths.equipo} text-center font-semibold text-gray-700`}>
                     Equipo
                   </th>
                 )}
                 {visibleColumns.acciones && (
-                  <th className={`${cellPadding} ${columnWidths.acciones} text-center font-semibold text-gray-900 tracking-tight`}>
-                    Acciones
-                  </th>
+                  <th className={`${cellPadding} ${columnWidths.acciones} text-center font-semibold text-gray-700`}></th>
                 )}
               </tr>
             </thead>
@@ -631,13 +629,15 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
               // 🔍 Debug: Log each render of motion.tr
                 // console.log('🔍 ListaEquipoItemList - Rendering motion.tr for item:', item.id, { estado: item.estado, resumenPedidos })
 
+              const rowIndex = filteredItems.indexOf(item)
               return (
                 <tr
                    key={item.id}
-                   className={`border-b hover:bg-gray-50 transition-colors ${
-                     item.estado === 'rechazado' ? 'bg-red-50/30' :
-                     item.estado === 'aprobado' ? 'bg-blue-50/30' : ''
-                   } ${clasesFilaPorEstado}`}
+                   className={`border-b hover:bg-orange-50/50 transition-colors ${
+                     item.estado === 'rechazado' ? 'bg-red-50/50' :
+                     item.estado === 'aprobado' ? 'bg-green-50/30' :
+                     rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                   }`}
                  >
                    {visibleColumns.codigoDescripcion && (
                      <td className={`${cellPadding} ${columnWidths.codigoDescripcion} text-gray-700`}>
@@ -649,6 +649,13 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                            {item.descripcion}
                          </div>
                        </div>
+                     </td>
+                   )}
+                   {visibleColumns.marca && (
+                     <td className={`${cellPadding} ${columnWidths.marca}`}>
+                       <span className="text-gray-600 truncate line-clamp-1" title={item.marca || ''}>
+                         {item.marca || '-'}
+                       </span>
                      </td>
                    )}
                    {visibleColumns.unidad && (
@@ -825,57 +832,55 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                       </div>
                      </td>
                    )}
-                   {visibleColumns.verificado && (
-                     <td className={`${cellPadding} ${columnWidths.verificado} text-center`}>
-                      <div className="flex items-center justify-center space-x-1">
-                        <Checkbox
-                          checked={item.verificado}
-                          disabled={!editable}
-                          onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
-                        />
-                        {item.verificado && (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        )}
-                      </div>
-                     </td>
-                   )}
-                   {visibleColumns.comentario && (
-                     <td className={`${cellPadding} ${columnWidths.comentario}`}>
-                      {isEditingComentario && editable ? (
-                        <div className="flex gap-2 items-center">
-                          <Input
-                            id={`comentario-${item.id}`}
-                            value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
-                            onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSaveComentario(item.id)}
-                            className="text-sm"
-                            placeholder="Agregar comentario..."
+                   {visibleColumns.verificadoComentario && (
+                     <td className={`${cellPadding} ${columnWidths.verificadoComentario}`}>
+                      <div className="flex items-center gap-2">
+                        {/* Checkbox */}
+                        <div className="flex-shrink-0">
+                          <Checkbox
+                            checked={item.verificado}
+                            disabled={!editable}
+                            onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
                           />
-                          <Button size="sm" onClick={() => handleSaveComentario(item.id)}>
-                            <CheckCircle2 className="h-3 w-3" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)}>
-                            <X className="h-3 w-3" />
-                          </Button>
                         </div>
-                      ) : (
-                        <div
-                          onClick={() => editable && setEditComentarioItemId(item.id)}
-                          className={`text-sm cursor-pointer hover:bg-muted/50 p-1 rounded transition-colors truncate ${
-                            editable ? 'hover:text-blue-600' : ''
-                          }`}
-                          title={item.comentarioRevision || 'Click para agregar comentario'}
-                        >
-                          {item.comentarioRevision ? (
-                            <span>{item.comentarioRevision}</span>
+                        {/* Comment */}
+                        <div className="flex-1 min-w-0">
+                          {isEditingComentario && editable ? (
+                            <div className="flex gap-1 items-center">
+                              <Input
+                                id={`comentario-${item.id}`}
+                                value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
+                                onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSaveComentario(item.id)}
+                                className="text-xs h-7"
+                                placeholder="Comentario..."
+                              />
+                              <Button size="sm" onClick={() => handleSaveComentario(item.id)} className="h-7 w-7 p-0">
+                                <CheckCircle2 className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)} className="h-7 w-7 p-0">
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
                           ) : (
-                            <span className="text-muted-foreground italic">
-                              {editable ? 'Click para agregar...' : 'Sin comentario'}
-                            </span>
+                            <div
+                              onClick={() => editable && setEditComentarioItemId(item.id)}
+                              className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors line-clamp-2 leading-tight ${
+                                editable ? 'hover:text-blue-600' : ''
+                              } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
+                              title={item.comentarioRevision || 'Click para agregar comentario'}
+                            >
+                              {item.comentarioRevision ? (
+                                <span>{item.comentarioRevision}</span>
+                              ) : (
+                                <span className="text-muted-foreground italic text-xs">
+                                  {editable ? '+' : '—'}
+                                </span>
+                              )}
+                            </div>
                           )}
-                          {editable && <Pencil className="h-3 w-3 ml-1 inline text-muted-foreground" />}
                         </div>
-                      )}
+                      </div>
                      </td>
                    )}
                    {visibleColumns.equipo && (
@@ -953,7 +958,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
   }
 
   return (
-        <div className="space-y-6">
+    <div className="space-y-3">
       {renderHeader()}
        
       {isLoading ? (
@@ -961,7 +966,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       ) : filteredItems.length === 0 ? (
         renderEmptyState()
       ) : viewMode === 'cards' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredItems.map((item) => {
               const isEditingCantidad = editCantidadItemId === item.id
               const isEditingComentario = editComentarioItemId === item.id
@@ -972,131 +977,113 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                   key={item.id}
                   className="h-full"
                 >
-                  <Card className={`h-full transition-all duration-200 hover:shadow-md ${
+                  <Card className={`h-full transition-all hover:shadow-sm hover:border-orange-300 ${
                     item.estado === 'rechazado' ? 'border-red-200 bg-red-50/30' :
-                    item.estado === 'aprobado' ? 'border-blue-200 bg-blue-50/30' : ''
+                    item.estado === 'aprobado' ? 'border-green-200 bg-green-50/30' : ''
                   }`}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="text-lg font-semibold text-gray-900">
+                    <CardHeader className="pb-2 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5 min-w-0">
+                          <CardTitle className="text-sm font-semibold text-gray-900 truncate">
                             {item.codigo}
                           </CardTitle>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
+                          <p className="text-xs text-muted-foreground line-clamp-2">
                             {item.descripcion}
                           </p>
                         </div>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           <Checkbox
                             checked={item.verificado}
                             disabled={!editable}
                             onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
                           />
                           {item.verificado && (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <CheckCircle className="h-3 w-3 text-green-600" />
                           )}
                         </div>
                       </div>
-                      
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant={getStatusVariant(item.estado) as "default" | "secondary" | "outline"}>
+
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        <Badge variant={getStatusVariant(item.estado) as "default" | "secondary" | "outline"} className="text-[10px] px-1.5 py-0">
                           {item.estado || 'Sin estado'}
                         </Badge>
-                        <Badge variant={getOrigenVariant(item.origen)}>
+                        <Badge variant={getOrigenVariant(item.origen)} className="text-[10px] px-1.5 py-0">
                           {labelOrigen[item.origen] || item.origen}
                         </Badge>
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-3 p-3 pt-0">
                       {/* Basic Info */}
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Unidad</p>
-                          <p className="font-medium">{item.unidad}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Cantidad</p>
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Cant:</span>
                           {isEditingCantidad ? (
-                            <div className="flex gap-1 items-center mt-1">
+                            <div className="flex gap-1 items-center">
                               <Input
                                 type="number"
                                 value={editCantidadValues[item.id] ?? item.cantidad?.toString() ?? ''}
                                 onChange={(e) => setEditCantidadValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                className="h-8 text-sm"
+                                className="h-6 w-16 text-xs"
                               />
-                              <Button size="sm" onClick={() => handleSaveCantidad(item.id)}>
+                              <Button size="sm" onClick={() => handleSaveCantidad(item.id)} className="h-6 w-6 p-0">
                                 <CheckCircle2 className="h-3 w-3" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditCantidadItemId(null)}>
+                              <Button size="sm" variant="ghost" onClick={() => setEditCantidadItemId(null)} className="h-6 w-6 p-0">
                                 <X className="h-3 w-3" />
                               </Button>
                             </div>
                           ) : (
-                            <div
-                              className="flex items-center gap-1 font-medium cursor-pointer hover:text-blue-600 transition-colors"
+                            <span
+                              className="font-medium cursor-pointer hover:text-orange-600"
                               onClick={() => editable && setEditCantidadItemId(item.id)}
                             >
-                              {item.cantidad}
-                              {editable && <Pencil className="h-3 w-3 text-muted-foreground" />}
-                            </div>
+                              {item.cantidad} {item.unidad}
+                            </span>
                           )}
                         </div>
+                        <span className="font-mono font-semibold text-green-600">
+                          {costoTotal > 0 ? formatCurrency(costoTotal) : '—'}
+                        </span>
                       </div>
-                      
-                      <Separator />
-                      
-                      {/* Financial Info */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Cotización:</span>
-                          <CotizacionCodigoSimple
-                            cotizaciones={item.cotizaciones || []}
-                            cotizacionSeleccionadaId={item.cotizacionSeleccionadaId || undefined}
-                            interactive={false}
-                          />
-                        </div>
-                        
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Costo Total:</span>
-                          <span className="font-bold text-lg text-emerald-600">
-                            {costoTotal > 0 ? formatCurrency(costoTotal) : '—'}
-                          </span>
-                        </div>
-                        
-                        {item.cotizacionSeleccionada?.tiempoEntrega && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">Entrega:</span>
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{item.cotizacionSeleccionada.tiempoEntrega}</span>
-                            </div>
+
+                      {/* Cotización */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Cotización:</span>
+                        <CotizacionCodigoSimple
+                          cotizaciones={item.cotizaciones || []}
+                          cotizacionSeleccionadaId={item.cotizacionSeleccionadaId || undefined}
+                          interactive={false}
+                        />
+                      </div>
+
+                      {item.cotizacionSeleccionada?.tiempoEntrega && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Entrega:</span>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <span>{item.cotizacionSeleccionada.tiempoEntrega}</span>
                           </div>
-                        )}
-                      </div>
-                      
-                      <Separator />
-                      
+                        </div>
+                      )}
+
                       {/* Comments */}
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">Comentario:</p>
+                      <div className="text-xs">
                         {isEditingComentario && editable ? (
-                          <div className="space-y-2">
+                          <div className="space-y-1">
                             <Input
                               id={`comentario-${item.id}`}
                               value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
                               onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
                               onKeyDown={(e) => e.key === 'Enter' && handleSaveComentario(item.id)}
-                              placeholder="Agregar comentario..."
-                              className="text-sm"
+                              placeholder="Comentario..."
+                              className="h-7 text-xs"
                             />
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleSaveComentario(item.id)}>
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                            <div className="flex gap-1">
+                              <Button size="sm" onClick={() => handleSaveComentario(item.id)} className="h-6 text-xs">
                                 Guardar
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)}>
-                                <X className="h-3 w-3 mr-1" />
+                              <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)} className="h-6 text-xs">
                                 Cancelar
                               </Button>
                             </div>
@@ -1104,74 +1091,52 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                         ) : (
                           <div
                             onClick={() => editable && setEditComentarioItemId(item.id)}
-                            className={`text-sm p-2 rounded border min-h-[2.5rem] flex items-center ${
-                              editable ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''
+                            className={`text-muted-foreground p-1.5 rounded border-dashed border ${
+                              editable ? 'cursor-pointer hover:bg-muted/50' : ''
                             }`}
                           >
-                            {item.comentarioRevision ? (
-                              <span>{item.comentarioRevision}</span>
-                            ) : (
-                              <span className="text-muted-foreground italic">
-                                {editable ? 'Click para agregar comentario...' : 'Sin comentario'}
-                              </span>
-                            )}
-                            {editable && <Pencil className="h-3 w-3 ml-auto text-muted-foreground" />}
+                            {item.comentarioRevision || (editable ? '+ Comentario' : '—')}
                           </div>
                         )}
                       </div>
-                      
-                      {/* Equipment Info */}
-                      {item.proyectoEquipo?.nombre && (
-                        <>
-                          <Separator />
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">Equipo:</span>
-                            <Badge variant="outline">{item.proyectoEquipo.nombre}</Badge>
-                          </div>
-                        </>
-                      )}
-                      
+
                       {/* Actions */}
-                      <div className="flex justify-between items-center pt-2">
-                        <div className="flex gap-2">
+                      <div className="flex justify-between items-center pt-1 border-t">
+                        <div className="flex gap-1">
                           {(item.estado !== 'rechazado') && (item.origen === 'cotizado' || item.origen === 'reemplazo') && (
                             !item.reemplazaProyectoEquipoCotizadoItemId ? (
-                              <Button 
-                                size="sm" 
-                                onClick={() => setItemReemplazoOriginal(item)} 
-                                variant="outline" 
+                              <Button
+                                size="sm"
+                                onClick={() => setItemReemplazoOriginal(item)}
+                                variant="ghost"
                                 disabled={!editable}
-                                className="text-xs"
+                                className="h-6 px-2 text-xs"
                               >
-                                🔄 Reemplazar
+                                <RotateCcw className="h-3 w-3" />
                               </Button>
                             ) : (
-                              <Button 
-                                size="sm" 
-                                onClick={() => setItemReemplazoReemplazo(item)} 
-                                variant="secondary" 
+                              <Button
+                                size="sm"
+                                onClick={() => setItemReemplazoReemplazo(item)}
+                                variant="ghost"
                                 disabled={!editable}
-                                className="text-xs"
+                                className="h-6 px-2 text-xs"
                               >
-                                ♻️ Reemplazar
+                                <Recycle className="h-3 w-3" />
                               </Button>
                             )
                           )}
                         </div>
-                        
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              disabled={!editable}
-                              onClick={() => setDeleteTarget(item.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Eliminar ítem</TooltipContent>
-                        </Tooltip>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={!editable}
+                          onClick={() => setDeleteTarget(item.id)}
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

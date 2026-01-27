@@ -24,7 +24,8 @@ interface PlantillaServicioItemIndependiente {
   catalogoServicioId?: string
   nombre: string
   descripcion: string
-  categoria: string
+  edtId?: string
+  edt?: { id: string; nombre: string }
   unidadServicioNombre: string
   recursoNombre: string
   formula: string
@@ -47,7 +48,7 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   plantillaId: string
-  categoriaId?: string // Nueva prop opcional para filtrar por categoría
+  edtId?: string // Prop opcional para filtrar por EDT
   onItemsCreated: (items: PlantillaServicioItemIndependiente[]) => void
 }
 
@@ -64,17 +65,17 @@ export default function PlantillaServicioIndependienteMultiAddModal({
   isOpen,
   onClose,
   plantillaId,
-  categoriaId,
+  edtId,
   onItemsCreated
 }: Props) {
   const [servicios, setServicios] = useState<CatalogoServicio[]>([])
-  const [categorias, setCategorias] = useState<Edt[]>([])
+  const [edts, setEdts] = useState<Edt[]>([])
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [unidadesServicio, setUnidadesServicio] = useState<UnidadServicio[]>([])
   const [filteredServicios, setFilteredServicios] = useState<CatalogoServicio[]>([])
   const [selectedServicios, setSelectedServicios] = useState<SelectedServicio[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [categoriaFiltro, setCategoriaFiltro] = useState('todas')
+  const [edtFiltro, setEdtFiltro] = useState('todas')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
@@ -82,29 +83,29 @@ export default function PlantillaServicioIndependienteMultiAddModal({
   // ✅ Load servicios and related data when modal opens
   useEffect(() => {
     console.log('🛠️ Modal useEffect triggered, isOpen:', isOpen)
-    console.log('🛠️ Modal props:', { isOpen, plantillaId, categoriaId })
+    console.log('🛠️ Modal props:', { isOpen, plantillaId, edtId })
     if (isOpen) {
       loadData()
     }
   }, [isOpen])
 
-  // ✅ Set initial category filter when categoriaId prop changes
+  // ✅ Set initial EDT filter when edtId prop changes
   useEffect(() => {
-    if (categoriaId) {
-      setCategoriaFiltro(categoriaId)
+    if (edtId) {
+      setEdtFiltro(edtId)
     } else {
-      setCategoriaFiltro('todas')
+      setEdtFiltro('todas')
     }
-  }, [categoriaId])
+  }, [edtId])
 
-  // ✅ Filter servicios based on search term and category
+  // ✅ Filter servicios based on search term and EDT
   useEffect(() => {
     let filtered = servicios
 
-    // Filter by category (use categoriaId prop if provided, otherwise use filter)
-    const effectiveCategoriaFiltro = categoriaId || categoriaFiltro
-    if (effectiveCategoriaFiltro !== 'todas') {
-      filtered = filtered.filter(servicio => servicio.categoriaId === effectiveCategoriaFiltro)
+    // Filter by EDT (use edtId prop if provided, otherwise use filter)
+    const effectiveEdtFiltro = edtId || edtFiltro
+    if (effectiveEdtFiltro !== 'todas') {
+      filtered = filtered.filter(servicio => servicio.categoriaId === effectiveEdtFiltro)
     }
 
     // Filter by search term
@@ -118,13 +119,13 @@ export default function PlantillaServicioIndependienteMultiAddModal({
     // ✅ Mantener el orden que viene de la API (ya ordenado por orden)
     console.log('🛠️ Servicios filtrados (manteniendo orden de API):', filtered.map(s => ({ nombre: s.nombre, orden: s.orden })))
     setFilteredServicios(filtered)
-  }, [searchTerm, categoriaFiltro, servicios, categoriaId])
+  }, [searchTerm, edtFiltro, servicios, edtId])
 
   const loadData = async () => {
     console.log('🛠️ loadData called')
     setLoading(true)
     try {
-      const [serviciosData, categoriasData, recursosData, unidadesData] = await Promise.all([
+      const [serviciosData, edtsData, recursosData, unidadesData] = await Promise.all([
         getCatalogoServicios(),
         getEdts(),
         getRecursos(),
@@ -133,13 +134,13 @@ export default function PlantillaServicioIndependienteMultiAddModal({
 
       console.log('🛠️ Data loaded:')
       console.log('🛠️ serviciosData:', serviciosData)
-      console.log('🛠️ categoriasData:', categoriasData)
+      console.log('🛠️ edtsData:', edtsData)
       console.log('🛠️ recursosData:', recursosData)
       console.log('🛠️ unidadesData:', unidadesData)
 
       console.log('🛠️ Servicios desde API:', serviciosData.map(s => ({ nombre: s.nombre, orden: s.orden })))
       setServicios(serviciosData)
-      setCategorias(categoriasData)
+      setEdts(edtsData)
       setRecursos(recursosData)
       setUnidadesServicio(unidadesData)
       setFilteredServicios(serviciosData)
@@ -342,7 +343,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-600" />
-            {categoriaId ? 'Agregar Servicios de la Plantilla' : 'Agregar Múltiples Servicios'}
+            {edtId ? 'Agregar Servicios de la Plantilla' : 'Agregar Múltiples Servicios'}
           </DialogTitle>
         </DialogHeader>
 
@@ -356,25 +357,25 @@ export default function PlantillaServicioIndependienteMultiAddModal({
               className="w-full"
             />
           </div>
-          {categoriaId ? (
+          {edtId ? (
             <div className="w-48">
               <div className="flex items-center justify-center h-10 px-3 bg-blue-50 border border-blue-200 rounded-md">
                 <span className="text-sm text-blue-700 font-medium">
-                  {categorias.find(c => c.id === categoriaId)?.nombre || 'Categoría filtrada'}
+                  {edts.find(e => e.id === edtId)?.nombre || 'EDT filtrado'}
                 </span>
               </div>
             </div>
           ) : (
             <div className="w-48">
-              <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+              <Select value={edtFiltro} onValueChange={setEdtFiltro}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Todas las categorías" />
+                  <SelectValue placeholder="Todos los EDTs" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todas las categorías</SelectItem>
-                  {categorias.filter(c => c && c.id).map(categoria => (
-                    <SelectItem key={categoria.id} value={categoria.id!}>
-                      {categoria.nombre}
+                  <SelectItem value="todas">Todos los EDTs</SelectItem>
+                  {edts.filter(e => e && e.id).map(edt => (
+                    <SelectItem key={edt.id} value={edt.id!}>
+                      {edt.nombre}
                     </SelectItem>
                   ))}
                 </SelectContent>

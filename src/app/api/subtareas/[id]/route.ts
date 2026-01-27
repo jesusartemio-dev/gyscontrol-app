@@ -71,7 +71,7 @@ export async function GET(
             proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edt: true,
                 proyecto: {
                   select: {
                     id: true,
@@ -274,7 +274,7 @@ export async function PUT(
             proyectoServicioCotizado: {
               select: {
                 id: true,
-                categoria: true,
+                edt: true,
                 proyecto: {
                   select: {
                     id: true,
