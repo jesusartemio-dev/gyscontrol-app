@@ -11,8 +11,8 @@ interface MetricasCardsProps {
     oportunidadesActivas: number
     oportunidadesGanadas: number
     oportunidadesPerdidas: number
-    valorTotalPipeline: number
-    valorPipelineActivo: number
+    valorTotalEmbudo: number
+    valorEmbudoActivo: number
     tasaConversion: number
   }
 }
@@ -28,9 +28,9 @@ export default function MetricasCards({ resumen }: MetricasCardsProps) {
       bgColor: 'bg-blue-100'
     },
     {
-      title: 'Valor Pipeline Activo',
-      value: formatCurrency(resumen.valorPipelineActivo),
-      description: `${formatCurrency(resumen.valorTotalPipeline)} total`,
+      title: 'Valor Embudo Activo',
+      value: formatCurrency(resumen.valorEmbudoActivo),
+      description: `${formatCurrency(resumen.valorTotalEmbudo)} total`,
       icon: DollarSign,
       color: 'text-green-600',
       bgColor: 'bg-green-100'

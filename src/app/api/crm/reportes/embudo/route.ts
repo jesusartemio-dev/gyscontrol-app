@@ -1,8 +1,8 @@
 // ===================================================
 // 📁 Archivo: route.ts
-// 📌 Ubicación: /api/crm/reportes/pipeline
-// 🔧 Descripción: API para reporte de pipeline de ventas
-// ✅ GET: Obtener análisis del pipeline por etapas
+// 📌 Ubicación: /api/crm/reportes/embudo
+// 🔧 Descripción: API para reporte del embudo de ventas
+// ✅ GET: Obtener análisis del embudo por etapas
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -11,14 +11,14 @@ import type { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-// ✅ Obtener análisis del pipeline de ventas
+// ✅ Obtener análisis del embudo de ventas
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const fechaDesde = searchParams.get('fechaDesde') || '2024-01-01'
     const fechaHasta = searchParams.get('fechaHasta') || '2024-12-31'
 
-    // Definir las etapas del pipeline
+    // Definir las etapas del embudo
     const etapas = [
       { nombre: 'Inicio', estado: 'inicio' },
       { nombre: 'Contacto Cliente', estado: 'contacto_cliente' },
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     ]
 
     // Calcular métricas para cada etapa
-    const pipelineData = await Promise.all(
+    const embudoData = await Promise.all(
       etapas.map(async (etapa) => {
         // Contar oportunidades en esta etapa
         const cantidad = await prisma.crmOportunidad.count({
@@ -120,23 +120,23 @@ export async function GET(req: NextRequest) {
       })
     )
 
-    // Calcular métricas generales del pipeline
-    const totalOportunidades = pipelineData.reduce((sum, etapa) => sum + etapa.cantidad, 0)
-    const valorTotalPipeline = pipelineData.reduce((sum, etapa) => sum + etapa.valorTotal, 0)
+    // Calcular métricas generales del embudo
+    const totalOportunidades = embudoData.reduce((sum, etapa) => sum + etapa.cantidad, 0)
+    const valorTotalEmbudo = embudoData.reduce((sum, etapa) => sum + etapa.valorTotal, 0)
 
     // Calcular valor activo (excluyendo cerradas)
-    const valorActivo = pipelineData
+    const valorActivo = embudoData
       .filter(etapa => !etapa.estado.includes('cerrada'))
       .reduce((sum, etapa) => sum + etapa.valorTotal, 0)
 
     // Calcular tasa de conversión general
-    const oportunidadesGanadas = pipelineData.find(e => e.estado === 'cerrada_ganada')?.cantidad || 0
+    const oportunidadesGanadas = embudoData.find(e => e.estado === 'cerrada_ganada')?.cantidad || 0
     const oportunidadesTotales = totalOportunidades
     const tasaConversion = oportunidadesTotales > 0 ? (oportunidadesGanadas / oportunidadesTotales) * 100 : 0
 
     const resumen = {
       totalOportunidades,
-      valorTotalPipeline,
+      valorTotalEmbudo,
       valorActivo,
       tasaConversion: Math.round(tasaConversion * 100) / 100,
       periodo: {
@@ -146,12 +146,12 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      etapas: pipelineData,
+      etapas: embudoData,
       resumen
     })
 
   } catch (error) {
-    console.error('❌ Error al obtener reporte de pipeline:', error)
+    console.error('❌ Error al obtener reporte del embudo:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

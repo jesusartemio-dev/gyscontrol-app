@@ -20,7 +20,7 @@ interface Oportunidad {
   }
 }
 
-interface PipelineStage {
+interface EtapaEmbudo {
   nombre: string
   estado: string
   cantidad: number
@@ -30,7 +30,7 @@ interface PipelineStage {
   oportunidades: any[]
 }
 
-const pipelineStages = [
+const etapasEmbudo = [
   { id: 'inicio', name: 'Inicio', color: 'text-purple-600', bgColor: 'bg-purple-50' },
   { id: 'contacto_cliente', name: 'Contacto Cliente', color: 'text-blue-600', bgColor: 'bg-blue-50' },
   { id: 'validacion_tecnica', name: 'Validación Técnica', color: 'text-cyan-600', bgColor: 'bg-cyan-50' },
@@ -43,26 +43,26 @@ const pipelineStages = [
   { id: 'cerrada_perdida', name: 'Cerrada Perdida', color: 'text-red-600', bgColor: 'bg-red-50' }
 ]
 
-export default function PipelineReportPage() {
+export default function EmbudoReportPage() {
   const [oportunidades, setOportunidades] = useState<Oportunidad[]>([])
   const [loading, setLoading] = useState(true)
-  const [pipelineData, setPipelineData] = useState<PipelineStage[]>([])
+  const [embudoData, setEmbudoData] = useState<EtapaEmbudo[]>([])
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true)
 
-        // Load pipeline data from API
-        const response = await fetch('/api/crm/reportes/pipeline')
+        // Cargar datos del embudo desde API
+        const response = await fetch('/api/crm/reportes/embudo')
         if (!response.ok) {
-          throw new Error('Error al cargar datos de pipeline')
+          throw new Error('Error al cargar datos del embudo')
         }
         const data = await response.json()
 
-        setPipelineData(data.etapas)
+        setEmbudoData(data.etapas)
       } catch (error) {
-        console.error('Error loading pipeline data:', error)
+        console.error('Error loading embudo data:', error)
       } finally {
         setLoading(false)
       }
@@ -79,13 +79,13 @@ export default function PipelineReportPage() {
     }).format(amount)
   }
 
-  const totalValue = pipelineData.reduce((sum, stage) => sum + stage.valorTotal, 0)
-  const activeValue = pipelineData
+  const totalValue = embudoData.reduce((sum, stage) => sum + stage.valorTotal, 0)
+  const activeValue = embudoData
     .filter(stage => !stage.estado.includes('cerrada'))
     .reduce((sum, stage) => sum + stage.valorTotal, 0)
 
   const conversionRate = totalValue > 0 ?
-    (pipelineData.find(s => s.estado === 'cerrada_ganada')?.valorTotal || 0) / totalValue * 100 : 0
+    (embudoData.find(s => s.estado === 'cerrada_ganada')?.valorTotal || 0) / totalValue * 100 : 0
 
   if (loading) {
     return (
@@ -93,7 +93,7 @@ export default function PipelineReportPage() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center space-y-4">
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Cargando reporte de pipeline...</p>
+            <p className="text-muted-foreground">Cargando reporte del embudo...</p>
           </div>
         </div>
       </div>
@@ -114,7 +114,7 @@ export default function PipelineReportPage() {
             <Target className="h-6 w-6 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reporte de Pipeline</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Reporte del Embudo</h1>
             <p className="text-gray-600 mt-1">Análisis del embudo de ventas por etapas</p>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function PipelineReportPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total Pipeline</CardTitle>
+            <CardTitle className="text-sm font-medium">Valor Total Embudo</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -162,21 +162,21 @@ export default function PipelineReportPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">24 días</div>
-            <p className="text-xs text-muted-foreground">En pipeline activo</p>
+            <p className="text-xs text-muted-foreground">En embudo activo</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Pipeline Visualization */}
+      {/* Visualización del Embudo */}
       <Card>
         <CardHeader>
           <CardTitle>Embudo de Ventas</CardTitle>
           <CardDescription>
-            Distribución de oportunidades por etapas del pipeline
+            Distribución de oportunidades por etapas del embudo
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {pipelineData.map((stage, index) => {
+          {embudoData.map((stage, index) => {
             // Define colors based on stage state
             const getStageColors = (estado: string) => {
               switch (estado) {

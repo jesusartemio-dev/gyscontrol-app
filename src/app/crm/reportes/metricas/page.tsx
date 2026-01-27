@@ -207,7 +207,7 @@ export default function MetricasReportPage() {
             </Card>
           </div>
 
-          {/* Pipeline Funnel */}
+          {/* Embudo de Conversión */}
           <Card>
             <CardHeader>
               <CardTitle>Embudo de Conversión</CardTitle>
@@ -290,7 +290,7 @@ export default function MetricasReportPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center p-3 bg-muted/50 rounded">
-                  <span className="text-sm">Valor Total Pipeline</span>
+                  <span className="text-sm">Valor Total Embudo</span>
                   <span className="font-medium">{formatCurrency(metricasData.totales.valorTotalVendido)}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-muted/50 rounded">

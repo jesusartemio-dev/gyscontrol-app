@@ -45,14 +45,14 @@ const reportTypes: ReportType[] = [
     route: '/crm'
   },
   {
-    id: 'pipeline',
-    title: 'Reporte de Pipeline',
-    description: 'Análisis detallado del pipeline de ventas por etapas',
+    id: 'embudo',
+    title: 'Reporte del Embudo',
+    description: 'Análisis detallado del embudo de ventas por etapas',
     icon: Target,
     color: 'text-green-600',
     bgColor: 'bg-green-50',
     available: true,
-    route: '/crm/reportes/pipeline'
+    route: '/crm/reportes/embudo'
   },
   {
     id: 'rendimiento',
@@ -295,7 +295,7 @@ export default function CrmReportesPage() {
           <div>
             <h4 className="font-medium mb-2">Reportes Disponibles</h4>
             <ul className="space-y-1 text-muted-foreground">
-              <li>• <strong>Pipeline:</strong> Análisis del embudo de ventas</li>
+              <li>• <strong>Embudo:</strong> Análisis del embudo de ventas</li>
               <li>• <strong>Rendimiento:</strong> Métricas por comercial</li>
               <li>• <strong>Actividades:</strong> Historial de interacciones</li>
             </ul>

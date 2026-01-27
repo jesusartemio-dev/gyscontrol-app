@@ -18,14 +18,14 @@ export async function GET(req: NextRequest) {
     const userId = searchParams.get('userId')
     const userRole = searchParams.get('role') || 'comercial'
 
-    // Obtener métricas generales del pipeline
+    // Obtener métricas generales del embudo
     const [
       totalOportunidades,
       oportunidadesActivas,
       oportunidadesGanadas,
       oportunidadesPerdidas,
-      valorTotalPipeline,
-      valorPipelineActivo,
+      valorTotalEmbudo,
+      valorEmbudoActivo,
       actividadesRecientes,
       oportunidadesPorEstado
     ] = await Promise.all([
@@ -51,12 +51,12 @@ export async function GET(req: NextRequest) {
         where: { estado: 'cerrada_perdida' }
       }),
 
-      // Valor total del pipeline
+      // Valor total del embudo
       prisma.crmOportunidad.aggregate({
         _sum: { valorEstimado: true }
       }),
 
-      // Valor del pipeline activo
+      // Valor del embudo activo
       prisma.crmOportunidad.aggregate({
         _sum: { valorEstimado: true },
         where: {
@@ -89,8 +89,8 @@ export async function GET(req: NextRequest) {
     ])
 
     // Calcular métricas adicionales
-    const totalValor = valorTotalPipeline._sum.valorEstimado || 0
-    const valorActivo = valorPipelineActivo._sum.valorEstimado || 0
+    const totalValor = valorTotalEmbudo._sum.valorEstimado || 0
+    const valorActivo = valorEmbudoActivo._sum.valorEstimado || 0
 
     const tasaConversion = totalOportunidades > 0 ?
       (oportunidadesGanadas / totalOportunidades) * 100 : 0
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Formatear datos de oportunidades por estado
-    const pipelineData = oportunidadesPorEstado.map(item => ({
+    const embudoData = oportunidadesPorEstado.map(item => ({
       estado: item.estado,
       cantidad: item._count.id,
       valor: item._sum.valorEstimado || 0
@@ -121,11 +121,11 @@ export async function GET(req: NextRequest) {
         oportunidadesActivas,
         oportunidadesGanadas,
         oportunidadesPerdidas,
-        valorTotalPipeline: totalValor,
-        valorPipelineActivo: valorActivo,
+        valorTotalEmbudo: totalValor,
+        valorEmbudoActivo: valorActivo,
         tasaConversion: Math.round(tasaConversion * 100) / 100
       },
-      pipeline: pipelineData,
+      embudo: embudoData,
       actividadesRecientes: actividadesRecientes.map(actividad => ({
         id: actividad.id,
         tipo: actividad.tipo,

@@ -7,15 +7,15 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils/plantilla-utils'
 
-interface PipelineChartProps {
-  pipeline: Array<{
+interface EmbudoChartProps {
+  embudo: Array<{
     estado: string
     cantidad: number
     valor: number
   }>
 }
 
-export default function PipelineChart({ pipeline }: PipelineChartProps) {
+export default function EmbudoChart({ embudo }: EmbudoChartProps) {
   const getEstadoInfo = (estado: string) => {
     switch (estado) {
       case 'inicio':
@@ -112,28 +112,28 @@ export default function PipelineChart({ pipeline }: PipelineChartProps) {
     }
   }
 
-  const totalValor = pipeline.reduce((sum, item) => sum + item.valor, 0)
-  const totalCantidad = pipeline.reduce((sum, item) => sum + item.cantidad, 0)
+  const totalValor = embudo.reduce((sum, item) => sum + item.valor, 0)
+  const totalCantidad = embudo.reduce((sum, item) => sum + item.cantidad, 0)
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5 text-blue-600" />
-          Pipeline de Ventas
+          Embudo de Ventas
         </CardTitle>
         <CardDescription>
           Distribución de oportunidades por etapa
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {pipeline.length === 0 ? (
+        {embudo.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No hay datos de pipeline disponibles</p>
+            <p>No hay datos del embudo disponibles</p>
           </div>
         ) : (
-          pipeline.map((stage, index) => {
+          embudo.map((stage, index) => {
             const estadoInfo = getEstadoInfo(stage.estado)
             const porcentajeValor = totalValor > 0 ? (stage.valor / totalValor) * 100 : 0
             const porcentajeCantidad = totalCantidad > 0 ? (stage.cantidad / totalCantidad) * 100 : 0
@@ -175,7 +175,7 @@ export default function PipelineChart({ pipeline }: PipelineChartProps) {
           })
         )}
 
-        {pipeline.length > 0 && (
+        {embudo.length > 0 && (
           <div className="mt-6 p-4 bg-muted/50 rounded-lg">
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
@@ -184,7 +184,7 @@ export default function PipelineChart({ pipeline }: PipelineChartProps) {
               </div>
               <div>
                 <div className="text-2xl font-bold text-green-600">{formatCurrency(totalValor)}</div>
-                <div className="text-sm text-muted-foreground">Valor Total Pipeline</div>
+                <div className="text-sm text-muted-foreground">Valor Total Embudo</div>
               </div>
             </div>
           </div>

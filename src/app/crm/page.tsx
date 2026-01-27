@@ -40,7 +40,7 @@ interface DashboardData {
     oportunidadesActivas: number
     oportunidadesGanadas: number
     oportunidadesPerdidas: number
-    valorTotalPipeline: number
+    valorTotalEmbudo: number
     tasaConversion: number
   }
   oportunidadesPorEstado: Array<{
@@ -68,7 +68,7 @@ interface DashboardData {
     }
   }>
   chartData: {
-    pipeline: Array<{
+    embudo: Array<{
       name: string
       value: number
       valor: number

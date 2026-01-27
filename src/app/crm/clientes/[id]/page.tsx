@@ -583,7 +583,7 @@ export default function CrmClienteDetailPage() {
                   <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No hay oportunidades activas</h3>
                   <p className="text-muted-foreground mb-4">
-                    Crea oportunidades para gestionar el pipeline comercial.
+                    Crea oportunidades para gestionar el embudo comercial.
                   </p>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />

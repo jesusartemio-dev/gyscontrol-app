@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import MetricasCards from './MetricasCards'
-import PipelineChart from './PipelineChart'
+import EmbudoChart from './EmbudoChart'
 import ActividadesRecientes from './ActividadesRecientes'
 import { formatCurrency } from '@/lib/utils/plantilla-utils'
 
@@ -18,11 +18,11 @@ interface DashboardData {
     oportunidadesActivas: number
     oportunidadesGanadas: number
     oportunidadesPerdidas: number
-    valorTotalPipeline: number
-    valorPipelineActivo: number
+    valorTotalEmbudo: number
+    valorEmbudoActivo: number
     tasaConversion: number
   }
-  pipeline: Array<{
+  embudo: Array<{
     estado: string
     cantidad: number
     valor: number
@@ -143,9 +143,9 @@ export default function CrmDashboard({ userId, userRole = 'comercial' }: CrmDash
       {/* Métricas Principales */}
       <MetricasCards resumen={dashboardData.resumen} />
 
-      {/* Pipeline y Actividades */}
+      {/* Embudo y Actividades */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PipelineChart pipeline={dashboardData.pipeline} />
+        <EmbudoChart embudo={dashboardData.embudo} />
         <ActividadesRecientes actividades={dashboardData.actividadesRecientes} />
       </div>
 
