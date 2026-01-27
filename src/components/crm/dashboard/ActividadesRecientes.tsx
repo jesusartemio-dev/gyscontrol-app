@@ -1,9 +1,11 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Activity, Phone, Mail, Calendar, User, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { Activity, Phone, Mail, Calendar, User, MessageSquare, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 interface Actividad {
@@ -24,6 +26,8 @@ interface ActividadesRecientesProps {
 }
 
 export default function ActividadesRecientes({ actividades }: ActividadesRecientesProps) {
+  const router = useRouter()
+
   const getTipoIcon = (tipo: string) => {
     switch (tipo.toLowerCase()) {
       case 'llamada':
@@ -76,10 +80,20 @@ export default function ActividadesRecientes({ actividades }: ActividadesRecient
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-green-600" />
-          Actividades Recientes
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-green-600" />
+            Actividades Recientes
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/crm/actividades')}
+          >
+            Ver todas
+            <ExternalLink className="h-3 w-3 ml-1" />
+          </Button>
+        </div>
         <CardDescription>
           Últimas actividades registradas en el sistema
         </CardDescription>

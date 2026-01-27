@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     // Determinar el tipo de oportunidad y valor estimado
     let valorEstimado = proyecto.grandTotal
     let nombreOportunidad = proyecto.nombre
-    let estadoInicial: 'inicio' | 'contacto_cliente' | 'validacion_tecnica' | 'consolidacion_precios' | 'validacion_comercial' | 'seguimiento_cliente' | 'negociacion' | 'seguimiento_proyecto' | 'cerrada_ganada' | 'cerrada_perdida' = 'contacto_cliente'
+    let estadoInicial: 'inicio' | 'contacto_cliente' | 'validacion_tecnica' | 'validacion_comercial' | 'negociacion' | 'seguimiento_proyecto' | 'feedback_mejora' | 'cerrada_ganada' | 'cerrada_perdida' = 'contacto_cliente'
 
     switch (tipo) {
       case 'upselling':

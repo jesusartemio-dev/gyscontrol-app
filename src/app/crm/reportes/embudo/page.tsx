@@ -30,18 +30,21 @@ interface EtapaEmbudo {
   oportunidades: any[]
 }
 
+// Flujo: Inicio → Contacto → Propuesta (V.Técnica / V.Comercial) → Negociación → [Seg.Proyecto / Feedback]
 const etapasEmbudo = [
   { id: 'inicio', name: 'Inicio', color: 'text-purple-600', bgColor: 'bg-purple-50' },
   { id: 'contacto_cliente', name: 'Contacto Cliente', color: 'text-blue-600', bgColor: 'bg-blue-50' },
   { id: 'validacion_tecnica', name: 'Validación Técnica', color: 'text-cyan-600', bgColor: 'bg-cyan-50' },
-  { id: 'consolidacion_precios', name: 'Consolidación Precios', color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
   { id: 'validacion_comercial', name: 'Validación Comercial', color: 'text-violet-600', bgColor: 'bg-violet-50' },
-  { id: 'seguimiento_cliente', name: 'Seguimiento Cliente', color: 'text-yellow-600', bgColor: 'bg-yellow-50' },
   { id: 'negociacion', name: 'Negociación', color: 'text-orange-600', bgColor: 'bg-orange-50' },
   { id: 'seguimiento_proyecto', name: 'Seguimiento Proyecto', color: 'text-teal-600', bgColor: 'bg-teal-50' },
-  { id: 'cerrada_ganada', name: 'Cerrada Ganada', color: 'text-green-600', bgColor: 'bg-green-50' },
-  { id: 'cerrada_perdida', name: 'Cerrada Perdida', color: 'text-red-600', bgColor: 'bg-red-50' }
+  { id: 'feedback_mejora', name: 'Feedback de Mejora', color: 'text-red-600', bgColor: 'bg-red-50' },
+  { id: 'cerrada_ganada', name: 'Cerrada Ganada', color: 'text-green-600', bgColor: 'bg-green-50' },  // Legacy
+  { id: 'cerrada_perdida', name: 'Cerrada Perdida', color: 'text-red-600', bgColor: 'bg-red-50' }     // Legacy
 ]
+
+// Estados cerrados (finales)
+const estadosCerrados = ['cerrada_ganada', 'cerrada_perdida', 'seguimiento_proyecto', 'feedback_mejora']
 
 export default function EmbudoReportPage() {
   const [oportunidades, setOportunidades] = useState<Oportunidad[]>([])
@@ -81,11 +84,14 @@ export default function EmbudoReportPage() {
 
   const totalValue = embudoData.reduce((sum, stage) => sum + stage.valorTotal, 0)
   const activeValue = embudoData
-    .filter(stage => !stage.estado.includes('cerrada'))
+    .filter(stage => !estadosCerrados.includes(stage.estado))
     .reduce((sum, stage) => sum + stage.valorTotal, 0)
 
-  const conversionRate = totalValue > 0 ?
-    (embudoData.find(s => s.estado === 'cerrada_ganada')?.valorTotal || 0) / totalValue * 100 : 0
+  // Conversion rate: incluye seguimiento_proyecto (ganada) y cerrada_ganada (legacy)
+  const valorGanado = embudoData
+    .filter(s => s.estado === 'cerrada_ganada' || s.estado === 'seguimiento_proyecto')
+    .reduce((sum, s) => sum + s.valorTotal, 0)
+  const conversionRate = totalValue > 0 ? (valorGanado / totalValue) * 100 : 0
 
   if (loading) {
     return (
@@ -191,6 +197,7 @@ export default function EmbudoReportPage() {
                 case 'propuesta_enviada': return { bgColor: 'bg-yellow-50', color: 'text-yellow-600' }
                 case 'negociacion': return { bgColor: 'bg-orange-50', color: 'text-orange-600' }
                 case 'seguimiento_proyecto': return { bgColor: 'bg-teal-50', color: 'text-teal-600' }
+                case 'feedback_mejora': return { bgColor: 'bg-red-50', color: 'text-red-600' }
                 case 'cerrada_ganada': return { bgColor: 'bg-green-50', color: 'text-green-600' }
                 case 'cerrada_perdida': return { bgColor: 'bg-red-50', color: 'text-red-600' }
                 default: return { bgColor: 'bg-gray-50', color: 'text-gray-600' }

@@ -240,14 +240,12 @@ export default function CrmDashboardPage() {
       case 'contacto_cliente':
       case 'contacto_inicial': return 'outline'
       case 'validacion_tecnica': return 'outline'
-      case 'consolidacion_precios': return 'outline'
       case 'validacion_comercial': return 'outline'
-      case 'seguimiento_cliente':
-      case 'cotizacion': return 'default'
       case 'negociacion': return 'warning'
       case 'seguimiento_proyecto': return 'default'
-      case 'cerrada_ganada': return 'default'
-      case 'cerrada_perdida': return 'destructive'
+      case 'feedback_mejora': return 'destructive'
+      case 'cerrada_ganada': return 'default'        // Legacy
+      case 'cerrada_perdida': return 'destructive'   // Legacy
       default: return 'outline'
     }
   }
@@ -259,14 +257,12 @@ export default function CrmDashboardPage() {
       case 'contacto_cliente':
       case 'contacto_inicial': return 'Contacto Cliente'
       case 'validacion_tecnica': return 'V. Técnica'
-      case 'consolidacion_precios': return 'C. Precios'
       case 'validacion_comercial': return 'V. Comercial'
-      case 'seguimiento_cliente':
-      case 'cotizacion': return 'Seguimiento'
       case 'negociacion': return 'Negociación'
-      case 'seguimiento_proyecto': return 'Proyecto'
-      case 'cerrada_ganada': return 'Ganada'
-      case 'cerrada_perdida': return 'Perdida'
+      case 'seguimiento_proyecto': return 'Seg. Proyecto'
+      case 'feedback_mejora': return 'Feedback'
+      case 'cerrada_ganada': return 'Ganada'         // Legacy
+      case 'cerrada_perdida': return 'Perdida'       // Legacy
       default: return estado
     }
   }

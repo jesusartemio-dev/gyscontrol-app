@@ -281,7 +281,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                     <span className="hidden sm:inline">+ CRM</span>
                   </Button>
                 )}
-                {cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada') && (
+                {cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada' || cotizacion.oportunidadCrm.estado === 'seguimiento_proyecto') && (
                   <CrearProyectoDesdeCotizacionModal
                     cotizacion={cotizacion}
                     buttonVariant="outline"

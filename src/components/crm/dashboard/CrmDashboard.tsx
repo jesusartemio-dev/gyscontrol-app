@@ -1,8 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Target, TrendingUp, Users, Activity, Loader2, AlertCircle } from 'lucide-react'
+import {
+  Target,
+  TrendingUp,
+  Users,
+  Activity,
+  Loader2,
+  AlertCircle,
+  BarChart3,
+  ExternalLink,
+  Calendar,
+  FileText
+} from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -49,6 +62,7 @@ interface CrmDashboardProps {
 }
 
 export default function CrmDashboard({ userId, userRole = 'comercial' }: CrmDashboardProps) {
+  const router = useRouter()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -130,14 +144,42 @@ export default function CrmDashboard({ userId, userRole = 'comercial' }: CrmDash
             <p className="text-gray-600 mt-1">Gestión integral de relaciones comerciales</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="secondary" className="text-xs">
             Última actualización: {new Date(dashboardData.fechaActualizacion).toLocaleTimeString('es-ES')}
           </Badge>
           <Button onClick={loadDashboardData} variant="outline" size="sm">
             Actualizar
           </Button>
+          <Button asChild variant="default" size="sm">
+            <Link href="/crm">
+              <ExternalLink className="h-4 w-4 mr-1" />
+              Gestionar Oportunidades
+            </Link>
+          </Button>
         </div>
+      </div>
+
+      {/* Navigation Links */}
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/crm/reportes">
+            <BarChart3 className="h-4 w-4 mr-1" />
+            Reportes
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/crm/actividades">
+            <Calendar className="h-4 w-4 mr-1" />
+            Actividades
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/crm/clientes">
+            <Users className="h-4 w-4 mr-1" />
+            Clientes
+          </Link>
+        </Button>
       </div>
 
       {/* Métricas Principales */}
@@ -161,18 +203,38 @@ export default function CrmDashboard({ userId, userRole = 'comercial' }: CrmDash
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button className="h-20 flex flex-col items-center gap-2" variant="outline">
-              <Users className="h-6 w-6 text-blue-600" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Button
+              className="h-20 flex flex-col items-center gap-2"
+              variant="outline"
+              onClick={() => router.push('/crm')}
+            >
+              <Target className="h-6 w-6 text-blue-600" />
               <span className="text-sm font-medium">Nueva Oportunidad</span>
             </Button>
-            <Button className="h-20 flex flex-col items-center gap-2" variant="outline">
-              <Activity className="h-6 w-6 text-green-600" />
-              <span className="text-sm font-medium">Registrar Actividad</span>
+            <Button
+              className="h-20 flex flex-col items-center gap-2"
+              variant="outline"
+              onClick={() => router.push('/crm/actividades')}
+            >
+              <Calendar className="h-6 w-6 text-green-600" />
+              <span className="text-sm font-medium">Actividades</span>
             </Button>
-            <Button className="h-20 flex flex-col items-center gap-2" variant="outline">
-              <TrendingUp className="h-6 w-6 text-purple-600" />
+            <Button
+              className="h-20 flex flex-col items-center gap-2"
+              variant="outline"
+              onClick={() => router.push('/crm/reportes')}
+            >
+              <BarChart3 className="h-6 w-6 text-purple-600" />
               <span className="text-sm font-medium">Ver Reportes</span>
+            </Button>
+            <Button
+              className="h-20 flex flex-col items-center gap-2"
+              variant="outline"
+              onClick={() => router.push('/crm/reportes/embudo')}
+            >
+              <TrendingUp className="h-6 w-6 text-orange-600" />
+              <span className="text-sm font-medium">Embudo Detallado</span>
             </Button>
           </div>
         </CardContent>

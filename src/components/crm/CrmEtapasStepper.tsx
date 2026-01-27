@@ -17,9 +17,7 @@ import {
   Target,
   Users,
   ClipboardCheck,
-  DollarSign,
   FileCheck,
-  Send,
   Handshake,
   FolderKanban,
   Trophy,
@@ -27,7 +25,9 @@ import {
   Loader2,
   ChevronRight,
   ChevronDown,
-  CheckCircle
+  CheckCircle,
+  FileText,
+  MessageSquareWarning
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -37,6 +37,8 @@ interface Props {
   compact?: boolean
 }
 
+// Configuración de etapas del flujo CRM
+// Flujo: Inicio → Contacto → Propuesta (V.Técnica / V.Comercial) → Negociación → [Seg.Proyecto / Feedback]
 const etapasConfig = {
   inicio: {
     icon: Target,
@@ -53,10 +55,10 @@ const etapasConfig = {
     color: 'text-blue-600',
     bgColor: 'bg-blue-100',
     activeColor: 'bg-blue-600 text-white',
-    label: 'Contacto Cliente',
+    label: 'Contacto',
     shortLabel: 'Contacto',
     order: 2,
-    group: 'preparacion'
+    group: 'contacto'
   },
   validacion_tecnica: {
     icon: ClipboardCheck,
@@ -65,18 +67,9 @@ const etapasConfig = {
     activeColor: 'bg-cyan-600 text-white',
     label: 'Validación Técnica',
     shortLabel: 'V. Técnica',
+    description: 'Alcance y recursos necesarios',
     order: 3,
-    group: 'preparacion'
-  },
-  consolidacion_precios: {
-    icon: DollarSign,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-100',
-    activeColor: 'bg-indigo-600 text-white',
-    label: 'Consolidación Precios',
-    shortLabel: 'Precios',
-    order: 4,
-    group: 'preparacion'
+    group: 'propuesta'
   },
   validacion_comercial: {
     icon: FileCheck,
@@ -85,18 +78,9 @@ const etapasConfig = {
     activeColor: 'bg-violet-600 text-white',
     label: 'Validación Comercial',
     shortLabel: 'V. Comercial',
-    order: 5,
-    group: 'preparacion'
-  },
-  seguimiento_cliente: {
-    icon: Send,
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-100',
-    activeColor: 'bg-yellow-600 text-white',
-    label: 'Seguimiento Cliente',
-    shortLabel: 'Seguimiento',
-    order: 6,
-    group: 'seguimiento'
+    description: 'Costeo, margen, condiciones',
+    order: 4,
+    group: 'propuesta'
   },
   negociacion: {
     icon: Handshake,
@@ -105,19 +89,33 @@ const etapasConfig = {
     activeColor: 'bg-orange-600 text-white',
     label: 'Negociación',
     shortLabel: 'Negociación',
-    order: 7,
-    group: 'seguimiento'
+    description: 'Post-envío de cotización',
+    order: 5,
+    group: 'negociacion'
   },
   seguimiento_proyecto: {
     icon: FolderKanban,
-    color: 'text-teal-600',
-    bgColor: 'bg-teal-100',
-    activeColor: 'bg-teal-600 text-white',
+    color: 'text-green-600',
+    bgColor: 'bg-green-100',
+    activeColor: 'bg-green-600 text-white',
     label: 'Seguimiento Proyecto',
-    shortLabel: 'Proyecto',
-    order: 8,
-    group: 'seguimiento'
+    shortLabel: 'Seg. Proyecto',
+    description: 'Seguimiento de ejecución',
+    order: 6,
+    group: 'cierre'
   },
+  feedback_mejora: {
+    icon: MessageSquareWarning,
+    color: 'text-red-600',
+    bgColor: 'bg-red-100',
+    activeColor: 'bg-red-600 text-white',
+    label: 'Feedback de Mejora',
+    shortLabel: 'Feedback',
+    description: 'Motivo, competidor, aprendizajes',
+    order: 6,
+    group: 'cierre'
+  },
+  // Legacy states - mantener para compatibilidad con datos existentes
   cerrada_ganada: {
     icon: Trophy,
     color: 'text-green-600',
@@ -125,7 +123,7 @@ const etapasConfig = {
     activeColor: 'bg-green-600 text-white',
     label: 'Cerrada Ganada',
     shortLabel: 'Ganada',
-    order: 9,
+    order: 6,
     group: 'cierre'
   },
   cerrada_perdida: {
@@ -135,29 +133,26 @@ const etapasConfig = {
     activeColor: 'bg-red-600 text-white',
     label: 'Cerrada Perdida',
     shortLabel: 'Perdida',
-    order: 9,
+    order: 6,
     group: 'cierre'
   }
 }
 
-// Key phases for simplified stepper view
-const keyPhases = ['inicio', 'contacto_cliente', 'seguimiento_cliente', 'negociacion', 'final'] as const
-const preparacionStates = ['validacion_tecnica', 'consolidacion_precios', 'validacion_comercial']
-const seguimientoStates = ['seguimiento_proyecto']
-const finalStates = ['cerrada_ganada', 'cerrada_perdida']
+// Estados por grupo
+const propuestaStates = ['validacion_tecnica', 'validacion_comercial']
+const cierreGanadoStates = ['seguimiento_proyecto', 'cerrada_ganada']
+const cierrePerdidoStates = ['feedback_mejora', 'cerrada_perdida']
+const allCierreStates = [...cierreGanadoStates, ...cierrePerdidoStates]
 
-// All states in order for dropdown
+// Todos los estados en orden para dropdown
 const allStatesOrdered = [
   'inicio',
   'contacto_cliente',
   'validacion_tecnica',
-  'consolidacion_precios',
   'validacion_comercial',
-  'seguimiento_cliente',
   'negociacion',
   'seguimiento_proyecto',
-  'cerrada_ganada',
-  'cerrada_perdida'
+  'feedback_mejora'
 ]
 
 export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = false }: Props) {
@@ -224,8 +219,20 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Preparación</DropdownMenuLabel>
-          {['contacto_cliente', 'validacion_tecnica', 'consolidacion_precios', 'validacion_comercial'].map(estado => {
+          <DropdownMenuLabel className="text-xs text-muted-foreground">Contacto</DropdownMenuLabel>
+          <DropdownMenuItem
+            onClick={() => handleEtapaChange('contacto_cliente')}
+            disabled={loadingEtapa !== null}
+            className={cn("gap-2", currentEstado === 'contacto_cliente' && "bg-muted")}
+          >
+            <Users className="h-4 w-4 text-blue-600" />
+            Contacto
+            {currentEstado === 'contacto_cliente' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs text-muted-foreground">Propuesta</DropdownMenuLabel>
+          {propuestaStates.map(estado => {
             const config = etapasConfig[estado as keyof typeof etapasConfig]
             return (
               <DropdownMenuItem
@@ -242,49 +249,43 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
           })}
 
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-xs text-muted-foreground">Seguimiento</DropdownMenuLabel>
-          {['seguimiento_cliente', 'negociacion', 'seguimiento_proyecto'].map(estado => {
-            const config = etapasConfig[estado as keyof typeof etapasConfig]
-            return (
-              <DropdownMenuItem
-                key={estado}
-                onClick={() => handleEtapaChange(estado)}
-                disabled={loadingEtapa !== null}
-                className={cn("gap-2", currentEstado === estado && "bg-muted")}
-              >
-                {React.createElement(config.icon, { className: `h-4 w-4 ${config.color}` })}
-                {config.label}
-                {currentEstado === estado && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
-              </DropdownMenuItem>
-            )
-          })}
+          <DropdownMenuLabel className="text-xs text-muted-foreground">Negociación</DropdownMenuLabel>
+          <DropdownMenuItem
+            onClick={() => handleEtapaChange('negociacion')}
+            disabled={loadingEtapa !== null}
+            className={cn("gap-2", currentEstado === 'negociacion' && "bg-muted")}
+          >
+            <Handshake className="h-4 w-4 text-orange-600" />
+            Negociación
+            {currentEstado === 'negociacion' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+          </DropdownMenuItem>
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-xs text-muted-foreground">Cierre</DropdownMenuLabel>
           <DropdownMenuItem
-            onClick={() => handleEtapaChange('cerrada_ganada')}
+            onClick={() => handleEtapaChange('seguimiento_proyecto')}
             disabled={loadingEtapa !== null}
-            className={cn("gap-2", currentEstado === 'cerrada_ganada' && "bg-muted")}
+            className={cn("gap-2", cierreGanadoStates.includes(currentEstado) && "bg-muted")}
           >
-            <Trophy className="h-4 w-4 text-green-600" />
-            Cerrada Ganada
-            {currentEstado === 'cerrada_ganada' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+            <FolderKanban className="h-4 w-4 text-green-600" />
+            Seguimiento Proyecto
+            {cierreGanadoStates.includes(currentEstado) && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => handleEtapaChange('cerrada_perdida')}
+            onClick={() => handleEtapaChange('feedback_mejora')}
             disabled={loadingEtapa !== null}
-            className={cn("gap-2", currentEstado === 'cerrada_perdida' && "bg-muted")}
+            className={cn("gap-2", cierrePerdidoStates.includes(currentEstado) && "bg-muted")}
           >
-            <XCircle className="h-4 w-4 text-red-600" />
-            Cerrada Perdida
-            {currentEstado === 'cerrada_perdida' && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+            <MessageSquareWarning className="h-4 w-4 text-red-600" />
+            Feedback de Mejora
+            {cierrePerdidoStates.includes(currentEstado) && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     )
   }
 
-  // Full stepper version - simplified with key phases and dropdowns for sub-phases
+  // Full stepper version - Flujo: Inicio → Contacto → Propuesta → Negociación → [Seg. Proyecto / Feedback]
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {/* Phase 1: Inicio */}
@@ -300,8 +301,21 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
 
       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
 
-      {/* Phase 2: Preparación (dropdown with sub-phases) */}
-      <PreparacionDropdown
+      {/* Phase 2: Contacto */}
+      <StepButton
+        estado="contacto_cliente"
+        config={etapasConfig.contacto_cliente}
+        isActive={currentEstado === 'contacto_cliente'}
+        isPast={currentStepIndex > 2}
+        isLoading={loadingEtapa === 'contacto_cliente'}
+        disabled={loadingEtapa !== null}
+        onClick={() => handleEtapaChange('contacto_cliente')}
+      />
+
+      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+
+      {/* Phase 3: Propuesta (dropdown con validacion_tecnica, validacion_comercial) */}
+      <PropuestaDropdown
         currentEstado={currentEstado}
         currentStepIndex={currentStepIndex}
         loadingEtapa={loadingEtapa}
@@ -310,25 +324,12 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
 
       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
 
-      {/* Phase 3: Seguimiento Cliente */}
-      <StepButton
-        estado="seguimiento_cliente"
-        config={etapasConfig.seguimiento_cliente}
-        isActive={currentEstado === 'seguimiento_cliente'}
-        isPast={currentStepIndex > 6}
-        isLoading={loadingEtapa === 'seguimiento_cliente'}
-        disabled={loadingEtapa !== null}
-        onClick={() => handleEtapaChange('seguimiento_cliente')}
-      />
-
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-
-      {/* Phase 4: Negociación */}
+      {/* Phase 4: Negociación (estado único) */}
       <StepButton
         estado="negociacion"
         config={etapasConfig.negociacion}
         isActive={currentEstado === 'negociacion'}
-        isPast={currentStepIndex > 7}
+        isPast={currentStepIndex > 5}
         isLoading={loadingEtapa === 'negociacion'}
         disabled={loadingEtapa !== null}
         onClick={() => handleEtapaChange('negociacion')}
@@ -336,21 +337,8 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
 
       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
 
-      {/* Phase 5: Seguimiento Proyecto (optional) */}
-      <StepButton
-        estado="seguimiento_proyecto"
-        config={etapasConfig.seguimiento_proyecto}
-        isActive={currentEstado === 'seguimiento_proyecto'}
-        isPast={currentStepIndex > 8}
-        isLoading={loadingEtapa === 'seguimiento_proyecto'}
-        disabled={loadingEtapa !== null}
-        onClick={() => handleEtapaChange('seguimiento_proyecto')}
-      />
-
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-
-      {/* Phase 6: Final (Ganada/Perdida) */}
-      {finalStates.includes(currentEstado) ? (
+      {/* Phase 5: Cierre (Seguimiento Proyecto / Feedback de Mejora) */}
+      {allCierreStates.includes(currentEstado) ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -362,10 +350,10 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
               )}
               disabled={loadingEtapa !== null}
             >
-              {loadingEtapa && finalStates.includes(loadingEtapa) ? (
+              {loadingEtapa && allCierreStates.includes(loadingEtapa) ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
-                React.createElement(currentConfig?.icon || Trophy, { className: 'h-3 w-3' })
+                React.createElement(currentConfig?.icon || FolderKanban, { className: 'h-3 w-3' })
               )}
               {currentConfig?.shortLabel}
               <ChevronDown className="h-3 w-3" />
@@ -373,20 +361,20 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => handleEtapaChange('cerrada_ganada')}
+              onClick={() => handleEtapaChange('seguimiento_proyecto')}
               disabled={loadingEtapa !== null}
               className="gap-2"
             >
-              <Trophy className="h-4 w-4 text-green-600" />
-              Cerrada Ganada
+              <FolderKanban className="h-4 w-4 text-green-600" />
+              Seguimiento Proyecto
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => handleEtapaChange('cerrada_perdida')}
+              onClick={() => handleEtapaChange('feedback_mejora')}
               disabled={loadingEtapa !== null}
               className="gap-2"
             >
-              <XCircle className="h-4 w-4 text-red-600" />
-              Cerrada Perdida
+              <MessageSquareWarning className="h-4 w-4 text-red-600" />
+              Feedback de Mejora
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -396,30 +384,30 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
             variant="ghost"
             size="sm"
             className="h-7 gap-1 text-xs font-medium px-2 text-green-600 hover:bg-green-50 hover:text-green-700"
-            onClick={() => handleEtapaChange('cerrada_ganada')}
+            onClick={() => handleEtapaChange('seguimiento_proyecto')}
             disabled={loadingEtapa !== null}
           >
-            {loadingEtapa === 'cerrada_ganada' ? (
+            {loadingEtapa === 'seguimiento_proyecto' ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              <Trophy className="h-3 w-3" />
+              <FolderKanban className="h-3 w-3" />
             )}
-            Ganada
+            Seg. Proyecto
           </Button>
           <span className="text-muted-foreground text-xs">/</span>
           <Button
             variant="ghost"
             size="sm"
             className="h-7 gap-1 text-xs font-medium px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
-            onClick={() => handleEtapaChange('cerrada_perdida')}
+            onClick={() => handleEtapaChange('feedback_mejora')}
             disabled={loadingEtapa !== null}
           >
-            {loadingEtapa === 'cerrada_perdida' ? (
+            {loadingEtapa === 'feedback_mejora' ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              <XCircle className="h-3 w-3" />
+              <MessageSquareWarning className="h-3 w-3" />
             )}
-            Perdida
+            Feedback
           </Button>
         </div>
       )}
@@ -427,22 +415,21 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
   )
 }
 
-// Dropdown for Preparación sub-phases
-interface PreparacionDropdownProps {
+// Dropdown for Propuesta sub-phases (Validación Técnica + Validación Comercial)
+interface PropuestaDropdownProps {
   currentEstado: string
   currentStepIndex: number
   loadingEtapa: string | null
   onEtapaChange: (estado: string) => void
 }
 
-function PreparacionDropdown({ currentEstado, currentStepIndex, loadingEtapa, onEtapaChange }: PreparacionDropdownProps) {
-  const preparacionEstados = ['contacto_cliente', 'validacion_tecnica', 'consolidacion_precios', 'validacion_comercial']
-  const isInPreparacion = preparacionEstados.includes(currentEstado)
-  const isPast = currentStepIndex > 5
+function PropuestaDropdown({ currentEstado, currentStepIndex, loadingEtapa, onEtapaChange }: PropuestaDropdownProps) {
+  const isInPropuesta = propuestaStates.includes(currentEstado)
+  const isPast = currentStepIndex > 4
 
-  const currentConfig = isInPreparacion
+  const currentConfig = isInPropuesta
     ? etapasConfig[currentEstado as keyof typeof etapasConfig]
-    : etapasConfig.contacto_cliente
+    : etapasConfig.validacion_tecnica
 
   return (
     <DropdownMenu>
@@ -452,35 +439,40 @@ function PreparacionDropdown({ currentEstado, currentStepIndex, loadingEtapa, on
           size="sm"
           className={cn(
             "h-7 gap-1 text-xs font-medium px-2 transition-all",
-            isInPreparacion && currentConfig.activeColor,
-            isPast && !isInPreparacion && "bg-blue-100 text-blue-600",
-            !isInPreparacion && !isPast && "text-muted-foreground hover:bg-muted"
+            isInPropuesta && currentConfig.activeColor,
+            isPast && !isInPropuesta && "bg-cyan-100 text-cyan-600",
+            !isInPropuesta && !isPast && "text-muted-foreground hover:bg-muted"
           )}
           disabled={loadingEtapa !== null}
         >
-          {loadingEtapa && preparacionEstados.includes(loadingEtapa) ? (
+          {loadingEtapa && propuestaStates.includes(loadingEtapa) ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            React.createElement(currentConfig.icon, { className: 'h-3 w-3' })
+            <FileText className="h-3 w-3" />
           )}
-          {isInPreparacion ? currentConfig.shortLabel : 'Preparación'}
+          {isInPropuesta ? currentConfig.shortLabel : 'Propuesta'}
           <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-48">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Etapas de Preparación</DropdownMenuLabel>
-        {preparacionEstados.map(estado => {
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Etapas de Propuesta</DropdownMenuLabel>
+        {propuestaStates.map(estado => {
           const config = etapasConfig[estado as keyof typeof etapasConfig]
           return (
             <DropdownMenuItem
               key={estado}
               onClick={() => onEtapaChange(estado)}
               disabled={loadingEtapa !== null}
-              className={cn("gap-2", currentEstado === estado && "bg-muted")}
+              className={cn("gap-2 flex-col items-start", currentEstado === estado && "bg-muted")}
             >
-              {React.createElement(config.icon, { className: `h-4 w-4 ${config.color}` })}
-              {config.label}
-              {currentEstado === estado && <CheckCircle className="h-3 w-3 ml-auto text-green-500" />}
+              <div className="flex items-center gap-2 w-full">
+                {React.createElement(config.icon, { className: `h-4 w-4 ${config.color}` })}
+                <span className="flex-1">{config.label}</span>
+                {currentEstado === estado && <CheckCircle className="h-3 w-3 text-green-500" />}
+              </div>
+              {'description' in config && (
+                <span className="text-xs text-muted-foreground ml-6">{config.description}</span>
+              )}
             </DropdownMenuItem>
           )
         })}

@@ -19,17 +19,17 @@ export async function GET(req: NextRequest) {
     const fechaHasta = searchParams.get('fechaHasta') || '2024-12-31'
 
     // Definir las etapas del embudo
+    // Flujo: Inicio → Contacto → Propuesta (V.Técnica / V.Comercial) → Negociación → [Seg.Proyecto / Feedback]
     const etapas = [
       { nombre: 'Inicio', estado: 'inicio' },
       { nombre: 'Contacto Cliente', estado: 'contacto_cliente' },
       { nombre: 'Validación Técnica', estado: 'validacion_tecnica' },
-      { nombre: 'Consolidación Precios', estado: 'consolidacion_precios' },
       { nombre: 'Validación Comercial', estado: 'validacion_comercial' },
-      { nombre: 'Seguimiento Cliente', estado: 'seguimiento_cliente' },
       { nombre: 'Negociación', estado: 'negociacion' },
       { nombre: 'Seguimiento Proyecto', estado: 'seguimiento_proyecto' },
-      { nombre: 'Cerrada Ganada', estado: 'cerrada_ganada' },
-      { nombre: 'Cerrada Perdida', estado: 'cerrada_perdida' }
+      { nombre: 'Feedback de Mejora', estado: 'feedback_mejora' },
+      { nombre: 'Cerrada Ganada', estado: 'cerrada_ganada' },      // Legacy
+      { nombre: 'Cerrada Perdida', estado: 'cerrada_perdida' }     // Legacy
     ]
 
     // Calcular métricas para cada etapa
@@ -124,13 +124,16 @@ export async function GET(req: NextRequest) {
     const totalOportunidades = embudoData.reduce((sum, etapa) => sum + etapa.cantidad, 0)
     const valorTotalEmbudo = embudoData.reduce((sum, etapa) => sum + etapa.valorTotal, 0)
 
-    // Calcular valor activo (excluyendo cerradas)
+    // Calcular valor activo (excluyendo cerradas y estados finales)
+    const estadosCerrados = ['cerrada_ganada', 'cerrada_perdida', 'seguimiento_proyecto', 'feedback_mejora']
     const valorActivo = embudoData
-      .filter(etapa => !etapa.estado.includes('cerrada'))
+      .filter(etapa => !estadosCerrados.includes(etapa.estado))
       .reduce((sum, etapa) => sum + etapa.valorTotal, 0)
 
-    // Calcular tasa de conversión general
-    const oportunidadesGanadas = embudoData.find(e => e.estado === 'cerrada_ganada')?.cantidad || 0
+    // Calcular tasa de conversión general (seguimiento_proyecto = ganada, cerrada_ganada = legacy)
+    const oportunidadesGanadas = embudoData
+      .filter(e => e.estado === 'cerrada_ganada' || e.estado === 'seguimiento_proyecto')
+      .reduce((sum, e) => sum + e.cantidad, 0)
     const oportunidadesTotales = totalOportunidades
     const tasaConversion = oportunidadesTotales > 0 ? (oportunidadesGanadas / oportunidadesTotales) * 100 : 0
 

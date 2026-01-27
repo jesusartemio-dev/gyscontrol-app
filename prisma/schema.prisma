@@ -1539,6 +1539,13 @@ model CrmOportunidad {
   cotizacionId        String?           @unique
   proyectoId          String?
   estado              EstadoOportunidad @default(inicio)
+
+  // Campos para Feedback de Mejora (cuando se pierde)
+  fechaCierre         DateTime?         // Fecha real de cierre (ganada o perdida)
+  motivoPerdida       String?           // Razón por la que se perdió
+  competidorGanador   String?           // Competidor que ganó el concurso
+  aprendizajes        String?           // Lecciones aprendidas
+
   crmActividad        CrmActividad[]
   cliente             Cliente           @relation(fields: [clienteId], references: [id])
   comercial           User?             @relation("CrmOportunidadComercial", fields: [comercialId], references: [id])
@@ -2275,14 +2282,13 @@ enum EstadoListaItem {
 enum EstadoOportunidad {
   inicio
   contacto_cliente
-  validacion_tecnica
-  consolidacion_precios
-  validacion_comercial
-  seguimiento_cliente
-  negociacion
-  seguimiento_proyecto
-  cerrada_ganada
-  cerrada_perdida
+  validacion_tecnica      // Propuesta: alcance y recursos
+  validacion_comercial    // Propuesta: costeo, margen, condiciones
+  negociacion             // Post-envío de cotización
+  seguimiento_proyecto    // Ganada: seguimiento de ejecución
+  feedback_mejora         // Perdida: motivo, competidor, aprendizajes
+  cerrada_ganada          // Legacy
+  cerrada_perdida         // Legacy
 }
 
 enum EstadoPedido {

@@ -239,11 +239,12 @@ export async function POST(
     }
 
     // ✅ Actualizar la oportunidad con el ID de la cotización
+    // Cambiar a negociación (post-envío de cotización)
     await prisma.crmOportunidad.update({
       where: { id },
       data: {
         cotizacionId: nuevaCotizacion.id,
-        estado: 'seguimiento_cliente'
+        estado: 'negociacion'
       }
     })
 

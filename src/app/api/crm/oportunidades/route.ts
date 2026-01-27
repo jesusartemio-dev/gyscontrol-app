@@ -153,7 +153,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (soloActivas === 'true') {
-      where.estado = { notIn: ['cerrada_ganada', 'cerrada_perdida'] }
+      // Excluir estados finales (nuevos y legacy)
+      where.estado = { notIn: ['cerrada_ganada', 'cerrada_perdida', 'seguimiento_proyecto', 'feedback_mejora'] }
     }
 
     // 📊 Obtener oportunidades con relaciones

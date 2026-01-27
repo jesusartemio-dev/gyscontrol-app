@@ -77,10 +77,10 @@ export async function GET(req: NextRequest) {
         }
       }),
 
-      // Oportunidades ganadas
+      // Oportunidades ganadas (seguimiento_proyecto = ganada, cerrada_ganada = legacy)
       prisma.crmOportunidad.count({
         where: {
-          estado: 'cerrada_ganada',
+          estado: { in: ['cerrada_ganada', 'seguimiento_proyecto'] },
           createdAt: { gte: fechaInicio, lte: fechaFin }
         }
       }),

@@ -205,18 +205,18 @@ export type EstadoCotizacion =
   | 'aprobada'
   | 'rechazada'
 
-// ✅ Nuevo tipo para estados de oportunidad CRM
+// ✅ Estados de oportunidad CRM
+// Flujo: Inicio → Contacto → Propuesta (V.Técnica / V.Comercial) → Negociación → [Seg.Proyecto / Feedback]
 export type EstadoOportunidad =
   | 'inicio'
   | 'contacto_cliente'
-  | 'validacion_tecnica'
-  | 'consolidacion_precios'
-  | 'validacion_comercial'
-  | 'seguimiento_cliente'
-  | 'negociacion'
-  | 'seguimiento_proyecto'
-  | 'cerrada_ganada'
-  | 'cerrada_perdida'
+  | 'validacion_tecnica'    // Propuesta: alcance y recursos
+  | 'validacion_comercial'  // Propuesta: costeo, margen, condiciones
+  | 'negociacion'           // Post-envío de cotización
+  | 'seguimiento_proyecto'  // Ganada: seguimiento de ejecución
+  | 'feedback_mejora'       // Perdida: motivo, competidor, aprendizajes
+  | 'cerrada_ganada'        // Legacy
+  | 'cerrada_perdida'       // Legacy
 
 // ✅ Simplificación: Eliminamos TipoFormula ya que solo usamos Escalonada
 // export type TipoFormula = 'Fijo' | 'Proporcional' | 'Escalonada'
@@ -244,6 +244,12 @@ export interface CrmOportunidad {
   competencia?: string // Competidores identificados
   createdAt: string
   updatedAt: string
+
+  // Campos para Feedback de Mejora (cuando se pierde)
+  fechaCierre?: string        // Fecha real de cierre (ganada o perdida)
+  motivoPerdida?: string      // Razón por la que se perdió
+  competidorGanador?: string  // Competidor que ganó el concurso
+  aprendizajes?: string       // Lecciones aprendidas
 
   // Relaciones
   cliente: Cliente

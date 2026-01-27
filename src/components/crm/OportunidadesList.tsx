@@ -27,7 +27,8 @@ import {
   FolderKanban,
   ClipboardCheck,
   FileCheck,
-  Send
+  Send,
+  MessageSquareWarning
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -133,24 +134,22 @@ const EmptyState = ({ onCreate }: { onCreate?: () => void }) => (
 )
 
 // ✅ Estados mejorados con iconos y colores
+// Flujo: Inicio → Contacto → Propuesta (V.Técnica / V.Comercial) → Negociación → [Seg.Proyecto / Feedback]
 const getEstadoAvanzado = (estado: string, cotizacion?: any) => {
   const estados = {
-    // Nuevos estados
+    // Estados actuales
     inicio: { label: 'Inicio', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Target, iconColor: 'text-purple-500' },
     contacto_cliente: { label: 'Contacto Cliente', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Users, iconColor: 'text-blue-500' },
     validacion_tecnica: { label: 'Validación Técnica', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: ClipboardCheck, iconColor: 'text-cyan-500' },
-    consolidacion_precios: { label: 'Consolidación Precios', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: DollarSign, iconColor: 'text-indigo-500' },
     validacion_comercial: { label: 'Validación Comercial', color: 'bg-violet-100 text-violet-800 border-violet-200', icon: FileCheck, iconColor: 'text-violet-500' },
-    seguimiento_cliente: { label: 'Seguimiento Cliente', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Send, iconColor: 'text-yellow-500' },
     negociacion: { label: 'En Negociación', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Handshake, iconColor: 'text-orange-500' },
     seguimiento_proyecto: { label: 'Seguimiento Proyecto', color: 'bg-teal-100 text-teal-800 border-teal-200', icon: FolderKanban, iconColor: 'text-teal-500' },
-    cerrada_ganada: { label: 'Cerrada - Ganada', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, iconColor: 'text-green-500' },
-    cerrada_perdida: { label: 'Cerrada - Perdida', color: 'bg-red-100 text-red-800 border-red-200', icon: AlertCircle, iconColor: 'text-red-500' },
+    feedback_mejora: { label: 'Feedback de Mejora', color: 'bg-red-100 text-red-800 border-red-200', icon: MessageSquareWarning, iconColor: 'text-red-500' },
+    cerrada_ganada: { label: 'Cerrada - Ganada', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, iconColor: 'text-green-500' },  // Legacy
+    cerrada_perdida: { label: 'Cerrada - Perdida', color: 'bg-red-100 text-red-800 border-red-200', icon: AlertCircle, iconColor: 'text-red-500' },        // Legacy
     // Legacy support for old state names
     prospecto: { label: 'Inicio', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Target, iconColor: 'text-purple-500' },
     contacto_inicial: { label: 'Contacto Cliente', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Users, iconColor: 'text-blue-500' },
-    propuesta_enviada: { label: 'Seguimiento Cliente', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Send, iconColor: 'text-yellow-500' },
-    cotizacion: { label: 'Seguimiento Cliente', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Send, iconColor: 'text-yellow-500' },
     ganada: { label: 'Cerrada - Ganada', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, iconColor: 'text-green-500' },
     perdida: { label: 'Cerrada - Perdida', color: 'bg-red-100 text-red-800 border-red-200', icon: AlertCircle, iconColor: 'text-red-500' }
   }
@@ -553,9 +552,12 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
   const puedeCrearProyecto = (oportunidad: CrmOportunidad) => {
     const tieneCotizacion = !!oportunidad.cotizacion
     const cotizacionAprobada = oportunidad.cotizacion?.estado === 'aprobada'
-    const estadoValido = oportunidad.estado === CRM_ESTADOS_OPORTUNIDAD.CERRADA_GANADA ||
+    // Estados válidos: seguimiento_proyecto (nuevo ganada), cerrada_ganada (legacy), negociacion
+    const estadoValido = oportunidad.estado === CRM_ESTADOS_OPORTUNIDAD.SEGUIMIENTO_PROYECTO ||
+                        oportunidad.estado === CRM_ESTADOS_OPORTUNIDAD.CERRADA_GANADA ||
                         oportunidad.estado === CRM_ESTADOS_OPORTUNIDAD.NEGOCIACION ||
-                        oportunidad.estado === 'cerrada_ganada' // Agregar estado alternativo
+                        oportunidad.estado === 'seguimiento_proyecto' ||
+                        oportunidad.estado === 'cerrada_ganada'
 
     // Debug logs (remover en producción)
     // if (oportunidad.id === 'cmfr5zqa90002l83wrvvmnfrp') {
@@ -850,10 +852,12 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
                   (() => {
                     const estadoInfo = getEstadoAvanzado(oportunidad.estado, oportunidad.cotizacion)
                     // Add subtle border color based on status
-                    if (oportunidad.estado === 'cerrada_ganada' || oportunidad.estado === 'ganada') {
+                    // Estados ganados: seguimiento_proyecto (nuevo), cerrada_ganada (legacy), ganada (legacy)
+                    if (oportunidad.estado === 'seguimiento_proyecto' || oportunidad.estado === 'cerrada_ganada' || oportunidad.estado === 'ganada') {
                       return 'border-l-4 border-l-green-500 bg-green-50/30'
                     }
-                    if (oportunidad.estado === 'cerrada_perdida' || oportunidad.estado === 'perdida') {
+                    // Estados perdidos: feedback_mejora (nuevo), cerrada_perdida (legacy), perdida (legacy)
+                    if (oportunidad.estado === 'feedback_mejora' || oportunidad.estado === 'cerrada_perdida' || oportunidad.estado === 'perdida') {
                       return 'border-l-4 border-l-red-500 bg-red-50/30'
                     }
                     if (oportunidad.estado === 'negociacion') {

@@ -36,19 +36,23 @@ export async function GET(req: NextRequest) {
       prisma.crmOportunidad.count({
         where: {
           estado: {
-            notIn: ['cerrada_ganada', 'cerrada_perdida']
+            notIn: ['cerrada_ganada', 'cerrada_perdida', 'seguimiento_proyecto', 'feedback_mejora']
           }
         }
       }),
 
-      // Oportunidades ganadas
+      // Oportunidades ganadas (seguimiento_proyecto = ganada, cerrada_ganada = legacy)
       prisma.crmOportunidad.count({
-        where: { estado: 'cerrada_ganada' }
+        where: {
+          estado: { in: ['cerrada_ganada', 'seguimiento_proyecto'] }
+        }
       }),
 
-      // Oportunidades perdidas
+      // Oportunidades perdidas (feedback_mejora = perdida, cerrada_perdida = legacy)
       prisma.crmOportunidad.count({
-        where: { estado: 'cerrada_perdida' }
+        where: {
+          estado: { in: ['cerrada_perdida', 'feedback_mejora'] }
+        }
       }),
 
       // Valor total del embudo
@@ -61,7 +65,7 @@ export async function GET(req: NextRequest) {
         _sum: { valorEstimado: true },
         where: {
           estado: {
-            notIn: ['cerrada_ganada', 'cerrada_perdida']
+            notIn: ['cerrada_ganada', 'cerrada_perdida', 'seguimiento_proyecto', 'feedback_mejora']
           }
         }
       }),

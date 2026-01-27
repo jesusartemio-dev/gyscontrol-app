@@ -1,10 +1,12 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Target, CheckCircle, XCircle, Users, ClipboardCheck, DollarSign, FileCheck, Send, Handshake, FolderKanban } from 'lucide-react'
+import { Target, CheckCircle, XCircle, Users, ClipboardCheck, FileCheck, Handshake, FolderKanban, ExternalLink, MessageSquareWarning } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils/plantilla-utils'
 
 interface EmbudoChartProps {
@@ -13,9 +15,21 @@ interface EmbudoChartProps {
     cantidad: number
     valor: number
   }>
+  onStageClick?: (estado: string) => void
 }
 
-export default function EmbudoChart({ embudo }: EmbudoChartProps) {
+export default function EmbudoChart({ embudo, onStageClick }: EmbudoChartProps) {
+  const router = useRouter()
+
+  const handleStageClick = (estado: string) => {
+    if (onStageClick) {
+      onStageClick(estado)
+    } else {
+      // Default: navigate to CRM page with estado filter
+      router.push(`/crm?estado=${estado}`)
+    }
+  }
+
   const getEstadoInfo = (estado: string) => {
     switch (estado) {
       case 'inicio':
@@ -44,14 +58,6 @@ export default function EmbudoChart({ embudo }: EmbudoChartProps) {
           borderColor: 'border-cyan-200',
           icon: ClipboardCheck
         }
-      case 'consolidacion_precios':
-        return {
-          nombre: 'Consolidación Precios',
-          color: 'text-indigo-600',
-          bgColor: 'bg-indigo-50',
-          borderColor: 'border-indigo-200',
-          icon: DollarSign
-        }
       case 'validacion_comercial':
         return {
           nombre: 'Validación Comercial',
@@ -59,15 +65,6 @@ export default function EmbudoChart({ embudo }: EmbudoChartProps) {
           bgColor: 'bg-violet-50',
           borderColor: 'border-violet-200',
           icon: FileCheck
-        }
-      case 'seguimiento_cliente':
-      case 'propuesta_enviada': // Legacy
-        return {
-          nombre: 'Seguimiento Cliente',
-          color: 'text-yellow-600',
-          bgColor: 'bg-yellow-50',
-          borderColor: 'border-yellow-200',
-          icon: Send
         }
       case 'negociacion':
         return {
@@ -101,6 +98,14 @@ export default function EmbudoChart({ embudo }: EmbudoChartProps) {
           borderColor: 'border-red-200',
           icon: XCircle
         }
+      case 'feedback_mejora':
+        return {
+          nombre: 'Feedback de Mejora',
+          color: 'text-red-600',
+          bgColor: 'bg-red-50',
+          borderColor: 'border-red-200',
+          icon: MessageSquareWarning
+        }
       default:
         return {
           nombre: estado,
@@ -118,12 +123,22 @@ export default function EmbudoChart({ embudo }: EmbudoChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-blue-600" />
-          Embudo de Ventas
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-blue-600" />
+            Embudo de Ventas
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/crm/reportes/embudo')}
+          >
+            Ver detalle
+            <ExternalLink className="h-3 w-3 ml-1" />
+          </Button>
+        </div>
         <CardDescription>
-          Distribución de oportunidades por etapa
+          Distribución de oportunidades por etapa (clic para filtrar)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -144,7 +159,11 @@ export default function EmbudoChart({ embudo }: EmbudoChartProps) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.1 }}
-                className={`p-4 border rounded-lg ${estadoInfo.borderColor} ${estadoInfo.bgColor}`}
+                className={`p-4 border rounded-lg ${estadoInfo.borderColor} ${estadoInfo.bgColor} cursor-pointer hover:shadow-md transition-shadow`}
+                onClick={() => handleStageClick(stage.estado)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && handleStageClick(stage.estado)}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -158,9 +177,12 @@ export default function EmbudoChart({ embudo }: EmbudoChartProps) {
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className={estadoInfo.color}>
-                    {porcentajeValor.toFixed(1)}%
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={estadoInfo.color}>
+                      {porcentajeValor.toFixed(1)}%
+                    </Badge>
+                    <ExternalLink className={`h-4 w-4 ${estadoInfo.color} opacity-50`} />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
