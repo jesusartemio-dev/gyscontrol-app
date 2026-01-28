@@ -1,25 +1,19 @@
 // ===================================================
 // 🎯 DASHBOARD DE ACTIVIDAD DEL SISTEMA
 // ===================================================
-// Componente que muestra la actividad reciente con filtros,
-// paginación, búsqueda y exportación
-// ===================================================
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import React, { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import * as XLSX from 'xlsx'
 import {
   Activity,
   Users,
-  FileText,
-  Package,
   Building2,
   TrendingUp,
   Clock,
-  Calendar,
   RefreshCw,
   Search,
   Download,
@@ -27,16 +21,17 @@ import {
   ChevronRight,
   ExternalLink,
   X,
-  Filter
+  ChevronDown,
+  FileText,
+  Package
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import type { AuditLog } from '@/types/modelos'
 import { formatDistanceToNow, format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -62,80 +57,62 @@ interface MetaPaginacion {
 }
 
 // ===================================================
-// 🎨 ICONOS Y ESTILOS POR TIPO DE ENTIDAD
+// 🎨 HELPERS
 // ===================================================
 
 const getEntityIcon = (entidadTipo: string) => {
-  switch (entidadTipo) {
-    case 'LISTA_EQUIPO':
-      return <Package className="w-4 h-4 text-blue-500" />
-    case 'PEDIDO_EQUIPO':
-      return <FileText className="w-4 h-4 text-green-500" />
-    case 'PROYECTO':
-      return <Building2 className="w-4 h-4 text-purple-500" />
-    case 'COTIZACION':
-      return <FileText className="w-4 h-4 text-orange-500" />
-    case 'OPORTUNIDAD':
-      return <TrendingUp className="w-4 h-4 text-red-500" />
-    default:
-      return <Activity className="w-4 h-4 text-gray-500" />
+  const icons: Record<string, React.ReactElement> = {
+    'LISTA_EQUIPO': <Package className="w-3.5 h-3.5 text-blue-500" />,
+    'PEDIDO_EQUIPO': <FileText className="w-3.5 h-3.5 text-green-500" />,
+    'PROYECTO': <Building2 className="w-3.5 h-3.5 text-purple-500" />,
+    'COTIZACION': <FileText className="w-3.5 h-3.5 text-orange-500" />,
+    'OPORTUNIDAD': <TrendingUp className="w-3.5 h-3.5 text-red-500" />
   }
+  return icons[entidadTipo] || <Activity className="w-3.5 h-3.5 text-gray-500" />
 }
 
 const getEntityColor = (entidadTipo: string) => {
-  switch (entidadTipo) {
-    case 'LISTA_EQUIPO':
-      return 'bg-blue-50 border-blue-200 text-blue-800'
-    case 'PEDIDO_EQUIPO':
-      return 'bg-green-50 border-green-200 text-green-800'
-    case 'PROYECTO':
-      return 'bg-purple-50 border-purple-200 text-purple-800'
-    case 'COTIZACION':
-      return 'bg-orange-50 border-orange-200 text-orange-800'
-    case 'OPORTUNIDAD':
-      return 'bg-red-50 border-red-200 text-red-800'
-    default:
-      return 'bg-gray-50 border-gray-200 text-gray-800'
+  const colors: Record<string, string> = {
+    'LISTA_EQUIPO': 'bg-blue-50 text-blue-700 border-blue-200',
+    'PEDIDO_EQUIPO': 'bg-green-50 text-green-700 border-green-200',
+    'PROYECTO': 'bg-purple-50 text-purple-700 border-purple-200',
+    'COTIZACION': 'bg-orange-50 text-orange-700 border-orange-200',
+    'OPORTUNIDAD': 'bg-red-50 text-red-700 border-red-200'
   }
+  return colors[entidadTipo] || 'bg-gray-50 text-gray-700 border-gray-200'
 }
 
 const getEntityLabel = (entidadTipo: string) => {
   const labels: Record<string, string> = {
-    'LISTA_EQUIPO': 'Lista de Equipo',
-    'PEDIDO_EQUIPO': 'Pedido de Equipo',
+    'LISTA_EQUIPO': 'Lista',
+    'PEDIDO_EQUIPO': 'Pedido',
     'PROYECTO': 'Proyecto',
     'COTIZACION': 'Cotización',
     'OPORTUNIDAD': 'Oportunidad',
-    'LISTA_EQUIPO_ITEM': 'Ítem de Lista'
+    'LISTA_EQUIPO_ITEM': 'Ítem'
   }
   return labels[entidadTipo] || entidadTipo.replace(/_/g, ' ')
 }
 
 const getEntityLink = (entidadTipo: string, entidadId: string): string | null => {
-  switch (entidadTipo) {
-    case 'PROYECTO':
-      return `/proyectos/${entidadId}`
-    case 'COTIZACION':
-      return `/comercial/cotizaciones/${entidadId}`
-    case 'OPORTUNIDAD':
-      return `/crm/oportunidades/${entidadId}`
-    case 'LISTA_EQUIPO':
-      return `/proyectos/listas/${entidadId}`
-    case 'PEDIDO_EQUIPO':
-      return `/proyectos/pedidos/${entidadId}`
-    default:
-      return null
+  const links: Record<string, string> = {
+    'PROYECTO': `/proyectos/${entidadId}`,
+    'COTIZACION': `/comercial/cotizaciones/${entidadId}`,
+    'OPORTUNIDAD': `/crm/oportunidades/${entidadId}`,
+    'LISTA_EQUIPO': `/proyectos/listas/${entidadId}`,
+    'PEDIDO_EQUIPO': `/proyectos/pedidos/${entidadId}`
   }
+  return links[entidadTipo] || null
 }
 
-const getActionIcon = (accion: string) => {
+const getActionColor = (accion: string) => {
   const colors: Record<string, string> = {
     'CREAR': 'bg-green-500',
     'ACTUALIZAR': 'bg-blue-500',
     'ELIMINAR': 'bg-red-500',
     'CAMBIAR_ESTADO': 'bg-purple-500'
   }
-  return <div className={`w-2 h-2 ${colors[accion] || 'bg-gray-500'} rounded-full`}></div>
+  return colors[accion] || 'bg-gray-500'
 }
 
 const getActionLabel = (accion: string) => {
@@ -143,18 +120,14 @@ const getActionLabel = (accion: string) => {
     'CREAR': 'Crear',
     'ACTUALIZAR': 'Actualizar',
     'ELIMINAR': 'Eliminar',
-    'CAMBIAR_ESTADO': 'Cambio de Estado'
+    'CAMBIAR_ESTADO': 'Cambio Estado'
   }
   return labels[accion] || accion
 }
 
-// ===================================================
-// 📅 FORMATEADORES DE FECHA
-// ===================================================
-
 const formatDate = (dateInput: string | Date) => {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
-  return format(date, 'dd/MM/yyyy HH:mm', { locale: es })
+  return format(date, 'dd/MM/yy HH:mm', { locale: es })
 }
 
 const formatRelativeTime = (dateInput: string | Date) => {
@@ -172,37 +145,26 @@ export default function ActivityDashboard({
   intervaloRefresh = 5,
   mostrarFiltros = true
 }: ActivityDashboardProps) {
-  // Estado principal
   const [actividad, setActividad] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Estado de filtros
+  // Filtros
   const [filtroUsuario, setFiltroUsuario] = useState<string>('all')
   const [filtroEntidad, setFiltroEntidad] = useState<string>('all')
   const [filtroAccion, setFiltroAccion] = useState<string>('all')
   const [busqueda, setBusqueda] = useState<string>('')
   const [fechaDesde, setFechaDesde] = useState<string>('')
   const [fechaHasta, setFechaHasta] = useState<string>('')
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
 
-  // Estado de paginación
+  // Paginación
   const [paginaActual, setPaginaActual] = useState(1)
-  const [meta, setMeta] = useState<MetaPaginacion>({
-    pagina: 1,
-    limite: limite,
-    total: 0,
-    totalPaginas: 0
-  })
+  const [meta, setMeta] = useState<MetaPaginacion>({ pagina: 1, limite, total: 0, totalPaginas: 0 })
+  const [filtrosDisponibles, setFiltrosDisponibles] = useState<FiltrosDisponibles>({ usuarios: [], entidades: [], acciones: [] })
 
-  // Filtros disponibles desde la API
-  const [filtrosDisponibles, setFiltrosDisponibles] = useState<FiltrosDisponibles>({
-    usuarios: [],
-    entidades: [],
-    acciones: []
-  })
-
-  // Estado de configuración
+  // Config
   const [intervaloActual, setIntervaloActual] = useState(intervaloRefresh)
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(autoRefresh)
 
@@ -216,61 +178,41 @@ export default function ActivityDashboard({
       else setRefreshing(true)
       setError(null)
 
-      const params = new URLSearchParams({
-        limite: limite.toString(),
-        pagina: paginaActual.toString()
-      })
-
-      if (filtroUsuario && filtroUsuario !== 'all') params.set('usuarioId', filtroUsuario)
-      if (filtroEntidad && filtroEntidad !== 'all') params.set('entidadTipo', filtroEntidad)
-      if (filtroAccion && filtroAccion !== 'all') params.set('accion', filtroAccion)
+      const params = new URLSearchParams({ limite: limite.toString(), pagina: paginaActual.toString() })
+      if (filtroUsuario !== 'all') params.set('usuarioId', filtroUsuario)
+      if (filtroEntidad !== 'all') params.set('entidadTipo', filtroEntidad)
+      if (filtroAccion !== 'all') params.set('accion', filtroAccion)
       if (busqueda) params.set('busqueda', busqueda)
       if (fechaDesde) params.set('fechaDesde', fechaDesde)
       if (fechaHasta) params.set('fechaHasta', fechaHasta)
 
-      const response = await fetch(`/api/audit/actividad-reciente?${params}`, {
-        method: 'GET',
-        credentials: 'include'
-      })
-
-      if (!response.ok) {
-        throw new Error(`Error al cargar actividad: ${response.statusText}`)
-      }
+      const response = await fetch(`/api/audit/actividad-reciente?${params}`, { credentials: 'include' })
+      if (!response.ok) throw new Error('Error al cargar actividad')
 
       const result = await response.json()
       setActividad(result.data || [])
       setMeta(result.meta || { pagina: 1, limite, total: 0, totalPaginas: 0 })
       setFiltrosDisponibles(result.filtros || { usuarios: [], entidades: [], acciones: [] })
     } catch (err) {
-      console.error('Error al cargar actividad:', err)
-      setError('Error al cargar la actividad del sistema')
+      console.error('Error:', err)
+      setError('Error al cargar la actividad')
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }, [limite, paginaActual, filtroUsuario, filtroEntidad, filtroAccion, busqueda, fechaDesde, fechaHasta])
 
-  // Cargar datos inicial y cuando cambian los filtros
-  useEffect(() => {
-    cargarActividad()
-  }, [cargarActividad])
+  useEffect(() => { cargarActividad() }, [cargarActividad])
 
-  // Auto-refresh
   useEffect(() => {
     if (!autoRefreshEnabled) return
-
-    const interval = setInterval(() => {
-      cargarActividad(false)
-    }, intervaloActual * 60 * 1000)
-
+    const interval = setInterval(() => cargarActividad(false), intervaloActual * 60 * 1000)
     return () => clearInterval(interval)
   }, [autoRefreshEnabled, intervaloActual, cargarActividad])
 
   // ===================================================
   // 🎮 HANDLERS
   // ===================================================
-
-  const handleRefresh = () => cargarActividad(false)
 
   const handleLimpiarFiltros = () => {
     setFiltroUsuario('all')
@@ -282,47 +224,24 @@ export default function ActivityDashboard({
     setPaginaActual(1)
   }
 
-  const handleBuscar = (e: React.FormEvent) => {
-    e.preventDefault()
-    setPaginaActual(1)
-    cargarActividad()
-  }
-
   const handleExportar = () => {
-    const data = actividad.map(evento => ({
-      'Fecha': formatDate(evento.createdAt),
-      'Usuario': evento.usuario?.name || 'Desconocido',
-      'Acción': getActionLabel(evento.accion),
-      'Entidad': getEntityLabel(evento.entidadTipo),
-      'ID Entidad': evento.entidadId,
-      'Descripción': evento.descripcion
+    const data = actividad.map(e => ({
+      'Fecha': formatDate(e.createdAt),
+      'Usuario': e.usuario?.name || 'Desconocido',
+      'Acción': getActionLabel(e.accion),
+      'Entidad': getEntityLabel(e.entidadTipo),
+      'Descripción': e.descripcion
     }))
-
-    const worksheet = XLSX.utils.json_to_sheet(data)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Actividad')
-    XLSX.writeFile(workbook, `actividad_sistema_${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Actividad')
+    XLSX.writeFile(wb, `actividad_${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
   }
-
-  // ===================================================
-  // 📊 ESTADÍSTICAS
-  // ===================================================
-
-  const estadisticas = actividad.reduce((acc, item) => {
-    acc.entidades[item.entidadTipo] = (acc.entidades[item.entidadTipo] || 0) + 1
-    acc.acciones[item.accion] = (acc.acciones[item.accion] || 0) + 1
-    if (item.usuario?.name) {
-      acc.usuarios[item.usuario.name] = (acc.usuarios[item.usuario.name] || 0) + 1
-    }
-    return acc
-  }, {
-    entidades: {} as Record<string, number>,
-    acciones: {} as Record<string, number>,
-    usuarios: {} as Record<string, number>
-  })
 
   const hayFiltrosActivos = filtroUsuario !== 'all' || filtroEntidad !== 'all' ||
     filtroAccion !== 'all' || busqueda || fechaDesde || fechaHasta
+
+  const contadorFiltros = [filtroUsuario !== 'all', filtroEntidad !== 'all', filtroAccion !== 'all', busqueda, fechaDesde, fechaHasta].filter(Boolean).length
 
   // ===================================================
   // 🎨 RENDERIZADO
@@ -330,414 +249,297 @@ export default function ActivityDashboard({
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center space-x-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            <span className="text-sm text-muted-foreground">Cargando actividad del sistema...</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-2"></div>
+        <span className="text-sm text-muted-foreground">Cargando...</span>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center space-x-2 text-red-600">
-            <Activity className="w-4 h-4" />
-            <span className="text-sm">{error}</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-12 text-red-600">
+        <Activity className="w-4 h-4 mr-2" />
+        <span className="text-sm">{error}</span>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header con controles */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-2">
-          <Activity className="w-6 h-6 text-primary" />
-          <div>
-            <h2 className="text-2xl font-bold">Actividad del Sistema</h2>
-            <p className="text-muted-foreground text-sm">
-              {meta.total} eventos registrados
-            </p>
-          </div>
+    <div className="space-y-4">
+      {/* Header compacto */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Activity className="w-5 h-5 text-primary" />
+          <h2 className="text-xl font-bold">Actividad del Sistema</h2>
+          <Badge variant="secondary" className="text-xs">{meta.total}</Badge>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Auto-refresh toggle */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Clock className="w-4 h-4 mr-2" />
-                {autoRefreshEnabled ? `Auto (${intervaloActual}m)` : 'Manual'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Auto-refresh</Label>
-                  <Button
-                    variant={autoRefreshEnabled ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-                  >
-                    {autoRefreshEnabled ? 'Activado' : 'Desactivado'}
-                  </Button>
-                </div>
-                {autoRefreshEnabled && (
-                  <div className="space-y-2">
-                    <Label>Intervalo (minutos)</Label>
-                    <Select
-                      value={intervaloActual.toString()}
-                      onValueChange={(v) => setIntervaloActual(parseInt(v))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 minuto</SelectItem>
-                        <SelectItem value="2">2 minutos</SelectItem>
-                        <SelectItem value="5">5 minutos</SelectItem>
-                        <SelectItem value="10">10 minutos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <Button variant="outline" size="sm" onClick={handleExportar}>
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Auto-refresh */}
+          <Select
+            value={autoRefreshEnabled ? intervaloActual.toString() : 'off'}
+            onValueChange={(v) => {
+              if (v === 'off') {
+                setAutoRefreshEnabled(false)
+              } else {
+                setAutoRefreshEnabled(true)
+                setIntervaloActual(parseInt(v))
+              }
+            }}
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Actualizar
+            <SelectTrigger className="w-[100px] h-8 text-xs">
+              <Clock className="w-3 h-3 mr-1" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="off">Manual</SelectItem>
+              <SelectItem value="1">1 min</SelectItem>
+              <SelectItem value="2">2 min</SelectItem>
+              <SelectItem value="5">5 min</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleExportar}>
+            <Download className="w-3 h-3 mr-1" />
+            Excel
+          </Button>
+
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => cargarActividad(false)} disabled={refreshing}>
+            <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
 
-      {/* Estadísticas rápidas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Eventos</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{meta.total}</div>
-            <p className="text-xs text-muted-foreground">
-              Página {meta.pagina} de {meta.totalPaginas}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entidades</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Object.keys(estadisticas.entidades).length}</div>
-            <p className="text-xs text-muted-foreground">Tipos diferentes</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuarios</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Object.keys(estadisticas.usuarios).length}</div>
-            <p className="text-xs text-muted-foreground">Han realizado acciones</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Acciones</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Object.keys(estadisticas.acciones).length}</div>
-            <p className="text-xs text-muted-foreground">Tipos de operaciones</p>
-          </CardContent>
-        </Card>
+      {/* Stats compactos */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: 'Eventos', value: meta.total, icon: Activity },
+          { label: 'Entidades', value: filtrosDisponibles.entidades.length, icon: Building2 },
+          { label: 'Usuarios', value: filtrosDisponibles.usuarios.length, icon: Users },
+          { label: 'Acciones', value: filtrosDisponibles.acciones.length, icon: TrendingUp }
+        ].map((stat, i) => (
+          <Card key={i} className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
+                <p className="text-lg font-bold">{stat.value}</p>
+              </div>
+              <stat.icon className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </Card>
+        ))}
       </div>
 
-      {/* Filtros */}
+      {/* Filtros colapsables */}
       {mostrarFiltros && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Filter className="w-5 h-5" />
+        <Collapsible open={filtrosAbiertos} onOpenChange={setFiltrosAbiertos}>
+          <div className="flex items-center gap-2">
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs">
+                <ChevronDown className={`w-3 h-3 mr-1 transition-transform ${filtrosAbiertos ? 'rotate-180' : ''}`} />
                 Filtros
-              </CardTitle>
-              {hayFiltrosActivos && (
-                <Button variant="ghost" size="sm" onClick={handleLimpiarFiltros}>
-                  <X className="w-4 h-4 mr-1" />
-                  Limpiar
-                </Button>
-              )}
+                {contadorFiltros > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{contadorFiltros}</Badge>
+                )}
+              </Button>
+            </CollapsibleTrigger>
+
+            {/* Búsqueda rápida siempre visible */}
+            <div className="flex-1 max-w-xs relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+              <Input
+                placeholder="Buscar..."
+                value={busqueda}
+                onChange={(e) => { setBusqueda(e.target.value); setPaginaActual(1) }}
+                className="h-8 text-xs pl-7"
+              />
             </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleBuscar} className="space-y-4">
-              {/* Búsqueda */}
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar en descripción..."
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Button type="submit">Buscar</Button>
+
+            {hayFiltrosActivos && (
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={handleLimpiarFiltros}>
+                <X className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
+
+          <CollapsibleContent>
+            <Card className="mt-2 p-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <Select value={filtroUsuario} onValueChange={(v) => { setFiltroUsuario(v); setPaginaActual(1) }}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Usuario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {filtrosDisponibles.usuarios.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name || 'Sin nombre'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={filtroEntidad} onValueChange={(v) => { setFiltroEntidad(v); setPaginaActual(1) }}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Entidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {filtrosDisponibles.entidades.map((e) => (
+                      <SelectItem key={e} value={e}>{getEntityLabel(e)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={filtroAccion} onValueChange={(v) => { setFiltroAccion(v); setPaginaActual(1) }}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Acción" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {filtrosDisponibles.acciones.map((a) => (
+                      <SelectItem key={a} value={a}>{getActionLabel(a)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Input
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => { setFechaDesde(e.target.value); setPaginaActual(1) }}
+                  className="h-8 text-xs"
+                  placeholder="Desde"
+                />
+
+                <Input
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => { setFechaHasta(e.target.value); setPaginaActual(1) }}
+                  className="h-8 text-xs"
+                  placeholder="Hasta"
+                />
               </div>
-
-              {/* Selectores de filtro */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Usuario</Label>
-                  <Select value={filtroUsuario} onValueChange={(v) => { setFiltroUsuario(v); setPaginaActual(1) }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos los usuarios" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los usuarios</SelectItem>
-                      {filtrosDisponibles.usuarios.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name || 'Sin nombre'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Entidad</Label>
-                  <Select value={filtroEntidad} onValueChange={(v) => { setFiltroEntidad(v); setPaginaActual(1) }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas las entidades" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las entidades</SelectItem>
-                      {filtrosDisponibles.entidades.map((e) => (
-                        <SelectItem key={e} value={e}>
-                          {getEntityLabel(e)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Acción</Label>
-                  <Select value={filtroAccion} onValueChange={(v) => { setFiltroAccion(v); setPaginaActual(1) }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas las acciones" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las acciones</SelectItem>
-                      {filtrosDisponibles.acciones.map((a) => (
-                        <SelectItem key={a} value={a}>
-                          {getActionLabel(a)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Rango de fechas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    Desde
-                  </Label>
-                  <Input
-                    type="date"
-                    value={fechaDesde}
-                    onChange={(e) => { setFechaDesde(e.target.value); setPaginaActual(1) }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    Hasta
-                  </Label>
-                  <Input
-                    type="date"
-                    value={fechaHasta}
-                    onChange={(e) => { setFechaHasta(e.target.value); setPaginaActual(1) }}
-                  />
-                </div>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
       {/* Lista de actividad */}
       <Card>
-        <CardHeader>
-          <CardTitle>Actividad Reciente</CardTitle>
-          <CardDescription>
-            Mostrando {actividad.length} de {meta.total} eventos
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm">Actividad Reciente</CardTitle>
+          <CardDescription className="text-xs">
+            {actividad.length} de {meta.total} • Pág. {meta.pagina}/{meta.totalPaginas || 1}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {actividad.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No hay actividad registrada</p>
-                {hayFiltrosActivos && (
-                  <Button variant="link" onClick={handleLimpiarFiltros} className="mt-2">
-                    Limpiar filtros
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {actividad.map((evento, index) => {
-                  const entityLink = getEntityLink(evento.entidadTipo, evento.entidadId)
-
+        <CardContent className="p-0">
+          {actividad.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Activity className="w-6 h-6 mx-auto mb-2 opacity-50" />
+              <p className="text-xs">Sin actividad</p>
+              {hayFiltrosActivos && (
+                <Button variant="link" size="sm" onClick={handleLimpiarFiltros} className="text-xs mt-1">
+                  Limpiar filtros
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="divide-y">
+              <AnimatePresence>
+                {actividad.map((evento, idx) => {
+                  const link = getEntityLink(evento.entidadTipo, evento.entidadId)
                   return (
                     <motion.div
                       key={evento.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.03 }}
-                      className="flex items-start space-x-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: idx * 0.02 }}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors"
                     >
                       {/* Indicador de acción */}
-                      <div className="flex-shrink-0 mt-1">
-                        {getActionIcon(evento.accion)}
-                      </div>
+                      <div className={`w-1.5 h-1.5 rounded-full ${getActionColor(evento.accion)}`} />
 
-                      {/* Icono de entidad */}
-                      <div className="flex-shrink-0">
-                        {getEntityIcon(evento.entidadTipo)}
-                      </div>
+                      {/* Icono entidad */}
+                      {getEntityIcon(evento.entidadTipo)}
 
-                      {/* Contenido */}
+                      {/* Contenido principal */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${getEntityColor(evento.entidadTipo)}`}
-                            >
-                              {getEntityLabel(evento.entidadTipo)}
-                            </Badge>
-                            <span className="text-sm font-medium">{evento.descripcion}</span>
-
-                            {/* Link a la entidad */}
-                            {entityLink && (
-                              <Link href={entityLink} className="text-primary hover:underline">
-                                <ExternalLink className="w-3 h-3" />
-                              </Link>
-                            )}
-                          </div>
-
-                          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                            <Clock className="w-3 h-3" />
-                            <span title={formatDate(evento.createdAt)}>
-                              {formatRelativeTime(evento.createdAt)}
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${getEntityColor(evento.entidadTipo)}`}>
+                            {getEntityLabel(evento.entidadTipo)}
+                          </Badge>
+                          <span className="text-xs truncate">{evento.descripcion}</span>
+                          {link && (
+                            <Link href={link} className="text-primary hover:underline flex-shrink-0">
+                              <ExternalLink className="w-3 h-3" />
+                            </Link>
+                          )}
                         </div>
-
-                        {/* Usuario */}
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Avatar className="w-5 h-5">
-                            <AvatarFallback className="text-xs">
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Avatar className="w-4 h-4">
+                            <AvatarFallback className="text-[8px]">
                               {evento.usuario?.name?.substring(0, 2).toUpperCase() || 'U'}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-xs text-muted-foreground">
-                            {evento.usuario?.name || 'Usuario desconocido'}
-                          </span>
+                          <span className="text-[10px] text-muted-foreground">{evento.usuario?.name || 'Desconocido'}</span>
                         </div>
                       </div>
+
+                      {/* Tiempo */}
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap" title={formatDate(evento.createdAt)}>
+                        {formatRelativeTime(evento.createdAt)}
+                      </span>
                     </motion.div>
                   )
                 })}
-              </div>
-            )}
-          </div>
+              </AnimatePresence>
+            </div>
+          )}
 
           {/* Paginación */}
           {meta.totalPaginas > 1 && (
-            <div className="flex items-center justify-between mt-6 pt-4 border-t">
-              <p className="text-sm text-muted-foreground">
-                Página {meta.pagina} de {meta.totalPaginas}
-              </p>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between px-4 py-2 border-t bg-muted/30">
+              <span className="text-[10px] text-muted-foreground">
+                Pág. {meta.pagina} de {meta.totalPaginas}
+              </span>
+              <div className="flex items-center gap-1">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
+                  className="h-6 w-6 p-0"
                   onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
                   disabled={paginaActual <= 1}
                 >
-                  <ChevronLeft className="w-4 h-4 mr-1" />
-                  Anterior
+                  <ChevronLeft className="w-3 h-3" />
                 </Button>
 
-                {/* Números de página */}
-                <div className="hidden sm:flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, meta.totalPaginas) }, (_, i) => {
-                    let pageNum: number
-                    if (meta.totalPaginas <= 5) {
-                      pageNum = i + 1
-                    } else if (paginaActual <= 3) {
-                      pageNum = i + 1
-                    } else if (paginaActual >= meta.totalPaginas - 2) {
-                      pageNum = meta.totalPaginas - 4 + i
-                    } else {
-                      pageNum = paginaActual - 2 + i
-                    }
+                {Array.from({ length: Math.min(5, meta.totalPaginas) }, (_, i) => {
+                  let num: number
+                  if (meta.totalPaginas <= 5) num = i + 1
+                  else if (paginaActual <= 3) num = i + 1
+                  else if (paginaActual >= meta.totalPaginas - 2) num = meta.totalPaginas - 4 + i
+                  else num = paginaActual - 2 + i
 
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={pageNum === paginaActual ? 'default' : 'outline'}
-                        size="sm"
-                        className="w-8 h-8 p-0"
-                        onClick={() => setPaginaActual(pageNum)}
-                      >
-                        {pageNum}
-                      </Button>
-                    )
-                  })}
-                </div>
+                  return (
+                    <Button
+                      key={num}
+                      variant={num === paginaActual ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-6 w-6 p-0 text-[10px]"
+                      onClick={() => setPaginaActual(num)}
+                    >
+                      {num}
+                    </Button>
+                  )
+                })}
 
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
+                  className="h-6 w-6 p-0"
                   onClick={() => setPaginaActual(p => Math.min(meta.totalPaginas, p + 1))}
                   disabled={paginaActual >= meta.totalPaginas}
                 >
-                  Siguiente
-                  <ChevronRight className="w-4 h-4 ml-1" />
+                  <ChevronRight className="w-3 h-3" />
                 </Button>
               </div>
             </div>
