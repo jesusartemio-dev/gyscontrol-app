@@ -1,31 +1,21 @@
 import { buildApiUrl } from '@/lib/utils'
 
 // ===================================================
-// 📁 Archivo: src/lib/services/catalogoExclusion.ts
-// 📌 Descripción: Servicios para gestionar catálogo de exclusiones
-// 🧠 Uso: CRUD completo para catálogo de exclusiones
+// Archivo: src/lib/services/catalogoExclusion.ts
+// Descripción: Servicios para gestionar catálogo de exclusiones
+// Uso: CRUD completo para catálogo de exclusiones (items individuales)
 // ===================================================
-
-export interface CatalogoExclusionItem {
-  id?: string
-  descripcion: string
-  orden?: number
-  activo?: boolean
-}
 
 export interface CatalogoExclusion {
   id: string
   codigo: string
-  nombre: string
-  descripcion?: string
+  descripcion: string
   categoriaId?: string
   activo: boolean
   orden: number
   createdAt: string
   updatedAt: string
   categoria?: CategoriaExclusion
-  items: CatalogoExclusionItem[]
-  _count?: { items: number }
 }
 
 export interface CategoriaExclusion {
@@ -39,15 +29,13 @@ export interface CategoriaExclusion {
 
 export interface CatalogoExclusionPayload {
   codigo?: string
-  nombre: string
-  descripcion?: string
+  descripcion: string
   categoriaId?: string
   activo?: boolean
   orden?: number
-  items?: CatalogoExclusionItem[]
 }
 
-// ✅ Obtener todas las categorías de exclusiones
+// Obtener todas las categorías de exclusiones
 export async function getCategoriasExclusion(): Promise<CategoriaExclusion[]> {
   try {
     const res = await fetch(buildApiUrl('/api/catalogo/categorias-exclusion'))
@@ -59,7 +47,7 @@ export async function getCategoriasExclusion(): Promise<CategoriaExclusion[]> {
   }
 }
 
-// ✅ Crear nueva categoría de exclusiones
+// Crear nueva categoría de exclusiones
 export async function createCategoriaExclusion(data: { nombre: string; descripcion?: string }): Promise<CategoriaExclusion> {
   try {
     const res = await fetch(buildApiUrl('/api/catalogo/categorias-exclusion'), {
@@ -78,7 +66,7 @@ export async function createCategoriaExclusion(data: { nombre: string; descripci
   }
 }
 
-// ✅ Obtener todo el catálogo de exclusiones
+// Obtener todo el catálogo de exclusiones
 export async function getCatalogoExclusiones(params?: {
   categoriaId?: string
   activo?: boolean
@@ -105,7 +93,7 @@ export async function getCatalogoExclusiones(params?: {
   }
 }
 
-// ✅ Obtener exclusión por ID
+// Obtener exclusión por ID
 export async function getCatalogoExclusionById(id: string): Promise<CatalogoExclusion> {
   try {
     const res = await fetch(buildApiUrl(`/api/catalogo/exclusiones/${id}`))
@@ -117,7 +105,7 @@ export async function getCatalogoExclusionById(id: string): Promise<CatalogoExcl
   }
 }
 
-// ✅ Crear nueva exclusión en catálogo
+// Crear nueva exclusión en catálogo
 export async function createCatalogoExclusion(data: CatalogoExclusionPayload): Promise<CatalogoExclusion> {
   try {
     const res = await fetch(buildApiUrl('/api/catalogo/exclusiones'), {
@@ -136,7 +124,7 @@ export async function createCatalogoExclusion(data: CatalogoExclusionPayload): P
   }
 }
 
-// ✅ Actualizar exclusión en catálogo
+// Actualizar exclusión en catálogo
 export async function updateCatalogoExclusion(id: string, data: Partial<CatalogoExclusionPayload>): Promise<CatalogoExclusion> {
   try {
     const res = await fetch(buildApiUrl(`/api/catalogo/exclusiones/${id}`), {
@@ -155,7 +143,7 @@ export async function updateCatalogoExclusion(id: string, data: Partial<Catalogo
   }
 }
 
-// ✅ Eliminar exclusión del catálogo
+// Eliminar exclusión del catálogo
 export async function deleteCatalogoExclusion(id: string): Promise<void> {
   try {
     const res = await fetch(buildApiUrl(`/api/catalogo/exclusiones/${id}`), {

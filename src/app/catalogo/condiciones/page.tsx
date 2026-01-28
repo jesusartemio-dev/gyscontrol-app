@@ -1,466 +1,417 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   getCatalogoCondiciones,
+  getCategoriasCondicion,
   createCatalogoCondicion,
   updateCatalogoCondicion,
   deleteCatalogoCondicion,
-  getCategoriasCondicion,
   createCategoriaCondicion,
   type CatalogoCondicion,
-  type CatalogoCondicionItem,
   type CategoriaCondicion
 } from '@/lib/services/catalogoCondicion'
 
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertCircle, FileCheck, TrendingUp, Package, Home, Settings, Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronRight, Search, X } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  ArrowLeft,
+  Plus,
+  Search,
+  FileText,
+  Pencil,
+  Trash2,
+  Loader2,
+  FolderPlus
+} from 'lucide-react'
 
 const TIPOS_CONDICION = [
   { value: 'comercial', label: 'Comercial' },
   { value: 'tecnica', label: 'Técnica' },
-  { value: 'legal', label: 'Legal' },
-  { value: 'operativa', label: 'Operativa' },
-  { value: 'financiera', label: 'Financiera' },
+  { value: 'entrega', label: 'Entrega' },
+  { value: 'pago', label: 'Pago' },
 ]
 
-export default function CondicionesPage() {
+export default function CatalogoCondicionesPage() {
+  const router = useRouter()
   const [condiciones, setCondiciones] = useState<CatalogoCondicion[]>([])
   const [categorias, setCategorias] = useState<CategoriaCondicion[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [search, setSearch] = useState('')
-  const [filterCategoria, setFilterCategoria] = useState<string>('')
-  const [filterTipo, setFilterTipo] = useState<string>('')
 
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingCondicion, setEditingCondicion] = useState<CatalogoCondicion | null>(null)
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
+  const [tipoFiltro, setTipoFiltro] = useState('__ALL__')
+
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showCategoriaModal, setShowCategoriaModal] = useState(false)
+  const [selectedCondicion, setSelectedCondicion] = useState<CatalogoCondicion | null>(null)
+  const [saving, setSaving] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
-    nombre: '',
     descripcion: '',
     categoriaId: '',
     tipo: '',
-    items: [] as CatalogoCondicionItem[]
   })
+  const [nuevaCategoria, setNuevaCategoria] = useState('')
 
-  // New item form
-  const [newItemText, setNewItemText] = useState('')
-  const [newItemTipo, setNewItemTipo] = useState('')
+  useEffect(() => {
+    cargarDatos()
+  }, [])
 
   const cargarDatos = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
       const [condicionesData, categoriasData] = await Promise.all([
-        getCatalogoCondiciones({
-          search: search || undefined,
-          categoriaId: filterCategoria || undefined,
-          tipo: filterTipo || undefined
-        }),
+        getCatalogoCondiciones(),
         getCategoriasCondicion()
       ])
       setCondiciones(condicionesData)
       setCategorias(categoriasData)
     } catch (error) {
-      toast.error('Error al cargar datos')
-      console.error('Error:', error)
+      console.error('Error cargando datos:', error)
+      toast.error('Error al cargar los datos')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    cargarDatos()
-  }, [search, filterCategoria, filterTipo])
+  const condicionesFiltradas = useMemo(() => {
+    return condiciones.filter(cond => {
+      const matchSearch = searchTerm === '' ||
+        cond.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cond.codigo.toLowerCase().includes(searchTerm.toLowerCase())
 
-  const handleOpenModal = (condicion?: CatalogoCondicion) => {
-    if (condicion) {
-      setEditingCondicion(condicion)
-      setFormData({
-        nombre: condicion.nombre,
-        descripcion: condicion.descripcion || '',
-        categoriaId: condicion.categoriaId || '',
-        tipo: condicion.tipo || '',
-        items: condicion.items || []
-      })
-    } else {
-      setEditingCondicion(null)
-      setFormData({
-        nombre: '',
-        descripcion: '',
-        categoriaId: '',
-        tipo: '',
-        items: []
-      })
-    }
-    setIsModalOpen(true)
-  }
+      const matchCategoria = categoriaFiltro === '__ALL__' || cond.categoriaId === categoriaFiltro
+      const matchTipo = tipoFiltro === '__ALL__' || cond.tipo === tipoFiltro
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setEditingCondicion(null)
-    setNewItemText('')
-    setNewItemTipo('')
-  }
+      return matchSearch && matchCategoria && matchTipo
+    })
+  }, [condiciones, searchTerm, categoriaFiltro, tipoFiltro])
 
-  const handleAddItem = () => {
-    if (!newItemText.trim()) return
-    setFormData(prev => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          descripcion: newItemText.trim(),
-          tipo: newItemTipo || undefined,
-          orden: prev.items.length + 1,
-          activo: true
-        }
-      ]
-    }))
-    setNewItemText('')
-    setNewItemTipo('')
-  }
-
-  const handleRemoveItem = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }))
-  }
-
-  const handleSave = async () => {
-    if (!formData.nombre.trim()) {
-      toast.error('El nombre es obligatorio')
+  const handleCreate = async () => {
+    if (!formData.descripcion.trim()) {
+      toast.error('La descripción es obligatoria')
       return
     }
 
-    if (formData.items.length === 0) {
-      toast.error('Debe agregar al menos un item')
-      return
-    }
-
+    setSaving(true)
     try {
-      setSaving(true)
-      if (editingCondicion) {
-        await updateCatalogoCondicion(editingCondicion.id, formData)
-        toast.success('Condición actualizada')
-      } else {
-        await createCatalogoCondicion(formData)
-        toast.success('Condición creada')
-      }
-      handleCloseModal()
+      await createCatalogoCondicion({
+        descripcion: formData.descripcion,
+        categoriaId: formData.categoriaId || undefined,
+        tipo: formData.tipo || undefined,
+      })
+      toast.success('Condición creada correctamente')
+      setShowCreateModal(false)
+      resetForm()
       cargarDatos()
     } catch (error) {
-      toast.error('Error al guardar')
-      console.error('Error:', error)
+      console.error('Error creando condición:', error)
+      toast.error('Error al crear la condición')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta condición?')) return
+  const handleUpdate = async () => {
+    if (!selectedCondicion || !formData.descripcion.trim()) {
+      toast.error('La descripción es obligatoria')
+      return
+    }
 
+    setSaving(true)
     try {
-      await deleteCatalogoCondicion(id)
-      toast.success('Condición eliminada')
+      await updateCatalogoCondicion(selectedCondicion.id, {
+        descripcion: formData.descripcion,
+        categoriaId: formData.categoriaId || undefined,
+        tipo: formData.tipo || undefined,
+      })
+      toast.success('Condición actualizada correctamente')
+      setShowEditModal(false)
+      setSelectedCondicion(null)
+      resetForm()
       cargarDatos()
     } catch (error) {
-      toast.error('Error al eliminar')
-      console.error('Error:', error)
+      console.error('Error actualizando condición:', error)
+      toast.error('Error al actualizar la condición')
+    } finally {
+      setSaving(false)
     }
   }
 
-  const toggleExpand = (id: string) => {
-    setExpandedItems(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
+  const handleDelete = async () => {
+    if (!selectedCondicion) return
+
+    setSaving(true)
+    try {
+      await deleteCatalogoCondicion(selectedCondicion.id)
+      toast.success('Condición eliminada correctamente')
+      setShowDeleteDialog(false)
+      setSelectedCondicion(null)
+      cargarDatos()
+    } catch (error) {
+      console.error('Error eliminando condición:', error)
+      toast.error('Error al eliminar la condición')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCreateCategoria = async () => {
+    if (!nuevaCategoria.trim()) {
+      toast.error('El nombre de la categoría es obligatorio')
+      return
+    }
+
+    setSaving(true)
+    try {
+      await createCategoriaCondicion({ nombre: nuevaCategoria.trim() })
+      toast.success('Categoría creada correctamente')
+      setShowCategoriaModal(false)
+      setNuevaCategoria('')
+      const categoriasData = await getCategoriasCondicion()
+      setCategorias(categoriasData)
+    } catch (error) {
+      console.error('Error creando categoría:', error)
+      toast.error('Error al crear la categoría')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openEditModal = (condicion: CatalogoCondicion) => {
+    setSelectedCondicion(condicion)
+    setFormData({
+      descripcion: condicion.descripcion,
+      categoriaId: condicion.categoriaId || '',
+      tipo: condicion.tipo || '',
+    })
+    setShowEditModal(true)
+  }
+
+  const openDeleteDialog = (condicion: CatalogoCondicion) => {
+    setSelectedCondicion(condicion)
+    setShowDeleteDialog(true)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      descripcion: '',
+      categoriaId: '',
+      tipo: '',
     })
   }
 
-  const totalItems = condiciones.reduce((sum, c) => sum + (c._count?.items || c.items?.length || 0), 0)
-  const avgItems = condiciones.length > 0 ? Math.round(totalItems / condiciones.length) : 0
-
-  if (loading && condiciones.length === 0) {
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="space-y-6">
-        {/* Breadcrumb */}
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/" className="flex items-center gap-2">
-                <Home className="h-4 w-4" />
-                Inicio
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/catalogo" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Configuración
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="flex items-center gap-2">
-                <FileCheck className="h-4 w-4" />
-                Catálogo de Condiciones
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-              <FileCheck className="h-7 w-7 text-blue-600" />
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <FileText className="h-6 w-6" />
               Catálogo de Condiciones
             </h1>
-            <p className="text-muted-foreground mt-1">
-              Gestiona condiciones reutilizables para cotizaciones
+            <p className="text-muted-foreground">
+              {condiciones.length} condiciones en el catálogo
             </p>
           </div>
-          <Button onClick={() => handleOpenModal()} className="gap-2">
-            <Plus className="h-4 w-4" />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowCategoriaModal(true)}>
+            <FolderPlus className="h-4 w-4 mr-2" />
+            Nueva Categoría
+          </Button>
+          <Button onClick={() => { resetForm(); setShowCreateModal(true) }}>
+            <Plus className="h-4 w-4 mr-2" />
             Nueva Condición
           </Button>
         </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{condiciones.length}</div>
-              <p className="text-xs text-muted-foreground">Grupos de condiciones</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Items</CardTitle>
-              <FileCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalItems}</div>
-              <p className="text-xs text-muted-foreground">Total de items</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Promedio</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{avgItems}</div>
-              <p className="text-xs text-muted-foreground">Items por grupo</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Categorías</CardTitle>
-              <Settings className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{categorias.length}</div>
-              <p className="text-xs text-muted-foreground">Categorías activas</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar condiciones..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {categorias.map(cat => (
-                <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterTipo} onValueChange={setFilterTipo}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {TIPOS_CONDICION.map(tipo => (
-                <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* List */}
-        <div className="space-y-3">
-          {condiciones.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">
-                  No hay condiciones registradas.
-                  <br />
-                  <Button variant="link" onClick={() => handleOpenModal()} className="p-0 h-auto">
-                    Crear la primera condición
-                  </Button>
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            condiciones.map(condicion => (
-              <Card key={condicion.id} className="overflow-hidden">
-                <div
-                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => toggleExpand(condicion.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    {expandedItems.has(condicion.id) ? (
-                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{condicion.nombre}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {condicion._count?.items || condicion.items?.length || 0} items
-                        </Badge>
-                        {condicion.categoria && (
-                          <Badge variant="secondary" className="text-xs">
-                            {condicion.categoria.nombre}
-                          </Badge>
-                        )}
-                        {condicion.tipo && (
-                          <Badge className="text-xs">
-                            {condicion.tipo}
-                          </Badge>
-                        )}
-                      </div>
-                      {condicion.descripcion && (
-                        <p className="text-sm text-muted-foreground mt-1">{condicion.descripcion}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenModal(condicion)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(condicion.id)}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-                {expandedItems.has(condicion.id) && condicion.items && condicion.items.length > 0 && (
-                  <div className="border-t bg-muted/30 px-4 py-3">
-                    <ul className="space-y-2">
-                      {condicion.items.map((item, idx) => (
-                        <li key={item.id || idx} className="flex items-start gap-2 text-sm">
-                          <span className="text-muted-foreground min-w-[24px]">{idx + 1}.</span>
-                          <span className="flex-1">{item.descripcion}</span>
-                          {item.tipo && (
-                            <Badge variant="outline" className="text-xs">{item.tipo}</Badge>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </Card>
-            ))
-          )}
-        </div>
       </div>
 
-      {/* Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por código o descripción..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__ALL__">Todas las categorías</SelectItem>
+            {categorias.map(cat => (
+              <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__ALL__">Todos los tipos</SelectItem>
+            {TIPOS_CONDICION.map(tipo => (
+              <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Table */}
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[120px]">Código</TableHead>
+              <TableHead>Descripción</TableHead>
+              <TableHead className="w-[150px]">Categoría</TableHead>
+              <TableHead className="w-[120px]">Tipo</TableHead>
+              <TableHead className="w-[100px]">Estado</TableHead>
+              <TableHead className="w-[100px] text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {condicionesFiltradas.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  No se encontraron condiciones
+                </TableCell>
+              </TableRow>
+            ) : (
+              condicionesFiltradas.map(cond => (
+                <TableRow key={cond.id}>
+                  <TableCell className="font-mono text-sm">{cond.codigo}</TableCell>
+                  <TableCell className="max-w-md">
+                    <p className="line-clamp-2">{cond.descripcion}</p>
+                  </TableCell>
+                  <TableCell>
+                    {cond.categoria ? (
+                      <Badge variant="outline">{cond.categoria.nombre}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {cond.tipo ? (
+                      <Badge variant="secondary">{cond.tipo}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={cond.activo ? 'default' : 'secondary'}>
+                      {cond.activo ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEditModal(cond)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(cond)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Create Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editingCondicion ? 'Editar Condición' : 'Nueva Condición'}
-            </DialogTitle>
+            <DialogTitle>Nueva Condición</DialogTitle>
             <DialogDescription>
-              {editingCondicion
-                ? 'Modifica los datos de la condición'
-                : 'Crea un nuevo grupo de condiciones reutilizables'}
+              Agrega una nueva condición al catálogo
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Descripción *</Label>
+              <Textarea
+                value={formData.descripcion}
+                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                placeholder="Escribe la condición..."
+                rows={3}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <Label htmlFor="nombre">Nombre del grupo *</Label>
-                <Input
-                  id="nombre"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
-                  placeholder="Ej: Condiciones de Pago"
-                />
-              </div>
-
-              <div className="col-span-2">
-                <Label htmlFor="descripcion">Descripción</Label>
-                <Textarea
-                  id="descripcion"
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
-                  placeholder="Descripción opcional del grupo"
-                  rows={2}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="categoria">Categoría</Label>
+              <div className="space-y-2">
+                <Label>Categoría</Label>
                 <Select
                   value={formData.categoriaId}
-                  onValueChange={(val) => setFormData(prev => ({ ...prev, categoriaId: val }))}
+                  onValueChange={(value) => setFormData({ ...formData, categoriaId: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar categoría" />
+                    <SelectValue placeholder="Seleccionar..." />
                   </SelectTrigger>
                   <SelectContent>
                     {categorias.map(cat => (
@@ -469,15 +420,14 @@ export default function CondicionesPage() {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div>
-                <Label htmlFor="tipo">Tipo</Label>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
                 <Select
                   value={formData.tipo}
-                  onValueChange={(val) => setFormData(prev => ({ ...prev, tipo: val }))}
+                  onValueChange={(value) => setFormData({ ...formData, tipo: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar tipo" />
+                    <SelectValue placeholder="Seleccionar..." />
                   </SelectTrigger>
                   <SelectContent>
                     {TIPOS_CONDICION.map(tipo => (
@@ -486,75 +436,131 @@ export default function CondicionesPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Items */}
-            <div className="space-y-3">
-              <Label>Items de condición *</Label>
-
-              {/* Add new item */}
-              <div className="flex gap-2">
-                <Input
-                  value={newItemText}
-                  onChange={(e) => setNewItemText(e.target.value)}
-                  placeholder="Texto de la condición..."
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddItem())}
-                />
-                <Select value={newItemTipo} onValueChange={setNewItemTipo}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIPOS_CONDICION.map(tipo => (
-                      <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button type="button" onClick={handleAddItem} variant="secondary">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Item list */}
-              {formData.items.length > 0 && (
-                <div className="border rounded-md divide-y">
-                  {formData.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2">
-                      <span className="text-sm text-muted-foreground w-6">{idx + 1}.</span>
-                      <span className="flex-1 text-sm">{item.descripcion}</span>
-                      {item.tipo && (
-                        <Badge variant="outline" className="text-xs">{item.tipo}</Badge>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleRemoveItem(idx)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {formData.items.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No hay items agregados. Agrega al menos una condición.
-                </p>
-              )}
             </div>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={handleCloseModal}>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleCreate} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editingCondicion ? 'Guardar cambios' : 'Crear condición'}
+              Crear Condición
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Condición</DialogTitle>
+            <DialogDescription>
+              Modifica los datos de la condición
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Descripción *</Label>
+              <Textarea
+                value={formData.descripcion}
+                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                placeholder="Escribe la condición..."
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Categoría</Label>
+                <Select
+                  value={formData.categoriaId}
+                  onValueChange={(value) => setFormData({ ...formData, categoriaId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categorias.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select
+                  value={formData.tipo}
+                  onValueChange={(value) => setFormData({ ...formData, tipo: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_CONDICION.map(tipo => (
+                      <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdate} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar condición?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La condición será eliminada permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Categoria Modal */}
+      <Dialog open={showCategoriaModal} onOpenChange={setShowCategoriaModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva Categoría</DialogTitle>
+            <DialogDescription>
+              Crea una nueva categoría para organizar las condiciones
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nombre de la categoría *</Label>
+              <Input
+                value={nuevaCategoria}
+                onChange={(e) => setNuevaCategoria(e.target.value)}
+                placeholder="Ej: Comercial, Técnica, Entrega..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCategoriaModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateCategoria} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Crear Categoría
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -20,7 +20,6 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       where.OR = [
-        { nombre: { contains: search, mode: 'insensitive' } },
         { descripcion: { contains: search, mode: 'insensitive' } },
         { codigo: { contains: search, mode: 'insensitive' } }
       ]
@@ -29,14 +28,7 @@ export async function GET(req: NextRequest) {
     const exclusiones = await prisma.catalogoExclusion.findMany({
       where,
       include: {
-        categoria: true,
-        items: {
-          where: { activo: true },
-          orderBy: { orden: 'asc' }
-        },
-        _count: {
-          select: { items: true }
-        }
+        categoria: true
       },
       orderBy: { orden: 'asc' }
     })
@@ -53,16 +45,15 @@ export async function POST(req: Request) {
     const data = await req.json()
 
     // Validación de campos requeridos
-    if (!data.nombre) {
-      return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 })
+    if (!data.descripcion) {
+      return NextResponse.json({ error: 'La descripción es obligatoria' }, { status: 400 })
     }
 
     // Generar código único si no se proporciona
     let codigo = data.codigo
     if (!codigo) {
-      const timestamp = Date.now()
-      const random = Math.random().toString(36).substring(2, 8)
-      codigo = `EXCL-${timestamp}-${random}`.toUpperCase()
+      const count = await prisma.catalogoExclusion.count()
+      codigo = `EXCL-${String(count + 1).padStart(4, '0')}`
     }
 
     // Verificar si el código ya existe
@@ -79,31 +70,17 @@ export async function POST(req: Request) {
       _max: { orden: true }
     })
 
-    // Crear la exclusión con sus items
+    // Crear la exclusión
     const nueva = await prisma.catalogoExclusion.create({
       data: {
         codigo,
-        nombre: data.nombre,
         descripcion: data.descripcion,
         categoriaId: data.categoriaId,
         activo: data.activo ?? true,
-        orden: data.orden ?? (maxOrden._max.orden || 0) + 1,
-        items: data.items?.length > 0 ? {
-          create: data.items.map((item: any, index: number) => ({
-            descripcion: item.descripcion,
-            orden: item.orden ?? index + 1,
-            activo: item.activo ?? true
-          }))
-        } : undefined
+        orden: data.orden ?? (maxOrden._max.orden || 0) + 1
       },
       include: {
-        categoria: true,
-        items: {
-          orderBy: { orden: 'asc' }
-        },
-        _count: {
-          select: { items: true }
-        }
+        categoria: true
       }
     })
 

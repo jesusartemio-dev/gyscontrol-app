@@ -1,24 +1,15 @@
 import { buildApiUrl } from '@/lib/utils'
 
 // ===================================================
-// 📁 Archivo: src/lib/services/catalogoCondicion.ts
-// 📌 Descripción: Servicios para gestionar catálogo de condiciones
-// 🧠 Uso: CRUD completo para catálogo de condiciones
+// Archivo: src/lib/services/catalogoCondicion.ts
+// Descripción: Servicios para gestionar catálogo de condiciones
+// Uso: CRUD completo para catálogo de condiciones (items individuales)
 // ===================================================
-
-export interface CatalogoCondicionItem {
-  id?: string
-  descripcion: string
-  tipo?: string
-  orden?: number
-  activo?: boolean
-}
 
 export interface CatalogoCondicion {
   id: string
   codigo: string
-  nombre: string
-  descripcion?: string
+  descripcion: string
   categoriaId?: string
   tipo?: string
   activo: boolean
@@ -26,8 +17,6 @@ export interface CatalogoCondicion {
   createdAt: string
   updatedAt: string
   categoria?: CategoriaCondicion
-  items: CatalogoCondicionItem[]
-  _count?: { items: number }
 }
 
 export interface CategoriaCondicion {
@@ -41,16 +30,14 @@ export interface CategoriaCondicion {
 
 export interface CatalogoCondicionPayload {
   codigo?: string
-  nombre: string
-  descripcion?: string
+  descripcion: string
   categoriaId?: string
   tipo?: string
   activo?: boolean
   orden?: number
-  items?: CatalogoCondicionItem[]
 }
 
-// ✅ Obtener todas las categorías de condiciones
+// Obtener todas las categorías de condiciones
 export async function getCategoriasCondicion(): Promise<CategoriaCondicion[]> {
   try {
     const res = await fetch(buildApiUrl('/api/catalogo/categorias-condicion'))
@@ -62,7 +49,7 @@ export async function getCategoriasCondicion(): Promise<CategoriaCondicion[]> {
   }
 }
 
-// ✅ Crear nueva categoría de condiciones
+// Crear nueva categoría de condiciones
 export async function createCategoriaCondicion(data: { nombre: string; descripcion?: string }): Promise<CategoriaCondicion> {
   try {
     const res = await fetch(buildApiUrl('/api/catalogo/categorias-condicion'), {
@@ -81,7 +68,7 @@ export async function createCategoriaCondicion(data: { nombre: string; descripci
   }
 }
 
-// ✅ Obtener todo el catálogo de condiciones
+// Obtener todo el catálogo de condiciones
 export async function getCatalogoCondiciones(params?: {
   categoriaId?: string
   activo?: boolean
@@ -110,7 +97,7 @@ export async function getCatalogoCondiciones(params?: {
   }
 }
 
-// ✅ Obtener condición por ID
+// Obtener condición por ID
 export async function getCatalogoCondicionById(id: string): Promise<CatalogoCondicion> {
   try {
     const res = await fetch(buildApiUrl(`/api/catalogo/condiciones/${id}`))
@@ -122,7 +109,7 @@ export async function getCatalogoCondicionById(id: string): Promise<CatalogoCond
   }
 }
 
-// ✅ Crear nueva condición en catálogo
+// Crear nueva condición en catálogo
 export async function createCatalogoCondicion(data: CatalogoCondicionPayload): Promise<CatalogoCondicion> {
   try {
     const res = await fetch(buildApiUrl('/api/catalogo/condiciones'), {
@@ -141,7 +128,7 @@ export async function createCatalogoCondicion(data: CatalogoCondicionPayload): P
   }
 }
 
-// ✅ Actualizar condición en catálogo
+// Actualizar condición en catálogo
 export async function updateCatalogoCondicion(id: string, data: Partial<CatalogoCondicionPayload>): Promise<CatalogoCondicion> {
   try {
     const res = await fetch(buildApiUrl(`/api/catalogo/condiciones/${id}`), {
@@ -160,7 +147,7 @@ export async function updateCatalogoCondicion(id: string, data: Partial<Catalogo
   }
 }
 
-// ✅ Eliminar condición del catálogo
+// Eliminar condición del catálogo
 export async function deleteCatalogoCondicion(id: string): Promise<void> {
   try {
     const res = await fetch(buildApiUrl(`/api/catalogo/condiciones/${id}`), {

@@ -11,13 +11,7 @@ export async function GET(
     const condicion = await prisma.catalogoCondicion.findUnique({
       where: { id },
       include: {
-        categoria: true,
-        items: {
-          orderBy: { orden: 'asc' }
-        },
-        _count: {
-          select: { items: true }
-        }
+        categoria: true
       }
     })
 
@@ -42,8 +36,7 @@ export async function PUT(
 
     // Verificar que existe
     const existente = await prisma.catalogoCondicion.findUnique({
-      where: { id },
-      include: { items: true }
+      where: { id }
     })
 
     if (!existente) {
@@ -60,33 +53,11 @@ export async function PUT(
       }
     }
 
-    // Actualizar items si se proporcionan
-    if (data.items !== undefined) {
-      // Eliminar items existentes
-      await prisma.catalogoCondicionItem.deleteMany({
-        where: { catalogoCondicionId: id }
-      })
-
-      // Crear nuevos items
-      if (data.items.length > 0) {
-        await prisma.catalogoCondicionItem.createMany({
-          data: data.items.map((item: any, index: number) => ({
-            catalogoCondicionId: id,
-            descripcion: item.descripcion,
-            tipo: item.tipo,
-            orden: item.orden ?? index + 1,
-            activo: item.activo ?? true
-          }))
-        })
-      }
-    }
-
     // Actualizar la condición
     const actualizada = await prisma.catalogoCondicion.update({
       where: { id },
       data: {
         codigo: data.codigo,
-        nombre: data.nombre,
         descripcion: data.descripcion,
         categoriaId: data.categoriaId,
         tipo: data.tipo,
@@ -94,13 +65,7 @@ export async function PUT(
         orden: data.orden
       },
       include: {
-        categoria: true,
-        items: {
-          orderBy: { orden: 'asc' }
-        },
-        _count: {
-          select: { items: true }
-        }
+        categoria: true
       }
     })
 
@@ -127,7 +92,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Condición no encontrada' }, { status: 404 })
     }
 
-    // Eliminar (los items se eliminan en cascada)
+    // Eliminar
     await prisma.catalogoCondicion.delete({
       where: { id }
     })
