@@ -194,10 +194,10 @@ export const ListaEquipoFilters: React.FC<ListaEquipoFiltersProps> = ({
       filters.push({ key: 'estado', label: 'Estado', value: filtros.estado });
     }
     if (filtros.montoMinimo) {
-      filters.push({ key: 'montoMinimo', label: 'Monto mín.', value: `S/ ${filtros.montoMinimo.toLocaleString()}` });
+      filters.push({ key: 'montoMinimo', label: 'Monto mín.', value: `$ ${filtros.montoMinimo.toLocaleString()}` });
     }
     if (filtros.montoMaximo) {
-      filters.push({ key: 'montoMaximo', label: 'Monto máx.', value: `S/ ${filtros.montoMaximo.toLocaleString()}` });
+      filters.push({ key: 'montoMaximo', label: 'Monto máx.', value: `$ ${filtros.montoMaximo.toLocaleString()}` });
     }
     if (filtros.tieneObservaciones) {
       filters.push({ key: 'tieneObservaciones', label: 'Con observaciones', value: 'Sí' });
@@ -509,7 +509,7 @@ export const ListaEquipoFilters: React.FC<ListaEquipoFiltersProps> = ({
                           name="montoMinimo"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Monto Mínimo (PEN)</FormLabel>
+                              <FormLabel>Monto Mínimo (USD)</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -532,7 +532,7 @@ export const ListaEquipoFilters: React.FC<ListaEquipoFiltersProps> = ({
                           name="montoMaximo"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Monto Máximo (PEN)</FormLabel>
+                              <FormLabel>Monto Máximo (USD)</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />

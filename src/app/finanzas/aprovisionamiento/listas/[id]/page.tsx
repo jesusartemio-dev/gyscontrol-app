@@ -166,10 +166,6 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
             <BreadcrumbLink href="/finanzas/aprovisionamiento">Aprovisionamiento</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />

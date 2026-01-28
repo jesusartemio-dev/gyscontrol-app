@@ -133,10 +133,6 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
             <BreadcrumbLink href="/finanzas/aprovisionamiento">Aprovisionamiento</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />

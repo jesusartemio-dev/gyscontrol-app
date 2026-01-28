@@ -67,7 +67,7 @@ export default function Sidebar() {
     'mi-trabajo': false,
     supervision: false,
     logistica: false,
-    finanzas: false,
+    aprovisionamiento: false,
     gestion: false,
   })
 
@@ -206,15 +206,15 @@ export default function Sidebar() {
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
       ],
     },
-    // 4. Finanzas - Control financiero y aprovisionamiento
+    // 4. Aprovisionamiento - Gestión de adquisiciones y compras
     {
-      key: 'finanzas',
-      title: 'Finanzas',
-      icon: DollarSign,
+      key: 'aprovisionamiento',
+      title: 'Aprovisionamiento',
+      icon: PackageCheck,
       color: 'text-emerald-400',
       roles: ['admin', 'gerente', 'gestor'],
       links: [
-        { href: '/finanzas/dashboard', label: 'Dashboard', icon: BarChart3 },
+        { href: '/finanzas/aprovisionamiento', label: 'Dashboard', icon: BarChart3 },
         { href: '/finanzas/aprovisionamiento/proyectos', label: 'Proyectos', icon: FolderOpen },
         { href: '/finanzas/aprovisionamiento/listas', label: 'Listas', icon: FileText },
         { href: '/finanzas/aprovisionamiento/pedidos', label: 'Pedidos', icon: Package },

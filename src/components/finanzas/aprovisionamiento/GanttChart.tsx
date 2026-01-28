@@ -260,7 +260,7 @@ const GanttItemComponent: React.FC<{
     if (!costOptions || costOptions.mode === 'none') return '';
     
     const cost = getCostValue();
-    if (cost === 0) return costOptions.compact ? 'S/ 0' : 'S/ 0.00';
+    if (cost === 0) return costOptions.compact ? '$ 0' : '$ 0.00';
 
     switch (costOptions.mode) {
       case 'total':
@@ -295,25 +295,6 @@ const GanttItemComponent: React.FC<{
       }
     };
 
-  const getCostPositionClasses = (): string => {
-    if (!costOptions || costOptions.mode === 'none') return 'hidden';
-    
-    const baseClasses = 'absolute text-xs font-medium bg-white/90 backdrop-blur-sm px-2 py-1 rounded shadow-sm border';
-    
-    switch (costOptions.position) {
-      case 'right':
-        return `${baseClasses} left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap`;
-      case 'left':
-        return `${baseClasses} right-full mr-2 top-1/2 -translate-y-1/2 whitespace-nowrap`;
-      case 'top':
-        return `${baseClasses} bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap`;
-      case 'bottom':
-        return `${baseClasses} top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap`;
-      default:
-        return `${baseClasses} left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap`;
-    }
-  };
-
   const costDisplay = formatCostDisplay();
 
   return (
@@ -322,7 +303,7 @@ const GanttItemComponent: React.FC<{
         <TooltipTrigger asChild>
             <div
               className={`
-                absolute rounded cursor-pointer border-2 border-opacity-50 transition-all duration-200
+                absolute rounded cursor-pointer border-2 border-opacity-50 transition-all duration-200 overflow-hidden
                 ${allowEdit ? 'hover:shadow-lg hover:scale-105' : ''}
                 ${isDragging ? 'shadow-xl z-10' : ''}
               `}
@@ -360,12 +341,6 @@ const GanttItemComponent: React.FC<{
               />
             )}
             
-            {/* 💰 Cost display */}
-            {costDisplay && (
-              <div className={getCostPositionClasses()}>
-                <span className="text-slate-700">{costDisplay}</span>
-              </div>
-            )}
           </div>
         </TooltipTrigger>
         
@@ -423,30 +398,32 @@ const GanttItemComponent: React.FC<{
         </TooltipContent>
       </Tooltip>
       
-      {/* 💰 Cost display next to bar */}
-      {showCosts && (
+      {/* 💰 Cost display next to bar - positioned based on costOptions */}
+      {showCosts && costDisplay && (
         <div
-          className="absolute text-xs font-medium text-gray-700 bg-white/90 px-2 py-1 rounded shadow-sm border whitespace-nowrap"
+          className="absolute text-[10px] font-medium text-gray-600 bg-white/95 px-1.5 py-0.5 rounded shadow-sm border border-gray-200 whitespace-nowrap pointer-events-none"
           style={{
-            left: item.x + item.width + 8, // 8px spacing from bar
-            top: item.y + (item.height / 2) - 10, // Center vertically
-            zIndex: 10,
+            // Position based on costOptions.position
+            ...(costOptions?.position === 'left' ? {
+              right: `calc(100% - ${item.x}px + 4px)`,
+              top: item.y + (item.height / 2) - 8,
+            } : costOptions?.position === 'top' ? {
+              left: item.x + (item.width / 2),
+              top: item.y - 20,
+              transform: 'translateX(-50%)',
+            } : costOptions?.position === 'bottom' ? {
+              left: item.x + (item.width / 2),
+              top: item.y + item.height + 4,
+              transform: 'translateX(-50%)',
+            } : {
+              // Default: right
+              left: item.x + item.width + 6,
+              top: item.y + (item.height / 2) - 8,
+            }),
+            zIndex: 5,
           }}
         >
-          {(() => {
-            // Use different amount properties based on item type
-            const ganttItem = item as any;
-            if (ganttItem.montoProyectado) {
-              return formatCurrency(ganttItem.montoProyectado);
-            } else if (ganttItem.montoEjecutado) {
-              return formatCurrency(ganttItem.montoEjecutado);
-            } else if (ganttItem.amount) {
-              return formatCurrency(ganttItem.amount);
-            } else if (ganttItem.monto) {
-              return formatCurrency(ganttItem.monto);
-            }
-            return 'S/ 0';
-          })()} 
+          {costDisplay}
         </div>
       )}
     </>

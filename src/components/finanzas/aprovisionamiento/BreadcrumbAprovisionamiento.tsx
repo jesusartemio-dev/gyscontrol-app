@@ -64,10 +64,6 @@ interface BreadcrumbItem {
 
 // ✅ Route configuration
 const ROUTE_CONFIG = {
-  '/finanzas': {
-    label: 'Finanzas',
-    icon: DollarSign,
-  },
   '/finanzas/aprovisionamiento': {
     label: 'Aprovisionamiento',
     icon: Package,

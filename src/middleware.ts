@@ -21,7 +21,7 @@ const routePermissions: Record<string, { resource: PermissionResource; action: P
   // Gestión
   '/gestion': { resource: 'projects', action: 'manage_team' },
 
-  // Finanzas
+  // Aprovisionamiento
   '/finanzas': { resource: 'reports', action: 'view' },
 }
 

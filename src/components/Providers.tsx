@@ -5,6 +5,7 @@ import { SessionProvider } from 'next-auth/react'
 import { SWRConfig } from 'swr'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { SidebarProvider } from '@/lib/context/SidebarContext'
 
 // ✅ SWR configuration
 const swrConfig = {
@@ -66,7 +67,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
         <SWRConfig value={swrConfig}>
-          {children}
+          <SidebarProvider>
+            {children}
+          </SidebarProvider>
         </SWRConfig>
         {/* 🔧 React Query DevTools solo en desarrollo */}
         {process.env.NODE_ENV === 'development' && (

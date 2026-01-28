@@ -162,10 +162,6 @@ export default function AprovisionamientoPage({ searchParams }: PageProps) {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
             <BreadcrumbPage>Aprovisionamiento</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -175,7 +171,7 @@ export default function AprovisionamientoPage({ searchParams }: PageProps) {
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Aprovisionamiento Financiero</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Aprovisionamiento</h1>
             <p className="text-muted-foreground mt-2">
               Gestión integral de listas y pedidos de equipos con control de coherencia
             </p>
@@ -418,8 +414,8 @@ function Error({
               Reintentar
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/finanzas">
-                Volver a Finanzas
+              <Link href="/">
+                Volver al Inicio
               </Link>
             </Button>
           </div>

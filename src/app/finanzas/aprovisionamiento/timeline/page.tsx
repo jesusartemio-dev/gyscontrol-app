@@ -16,7 +16,7 @@ import { TimelinePageContent } from './TimelinePageContent'
 
 export const metadata = {
   title: 'Timeline | Aprovisionamiento | GYS',
-  description: 'Vista Gantt de aprovisionamiento financiero'
+  description: 'Vista Gantt del aprovisionamiento de equipos'
 }
 
 interface PageProps {
@@ -40,10 +40,6 @@ export default async function TimelinePage({ searchParams: searchParamsPromise }
       <nav className="flex items-center gap-1 text-xs text-muted-foreground">
         <Link href="/" className="hover:text-foreground transition-colors">
           <Home className="h-3.5 w-3.5" />
-        </Link>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <Link href="/finanzas" className="hover:text-foreground transition-colors">
-          Finanzas
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
         <Link href="/finanzas/aprovisionamiento" className="hover:text-foreground transition-colors">

@@ -277,6 +277,6 @@ function TablaSkeleton() {
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Proyectos | Finanzas | GYS',
-  description: 'Vista consolidada de proyectos con seguimiento financiero'
+  title: 'Proyectos | Aprovisionamiento | GYS',
+  description: 'Vista consolidada de proyectos con seguimiento de aprovisionamiento'
 }

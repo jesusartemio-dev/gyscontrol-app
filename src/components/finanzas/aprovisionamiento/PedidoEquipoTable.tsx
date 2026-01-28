@@ -423,7 +423,7 @@ const PedidoEquipoTableRow = memo<PedidoTableRowProps>(({
 
   const montoDisplay = useMemo(() => {
     return montoTotal > 0 
-      ? `PEN ${montoTotal.toLocaleString()}`
+      ? `$ ${montoTotal.toLocaleString()}`
       : '-';
   }, [montoTotal]);
 

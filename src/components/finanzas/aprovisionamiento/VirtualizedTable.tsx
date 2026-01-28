@@ -275,7 +275,7 @@ const VirtualizedRow = memo<ListChildComponentProps<VirtualizedRowData>>(({
   // 🎯 Memoized computed values
   const montoDisplay = useMemo(() => {
     return lista.estadisticas?.montoTotal 
-      ? `PEN ${lista.estadisticas.montoTotal.toLocaleString()}`
+      ? `$ ${lista.estadisticas.montoTotal.toLocaleString()}`
       : '-';
   }, [lista.estadisticas?.montoTotal]);
 

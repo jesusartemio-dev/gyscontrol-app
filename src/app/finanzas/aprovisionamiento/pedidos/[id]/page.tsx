@@ -159,10 +159,6 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href="/finanzas">Finanzas</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
             <BreadcrumbLink href="/finanzas/aprovisionamiento">Aprovisionamiento</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
