@@ -61,13 +61,13 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
     setCondiciones(cotizacion.condiciones || [])
   }, [cotizacion.condiciones])
 
-  // Cargar condiciones disponibles
+  // Cargar condiciones disponibles desde el catálogo
   const loadCondicionesDisponibles = async () => {
     try {
-      const response = await fetch('/api/plantillas/condiciones')
+      const response = await fetch('/api/catalogo/condiciones?activo=true')
       if (response.ok) {
         const data = await response.json()
-        setCondicionesDisponibles(data.data || [])
+        setCondicionesDisponibles(data || [])
       }
     } catch (error) {
       console.error('Error loading condiciones:', error)
@@ -86,7 +86,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plantillaId: selectedCondicion,
+          catalogoId: selectedCondicion,
           modo: importMode,
           itemsSeleccionados: selectedItems.length > 0 ? selectedItems : undefined
         })
@@ -128,7 +128,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
     setShowImportDialog(true)
   }
 
-  // Manejar selección de plantilla
+  // Manejar selección de catálogo
   const handleCondicionSelect = (condicionId: string) => {
     setSelectedCondicion(condicionId)
     setSelectedItems([])
@@ -308,18 +308,18 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
-                    Importar desde Condición
+                    Importar desde Catálogo
                   </DialogTitle>
                   <DialogDescription>
-                    Selecciona una plantilla de condiciones y elige qué items importar.
+                    Selecciona una condición del catálogo y elige qué items importar.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="condicion">Plantilla de Condiciones</Label>
+                    <Label htmlFor="condicion">Condición del Catálogo</Label>
                     <Select value={selectedCondicion} onValueChange={handleCondicionSelect}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una plantilla..." />
+                        <SelectValue placeholder="Selecciona una condición..." />
                       </SelectTrigger>
                       <SelectContent>
                         {condicionesDisponibles.map((condicion) => (

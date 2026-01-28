@@ -101,6 +101,32 @@ model CategoriaGasto {
   @@map("categoria_gasto")
 }
 
+model CategoriaCondicion {
+  id                  String              @id @default(cuid())
+  nombre              String              @unique
+  descripcion         String?
+  orden               Int                 @default(0)
+  activo              Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  catalogoCondiciones CatalogoCondicion[]
+
+  @@map("categoria_condicion")
+}
+
+model CategoriaExclusion {
+  id                  String              @id @default(cuid())
+  nombre              String              @unique
+  descripcion         String?
+  orden               Int                 @default(0)
+  activo              Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  catalogoExclusiones CatalogoExclusion[]
+
+  @@map("categoria_exclusion")
+}
+
 model CatalogoGasto {
   id            String         @id @default(cuid())
   codigo        String         @unique
@@ -1237,14 +1263,16 @@ model CotizacionActividad {
 }
 
 model CotizacionCondicion {
-  id           String     @id
-  cotizacionId String
-  tipo         String?
-  descripcion  String
-  orden        Int?       @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime
-  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  id                      String                 @id
+  cotizacionId            String
+  catalogoCondicionItemId String?
+  tipo                    String?
+  descripcion             String
+  orden                   Int?                   @default(0)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime
+  cotizacion              Cotizacion             @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  catalogoCondicionItem   CatalogoCondicionItem? @relation(fields: [catalogoCondicionItemId], references: [id])
 
   @@index([cotizacionId, orden])
   @@map("cotizacion_condicion")
@@ -1298,13 +1326,15 @@ model CotizacionEdt {
 }
 
 model CotizacionExclusion {
-  id           String     @id
-  cotizacionId String
-  descripcion  String
-  orden        Int?       @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime
-  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  id                      String                 @id
+  cotizacionId            String
+  catalogoExclusionItemId String?
+  descripcion             String
+  orden                   Int?                   @default(0)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime
+  cotizacion              Cotizacion             @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  catalogoExclusionItem   CatalogoExclusionItem? @relation(fields: [catalogoExclusionItemId], references: [id])
 
   @@index([cotizacionId, orden])
   @@map("cotizacion_exclusion")
@@ -1541,17 +1571,17 @@ model CrmOportunidad {
   estado              EstadoOportunidad @default(inicio)
 
   // Campos para Feedback de Mejora (cuando se pierde)
-  fechaCierre         DateTime?         // Fecha real de cierre (ganada o perdida)
-  motivoPerdida       String?           // Razón por la que se perdió
-  competidorGanador   String?           // Competidor que ganó el concurso
-  aprendizajes        String?           // Lecciones aprendidas
+  fechaCierre       DateTime? // Fecha real de cierre (ganada o perdida)
+  motivoPerdida     String? // Razón por la que se perdió
+  competidorGanador String? // Competidor que ganó el concurso
+  aprendizajes      String? // Lecciones aprendidas
 
-  crmActividad        CrmActividad[]
-  cliente             Cliente           @relation(fields: [clienteId], references: [id])
-  comercial           User?             @relation("CrmOportunidadComercial", fields: [comercialId], references: [id])
-  cotizacion          Cotizacion?       @relation(fields: [cotizacionId], references: [id])
-  proyecto            Proyecto?         @relation(fields: [proyectoId], references: [id])
-  responsable         User?             @relation("CrmOportunidadResponsable", fields: [responsableId], references: [id])
+  crmActividad CrmActividad[]
+  cliente      Cliente        @relation(fields: [clienteId], references: [id])
+  comercial    User?          @relation("CrmOportunidadComercial", fields: [comercialId], references: [id])
+  cotizacion   Cotizacion?    @relation(fields: [cotizacionId], references: [id])
+  proyecto     Proyecto?      @relation(fields: [proyectoId], references: [id])
+  responsable  User?          @relation("CrmOportunidadResponsable", fields: [responsableId], references: [id])
 
   @@index([clienteId, estado])
   @@index([comercialId, fechaCierreEstimada])
@@ -1710,35 +1740,38 @@ model Permission {
   @@map("permissions")
 }
 
-model PlantillaCondicion {
-  id                     String                   @id
-  nombre                 String
-  descripcion            String?
-  categoria              String?
-  tipo                   String?
-  activo                 Boolean                  @default(true)
-  orden                  Int                      @default(0)
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime
-  plantillaCondicionItem PlantillaCondicionItem[]
+model CatalogoCondicion {
+  id          String                  @id @default(cuid())
+  codigo      String                  @unique
+  nombre      String
+  descripcion String?
+  categoriaId String?
+  tipo        String?
+  activo      Boolean                 @default(true)
+  orden       Int                     @default(0)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  categoria   CategoriaCondicion?     @relation(fields: [categoriaId], references: [id])
+  items       CatalogoCondicionItem[]
 
-  @@index([categoria, tipo, activo])
-  @@map("plantilla_condicion")
+  @@index([categoriaId, tipo, activo])
+  @@map("catalogo_condicion")
 }
 
-model PlantillaCondicionItem {
-  id                   String             @id
-  plantillaCondicionId String
-  descripcion          String
-  tipo                 String?
-  orden                Int                @default(0)
-  activo               Boolean            @default(true)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime
-  plantillaCondicion   PlantillaCondicion @relation(fields: [plantillaCondicionId], references: [id], onDelete: Cascade)
+model CatalogoCondicionItem {
+  id                    String                @id @default(cuid())
+  catalogoCondicionId   String
+  descripcion           String
+  tipo                  String?
+  orden                 Int                   @default(0)
+  activo                Boolean               @default(true)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  catalogoCondicion     CatalogoCondicion     @relation(fields: [catalogoCondicionId], references: [id], onDelete: Cascade)
+  cotizacionCondiciones CotizacionCondicion[]
 
-  @@index([plantillaCondicionId, orden])
-  @@map("plantilla_condicion_item")
+  @@index([catalogoCondicionId, orden])
+  @@map("catalogo_condicion_item")
 }
 
 model PlantillaDuracionCronograma {
@@ -1792,33 +1825,36 @@ model PlantillaEquipoItemIndependiente {
   @@map("plantilla_equipo_item_independiente")
 }
 
-model PlantillaExclusion {
-  id                     String                   @id
-  nombre                 String
-  descripcion            String?
-  categoria              String?
-  activo                 Boolean                  @default(true)
-  orden                  Int                      @default(0)
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime
-  plantillaExclusionItem PlantillaExclusionItem[]
+model CatalogoExclusion {
+  id          String                  @id @default(cuid())
+  codigo      String                  @unique
+  nombre      String
+  descripcion String?
+  categoriaId String?
+  activo      Boolean                 @default(true)
+  orden       Int                     @default(0)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  categoria   CategoriaExclusion?     @relation(fields: [categoriaId], references: [id])
+  items       CatalogoExclusionItem[]
 
-  @@index([categoria, activo])
-  @@map("plantilla_exclusion")
+  @@index([categoriaId, activo])
+  @@map("catalogo_exclusion")
 }
 
-model PlantillaExclusionItem {
-  id                   String             @id
-  plantillaExclusionId String
-  descripcion          String
-  orden                Int                @default(0)
-  activo               Boolean            @default(true)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime
-  plantillaExclusion   PlantillaExclusion @relation(fields: [plantillaExclusionId], references: [id], onDelete: Cascade)
+model CatalogoExclusionItem {
+  id                    String                @id @default(cuid())
+  catalogoExclusionId   String
+  descripcion           String
+  orden                 Int                   @default(0)
+  activo                Boolean               @default(true)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  catalogoExclusion     CatalogoExclusion     @relation(fields: [catalogoExclusionId], references: [id], onDelete: Cascade)
+  cotizacionExclusiones CotizacionExclusion[]
 
-  @@index([plantillaExclusionId, orden])
-  @@map("plantilla_exclusion_item")
+  @@index([catalogoExclusionId, orden])
+  @@map("catalogo_exclusion_item")
 }
 
 model PlantillaGastoIndependiente {
@@ -2282,13 +2318,13 @@ enum EstadoListaItem {
 enum EstadoOportunidad {
   inicio
   contacto_cliente
-  validacion_tecnica      // Propuesta: alcance y recursos
-  validacion_comercial    // Propuesta: costeo, margen, condiciones
-  negociacion             // Post-envío de cotización
-  seguimiento_proyecto    // Ganada: seguimiento de ejecución
-  feedback_mejora         // Perdida: motivo, competidor, aprendizajes
-  cerrada_ganada          // Legacy
-  cerrada_perdida         // Legacy
+  validacion_tecnica // Propuesta: alcance y recursos
+  validacion_comercial // Propuesta: costeo, margen, condiciones
+  negociacion // Post-envío de cotización
+  seguimiento_proyecto // Ganada: seguimiento de ejecución
+  feedback_mejora // Perdida: motivo, competidor, aprendizajes
+  cerrada_ganada // Legacy
+  cerrada_perdida // Legacy
 }
 
 enum EstadoPedido {

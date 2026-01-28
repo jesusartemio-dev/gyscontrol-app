@@ -1,10 +1,10 @@
 /**
- * 📋 API Importar Condiciones desde Plantilla
+ * API Importar Condiciones desde Catálogo
  *
- * Permite importar una plantilla de condiciones a una cotización específica.
+ * Permite importar condiciones desde el catálogo a una cotización específica.
  *
  * @author GYS Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -12,7 +12,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { plantillasCondiciones } from '@/lib/temp-plantillas-storage'
 
 export async function POST(
   request: NextRequest,
@@ -25,7 +24,7 @@ export async function POST(
     }
 
     const { id } = await params
-    const { plantillaId, modo = 'replace', itemsSeleccionados } = await request.json()
+    const { catalogoId, modo = 'replace', itemsSeleccionados } = await request.json()
 
     // Validar que la cotización existe
     const cotizacion = await prisma.cotizacion.findUnique({
@@ -40,13 +39,20 @@ export async function POST(
       )
     }
 
-    // Usar las plantillas dinámicas del almacenamiento temporal
-    const plantillas = plantillasCondiciones
+    // Obtener la condición del catálogo con sus items
+    const catalogoCondicion = await prisma.catalogoCondicion.findUnique({
+      where: { id: catalogoId },
+      include: {
+        items: {
+          where: { activo: true },
+          orderBy: { orden: 'asc' }
+        }
+      }
+    })
 
-    const plantilla = plantillas.find(p => p.id === plantillaId)
-    if (!plantilla) {
+    if (!catalogoCondicion) {
       return NextResponse.json(
-        { error: 'Plantilla no encontrada' },
+        { error: 'Condición no encontrada en el catálogo' },
         { status: 404 }
       )
     }
@@ -69,16 +75,48 @@ export async function POST(
 
     // Filtrar items seleccionados si se especificaron
     const itemsAFiltrar = itemsSeleccionados && Array.isArray(itemsSeleccionados) && itemsSeleccionados.length > 0
-      ? plantilla.items.filter((item, index) => itemsSeleccionados.includes(index))
-      : plantilla.items
+      ? catalogoCondicion.items.filter((_, index) => itemsSeleccionados.includes(index))
+      : catalogoCondicion.items
 
-    // Crear nuevas condiciones desde la plantilla
-    const nuevasCondiciones = itemsAFiltrar.map((item, index) => ({
+    if (itemsAFiltrar.length === 0) {
+      return NextResponse.json(
+        { error: 'No hay items para importar' },
+        { status: 400 }
+      )
+    }
+
+    // Check for existing conditions with same description (for append mode)
+    let filteredItems = itemsAFiltrar
+    if (modo === 'append') {
+      const existingDescriptions = await prisma.cotizacionCondicion.findMany({
+        where: {
+          cotizacionId: id,
+          descripcion: {
+            in: itemsAFiltrar.map(item => item.descripcion)
+          }
+        },
+        select: { descripcion: true }
+      })
+
+      const existingDescSet = new Set(existingDescriptions.map(e => e.descripcion))
+      filteredItems = itemsAFiltrar.filter(item => !existingDescSet.has(item.descripcion))
+
+      if (filteredItems.length === 0) {
+        return NextResponse.json(
+          { error: 'Todos los items ya están importados' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Crear nuevas condiciones desde el catálogo
+    const nuevasCondiciones = filteredItems.map((item, index) => ({
       id: `cot-cond-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       cotizacionId: id,
       descripcion: item.descripcion,
       tipo: item.tipo,
       orden: nextOrden + index,
+      catalogoCondicionItemId: item.id,
       updatedAt: new Date()
     }))
 
@@ -86,7 +124,7 @@ export async function POST(
       data: nuevasCondiciones
     })
 
-    logger.info(`✅ Importadas ${condicionesCreadas.count} condiciones desde plantilla ${plantillaId} a cotización ${id}`)
+    logger.info(`Importadas ${condicionesCreadas.count} condiciones desde catálogo ${catalogoId} a cotización ${id}`)
 
     // Obtener las condiciones creadas para devolver
     const condiciones = await prisma.cotizacionCondicion.findMany({
@@ -97,16 +135,16 @@ export async function POST(
     return NextResponse.json({
       success: true,
       data: condiciones,
-      message: `Se importaron ${condicionesCreadas.count} condiciones desde la plantilla "${plantilla.nombre}"`,
+      message: `Se importaron ${condicionesCreadas.count} condiciones desde "${catalogoCondicion.nombre}"`,
       meta: {
-        plantilla: plantilla.nombre,
+        catalogo: catalogoCondicion.nombre,
         modo,
         importadas: condicionesCreadas.count
       }
     })
 
   } catch (error) {
-    logger.error('❌ Error al importar condiciones desde plantilla:', error)
+    logger.error('Error al importar condiciones desde catálogo:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

@@ -67,13 +67,13 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
     setExclusiones(cotizacion.exclusiones || [])
   }, [cotizacion.exclusiones])
 
-  // Cargar exclusiones disponibles
+  // Cargar exclusiones disponibles desde el catálogo
   const loadExclusionesDisponibles = async () => {
     try {
-      const response = await fetch('/api/plantillas/exclusiones')
+      const response = await fetch('/api/catalogo/exclusiones?activo=true')
       if (response.ok) {
         const data = await response.json()
-        setExclusionesDisponibles(data.data || [])
+        setExclusionesDisponibles(data || [])
       }
     } catch (error) {
       console.error('Error loading exclusiones:', error)
@@ -92,7 +92,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          plantillaId: selectedExclusion,
+          catalogoId: selectedExclusion,
           modo: importMode,
           itemsSeleccionados: selectedItems.length > 0 ? selectedItems : undefined
         })
@@ -134,7 +134,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
     setShowImportDialog(true)
   }
 
-  // Manejar selección de plantilla
+  // Manejar selección de catálogo
   const handleExclusionSelect = (exclusionId: string) => {
     setSelectedExclusion(exclusionId)
     setSelectedItems([])
@@ -309,18 +309,18 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
-                    Importar desde Exclusión
+                    Importar desde Catálogo
                   </DialogTitle>
                   <DialogDescription>
-                    Selecciona una plantilla de exclusión y elige qué items importar.
+                    Selecciona una exclusión del catálogo y elige qué items importar.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="exclusion">Plantilla de Exclusión</Label>
+                    <Label htmlFor="exclusion">Exclusión del Catálogo</Label>
                     <Select value={selectedExclusion} onValueChange={handleExclusionSelect}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una plantilla..." />
+                        <SelectValue placeholder="Selecciona una exclusión..." />
                       </SelectTrigger>
                       <SelectContent>
                         {exclusionesDisponibles.map((exclusion) => (

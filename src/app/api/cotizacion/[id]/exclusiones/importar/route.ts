@@ -1,10 +1,10 @@
 /**
- * 📋 API Importar Exclusiones desde Plantilla
+ * API Importar Exclusiones desde Catálogo
  *
- * Permite importar una plantilla de exclusiones a una cotización específica.
+ * Permite importar exclusiones desde el catálogo a una cotización específica.
  *
  * @author GYS Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -12,7 +12,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { plantillasExclusiones } from '@/lib/temp-plantillas-storage'
 
 export async function POST(
   request: NextRequest,
@@ -25,7 +24,7 @@ export async function POST(
     }
 
     const { id } = await params
-    const { plantillaId, modo = 'replace', itemsSeleccionados } = await request.json()
+    const { catalogoId, modo = 'replace', itemsSeleccionados } = await request.json()
 
     // Validar que la cotización existe
     const cotizacion = await prisma.cotizacion.findUnique({
@@ -40,13 +39,20 @@ export async function POST(
       )
     }
 
-    // Usar las plantillas dinámicas del almacenamiento temporal
-    const plantillas = plantillasExclusiones
+    // Obtener la exclusión del catálogo con sus items
+    const catalogoExclusion = await prisma.catalogoExclusion.findUnique({
+      where: { id: catalogoId },
+      include: {
+        items: {
+          where: { activo: true },
+          orderBy: { orden: 'asc' }
+        }
+      }
+    })
 
-    const plantilla = plantillas.find(p => p.id === plantillaId)
-    if (!plantilla) {
+    if (!catalogoExclusion) {
       return NextResponse.json(
-        { error: 'Plantilla no encontrada' },
+        { error: 'Exclusión no encontrada en el catálogo' },
         { status: 404 }
       )
     }
@@ -69,51 +75,55 @@ export async function POST(
 
     // Filtrar items seleccionados si se especificaron
     const itemsAFiltrar = itemsSeleccionados && Array.isArray(itemsSeleccionados) && itemsSeleccionados.length > 0
-      ? plantilla.items.filter((item, index) => itemsSeleccionados.includes(index))
-      : plantilla.items
+      ? catalogoExclusion.items.filter((_, index) => itemsSeleccionados.includes(index))
+      : catalogoExclusion.items
 
-    // Crear nuevas exclusiones desde la plantilla
-    const nuevasExclusiones = itemsAFiltrar.map((item, index) => ({
-      id: `cot-excl-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-      cotizacionId: id,
-      descripcion: item.descripcion,
-      orden: nextOrden + index,
-      updatedAt: new Date()
-    }))
-
-    if (nuevasExclusiones.length === 0) {
+    if (itemsAFiltrar.length === 0) {
       return NextResponse.json(
         { error: 'No hay items para importar' },
         { status: 400 }
       )
     }
 
-    // Check for existing exclusions with same description
-    const existingDescriptions = await prisma.cotizacionExclusion.findMany({
-      where: {
-        cotizacionId: id,
-        descripcion: {
-          in: nuevasExclusiones.map(e => e.descripcion)
-        }
-      },
-      select: { descripcion: true }
-    })
+    // Check for existing exclusions with same description (for append mode)
+    let filteredItems = itemsAFiltrar
+    if (modo === 'append') {
+      const existingDescriptions = await prisma.cotizacionExclusion.findMany({
+        where: {
+          cotizacionId: id,
+          descripcion: {
+            in: itemsAFiltrar.map(item => item.descripcion)
+          }
+        },
+        select: { descripcion: true }
+      })
 
-    const existingDescSet = new Set(existingDescriptions.map(e => e.descripcion))
-    const filteredExclusiones = nuevasExclusiones.filter(e => !existingDescSet.has(e.descripcion))
+      const existingDescSet = new Set(existingDescriptions.map(e => e.descripcion))
+      filteredItems = itemsAFiltrar.filter(item => !existingDescSet.has(item.descripcion))
 
-    if (filteredExclusiones.length === 0) {
-      return NextResponse.json(
-        { error: 'Todos los items ya están importados' },
-        { status: 400 }
-      )
+      if (filteredItems.length === 0) {
+        return NextResponse.json(
+          { error: 'Todos los items ya están importados' },
+          { status: 400 }
+        )
+      }
     }
 
+    // Crear nuevas exclusiones desde el catálogo
+    const nuevasExclusiones = filteredItems.map((item, index) => ({
+      id: `cot-excl-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+      cotizacionId: id,
+      descripcion: item.descripcion,
+      orden: nextOrden + index,
+      catalogoExclusionItemId: item.id,
+      updatedAt: new Date()
+    }))
+
     const exclusionesCreadas = await prisma.cotizacionExclusion.createMany({
-      data: filteredExclusiones
+      data: nuevasExclusiones
     })
 
-    logger.info(`✅ Importadas ${exclusionesCreadas.count} exclusiones desde plantilla ${plantillaId} a cotización ${id}`)
+    logger.info(`Importadas ${exclusionesCreadas.count} exclusiones desde catálogo ${catalogoId} a cotización ${id}`)
 
     // Obtener las exclusiones creadas para devolver
     const exclusiones = await prisma.cotizacionExclusion.findMany({
@@ -124,16 +134,16 @@ export async function POST(
     return NextResponse.json({
       success: true,
       data: exclusiones,
-      message: `Se importaron ${exclusionesCreadas.count} exclusiones desde la plantilla "${plantilla.nombre}"`,
+      message: `Se importaron ${exclusionesCreadas.count} exclusiones desde "${catalogoExclusion.nombre}"`,
       meta: {
-        plantilla: plantilla.nombre,
+        catalogo: catalogoExclusion.nombre,
         modo,
         importadas: exclusionesCreadas.count
       }
     })
 
   } catch (error) {
-    logger.error('❌ Error al importar exclusiones desde plantilla:', error)
+    logger.error('Error al importar exclusiones desde catálogo:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
