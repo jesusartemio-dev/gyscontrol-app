@@ -739,40 +739,43 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         <div className="flex items-center gap-2 flex-wrap">
           {timelineData?.resumen && (
             <>
-              <Badge variant="outline" className="h-7 gap-1.5 px-2.5">
-                <Calendar className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1.5 h-7 px-2.5 text-sm border rounded-md bg-background">
+                <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="font-semibold">{timelineData.resumen.totalItems}</span>
-                <span className="text-muted-foreground">items</span>
-              </Badge>
-              <Badge variant="outline" className="h-7 gap-1.5 px-2.5 text-emerald-700 border-emerald-300 bg-emerald-50">
+                <span className="text-muted-foreground text-xs">items</span>
+              </div>
+
+              <div className="flex items-center gap-1 h-7 px-2.5 text-sm border rounded-md bg-emerald-50 border-emerald-200 text-emerald-700">
                 <span className="font-semibold">$ {(timelineData.resumen.montoTotal || 0).toLocaleString()}</span>
-              </Badge>
+              </div>
+
               {timelineData.resumen.itemsVencidos > 0 && (
-                <Badge variant="destructive" className="h-7 gap-1.5 px-2.5">
+                <div className="flex items-center gap-1.5 h-7 px-2.5 text-sm rounded-md bg-red-500 text-white">
                   <AlertCircle className="w-3.5 h-3.5" />
-                  <span className="font-semibold">{timelineData.resumen.itemsVencidos}</span> vencidos
-                </Badge>
+                  <span className="font-semibold">{timelineData.resumen.itemsVencidos}</span>
+                  <span className="text-xs">vencidos</span>
+                </div>
               )}
+
               {timelineData.resumen.itemsEnRiesgo > 0 && (
-                <Badge className="h-7 gap-1.5 px-2.5 bg-orange-100 text-orange-700 hover:bg-orange-100">
+                <div className="flex items-center gap-1.5 h-7 px-2.5 text-sm rounded-md bg-orange-100 text-orange-700 border border-orange-200">
                   <AlertCircle className="w-3.5 h-3.5" />
-                  <span className="font-semibold">{timelineData.resumen.itemsEnRiesgo}</span> en riesgo
-                </Badge>
+                  <span className="font-semibold">{timelineData.resumen.itemsEnRiesgo}</span>
+                  <span className="text-xs">en riesgo</span>
+                </div>
               )}
+
               {/* Coherence inline */}
               {showCoherencePanel && (
-                <Badge
-                  variant="outline"
-                  className={`h-7 gap-1.5 px-2.5 ${
-                    (validacionData?.estadisticas?.coherenciaPromedio || 100) >= 80
-                      ? 'text-green-700 border-green-300 bg-green-50'
-                      : 'text-red-700 border-red-300 bg-red-50'
-                  }`}
-                >
+                <div className={`flex items-center gap-1.5 h-7 px-2.5 text-sm rounded-md border ${
+                  (validacionData?.estadisticas?.coherenciaPromedio || 100) >= 80
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-red-50 border-red-200 text-red-700'
+                }`}>
                   <BarChart3 className="w-3.5 h-3.5" />
                   <span className="font-semibold">{validacionData?.estadisticas?.coherenciaPromedio || 100}%</span>
-                  <span className="text-muted-foreground hidden sm:inline">coherencia</span>
-                </Badge>
+                  <span className="text-xs hidden sm:inline">coherencia</span>
+                </div>
               )}
             </>
           )}
