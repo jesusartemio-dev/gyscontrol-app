@@ -19,6 +19,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -49,14 +50,11 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
-  Filter,
   Eye,
   Edit,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
   Package,
   ShoppingCart,
+  ExternalLink,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -400,76 +398,95 @@ export const ListView: React.FC<ListViewProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedData.map((item) => (
-                <TableRow key={item.id} className="hover:bg-muted/50">
-                  <TableCell className="font-mono text-sm">
-                    {item.label}
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="font-medium">{item.titulo}</div>
-                      {item.descripcion && (
-                        <div className="text-sm text-muted-foreground">
-                          {item.descripcion}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getTypeIcon(item.tipo)}
-                      <span className="capitalize">{item.tipo}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {formatDate(item.fechaInicio)}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {formatDate(item.fechaFin)}
-                  </TableCell>
-                  <TableCell className="text-sm font-medium">
-                    {formatCurrency(item.amount)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusBadgeVariant(item.estado)}>
-                      {item.estado}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 bg-muted rounded-full h-2">
-                        <div
-                          className="bg-primary h-2 rounded-full transition-all"
-                          style={{ width: `${(item.progreso || 0)}%` }}
-                        />
-                      </div>
-                      <span className="text-sm text-muted-foreground">
-                        {item.progreso || 0}%
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onItemClick?.(item)}
+              {paginatedData.map((item) => {
+                // Build link to entity detail page
+                const detailUrl = item.tipo === 'lista'
+                  ? `/finanzas/aprovisionamiento/listas/${item.id}`
+                  : `/finanzas/aprovisionamiento/pedidos/${item.id}`;
+
+                return (
+                  <TableRow
+                    key={item.id}
+                    className="hover:bg-muted/50 cursor-pointer group"
+                    onClick={() => onItemClick?.(item)}
+                  >
+                    <TableCell className="font-mono text-sm">
+                      <Link
+                        href={detailUrl}
+                        className="text-primary hover:underline flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      {onItemEdit && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onItemEdit(item)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        {item.codigo || item.label}
+                        <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="font-medium">{item.titulo}</div>
+                        {item.descripcion && (
+                          <div className="text-sm text-muted-foreground">
+                            {item.descripcion}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getTypeIcon(item.tipo)}
+                        <span className="capitalize">{item.tipo}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {formatDate(item.fechaInicio)}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {formatDate(item.fechaFin)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {formatCurrency(item.amount)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusBadgeVariant(item.estado)}>
+                        {item.estado}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 bg-muted rounded-full h-2">
+                          <div
+                            className="bg-primary h-2 rounded-full transition-all"
+                            style={{ width: `${(item.progreso || 0)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {item.progreso || 0}%
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Link href={detailUrl} onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="sm">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        {onItemEdit && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onItemEdit(item);
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

@@ -18,6 +18,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -456,6 +457,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   showCoherencePanel = true,
   defaultFilters = {},
 }) => {
+  // Router for navigation
+  const router = useRouter();
+
   // State
   const [filtros, setFiltros] = useState<FiltrosTimeline>({
     tipoVista: 'gantt',
@@ -508,53 +512,148 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     filtros.validarCoherencia
   ]);
 
-  // 🔁 Run coherence validation
+  // 🔁 Run coherence validation using real API
   const runCoherenceValidation = useCallback(async () => {
     try {
       setValidating(true);
-      // TODO: Implement coherence validation using aprovisionamiento services
-      // For now, create a mock validation result
+
+      // Call the real coherence validation API
+      const params = new URLSearchParams();
+      if (filtros.proyectoIds && filtros.proyectoIds.length > 0) {
+        params.set('proyectoIds', filtros.proyectoIds.join(','));
+      }
+
+      const response = await fetch('/api/aprovisionamiento/timeline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          proyectoIds: filtros.proyectoIds,
+          recalcularFechas: false,
+          aplicarSugerencias: false,
+          configuracion: {
+            margenDias: filtros.margenDias || 7,
+            alertaAnticipacion: filtros.alertaAnticipacion || 14
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al validar coherencia');
+      }
+
+      const result = await response.json();
+
+      // Map API response to ValidacionCoherencia format
+      const validaciones = result.data?.validaciones || {};
+      const estadisticas = validaciones.estadisticas || {};
+
       const validacion: ValidacionCoherencia = {
-        listaId: 'mock-lista-id',
-        listaCodigo: 'MOCK-001',
+        listaId: 'all',
+        listaCodigo: 'CONSOLIDADO',
         montoLista: 0,
         montoPedidos: 0,
         diferencia: 0,
         porcentajeDesviacion: 0,
-        estado: 'ok',
-        mensaje: 'Validación de coherencia completada',
+        estado: validaciones.errores?.length > 0 ? 'critica' : 'ok',
+        mensaje: result.message || 'Validación completada',
         pedidosAsociados: [],
-        esCoherente: true,
+        esCoherente: (validaciones.errores?.length || 0) === 0,
+        alertas: [
+          ...(validaciones.errores || []).map((e: any) => ({
+            tipo: 'error' as const,
+            titulo: e.tipo,
+            mensaje: e.mensaje,
+            prioridad: 'alta' as const
+          })),
+          ...(validaciones.advertencias || []).map((a: any) => ({
+            tipo: 'warning' as const,
+            titulo: a.tipo,
+            mensaje: a.mensaje,
+            prioridad: 'media' as const
+          }))
+        ],
+        sugerencias: (result.data?.sugerenciasRecalculo || []).map((s: any) => ({
+          tipo: s.tipo,
+          titulo: s.descripcion,
+          descripcion: s.accion,
+          impacto: s.impacto,
+          acciones: []
+        })),
+        estadisticas: {
+          totalListas: estadisticas.listasAnalizadas || 0,
+          totalPedidos: estadisticas.pedidosAnalizados || 0,
+          coherenciaPromedio: estadisticas.conflictosEncontrados > 0
+            ? Math.max(0, 100 - (estadisticas.conflictosEncontrados * 10))
+            : 100,
+          totalValidaciones: estadisticas.proyectosAnalizados || 1,
+          erroresEncontrados: validaciones.errores?.length || 0,
+          advertenciasEncontradas: validaciones.advertencias?.length || 0
+        }
+      };
+
+      setValidacionData(validacion);
+
+      const errores = validaciones.errores?.length || 0;
+      const advertencias = validaciones.advertencias?.length || 0;
+
+      if (errores > 0) {
+        toast.warning(`Validación completada: ${errores} errores, ${advertencias} advertencias`);
+      } else if (advertencias > 0) {
+        toast.info(`Validación completada: ${advertencias} advertencias`);
+      } else {
+        toast.success('Validación completada sin problemas');
+      }
+    } catch (error) {
+      console.error('Error validating coherence:', error);
+      toast.error('Error al validar coherencia');
+
+      // Set error state
+      setValidacionData({
+        listaId: 'error',
+        listaCodigo: 'ERROR',
+        montoLista: 0,
+        montoPedidos: 0,
+        diferencia: 0,
+        porcentajeDesviacion: 0,
+        estado: 'critica',
+        mensaje: 'Error al ejecutar validación',
+        pedidosAsociados: [],
+        esCoherente: false,
         alertas: [],
         sugerencias: [],
         estadisticas: {
           totalListas: 0,
           totalPedidos: 0,
-          coherenciaPromedio: 100,
-          totalValidaciones: 1,
+          coherenciaPromedio: 0,
+          totalValidaciones: 0,
           erroresEncontrados: 0,
           advertenciasEncontradas: 0
         }
-      };
-      setValidacionData(validacion);
-      toast.success('Validación de coherencia completada');
-    } catch (error) {
-      console.error('Error validating coherence:', error);
-      toast.error('Error al validar coherencia');
+      });
     } finally {
       setValidating(false);
     }
-  }, []); // ✅ Removed filtros dependency to prevent infinite loop
+  }, [filtros.proyectoIds, filtros.margenDias, filtros.alertaAnticipacion]);
 
   // 🔁 Handle filter changes
   const handleFiltrosChange = useCallback((newFiltros: FiltrosTimeline) => {
     setFiltros(newFiltros);
   }, []);
 
-  // 🔁 Handle item click
+  // 🔁 Handle item click - navigate to detail page
   const handleItemClick = useCallback((item: GanttItem) => {
-    setSelectedItem(item);
-  }, []);
+    // Navigate to the appropriate detail page based on item type
+    if (item.tipo === 'lista') {
+      router.push(`/finanzas/aprovisionamiento/listas/${item.id}`);
+    } else if (item.tipo === 'pedido') {
+      router.push(`/finanzas/aprovisionamiento/pedidos/${item.id}`);
+    } else {
+      // Fallback: show item details in dialog
+      setSelectedItem(item);
+    }
+  }, [router]);
 
   // 🔁 Handle item update (for GanttChart with dates)
   const handleItemUpdate = useCallback(async (item: GanttItem, newDates: { inicio: string; fin: string }) => {
