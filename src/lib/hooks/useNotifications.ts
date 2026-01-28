@@ -31,7 +31,9 @@ interface UseNotificationsReturn {
 
 // 🎯 Constantes para evitar re-renders
 const DEFAULT_COUNTS: NotificationCounts = {
-  'ordenes-pendientes': 0,
+  'cotizaciones-pendientes': 0,
+  'proyectos-activos': 0,
+  'pedidos-pendientes': 0,
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -112,7 +114,7 @@ export function useNotifications(): UseNotificationsReturn {
     }
   }, [preferences.soundEnabled])
 
-  // ✅ Función para obtener contadores desde las APIs
+  // ✅ Función para obtener contadores desde la API
   const refreshCounts = useCallback(async () => {
     if (!session?.user || !preferences.enabled) return
 
@@ -120,18 +122,20 @@ export function useNotifications(): UseNotificationsReturn {
       setLoading(true)
       setError(null)
 
-      // 🔄 Sistema de notificaciones actualizado post-eliminación de aprovisionamiento
-      // Solo mantenemos notificaciones de órdenes pendientes del sistema actual
-      // Las APIs de aprovisionamiento (órdenes de compra, recepciones, pagos) fueron eliminadas
-      
-      // TODO: Implementar notificaciones para el sistema actual (cotizaciones, proyectos, etc.)
-      // Por ahora, mantenemos la estructura pero sin llamadas a APIs eliminadas
-      
-      const role = session?.user?.role
-      
-      // 🔁 Actualizar contadores - estructura simplificada
+      // Llamar a la API de notificaciones
+      const response = await fetch('/api/notifications/counts')
+
+      if (!response.ok) {
+        throw new Error('Error al obtener notificaciones')
+      }
+
+      const data = await response.json()
+
+      // Actualizar contadores con datos reales de la API
       const newCounts: NotificationCounts = {
-        'ordenes-pendientes': 0, // Placeholder para futuras implementaciones
+        'cotizaciones-pendientes': data['cotizaciones-pendientes'] || 0,
+        'proyectos-activos': data['proyectos-activos'] || 0,
+        'pedidos-pendientes': data['pedidos-pendientes'] || 0,
       }
 
       setCounts(newCounts)
@@ -141,7 +145,7 @@ export function useNotifications(): UseNotificationsReturn {
     } finally {
       setLoading(false)
     }
-  }, [session?.user?.id, session?.user?.role, preferences.enabled])
+  }, [session?.user?.id, preferences.enabled])
 
   // 🔁 Efecto para carga inicial - optimizado para evitar bucles infinitos
   useEffect(() => {

@@ -29,8 +29,10 @@ export type RolUsuario =
   | 'admin'
 
 // ✅ Tipos para el sistema de notificaciones del sidebar
-export type NotificationBadgeType = 
-  | 'ordenes-pendientes'
+export type NotificationBadgeType =
+  | 'cotizaciones-pendientes'
+  | 'proyectos-activos'
+  | 'pedidos-pendientes'
   
 
 // ✅ Tipo para enlaces del sidebar con notificaciones

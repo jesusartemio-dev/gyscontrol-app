@@ -194,22 +194,25 @@ export default function NotificationSettings({ className }: NotificationSettings
         <div className="bg-muted/50 rounded-lg p-4 space-y-2">
           <h4 className="text-sm font-medium flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            Tipos de notificaciones
+            Tipos de notificaciones activas
           </h4>
           <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
             <div className="flex items-center justify-between">
-              <span>• Cotizaciones pendientes</span>
+              <span>• Cotizaciones pendientes (borrador/enviada)</span>
               <Badge variant="secondary">Comercial</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span>• Proyectos en progreso</span>
+              <span>• Proyectos activos (en ejecución)</span>
               <Badge variant="secondary">Proyectos</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span>• Pedidos de equipos</span>
+              <span>• Pedidos pendientes (borrador/enviado)</span>
               <Badge variant="secondary">Logística</Badge>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-3 pt-2 border-t">
+            Los contadores aparecen como badges en el menú lateral junto a cada enlace.
+          </p>
         </div>
 
         {/* 💾 Botones de acción */}

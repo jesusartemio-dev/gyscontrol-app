@@ -133,7 +133,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'comercial', 'presupuestos'],
       links: [
         { href: '/comercial/plantillas', label: 'Plantillas', icon: FileText },
-        { href: '/comercial/cotizaciones', label: 'Cotizaciones', icon: Calculator },
+        { href: '/comercial/cotizaciones', label: 'Cotizaciones', icon: Calculator, badge: 'cotizaciones-pendientes' as NotificationBadgeType },
       ],
     },
     // 1.1. CRM - Gestión de Relaciones con Clientes
@@ -159,10 +159,10 @@ export default function Sidebar() {
       color: 'text-purple-400',
       roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor'],
       links: [
-        { href: '/proyectos', label: 'Ver Proyectos', icon: FolderOpen },
+        { href: '/proyectos', label: 'Ver Proyectos', icon: FolderOpen, badge: 'proyectos-activos' as NotificationBadgeType },
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
-        { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart },
+        { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart, badge: 'pedidos-pendientes' as NotificationBadgeType },
       ],
     },
     // 2.1. Mi Trabajo - Registro personal de horas y tareas (para todos)
@@ -201,7 +201,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'logistico'],
       links: [
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText },
-        { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package },
+        { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
       ],
