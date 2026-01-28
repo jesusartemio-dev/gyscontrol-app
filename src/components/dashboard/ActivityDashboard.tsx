@@ -1,13 +1,16 @@
 // ===================================================
 // 🎯 DASHBOARD DE ACTIVIDAD DEL SISTEMA
 // ===================================================
-// Componente que muestra la actividad reciente de todo el sistema
+// Componente que muestra la actividad reciente con filtros,
+// paginación, búsqueda y exportación
 // ===================================================
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
+import * as XLSX from 'xlsx'
 import {
   Activity,
   Users,
@@ -16,28 +19,50 @@ import {
   Building2,
   TrendingUp,
   Clock,
-  User,
   Calendar,
-  Filter,
-  RefreshCw
+  RefreshCw,
+  Search,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  X,
+  Filter
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { AuditLog } from '@/types/modelos'
 import { formatDistanceToNow, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 interface ActivityDashboardProps {
   limite?: number
   autoRefresh?: boolean
-  intervaloRefresh?: number // en minutos
+  intervaloRefresh?: number
   mostrarFiltros?: boolean
 }
 
+interface FiltrosDisponibles {
+  usuarios: Array<{ id: string; name: string | null }>
+  entidades: string[]
+  acciones: string[]
+}
+
+interface MetaPaginacion {
+  pagina: number
+  limite: number
+  total: number
+  totalPaginas: number
+}
+
 // ===================================================
-// 🎨 ICONOS POR TIPO DE ENTIDAD
+// 🎨 ICONOS Y ESTILOS POR TIPO DE ENTIDAD
 // ===================================================
 
 const getEntityIcon = (entidadTipo: string) => {
@@ -75,41 +100,52 @@ const getEntityColor = (entidadTipo: string) => {
 }
 
 const getEntityLabel = (entidadTipo: string) => {
+  const labels: Record<string, string> = {
+    'LISTA_EQUIPO': 'Lista de Equipo',
+    'PEDIDO_EQUIPO': 'Pedido de Equipo',
+    'PROYECTO': 'Proyecto',
+    'COTIZACION': 'Cotización',
+    'OPORTUNIDAD': 'Oportunidad',
+    'LISTA_EQUIPO_ITEM': 'Ítem de Lista'
+  }
+  return labels[entidadTipo] || entidadTipo.replace(/_/g, ' ')
+}
+
+const getEntityLink = (entidadTipo: string, entidadId: string): string | null => {
   switch (entidadTipo) {
-    case 'LISTA_EQUIPO':
-      return 'Lista de Equipo'
-    case 'PEDIDO_EQUIPO':
-      return 'Pedido de Equipo'
     case 'PROYECTO':
-      return 'Proyecto'
+      return `/proyectos/${entidadId}`
     case 'COTIZACION':
-      return 'Cotización'
+      return `/comercial/cotizaciones/${entidadId}`
     case 'OPORTUNIDAD':
-      return 'Oportunidad'
-    case 'LISTA_EQUIPO_ITEM':
-      return 'Ítem de Lista'
+      return `/crm/oportunidades/${entidadId}`
+    case 'LISTA_EQUIPO':
+      return `/proyectos/listas/${entidadId}`
+    case 'PEDIDO_EQUIPO':
+      return `/proyectos/pedidos/${entidadId}`
     default:
-      return entidadTipo.replace('_', ' ')
+      return null
   }
 }
 
-// ===================================================
-// 🎨 ICONOS POR TIPO DE ACCIÓN
-// ===================================================
-
 const getActionIcon = (accion: string) => {
-  switch (accion) {
-    case 'CREAR':
-      return <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-    case 'ACTUALIZAR':
-      return <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-    case 'ELIMINAR':
-      return <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-    case 'CAMBIAR_ESTADO':
-      return <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-    default:
-      return <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+  const colors: Record<string, string> = {
+    'CREAR': 'bg-green-500',
+    'ACTUALIZAR': 'bg-blue-500',
+    'ELIMINAR': 'bg-red-500',
+    'CAMBIAR_ESTADO': 'bg-purple-500'
   }
+  return <div className={`w-2 h-2 ${colors[accion] || 'bg-gray-500'} rounded-full`}></div>
+}
+
+const getActionLabel = (accion: string) => {
+  const labels: Record<string, string> = {
+    'CREAR': 'Crear',
+    'ACTUALIZAR': 'Actualizar',
+    'ELIMINAR': 'Eliminar',
+    'CAMBIAR_ESTADO': 'Cambio de Estado'
+  }
+  return labels[accion] || accion
 }
 
 // ===================================================
@@ -118,14 +154,12 @@ const getActionIcon = (accion: string) => {
 
 const formatDate = (dateInput: string | Date) => {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
-  return format(date, 'dd/MM/yyyy HH:mm')
+  return format(date, 'dd/MM/yyyy HH:mm', { locale: es })
 }
 
 const formatRelativeTime = (dateInput: string | Date) => {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
-  return formatDistanceToNow(date, {
-    addSuffix: true
-  })
+  return formatDistanceToNow(date, { addSuffix: true, locale: es })
 }
 
 // ===================================================
@@ -133,40 +167,70 @@ const formatRelativeTime = (dateInput: string | Date) => {
 // ===================================================
 
 export default function ActivityDashboard({
-  limite = 50,
+  limite = 20,
   autoRefresh = false,
   intervaloRefresh = 5,
   mostrarFiltros = true
 }: ActivityDashboardProps) {
+  // Estado principal
   const [actividad, setActividad] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filtroUsuario, setFiltroUsuario] = useState<string>('')
-  const [filtroEntidad, setFiltroEntidad] = useState<string>('')
   const [refreshing, setRefreshing] = useState(false)
+
+  // Estado de filtros
+  const [filtroUsuario, setFiltroUsuario] = useState<string>('all')
+  const [filtroEntidad, setFiltroEntidad] = useState<string>('all')
+  const [filtroAccion, setFiltroAccion] = useState<string>('all')
+  const [busqueda, setBusqueda] = useState<string>('')
+  const [fechaDesde, setFechaDesde] = useState<string>('')
+  const [fechaHasta, setFechaHasta] = useState<string>('')
+
+  // Estado de paginación
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [meta, setMeta] = useState<MetaPaginacion>({
+    pagina: 1,
+    limite: limite,
+    total: 0,
+    totalPaginas: 0
+  })
+
+  // Filtros disponibles desde la API
+  const [filtrosDisponibles, setFiltrosDisponibles] = useState<FiltrosDisponibles>({
+    usuarios: [],
+    entidades: [],
+    acciones: []
+  })
+
+  // Estado de configuración
+  const [intervaloActual, setIntervaloActual] = useState(intervaloRefresh)
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(autoRefresh)
 
   // ===================================================
   // 📡 CARGA DE DATOS
   // ===================================================
 
-  const cargarActividad = async (showLoading = true) => {
+  const cargarActividad = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true)
       else setRefreshing(true)
       setError(null)
 
-      // Llamar a la API en lugar del servicio directo
       const params = new URLSearchParams({
         limite: limite.toString(),
-        ...(filtroUsuario && { usuarioId: filtroUsuario })
+        pagina: paginaActual.toString()
       })
+
+      if (filtroUsuario && filtroUsuario !== 'all') params.set('usuarioId', filtroUsuario)
+      if (filtroEntidad && filtroEntidad !== 'all') params.set('entidadTipo', filtroEntidad)
+      if (filtroAccion && filtroAccion !== 'all') params.set('accion', filtroAccion)
+      if (busqueda) params.set('busqueda', busqueda)
+      if (fechaDesde) params.set('fechaDesde', fechaDesde)
+      if (fechaHasta) params.set('fechaHasta', fechaHasta)
 
       const response = await fetch(`/api/audit/actividad-reciente?${params}`, {
         method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        credentials: 'include'
       })
 
       if (!response.ok) {
@@ -175,6 +239,8 @@ export default function ActivityDashboard({
 
       const result = await response.json()
       setActividad(result.data || [])
+      setMeta(result.meta || { pagina: 1, limite, total: 0, totalPaginas: 0 })
+      setFiltrosDisponibles(result.filtros || { usuarios: [], entidades: [], acciones: [] })
     } catch (err) {
       console.error('Error al cargar actividad:', err)
       setError('Error al cargar la actividad del sistema')
@@ -182,42 +248,60 @@ export default function ActivityDashboard({
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [limite, paginaActual, filtroUsuario, filtroEntidad, filtroAccion, busqueda, fechaDesde, fechaHasta])
 
+  // Cargar datos inicial y cuando cambian los filtros
   useEffect(() => {
     cargarActividad()
-  }, [limite])
-
-  // Recargar cuando cambie el filtro de usuario
-  useEffect(() => {
-    cargarActividad(false)
-  }, [filtroUsuario])
+  }, [cargarActividad])
 
   // Auto-refresh
   useEffect(() => {
-    if (!autoRefresh) return
+    if (!autoRefreshEnabled) return
 
     const interval = setInterval(() => {
       cargarActividad(false)
-    }, intervaloRefresh * 60 * 1000) // Convertir minutos a milisegundos
+    }, intervaloActual * 60 * 1000)
 
     return () => clearInterval(interval)
-  }, [autoRefresh, intervaloRefresh])
+  }, [autoRefreshEnabled, intervaloActual, cargarActividad])
 
   // ===================================================
   // 🎮 HANDLERS
   // ===================================================
 
-  const handleRefresh = () => {
-    cargarActividad(false)
+  const handleRefresh = () => cargarActividad(false)
+
+  const handleLimpiarFiltros = () => {
+    setFiltroUsuario('all')
+    setFiltroEntidad('all')
+    setFiltroAccion('all')
+    setBusqueda('')
+    setFechaDesde('')
+    setFechaHasta('')
+    setPaginaActual(1)
   }
 
-  const handleFiltroChange = (tipo: 'usuario' | 'entidad', valor: string) => {
-    if (tipo === 'usuario') {
-      setFiltroUsuario(valor)
-    } else {
-      setFiltroEntidad(valor)
-    }
+  const handleBuscar = (e: React.FormEvent) => {
+    e.preventDefault()
+    setPaginaActual(1)
+    cargarActividad()
+  }
+
+  const handleExportar = () => {
+    const data = actividad.map(evento => ({
+      'Fecha': formatDate(evento.createdAt),
+      'Usuario': evento.usuario?.name || 'Desconocido',
+      'Acción': getActionLabel(evento.accion),
+      'Entidad': getEntityLabel(evento.entidadTipo),
+      'ID Entidad': evento.entidadId,
+      'Descripción': evento.descripcion
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(data)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Actividad')
+    XLSX.writeFile(workbook, `actividad_sistema_${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
   }
 
   // ===================================================
@@ -225,23 +309,20 @@ export default function ActivityDashboard({
   // ===================================================
 
   const estadisticas = actividad.reduce((acc, item) => {
-    // Por entidad
     acc.entidades[item.entidadTipo] = (acc.entidades[item.entidadTipo] || 0) + 1
-
-    // Por acción
     acc.acciones[item.accion] = (acc.acciones[item.accion] || 0) + 1
-
-    // Por usuario
     if (item.usuario?.name) {
       acc.usuarios[item.usuario.name] = (acc.usuarios[item.usuario.name] || 0) + 1
     }
-
     return acc
   }, {
     entidades: {} as Record<string, number>,
     acciones: {} as Record<string, number>,
     usuarios: {} as Record<string, number>
   })
+
+  const hayFiltrosActivos = filtroUsuario !== 'all' || filtroEntidad !== 'all' ||
+    filtroAccion !== 'all' || busqueda || fechaDesde || fechaHasta
 
   // ===================================================
   // 🎨 RENDERIZADO
@@ -273,74 +354,115 @@ export default function ActivityDashboard({
     )
   }
 
-  // Filtrar actividad por entidad si hay filtro
-  const actividadFiltrada = filtroEntidad
-    ? actividad.filter(item => item.entidadTipo === filtroEntidad)
-    : actividad
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header con controles */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-2">
           <Activity className="w-6 h-6 text-primary" />
           <div>
             <h2 className="text-2xl font-bold">Actividad del Sistema</h2>
-            <p className="text-muted-foreground">
-              Historial reciente de acciones en la plataforma
+            <p className="text-muted-foreground text-sm">
+              {meta.total} eventos registrados
             </p>
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={refreshing}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Auto-refresh toggle */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Clock className="w-4 h-4 mr-2" />
+                {autoRefreshEnabled ? `Auto (${intervaloActual}m)` : 'Manual'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Auto-refresh</Label>
+                  <Button
+                    variant={autoRefreshEnabled ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                  >
+                    {autoRefreshEnabled ? 'Activado' : 'Desactivado'}
+                  </Button>
+                </div>
+                {autoRefreshEnabled && (
+                  <div className="space-y-2">
+                    <Label>Intervalo (minutos)</Label>
+                    <Select
+                      value={intervaloActual.toString()}
+                      onValueChange={(v) => setIntervaloActual(parseInt(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 minuto</SelectItem>
+                        <SelectItem value="2">2 minutos</SelectItem>
+                        <SelectItem value="5">5 minutos</SelectItem>
+                        <SelectItem value="10">10 minutos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Button variant="outline" size="sm" onClick={handleExportar}>
+            <Download className="w-4 h-4 mr-2" />
+            Exportar
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
       {/* Estadísticas rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Eventos</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{actividadFiltrada.length}</div>
+            <div className="text-2xl font-bold">{meta.total}</div>
             <p className="text-xs text-muted-foreground">
-              En las últimas horas
+              Página {meta.pagina} de {meta.totalPaginas}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entidades Activas</CardTitle>
+            <CardTitle className="text-sm font-medium">Entidades</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{Object.keys(estadisticas.entidades).length}</div>
-            <p className="text-xs text-muted-foreground">
-              Tipos diferentes
-            </p>
+            <p className="text-xs text-muted-foreground">Tipos diferentes</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuarios Activos</CardTitle>
+            <CardTitle className="text-sm font-medium">Usuarios</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{Object.keys(estadisticas.usuarios).length}</div>
-            <p className="text-xs text-muted-foreground">
-              Han realizado acciones
-            </p>
+            <p className="text-xs text-muted-foreground">Han realizado acciones</p>
           </CardContent>
         </Card>
 
@@ -351,24 +473,124 @@ export default function ActivityDashboard({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{Object.keys(estadisticas.acciones).length}</div>
-            <p className="text-xs text-muted-foreground">
-              Tipos de operaciones
-            </p>
+            <p className="text-xs text-muted-foreground">Tipos de operaciones</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filtros - Temporalmente deshabilitados para evitar errores de SelectItem */}
+      {/* Filtros */}
       {mostrarFiltros && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Filtros</CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Filter className="w-5 h-5" />
+                Filtros
+              </CardTitle>
+              {hayFiltrosActivos && (
+                <Button variant="ghost" size="sm" onClick={handleLimpiarFiltros}>
+                  <X className="w-4 h-4 mr-1" />
+                  Limpiar
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground">
-              Los filtros avanzados estarán disponibles próximamente.
-              Por ahora se muestra toda la actividad del sistema.
-            </div>
+            <form onSubmit={handleBuscar} className="space-y-4">
+              {/* Búsqueda */}
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar en descripción..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Button type="submit">Buscar</Button>
+              </div>
+
+              {/* Selectores de filtro */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Usuario</Label>
+                  <Select value={filtroUsuario} onValueChange={(v) => { setFiltroUsuario(v); setPaginaActual(1) }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos los usuarios" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los usuarios</SelectItem>
+                      {filtrosDisponibles.usuarios.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name || 'Sin nombre'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Entidad</Label>
+                  <Select value={filtroEntidad} onValueChange={(v) => { setFiltroEntidad(v); setPaginaActual(1) }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas las entidades" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las entidades</SelectItem>
+                      {filtrosDisponibles.entidades.map((e) => (
+                        <SelectItem key={e} value={e}>
+                          {getEntityLabel(e)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Acción</Label>
+                  <Select value={filtroAccion} onValueChange={(v) => { setFiltroAccion(v); setPaginaActual(1) }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas las acciones" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las acciones</SelectItem>
+                      {filtrosDisponibles.acciones.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          {getActionLabel(a)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Rango de fechas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Desde
+                  </Label>
+                  <Input
+                    type="date"
+                    value={fechaDesde}
+                    onChange={(e) => { setFechaDesde(e.target.value); setPaginaActual(1) }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Hasta
+                  </Label>
+                  <Input
+                    type="date"
+                    value={fechaHasta}
+                    onChange={(e) => { setFechaHasta(e.target.value); setPaginaActual(1) }}
+                  />
+                </div>
+              </div>
+            </form>
           </CardContent>
         </Card>
       )}
@@ -378,74 +600,148 @@ export default function ActivityDashboard({
         <CardHeader>
           <CardTitle>Actividad Reciente</CardTitle>
           <CardDescription>
-            {actividadFiltrada.length} eventos registrados
+            Mostrando {actividad.length} de {meta.total} eventos
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {actividadFiltrada.length === 0 ? (
+            {actividad.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No hay actividad registrada</p>
+                {hayFiltrosActivos && (
+                  <Button variant="link" onClick={handleLimpiarFiltros} className="mt-2">
+                    Limpiar filtros
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
-                {actividadFiltrada.map((evento, index) => (
-                  <motion.div
-                    key={evento.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="flex items-start space-x-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    {/* Indicador de acción */}
-                    <div className="flex-shrink-0 mt-1">
-                      {getActionIcon(evento.accion)}
-                    </div>
+                {actividad.map((evento, index) => {
+                  const entityLink = getEntityLink(evento.entidadTipo, evento.entidadId)
 
-                    {/* Icono de entidad */}
-                    <div className="flex-shrink-0">
-                      {getEntityIcon(evento.entidadTipo)}
-                    </div>
+                  return (
+                    <motion.div
+                      key={evento.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="flex items-start space-x-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      {/* Indicador de acción */}
+                      <div className="flex-shrink-0 mt-1">
+                        {getActionIcon(evento.accion)}
+                      </div>
 
-                    {/* Contenido */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${getEntityColor(evento.entidadTipo)}`}
-                          >
-                            {getEntityLabel(evento.entidadTipo)}
-                          </Badge>
-                          <span className="text-sm font-medium">{evento.descripcion}</span>
+                      {/* Icono de entidad */}
+                      <div className="flex-shrink-0">
+                        {getEntityIcon(evento.entidadTipo)}
+                      </div>
+
+                      {/* Contenido */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${getEntityColor(evento.entidadTipo)}`}
+                            >
+                              {getEntityLabel(evento.entidadTipo)}
+                            </Badge>
+                            <span className="text-sm font-medium">{evento.descripcion}</span>
+
+                            {/* Link a la entidad */}
+                            {entityLink && (
+                              <Link href={entityLink} className="text-primary hover:underline">
+                                <ExternalLink className="w-3 h-3" />
+                              </Link>
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            <span title={formatDate(evento.createdAt)}>
+                              {formatRelativeTime(evento.createdAt)}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                          <Clock className="w-3 h-3" />
-                          <span title={formatDate(evento.createdAt)}>
-                            {formatRelativeTime(evento.createdAt)}
+                        {/* Usuario */}
+                        <div className="flex items-center space-x-2 mt-2">
+                          <Avatar className="w-5 h-5">
+                            <AvatarFallback className="text-xs">
+                              {evento.usuario?.name?.substring(0, 2).toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-muted-foreground">
+                            {evento.usuario?.name || 'Usuario desconocido'}
                           </span>
                         </div>
                       </div>
-
-                      {/* Usuario */}
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Avatar className="w-5 h-5">
-                          <AvatarFallback className="text-xs">
-                            {evento.usuario?.name?.substring(0, 2).toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-xs text-muted-foreground">
-                          {evento.usuario?.name || 'Usuario desconocido'}
-                        </span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  )
+                })}
               </div>
             )}
           </div>
+
+          {/* Paginación */}
+          {meta.totalPaginas > 1 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Página {meta.pagina} de {meta.totalPaginas}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                  disabled={paginaActual <= 1}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Anterior
+                </Button>
+
+                {/* Números de página */}
+                <div className="hidden sm:flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, meta.totalPaginas) }, (_, i) => {
+                    let pageNum: number
+                    if (meta.totalPaginas <= 5) {
+                      pageNum = i + 1
+                    } else if (paginaActual <= 3) {
+                      pageNum = i + 1
+                    } else if (paginaActual >= meta.totalPaginas - 2) {
+                      pageNum = meta.totalPaginas - 4 + i
+                    } else {
+                      pageNum = paginaActual - 2 + i
+                    }
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pageNum === paginaActual ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setPaginaActual(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPaginaActual(p => Math.min(meta.totalPaginas, p + 1))}
+                  disabled={paginaActual >= meta.totalPaginas}
+                >
+                  Siguiente
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
