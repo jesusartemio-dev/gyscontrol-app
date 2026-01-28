@@ -44,23 +44,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  AlertCircle, 
-  BarChart3, 
-  Calendar, 
-  CheckCircle, 
-  DollarSign, // 💰 Icon for cost toggle
-  Filter, 
-  Lightbulb, 
+import {
+  AlertCircle,
+  BarChart3,
+  Calendar,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  DollarSign,
+  FileText,
+  Filter,
+  Lightbulb,
   Package,
-  RefreshCw, 
-  Settings, 
+  Percent,
+  RefreshCw,
+  Settings,
   ShoppingCart,
-  TrendingUp, 
+  TrendingUp,
+  X,
   Zap,
-  ChevronDown, // 📊 For dropdown selector
-  Percent, // 📊 For percentage display
-  Clock, // ⏰ For daily cost display
 } from 'lucide-react';
 // Removed framer-motion imports as they were causing ref conflicts with Radix UI
 import { toast } from 'sonner';
@@ -724,31 +727,51 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     }
   }, [filtros.validarCoherencia, timelineData]); // ✅ Removed runCoherenceValidation dependency to prevent infinite loop
 
+  // State for collapsible sections
+  const [showFiltersSection, setShowFiltersSection] = useState(false);
+  const [showAlertsSection, setShowAlertsSection] = useState(true);
+
   return (
-    <div className={`space-y-2 ${className}`}>
-      {/* Single-row toolbar with stats and actions */}
-      <div className="flex items-center justify-between gap-2 flex-wrap bg-muted/30 rounded-lg p-2">
-        {/* Left: Key stats */}
+    <div className={`space-y-3 ${className}`}>
+      {/* ===== TOP BAR: Stats + Coherence + Actions ===== */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        {/* Left: Stats badges */}
         <div className="flex items-center gap-2 flex-wrap">
           {timelineData?.resumen && (
             <>
-              <Badge variant="outline" className="h-6 gap-1 font-normal">
-                <Calendar className="w-3 h-3" />
-                {timelineData.resumen.totalItems} items
+              <Badge variant="outline" className="h-7 gap-1.5 px-2.5">
+                <Calendar className="w-3.5 h-3.5" />
+                <span className="font-semibold">{timelineData.resumen.totalItems}</span>
+                <span className="text-muted-foreground">items</span>
               </Badge>
-              <Badge variant="outline" className="h-6 gap-1 font-normal text-emerald-700 border-emerald-200 bg-emerald-50">
-                $ {(timelineData.resumen.montoTotal || 0).toLocaleString()}
+              <Badge variant="outline" className="h-7 gap-1.5 px-2.5 text-emerald-700 border-emerald-300 bg-emerald-50">
+                <span className="font-semibold">$ {(timelineData.resumen.montoTotal || 0).toLocaleString()}</span>
               </Badge>
               {timelineData.resumen.itemsVencidos > 0 && (
-                <Badge variant="destructive" className="h-6 gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {timelineData.resumen.itemsVencidos} vencidos
+                <Badge variant="destructive" className="h-7 gap-1.5 px-2.5">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span className="font-semibold">{timelineData.resumen.itemsVencidos}</span> vencidos
                 </Badge>
               )}
               {timelineData.resumen.itemsEnRiesgo > 0 && (
-                <Badge className="h-6 gap-1 bg-orange-100 text-orange-700 hover:bg-orange-100">
-                  <AlertCircle className="w-3 h-3" />
-                  {timelineData.resumen.itemsEnRiesgo} en riesgo
+                <Badge className="h-7 gap-1.5 px-2.5 bg-orange-100 text-orange-700 hover:bg-orange-100">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span className="font-semibold">{timelineData.resumen.itemsEnRiesgo}</span> en riesgo
+                </Badge>
+              )}
+              {/* Coherence inline */}
+              {showCoherencePanel && (
+                <Badge
+                  variant="outline"
+                  className={`h-7 gap-1.5 px-2.5 ${
+                    (validacionData?.estadisticas?.coherenciaPromedio || 100) >= 80
+                      ? 'text-green-700 border-green-300 bg-green-50'
+                      : 'text-red-700 border-red-300 bg-red-50'
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span className="font-semibold">{validacionData?.estadisticas?.coherenciaPromedio || 100}%</span>
+                  <span className="text-muted-foreground hidden sm:inline">coherencia</span>
                 </Badge>
               )}
             </>
@@ -756,21 +779,35 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* Filter toggle */}
+          {showFilters && (
+            <Button
+              variant={showFiltersSection ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowFiltersSection(!showFiltersSection)}
+              className="h-8"
+            >
+              <Filter className="w-4 h-4 mr-1.5" />
+              Filtros
+              {showFiltersSection ? <ChevronUp className="w-3.5 h-3.5 ml-1" /> : <ChevronDown className="w-3.5 h-3.5 ml-1" />}
+            </Button>
+          )}
+
           {showCoherencePanel && (
             <Button
               variant="outline"
               size="sm"
               onClick={runCoherenceValidation}
               disabled={validating}
-              className="h-7 px-2 text-xs"
+              className="h-8"
             >
               {validating ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
+                <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
               ) : (
-                <BarChart3 className="w-3 h-3" />
+                <BarChart3 className="w-4 h-4 mr-1.5" />
               )}
-              <span className="hidden sm:inline ml-1">Validar</span>
+              Validar
             </Button>
           )}
 
@@ -790,29 +827,91 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             size="sm"
             onClick={loadTimelineData}
             disabled={loading}
-            className="h-7 px-2 text-xs"
+            className="h-8"
           >
             {loading ? (
-              <RefreshCw className="w-3 h-3 animate-spin" />
+              <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
             ) : (
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-4 h-4 mr-1.5" />
             )}
-            <span className="hidden sm:inline ml-1">Actualizar</span>
+            Actualizar
           </Button>
         </div>
       </div>
 
-      {/* Main content with sidebar layout */}
-       <div className="flex gap-4">
-        {/* Filters Sidebar */}
-        {showFilters && (
-          <FiltersSidebar
-            filtros={filtros}
-            onFiltrosChange={handleFiltrosChange}
-            loading={loading}
-            className="w-64 flex-shrink-0"
-          />
-        )}
+      {/* ===== FILTERS: Horizontal, collapsible ===== */}
+      {showFilters && showFiltersSection && (
+        <Card className="border shadow-sm">
+          <CardContent className="p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* View type */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Vista:</span>
+                <div className="flex border rounded-md">
+                  {[
+                    { key: 'gantt', icon: BarChart3, label: 'Gantt' },
+                    { key: 'lista', icon: FileText, label: 'Lista' },
+                    { key: 'calendario', icon: Calendar, label: 'Calendario' }
+                  ].map((view) => (
+                    <Button
+                      key={view.key}
+                      variant={filtros.tipoVista === view.key ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => handleFiltrosChange({ ...filtros, tipoVista: view.key as any })}
+                      className="h-7 px-2 rounded-none first:rounded-l-md last:rounded-r-md"
+                    >
+                      <view.icon className="w-3.5 h-3.5 mr-1" />
+                      {view.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick filters */}
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant={filtros.soloAlertas ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleFiltrosChange({ ...filtros, soloAlertas: !filtros.soloAlertas })}
+                  className="h-7 text-xs"
+                >
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  Solo Alertas
+                </Button>
+                <Button
+                  variant={filtros.validarCoherencia ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleFiltrosChange({ ...filtros, validarCoherencia: !filtros.validarCoherencia })}
+                  className="h-7 text-xs"
+                >
+                  <BarChart3 className="w-3 h-3 mr-1" />
+                  Validar Auto
+                </Button>
+              </div>
+
+              {/* Clear filters */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleFiltrosChange({
+                  tipoVista: 'gantt',
+                  agrupacion: 'proyecto',
+                  validarCoherencia: true,
+                  margenDias: 7,
+                  alertaAnticipacion: 15
+                })}
+                className="h-7 text-xs text-muted-foreground"
+              >
+                <X className="w-3 h-3 mr-1" />
+                Limpiar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ===== MAIN: Gantt Chart (full width) ===== */}
+      <div className="min-h-[400px]">
         
         {/* Timeline chart */}
         <div className="flex-1 min-w-0">
@@ -913,83 +1012,54 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             />
           )}
          </div>
-         
-         {/* Coherence panel - compact sidebar */}
-         {showCoherencePanel && (
-           <div className="w-64 flex-shrink-0 space-y-3">
-            {/* Coherence stats - compact */}
-            <Card className="border-0 shadow-sm bg-muted/30">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <BarChart3 className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Coherencia</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="text-center p-2 bg-white rounded">
-                    <div className="text-lg font-bold text-green-600">
-                      {validacionData?.estadisticas?.coherenciaPromedio || 100}%
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">Promedio</div>
-                  </div>
-                  <div className="text-center p-2 bg-white rounded">
-                    <div className="text-lg font-bold text-blue-600">
-                      {validacionData?.estadisticas?.totalValidaciones || 0}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">Validaciones</div>
-                  </div>
-                  {(validacionData?.estadisticas?.erroresEncontrados || 0) > 0 && (
-                    <div className="text-center p-2 bg-red-50 rounded col-span-2">
-                      <div className="text-sm font-bold text-red-600">
-                        {validacionData?.estadisticas?.erroresEncontrados} errores
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Alerts - compact */}
-            <Card className="border-0 shadow-sm bg-muted/30">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm font-medium">Alertas</span>
-                  {(timelineData?.alertas?.length || 0) > 0 && (
-                    <Badge variant="secondary" className="h-5 text-[10px]">
-                      {timelineData?.alertas?.length}
-                    </Badge>
-                  )}
-                </div>
-                <AlertSummary
-                  alertas={timelineData?.alertas || []}
-                  onAlertClick={(alerta) => {
-                    console.log('Alert clicked:', alerta);
-                  }}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Suggestions - only show if there are any */}
-            {filtros.incluirSugerencias && validacionData?.sugerencias && validacionData.sugerencias.length > 0 && (
-              <Card className="border-0 shadow-sm bg-muted/30">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Lightbulb className="w-4 h-4 text-yellow-500" />
-                    <span className="text-sm font-medium">Sugerencias</span>
-                    <Badge variant="secondary" className="h-5 text-[10px]">
-                      {validacionData.sugerencias.length}
-                    </Badge>
-                  </div>
-                  <SuggestionsPanel
-                    sugerencias={validacionData.sugerencias}
-                    onApplySuggestion={handleApplySuggestion}
-                  />
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
       </div>
+
+      {/* ===== BOTTOM: Alerts Section (collapsible) ===== */}
+      {(timelineData?.alertas?.length || 0) > 0 && (
+        <Card className="border shadow-sm">
+          <CardHeader className="p-3 cursor-pointer" onClick={() => setShowAlertsSection(!showAlertsSection)}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-orange-500" />
+                <span className="text-sm font-medium">Alertas</span>
+                <Badge variant="secondary" className="h-5 text-xs">
+                  {timelineData?.alertas?.length || 0}
+                </Badge>
+                {(timelineData?.alertas?.filter(a => a.prioridad === 'alta').length || 0) > 0 && (
+                  <Badge variant="destructive" className="h-5 text-xs">
+                    {timelineData?.alertas?.filter(a => a.prioridad === 'alta').length} críticas
+                  </Badge>
+                )}
+              </div>
+              {showAlertsSection ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
+          </CardHeader>
+          {showAlertsSection && (
+            <CardContent className="p-3 pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto">
+                {timelineData?.alertas?.slice(0, 9).map((alerta, index) => (
+                  <div
+                    key={index}
+                    className={`p-2 rounded border text-xs ${
+                      alerta.prioridad === 'alta' ? 'bg-red-50 border-red-200' :
+                      alerta.prioridad === 'media' ? 'bg-orange-50 border-orange-200' :
+                      'bg-blue-50 border-blue-200'
+                    }`}
+                  >
+                    <div className="font-medium truncate">{alerta.titulo}</div>
+                    <div className="text-muted-foreground truncate">{alerta.mensaje}</div>
+                  </div>
+                ))}
+              </div>
+              {(timelineData?.alertas?.length || 0) > 9 && (
+                <div className="text-xs text-muted-foreground text-center mt-2">
+                  +{(timelineData?.alertas?.length || 0) - 9} alertas más
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Item details dialog */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
