@@ -15,14 +15,15 @@ import {
   Upload,
   CheckSquare,
   Square,
-  CheckCircle
+  CheckCircle,
+  Package
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -54,105 +55,121 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
   const [newExclusion, setNewExclusion] = useState('')
   const [editText, setEditText] = useState('')
 
-  // Estados para importar desde exclusiones
+  // Estados para importar
   const [showImportDialog, setShowImportDialog] = useState(false)
-  const [exclusionesDisponibles, setExclusionesDisponibles] = useState<any[]>([])
-  const [selectedExclusion, setSelectedExclusion] = useState('')
-  const [importMode, setImportMode] = useState<'replace' | 'append'>('append')
+  const [importTab, setImportTab] = useState<'catalogo' | 'plantilla'>('catalogo')
+  const [catalogoItems, setCatalogoItems] = useState<any[]>([])
+  const [plantillas, setPlantillas] = useState<any[]>([])
+  const [selectedPlantilla, setSelectedPlantilla] = useState('')
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
-  const [selectedItems, setSelectedItems] = useState<number[]>([])
-  const [showItemSelection, setShowItemSelection] = useState(false)
 
   useEffect(() => {
     setExclusiones(cotizacion.exclusiones || [])
   }, [cotizacion.exclusiones])
 
-  // Cargar exclusiones disponibles desde el catálogo
-  const loadExclusionesDisponibles = async () => {
+  // Cargar datos para importacion
+  const loadImportData = async () => {
     try {
-      const response = await fetch('/api/catalogo/exclusiones?activo=true')
-      if (response.ok) {
-        const data = await response.json()
-        setExclusionesDisponibles(data || [])
+      const [catalogoRes, plantillasRes] = await Promise.all([
+        fetch('/api/catalogo/exclusiones?activo=true'),
+        fetch('/api/plantillas/exclusiones-independiente?activo=true')
+      ])
+
+      if (catalogoRes.ok) {
+        const data = await catalogoRes.json()
+        setCatalogoItems(data || [])
+      }
+
+      if (plantillasRes.ok) {
+        const data = await plantillasRes.json()
+        setPlantillas(data || [])
       }
     } catch (error) {
-      console.error('Error loading exclusiones:', error)
+      console.error('Error loading import data:', error)
     }
   }
 
-  // Importar desde exclusión
-  const handleImportFromExclusion = async () => {
-    if (!selectedExclusion) return
+  const openImportDialog = () => {
+    loadImportData()
+    setSelectedItems([])
+    setSelectedPlantilla('')
+    setImportTab('catalogo')
+    setShowImportDialog(true)
+  }
+
+  const handleItemToggle = (itemId: string) => {
+    setSelectedItems(prev =>
+      prev.includes(itemId)
+        ? prev.filter(i => i !== itemId)
+        : [...prev, itemId]
+    )
+  }
+
+  const isItemAlreadyImported = (descripcion: string) => {
+    return exclusiones.some(exc => exc.descripcion.trim() === descripcion.trim())
+  }
+
+  // Importar items seleccionados
+  const handleImport = async () => {
+    if (selectedItems.length === 0) return
 
     setImporting(true)
     setError(null)
 
     try {
-      const response = await fetch(`/api/cotizacion/${cotizacion.id}/exclusiones/importar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          catalogoId: selectedExclusion,
-          modo: importMode,
-          itemsSeleccionados: selectedItems.length > 0 ? selectedItems : undefined
+      let itemsToImport: Array<{ descripcion: string }> = []
+
+      if (importTab === 'catalogo') {
+        itemsToImport = catalogoItems
+          .filter(item => selectedItems.includes(item.id))
+          .map(item => ({ descripcion: item.descripcion }))
+      } else {
+        const plantilla = plantillas.find(p => p.id === selectedPlantilla)
+        if (plantilla?.plantillaExclusionItemIndependiente) {
+          itemsToImport = plantilla.plantillaExclusionItemIndependiente
+            .filter((item: any) => selectedItems.includes(item.id))
+            .map((item: any) => ({ descripcion: item.descripcion }))
+        }
+      }
+
+      // Crear cada exclusion
+      const newExclusiones: CotizacionExclusion[] = []
+      for (let i = 0; i < itemsToImport.length; i++) {
+        const item = itemsToImport[i]
+        const response = await fetch(`/api/cotizacion/${cotizacion.id}/exclusiones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            descripcion: item.descripcion,
+            orden: exclusiones.length + i + 1
+          })
         })
-      })
 
-      if (!response.ok) throw new Error('Error al importar desde exclusión')
+        if (response.ok) {
+          const data = await response.json()
+          newExclusiones.push(data.data)
+        }
+      }
 
-      const data = await response.json()
+      const updatedExclusiones = [...exclusiones, ...newExclusiones]
+      setExclusiones(updatedExclusiones)
 
-      // Actualizar el estado local
-      setExclusiones(data.data)
-
-      // Update parent component
       onUpdated({
         ...cotizacion,
-        exclusiones: data.data
+        exclusiones: updatedExclusiones
       })
 
       setShowImportDialog(false)
-      setSelectedExclusion('')
       setSelectedItems([])
-      setShowItemSelection(false)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError('Error al importar desde exclusión')
-      console.error('Error importing from exclusión:', err)
+      setError('Error al importar exclusiones')
+      console.error('Error importing:', err)
     } finally {
       setImporting(false)
     }
-  }
-
-  // Abrir diálogo de importación
-  const openImportDialog = () => {
-    loadExclusionesDisponibles()
-    setSelectedExclusion('')
-    setSelectedItems([])
-    setShowItemSelection(false)
-    setShowImportDialog(true)
-  }
-
-  // Manejar selección de catálogo
-  const handleExclusionSelect = (exclusionId: string) => {
-    setSelectedExclusion(exclusionId)
-    setSelectedItems([])
-    setShowItemSelection(true)
-  }
-
-  // Manejar selección de items individuales
-  const handleItemToggle = (itemIndex: number) => {
-    setSelectedItems(prev =>
-      prev.includes(itemIndex)
-        ? prev.filter(i => i !== itemIndex)
-        : [...prev, itemIndex]
-    )
-  }
-
-  // Verificar si un item ya está importado
-  const isItemAlreadyImported = (itemDescription: string) => {
-    return exclusiones.some(exc => exc.descripcion.trim() === itemDescription.trim())
   }
 
   const handleAddExclusion = async () => {
@@ -171,13 +188,12 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
         })
       })
 
-      if (!response.ok) throw new Error('Error al crear exclusión')
+      if (!response.ok) throw new Error('Error al crear exclusion')
 
       const data = await response.json()
       const updatedExclusiones = [...exclusiones, data.data]
       setExclusiones(updatedExclusiones)
 
-      // Update parent component
       onUpdated({
         ...cotizacion,
         exclusiones: updatedExclusiones
@@ -187,7 +203,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError('Error al agregar la exclusión')
+      setError('Error al agregar la exclusion')
       console.error('Error adding exclusion:', err)
     } finally {
       setLoading(false)
@@ -209,7 +225,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
         })
       })
 
-      if (!response.ok) throw new Error('Error al actualizar exclusión')
+      if (!response.ok) throw new Error('Error al actualizar exclusion')
 
       const data = await response.json()
       const updatedExclusiones = exclusiones.map(exc =>
@@ -217,7 +233,6 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
       )
       setExclusiones(updatedExclusiones)
 
-      // Update parent component
       onUpdated({
         ...cotizacion,
         exclusiones: updatedExclusiones
@@ -228,7 +243,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError('Error al actualizar la exclusión')
+      setError('Error al actualizar la exclusion')
       console.error('Error updating exclusion:', err)
     } finally {
       setLoading(false)
@@ -236,7 +251,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
   }
 
   const handleDeleteExclusion = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta exclusión?')) return
+    if (!confirm('Estas seguro de que deseas eliminar esta exclusion?')) return
 
     setLoading(true)
     setError(null)
@@ -246,12 +261,11 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
         method: 'DELETE'
       })
 
-      if (!response.ok) throw new Error('Error al eliminar exclusión')
+      if (!response.ok) throw new Error('Error al eliminar exclusion')
 
       const updatedExclusiones = exclusiones.filter(exc => exc.id !== id)
       setExclusiones(updatedExclusiones)
 
-      // Update parent component
       onUpdated({
         ...cotizacion,
         exclusiones: updatedExclusiones
@@ -260,7 +274,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError('Error al eliminar la exclusión')
+      setError('Error al eliminar la exclusion')
       console.error('Error deleting exclusion:', err)
     } finally {
       setLoading(false)
@@ -277,6 +291,13 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
     setEditText('')
   }
 
+  // Get items for selected plantilla
+  const getPlantillaItems = () => {
+    if (!selectedPlantilla) return []
+    const plantilla = plantillas.find(p => p.id === selectedPlantilla)
+    return plantilla?.plantillaExclusionItemIndependiente || []
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -288,7 +309,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-500" />
-              Exclusiones de la Cotización
+              Exclusiones de la Cotizacion
               <span className="text-sm font-normal text-muted-foreground">
                 ({exclusiones.length})
               </span>
@@ -302,133 +323,168 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
                   className="flex items-center gap-2"
                 >
                   <Upload className="h-4 w-4" />
-                  Importar Exclusión
+                  Importar
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
-                    Importar desde Catálogo
+                    Importar Exclusiones
                   </DialogTitle>
                   <DialogDescription>
-                    Selecciona una exclusión del catálogo y elige qué items importar.
+                    Selecciona exclusiones del catalogo o de una plantilla.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="exclusion">Exclusión del Catálogo</Label>
-                    <Select value={selectedExclusion} onValueChange={handleExclusionSelect}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una exclusión..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {exclusionesDisponibles.map((exclusion) => (
-                          <SelectItem key={exclusion.id} value={exclusion.id}>
-                            {exclusion.nombre} ({exclusion._count?.items || 0} items)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
-                  {showItemSelection && selectedExclusion && (
-                    <>
-                      <div className="grid gap-2">
-                        <Label htmlFor="modo">Modo de importación</Label>
-                        <Select value={importMode} onValueChange={(value: 'replace' | 'append') => setImportMode(value)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="append">Agregar a existentes</SelectItem>
-                            <SelectItem value="replace">Reemplazar todas</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                <Tabs value={importTab} onValueChange={(v) => { setImportTab(v as any); setSelectedItems([]); setSelectedPlantilla(''); }}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="catalogo">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Catalogo ({catalogoItems.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="plantilla">
+                      <Package className="h-4 w-4 mr-2" />
+                      Plantillas ({plantillas.length})
+                    </TabsTrigger>
+                  </TabsList>
 
-                      <div className="grid gap-2">
-                        <Label>Seleccionar Items a Importar</Label>
-                        <div className="max-h-60 overflow-y-auto border rounded-md p-3 space-y-2">
-                          {(() => {
-                            const selectedTemplate = exclusionesDisponibles.find(e => e.id === selectedExclusion)
-                            return selectedTemplate?.items?.map((item: any, index: number) => {
-                              const alreadyImported = isItemAlreadyImported(item.descripcion)
-                              const isSelected = selectedItems.includes(index)
+                  <TabsContent value="catalogo" className="space-y-4 mt-4">
+                    <div className="max-h-60 overflow-y-auto border rounded-md p-3 space-y-2">
+                      {catalogoItems.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No hay exclusiones en el catalogo
+                        </p>
+                      ) : (
+                        catalogoItems.map((item) => {
+                          const alreadyImported = isItemAlreadyImported(item.descripcion)
+                          const isSelected = selectedItems.includes(item.id)
 
-                              return (
-                                <div
-                                  key={index}
-                                  className={`flex items-start gap-3 p-2 rounded border ${
-                                    alreadyImported
-                                      ? 'bg-green-50 border-green-200'
-                                      : isSelected
-                                        ? 'bg-blue-50 border-blue-200'
-                                        : 'bg-gray-50 border-gray-200'
-                                  }`}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => !alreadyImported && handleItemToggle(index)}
-                                    disabled={alreadyImported}
-                                    className={`mt-0.5 ${alreadyImported ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                                  >
-                                    {alreadyImported ? (
-                                      <CheckCircle className="h-4 w-4 text-green-600" />
-                                    ) : isSelected ? (
-                                      <CheckSquare className="h-4 w-4 text-blue-600" />
-                                    ) : (
-                                      <Square className="h-4 w-4 text-gray-400" />
-                                    )}
-                                  </button>
-                                  <div className="flex-1">
-                                    <p className={`text-sm ${alreadyImported ? 'text-green-800' : 'text-gray-700'}`}>
-                                      {item.descripcion}
-                                    </p>
-                                    {alreadyImported && (
-                                      <p className="text-xs text-green-600 mt-1">✓ Ya importado</p>
-                                    )}
-                                  </div>
+                          return (
+                            <div
+                              key={item.id}
+                              className={`flex items-start gap-3 p-2 rounded border cursor-pointer transition-colors ${
+                                alreadyImported
+                                  ? 'bg-green-50 border-green-200 cursor-not-allowed'
+                                  : isSelected
+                                    ? 'bg-orange-50 border-orange-200'
+                                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                              }`}
+                              onClick={() => !alreadyImported && handleItemToggle(item.id)}
+                            >
+                              {alreadyImported ? (
+                                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                              ) : isSelected ? (
+                                <CheckSquare className="h-4 w-4 text-orange-600 mt-0.5" />
+                              ) : (
+                                <Square className="h-4 w-4 text-gray-400 mt-0.5" />
+                              )}
+                              <div className="flex-1">
+                                <p className={`text-sm ${alreadyImported ? 'text-green-800' : 'text-gray-700'}`}>
+                                  {item.descripcion}
+                                </p>
+                                <div className="flex gap-2 mt-1">
+                                  <span className="text-xs text-muted-foreground">{item.codigo}</span>
+                                  {alreadyImported && (
+                                    <span className="text-xs text-green-600">Ya importado</span>
+                                  )}
                                 </div>
-                              )
-                            }) || []
-                          })()}
-                        </div>
-                        <div className="flex gap-2 text-sm text-muted-foreground">
-                          <span>{selectedItems.length} seleccionados</span>
-                          <span>•</span>
-                          <span>{(() => {
-                            const selectedTemplate = exclusionesDisponibles.find(e => e.id === selectedExclusion)
-                            const alreadyImportedCount = selectedTemplate?.items?.filter((item: any) =>
-                              isItemAlreadyImported(item.descripcion)
-                            ).length || 0
-                            return `${alreadyImportedCount} ya importados`
-                          })()}</span>
-                        </div>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="plantilla" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label>Seleccionar Plantilla</Label>
+                      <Select value={selectedPlantilla} onValueChange={(v) => { setSelectedPlantilla(v); setSelectedItems([]); }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una plantilla..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plantillas.map((plantilla) => (
+                            <SelectItem key={plantilla.id} value={plantilla.id}>
+                              {plantilla.nombre} ({plantilla._count?.plantillaExclusionItemIndependiente || 0} items)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedPlantilla && (
+                      <div className="max-h-60 overflow-y-auto border rounded-md p-3 space-y-2">
+                        {getPlantillaItems().length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Esta plantilla no tiene items
+                          </p>
+                        ) : (
+                          getPlantillaItems().map((item: any) => {
+                            const alreadyImported = isItemAlreadyImported(item.descripcion)
+                            const isSelected = selectedItems.includes(item.id)
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={`flex items-start gap-3 p-2 rounded border cursor-pointer transition-colors ${
+                                  alreadyImported
+                                    ? 'bg-green-50 border-green-200 cursor-not-allowed'
+                                    : isSelected
+                                      ? 'bg-orange-50 border-orange-200'
+                                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                                }`}
+                                onClick={() => !alreadyImported && handleItemToggle(item.id)}
+                              >
+                                {alreadyImported ? (
+                                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                                ) : isSelected ? (
+                                  <CheckSquare className="h-4 w-4 text-orange-600 mt-0.5" />
+                                ) : (
+                                  <Square className="h-4 w-4 text-gray-400 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                  <p className={`text-sm ${alreadyImported ? 'text-green-800' : 'text-gray-700'}`}>
+                                    {item.descripcion}
+                                  </p>
+                                  {alreadyImported && (
+                                    <span className="text-xs text-green-600">Ya importado</span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })
+                        )}
                       </div>
-                    </>
-                  )}
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowImportDialog(false)}
-                    disabled={importing}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleImportFromExclusion}
-                    disabled={!selectedExclusion || selectedItems.length === 0 || importing}
-                    className="flex items-center gap-2"
-                  >
-                    {importing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Upload className="h-4 w-4" />
                     )}
-                    {importing ? 'Importando...' : `Importar ${selectedItems.length} items`}
-                  </Button>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="flex justify-between items-center mt-4">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedItems.length} seleccionados
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowImportDialog(false)}
+                      disabled={importing}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleImport}
+                      disabled={selectedItems.length === 0 || importing}
+                    >
+                      {importing ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Upload className="h-4 w-4 mr-2" />
+                      )}
+                      Importar {selectedItems.length > 0 && `(${selectedItems.length})`}
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -446,14 +502,14 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
             <Alert className="border-green-200 bg-green-50">
               <AlertCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                Operación realizada exitosamente
+                Operacion realizada exitosamente
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Agregar nueva exclusión */}
+          {/* Agregar nueva exclusion */}
           <div className="space-y-4">
-            <Label className="text-sm font-medium">Agregar Nueva Exclusión</Label>
+            <Label className="text-sm font-medium">Agregar Nueva Exclusion</Label>
             <div className="flex gap-2">
               <Textarea
                 value={newExclusion}

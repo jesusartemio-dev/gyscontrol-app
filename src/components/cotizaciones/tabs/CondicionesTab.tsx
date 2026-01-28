@@ -15,15 +15,16 @@ import {
   Upload,
   CheckSquare,
   Square,
-  CheckCircle
+  CheckCircle,
+  Package
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -48,105 +49,122 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
   const [newCondicion, setNewCondicion] = useState({ descripcion: '', tipo: '' })
   const [editData, setEditData] = useState({ descripcion: '', tipo: '' })
 
-  // Estados para importar desde condiciones
+  // Estados para importar
   const [showImportDialog, setShowImportDialog] = useState(false)
-  const [condicionesDisponibles, setCondicionesDisponibles] = useState<any[]>([])
-  const [selectedCondicion, setSelectedCondicion] = useState('')
-  const [importMode, setImportMode] = useState<'replace' | 'append'>('append')
+  const [importTab, setImportTab] = useState<'catalogo' | 'plantilla'>('catalogo')
+  const [catalogoItems, setCatalogoItems] = useState<any[]>([])
+  const [plantillas, setPlantillas] = useState<any[]>([])
+  const [selectedPlantilla, setSelectedPlantilla] = useState('')
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
-  const [selectedItems, setSelectedItems] = useState<number[]>([])
-  const [showItemSelection, setShowItemSelection] = useState(false)
 
   useEffect(() => {
     setCondiciones(cotizacion.condiciones || [])
   }, [cotizacion.condiciones])
 
-  // Cargar condiciones disponibles desde el catálogo
-  const loadCondicionesDisponibles = async () => {
+  // Cargar datos para importacion
+  const loadImportData = async () => {
     try {
-      const response = await fetch('/api/catalogo/condiciones?activo=true')
-      if (response.ok) {
-        const data = await response.json()
-        setCondicionesDisponibles(data || [])
+      const [catalogoRes, plantillasRes] = await Promise.all([
+        fetch('/api/catalogo/condiciones?activo=true'),
+        fetch('/api/plantillas/condiciones-independiente?activo=true')
+      ])
+
+      if (catalogoRes.ok) {
+        const data = await catalogoRes.json()
+        setCatalogoItems(data || [])
+      }
+
+      if (plantillasRes.ok) {
+        const data = await plantillasRes.json()
+        setPlantillas(data || [])
       }
     } catch (error) {
-      console.error('Error loading condiciones:', error)
+      console.error('Error loading import data:', error)
     }
   }
 
-  // Importar desde condición
-  const handleImportFromCondicion = async () => {
-    if (!selectedCondicion) return
+  const openImportDialog = () => {
+    loadImportData()
+    setSelectedItems([])
+    setSelectedPlantilla('')
+    setImportTab('catalogo')
+    setShowImportDialog(true)
+  }
+
+  const handleItemToggle = (itemId: string) => {
+    setSelectedItems(prev =>
+      prev.includes(itemId)
+        ? prev.filter(i => i !== itemId)
+        : [...prev, itemId]
+    )
+  }
+
+  const isItemAlreadyImported = (descripcion: string) => {
+    return condiciones.some(cond => cond.descripcion.trim() === descripcion.trim())
+  }
+
+  // Importar items seleccionados
+  const handleImport = async () => {
+    if (selectedItems.length === 0) return
 
     setImporting(true)
     setError(null)
 
     try {
-      const response = await fetch(`/api/cotizacion/${cotizacion.id}/condiciones/importar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          catalogoId: selectedCondicion,
-          modo: importMode,
-          itemsSeleccionados: selectedItems.length > 0 ? selectedItems : undefined
+      let itemsToImport: Array<{ descripcion: string; tipo?: string }> = []
+
+      if (importTab === 'catalogo') {
+        itemsToImport = catalogoItems
+          .filter(item => selectedItems.includes(item.id))
+          .map(item => ({ descripcion: item.descripcion, tipo: item.tipo }))
+      } else {
+        const plantilla = plantillas.find(p => p.id === selectedPlantilla)
+        if (plantilla?.plantillaCondicionItemIndependiente) {
+          itemsToImport = plantilla.plantillaCondicionItemIndependiente
+            .filter((item: any) => selectedItems.includes(item.id))
+            .map((item: any) => ({ descripcion: item.descripcion, tipo: item.tipo }))
+        }
+      }
+
+      // Crear cada condicion
+      const newCondiciones: CotizacionCondicion[] = []
+      for (let i = 0; i < itemsToImport.length; i++) {
+        const item = itemsToImport[i]
+        const response = await fetch(`/api/cotizacion/${cotizacion.id}/condiciones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            descripcion: item.descripcion,
+            tipo: item.tipo || null,
+            orden: condiciones.length + i + 1
+          })
         })
-      })
 
-      if (!response.ok) throw new Error('Error al importar desde condición')
+        if (response.ok) {
+          const data = await response.json()
+          newCondiciones.push(data.data)
+        }
+      }
 
-      const data = await response.json()
+      const updatedCondiciones = [...condiciones, ...newCondiciones]
+      setCondiciones(updatedCondiciones)
 
-      // Actualizar el estado local
-      setCondiciones(data.data)
-
-      // Update parent component
       onUpdated({
         ...cotizacion,
-        condiciones: data.data
+        condiciones: updatedCondiciones
       })
 
       setShowImportDialog(false)
-      setSelectedCondicion('')
       setSelectedItems([])
-      setShowItemSelection(false)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError('Error al importar desde condición')
-      console.error('Error importing from condición:', err)
+      setError('Error al importar condiciones')
+      console.error('Error importing:', err)
     } finally {
       setImporting(false)
     }
-  }
-
-  // Abrir diálogo de importación
-  const openImportDialog = () => {
-    loadCondicionesDisponibles()
-    setSelectedCondicion('')
-    setSelectedItems([])
-    setShowItemSelection(false)
-    setShowImportDialog(true)
-  }
-
-  // Manejar selección de catálogo
-  const handleCondicionSelect = (condicionId: string) => {
-    setSelectedCondicion(condicionId)
-    setSelectedItems([])
-    setShowItemSelection(true)
-  }
-
-  // Manejar selección de items individuales
-  const handleItemToggle = (itemIndex: number) => {
-    setSelectedItems(prev =>
-      prev.includes(itemIndex)
-        ? prev.filter(i => i !== itemIndex)
-        : [...prev, itemIndex]
-    )
-  }
-
-  // Verificar si un item ya está importado
-  const isItemAlreadyImported = (itemDescription: string) => {
-    return condiciones.some(cond => cond.descripcion.trim() === itemDescription.trim())
   }
 
   const handleAddCondicion = async () => {
@@ -166,13 +184,12 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
         })
       })
 
-      if (!response.ok) throw new Error('Error al crear condición')
+      if (!response.ok) throw new Error('Error al crear condicion')
 
       const data = await response.json()
       const updatedCondiciones = [...condiciones, data.data]
       setCondiciones(updatedCondiciones)
 
-      // Update parent component
       onUpdated({
         ...cotizacion,
         condiciones: updatedCondiciones
@@ -182,7 +199,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError('Error al agregar la condición')
+      setError('Error al agregar la condicion')
       console.error('Error adding condition:', err)
     } finally {
       setLoading(false)
@@ -205,7 +222,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
         })
       })
 
-      if (!response.ok) throw new Error('Error al actualizar condición')
+      if (!response.ok) throw new Error('Error al actualizar condicion')
 
       const data = await response.json()
       const updatedCondiciones = condiciones.map(cond =>
@@ -213,7 +230,6 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
       )
       setCondiciones(updatedCondiciones)
 
-      // Update parent component
       onUpdated({
         ...cotizacion,
         condiciones: updatedCondiciones
@@ -224,7 +240,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError('Error al actualizar la condición')
+      setError('Error al actualizar la condicion')
       console.error('Error updating condition:', err)
     } finally {
       setLoading(false)
@@ -232,7 +248,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
   }
 
   const handleDeleteCondicion = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta condición?')) return
+    if (!confirm('Estas seguro de que deseas eliminar esta condicion?')) return
 
     setLoading(true)
     setError(null)
@@ -242,12 +258,11 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
         method: 'DELETE'
       })
 
-      if (!response.ok) throw new Error('Error al eliminar condición')
+      if (!response.ok) throw new Error('Error al eliminar condicion')
 
       const updatedCondiciones = condiciones.filter(cond => cond.id !== id)
       setCondiciones(updatedCondiciones)
 
-      // Update parent component
       onUpdated({
         ...cotizacion,
         condiciones: updatedCondiciones
@@ -256,7 +271,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError('Error al eliminar la condición')
+      setError('Error al eliminar la condicion')
       console.error('Error deleting condition:', err)
     } finally {
       setLoading(false)
@@ -276,6 +291,13 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
     setEditData({ descripcion: '', tipo: '' })
   }
 
+  // Get items for selected plantilla
+  const getPlantillaItems = () => {
+    if (!selectedPlantilla) return []
+    const plantilla = plantillas.find(p => p.id === selectedPlantilla)
+    return plantilla?.plantillaCondicionItemIndependiente || []
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -287,7 +309,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <FileCheck className="h-5 w-5 text-blue-500" />
-              Condiciones de la Cotización
+              Condiciones de la Cotizacion
               <span className="text-sm font-normal text-muted-foreground">
                 ({condiciones.length})
               </span>
@@ -301,138 +323,178 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
                   className="flex items-center gap-2"
                 >
                   <Upload className="h-4 w-4" />
-                  Importar Condición
+                  Importar
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
-                    Importar desde Catálogo
+                    Importar Condiciones
                   </DialogTitle>
                   <DialogDescription>
-                    Selecciona una condición del catálogo y elige qué items importar.
+                    Selecciona condiciones del catalogo o de una plantilla.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="condicion">Condición del Catálogo</Label>
-                    <Select value={selectedCondicion} onValueChange={handleCondicionSelect}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una condición..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {condicionesDisponibles.map((condicion) => (
-                          <SelectItem key={condicion.id} value={condicion.id}>
-                            {condicion.nombre} ({condicion._count?.items || 0} items)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
-                  {showItemSelection && selectedCondicion && (
-                    <>
-                      <div className="grid gap-2">
-                        <Label htmlFor="modo">Modo de importación</Label>
-                        <Select value={importMode} onValueChange={(value: 'replace' | 'append') => setImportMode(value)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="append">Agregar a existentes</SelectItem>
-                            <SelectItem value="replace">Reemplazar todas</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                <Tabs value={importTab} onValueChange={(v) => { setImportTab(v as any); setSelectedItems([]); setSelectedPlantilla(''); }}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="catalogo">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Catalogo ({catalogoItems.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="plantilla">
+                      <Package className="h-4 w-4 mr-2" />
+                      Plantillas ({plantillas.length})
+                    </TabsTrigger>
+                  </TabsList>
 
-                      <div className="grid gap-2">
-                        <Label>Seleccionar Items a Importar</Label>
-                        <div className="max-h-60 overflow-y-auto border rounded-md p-3 space-y-2">
-                          {(() => {
-                            const selectedTemplate = condicionesDisponibles.find(c => c.id === selectedCondicion)
-                            return selectedTemplate?.items?.map((item: any, index: number) => {
-                              const alreadyImported = isItemAlreadyImported(item.descripcion)
-                              const isSelected = selectedItems.includes(index)
+                  <TabsContent value="catalogo" className="space-y-4 mt-4">
+                    <div className="max-h-60 overflow-y-auto border rounded-md p-3 space-y-2">
+                      {catalogoItems.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No hay condiciones en el catalogo
+                        </p>
+                      ) : (
+                        catalogoItems.map((item) => {
+                          const alreadyImported = isItemAlreadyImported(item.descripcion)
+                          const isSelected = selectedItems.includes(item.id)
 
-                              return (
-                                <div
-                                  key={index}
-                                  className={`flex items-start gap-3 p-2 rounded border ${
-                                    alreadyImported
-                                      ? 'bg-green-50 border-green-200'
-                                      : isSelected
-                                        ? 'bg-blue-50 border-blue-200'
-                                        : 'bg-gray-50 border-gray-200'
-                                  }`}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => !alreadyImported && handleItemToggle(index)}
-                                    disabled={alreadyImported}
-                                    className={`mt-0.5 ${alreadyImported ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                                  >
-                                    {alreadyImported ? (
-                                      <CheckCircle className="h-4 w-4 text-green-600" />
-                                    ) : isSelected ? (
-                                      <CheckSquare className="h-4 w-4 text-blue-600" />
-                                    ) : (
-                                      <Square className="h-4 w-4 text-gray-400" />
-                                    )}
-                                  </button>
-                                  <div className="flex-1">
-                                    <p className={`text-sm ${alreadyImported ? 'text-green-800' : 'text-gray-700'}`}>
-                                      {item.descripcion}
-                                    </p>
-                                    {item.tipo && (
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        Tipo: {item.tipo}
-                                      </p>
-                                    )}
-                                    {alreadyImported && (
-                                      <p className="text-xs text-green-600 mt-1">✓ Ya importado</p>
-                                    )}
-                                  </div>
+                          return (
+                            <div
+                              key={item.id}
+                              className={`flex items-start gap-3 p-2 rounded border cursor-pointer transition-colors ${
+                                alreadyImported
+                                  ? 'bg-green-50 border-green-200 cursor-not-allowed'
+                                  : isSelected
+                                    ? 'bg-blue-50 border-blue-200'
+                                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                              }`}
+                              onClick={() => !alreadyImported && handleItemToggle(item.id)}
+                            >
+                              {alreadyImported ? (
+                                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                              ) : isSelected ? (
+                                <CheckSquare className="h-4 w-4 text-blue-600 mt-0.5" />
+                              ) : (
+                                <Square className="h-4 w-4 text-gray-400 mt-0.5" />
+                              )}
+                              <div className="flex-1">
+                                <p className={`text-sm ${alreadyImported ? 'text-green-800' : 'text-gray-700'}`}>
+                                  {item.descripcion}
+                                </p>
+                                <div className="flex gap-2 mt-1">
+                                  <span className="text-xs text-muted-foreground">{item.codigo}</span>
+                                  {item.tipo && (
+                                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 rounded">
+                                      {item.tipo}
+                                    </span>
+                                  )}
+                                  {alreadyImported && (
+                                    <span className="text-xs text-green-600">Ya importado</span>
+                                  )}
                                 </div>
-                              )
-                            }) || []
-                          })()}
-                        </div>
-                        <div className="flex gap-2 text-sm text-muted-foreground">
-                          <span>{selectedItems.length} seleccionados</span>
-                          <span>•</span>
-                          <span>{(() => {
-                            const selectedTemplate = condicionesDisponibles.find(c => c.id === selectedCondicion)
-                            const alreadyImportedCount = selectedTemplate?.items?.filter((item: any) =>
-                              isItemAlreadyImported(item.descripcion)
-                            ).length || 0
-                            return `${alreadyImportedCount} ya importados`
-                          })()}</span>
-                        </div>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="plantilla" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label>Seleccionar Plantilla</Label>
+                      <Select value={selectedPlantilla} onValueChange={(v) => { setSelectedPlantilla(v); setSelectedItems([]); }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una plantilla..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plantillas.map((plantilla) => (
+                            <SelectItem key={plantilla.id} value={plantilla.id}>
+                              {plantilla.nombre} ({plantilla._count?.plantillaCondicionItemIndependiente || 0} items)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedPlantilla && (
+                      <div className="max-h-60 overflow-y-auto border rounded-md p-3 space-y-2">
+                        {getPlantillaItems().length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Esta plantilla no tiene items
+                          </p>
+                        ) : (
+                          getPlantillaItems().map((item: any) => {
+                            const alreadyImported = isItemAlreadyImported(item.descripcion)
+                            const isSelected = selectedItems.includes(item.id)
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={`flex items-start gap-3 p-2 rounded border cursor-pointer transition-colors ${
+                                  alreadyImported
+                                    ? 'bg-green-50 border-green-200 cursor-not-allowed'
+                                    : isSelected
+                                      ? 'bg-blue-50 border-blue-200'
+                                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                                }`}
+                                onClick={() => !alreadyImported && handleItemToggle(item.id)}
+                              >
+                                {alreadyImported ? (
+                                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                                ) : isSelected ? (
+                                  <CheckSquare className="h-4 w-4 text-blue-600 mt-0.5" />
+                                ) : (
+                                  <Square className="h-4 w-4 text-gray-400 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                  <p className={`text-sm ${alreadyImported ? 'text-green-800' : 'text-gray-700'}`}>
+                                    {item.descripcion}
+                                  </p>
+                                  {item.tipo && (
+                                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 rounded mt-1 inline-block">
+                                      {item.tipo}
+                                    </span>
+                                  )}
+                                  {alreadyImported && (
+                                    <span className="text-xs text-green-600 ml-2">Ya importado</span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })
+                        )}
                       </div>
-                    </>
-                  )}
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowImportDialog(false)}
-                    disabled={importing}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleImportFromCondicion}
-                    disabled={!selectedCondicion || selectedItems.length === 0 || importing}
-                    className="flex items-center gap-2"
-                  >
-                    {importing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Upload className="h-4 w-4" />
                     )}
-                    {importing ? 'Importando...' : `Importar ${selectedItems.length} items`}
-                  </Button>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="flex justify-between items-center mt-4">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedItems.length} seleccionados
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowImportDialog(false)}
+                      disabled={importing}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleImport}
+                      disabled={selectedItems.length === 0 || importing}
+                    >
+                      {importing ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Upload className="h-4 w-4 mr-2" />
+                      )}
+                      Importar {selectedItems.length > 0 && `(${selectedItems.length})`}
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -450,25 +512,25 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
             <Alert className="border-green-200 bg-green-50">
               <AlertCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                Operación realizada exitosamente
+                Operacion realizada exitosamente
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Agregar nueva condición */}
+          {/* Agregar nueva condicion */}
           <div className="space-y-4">
-            <Label className="text-sm font-medium">Agregar Nueva Condición</Label>
+            <Label className="text-sm font-medium">Agregar Nueva Condicion</Label>
             <div className="space-y-3">
               <Select
                 value={newCondicion.tipo}
                 onValueChange={(value) => setNewCondicion(prev => ({ ...prev, tipo: value }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar tipo de condición (opcional)" />
+                  <SelectValue placeholder="Seleccionar tipo de condicion (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="comercial">Comercial</SelectItem>
-                  <SelectItem value="tecnica">Técnica</SelectItem>
+                  <SelectItem value="tecnica">Tecnica</SelectItem>
                   <SelectItem value="legal">Legal</SelectItem>
                   <SelectItem value="operativa">Operativa</SelectItem>
                   <SelectItem value="financiera">Financiera</SelectItem>
@@ -478,7 +540,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
               <Textarea
                 value={newCondicion.descripcion}
                 onChange={(e) => setNewCondicion(prev => ({ ...prev, descripcion: e.target.value }))}
-                placeholder="Ej: Los precios están sujetos a variaciones del tipo de cambio..."
+                placeholder="Ej: Los precios estan sujetos a variaciones del tipo de cambio..."
                 rows={3}
               />
 
@@ -492,7 +554,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
                 ) : (
                   <Plus className="h-4 w-4" />
                 )}
-                Agregar Condición
+                Agregar Condicion
               </Button>
             </div>
           </div>
@@ -533,7 +595,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="comercial">Comercial</SelectItem>
-                              <SelectItem value="tecnica">Técnica</SelectItem>
+                              <SelectItem value="tecnica">Tecnica</SelectItem>
                               <SelectItem value="legal">Legal</SelectItem>
                               <SelectItem value="operativa">Operativa</SelectItem>
                               <SelectItem value="financiera">Financiera</SelectItem>

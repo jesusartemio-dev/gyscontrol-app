@@ -13,6 +13,12 @@ import {
   type CatalogoCondicion,
   type CategoriaCondicion
 } from '@/lib/services/catalogoCondicion'
+import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
+import {
+  exportarCondicionesAExcel,
+  importarCondicionesDesdeExcel,
+  validarCondicionesImportadas
+} from '@/lib/utils/condicionesExcel'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -61,7 +67,8 @@ import {
   Pencil,
   Trash2,
   Loader2,
-  FolderPlus
+  FolderPlus,
+  AlertCircle
 } from 'lucide-react'
 
 const TIPOS_CONDICION = [
@@ -76,6 +83,8 @@ export default function CatalogoCondicionesPage() {
   const [condiciones, setCondiciones] = useState<CatalogoCondicion[]>([])
   const [categorias, setCategorias] = useState<CategoriaCondicion[]>([])
   const [loading, setLoading] = useState(true)
+  const [importando, setImportando] = useState(false)
+  const [erroresImport, setErroresImport] = useState<string[]>([])
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -223,6 +232,84 @@ export default function CatalogoCondicionesPage() {
     }
   }
 
+  const handleExportar = () => {
+    try {
+      exportarCondicionesAExcel(condiciones)
+      toast.success('Condiciones exportadas a Excel')
+    } catch (error) {
+      console.error('Error exportando:', error)
+      toast.error('Error al exportar')
+    }
+  }
+
+  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImportando(true)
+    setErroresImport([])
+
+    try {
+      const datos = await importarCondicionesDesdeExcel(file)
+      const codigosExistentes = condiciones.map(c => c.codigo)
+
+      const { condicionesValidas, errores } = validarCondicionesImportadas(
+        datos,
+        categorias,
+        codigosExistentes
+      )
+
+      if (errores.length > 0) {
+        setErroresImport(errores)
+        toast.error('Hay errores en el archivo')
+        return
+      }
+
+      if (condicionesValidas.length === 0) {
+        toast.error('No hay condiciones validas para importar')
+        return
+      }
+
+      // Procesar nuevas y actualizaciones
+      let creadas = 0
+      let actualizadas = 0
+
+      for (const cond of condicionesValidas) {
+        if (cond.esNueva) {
+          await createCatalogoCondicion({
+            descripcion: cond.descripcion,
+            categoriaId: cond.categoriaId,
+            tipo: cond.tipo
+          })
+          creadas++
+        } else if (cond.codigo) {
+          const existente = condiciones.find(c => c.codigo === cond.codigo)
+          if (existente) {
+            await updateCatalogoCondicion(existente.id, {
+              descripcion: cond.descripcion,
+              categoriaId: cond.categoriaId,
+              tipo: cond.tipo
+            })
+            actualizadas++
+          }
+        }
+      }
+
+      await cargarDatos()
+
+      const mensaje = []
+      if (creadas > 0) mensaje.push(`${creadas} creadas`)
+      if (actualizadas > 0) mensaje.push(`${actualizadas} actualizadas`)
+      toast.success(`Condiciones importadas: ${mensaje.join(', ')}`)
+    } catch (error) {
+      console.error('Error importando:', error)
+      toast.error('Error al importar el archivo')
+    } finally {
+      setImportando(false)
+      e.target.value = ''
+    }
+  }
+
   const openEditModal = (condicion: CatalogoCondicion) => {
     setSelectedCondicion(condicion)
     setFormData({
@@ -274,7 +361,12 @@ export default function CatalogoCondicionesPage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <BotonesImportExport
+            onExportar={handleExportar}
+            onImportar={handleImportar}
+            importando={importando}
+          />
           <Button variant="outline" onClick={() => setShowCategoriaModal(true)}>
             <FolderPlus className="h-4 w-4 mr-2" />
             Nueva Categoría
@@ -285,6 +377,28 @@ export default function CatalogoCondicionesPage() {
           </Button>
         </div>
       </div>
+
+      {/* Errores de importacion */}
+      {erroresImport.length > 0 && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2 text-sm font-medium text-red-700 mb-2">
+            <AlertCircle className="h-4 w-4" />
+            Errores de importacion:
+          </div>
+          <ul className="text-xs text-red-600 space-y-1 ml-6 list-disc">
+            {erroresImport.slice(0, 10).map((err, i) => <li key={i}>{err}</li>)}
+            {erroresImport.length > 10 && <li>... y {erroresImport.length - 10} mas</li>}
+          </ul>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setErroresImport([])}
+            className="mt-2 text-red-600 hover:text-red-700"
+          >
+            Cerrar
+          </Button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4">

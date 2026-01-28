@@ -11,26 +11,41 @@ import {
   Wrench,
   Truck,
   DollarSign,
-  ChevronDown
+  ChevronDown,
+  FileText,
+  FileX
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { toast } from 'sonner'
 import PlantillaModal from '@/components/plantillas/PlantillaModal'
 import PlantillaModalEquipos from '@/components/plantillas/PlantillaModalEquipos'
 import PlantillaModalServicios from '@/components/plantillas/PlantillaModalServicios'
 import PlantillaModalGastos from '@/components/plantillas/PlantillaModalGastos'
 import PlantillasView from '@/components/plantillas/PlantillasView'
 import { getPlantillas, getPlantillasEquipos, getPlantillasServicios, getPlantillasGastos } from '@/lib/services/plantilla'
+import { getPlantillasCondicionIndependiente, createPlantillaCondicionIndependiente, type PlantillaCondicionIndependiente } from '@/lib/services/plantillaCondicionIndependiente'
+import { getPlantillasExclusionIndependiente, createPlantillaExclusionIndependiente, type PlantillaExclusionIndependiente } from '@/lib/services/plantillaExclusionIndependiente'
 import type { Plantilla } from '@/types'
 
-type TemplateFilter = 'todas' | 'completas' | 'equipos' | 'servicios' | 'gastos'
+type TemplateFilter = 'todas' | 'completas' | 'equipos' | 'servicios' | 'gastos' | 'condiciones' | 'exclusiones'
 
 export default function PlantillasPage() {
   const router = useRouter()
@@ -38,6 +53,8 @@ export default function PlantillasPage() {
   const [plantillasEquipos, setPlantillasEquipos] = useState<any[]>([])
   const [plantillasServicios, setPlantillasServicios] = useState<any[]>([])
   const [plantillasGastos, setPlantillasGastos] = useState<any[]>([])
+  const [plantillasCondiciones, setPlantillasCondiciones] = useState<PlantillaCondicionIndependiente[]>([])
+  const [plantillasExclusiones, setPlantillasExclusiones] = useState<PlantillaExclusionIndependiente[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState<TemplateFilter>('todas')
@@ -48,27 +65,37 @@ export default function PlantillasPage() {
   const [showModalEquipos, setShowModalEquipos] = useState(false)
   const [showModalServicios, setShowModalServicios] = useState(false)
   const [showModalGastos, setShowModalGastos] = useState(false)
+  const [showModalCondiciones, setShowModalCondiciones] = useState(false)
+  const [showModalExclusiones, setShowModalExclusiones] = useState(false)
+  const [nombrePlantilla, setNombrePlantilla] = useState('')
+  const [creatingPlantilla, setCreatingPlantilla] = useState(false)
 
   useEffect(() => {
     const loadAllTemplates = async () => {
       try {
         setLoading(true)
-        const [general, equipos, servicios, gastos] = await Promise.all([
+        const [general, equipos, servicios, gastos, condiciones, exclusiones] = await Promise.all([
           getPlantillas(),
           getPlantillasEquipos(),
           getPlantillasServicios(),
-          getPlantillasGastos()
+          getPlantillasGastos(),
+          getPlantillasCondicionIndependiente(),
+          getPlantillasExclusionIndependiente()
         ])
 
         const generalWithTipo = general.map((p: any) => ({ ...p, tipo: p.tipo || 'completa' }))
         const equiposWithTipo = equipos.map((p: any) => ({ ...p, tipo: 'equipos' }))
         const serviciosWithTipo = servicios.map((p: any) => ({ ...p, tipo: 'servicios' }))
         const gastosWithTipo = gastos.map((p: any) => ({ ...p, tipo: 'gastos' }))
+        const condicionesWithTipo = condiciones.map((p: any) => ({ ...p, tipo: 'condiciones' }))
+        const exclusionesWithTipo = exclusiones.map((p: any) => ({ ...p, tipo: 'exclusiones' }))
 
         setPlantillas(generalWithTipo)
         setPlantillasEquipos(equiposWithTipo)
         setPlantillasServicios(serviciosWithTipo)
         setPlantillasGastos(gastosWithTipo)
+        setPlantillasCondiciones(condicionesWithTipo)
+        setPlantillasExclusiones(exclusionesWithTipo)
       } catch (error) {
         console.error('Error loading templates:', error)
         setError('Error al cargar plantillas.')
@@ -80,13 +107,17 @@ export default function PlantillasPage() {
     loadAllTemplates()
   }, [])
 
-  const handleCreated = (nueva: any, tipo?: 'equipos' | 'servicios' | 'gastos') => {
+  const handleCreated = (nueva: any, tipo?: 'equipos' | 'servicios' | 'gastos' | 'condiciones' | 'exclusiones') => {
     if (tipo === 'equipos') {
       setPlantillasEquipos((prev) => [...prev, { ...nueva, tipo: 'equipos' }])
     } else if (tipo === 'servicios') {
       setPlantillasServicios((prev) => [...prev, { ...nueva, tipo: 'servicios' }])
     } else if (tipo === 'gastos') {
       setPlantillasGastos((prev) => [...prev, { ...nueva, tipo: 'gastos' }])
+    } else if (tipo === 'condiciones') {
+      setPlantillasCondiciones((prev) => [...prev, { ...nueva, tipo: 'condiciones' }])
+    } else if (tipo === 'exclusiones') {
+      setPlantillasExclusiones((prev) => [...prev, { ...nueva, tipo: 'exclusiones' }])
     } else {
       setPlantillas((prev) => [...prev, nueva])
     }
@@ -101,6 +132,8 @@ export default function PlantillasPage() {
       setPlantillasEquipos((prev) => prev.filter((p) => p.id !== id))
       setPlantillasServicios((prev) => prev.filter((p) => p.id !== id))
       setPlantillasGastos((prev) => prev.filter((p) => p.id !== id))
+      setPlantillasCondiciones((prev) => prev.filter((p) => p.id !== id))
+      setPlantillasExclusiones((prev) => prev.filter((p) => p.id !== id))
     } catch (error) {
       console.error('Error deleting template:', error)
     }
@@ -111,6 +144,8 @@ export default function PlantillasPage() {
     setPlantillasEquipos((prev) => prev.map((p) => p.id === actualizada.id ? actualizada : p))
     setPlantillasServicios((prev) => prev.map((p) => p.id === actualizada.id ? actualizada : p))
     setPlantillasGastos((prev) => prev.map((p) => p.id === actualizada.id ? actualizada : p))
+    setPlantillasCondiciones((prev) => prev.map((p) => p.id === actualizada.id ? actualizada : p))
+    setPlantillasExclusiones((prev) => prev.map((p) => p.id === actualizada.id ? actualizada : p))
   }
 
   const handleEdit = (id: string, currentName: string) => {
@@ -133,12 +168,16 @@ export default function PlantillasPage() {
         return plantillasServicios.filter(p => p.tipo === 'servicios')
       case 'gastos':
         return plantillasGastos.filter(p => p.tipo === 'gastos')
+      case 'condiciones':
+        return plantillasCondiciones
+      case 'exclusiones':
+        return plantillasExclusiones
       default:
         const completas = plantillas.filter(p => !p.tipo || p.tipo === 'completa')
         const equiposEspecificos = plantillasEquipos.filter(p => p.tipo === 'equipos')
         const serviciosEspecificos = plantillasServicios.filter(p => p.tipo === 'servicios')
         const gastosEspecificos = plantillasGastos.filter(p => p.tipo === 'gastos')
-        const allTemplates = [...completas, ...equiposEspecificos, ...serviciosEspecificos, ...gastosEspecificos]
+        const allTemplates = [...completas, ...equiposEspecificos, ...serviciosEspecificos, ...gastosEspecificos, ...plantillasCondiciones, ...plantillasExclusiones]
         return allTemplates.filter((template, index, self) =>
           index === self.findIndex(t => t.id === template.id)
         )
@@ -150,7 +189,9 @@ export default function PlantillasPage() {
   const equiposCount = plantillasEquipos.filter(p => p.tipo === 'equipos').length
   const serviciosCount = plantillasServicios.filter(p => p.tipo === 'servicios').length
   const gastosCount = plantillasGastos.filter(p => p.tipo === 'gastos').length
-  const todasCount = completasCount + equiposCount + serviciosCount + gastosCount
+  const condicionesCount = plantillasCondiciones.length
+  const exclusionesCount = plantillasExclusiones.length
+  const todasCount = completasCount + equiposCount + serviciosCount + gastosCount + condicionesCount + exclusionesCount
 
   const currentTemplates = getCurrentTemplates()
 
@@ -192,6 +233,14 @@ export default function PlantillasPage() {
             <div className="flex items-center gap-1 text-purple-600" title="Gastos">
               <DollarSign className="h-3.5 w-3.5" />
               <span className="font-medium">{gastosCount}</span>
+            </div>
+            <div className="flex items-center gap-1 text-cyan-600" title="Condiciones">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="font-medium">{condicionesCount}</span>
+            </div>
+            <div className="flex items-center gap-1 text-rose-600" title="Exclusiones">
+              <FileX className="h-3.5 w-3.5" />
+              <span className="font-medium">{exclusionesCount}</span>
             </div>
           </div>
 
@@ -246,6 +295,26 @@ export default function PlantillasPage() {
                 <DollarSign className="h-4 w-4 mr-2 text-purple-600" />
                 Gastos
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setDropdownOpen(false)
+                  setNombrePlantilla('')
+                  setTimeout(() => setShowModalCondiciones(true), 150)
+                }}
+              >
+                <FileText className="h-4 w-4 mr-2 text-cyan-600" />
+                Condiciones
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setDropdownOpen(false)
+                  setNombrePlantilla('')
+                  setTimeout(() => setShowModalExclusiones(true), 150)
+                }}
+              >
+                <FileX className="h-4 w-4 mr-2 text-rose-600" />
+                Exclusiones
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -281,11 +350,111 @@ export default function PlantillasPage() {
             isOpen={showModalGastos}
             onClose={() => setShowModalGastos(false)}
           />
+
+          {/* Modal Condiciones */}
+          <Dialog open={showModalCondiciones} onOpenChange={setShowModalCondiciones}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Nueva Plantilla de Condiciones</DialogTitle>
+                <DialogDescription>
+                  Crea una plantilla para agrupar condiciones reutilizables
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Nombre *</Label>
+                  <Input
+                    value={nombrePlantilla}
+                    onChange={(e) => setNombrePlantilla(e.target.value)}
+                    placeholder="Ej: Condiciones Generales"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowModalCondiciones(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!nombrePlantilla.trim()) {
+                      toast.error('El nombre es obligatorio')
+                      return
+                    }
+                    setCreatingPlantilla(true)
+                    try {
+                      const nueva = await createPlantillaCondicionIndependiente({ nombre: nombrePlantilla.trim() })
+                      handleCreated(nueva, 'condiciones')
+                      setShowModalCondiciones(false)
+                      toast.success('Plantilla de condiciones creada')
+                    } catch (error) {
+                      toast.error('Error al crear plantilla')
+                    } finally {
+                      setCreatingPlantilla(false)
+                    }
+                  }}
+                  disabled={creatingPlantilla}
+                >
+                  {creatingPlantilla && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Crear Plantilla
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal Exclusiones */}
+          <Dialog open={showModalExclusiones} onOpenChange={setShowModalExclusiones}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Nueva Plantilla de Exclusiones</DialogTitle>
+                <DialogDescription>
+                  Crea una plantilla para agrupar exclusiones reutilizables
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Nombre *</Label>
+                  <Input
+                    value={nombrePlantilla}
+                    onChange={(e) => setNombrePlantilla(e.target.value)}
+                    placeholder="Ej: Exclusiones Generales"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowModalExclusiones(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!nombrePlantilla.trim()) {
+                      toast.error('El nombre es obligatorio')
+                      return
+                    }
+                    setCreatingPlantilla(true)
+                    try {
+                      const nueva = await createPlantillaExclusionIndependiente({ nombre: nombrePlantilla.trim() })
+                      handleCreated(nueva, 'exclusiones')
+                      setShowModalExclusiones(false)
+                      toast.success('Plantilla de exclusiones creada')
+                    } catch (error) {
+                      toast.error('Error al crear plantilla')
+                    } finally {
+                      setCreatingPlantilla(false)
+                    }
+                  }}
+                  disabled={creatingPlantilla}
+                >
+                  {creatingPlantilla && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Crear Plantilla
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
       {/* Mobile Stats */}
-      <div className="md:hidden grid grid-cols-4 gap-2">
+      <div className="md:hidden grid grid-cols-3 gap-2">
         <div className="bg-blue-50 rounded-lg p-2 text-center">
           <div className="text-lg font-bold text-blue-600">{completasCount}</div>
           <div className="text-[10px] text-blue-700">Completas</div>
@@ -301,6 +470,14 @@ export default function PlantillasPage() {
         <div className="bg-purple-50 rounded-lg p-2 text-center">
           <div className="text-lg font-bold text-purple-600">{gastosCount}</div>
           <div className="text-[10px] text-purple-700">Gastos</div>
+        </div>
+        <div className="bg-cyan-50 rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-cyan-600">{condicionesCount}</div>
+          <div className="text-[10px] text-cyan-700">Condiciones</div>
+        </div>
+        <div className="bg-rose-50 rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-rose-600">{exclusionesCount}</div>
+          <div className="text-[10px] text-rose-700">Exclusiones</div>
         </div>
       </div>
 
@@ -355,6 +532,26 @@ export default function PlantillasPage() {
           Gastos
           <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">{gastosCount}</Badge>
         </Button>
+        <Button
+          variant={activeFilter === 'condiciones' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveFilter('condiciones')}
+          className="h-7 text-xs"
+        >
+          <FileText className="h-3 w-3 mr-1" />
+          Condiciones
+          <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">{condicionesCount}</Badge>
+        </Button>
+        <Button
+          variant={activeFilter === 'exclusiones' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveFilter('exclusiones')}
+          className="h-7 text-xs"
+        >
+          <FileX className="h-3 w-3 mr-1" />
+          Exclusiones
+          <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">{exclusionesCount}</Badge>
+        </Button>
       </div>
 
       {/* Error State */}
@@ -394,10 +591,45 @@ export default function PlantillasPage() {
             />
           </CardContent>
         </Card>
+      ) : activeFilter === 'condiciones' || activeFilter === 'exclusiones' ? (
+        <Card>
+          <CardContent className="p-4">
+            <div className="space-y-2">
+              {(activeFilter === 'condiciones' ? plantillasCondiciones : plantillasExclusiones).map((plantilla) => (
+                <div key={plantilla.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    {activeFilter === 'condiciones' ? (
+                      <FileText className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <FileX className="h-5 w-5 text-orange-600" />
+                    )}
+                    <div>
+                      <p className="font-medium">{plantilla.nombre}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {activeFilter === 'condiciones'
+                          ? (plantilla as PlantillaCondicionIndependiente)._count?.plantillaCondicionItemIndependiente || 0
+                          : (plantilla as PlantillaExclusionIndependiente)._count?.plantillaExclusionItemIndependiente || 0
+                        } items
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant={plantilla.activo ? 'default' : 'secondary'}>
+                    {plantilla.activo ? 'Activa' : 'Inactiva'}
+                  </Badge>
+                </div>
+              ))}
+              {(activeFilter === 'condiciones' ? plantillasCondiciones : plantillasExclusiones).length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No hay plantillas de {activeFilter} registradas
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <PlantillasView
-          plantillas={currentTemplates}
-          filterType={activeFilter}
+          plantillas={currentTemplates as any}
+          filterType={activeFilter as 'todas' | 'completas' | 'equipos' | 'servicios' | 'gastos'}
           onDelete={handleDelete}
           onEdit={handleEdit}
         />

@@ -262,6 +262,8 @@ export default function Sidebar() {
         // 📋 Plantillas para cotizaciones
         { href: '/catalogo/exclusiones', label: 'Exclusiones', icon: FileText },
         { href: '/catalogo/condiciones', label: 'Condiciones', icon: FileCheck },
+        { href: '/catalogo/categorias-exclusion', label: 'Categorías Exclusión', icon: FolderOpen },
+        { href: '/catalogo/categorias-condicion', label: 'Categorías Condición', icon: FolderOpen },
         // 🏗️ Configuración de fases
         { href: '/configuracion/fases', label: 'Fases por Defecto', icon: GitBranch },
         // 📅 Configuración de duraciones de cronograma

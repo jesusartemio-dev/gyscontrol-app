@@ -1,493 +1,609 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   getCatalogoExclusiones,
+  getCategoriasExclusion,
   createCatalogoExclusion,
   updateCatalogoExclusion,
   deleteCatalogoExclusion,
-  getCategoriasExclusion,
+  createCategoriaExclusion,
   type CatalogoExclusion,
-  type CatalogoExclusionItem,
   type CategoriaExclusion
 } from '@/lib/services/catalogoExclusion'
+import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
+import {
+  exportarExclusionesAExcel,
+  importarExclusionesDesdeExcel,
+  validarExclusionesImportadas
+} from '@/lib/utils/exclusionesExcel'
 
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertCircle, FileText, TrendingUp, Package, Home, Settings, Loader2, Plus, Pencil, Trash2, ChevronDown, ChevronRight, Search, X } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  ArrowLeft,
+  Plus,
+  Search,
+  FileX,
+  Pencil,
+  Trash2,
+  Loader2,
+  FolderPlus,
+  AlertCircle
+} from 'lucide-react'
 
-export default function ExclusionesPage() {
+export default function CatalogoExclusionesPage() {
+  const router = useRouter()
   const [exclusiones, setExclusiones] = useState<CatalogoExclusion[]>([])
   const [categorias, setCategorias] = useState<CategoriaExclusion[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [search, setSearch] = useState('')
-  const [filterCategoria, setFilterCategoria] = useState<string>('')
+  const [importando, setImportando] = useState(false)
+  const [erroresImport, setErroresImport] = useState<string[]>([])
 
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingExclusion, setEditingExclusion] = useState<CatalogoExclusion | null>(null)
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
+
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showCategoriaModal, setShowCategoriaModal] = useState(false)
+  const [selectedExclusion, setSelectedExclusion] = useState<CatalogoExclusion | null>(null)
+  const [saving, setSaving] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
-    nombre: '',
     descripcion: '',
     categoriaId: '',
-    items: [] as CatalogoExclusionItem[]
   })
+  const [nuevaCategoria, setNuevaCategoria] = useState('')
 
-  // New item form
-  const [newItemText, setNewItemText] = useState('')
+  useEffect(() => {
+    cargarDatos()
+  }, [])
 
   const cargarDatos = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
       const [exclusionesData, categoriasData] = await Promise.all([
-        getCatalogoExclusiones({
-          search: search || undefined,
-          categoriaId: filterCategoria || undefined
-        }),
+        getCatalogoExclusiones(),
         getCategoriasExclusion()
       ])
       setExclusiones(exclusionesData)
       setCategorias(categoriasData)
     } catch (error) {
-      toast.error('Error al cargar datos')
-      console.error('Error:', error)
+      console.error('Error cargando datos:', error)
+      toast.error('Error al cargar los datos')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    cargarDatos()
-  }, [search, filterCategoria])
+  const exclusionesFiltradas = useMemo(() => {
+    return exclusiones.filter(excl => {
+      const matchSearch = searchTerm === '' ||
+        excl.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        excl.codigo.toLowerCase().includes(searchTerm.toLowerCase())
 
-  const handleOpenModal = (exclusion?: CatalogoExclusion) => {
-    if (exclusion) {
-      setEditingExclusion(exclusion)
-      setFormData({
-        nombre: exclusion.nombre,
-        descripcion: exclusion.descripcion || '',
-        categoriaId: exclusion.categoriaId || '',
-        items: exclusion.items || []
-      })
-    } else {
-      setEditingExclusion(null)
-      setFormData({
-        nombre: '',
-        descripcion: '',
-        categoriaId: '',
-        items: []
-      })
-    }
-    setIsModalOpen(true)
-  }
+      const matchCategoria = categoriaFiltro === '__ALL__' || excl.categoriaId === categoriaFiltro
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setEditingExclusion(null)
-    setNewItemText('')
-  }
+      return matchSearch && matchCategoria
+    })
+  }, [exclusiones, searchTerm, categoriaFiltro])
 
-  const handleAddItem = () => {
-    if (!newItemText.trim()) return
-    setFormData(prev => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          descripcion: newItemText.trim(),
-          orden: prev.items.length + 1,
-          activo: true
-        }
-      ]
-    }))
-    setNewItemText('')
-  }
-
-  const handleRemoveItem = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }))
-  }
-
-  const handleSave = async () => {
-    if (!formData.nombre.trim()) {
-      toast.error('El nombre es obligatorio')
+  const handleCreate = async () => {
+    if (!formData.descripcion.trim()) {
+      toast.error('La descripcion es obligatoria')
       return
     }
 
-    if (formData.items.length === 0) {
-      toast.error('Debe agregar al menos un item')
-      return
-    }
-
+    setSaving(true)
     try {
-      setSaving(true)
-      if (editingExclusion) {
-        await updateCatalogoExclusion(editingExclusion.id, formData)
-        toast.success('Exclusión actualizada')
-      } else {
-        await createCatalogoExclusion(formData)
-        toast.success('Exclusión creada')
-      }
-      handleCloseModal()
+      await createCatalogoExclusion({
+        descripcion: formData.descripcion,
+        categoriaId: formData.categoriaId || undefined,
+      })
+      toast.success('Exclusion creada correctamente')
+      setShowCreateModal(false)
+      resetForm()
       cargarDatos()
     } catch (error) {
-      toast.error('Error al guardar')
-      console.error('Error:', error)
+      console.error('Error creando exclusion:', error)
+      toast.error('Error al crear la exclusion')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta exclusión?')) return
+  const handleUpdate = async () => {
+    if (!selectedExclusion || !formData.descripcion.trim()) {
+      toast.error('La descripcion es obligatoria')
+      return
+    }
 
+    setSaving(true)
     try {
-      await deleteCatalogoExclusion(id)
-      toast.success('Exclusión eliminada')
+      await updateCatalogoExclusion(selectedExclusion.id, {
+        descripcion: formData.descripcion,
+        categoriaId: formData.categoriaId || undefined,
+      })
+      toast.success('Exclusion actualizada correctamente')
+      setShowEditModal(false)
+      setSelectedExclusion(null)
+      resetForm()
       cargarDatos()
     } catch (error) {
-      toast.error('Error al eliminar')
-      console.error('Error:', error)
+      console.error('Error actualizando exclusion:', error)
+      toast.error('Error al actualizar la exclusion')
+    } finally {
+      setSaving(false)
     }
   }
 
-  const toggleExpand = (id: string) => {
-    setExpandedItems(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
+  const handleDelete = async () => {
+    if (!selectedExclusion) return
+
+    setSaving(true)
+    try {
+      await deleteCatalogoExclusion(selectedExclusion.id)
+      toast.success('Exclusion eliminada correctamente')
+      setShowDeleteDialog(false)
+      setSelectedExclusion(null)
+      cargarDatos()
+    } catch (error) {
+      console.error('Error eliminando exclusion:', error)
+      toast.error('Error al eliminar la exclusion')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCreateCategoria = async () => {
+    if (!nuevaCategoria.trim()) {
+      toast.error('El nombre de la categoria es obligatorio')
+      return
+    }
+
+    setSaving(true)
+    try {
+      await createCategoriaExclusion({ nombre: nuevaCategoria.trim() })
+      toast.success('Categoria creada correctamente')
+      setShowCategoriaModal(false)
+      setNuevaCategoria('')
+      const categoriasData = await getCategoriasExclusion()
+      setCategorias(categoriasData)
+    } catch (error) {
+      console.error('Error creando categoria:', error)
+      toast.error('Error al crear la categoria')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleExportar = () => {
+    try {
+      exportarExclusionesAExcel(exclusiones)
+      toast.success('Exclusiones exportadas a Excel')
+    } catch (error) {
+      console.error('Error exportando:', error)
+      toast.error('Error al exportar')
+    }
+  }
+
+  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImportando(true)
+    setErroresImport([])
+
+    try {
+      const datos = await importarExclusionesDesdeExcel(file)
+      const codigosExistentes = exclusiones.map(c => c.codigo)
+
+      const { exclusionesValidas, errores } = validarExclusionesImportadas(
+        datos,
+        categorias,
+        codigosExistentes
+      )
+
+      if (errores.length > 0) {
+        setErroresImport(errores)
+        toast.error('Hay errores en el archivo')
+        return
       }
-      return next
+
+      if (exclusionesValidas.length === 0) {
+        toast.error('No hay exclusiones validas para importar')
+        return
+      }
+
+      // Procesar nuevas y actualizaciones
+      let creadas = 0
+      let actualizadas = 0
+
+      for (const excl of exclusionesValidas) {
+        if (excl.esNueva) {
+          await createCatalogoExclusion({
+            descripcion: excl.descripcion,
+            categoriaId: excl.categoriaId
+          })
+          creadas++
+        } else if (excl.codigo) {
+          const existente = exclusiones.find(c => c.codigo === excl.codigo)
+          if (existente) {
+            await updateCatalogoExclusion(existente.id, {
+              descripcion: excl.descripcion,
+              categoriaId: excl.categoriaId
+            })
+            actualizadas++
+          }
+        }
+      }
+
+      await cargarDatos()
+
+      const mensaje = []
+      if (creadas > 0) mensaje.push(`${creadas} creadas`)
+      if (actualizadas > 0) mensaje.push(`${actualizadas} actualizadas`)
+      toast.success(`Exclusiones importadas: ${mensaje.join(', ')}`)
+    } catch (error) {
+      console.error('Error importando:', error)
+      toast.error('Error al importar el archivo')
+    } finally {
+      setImportando(false)
+      e.target.value = ''
+    }
+  }
+
+  const openEditModal = (exclusion: CatalogoExclusion) => {
+    setSelectedExclusion(exclusion)
+    setFormData({
+      descripcion: exclusion.descripcion,
+      categoriaId: exclusion.categoriaId || '',
+    })
+    setShowEditModal(true)
+  }
+
+  const openDeleteDialog = (exclusion: CatalogoExclusion) => {
+    setSelectedExclusion(exclusion)
+    setShowDeleteDialog(true)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      descripcion: '',
+      categoriaId: '',
     })
   }
 
-  const totalItems = exclusiones.reduce((sum, e) => sum + (e._count?.items || e.items?.length || 0), 0)
-  const avgItems = exclusiones.length > 0 ? Math.round(totalItems / exclusiones.length) : 0
-
-  if (loading && exclusiones.length === 0) {
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="space-y-6">
-        {/* Breadcrumb */}
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/" className="flex items-center gap-2">
-                <Home className="h-4 w-4" />
-                Inicio
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/catalogo" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Configuración
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Catálogo de Exclusiones
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-              <FileText className="h-7 w-7 text-orange-600" />
-              Catálogo de Exclusiones
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <FileX className="h-6 w-6" />
+              Catalogo de Exclusiones
             </h1>
-            <p className="text-muted-foreground mt-1">
-              Gestiona exclusiones reutilizables para cotizaciones
+            <p className="text-muted-foreground">
+              {exclusiones.length} exclusiones en el catalogo
             </p>
           </div>
-          <Button onClick={() => handleOpenModal()} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nueva Exclusión
+        </div>
+        <div className="flex gap-2 items-center">
+          <BotonesImportExport
+            onExportar={handleExportar}
+            onImportar={handleImportar}
+            importando={importando}
+          />
+          <Button variant="outline" onClick={() => setShowCategoriaModal(true)}>
+            <FolderPlus className="h-4 w-4 mr-2" />
+            Nueva Categoria
           </Button>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{exclusiones.length}</div>
-              <p className="text-xs text-muted-foreground">Grupos de exclusiones</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Items</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalItems}</div>
-              <p className="text-xs text-muted-foreground">Total de items</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Promedio</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{avgItems}</div>
-              <p className="text-xs text-muted-foreground">Items por grupo</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Categorías</CardTitle>
-              <Settings className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{categorias.length}</div>
-              <p className="text-xs text-muted-foreground">Categorías activas</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar exclusiones..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {categorias.map(cat => (
-                <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* List */}
-        <div className="space-y-3">
-          {exclusiones.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-center">
-                  No hay exclusiones registradas.
-                  <br />
-                  <Button variant="link" onClick={() => handleOpenModal()} className="p-0 h-auto">
-                    Crear la primera exclusión
-                  </Button>
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            exclusiones.map(exclusion => (
-              <Card key={exclusion.id} className="overflow-hidden">
-                <div
-                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => toggleExpand(exclusion.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    {expandedItems.has(exclusion.id) ? (
-                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{exclusion.nombre}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {exclusion._count?.items || exclusion.items?.length || 0} items
-                        </Badge>
-                        {exclusion.categoria && (
-                          <Badge variant="secondary" className="text-xs">
-                            {exclusion.categoria.nombre}
-                          </Badge>
-                        )}
-                      </div>
-                      {exclusion.descripcion && (
-                        <p className="text-sm text-muted-foreground mt-1">{exclusion.descripcion}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenModal(exclusion)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(exclusion.id)}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-                {expandedItems.has(exclusion.id) && exclusion.items && exclusion.items.length > 0 && (
-                  <div className="border-t bg-muted/30 px-4 py-3">
-                    <ul className="space-y-2">
-                      {exclusion.items.map((item, idx) => (
-                        <li key={item.id || idx} className="flex items-start gap-2 text-sm">
-                          <span className="text-muted-foreground min-w-[24px]">{idx + 1}.</span>
-                          <span className="flex-1">{item.descripcion}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </Card>
-            ))
-          )}
+          <Button onClick={() => { resetForm(); setShowCreateModal(true) }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Exclusion
+          </Button>
         </div>
       </div>
 
-      {/* Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingExclusion ? 'Editar Exclusión' : 'Nueva Exclusión'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingExclusion
-                ? 'Modifica los datos de la exclusión'
-                : 'Crea un nuevo grupo de exclusiones reutilizables'}
-            </DialogDescription>
-          </DialogHeader>
+      {/* Errores de importacion */}
+      {erroresImport.length > 0 && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2 text-sm font-medium text-red-700 mb-2">
+            <AlertCircle className="h-4 w-4" />
+            Errores de importacion:
+          </div>
+          <ul className="text-xs text-red-600 space-y-1 ml-6 list-disc">
+            {erroresImport.slice(0, 10).map((err, i) => <li key={i}>{err}</li>)}
+            {erroresImport.length > 10 && <li>... y {erroresImport.length - 10} mas</li>}
+          </ul>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setErroresImport([])}
+            className="mt-2 text-red-600 hover:text-red-700"
+          >
+            Cerrar
+          </Button>
+        </div>
+      )}
 
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <Label htmlFor="nombre">Nombre del grupo *</Label>
-                <Input
-                  id="nombre"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
-                  placeholder="Ej: Exclusiones Técnicas"
-                />
-              </div>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por codigo o descripcion..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__ALL__">Todas las categorias</SelectItem>
+            {categorias.map(cat => (
+              <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-              <div className="col-span-2">
-                <Label htmlFor="descripcion">Descripción</Label>
-                <Textarea
-                  id="descripcion"
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
-                  placeholder="Descripción opcional del grupo"
-                  rows={2}
-                />
-              </div>
-
-              <div className="col-span-2">
-                <Label htmlFor="categoria">Categoría</Label>
-                <Select
-                  value={formData.categoriaId}
-                  onValueChange={(val) => setFormData(prev => ({ ...prev, categoriaId: val }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categorias.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Items */}
-            <div className="space-y-3">
-              <Label>Items de exclusión *</Label>
-
-              {/* Add new item */}
-              <div className="flex gap-2">
-                <Input
-                  value={newItemText}
-                  onChange={(e) => setNewItemText(e.target.value)}
-                  placeholder="Texto de la exclusión..."
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddItem())}
-                />
-                <Button type="button" onClick={handleAddItem} variant="secondary">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Item list */}
-              {formData.items.length > 0 && (
-                <div className="border rounded-md divide-y">
-                  {formData.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2">
-                      <span className="text-sm text-muted-foreground w-6">{idx + 1}.</span>
-                      <span className="flex-1 text-sm">{item.descripcion}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleRemoveItem(idx)}
-                      >
-                        <X className="h-3 w-3" />
+      {/* Table */}
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[120px]">Codigo</TableHead>
+              <TableHead>Descripcion</TableHead>
+              <TableHead className="w-[150px]">Categoria</TableHead>
+              <TableHead className="w-[100px]">Estado</TableHead>
+              <TableHead className="w-[100px] text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {exclusionesFiltradas.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  No se encontraron exclusiones
+                </TableCell>
+              </TableRow>
+            ) : (
+              exclusionesFiltradas.map(excl => (
+                <TableRow key={excl.id}>
+                  <TableCell className="font-mono text-sm">{excl.codigo}</TableCell>
+                  <TableCell className="max-w-md">
+                    <p className="line-clamp-2">{excl.descripcion}</p>
+                  </TableCell>
+                  <TableCell>
+                    {excl.categoria ? (
+                      <Badge variant="outline">{excl.categoria.nombre}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={excl.activo ? 'default' : 'secondary'}>
+                      {excl.activo ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEditModal(excl)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(excl)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-              {formData.items.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No hay items agregados. Agrega al menos una exclusión.
-                </p>
-              )}
+      {/* Create Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva Exclusion</DialogTitle>
+            <DialogDescription>
+              Agrega una nueva exclusion al catalogo
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Descripcion *</Label>
+              <Textarea
+                value={formData.descripcion}
+                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                placeholder="Escribe la exclusion..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select
+                value={formData.categoriaId}
+                onValueChange={(value) => setFormData({ ...formData, categoriaId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {categorias.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={handleCloseModal}>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleCreate} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editingExclusion ? 'Guardar cambios' : 'Crear exclusión'}
+              Crear Exclusion
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Exclusion</DialogTitle>
+            <DialogDescription>
+              Modifica los datos de la exclusion
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Descripcion *</Label>
+              <Textarea
+                value={formData.descripcion}
+                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                placeholder="Escribe la exclusion..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select
+                value={formData.categoriaId}
+                onValueChange={(value) => setFormData({ ...formData, categoriaId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {categorias.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdate} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar exclusion?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta accion no se puede deshacer. La exclusion sera eliminada permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Categoria Modal */}
+      <Dialog open={showCategoriaModal} onOpenChange={setShowCategoriaModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva Categoria</DialogTitle>
+            <DialogDescription>
+              Crea una nueva categoria para organizar las exclusiones
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nombre de la categoria *</Label>
+              <Input
+                value={nuevaCategoria}
+                onChange={(e) => setNuevaCategoria(e.target.value)}
+                placeholder="Ej: Tecnica, Comercial..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCategoriaModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateCategoria} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Crear Categoria
             </Button>
           </DialogFooter>
         </DialogContent>
