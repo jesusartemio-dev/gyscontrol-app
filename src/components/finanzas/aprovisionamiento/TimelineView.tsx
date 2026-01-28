@@ -725,73 +725,81 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   }, [filtros.validarCoherencia, timelineData]); // ✅ Removed runCoherenceValidation dependency to prevent infinite loop
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Compact Header */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-              <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Timeline de Aprovisionamiento</span>
-              <span className="sm:hidden">Timeline</span>
-            </h2>
-            
-            {/* Compact action buttons */}
-            <div className="flex items-center gap-1">
-              {showCoherencePanel && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={runCoherenceValidation}
-                  disabled={validating}
-                  className="h-8 px-2"
-                >
-                  {validating ? (
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <BarChart3 className="w-3 h-3" />
-                  )}
-                  <span className="hidden sm:inline ml-1">Validar</span>
-                </Button>
+    <div className={`space-y-2 ${className}`}>
+      {/* Single-row toolbar with stats and actions */}
+      <div className="flex items-center justify-between gap-2 flex-wrap bg-muted/30 rounded-lg p-2">
+        {/* Left: Key stats */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {timelineData?.resumen && (
+            <>
+              <Badge variant="outline" className="h-6 gap-1 font-normal">
+                <Calendar className="w-3 h-3" />
+                {timelineData.resumen.totalItems} items
+              </Badge>
+              <Badge variant="outline" className="h-6 gap-1 font-normal text-emerald-700 border-emerald-200 bg-emerald-50">
+                $ {(timelineData.resumen.montoTotal || 0).toLocaleString()}
+              </Badge>
+              {timelineData.resumen.itemsVencidos > 0 && (
+                <Badge variant="destructive" className="h-6 gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {timelineData.resumen.itemsVencidos} vencidos
+                </Badge>
               )}
-              
-              {/* 💰 Cost display options */}
-              {filtros.tipoVista === 'gantt' && (
-                <CostDisplaySelector
-                  options={costOptions}
-                  onOptionsChange={(newOptions) => {
-                    setCostOptions(newOptions);
-                    setShowCosts(newOptions.mode !== 'none');
-                  }}
-                  disabled={loading}
-                />
+              {timelineData.resumen.itemsEnRiesgo > 0 && (
+                <Badge className="h-6 gap-1 bg-orange-100 text-orange-700 hover:bg-orange-100">
+                  <AlertCircle className="w-3 h-3" />
+                  {timelineData.resumen.itemsEnRiesgo} en riesgo
+                </Badge>
               )}
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadTimelineData}
-                disabled={loading}
-                className="h-8 px-2"
-              >
-                {loading ? (
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-3 h-3" />
-                )}
-                <span className="hidden sm:inline ml-1">Actualizar</span>
-              </Button>
-            </div>
-          </div>
+            </>
+          )}
         </div>
-        
-        {/* Compact Status Badges */}
-        {timelineData?.resumen && (
-          <CompactStatusBadges 
-            resumen={timelineData.resumen} 
-            className="" 
-          />
-        )}
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1">
+          {showCoherencePanel && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runCoherenceValidation}
+              disabled={validating}
+              className="h-7 px-2 text-xs"
+            >
+              {validating ? (
+                <RefreshCw className="w-3 h-3 animate-spin" />
+              ) : (
+                <BarChart3 className="w-3 h-3" />
+              )}
+              <span className="hidden sm:inline ml-1">Validar</span>
+            </Button>
+          )}
+
+          {filtros.tipoVista === 'gantt' && (
+            <CostDisplaySelector
+              options={costOptions}
+              onOptionsChange={(newOptions) => {
+                setCostOptions(newOptions);
+                setShowCosts(newOptions.mode !== 'none');
+              }}
+              disabled={loading}
+            />
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadTimelineData}
+            disabled={loading}
+            className="h-7 px-2 text-xs"
+          >
+            {loading ? (
+              <RefreshCw className="w-3 h-3 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3 h-3" />
+            )}
+            <span className="hidden sm:inline ml-1">Actualizar</span>
+          </Button>
+        </div>
       </div>
 
       {/* Main content with sidebar layout */}
@@ -906,52 +914,72 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           )}
          </div>
          
-         {/* Coherence panel */}
+         {/* Coherence panel - compact sidebar */}
          {showCoherencePanel && (
-           <div className="w-80 flex-shrink-0 space-y-4">
-            {/* Coherence stats */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Coherencia</span>
-                  <span className="sm:hidden">Stats</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CoherenceStats validacion={validacionData} />
+           <div className="w-64 flex-shrink-0 space-y-3">
+            {/* Coherence stats - compact */}
+            <Card className="border-0 shadow-sm bg-muted/30">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Coherencia</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="text-center p-2 bg-white rounded">
+                    <div className="text-lg font-bold text-green-600">
+                      {validacionData?.estadisticas?.coherenciaPromedio || 100}%
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Promedio</div>
+                  </div>
+                  <div className="text-center p-2 bg-white rounded">
+                    <div className="text-lg font-bold text-blue-600">
+                      {validacionData?.estadisticas?.totalValidaciones || 0}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Validaciones</div>
+                  </div>
+                  {(validacionData?.estadisticas?.erroresEncontrados || 0) > 0 && (
+                    <div className="text-center p-2 bg-red-50 rounded col-span-2">
+                      <div className="text-sm font-bold text-red-600">
+                        {validacionData?.estadisticas?.erroresEncontrados} errores
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Alerts */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base lg:text-lg flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  Alertas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Alerts - compact */}
+            <Card className="border-0 shadow-sm bg-muted/30">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-4 h-4 text-orange-500" />
+                  <span className="text-sm font-medium">Alertas</span>
+                  {(timelineData?.alertas?.length || 0) > 0 && (
+                    <Badge variant="secondary" className="h-5 text-[10px]">
+                      {timelineData?.alertas?.length}
+                    </Badge>
+                  )}
+                </div>
                 <AlertSummary
                   alertas={timelineData?.alertas || []}
                   onAlertClick={(alerta) => {
-                    // TODO: Handle alert click
                     console.log('Alert clicked:', alerta);
                   }}
                 />
               </CardContent>
             </Card>
 
-            {/* Suggestions */}
-            {filtros.incluirSugerencias && validacionData?.sugerencias && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base lg:text-lg flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4" />
-                    Sugerencias
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+            {/* Suggestions - only show if there are any */}
+            {filtros.incluirSugerencias && validacionData?.sugerencias && validacionData.sugerencias.length > 0 && (
+              <Card className="border-0 shadow-sm bg-muted/30">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lightbulb className="w-4 h-4 text-yellow-500" />
+                    <span className="text-sm font-medium">Sugerencias</span>
+                    <Badge variant="secondary" className="h-5 text-[10px]">
+                      {validacionData.sugerencias.length}
+                    </Badge>
+                  </div>
                   <SuggestionsPanel
                     sugerencias={validacionData.sugerencias}
                     onApplySuggestion={handleApplySuggestion}
