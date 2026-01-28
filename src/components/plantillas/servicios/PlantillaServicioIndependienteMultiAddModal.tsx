@@ -425,7 +425,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
                             <h4 className="font-medium text-sm">{servicio.nombre}</h4>
                             <p className="text-xs text-gray-600 line-clamp-2">{servicio.descripcion}</p>
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-500">{servicio.categoria?.nombre || 'Sin categoría'}</span>
+                              <span className="text-gray-500">{servicio.edt?.nombre || 'Sin EDT'}</span>
                               <span className="text-gray-500">Escalonada (Dificultad: {servicio.nivelDificultad || 1})</span>
                             </div>
                             {isSelected && (

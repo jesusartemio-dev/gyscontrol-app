@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import CotizacionServicioItemTable from './CotizacionServicioItemTable'
 import CotizacionServicioItemMultiAddModal from './CotizacionServicioItemMultiAddModal'
+import CotizacionServicioItemCreateModal from './CotizacionServicioItemCreateModal'
 import type { CotizacionServicio, CotizacionServicioItem } from '@/types'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { cn } from '@/lib/utils'
@@ -16,7 +17,8 @@ import {
   TrendingUp,
   ChevronRight,
   Plus,
-  Clock
+  Clock,
+  Download
 } from 'lucide-react'
 
 const formatCurrency = (amount: number): string => {
@@ -49,7 +51,8 @@ export default function CotizacionServicioAccordion({
   const [isOpen, setIsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(servicio.nombre)
-  const [modalAbierto, setModalAbierto] = useState(false)
+  const [modalImportarAbierto, setModalImportarAbierto] = useState(false)
+  const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
@@ -87,7 +90,12 @@ export default function CotizacionServicioAccordion({
         items.forEach(item => onCreated(item))
       }
     }
-    setModalAbierto(false)
+    setModalImportarAbierto(false)
+  }
+
+  const handleItemCreated = (item: CotizacionServicioItem) => {
+    onCreated(item)
+    setModalNuevoAbierto(false)
   }
 
   return (
@@ -204,15 +212,26 @@ export default function CotizacionServicioAccordion({
                 <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
                   Items del grupo
                 </span>
-                <Button
-                  onClick={() => setModalAbierto(true)}
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 text-xs px-2"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Agregar
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    onClick={() => setModalNuevoAbierto(true)}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Nuevo
+                  </Button>
+                  <Button
+                    onClick={() => setModalImportarAbierto(true)}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Importar
+                  </Button>
+                </div>
               </div>
 
               {/* Lista de Items */}
@@ -220,15 +239,27 @@ export default function CotizacionServicioAccordion({
                 {servicio.items.length === 0 ? (
                   <div className="text-center py-6">
                     <Wrench className="h-6 w-6 text-gray-300 mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground mb-2">Sin servicios en este grupo</p>
-                    <Button
-                      onClick={() => setModalAbierto(true)}
-                      size="sm"
-                      variant="link"
-                      className="h-auto p-0 text-xs"
-                    >
-                      Agregar servicios
-                    </Button>
+                    <p className="text-xs text-muted-foreground mb-3">Sin servicios en este grupo</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        onClick={() => setModalNuevoAbierto(true)}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Crear nuevo
+                      </Button>
+                      <Button
+                        onClick={() => setModalImportarAbierto(true)}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Importar de catálogo
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <CotizacionServicioItemTable
@@ -259,12 +290,21 @@ export default function CotizacionServicioAccordion({
         </div>
       </Collapsible>
 
-      {/* Modal para agregar items */}
+      {/* Modal para importar items desde catálogo */}
       <CotizacionServicioItemMultiAddModal
-        isOpen={modalAbierto}
-        onClose={() => setModalAbierto(false)}
+        isOpen={modalImportarAbierto}
+        onClose={() => setModalImportarAbierto(false)}
         servicio={servicio}
         onItemsCreated={handleItemsCreated}
+        existingItemIds={servicio.items.map(i => i.catalogoServicioId).filter(Boolean) as string[]}
+      />
+
+      {/* Modal para crear item nuevo */}
+      <CotizacionServicioItemCreateModal
+        isOpen={modalNuevoAbierto}
+        onClose={() => setModalNuevoAbierto(false)}
+        servicio={servicio}
+        onItemCreated={handleItemCreated}
       />
 
       {/* Delete confirmation dialog */}

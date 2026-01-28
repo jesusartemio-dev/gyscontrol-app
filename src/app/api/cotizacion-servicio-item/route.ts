@@ -22,7 +22,6 @@ export async function POST(req: Request) {
     if (
       !data.cotizacionServicioId ||
       !data.nombre ||
-      !data.descripcion ||
       !data.edtId ||
       !data.formula ||
       !data.unidadServicioNombre ||
@@ -52,7 +51,7 @@ export async function POST(req: Request) {
         unidadServicioId: data.unidadServicioId,
         recursoId: data.recursoId,
         nombre: data.nombre,
-        descripcion: data.descripcion,
+        descripcion: data.descripcion || '',
         edtId: data.edtId,
         formula: data.formula,
         horaBase: data.horaBase,

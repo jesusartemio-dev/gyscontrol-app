@@ -1,33 +1,34 @@
 // ===================================================
 // 📁 Archivo: CotizacionServicioItemMultiAddModal.tsx
 // 📌 Ubicación: src/components/cotizaciones/
-// 🔧 Descripción: Modal para agregar múltiples items de servicio desde catálogo a una sección de cotización
-//
-// 🧠 Uso: Permite seleccionar múltiples servicios del catálogo y agregarlos a una sección de cotización
+// 🔧 Descripción: Modal para agregar múltiples items de servicio desde catálogo
 // ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-10-03
+// 📅 Última actualización: 2025-01-28
 // ===================================================
 
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { useState, useEffect, useMemo } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Search, Plus, Trash2, Package, Loader2 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Search,
+  Plus,
+  Package,
+  Loader2,
+  X
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { getCatalogoServicios } from '@/lib/services/catalogoServicio'
-import { getEdts } from '@/lib/services/edt'
 import { getRecursos } from '@/lib/services/recurso'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { createCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { formatCurrency } from '@/lib/utils/plantilla-utils'
-import { calcularHoras } from '@/lib/utils/formulas'
-import type { CatalogoServicio, Edt, Recurso, UnidadServicio, CotizacionServicioItem, CotizacionServicioItemPayload } from '@/types'
+import { cn } from '@/lib/utils'
+import type { CatalogoServicio, Recurso, UnidadServicio, CotizacionServicioItem, CotizacionServicioItemPayload } from '@/types'
 
 interface Props {
   isOpen: boolean
@@ -39,78 +40,91 @@ interface Props {
     edt?: { id: string; nombre: string }
   }
   onItemsCreated: (items: CotizacionServicioItem[]) => void
-}
-
-interface SelectedServicio {
-  servicio: CatalogoServicio
-  cantidad: number
-  precioInterno: number
-  precioCliente: number
-  recursoId: string
-  unidadServicioId: string
+  existingItemIds?: string[] // IDs de catalogoServicio ya agregados
 }
 
 export default function CotizacionServicioItemMultiAddModal({
   isOpen,
   onClose,
   servicio,
-  onItemsCreated
+  onItemsCreated,
+  existingItemIds = []
 }: Props) {
   const [servicios, setServicios] = useState<CatalogoServicio[]>([])
-  const [categorias, setCategorias] = useState<Edt[]>([])
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [unidadesServicio, setUnidadesServicio] = useState<UnidadServicio[]>([])
-  const [filteredServicios, setFilteredServicios] = useState<CatalogoServicio[]>([])
-  const [selectedServicios, setSelectedServicios] = useState<SelectedServicio[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  // ✅ Load servicios and related data when modal opens
   useEffect(() => {
     if (isOpen) {
       loadData()
     }
   }, [isOpen])
 
-  // ✅ Filter servicios based on search term and service's EDT
-  useEffect(() => {
+  // Filtrar servicios por el EDT del grupo de servicio actual
+  const filteredServicios = useMemo(() => {
+    // Filtrar por EDT: usar edtId del servicio (grupo) o el edt.id
+    const targetEdtId = servicio.edtId || servicio.edt?.id
     let filtered = servicios
 
-    // Filter by service's EDT
-    const edtNombre = servicio.edt?.nombre || servicio.nombre
-    if (edtNombre) {
-      const edtEncontrado = categorias.find(c => c.nombre === edtNombre)
-      if (edtEncontrado) {
-        filtered = filtered.filter(s => s.categoriaId === edtEncontrado.id)
-      }
+    // Solo mostrar servicios del mismo EDT
+    if (targetEdtId) {
+      filtered = filtered.filter(s => s.categoriaId === targetEdtId)
     }
 
-    // Filter by search term
+    // Excluir servicios ya agregados
+    if (existingItemIds.length > 0) {
+      const existingSet = new Set(existingItemIds)
+      filtered = filtered.filter(s => !existingSet.has(s.id!))
+    }
+
+    // Filtrar por búsqueda
     if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase()
       filtered = filtered.filter(s =>
-        s.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+        s.nombre.toLowerCase().includes(term) ||
+        s.descripcion?.toLowerCase().includes(term)
       )
     }
 
-    setFilteredServicios(filtered)
-  }, [searchTerm, servicios, categorias, servicio.edt?.nombre, servicio.nombre])
+    return filtered
+  }, [searchTerm, servicios, servicio.edtId, servicio.edt?.id, existingItemIds])
+
+  // Calcular costo estimado de un servicio (usando fórmula escalonada estándar)
+  // Muestra el mismo cálculo que el catálogo: HH Total × Costo/Hora (sin margen)
+  const calcularCostoEstimado = (item: CatalogoServicio) => {
+    const recurso = recursos.find(r => r.id === item.recursoId)
+    const costoHora = recurso?.costoHora || item.recurso?.costoHora || 0
+
+    // Fórmula escalonada: HH = HH_base + (cantidad - 1) × HH_repetido
+    // Con cantidad = 1: HH = HH_base
+    const cantidad = item.cantidad || 1
+    const horasBase = (item.horaBase ?? 0) + Math.max(0, cantidad - 1) * (item.horaRepetido ?? 0)
+
+    // Aplicar factor de dificultad
+    const factorDificultad = item.nivelDificultad ?? 1
+    const horaTotal = horasBase * factorDificultad
+
+    // Costo total = HH × $/Hora (igual que el catálogo, sin margen)
+    const costoTotal = horaTotal * costoHora
+    return { horaTotal, costoHora, costoTotal }
+  }
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const [serviciosData, categoriasData, recursosData, unidadesData] = await Promise.all([
+      const [serviciosData, recursosData, unidadesData] = await Promise.all([
         getCatalogoServicios(),
-        getEdts(),
         getRecursos(),
         getUnidadesServicio()
       ])
 
       setServicios(serviciosData)
-      setCategorias(categoriasData)
       setRecursos(recursosData)
       setUnidadesServicio(unidadesData)
-      setFilteredServicios(serviciosData)
     } catch (error) {
       console.error('Error loading data:', error)
       toast.error('Error al cargar los datos')
@@ -119,157 +133,81 @@ export default function CotizacionServicioItemMultiAddModal({
     }
   }
 
-  // ✅ Add servicio to selection
-  const handleAddServicio = (servicio: CatalogoServicio) => {
-    const existingIndex = selectedServicios.findIndex(item => item.servicio.id === servicio.id)
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
 
-    if (existingIndex >= 0) {
-      // If already selected, increase quantity
-      const updated = [...selectedServicios]
-      updated[existingIndex].cantidad += 1
-      setSelectedServicios(updated)
+  const toggleAll = () => {
+    if (selectedIds.size === filteredServicios.length) {
+      setSelectedIds(new Set())
     } else {
-      // Add new selection with default values
+      setSelectedIds(new Set(filteredServicios.map(s => s.id!)))
+    }
+  }
+
+  const handleSave = async () => {
+    if (selectedIds.size === 0) {
+      toast.error('Selecciona al menos un servicio')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const createdItems: CotizacionServicioItem[] = []
       const validRecursos = recursos.filter(r => r && r.id)
       const validUnidades = unidadesServicio.filter(u => u && u.id)
       const defaultRecurso = validRecursos.find(r => r.nombre === 'Ingeniero Senior') || validRecursos[0]
       const defaultUnidad = validUnidades.find(u => u.nombre === 'hora') || validUnidades[0]
 
-      // Calculate default prices using the same logic
-      const cantidad = 1
-      const horaTotal = calcularHoras({
-        formula: servicio.formula,
-        cantidad,
-        horaBase: servicio.horaBase,
-        horaRepetido: servicio.horaRepetido,
-        horaUnidad: servicio.horaUnidad,
-        horaFijo: servicio.horaFijo
-      })
+      for (const id of selectedIds) {
+        const catalogoServicio = servicios.find(s => s.id === id)
+        if (!catalogoServicio) continue
 
-      // Get costoHora from servicio.recurso OR look it up from recursos array
-      const servicioRecurso = servicio.recurso || validRecursos.find(r => r.id === servicio.recursoId)
-      const costoHora = servicioRecurso?.costoHora || defaultRecurso?.costoHora || 0
-      const factorSeguridad = 1.0
-      const margen = 1.35
-      const calculatedCostoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
-      const calculatedPrecioCliente = +(calculatedCostoInterno * margen).toFixed(2)
+        // Usar cantidad del catálogo o 1 por defecto
+        const cantidad = catalogoServicio.cantidad || 1
 
-      const newItem = {
-         servicio,
-         cantidad: 1,
-         precioInterno: calculatedCostoInterno,
-         precioCliente: calculatedPrecioCliente,
-         recursoId: defaultRecurso?.id || '',
-         unidadServicioId: defaultUnidad?.id || ''
-       }
+        // Fórmula escalonada: HH = HH_base + (cantidad - 1) × HH_repetido
+        const horasBase = (catalogoServicio.horaBase ?? 0) + Math.max(0, cantidad - 1) * (catalogoServicio.horaRepetido ?? 0)
+        const factorDificultad = catalogoServicio.nivelDificultad ?? 1
+        const horaTotal = horasBase * factorDificultad
 
-      setSelectedServicios(prev => [...prev, newItem])
-    }
-  }
-
-  // ✅ Update quantity for selected servicio
-  const handleUpdateQuantity = (servicioId: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
-      setSelectedServicios(prev => prev.filter(item => item.servicio.id !== servicioId))
-    } else {
-      setSelectedServicios(prev => prev.map(item =>
-        item.servicio.id === servicioId
-          ? { ...item, cantidad: newQuantity }
-          : item
-      ))
-    }
-  }
-
-  // ✅ Update unit price for selected servicio
-  const handleUpdatePrice = (servicioId: string, field: 'precioInterno' | 'precioCliente', newPrice: number) => {
-    setSelectedServicios(prev => prev.map(item =>
-      item.servicio.id === servicioId
-        ? { ...item, [field]: newPrice }
-        : item
-    ))
-  }
-
-  // ✅ Update resource for selected servicio
-  const handleUpdateRecurso = (servicioId: string, recursoId: string) => {
-    setSelectedServicios(prev => prev.map(item =>
-      item.servicio.id === servicioId
-        ? { ...item, recursoId }
-        : item
-    ))
-  }
-
-  // ✅ Update service unit for selected servicio
-  const handleUpdateUnidad = (servicioId: string, unidadServicioId: string) => {
-    setSelectedServicios(prev => prev.map(item =>
-      item.servicio.id === servicioId
-        ? { ...item, unidadServicioId }
-        : item
-    ))
-  }
-
-  // ✅ Remove servicio from selection
-  const handleRemoveServicio = (servicioId: string) => {
-    setSelectedServicios(prev => prev.filter(item => item.servicio.id !== servicioId))
-  }
-
-  // ✅ Calculate total amount
-  const totalAmount = selectedServicios.reduce((sum, item) =>
-    sum + (item.cantidad * item.precioCliente), 0
-  )
-
-  // ✅ Save selected servicios as cotizacion servicio items
-  const handleSave = async () => {
-    if (selectedServicios.length === 0) {
-      toast.error('Selecciona al menos un servicio')
-      return
-    }
-
-    // Validate that all services have required fields
-    const invalidItems = selectedServicios.filter(item =>
-      !item.recursoId || !item.unidadServicioId
-    )
-
-    if (invalidItems.length > 0) {
-      toast.error('Todos los servicios deben tener recurso y unidad asignados')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const createdItems: CotizacionServicioItem[] = []
-
-      for (const selectedServicio of selectedServicios) {
-        const horaTotal = calcularHoras({
-          formula: selectedServicio.servicio.formula,
-          cantidad: selectedServicio.cantidad,
-          horaBase: selectedServicio.servicio.horaBase,
-          horaRepetido: selectedServicio.servicio.horaRepetido,
-          horaUnidad: selectedServicio.servicio.horaUnidad,
-          horaFijo: selectedServicio.servicio.horaFijo
-        })
+        const servicioRecurso = catalogoServicio.recurso || validRecursos.find(r => r.id === catalogoServicio.recursoId)
+        const costoHora = servicioRecurso?.costoHora || defaultRecurso?.costoHora || 0
+        const factorSeguridad = 1.0
+        const margen = 1.35
+        const calculatedCostoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
+        const calculatedPrecioCliente = +(calculatedCostoInterno * margen).toFixed(2)
 
         const payload: CotizacionServicioItemPayload = {
           cotizacionServicioId: servicio.id,
-          catalogoServicioId: selectedServicio.servicio.id,
-          nombre: selectedServicio.servicio.nombre,
-          descripcion: selectedServicio.servicio.descripcion,
-          edtId: selectedServicio.servicio.edt?.id || selectedServicio.servicio.categoriaId,
-          unidadServicioId: selectedServicio.unidadServicioId,
-          unidadServicioNombre: unidadesServicio.find(u => u.id === selectedServicio.unidadServicioId)?.nombre || '',
-          recursoId: selectedServicio.recursoId,
-          recursoNombre: recursos.find(r => r.id === selectedServicio.recursoId)?.nombre || '',
+          catalogoServicioId: catalogoServicio.id,
+          nombre: catalogoServicio.nombre,
+          descripcion: catalogoServicio.descripcion,
+          edtId: catalogoServicio.edt?.id || catalogoServicio.categoriaId,
+          unidadServicioId: defaultUnidad?.id || '',
+          unidadServicioNombre: defaultUnidad?.nombre || '',
+          recursoId: defaultRecurso?.id || '',
+          recursoNombre: defaultRecurso?.nombre || '',
           formula: 'Escalonada',
-          horaBase: selectedServicio.servicio.horaBase,
-          horaRepetido: selectedServicio.servicio.horaRepetido,
+          horaBase: catalogoServicio.horaBase,
+          horaRepetido: catalogoServicio.horaRepetido,
           horaUnidad: undefined,
           horaFijo: undefined,
-          costoHora: selectedServicio.servicio.recurso?.costoHora || 0,
-          cantidad: selectedServicio.cantidad,
+          costoHora,
+          cantidad,
           horaTotal,
-          factorSeguridad: 1.0,
-          margen: 1.35,
-          costoInterno: selectedServicio.precioInterno,
-          costoCliente: selectedServicio.precioCliente
+          factorSeguridad,
+          margen,
+          costoInterno: calculatedCostoInterno,
+          costoCliente: calculatedPrecioCliente
         }
 
         const createdItem = await createCotizacionServicioItem(payload)
@@ -283,265 +221,221 @@ export default function CotizacionServicioItemMultiAddModal({
       console.error('Error saving items:', error)
       toast.error('Error al guardar los servicios')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  // ✅ Close modal and reset state
   const handleClose = () => {
-    setSelectedServicios([])
+    setSelectedIds(new Set())
     setSearchTerm('')
     onClose()
   }
 
+  const allSelected = filteredServicios.length > 0 && selectedIds.size === filteredServicios.length
+  const someSelected = selectedIds.size > 0 && selectedIds.size < filteredServicios.length
+
+  // Calcular total estimado de seleccionados (mismo cálculo que el catálogo)
+  const totalEstimado = useMemo(() => {
+    let total = 0
+    for (const id of selectedIds) {
+      const item = servicios.find(s => s.id === id)
+      if (item) {
+        const costos = calcularCostoEstimado(item)
+        total += costos.costoTotal
+      }
+    }
+    return total
+  }, [selectedIds, servicios, recursos])
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-7xl h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-blue-600" />
-            Agregar Servicios - {servicio.edt?.nombre || servicio.nombre}
-          </DialogTitle>
+      <DialogContent className="max-w-4xl w-full max-h-[85vh] flex flex-col p-0 gap-0">
+        {/* Header */}
+        <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Package className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold text-gray-900">
+                  Agregar Servicios
+                </DialogTitle>
+                <p className="text-sm text-gray-500">
+                  {servicio.edt?.nombre || servicio.nombre}
+                </p>
+              </div>
+            </div>
+            {selectedIds.size > 0 && (
+              <Badge className="bg-blue-600 text-white">
+                {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
         </DialogHeader>
 
-        {/* Búsqueda */}
-        <div className="flex gap-3 mb-4">
-          <div className="flex-1">
+        {/* Search */}
+        <div className="px-4 py-2 border-b bg-gray-50/50 flex items-center gap-2 flex-shrink-0">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Buscar servicios..."
+              placeholder="Buscar por nombre o descripción..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full"
+              className="pl-9 pr-9 h-8 bg-white text-sm"
             />
-          </div>
-          <div className="w-48">
-            <div className="flex items-center justify-center h-10 px-3 bg-blue-50 border border-blue-200 rounded-md">
-              <span className="text-sm text-blue-700 font-medium">
-                {servicio.edt?.nombre || servicio.nombre}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Layout de Dos Columnas Lado a Lado */}
-        <div className="grid grid-cols-2 gap-4 flex-1 overflow-hidden">
-          {/* Columna Izquierda - Servicios Disponibles */}
-          <div className="flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-              <h3 className="font-medium text-gray-900">Servicios Disponibles</h3>
-              <Badge variant="outline" className="text-xs">
-                {filteredServicios.length}
-              </Badge>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                  <span className="ml-2">Cargando servicios...</span>
-                </div>
-              ) : (
-                <AnimatePresence>
-                  {filteredServicios.map(servicio => {
-                    const isSelected = selectedServicios.some(item => item.servicio.id === servicio.id)
-
-                    return (
-                      <motion.div
-                        key={servicio.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div
-                          className={`p-3 border rounded-lg transition-all cursor-pointer ${
-                            isSelected
-                              ? 'border-blue-500 bg-blue-50 opacity-50'
-                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                          }`}
-                          onClick={() => !isSelected && handleAddServicio(servicio)}
-                        >
-                          <div className="space-y-1">
-                            <h4 className="font-medium text-sm">{servicio.nombre}</h4>
-                            <p className="text-xs text-gray-600 line-clamp-2">{servicio.descripcion}</p>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-500">{servicio.edt?.nombre || 'Sin EDT'}</span>
-                              <span className="text-gray-500">{servicio.formula}</span>
-                            </div>
-                            {isSelected && (
-                              <div className="text-blue-600 text-xs font-medium">
-                                ✓ Seleccionado
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )
-                  })}
-                </AnimatePresence>
-              )}
-
-              {filteredServicios.length === 0 && !loading && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Package className="mx-auto h-10 w-10 mb-3 opacity-50" />
-                  <p className="text-sm">No se encontraron servicios</p>
-                  <p className="text-xs text-gray-400">Ajusta los filtros de búsqueda</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Columna Derecha - Servicios Seleccionados */}
-          <div className="flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-              <h3 className="font-medium text-gray-900">Servicios Seleccionados</h3>
-              <Badge variant="secondary" className="text-blue-600 bg-blue-100">
-                {selectedServicios.length}
-              </Badge>
-            </div>
-
-            {selectedServicios.length > 0 ? (
-              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                {selectedServicios.map((item) => (
-                  <div key={item.servicio.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <h4 className="font-medium text-sm text-blue-900">{item.servicio.nombre}</h4>
-                        <p className="text-xs text-blue-700 line-clamp-2">{item.servicio.descripcion}</p>
-
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs font-medium">Cantidad:</Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={item.cantidad}
-                                onChange={(e) => handleUpdateQuantity(item.servicio.id!, parseInt(e.target.value) || 1)}
-                                className="w-16 h-7 text-xs"
-                              />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs font-medium">Precio Int:</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.precioInterno.toString()}
-                                onChange={(e) => handleUpdatePrice(item.servicio.id!, 'precioInterno', parseFloat(e.target.value) || 0)}
-                                className="w-24 h-7 text-xs"
-                              />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs font-medium">Precio Cli:</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.precioCliente.toString()}
-                                onChange={(e) => handleUpdatePrice(item.servicio.id!, 'precioCliente', parseFloat(e.target.value) || 0)}
-                                className="w-24 h-7 text-xs"
-                              />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="text-xs font-medium text-green-600">
-                                Total: {formatCurrency(item.cantidad * item.precioCliente)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs">Recurso:</Label>
-                            <Select
-                              value={item.recursoId}
-                              onValueChange={(value) => handleUpdateRecurso(item.servicio.id!, value)}
-                            >
-                              <SelectTrigger className="w-32 h-6 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {recursos.filter(r => r && r.id).map(recurso => (
-                                  <SelectItem key={recurso.id} value={recurso.id!}>
-                                    {recurso.nombre}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs">Unidad:</Label>
-                            <Select
-                              value={item.unidadServicioId}
-                              onValueChange={(value) => handleUpdateUnidad(item.servicio.id!, value)}
-                            >
-                              <SelectTrigger className="w-24 h-6 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {unidadesServicio.filter(u => u && u.id).map(unidad => (
-                                  <SelectItem key={unidad.id} value={unidad.id!}>
-                                    {unidad.nombre}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRemoveServicio(item.servicio.id!)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0 ml-2 h-7 w-7 p-0"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <Package className="mx-auto h-12 w-12 mb-3 opacity-30" />
-                  <p className="text-sm">Selecciona servicios de la lista</p>
-                  <p className="text-xs mt-1">Haz clic en cualquier servicio</p>
-                </div>
-              </div>
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
           </div>
+          <Badge variant="outline" className="text-xs whitespace-nowrap">
+            {filteredServicios.length} disponible{filteredServicios.length !== 1 ? 's' : ''}
+          </Badge>
         </div>
 
-        <DialogFooter className="flex justify-between items-center w-full pt-3 border-t bg-white">
+        {/* Table */}
+        <div className="flex-1 min-h-0 overflow-auto">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-3" />
+              <p className="text-sm text-gray-500">Cargando servicios...</p>
+            </div>
+          ) : filteredServicios.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Package className="h-12 w-12 text-gray-300 mb-3" />
+              <p className="text-sm text-gray-500">No se encontraron servicios</p>
+              {searchTerm && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Intenta con otro término de búsqueda
+                </p>
+              )}
+            </div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr className="border-b">
+                  <th className="w-10 px-3 py-2 text-left">
+                    <Checkbox
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) (el as any).indeterminate = someSelected
+                      }}
+                      onCheckedChange={toggleAll}
+                    />
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-600">Servicio</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600 hidden sm:table-cell">Recurso</th>
+                  <th className="px-3 py-2 text-center font-medium text-gray-600 w-20">HH Total</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-600 w-24">Costo/Hora</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-600 w-28">Costo Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredServicios.map((item) => {
+                  const isSelected = selectedIds.has(item.id!)
+                  const costos = calcularCostoEstimado(item)
+                  return (
+                    <tr
+                      key={item.id}
+                      onClick={() => toggleSelection(item.id!)}
+                      className={cn(
+                        "cursor-pointer transition-colors",
+                        isSelected
+                          ? "bg-blue-50 hover:bg-blue-100"
+                          : "hover:bg-gray-50"
+                      )}
+                    >
+                      <td className="px-3 py-2.5">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelection(item.id!)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className={cn(
+                          "font-medium",
+                          isSelected ? "text-blue-900" : "text-gray-900"
+                        )}>
+                          {item.nombre}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center hidden sm:table-cell">
+                        <Badge variant="secondary" className="text-[10px] font-normal">
+                          {item.recurso?.nombre || 'N/A'}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className="tabular-nums text-blue-600 font-medium">
+                          {costos.horaTotal.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-gray-600">
+                        {formatCurrency(costos.costoHora)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <span className={cn(
+                          "font-semibold tabular-nums",
+                          isSelected ? "text-blue-700" : "text-green-600"
+                        )}>
+                          {formatCurrency(costos.costoTotal)}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t bg-gray-50/50 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-4">
-            <div className="text-xs text-gray-500">
-              {selectedServicios.length > 0 && `${selectedServicios.length} servicio${selectedServicios.length > 1 ? 's' : ''} seleccionado${selectedServicios.length > 1 ? 's' : ''}`}
-            </div>
-            {selectedServicios.length > 0 && (
-              <div className="text-sm font-bold text-blue-600">
-                Total: {formatCurrency(totalAmount)}
-              </div>
+            <span className="text-sm text-gray-500">
+              {selectedIds.size > 0 ? (
+                <>
+                  <span className="font-medium text-blue-600">{selectedIds.size}</span> servicio{selectedIds.size !== 1 ? 's' : ''}
+                </>
+              ) : (
+                'Selecciona servicios'
+              )}
+            </span>
+            {selectedIds.size > 0 && (
+              <span className="text-sm font-semibold text-green-600">
+                Total: {formatCurrency(totalEstimado)}
+              </span>
             )}
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={handleClose} className="h-9 px-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleClose} size="sm">
               Cancelar
             </Button>
             <Button
               onClick={handleSave}
-              disabled={selectedServicios.length === 0 || loading}
-              className="h-9 px-6 bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+              disabled={selectedIds.size === 0 || saving}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 min-w-[100px]"
             >
-              {loading ? (
-                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
               ) : (
-                <Plus className="mr-2 h-3 w-3" />
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar ({selectedIds.size})
+                </>
               )}
-              {loading ? 'Guardando...' : `Agregar (${selectedServicios.length})`}
             </Button>
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -401,11 +401,11 @@ export function CotizacionEdtForm({
                 // ✅ Si no hay horas del servicio, usar configuración por defecto
                 const horasFinales = horasTotalesServicio > 0 ? horasTotalesServicio : obtenerDuracionPorDefecto()
 
-                // ✅ Obtener nombre de la categoría para el EDT
-                const categoriaNombre = servicioSeleccionado?.items[0]?.catalogoServicio?.categoria?.descripcion ||
-                                       servicioSeleccionado?.items[0]?.catalogoServicio?.categoria?.nombre ||
-                                       servicioSeleccionado?.categoria ||
-                                       `EDT ${servicioSeleccionado?.categoria || 'Sin Categoría'}`
+                // ✅ Obtener nombre de la categoría para el EDT (usar edt en vez de categoria)
+                const categoriaNombre = servicioSeleccionado?.items[0]?.catalogoServicio?.edt?.nombre ||
+                                       servicioSeleccionado?.edt?.nombre ||
+                                       servicioSeleccionado?.nombre ||
+                                       `EDT ${servicioSeleccionado?.edtId || 'Sin Categoría'}`
 
                 setFormData(prev => ({
                   ...prev,
@@ -435,7 +435,7 @@ export function CotizacionEdtForm({
                   .filter(servicio => servicio.edtId) // Only show services with edtId
                   .map((servicio) => (
                     <SelectItem key={servicio.id} value={servicio.edtId!}>
-                      {servicio.nombre} - {servicio.items[0]?.catalogoServicio?.categoria?.nombre || servicio.categoria}
+                      {servicio.nombre} - {servicio.items[0]?.catalogoServicio?.edt?.nombre || servicio.edt?.nombre || servicio.nombre}
                     </SelectItem>
                   ))}
               </SelectContent>

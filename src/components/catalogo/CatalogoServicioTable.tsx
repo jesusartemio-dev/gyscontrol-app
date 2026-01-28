@@ -154,15 +154,15 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
       (`${s.nombre} ${s.descripcion}`.toLowerCase().includes(filtroTexto.toLowerCase()))
     )
     .sort((a, b) => {
-      // Primero ordenar por EDT (categoría)
-      const categoriaA = a.categoria?.nombre || ''
-      const categoriaB = b.categoria?.nombre || ''
+      // Primero ordenar por EDT
+      const edtA = a.edt?.nombre || ''
+      const edtB = b.edt?.nombre || ''
 
-      if (categoriaA !== categoriaB) {
-        return categoriaA.localeCompare(categoriaB)
+      if (edtA !== edtB) {
+        return edtA.localeCompare(edtB)
       }
 
-      // Luego ordenar por orden dentro de la categoría
+      // Luego ordenar por orden dentro del EDT
       return (a.orden || 0) - (b.orden || 0)
     })
 
@@ -482,7 +482,7 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                     {/* EDT */}
                     <TableCell className="text-center">
                       <Badge variant="outline" className="text-xs">
-                        {item.categoria?.nombre || 'Sin EDT'}
+                        {item.edt?.nombre || 'Sin EDT'}
                       </Badge>
                     </TableCell>
 

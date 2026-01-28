@@ -214,20 +214,14 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                   )}
                 >
                   {/* Servicio */}
-                  <td className="px-2 py-1.5">
+                  <td className="px-2 py-1.5 min-w-[180px] max-w-[280px]">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="cursor-help">
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium text-gray-900 line-clamp-1">{item.nombre}</span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 flex-shrink-0">
-                                {item.unidadServicioNombre}
-                              </Badge>
-                            </div>
-                            {item.edt?.nombre && (
-                              <div className="text-[10px] text-gray-400">{item.edt.nombre}</div>
-                            )}
+                            <span className="font-medium text-gray-900 block leading-tight">
+                              {item.nombre}
+                            </span>
                           </div>
                         </TooltipTrigger>
                         {item.descripcion && (
