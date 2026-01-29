@@ -576,7 +576,7 @@ export default function UsuariosClient() {
                 </Tooltip>
               </TableCell>
               <TableCell className="text-right">
-                <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex justify-end gap-1">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -681,7 +681,7 @@ export default function UsuariosClient() {
               </Tooltip>
 
               {/* Actions */}
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
