@@ -20,7 +20,9 @@ import {
   Search,
   Filter,
   MoreHorizontal,
-  X
+  X,
+  LayoutGrid,
+  List
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -44,8 +46,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import type { RolUsuario, User as UsuarioModel } from '@/types/modelos'
 import { buildApiUrl } from '@/lib/utils'
 
@@ -161,6 +172,8 @@ function getAvatarColor(role: RolUsuario): string {
   }
   return colors[role] || 'bg-gray-500'
 }
+
+type ViewMode = 'table' | 'cards'
 
 // Componente Modal de Usuario
 interface UserFormModalProps {
@@ -414,6 +427,9 @@ export default function UsuariosClient() {
   const [usuarios, setUsuarios] = useState<UsuarioModel[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
 
+  // View mode - table by default
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
+
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UsuarioModel | null>(null)
@@ -518,6 +534,212 @@ export default function UsuariosClient() {
 
   const hasActiveFilters = searchQuery !== '' || roleFilter !== 'all'
 
+  // Render Table View
+  const renderTableView = () => (
+    <div className="border rounded-lg overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="w-[300px]">Usuario</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead className="w-[150px]">Rol</TableHead>
+            <TableHead className="w-[100px] text-right">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredUsuarios.map((usuario) => (
+            <TableRow key={usuario.id} className="group">
+              <TableCell>
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-xs ${getAvatarColor(usuario.role)}`}>
+                    {getInitials(usuario.name || usuario.email || '?')}
+                  </div>
+                  <span className="font-medium">{usuario.name || 'Sin nombre'}</span>
+                </div>
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {usuario.email}
+              </TableCell>
+              <TableCell>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className={`${roleDisplayMap[usuario.role]?.bgColor} ${roleDisplayMap[usuario.role]?.color} border cursor-help`}
+                    >
+                      {roleDisplayMap[usuario.role]?.label || usuario.role}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{roleDisplayMap[usuario.role]?.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenEdit(usuario)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Editar</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setUserToDelete(usuario)}
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Eliminar</TooltipContent>
+                  </Tooltip>
+                </div>
+                {/* Mobile dropdown - always visible on mobile */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild className="sm:hidden">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleOpenEdit(usuario)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setUserToDelete(usuario)}
+                      className="text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+
+  // Render Cards View
+  const renderCardsView = () => (
+    <div className="space-y-2">
+      <AnimatePresence mode="popLayout">
+        {filteredUsuarios.map((usuario) => (
+          <motion.div
+            key={usuario.id}
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="flex items-center justify-between p-4 rounded-lg border bg-white hover:border-blue-200 hover:shadow-sm transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              {/* Avatar */}
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm ${getAvatarColor(usuario.role)}`}>
+                {getInitials(usuario.name || usuario.email || '?')}
+              </div>
+
+              {/* User Info */}
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 truncate">
+                  {usuario.name || 'Sin nombre'}
+                </div>
+                <div className="text-sm text-muted-foreground truncate">
+                  {usuario.email}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Role Badge with Tooltip */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className={`${roleDisplayMap[usuario.role]?.bgColor} ${roleDisplayMap[usuario.role]?.color} border cursor-help`}
+                  >
+                    {roleDisplayMap[usuario.role]?.label || usuario.role}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{roleDisplayMap[usuario.role]?.description}</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Actions */}
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenEdit(usuario)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Editar usuario</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setUserToDelete(usuario)}
+                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Eliminar usuario</TooltipContent>
+                </Tooltip>
+              </div>
+
+              {/* Mobile menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild className="sm:hidden">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleOpenEdit(usuario)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setUserToDelete(usuario)}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gray-50/50 p-4 md:p-6 lg:p-8">
@@ -567,8 +789,8 @@ export default function UsuariosClient() {
             <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 {/* Search and Filters */}
-                <div className="flex flex-1 gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:max-w-xs">
+                <div className="flex flex-1 gap-2 w-full sm:w-auto flex-wrap">
+                  <div className="relative flex-1 sm:max-w-xs min-w-[200px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Buscar por nombre o email..."
@@ -615,11 +837,50 @@ export default function UsuariosClient() {
                   )}
                 </div>
 
-                {/* Add Button */}
-                <Button onClick={handleOpenCreate} className="h-9">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Nuevo Usuario
-                </Button>
+                {/* View Toggle + Add Button */}
+                <div className="flex items-center gap-2">
+                  {/* View Toggle */}
+                  <div className="flex items-center border rounded-lg p-0.5 bg-muted/50">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewMode('table')}
+                          className={cn(
+                            "h-8 w-8 p-0 rounded-md",
+                            viewMode === 'table' && "bg-white shadow-sm"
+                          )}
+                        >
+                          <List className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Vista tabla</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewMode('cards')}
+                          className={cn(
+                            "h-8 w-8 p-0 rounded-md",
+                            viewMode === 'cards' && "bg-white shadow-sm"
+                          )}
+                        >
+                          <LayoutGrid className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Vista tarjetas</TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  {/* Add Button */}
+                  <Button onClick={handleOpenCreate} className="h-9">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Nuevo Usuario
+                  </Button>
+                </div>
               </div>
             </CardHeader>
 
@@ -672,109 +933,8 @@ export default function UsuariosClient() {
                   )}
                 </div>
               ) : (
-                // Users list
-                <div className="space-y-2">
-                  <AnimatePresence mode="popLayout">
-                    {filteredUsuarios.map((usuario) => (
-                      <motion.div
-                        key={usuario.id}
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="flex items-center justify-between p-4 rounded-lg border bg-white hover:border-blue-200 hover:shadow-sm transition-all group"
-                      >
-                        <div className="flex items-center gap-4">
-                          {/* Avatar */}
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm ${getAvatarColor(usuario.role)}`}>
-                            {getInitials(usuario.name || usuario.email || '?')}
-                          </div>
-
-                          {/* User Info */}
-                          <div className="min-w-0">
-                            <div className="font-medium text-gray-900 truncate">
-                              {usuario.name || 'Sin nombre'}
-                            </div>
-                            <div className="text-sm text-muted-foreground truncate">
-                              {usuario.email}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          {/* Role Badge with Tooltip */}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge
-                                variant="outline"
-                                className={`${roleDisplayMap[usuario.role]?.bgColor} ${roleDisplayMap[usuario.role]?.color} border cursor-help`}
-                              >
-                                {roleDisplayMap[usuario.role]?.label || usuario.role}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{roleDisplayMap[usuario.role]?.description}</p>
-                            </TooltipContent>
-                          </Tooltip>
-
-                          {/* Actions */}
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleOpenEdit(usuario)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Editar usuario</TooltipContent>
-                            </Tooltip>
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setUserToDelete(usuario)}
-                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Eliminar usuario</TooltipContent>
-                            </Tooltip>
-                          </div>
-
-                          {/* Mobile menu */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild className="sm:hidden">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleOpenEdit(usuario)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => setUserToDelete(usuario)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
+                // Render view based on mode
+                viewMode === 'table' ? renderTableView() : renderCardsView()
               )}
 
               {/* Results count */}
