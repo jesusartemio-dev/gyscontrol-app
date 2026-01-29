@@ -9,6 +9,7 @@ import { calcularHoras } from '@/lib/utils/formulas'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -38,6 +39,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editableItem, setEditableItem] = useState<Partial<CotizacionServicioItem>>({})
   const [saving, setSaving] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<CotizacionServicioItem | null>(null)
 
   const sortedItems = [...items].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
 
@@ -184,7 +186,15 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
 
   const totals = calculateTotals()
 
+  const handleConfirmDelete = () => {
+    if (itemToDelete) {
+      onDeleted(itemToDelete.id)
+      setItemToDelete(null)
+    }
+  }
+
   return (
+    <>
     <div className="border rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -378,7 +388,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => onDeleted(item.id)}
+                            onClick={() => setItemToDelete(item)}
                             className="h-5 w-5 p-0 hover:bg-red-100"
                           >
                             <Trash2 className="h-3 w-3 text-gray-500" />
@@ -412,5 +422,15 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
         </table>
       </div>
     </div>
+
+    {/* Modal de confirmación para eliminar */}
+    <DeleteAlertDialog
+      open={!!itemToDelete}
+      onOpenChange={(open) => !open && setItemToDelete(null)}
+      onConfirm={handleConfirmDelete}
+      title="¿Eliminar servicio?"
+      description={itemToDelete ? `Se eliminará "${itemToDelete.nombre}" de la cotización. Esta acción no se puede deshacer.` : ''}
+    />
+    </>
   )
 }
