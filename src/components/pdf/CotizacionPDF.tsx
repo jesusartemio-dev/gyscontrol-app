@@ -1483,12 +1483,17 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 }
 
 export const DescargarPDFButton = ({ cotizacion }: Props) => {
+  // Generate a stable key based on cotizacion content to force remount when data changes
+  // This prevents @react-pdf reconciler errors when trying to update an existing PDF
+  const pdfKey = `pdf-${cotizacion.id}-${cotizacion.equipos?.length || 0}-${cotizacion.servicios?.length || 0}-${cotizacion.gastos?.length || 0}-${cotizacion.grandTotal || 0}`
+
   const fileName = `Cotizacion_${safeText(cotizacion.nombre)}_${safeText(cotizacion.cliente?.nombre)}.pdf`
     .replace(/[^a-zA-Z0-9._-]/g, '_')
     .replace(/_+/g, '_')
 
   return (
     <PDFDownloadLink
+      key={pdfKey}
       document={<CotizacionPDF cotizacion={cotizacion} />}
       fileName={fileName}
       className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors duration-200 shadow-sm hover:shadow-md h-8 min-w-[120px] justify-center flex-shrink-0"
