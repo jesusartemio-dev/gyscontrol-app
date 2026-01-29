@@ -276,7 +276,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="font-medium text-purple-600 cursor-help">
-                            {(currentItem.horaTotal ?? 0).toFixed(0)}h
+                            {(currentItem.horaTotal ?? 0).toFixed(2)}h
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
@@ -395,7 +395,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                 Total ({sortedItems.length} servicios):
               </td>
               <td className="px-2 py-1.5 text-center font-medium text-purple-700">
-                {totals.totalHH.toFixed(0)}h
+                {totals.totalHH.toFixed(2)}h
               </td>
               <td colSpan={3}></td>
               <td className="px-2 py-1.5 text-right font-mono font-medium text-gray-700">

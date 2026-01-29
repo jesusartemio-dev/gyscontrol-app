@@ -1,30 +1,18 @@
-// ===================================================
-// 📁 Archivo: RecursoTableView.tsx
-// 📌 Ubicación: src/components/catalogo/
-// 🔧 Vista de tabla para recursos
-//
-// 🧠 Uso: Vista tabular de recursos con edición inline
-// ✍️ Autor: Jesús Artemio
-// 📅 Creación: 2025-09-25
-// ===================================================
-
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
 import { Recurso } from '@/types'
 import { deleteRecurso, updateRecurso } from '@/lib/services/recurso'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
 import {
   Edit,
   Trash2,
   Save,
   X,
   DollarSign,
-  AlertCircle,
+  Users,
   Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -108,9 +96,9 @@ export default function RecursoTableView({ data, onUpdate, onDelete, loading = f
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="border rounded-lg bg-white p-4 space-y-2">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
+          <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />
         ))}
       </div>
     )
@@ -118,51 +106,48 @@ export default function RecursoTableView({ data, onUpdate, onDelete, loading = f
 
   if (error) {
     return (
-      <div className="text-center py-8">
-        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <p className="text-red-600">{error}</p>
+      <div className="border rounded-lg bg-white p-8 text-center">
+        <p className="text-red-600 text-sm">{error}</p>
       </div>
     )
   }
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-center py-12">
-        <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          No hay recursos disponibles
-        </h3>
-        <p className="text-gray-500">
-          Los recursos que agregues aparecerán aquí para su gestión.
+      <div className="border rounded-lg bg-white p-8 text-center">
+        <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+        <h3 className="text-base font-medium mb-1">No hay recursos</h3>
+        <p className="text-sm text-muted-foreground">
+          Comienza agregando tu primer recurso
         </p>
       </div>
     )
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-lg bg-white overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-[40%]">Nombre del Recurso</TableHead>
-            <TableHead className="w-[30%]">Costo por Hora</TableHead>
-            <TableHead className="w-[30%] text-right">Acciones</TableHead>
+          <TableRow className="bg-gray-50/80">
+            <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700">Nombre</TableHead>
+            <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-32">Costo/Hora</TableHead>
+            <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-24 text-center">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((recurso) => (
-            <TableRow key={recurso.id}>
+            <TableRow key={recurso.id} className="hover:bg-blue-50/50 text-xs">
               {editando === recurso.id ? (
                 <>
-                  <TableCell>
+                  <TableCell className="px-3 py-1.5">
                     <Input
                       value={nombre}
                       onChange={(e) => setNombre(e.target.value)}
                       placeholder="Nombre del recurso"
-                      className="h-8"
+                      className="h-7 text-xs"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-3 py-1.5">
                     <div className="relative">
                       <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                       <Input
@@ -170,40 +155,34 @@ export default function RecursoTableView({ data, onUpdate, onDelete, loading = f
                         value={costoHora}
                         onChange={(e) => setCostoHora(parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
-                        className="pl-8 h-8"
+                        className="pl-7 h-7 text-xs"
                         min="0"
                         step="0.01"
                       />
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-1">
+                  <TableCell className="px-3 py-1.5 text-center">
+                    <div className="flex justify-center gap-1">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={cancelarEdicion}
                         disabled={guardando}
-                        className="h-7 px-2 text-xs"
+                        className="h-6 w-6 p-0"
                       >
-                        <X className="h-3 w-3 mr-1" />
-                        Cancelar
+                        <X className="h-3.5 w-3.5" />
                       </Button>
                       <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => guardar(recurso.id)}
                         disabled={guardando}
-                        className="h-7 px-2 text-xs"
+                        className="h-6 w-6 p-0 text-green-600 hover:text-green-700"
                       >
                         {guardando ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Guardando...
-                          </>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <>
-                            <Save className="h-3 w-3 mr-1" />
-                            Guardar
-                          </>
+                          <Save className="h-3.5 w-3.5" />
                         )}
                       </Button>
                     </div>
@@ -211,41 +190,36 @@ export default function RecursoTableView({ data, onUpdate, onDelete, loading = f
                 </>
               ) : (
                 <>
-                  <TableCell className="font-medium">{recurso.nombre}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-mono">
+                  <TableCell className="px-3 py-1.5 font-medium">{recurso.nombre}</TableCell>
+                  <TableCell className="px-3 py-1.5">
+                    <span className="font-mono text-xs">
                       {formatCurrency(recurso.costoHora)}
-                    </Badge>
+                    </span>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-1">
+                  <TableCell className="px-3 py-1.5 text-center">
+                    <div className="flex justify-center gap-1">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={() => iniciarEdicion(recurso)}
                         disabled={editando !== null || eliminando !== null}
-                        className="h-7 px-2 text-xs"
+                        className="h-7 w-7 p-0 hover:bg-blue-50 hover:text-blue-600"
+                        title="Editar"
                       >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Editar
+                        <Edit className="h-3.5 w-3.5" />
                       </Button>
                       <Button
-                        variant="destructive"
+                        variant="ghost"
                         size="sm"
                         onClick={() => eliminar(recurso.id)}
                         disabled={editando !== null || eliminando === recurso.id}
-                        className="h-7 px-2 text-xs"
+                        className="h-7 w-7 p-0 hover:bg-red-50 hover:text-red-600"
+                        title="Eliminar"
                       >
                         {eliminando === recurso.id ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Eliminando...
-                          </>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <>
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Eliminar
-                          </>
+                          <Trash2 className="h-3.5 w-3.5" />
                         )}
                       </Button>
                     </div>

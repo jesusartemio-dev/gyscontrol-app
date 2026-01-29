@@ -192,32 +192,16 @@ export const PedidoEquipoFilters: React.FC<PedidoEquipoFiltersProps> = ({
             handleFieldChange('proyectoId', value)
           }}
         >
-          <SelectTrigger className="w-full sm:w-40 h-9">
-            <SelectValue placeholder="Proyecto" />
+          <SelectTrigger className="w-full sm:w-48 h-9">
+            <SelectValue placeholder="Todos los proyectos" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Todos los proyectos</SelectItem>
             {proyectos.map((p) => (
-              <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Proveedor */}
-        <Select
-          value={form.watch('proveedorId') || 'all'}
-          onValueChange={(value) => {
-            form.setValue('proveedorId', value)
-            handleFieldChange('proveedorId', value)
-          }}
-        >
-          <SelectTrigger className="w-full sm:w-40 h-9">
-            <SelectValue placeholder="Proveedor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {proveedores.map((p) => (
-              <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+              <SelectItem key={p.id} value={p.id}>
+                <span className="font-medium">{p.codigo}</span>
+                <span className="text-muted-foreground ml-1.5 text-xs">{p.nombre}</span>
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -230,11 +214,11 @@ export const PedidoEquipoFilters: React.FC<PedidoEquipoFiltersProps> = ({
             handleFieldChange('estado', value === 'all' ? undefined : value)
           }}
         >
-          <SelectTrigger className="w-full sm:w-32 h-9">
-            <SelectValue placeholder="Estado" />
+          <SelectTrigger className="w-full sm:w-40 h-9">
+            <SelectValue placeholder="Todos los estados" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value={EstadoPedido.borrador}>Borrador</SelectItem>
             <SelectItem value={EstadoPedido.enviado}>Enviado</SelectItem>
             <SelectItem value={EstadoPedido.atendido}>Atendido</SelectItem>

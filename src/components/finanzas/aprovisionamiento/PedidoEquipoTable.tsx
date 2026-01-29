@@ -142,39 +142,36 @@ interface ColumnConfig {
 }
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
-  { key: 'codigo', label: 'Código', sortable: true, width: '120px' },
-  { key: 'proyecto', label: 'Proyecto', sortable: true, width: '150px' },
-  { key: 'fechaPedido', label: 'F. Pedido', sortable: true, width: '110px', align: 'center' },
-  { key: 'fechaNecesaria', label: 'F. Necesaria', sortable: true, width: '120px', align: 'center' }, // ✅ Critical for procurement planning
-  { key: 'fechaEntregaEstimada', label: 'F. Entrega Est.', sortable: true, width: '130px', align: 'center' },
-  { key: 'fechaEntregaReal', label: 'F. Entrega Real', sortable: true, width: '130px', align: 'center' },
-  { key: 'estado', label: 'Estado', sortable: true, width: '120px', align: 'center' },
-  { key: 'montoTotal', label: 'Monto Total', sortable: true, width: '130px', align: 'right' },
-  { key: 'coherencia', label: 'Coherencia', sortable: true, width: '100px', align: 'center' },
-  { key: 'alertas', label: 'Alertas', sortable: false, width: '80px', align: 'center' },
-  { key: 'acciones', label: 'Acciones', sortable: false, width: '100px', align: 'center' },
+  { key: 'codigo', label: 'Código', sortable: true, width: '100px' },
+  { key: 'proyecto', label: 'Proyecto', sortable: true, width: '140px' },
+  { key: 'fechaPedido', label: 'F. Pedido', sortable: true, width: '90px', align: 'center' },
+  { key: 'fechaEntregaEstimada', label: 'F. Entrega', sortable: true, width: '90px', align: 'center' },
+  { key: 'estado', label: 'Estado', sortable: true, width: '100px', align: 'center' },
+  { key: 'montoTotal', label: 'Monto', sortable: true, width: '90px', align: 'right' },
+  { key: 'coherencia', label: 'Coherencia', sortable: true, width: '80px', align: 'center' },
+  { key: 'acciones', label: 'Acciones', sortable: false, width: '70px', align: 'center' },
 ];
 
-// ✅ Status badge component
+// ✅ Status badge component - compact version
 const StatusBadge: React.FC<{ estado: EstadoPedido }> = ({ estado }) => {
-  const variants = {
-    borrador: { variant: 'secondary' as const, label: 'Borrador', icon: Edit },
-    enviado: { variant: 'outline' as const, label: 'Enviado', icon: Package },
-    confirmado: { variant: 'default' as const, label: 'Confirmado', icon: CheckCircle },
-    parcial: { variant: 'secondary' as const, label: 'Parcial', icon: Package },
-    en_transito: { variant: 'secondary' as const, label: 'En Tránsito', icon: Truck },
-    entregado: { variant: 'default' as const, label: 'Entregado', icon: CheckCircle },
-    atendido: { variant: 'default' as const, label: 'Atendido', icon: CheckCircle },
-    cancelado: { variant: 'destructive' as const, label: 'Cancelado', icon: X },
-    retrasado: { variant: 'destructive' as const, label: 'Retrasado', icon: Clock },
+  const variants: Record<string, { color: string; label: string; icon: React.ElementType }> = {
+    borrador: { color: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Borrador', icon: Edit },
+    enviado: { color: 'bg-indigo-50 text-indigo-700 border-indigo-200', label: 'Enviado', icon: Package },
+    confirmado: { color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Confirmado', icon: CheckCircle },
+    parcial: { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Parcial', icon: Package },
+    en_transito: { color: 'bg-purple-50 text-purple-700 border-purple-200', label: 'En Tránsito', icon: Truck },
+    entregado: { color: 'bg-green-50 text-green-700 border-green-200', label: 'Entregado', icon: CheckCircle },
+    atendido: { color: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Atendido', icon: CheckCircle },
+    cancelado: { color: 'bg-red-50 text-red-700 border-red-200', label: 'Cancelado', icon: X },
+    retrasado: { color: 'bg-orange-50 text-orange-700 border-orange-200', label: 'Retrasado', icon: Clock },
   };
 
   const config = variants[estado] || variants.borrador;
   const Icon = config.icon;
-  
+
   return (
-    <Badge variant={config.variant} className="flex items-center gap-1">
-      <Icon className="w-3 h-3" />
+    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-medium ${config.color}`}>
+      <Icon className="w-3 h-3 mr-1" />
       {config.label}
     </Badge>
   );
@@ -447,162 +444,98 @@ const PedidoEquipoTableRow = memo<PedidoTableRowProps>(({
 
   return (
     <TableRow
-      className="hover:bg-gray-50 cursor-pointer"
+      className="hover:bg-blue-50/50 cursor-pointer text-xs"
       onClick={handleRowClick}
     >
       {allowBulkActions && (
-        <TableCell onClick={(e) => e.stopPropagation()}>
+        <TableCell className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={isSelected}
             onCheckedChange={handleSelectChange}
           />
         </TableCell>
       )}
-      
+
       {visibleColumns.includes('codigo') && (
-        <TableCell className="font-mono text-sm">
-          {allowEdit ? (
-            <InlineEditCell
-              value={pedido.codigo}
-              onSave={handleCodigoEdit}
-            />
-          ) : (
-            pedido.codigo
-          )}
+        <TableCell className="px-2 py-1.5 font-mono text-xs font-medium">
+          {pedido.codigo}
         </TableCell>
       )}
-      
+
       {visibleColumns.includes('proyecto') && (
-        <TableCell>
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-500" />
-            <div className="flex flex-col">
-              <span className="font-medium text-sm">{(pedido as any).proyecto?.codigo || 'N/A'}</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={(pedido as any).proyecto?.nombre}>
-                {(pedido as any).proyecto?.nombre || 'Sin proyecto'}
+        <TableCell className="px-2 py-1.5">
+          <div className="flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            <div className="min-w-0">
+              <span className="font-medium text-xs block truncate">{(pedido as any).proyecto?.codigo || 'N/A'}</span>
+              <span className="text-[10px] text-muted-foreground truncate block max-w-[100px]">
+                {(pedido as any).proyecto?.nombre || ''}
               </span>
             </div>
           </div>
         </TableCell>
       )}
-      
-      {visibleColumns.includes('descripcion') && (
-        <TableCell>
-          <div className="max-w-xs truncate" title={pedido.observacion}>
-            {pedido.observacion || 'Sin descripción'}
-          </div>
-        </TableCell>
-      )}
-      
+
       {visibleColumns.includes('fechaPedido') && (
-        <TableCell className="text-center">
+        <TableCell className="px-2 py-1.5 text-center text-xs">
           <span className={!pedido.fechaPedido ? 'text-muted-foreground' : ''}>
             {fechaPedidoDisplay}
           </span>
         </TableCell>
       )}
-      
-      {visibleColumns.includes('fechaNecesaria') && (
-        <TableCell className="text-center">
-          <div className="flex items-center justify-center gap-2">
-            {pedido.fechaNecesaria ? (
-              <>
-                <Calendar className="w-4 h-4 text-orange-500" />
-                {allowEdit ? (
-                  <InlineEditCell
-                    value={pedido.fechaNecesaria}
-                    type="date"
-                    onSave={handleFechaNecesariaEdit}
-                  />
-                ) : (
-                  <span className="font-medium text-orange-700">
-                    {fechaNecesariaDisplay}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </div>
-        </TableCell>
-      )}
-      
+
       {visibleColumns.includes('fechaEntregaEstimada') && (
-        <TableCell className="text-center">
-          <div className="flex items-center justify-center gap-2">
-            {pedido.fechaEntregaEstimada ? (
-              <>
-                <Truck className="w-4 h-4 text-green-500" />
-                <span className="font-medium text-green-700">
-                  {fechaEntregaDisplay}
-                </span>
-              </>
-            ) : (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </div>
+        <TableCell className="px-2 py-1.5 text-center text-xs">
+          {pedido.fechaEntregaEstimada ? (
+            <span className="text-green-700">{fechaEntregaDisplay}</span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
         </TableCell>
       )}
-      
+
       {visibleColumns.includes('estado') && (
-        <TableCell className="text-center">
+        <TableCell className="px-2 py-1.5 text-center">
           <StatusBadge estado={pedido.estado} />
         </TableCell>
       )}
-      
+
       {visibleColumns.includes('montoTotal') && (
-        <TableCell className="text-right font-mono">
-          <span className={!montoTotal ? 'text-muted-foreground' : ''}>
+        <TableCell className="px-2 py-1.5 text-right font-mono text-xs">
+          <span className={!montoTotal ? 'text-muted-foreground' : 'font-medium'}>
             {montoDisplay}
           </span>
         </TableCell>
       )}
-      
-      {visibleColumns.includes('proveedor') && (
-        <TableCell>
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-purple-500" />
-            <span className="font-medium">
-              {(pedido as any).proveedor?.nombre || 'Sin asignar'}
-            </span>
-          </div>
-        </TableCell>
-      )}
-      
+
       {visibleColumns.includes('coherencia') && showCoherenceIndicators && (
-        <TableCell className="text-center">
+        <TableCell className="px-2 py-1.5 text-center">
           <CoherenceIndicator coherencia={(pedido as any).coherencia} />
         </TableCell>
       )}
-      
+
       {visibleColumns.includes('acciones') && (
-        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+        <TableCell className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleRowClick}>
-                <Eye className="w-4 h-4 mr-2" />
+                <Eye className="w-3.5 h-3.5 mr-2" />
                 Ver detalles
               </DropdownMenuItem>
               {allowEdit && (
                 <DropdownMenuItem onClick={handleEditClick}>
-                  <Edit className="w-4 h-4 mr-2" />
+                  <Edit className="w-3.5 h-3.5 mr-2" />
                   Editar
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem>
-                <Package className="w-4 h-4 mr-2" />
-                Ver seguimiento
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileText className="w-4 h-4 mr-2" />
-                Generar reporte
+                <Package className="w-3.5 h-3.5 mr-2" />
+                Seguimiento
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -755,136 +688,110 @@ export const PedidoEquipoTable: React.FC<PedidoEquipoTableProps> = ({
 
   if (loading) {
     return (
-      <Card className={className}>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className={`border rounded-lg bg-white ${className}`}>
+        <div className="p-4 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <Card className={className}>
-        <CardContent className="p-12 text-center">
-          <ShoppingCart className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-medium mb-2">No hay pedidos de equipos</h3>
-          <p className="text-muted-foreground mb-4">
-            {filtros ? 'No se encontraron pedidos con los filtros aplicados' : 'Aún no se han creado pedidos de equipos'}
-          </p>
-        </CardContent>
-      </Card>
+      <div className={`border rounded-lg bg-white p-8 text-center ${className}`}>
+        <ShoppingCart className="w-10 h-10 mx-auto mb-3 text-gray-400" />
+        <h3 className="text-base font-medium mb-1">No hay pedidos</h3>
+        <p className="text-sm text-muted-foreground">
+          {filtros ? 'No se encontraron pedidos con los filtros aplicados' : 'Aún no se han creado pedidos'}
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card className={className}>
+    <div className={`border rounded-lg bg-white overflow-hidden ${className}`}>
       {/* Header with bulk actions */}
       {allowBulkActions && selectedIds.length > 0 && (
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">
-                {selectedIds.length} pedido{selectedIds.length > 1 ? 's' : ''} seleccionado{selectedIds.length > 1 ? 's' : ''}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkAction('confirmar')}
-              >
-                Confirmar
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkAction('cancelar')}
-              >
-                Cancelar
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkAction('exportar')}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Exportar
-              </Button>
-            </div>
+        <div className="px-3 py-2 bg-blue-50 border-b flex items-center justify-between">
+          <span className="text-xs font-medium text-blue-700">
+            {selectedIds.length} seleccionado{selectedIds.length > 1 ? 's' : ''}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => handleBulkAction('confirmar')}>
+              Confirmar
+            </Button>
+            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => handleBulkAction('exportar')}>
+              Exportar
+            </Button>
           </div>
-        </CardHeader>
+        </div>
       )}
 
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {allowBulkActions && (
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectedIds.length === data.length}
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </TableHead>
-                )}
-                {visibleColumns.map(columnKey => {
-                  const config = getColumnConfig(columnKey);
-                  if (!config) return null;
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-50/80">
+              {allowBulkActions && (
+                <TableHead className="w-10 px-2">
+                  <Checkbox
+                    checked={selectedIds.length === data.length}
+                    onCheckedChange={handleSelectAll}
+                  />
+                </TableHead>
+              )}
+              {visibleColumns.map(columnKey => {
+                const config = getColumnConfig(columnKey);
+                if (!config) return null;
 
-                  return (
-                    <TableHead
-                      key={columnKey}
-                      className={`${config.align === 'center' ? 'text-center' : config.align === 'right' ? 'text-right' : ''}`}
-                      style={{ width: config.width }}
-                    >
-                      {config.sortable ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 p-0 font-medium"
-                          onClick={() => handleSort(columnKey)}
-                        >
-                          {config.label}
-                          <ArrowUpDown className="w-3 h-3 ml-1" />
-                        </Button>
-                      ) : (
-                        config.label
-                      )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedPedidos.map((pedido, index) => (
-                <PedidoEquipoTableRow
-                  key={pedido.id}
-                  pedido={pedido}
-                  index={index}
-                  visibleColumns={visibleColumns}
-                  allowEdit={allowEdit}
-                  allowBulkActions={allowBulkActions}
-                  showCoherenceIndicators={showCoherenceIndicators}
-                  isSelected={selectedIds.includes(pedido.id)}
-                  onPedidoClick={onPedidoClick}
-                  onPedidoEdit={onEdit}
-                  onSelectItem={handleSelectItem}
-                  onInlineEdit={handleInlineEdit}
-                  onViewTracking={onViewTracking}
-                  onContactSupplier={onContactSupplier}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+                return (
+                  <TableHead
+                    key={columnKey}
+                    className={`px-2 py-2 text-xs font-semibold text-gray-700 ${config.align === 'center' ? 'text-center' : config.align === 'right' ? 'text-right' : ''}`}
+                    style={{ width: config.width }}
+                  >
+                    {config.sortable ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1 text-xs font-semibold"
+                        onClick={() => handleSort(columnKey)}
+                      >
+                        {config.label}
+                        <ArrowUpDown className="w-3 h-3 ml-1" />
+                      </Button>
+                    ) : (
+                      config.label
+                    )}
+                  </TableHead>
+                );
+              })}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedPedidos.map((pedido, index) => (
+              <PedidoEquipoTableRow
+                key={pedido.id}
+                pedido={pedido}
+                index={index}
+                visibleColumns={visibleColumns}
+                allowEdit={allowEdit}
+                allowBulkActions={allowBulkActions}
+                showCoherenceIndicators={showCoherenceIndicators}
+                isSelected={selectedIds.includes(pedido.id)}
+                onPedidoClick={onPedidoClick}
+                onPedidoEdit={onEdit}
+                onSelectItem={handleSelectItem}
+                onInlineEdit={handleInlineEdit}
+                onViewTracking={onViewTracking}
+                onContactSupplier={onContactSupplier}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 };
 

@@ -1,14 +1,6 @@
-// ===================================================
-// 📁 Archivo: page.tsx
-// 📌 Ubicación: src/app/catalogo/recursos/
-// 🔧 Página moderna de recursos con UX/UI mejorada
-// 🎨 Mejoras aplicadas: Framer Motion, Shadcn/UI, Estados de carga, Breadcrumb navigation
-// ===================================================
-
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
 import { getRecursos, createRecurso } from '@/lib/services/recurso'
 import { Recurso } from '@/types'
 import RecursoModal from '@/components/catalogo/RecursoModal'
@@ -16,21 +8,26 @@ import RecursoTableView from '@/components/catalogo/RecursoTableView'
 import RecursoCardView from '@/components/catalogo/RecursoCardView'
 import { toast } from 'sonner'
 import { exportarRecursosAExcel } from '@/lib/utils/recursoExcel'
-import {
-  leerRecursosDesdeExcel,
-  validarRecursos
-} from '@/lib/utils/recursoImportUtils'
-import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { leerRecursosDesdeExcel, validarRecursos } from '@/lib/utils/recursoImportUtils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { AlertCircle, Calculator, TrendingUp, Package, Home, Settings, Loader2, Plus, Table, Grid, Search, Filter } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertCircle,
+  Users,
+  TrendingUp,
+  DollarSign,
+  Loader2,
+  Plus,
+  Search,
+  LayoutList,
+  LayoutGrid,
+  FileSpreadsheet,
+  Upload
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-// Currency formatter
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -39,36 +36,14 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-// Variantes de animación para Framer Motion
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.5
-    }
-  }
-}
-
-export default function Page() {
+export default function RecursosPage() {
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [importando, setImportando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table') // Vista tabla por defecto
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [searchTerm, setSearchTerm] = useState('')
 
   const cargarRecursos = async () => {
@@ -78,10 +53,8 @@ export default function Page() {
       const data = await getRecursos()
       setRecursos(data)
     } catch (err) {
-      const errorMessage = 'Error al cargar los recursos'
-      setError(errorMessage)
-      toast.error(errorMessage)
-      console.error('Error loading recursos:', err)
+      setError('Error al cargar los recursos')
+      toast.error('Error al cargar los recursos')
     } finally {
       setLoading(false)
     }
@@ -93,7 +66,6 @@ export default function Page() {
 
   const handleCreated = (nuevo: Recurso) => {
     setRecursos((prev) => [nuevo, ...prev])
-    setError(null) // Clear any previous errors
     toast.success('Recurso creado exitosamente')
   }
 
@@ -101,26 +73,23 @@ export default function Page() {
     setRecursos((prev) =>
       prev.map((r) => (r.id === actualizado.id ? actualizado : r))
     )
-    setError(null)
-    toast.success('Recurso actualizado exitosamente')
+    toast.success('Recurso actualizado')
   }
 
   const handleDeleted = (id: string) => {
     setRecursos((prev) => prev.filter((r) => r.id !== id))
-    setError(null)
-    toast.success('Recurso eliminado exitosamente')
+    toast.success('Recurso eliminado')
   }
 
   const handleExportar = () => {
     try {
       exportarRecursosAExcel(recursos)
-      toast.success('Recursos exportados exitosamente')
-    } catch (err) {
-      toast.error('Error al exportar recursos')
+      toast.success('Excel exportado')
+    } catch {
+      toast.error('Error al exportar')
     }
   }
 
-  // Filtrar recursos basado en el término de búsqueda
   const filteredRecursos = recursos.filter(recurso =>
     recurso.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -138,341 +107,217 @@ export default function Page() {
 
       if (erroresImport.length > 0) {
         setErrores(erroresImport)
-        toast.error('Errores encontrados en la importación')
+        toast.error('Errores en la importación')
         return
       }
 
       await Promise.all(nuevos.map(r => createRecurso({ nombre: r.nombre, costoHora: r.costoHora })))
-      toast.success(`${nuevos.length} recursos importados correctamente`)
+      toast.success(`${nuevos.length} recursos importados`)
       cargarRecursos()
-    } catch (err) {
-      const errorMessage = 'Error inesperado en la importación'
-      setError(errorMessage)
-      console.error('Error al importar recursos:', err)
-      toast.error(errorMessage)
+    } catch {
+      toast.error('Error en la importación')
     } finally {
       setImportando(false)
       e.target.value = ''
     }
   }
 
-  // Estado de carga
+  // Stats
+  const stats = {
+    total: recursos.length,
+    promedio: recursos.length > 0
+      ? recursos.reduce((sum, r) => sum + r.costoHora, 0) / recursos.length
+      : 0,
+    maximo: recursos.length > 0
+      ? Math.max(...recursos.map(r => r.costoHora))
+      : 0
+  }
+
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="space-y-6">
-          {/* Skeleton Breadcrumb */}
-          <div className="h-4 bg-gray-200 rounded w-48 animate-pulse" />
-          
-          {/* Skeleton Header */}
-          <div className="flex justify-between items-center">
-            <div className="h-8 bg-gray-200 rounded w-64 animate-pulse" />
-            <div className="h-10 bg-gray-200 rounded w-48 animate-pulse" />
-          </div>
-          
-          {/* Skeleton Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-lg animate-pulse" />
-            ))}
-          </div>
-          
-          {/* Skeleton Content */}
-          <div className="grid grid-cols-1 gap-6">
-            <div className="h-96 bg-gray-200 rounded-lg animate-pulse" />
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     )
   }
 
   return (
-    <motion.div
-      className="container mx-auto px-4 py-8 max-w-7xl"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      <div className="space-y-6">
-        {/* Breadcrumb Navigation */}
-        <motion.div variants={itemVariants}>
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/" className="flex items-center gap-2">
-                  <Home className="h-4 w-4" />
-                  Inicio
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/catalogo" className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  Catálogo
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="flex items-center gap-2">
-                  <Calculator className="h-4 w-4" />
-                  Recursos
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </motion.div>
+    <div className="p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Users className="h-6 w-6 text-blue-600" />
+          <h1 className="text-xl font-bold">Recursos</h1>
+          <Badge variant="secondary" className="text-xs">
+            {stats.total}
+          </Badge>
+        </div>
 
-        {/* Header Section */}
-        <motion.div
-          className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-          variants={itemVariants}
-        >
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-              <Calculator className="h-8 w-8 text-blue-600" />
-              Gestión de Recursos
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Administra los recursos humanos y sus costos por hora
-            </p>
+        <div className="flex items-center gap-2">
+          {/* Inline Stats - Desktop */}
+          <div className="hidden md:flex items-center gap-3 mr-4 text-xs">
+            <div className="flex items-center gap-1 text-blue-600" title="Costo Promedio">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span className="font-medium">{formatCurrency(stats.promedio)}/h</span>
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex items-center gap-1 text-green-600" title="Costo Máximo">
+              <DollarSign className="h-3.5 w-3.5" />
+              <span className="font-medium">{formatCurrency(stats.maximo)}/h</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          {/* View Toggle */}
+          <div className="flex items-center border rounded-md">
             <Button
-              onClick={() => setShowCreateModal(true)}
-              size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              variant="ghost"
+              size="sm"
+              className={cn('h-8 px-2 rounded-r-none', viewMode === 'table' && 'bg-gray-100')}
+              onClick={() => setViewMode('table')}
+              title="Vista tabla"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Recurso
+              <LayoutList className="h-4 w-4" />
             </Button>
-            <BotonesImportExport
-              onExportar={handleExportar}
-              onImportar={handleImportar}
-              importando={importando}
-            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn('h-8 px-2 rounded-l-none border-l', viewMode === 'cards' && 'bg-gray-100')}
+              onClick={() => setViewMode('cards')}
+              title="Vista cards"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
           </div>
-        </motion.div>
 
-        {/* Quick Stats */}
-        <motion.div 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-          variants={itemVariants}
-        >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Recursos</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{recursos.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Recursos registrados
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Costo Promedio</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {recursos.length > 0
-                  ? formatCurrency(recursos.reduce((sum, r) => sum + r.costoHora, 0) / recursos.length)
-                  : formatCurrency(0)
-                }
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Por hora
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Costo Máximo</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {recursos.length > 0
-                  ? formatCurrency(Math.max(...recursos.map(r => r.costoHora)))
-                  : formatCurrency(0)
-                }
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Recurso más costoso
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Estado</CardTitle>
-              <Badge variant={recursos.length > 0 ? "default" : "secondary"}>
-                {recursos.length > 0 ? "Activo" : "Vacío"}
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {importando ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Importando...</span>
-                  </div>
-                ) : (
-                  "✓"
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Sistema operativo
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+          {/* Export */}
+          <Button variant="outline" size="sm" className="h-8" onClick={handleExportar}>
+            <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5 text-green-600" />
+            Excel
+          </Button>
 
-        <Separator />
+          {/* Import */}
+          <Button variant="outline" size="sm" className="h-8 relative" disabled={importando}>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImportar}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              disabled={importando}
+            />
+            {importando ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Importar
+          </Button>
 
-        {/* Error State */}
-        {error && (
-          <motion.div variants={itemVariants}>
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          </motion.div>
-        )}
-
-        {/* Import Errors */}
-        {errores.length > 0 && (
-          <motion.div variants={itemVariants}>
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Errores de Importación</AlertTitle>
-              <AlertDescription>
-                <ul className="list-disc pl-5 mt-2 space-y-1">
-                  {errores.map((err, idx) => (
-                    <li key={idx}>{err}</li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          </motion.div>
-        )}
-
-        {/* Main Content */}
-        <motion.div variants={itemVariants} className="space-y-6">
-          {/* View Controls and Filter */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">Vista:</span>
-                  <div className="flex rounded-md border">
-                    <Button
-                      variant={viewMode === 'table' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setViewMode('table')}
-                      className="rounded-r-none"
-                    >
-                      <Table className="h-4 w-4 mr-1" />
-                      Tabla
-                    </Button>
-                    <Button
-                      variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setViewMode('cards')}
-                      className="rounded-l-none"
-                    >
-                      <Grid className="h-4 w-4 mr-1" />
-                      Cards
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:w-64">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Buscar recursos..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8"
-                    />
-                  </div>
-                  {searchTerm && (
-                    <Badge variant="secondary" className="text-xs">
-                      {filteredRecursos.length} resultado{filteredRecursos.length !== 1 ? 's' : ''}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Content Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Recursos ({filteredRecursos.length})
-              </CardTitle>
-              <CardDescription>
-                {viewMode === 'table' ? 'Vista tabular de recursos' : 'Vista de tarjetas de recursos'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {filteredRecursos.length === 0 && recursos.length > 0 ? (
-                <div className="text-center py-12">
-                  <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No se encontraron recursos</h3>
-                  <p className="text-muted-foreground mb-4">
-                    No hay recursos que coincidan con "{searchTerm}"
-                  </p>
-                  <Button variant="outline" onClick={() => setSearchTerm('')}>
-                    Limpiar búsqueda
-                  </Button>
-                </div>
-              ) : filteredRecursos.length === 0 ? (
-                <div className="text-center py-12">
-                  <Calculator className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No hay recursos registrados</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Comienza agregando tu primer recurso usando el botón "Nuevo Recurso" en la parte superior
-                  </p>
-                  <Badge variant="outline">Sistema listo para usar</Badge>
-                </div>
-              ) : viewMode === 'table' ? (
-                <RecursoTableView
-                  data={filteredRecursos}
-                  onUpdate={handleUpdated}
-                  onDelete={handleDeleted}
-                  loading={loading}
-                  error={error}
-                />
-              ) : (
-                <RecursoCardView
-                  data={filteredRecursos}
-                  onUpdate={handleUpdated}
-                  onDelete={handleDeleted}
-                  loading={loading}
-                  error={error}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+          {/* New */}
+          <Button size="sm" className="h-8" onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Nuevo
+          </Button>
+        </div>
       </div>
 
-      {/* Modal para crear recursos */}
+      {/* Mobile Stats */}
+      <div className="md:hidden grid grid-cols-2 gap-2">
+        <div className="bg-blue-50 rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-blue-600">{formatCurrency(stats.promedio)}</div>
+          <div className="text-[10px] text-blue-700">Promedio/hora</div>
+        </div>
+        <div className="bg-green-50 rounded-lg p-2 text-center">
+          <div className="text-lg font-bold text-green-600">{formatCurrency(stats.maximo)}</div>
+          <div className="text-[10px] text-green-700">Máximo/hora</div>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar recurso por nombre..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+        {searchTerm && (
+          <Badge variant="outline" className="text-xs">
+            {filteredRecursos.length} resultado{filteredRecursos.length !== 1 ? 's' : ''}
+          </Badge>
+        )}
+      </div>
+
+      {/* Errors */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {errores.length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <ul className="list-disc pl-5 space-y-1 text-sm">
+              {errores.slice(0, 5).map((err, idx) => (
+                <li key={idx}>{err}</li>
+              ))}
+              {errores.length > 5 && (
+                <li>...y {errores.length - 5} errores más</li>
+              )}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Content */}
+      {filteredRecursos.length === 0 && recursos.length > 0 ? (
+        <div className="border rounded-lg bg-white p-8 text-center">
+          <Search className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-base font-medium mb-1">Sin resultados</h3>
+          <p className="text-sm text-muted-foreground mb-3">
+            No hay recursos que coincidan con "{searchTerm}"
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setSearchTerm('')}>
+            Limpiar búsqueda
+          </Button>
+        </div>
+      ) : filteredRecursos.length === 0 ? (
+        <div className="border rounded-lg bg-white p-8 text-center">
+          <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-base font-medium mb-1">No hay recursos</h3>
+          <p className="text-sm text-muted-foreground">
+            Comienza agregando tu primer recurso
+          </p>
+        </div>
+      ) : viewMode === 'table' ? (
+        <RecursoTableView
+          data={filteredRecursos}
+          onUpdate={handleUpdated}
+          onDelete={handleDeleted}
+          loading={loading}
+          error={error}
+        />
+      ) : (
+        <RecursoCardView
+          data={filteredRecursos}
+          onUpdate={handleUpdated}
+          onDelete={handleDeleted}
+          loading={loading}
+          error={error}
+        />
+      )}
+
+      {/* Modal */}
       <RecursoModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreated={handleCreated}
       />
-    </motion.div>
+    </div>
   )
 }

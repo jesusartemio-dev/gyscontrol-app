@@ -146,7 +146,7 @@ export default function CotizacionServicioAccordion({
                 <span className="text-gray-300">|</span>
                 <span className="flex items-center gap-0.5">
                   <Clock className="h-3 w-3 text-purple-500" />
-                  <span className="font-mono text-purple-600">{totalHoras.toFixed(0)}h</span>
+                  <span className="font-mono text-purple-600">{totalHoras.toFixed(2)}h</span>
                 </span>
                 <span className="text-gray-300">|</span>
                 <span className="font-mono">{formatCurrency(servicio.subtotalInterno)}</span>
@@ -198,7 +198,7 @@ export default function CotizacionServicioAccordion({
           {!isOpen && (
             <div className="sm:hidden px-3 pb-2 pt-0">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{servicio.items.length} items • {totalHoras.toFixed(0)}h</span>
+                <span>{servicio.items.length} items • {totalHoras.toFixed(2)}h</span>
                 <span className="font-mono text-green-600 font-medium">{formatCurrency(servicio.subtotalCliente)}</span>
               </div>
             </div>
@@ -276,7 +276,7 @@ export default function CotizacionServicioAccordion({
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Total:</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-purple-600">{totalHoras.toFixed(0)}h</span>
+                      <span className="font-mono text-purple-600">{totalHoras.toFixed(2)}h</span>
                       <span className="text-gray-300">|</span>
                       <span className="font-mono">{formatCurrency(servicio.subtotalInterno)}</span>
                       <span className="text-gray-300">→</span>

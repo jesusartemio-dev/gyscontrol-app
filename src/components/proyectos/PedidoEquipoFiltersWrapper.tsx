@@ -6,9 +6,10 @@ import type { FiltrosPedidoEquipo } from '@/types/aprovisionamiento'
 
 interface PedidoEquipoFiltersWrapperProps {
   filtros: FiltrosPedidoEquipo
+  proyectos?: Array<{ id: string; nombre: string; codigo: string }>
 }
 
-export function PedidoEquipoFiltersWrapper({ filtros }: PedidoEquipoFiltersWrapperProps) {
+export function PedidoEquipoFiltersWrapper({ filtros, proyectos = [] }: PedidoEquipoFiltersWrapperProps) {
   const router = useRouter()
 
   const handleFiltrosChange = (newFiltros: FiltrosPedidoEquipo) => {
@@ -31,6 +32,7 @@ export function PedidoEquipoFiltersWrapper({ filtros }: PedidoEquipoFiltersWrapp
     <PedidoEquipoFilters
       filtros={filtros}
       onFiltrosChange={handleFiltrosChange}
+      proyectos={proyectos}
     />
   )
 }

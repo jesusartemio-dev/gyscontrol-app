@@ -1,12 +1,11 @@
 import { Suspense } from 'react'
 import { Metadata } from 'next'
-import { ShoppingCart, Plus, Download, Clock, DollarSign, CheckCircle, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Loader2 } from 'lucide-react'
 import { EstadoPedido } from '@prisma/client'
-import { PedidoEquipoTableWrapper } from '@/components/finanzas/aprovisionamiento/PedidoEquipoTableWrapper'
 import { PedidoEquipoFiltersWrapper } from '@/components/proyectos/PedidoEquipoFiltersWrapper'
+import { PedidosPageContent } from '@/components/proyectos/PedidosPageContent'
 import { getPedidosEquipo } from '@/lib/services/aprovisionamiento'
+import { getProyectos } from '@/lib/services/proyecto'
 
 export const metadata: Metadata = {
   title: 'Pedidos de Equipos - Proyectos | GYS',
@@ -31,16 +30,6 @@ interface PageProps {
   }>
 }
 
-const formatCurrency = (amount: number): string => {
-  if (amount >= 1000000) {
-    return `$${(amount / 1000000).toFixed(1)}M`
-  }
-  if (amount >= 1000) {
-    return `$${(amount / 1000).toFixed(0)}K`
-  }
-  return `$${amount.toFixed(0)}`
-}
-
 function LoadingState() {
   return (
     <div className="flex items-center justify-center h-64">
@@ -54,6 +43,14 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
 
   const page = parseInt(params.page || '1')
   const limit = parseInt(params.limit || '10')
+
+  // Fetch proyectos para los filtros
+  const proyectos = await getProyectos()
+  const proyectosParaFiltros = proyectos.map(p => ({
+    id: p.id,
+    nombre: p.nombre,
+    codigo: p.codigo
+  }))
 
   const pedidosResponse = await getPedidosEquipo({
     proyectoId: params.proyecto,
@@ -110,71 +107,17 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-4 space-y-4">
-      {/* Compact Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ShoppingCart className="h-6 w-6 text-blue-600" />
-          <h1 className="text-xl font-bold">Pedidos</h1>
-          <Badge variant="secondary" className="text-xs">
-            {stats.total}
-          </Badge>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Inline Stats - Desktop */}
-          <div className="hidden md:flex items-center gap-3 mr-4 text-xs">
-            <div className="flex items-center gap-1 text-yellow-600" title="Pendientes">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="font-medium">{stats.pendientes}</span>
-            </div>
-            <div className="flex items-center gap-1 text-green-600" title="Completados">
-              <CheckCircle className="h-3.5 w-3.5" />
-              <span className="font-medium">{stats.completados}</span>
-            </div>
-            <div className="w-px h-4 bg-gray-200" />
-            <div className="flex items-center gap-1 text-emerald-600" title="Monto Total">
-              <DollarSign className="h-3.5 w-3.5" />
-              <span className="font-semibold">{formatCurrency(stats.montoTotal)}</span>
-            </div>
-          </div>
-
-          <Button variant="outline" size="sm" className="h-8">
-            <Download className="h-3.5 w-3.5 mr-1.5" />
-            Exportar
-          </Button>
-          <Button size="sm" className="h-8">
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            Nuevo
-          </Button>
-        </div>
-      </div>
-
-      {/* Mobile Stats */}
-      <div className="md:hidden grid grid-cols-3 gap-2">
-        <div className="bg-yellow-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-yellow-600">{stats.pendientes}</div>
-          <div className="text-[10px] text-yellow-700">Pendientes</div>
-        </div>
-        <div className="bg-green-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-green-600">{stats.completados}</div>
-          <div className="text-[10px] text-green-700">Completados</div>
-        </div>
-        <div className="bg-emerald-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-emerald-600">{formatCurrency(stats.montoTotal)}</div>
-          <div className="text-[10px] text-emerald-700">Total</div>
-        </div>
-      </div>
-
       {/* Filters */}
       <Suspense fallback={<div className="h-10 bg-gray-100 rounded animate-pulse" />}>
-        <PedidoEquipoFiltersWrapper filtros={filtros} />
+        <PedidoEquipoFiltersWrapper filtros={filtros} proyectos={proyectosParaFiltros} />
       </Suspense>
 
-      {/* Table */}
+      {/* Content with header, stats and table/cards */}
       <Suspense fallback={<LoadingState />}>
-        <PedidoEquipoTableWrapper
-          data={pedidosData.items}
+        <PedidosPageContent
+          pedidos={pedidosData.items}
           pagination={pedidosData.pagination}
+          stats={stats}
         />
       </Suspense>
     </div>
