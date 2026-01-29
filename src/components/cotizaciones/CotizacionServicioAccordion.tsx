@@ -311,10 +311,7 @@ export default function CotizacionServicioAccordion({
       <DeleteAlertDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
-        onConfirm={() => {
-          onDeletedGrupo()
-          setShowDeleteDialog(false)
-        }}
+        onConfirm={onDeletedGrupo}
         title="¿Eliminar grupo de servicios?"
         description="Esta acción eliminará permanentemente el grupo y todos sus items."
       />
