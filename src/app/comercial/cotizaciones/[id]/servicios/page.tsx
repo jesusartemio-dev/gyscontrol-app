@@ -49,9 +49,11 @@ export default function CotizacionServiciosPage() {
 
   const actualizarServicio = (servicioId: string, callback: (items: CotizacionServicioItem[]) => CotizacionServicioItem[]) => {
     if (!cotizacion) return
-    const servicios = cotizacion.servicios.map(s =>
-      s.id === servicioId ? { ...s, items: callback(s.items), ...calcularSubtotal(callback(s.items)) } : s
-    )
+    const servicios = cotizacion.servicios.map(s => {
+      if (s.id !== servicioId) return s
+      const newItems = callback(s.items)
+      return { ...s, items: newItems, ...calcularSubtotal(newItems) }
+    })
     const nuevosTotales = actualizarTotalesParciales(cotizacion.equipos, servicios, cotizacion.gastos)
     setCotizacion({ ...cotizacion, servicios, ...nuevosTotales })
     void updateCotizacion(cotizacion.id, nuevosTotales)
