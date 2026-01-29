@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 
 import { updateCotizacion } from '@/lib/services/cotizacion'
 import { deleteCotizacionServicio, updateCotizacionServicio } from '@/lib/services/cotizacionServicio'
+import { deleteCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
 
 import { Button } from '@/components/ui/button'
@@ -85,6 +86,18 @@ export default function CotizacionServiciosPage() {
     }
   }
 
+  const handleEliminarItem = async (servicioId: string, itemId: string) => {
+    if (!cotizacion) return
+    try {
+      await deleteCotizacionServicioItem(itemId)
+      actualizarServicio(servicioId, items => items.filter(i => i.id !== itemId))
+      toast.success('Item eliminado')
+    } catch (error) {
+      console.error('Error al eliminar item:', error)
+      toast.error('Error al eliminar el item')
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Toolbar Compacto */}
@@ -121,7 +134,7 @@ export default function CotizacionServiciosPage() {
                 onCreated={i => actualizarServicio(s.id, items => [...items, i])}
                 onMultipleCreated={newItems => actualizarServicio(s.id, items => [...items, ...newItems])}
                 onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))}
-                onDeleted={id => actualizarServicio(s.id, items => items.filter(i => i.id !== id))}
+                onDeleted={itemId => handleEliminarItem(s.id, itemId)}
                 onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)}
                 onUpdatedNombre={nuevo => handleActualizarNombreServicio(s.id, nuevo)}
               />

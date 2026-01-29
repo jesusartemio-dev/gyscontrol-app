@@ -88,10 +88,11 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
           const costoInterno = horas * costoHora * (merged.factorSeguridad ?? 1) * dificultadMultiplier
           const costoCliente = costoInterno * (merged.margen ?? 1)
 
-          updated.horaTotal = isNaN(horas) ? 0 : horas
-          updated.costoInterno = isNaN(costoInterno) ? 0 : costoInterno
-          updated.costoCliente = isNaN(costoCliente) ? 0 : costoCliente
-          updated.costoHora = isNaN(costoHora) ? 0 : costoHora
+          // Redondear a 2 decimales para evitar errores de precisión
+          updated.horaTotal = isNaN(horas) ? 0 : Math.round(horas * 100) / 100
+          updated.costoInterno = isNaN(costoInterno) ? 0 : Math.round(costoInterno * 100) / 100
+          updated.costoCliente = isNaN(costoCliente) ? 0 : Math.round(costoCliente * 100) / 100
+          updated.costoHora = isNaN(costoHora) ? 0 : Math.round(costoHora * 100) / 100
           if (recurso) updated.recursoNombre = recurso.nombre
         }
       }
@@ -131,13 +132,14 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
     const costoInterno = horas * costoHora * (updated.factorSeguridad ?? 1) * dificultadMultiplier
     const costoCliente = costoInterno * (updated.margen ?? 1)
 
+    // Redondear a 2 decimales para evitar errores de precisión
     const finalUpdated = {
       ...updated,
-      horaTotal: isNaN(horas) ? 0 : horas,
-      costoInterno: isNaN(costoInterno) ? 0 : costoInterno,
-      costoCliente: isNaN(costoCliente) ? 0 : costoCliente,
+      horaTotal: isNaN(horas) ? 0 : Math.round(horas * 100) / 100,
+      costoInterno: isNaN(costoInterno) ? 0 : Math.round(costoInterno * 100) / 100,
+      costoCliente: isNaN(costoCliente) ? 0 : Math.round(costoCliente * 100) / 100,
       recursoNombre: recurso?.nombre ?? '',
-      costoHora: isNaN(costoHora) ? 0 : costoHora
+      costoHora: isNaN(costoHora) ? 0 : Math.round(costoHora * 100) / 100
     }
 
     try {
