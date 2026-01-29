@@ -7,9 +7,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import CotizacionServicioItemTable from './CotizacionServicioItemTable'
 import CotizacionServicioItemMultiAddModal from './CotizacionServicioItemMultiAddModal'
 import CotizacionServicioItemCreateModal from './CotizacionServicioItemCreateModal'
+import CotizacionServicioItemImportExcelModal from './CotizacionServicioItemImportExcelModal'
 import type { CotizacionServicio, CotizacionServicioItem } from '@/types'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { cn } from '@/lib/utils'
+import { exportarCotizacionServicioItemsAExcel } from '@/lib/utils/cotizacionServicioItemExcel'
+import { toast } from 'sonner'
 import {
   Pencil,
   Trash2,
@@ -18,7 +21,9 @@ import {
   ChevronRight,
   Plus,
   Clock,
-  Download
+  BookOpen,
+  Upload,
+  FileDown
 } from 'lucide-react'
 
 const formatCurrency = (amount: number): string => {
@@ -51,8 +56,9 @@ export default function CotizacionServicioAccordion({
   const [isOpen, setIsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(servicio.nombre)
-  const [modalImportarAbierto, setModalImportarAbierto] = useState(false)
+  const [modalCatalogoAbierto, setModalCatalogoAbierto] = useState(false)
   const [modalNuevoAbierto, setModalNuevoAbierto] = useState(false)
+  const [modalExcelAbierto, setModalExcelAbierto] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
@@ -90,7 +96,27 @@ export default function CotizacionServicioAccordion({
         items.forEach(item => onCreated(item))
       }
     }
-    setModalImportarAbierto(false)
+    setModalCatalogoAbierto(false)
+  }
+
+  const handleExcelItemsCreated = (items: CotizacionServicioItem[]) => {
+    if (items.length > 0) {
+      if (onMultipleCreated) {
+        onMultipleCreated(items)
+      } else {
+        items.forEach(item => onCreated(item))
+      }
+    }
+    setModalExcelAbierto(false)
+  }
+
+  const handleExportExcel = () => {
+    if (servicio.items.length === 0) {
+      toast.error('No hay items para exportar')
+      return
+    }
+    exportarCotizacionServicioItemsAExcel(servicio.items, `Servicios_${servicio.nombre}`)
+    toast.success('Excel exportado')
   }
 
   const handleItemCreated = (item: CotizacionServicioItem) => {
@@ -223,14 +249,34 @@ export default function CotizacionServicioAccordion({
                     Nuevo
                   </Button>
                   <Button
-                    onClick={() => setModalImportarAbierto(true)}
+                    onClick={() => setModalCatalogoAbierto(true)}
                     size="sm"
                     variant="ghost"
                     className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                   >
-                    <Download className="h-3 w-3 mr-1" />
-                    Importar
+                    <BookOpen className="h-3 w-3 mr-1" />
+                    Catálogo
                   </Button>
+                  <Button
+                    onClick={() => setModalExcelAbierto(true)}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  >
+                    <Upload className="h-3 w-3 mr-1" />
+                    Excel
+                  </Button>
+                  {servicio.items.length > 0 && (
+                    <Button
+                      onClick={handleExportExcel}
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs px-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100"
+                      title="Exportar a Excel"
+                    >
+                      <FileDown className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -240,7 +286,7 @@ export default function CotizacionServicioAccordion({
                   <div className="text-center py-6">
                     <Wrench className="h-6 w-6 text-gray-300 mx-auto mb-2" />
                     <p className="text-xs text-muted-foreground mb-3">Sin servicios en este grupo</p>
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
                       <Button
                         onClick={() => setModalNuevoAbierto(true)}
                         size="sm"
@@ -248,16 +294,25 @@ export default function CotizacionServicioAccordion({
                         className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50"
                       >
                         <Plus className="h-3 w-3 mr-1" />
-                        Crear nuevo
+                        Nuevo
                       </Button>
                       <Button
-                        onClick={() => setModalImportarAbierto(true)}
+                        onClick={() => setModalCatalogoAbierto(true)}
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
                       >
-                        <Download className="h-3 w-3 mr-1" />
-                        Importar de catálogo
+                        <BookOpen className="h-3 w-3 mr-1" />
+                        Catálogo
+                      </Button>
+                      <Button
+                        onClick={() => setModalExcelAbierto(true)}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Importar Excel
                       </Button>
                     </div>
                   </div>
@@ -292,8 +347,8 @@ export default function CotizacionServicioAccordion({
 
       {/* Modal para importar items desde catálogo */}
       <CotizacionServicioItemMultiAddModal
-        isOpen={modalImportarAbierto}
-        onClose={() => setModalImportarAbierto(false)}
+        isOpen={modalCatalogoAbierto}
+        onClose={() => setModalCatalogoAbierto(false)}
         servicio={servicio}
         onItemsCreated={handleItemsCreated}
         existingItemIds={servicio.items.map(i => i.catalogoServicioId).filter(Boolean) as string[]}
@@ -305,6 +360,14 @@ export default function CotizacionServicioAccordion({
         onClose={() => setModalNuevoAbierto(false)}
         servicio={servicio}
         onItemCreated={handleItemCreated}
+      />
+
+      {/* Modal para importar desde Excel */}
+      <CotizacionServicioItemImportExcelModal
+        isOpen={modalExcelAbierto}
+        onClose={() => setModalExcelAbierto(false)}
+        servicio={servicio}
+        onItemsCreated={handleExcelItemsCreated}
       />
 
       {/* Delete confirmation dialog */}
