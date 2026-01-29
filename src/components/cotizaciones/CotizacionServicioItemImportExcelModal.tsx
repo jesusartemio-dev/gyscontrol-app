@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,13 +22,15 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
-  FileWarning
+  FileWarning,
+  RefreshCw,
+  Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { getRecursos } from '@/lib/services/recurso'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
-import { createCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
+import { createCotizacionServicioItem, updateCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import {
   leerExcelServicioItems,
   validarEImportarServicioItems,
@@ -46,6 +48,7 @@ interface Props {
     nombre: string
     edtId?: string
     edt?: { id: string; nombre: string }
+    items?: CotizacionServicioItem[]
   }
   onItemsCreated: (items: CotizacionServicioItem[]) => void
 }
@@ -77,9 +80,11 @@ export default function CotizacionServicioItemImportExcelModal({
   const [saving, setSaving] = useState(false)
 
   const [file, setFile] = useState<File | null>(null)
-  const [itemsValidos, setItemsValidos] = useState<ImportedServiceItem[]>([])
+  const [itemsNuevos, setItemsNuevos] = useState<ImportedServiceItem[]>([])
+  const [itemsActualizar, setItemsActualizar] = useState<ImportedServiceItem[]>([])
   const [errores, setErrores] = useState<string[]>([])
-  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set())
+  const [selectedNuevos, setSelectedNuevos] = useState<Set<number>>(new Set())
+  const [selectedActualizar, setSelectedActualizar] = useState<Set<number>>(new Set())
   const [step, setStep] = useState<'upload' | 'preview'>('upload')
 
   useEffect(() => {
@@ -108,9 +113,11 @@ export default function CotizacionServicioItemImportExcelModal({
 
   const resetState = () => {
     setFile(null)
-    setItemsValidos([])
+    setItemsNuevos([])
+    setItemsActualizar([])
     setErrores([])
-    setSelectedItems(new Set())
+    setSelectedNuevos(new Set())
+    setSelectedActualizar(new Set())
     setStep('upload')
   }
 
@@ -126,17 +133,26 @@ export default function CotizacionServicioItemImportExcelModal({
 
       if (rows.length === 0) {
         setErrores(['El archivo está vacío o no tiene datos válidos'])
-        setItemsValidos([])
+        setItemsNuevos([])
+        setItemsActualizar([])
         setStep('preview')
         return
       }
 
-      const result = validarEImportarServicioItems(rows, recursos, unidades)
-      setItemsValidos(result.itemsValidos)
+      // Preparar lista de items existentes para detección de duplicados
+      const existingItems = (servicio.items || []).map(item => ({
+        id: item.id,
+        nombre: item.nombre
+      }))
+
+      const result = validarEImportarServicioItems(rows, recursos, unidades, existingItems)
+      setItemsNuevos(result.itemsNuevos)
+      setItemsActualizar(result.itemsActualizar)
       setErrores(result.errores)
 
-      // Seleccionar todos los items válidos por defecto
-      setSelectedItems(new Set(result.itemsValidos.map((_, idx) => idx)))
+      // Seleccionar todos los items por defecto
+      setSelectedNuevos(new Set(result.itemsNuevos.map((_, idx) => idx)))
+      setSelectedActualizar(new Set(result.itemsActualizar.map((_, idx) => idx)))
       setStep('preview')
     } catch (error) {
       console.error('Error reading file:', error)
@@ -152,38 +168,58 @@ export default function CotizacionServicioItemImportExcelModal({
     toast.success('Plantilla descargada')
   }
 
-  const toggleItem = (index: number) => {
-    const newSelected = new Set(selectedItems)
+  const toggleNuevo = (index: number) => {
+    const newSelected = new Set(selectedNuevos)
     if (newSelected.has(index)) {
       newSelected.delete(index)
     } else {
       newSelected.add(index)
     }
-    setSelectedItems(newSelected)
+    setSelectedNuevos(newSelected)
   }
 
-  const toggleAll = () => {
-    if (selectedItems.size === itemsValidos.length) {
-      setSelectedItems(new Set())
+  const toggleActualizar = (index: number) => {
+    const newSelected = new Set(selectedActualizar)
+    if (newSelected.has(index)) {
+      newSelected.delete(index)
     } else {
-      setSelectedItems(new Set(itemsValidos.map((_, idx) => idx)))
+      newSelected.add(index)
+    }
+    setSelectedActualizar(newSelected)
+  }
+
+  const toggleAllNuevos = () => {
+    if (selectedNuevos.size === itemsNuevos.length) {
+      setSelectedNuevos(new Set())
+    } else {
+      setSelectedNuevos(new Set(itemsNuevos.map((_, idx) => idx)))
+    }
+  }
+
+  const toggleAllActualizar = () => {
+    if (selectedActualizar.size === itemsActualizar.length) {
+      setSelectedActualizar(new Set())
+    } else {
+      setSelectedActualizar(new Set(itemsActualizar.map((_, idx) => idx)))
     }
   }
 
   const handleImport = async () => {
-    const itemsToImport = itemsValidos.filter((_, idx) => selectedItems.has(idx))
+    const nuevosToCreate = itemsNuevos.filter((_, idx) => selectedNuevos.has(idx))
+    const existentesToUpdate = itemsActualizar.filter((_, idx) => selectedActualizar.has(idx))
 
-    if (itemsToImport.length === 0) {
-      toast.error('Selecciona al menos un item para importar')
+    if (nuevosToCreate.length === 0 && existentesToUpdate.length === 0) {
+      toast.error('Selecciona al menos un item')
       return
     }
 
     setSaving(true)
-    const createdItems: CotizacionServicioItem[] = []
+    const resultItems: CotizacionServicioItem[] = []
     const edtId = servicio.edtId || servicio.edt?.id || ''
 
     try {
-      for (const item of itemsToImport) {
+      // Crear nuevos items
+      for (const item of nuevosToCreate) {
         const payload: CotizacionServicioItemPayload = {
           cotizacionServicioId: servicio.id,
           nombre: item.nombre,
@@ -194,7 +230,7 @@ export default function CotizacionServicioItemImportExcelModal({
           unidadServicioId: item.unidadServicioId,
           unidadServicioNombre: item.unidadServicioNombre,
           formula: 'Escalonada',
-          horaBase: item.horaTotal, // Usamos horaTotal calculada como horaBase
+          horaBase: item.horaTotal,
           horaRepetido: 0,
           costoHora: item.costoHora,
           cantidad: 1,
@@ -207,11 +243,39 @@ export default function CotizacionServicioItemImportExcelModal({
         }
 
         const created = await createCotizacionServicioItem(payload)
-        createdItems.push(created)
+        resultItems.push(created)
       }
 
-      toast.success(`${createdItems.length} servicios importados`)
-      onItemsCreated(createdItems)
+      // Actualizar items existentes
+      for (const item of existentesToUpdate) {
+        if (!item.existingItemId) continue
+
+        const updatePayload = {
+          recursoId: item.recursoId,
+          horaBase: item.horaTotal,
+          horaRepetido: 0,
+          costoHora: item.costoHora,
+          cantidad: 1,
+          horaTotal: item.horaTotal,
+          factorSeguridad: item.factorSeguridad,
+          margen: item.margen,
+          costoInterno: item.costoInterno,
+          costoCliente: item.precioCliente,
+          nivelDificultad: item.nivelDificultad
+        }
+
+        const updated = await updateCotizacionServicioItem(item.existingItemId, updatePayload)
+        resultItems.push(updated)
+      }
+
+      const creados = nuevosToCreate.length
+      const actualizados = existentesToUpdate.length
+      const mensaje = []
+      if (creados > 0) mensaje.push(`${creados} creados`)
+      if (actualizados > 0) mensaje.push(`${actualizados} actualizados`)
+      toast.success(`Servicios importados: ${mensaje.join(', ')}`)
+
+      onItemsCreated(resultItems)
       handleClose()
     } catch (error) {
       console.error('Error importing items:', error)
@@ -226,9 +290,13 @@ export default function CotizacionServicioItemImportExcelModal({
     onClose()
   }
 
-  const totalSeleccionado = itemsValidos
-    .filter((_, idx) => selectedItems.has(idx))
-    .reduce((sum, item) => sum + item.precioCliente, 0)
+  const totalItems = itemsNuevos.length + itemsActualizar.length
+  const totalSeleccionado = [
+    ...itemsNuevos.filter((_, idx) => selectedNuevos.has(idx)),
+    ...itemsActualizar.filter((_, idx) => selectedActualizar.has(idx))
+  ].reduce((sum, item) => sum + item.precioCliente, 0)
+
+  const totalSelected = selectedNuevos.size + selectedActualizar.size
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -344,86 +412,134 @@ export default function CotizacionServicioItemImportExcelModal({
               </div>
             )}
 
-            {/* Lista de items válidos */}
-            {itemsValidos.length > 0 ? (
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={selectedItems.size === itemsValidos.length}
-                      onCheckedChange={toggleAll}
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {selectedItems.size} de {itemsValidos.length} seleccionados
-                    </span>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">
-                    Total: {formatCurrency(totalSeleccionado)}
-                  </Badge>
+            {/* Resumen */}
+            {totalItems > 0 && (
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  {itemsNuevos.length > 0 && (
+                    <Badge variant="outline" className="text-xs text-green-600 border-green-300 bg-green-50">
+                      <Plus className="h-3 w-3 mr-1" />
+                      {itemsNuevos.length} nuevos
+                    </Badge>
+                  )}
+                  {itemsActualizar.length > 0 && (
+                    <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 bg-blue-50">
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      {itemsActualizar.length} a actualizar
+                    </Badge>
+                  )}
                 </div>
+                <Badge variant="secondary" className="text-xs">
+                  Total: {formatCurrency(totalSeleccionado)}
+                </Badge>
+              </div>
+            )}
 
-                <div className="flex-1 overflow-y-auto border rounded-lg">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left w-8"></th>
-                        <th className="px-2 py-1.5 text-left">Nombre</th>
-                        <th className="px-2 py-1.5 text-left w-24">Recurso</th>
-                        <th className="px-2 py-1.5 text-center w-16">Dific.</th>
-                        <th className="px-2 py-1.5 text-right w-16">HH</th>
-                        <th className="px-2 py-1.5 text-right w-20">Interno</th>
-                        <th className="px-2 py-1.5 text-right w-20">Cliente</th>
+            {/* Lista de items */}
+            {totalItems > 0 ? (
+              <div className="flex-1 overflow-y-auto border rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left w-8"></th>
+                      <th className="px-2 py-1.5 text-left w-20">Acción</th>
+                      <th className="px-2 py-1.5 text-left">Nombre</th>
+                      <th className="px-2 py-1.5 text-left w-24">Recurso</th>
+                      <th className="px-2 py-1.5 text-center w-16">Dific.</th>
+                      <th className="px-2 py-1.5 text-right w-16">HH</th>
+                      <th className="px-2 py-1.5 text-right w-20">Cliente</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {/* Items nuevos */}
+                    {itemsNuevos.map((item, idx) => (
+                      <tr
+                        key={`new-${idx}`}
+                        className={cn(
+                          'hover:bg-green-50/50 transition-colors cursor-pointer',
+                          selectedNuevos.has(idx) ? 'bg-green-50/30' : ''
+                        )}
+                        onClick={() => toggleNuevo(idx)}
+                      >
+                        <td className="px-2 py-1.5">
+                          <Checkbox
+                            checked={selectedNuevos.has(idx)}
+                            onCheckedChange={() => toggleNuevo(idx)}
+                          />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <Badge className="text-[10px] bg-green-100 text-green-700 hover:bg-green-100">
+                            <Plus className="h-2.5 w-2.5 mr-0.5" />
+                            Nuevo
+                          </Badge>
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <div className="font-medium truncate max-w-[180px]">
+                            {item.nombre}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1.5 text-muted-foreground">
+                          {item.recursoNombre}
+                        </td>
+                        <td className="px-2 py-1.5 text-center">
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">
+                            {dificultadLabels[item.nivelDificultad]}
+                          </Badge>
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono text-purple-600">
+                          {item.horaTotal.toFixed(2)}h
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono font-medium text-green-600">
+                          {formatCurrency(item.precioCliente)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {itemsValidos.map((item, idx) => (
-                        <tr
-                          key={idx}
-                          className={cn(
-                            'hover:bg-blue-50/50 transition-colors cursor-pointer',
-                            selectedItems.has(idx) ? 'bg-blue-50/30' : ''
-                          )}
-                          onClick={() => toggleItem(idx)}
-                        >
-                          <td className="px-2 py-1.5">
-                            <Checkbox
-                              checked={selectedItems.has(idx)}
-                              onCheckedChange={() => toggleItem(idx)}
-                            />
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <div className="font-medium truncate max-w-[200px]">
-                              {item.nombre}
-                            </div>
-                            {item.descripcion && (
-                              <div className="text-[10px] text-muted-foreground truncate max-w-[200px]">
-                                {item.descripcion}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-2 py-1.5 text-muted-foreground">
-                            {item.recursoNombre}
-                          </td>
-                          <td className="px-2 py-1.5 text-center">
-                            <Badge variant="outline" className="text-[10px] px-1 py-0">
-                              {dificultadLabels[item.nivelDificultad]}
-                            </Badge>
-                          </td>
-                          <td className="px-2 py-1.5 text-right font-mono text-purple-600">
-                            {item.horaTotal.toFixed(2)}h
-                          </td>
-                          <td className="px-2 py-1.5 text-right font-mono">
-                            {formatCurrency(item.costoInterno)}
-                          </td>
-                          <td className="px-2 py-1.5 text-right font-mono font-medium text-green-600">
-                            {formatCurrency(item.precioCliente)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+                    ))}
+                    {/* Items a actualizar */}
+                    {itemsActualizar.map((item, idx) => (
+                      <tr
+                        key={`update-${idx}`}
+                        className={cn(
+                          'hover:bg-blue-50/50 transition-colors cursor-pointer',
+                          selectedActualizar.has(idx) ? 'bg-blue-50/30' : ''
+                        )}
+                        onClick={() => toggleActualizar(idx)}
+                      >
+                        <td className="px-2 py-1.5">
+                          <Checkbox
+                            checked={selectedActualizar.has(idx)}
+                            onCheckedChange={() => toggleActualizar(idx)}
+                          />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <Badge className="text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-100">
+                            <RefreshCw className="h-2.5 w-2.5 mr-0.5" />
+                            Actualizar
+                          </Badge>
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <div className="font-medium truncate max-w-[180px]">
+                            {item.nombre}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1.5 text-muted-foreground">
+                          {item.recursoNombre}
+                        </td>
+                        <td className="px-2 py-1.5 text-center">
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">
+                            {dificultadLabels[item.nivelDificultad]}
+                          </Badge>
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono text-purple-600">
+                          {item.horaTotal.toFixed(2)}h
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono font-medium text-green-600">
+                          {formatCurrency(item.precioCliente)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
@@ -442,11 +558,11 @@ export default function CotizacionServicioItemImportExcelModal({
           <Button variant="outline" size="sm" onClick={handleClose}>
             Cancelar
           </Button>
-          {step === 'preview' && itemsValidos.length > 0 && (
+          {step === 'preview' && totalItems > 0 && (
             <Button
               size="sm"
               onClick={handleImport}
-              disabled={saving || selectedItems.size === 0}
+              disabled={saving || totalSelected === 0}
               className="bg-orange-600 hover:bg-orange-700"
             >
               {saving ? (
@@ -457,7 +573,7 @@ export default function CotizacionServicioItemImportExcelModal({
               ) : (
                 <>
                   <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                  Importar {selectedItems.size} items
+                  Importar {totalSelected} items
                 </>
               )}
             </Button>

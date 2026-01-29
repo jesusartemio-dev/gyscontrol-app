@@ -80,7 +80,7 @@ export function generarPlantillaImportacion(nombreArchivo: string = 'PlantillaSe
       'Nombre': 'Configuración de PLC',
       'Descripción': 'Programación y puesta en marcha',
       'Recurso': 'Ingeniero Senior',
-      'Unidad': 'hora',
+      'Unidad': 'Equipo',
       'Precio Cliente': 1500,
       'Factor Seg.': 1.0,
       'Dificultad': 1,
@@ -90,7 +90,7 @@ export function generarPlantillaImportacion(nombreArchivo: string = 'PlantillaSe
       'Nombre': 'Instalación de sensores',
       'Descripción': 'Instalación y calibración',
       'Recurso': 'Técnico',
-      'Unidad': 'hora',
+      'Unidad': 'Equipo',
       'Precio Cliente': 800,
       'Factor Seg.': 1.0,
       'Dificultad': 2,
@@ -168,20 +168,31 @@ export interface ImportedServiceItem {
   // Calculados con fórmula inversa
   horaTotal: number
   costoInterno: number
+  // Para detectar si es actualización
+  isUpdate: boolean
+  existingItemId?: string
+}
+
+export interface ExistingItem {
+  id: string
+  nombre: string
 }
 
 export interface ImportValidationResult {
-  itemsValidos: ImportedServiceItem[]
+  itemsNuevos: ImportedServiceItem[]
+  itemsActualizar: ImportedServiceItem[]
   errores: string[]
 }
 
 export function validarEImportarServicioItems(
   rows: any[],
   recursos: Recurso[],
-  unidades: UnidadServicio[]
+  unidades: UnidadServicio[],
+  existingItems: ExistingItem[] = []
 ): ImportValidationResult {
   const errores: string[] = []
-  const itemsValidos: ImportedServiceItem[] = []
+  const itemsNuevos: ImportedServiceItem[] = []
+  const itemsActualizar: ImportedServiceItem[] = []
 
   const dificultadMultipliers: Record<number, number> = {
     1: 1.0,
@@ -250,7 +261,12 @@ export function validarEImportarServicioItems(
     const horaTotal = Math.round((precioCliente / divisor) * 100) / 100
     const costoInterno = Math.round((horaTotal * costoHora * factorSeguridad * dificultadMultiplier) * 100) / 100
 
-    itemsValidos.push({
+    // Detectar si ya existe un item con el mismo nombre
+    const existingItem = existingItems.find(
+      item => item.nombre.toLowerCase().trim() === nombre.toLowerCase().trim()
+    )
+
+    const importedItem: ImportedServiceItem = {
       nombre,
       descripcion,
       recursoId: recurso.id,
@@ -263,9 +279,17 @@ export function validarEImportarServicioItems(
       nivelDificultad,
       margen,
       horaTotal,
-      costoInterno
-    })
+      costoInterno,
+      isUpdate: !!existingItem,
+      existingItemId: existingItem?.id
+    }
+
+    if (existingItem) {
+      itemsActualizar.push(importedItem)
+    } else {
+      itemsNuevos.push(importedItem)
+    }
   }
 
-  return { itemsValidos, errores }
+  return { itemsNuevos, itemsActualizar, errores }
 }
