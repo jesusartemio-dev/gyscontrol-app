@@ -88,11 +88,11 @@ export default function CotizacionServiciosPage() {
     }
   }
 
-  const handleEliminarItem = async (servicioId: string, itemId: string) => {
+  const handleEliminarItem = async (itemId: string) => {
     if (!cotizacion) return
     try {
       await deleteCotizacionServicioItem(itemId)
-      actualizarServicio(servicioId, items => items.filter(i => i.id !== itemId))
+      await refreshCotizacion()
       toast.success('Item eliminado')
     } catch (error) {
       console.error('Error al eliminar item:', error)
@@ -136,7 +136,7 @@ export default function CotizacionServiciosPage() {
                 onCreated={i => actualizarServicio(s.id, items => [...items, i])}
                 onMultipleCreated={newItems => actualizarServicio(s.id, items => [...items, ...newItems])}
                 onUpdated={item => actualizarServicio(s.id, items => items.map(i => i.id === item.id ? item : i))}
-                onDeleted={itemId => handleEliminarItem(s.id, itemId)}
+                onDeleted={handleEliminarItem}
                 onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)}
                 onUpdatedNombre={nuevo => handleActualizarNombreServicio(s.id, nuevo)}
               />
