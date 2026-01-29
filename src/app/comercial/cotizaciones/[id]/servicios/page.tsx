@@ -139,6 +139,7 @@ export default function CotizacionServiciosPage() {
                 onDeleted={handleEliminarItem}
                 onDeletedGrupo={() => handleEliminarGrupoServicio(s.id)}
                 onUpdatedNombre={nuevo => handleActualizarNombreServicio(s.id, nuevo)}
+                onRefresh={refreshCotizacion}
               />
             ))}
           </div>

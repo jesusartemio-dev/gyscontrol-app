@@ -42,6 +42,7 @@ interface Props {
   onUpdated: (item: CotizacionServicioItem) => void
   onDeletedGrupo: () => void
   onUpdatedNombre: (nuevoNombre: string) => void
+  onRefresh?: () => Promise<void>
 }
 
 export default function CotizacionServicioAccordion({
@@ -51,7 +52,8 @@ export default function CotizacionServicioAccordion({
   onDeleted,
   onUpdated,
   onDeletedGrupo,
-  onUpdatedNombre
+  onUpdatedNombre,
+  onRefresh
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -99,15 +101,20 @@ export default function CotizacionServicioAccordion({
     setModalCatalogoAbierto(false)
   }
 
-  const handleExcelItemsCreated = (items: CotizacionServicioItem[]) => {
-    if (items.length > 0) {
+  const handleExcelItemsCreated = async (items: CotizacionServicioItem[]) => {
+    setModalExcelAbierto(false)
+    // Use onRefresh to reload all data from server - this prevents duplicates
+    // when Excel import updates existing items (they would be added again otherwise)
+    if (onRefresh) {
+      await onRefresh()
+    } else if (items.length > 0) {
+      // Fallback to manual update if no refresh callback provided
       if (onMultipleCreated) {
         onMultipleCreated(items)
       } else {
         items.forEach(item => onCreated(item))
       }
     }
-    setModalExcelAbierto(false)
   }
 
   const handleExportExcel = () => {
