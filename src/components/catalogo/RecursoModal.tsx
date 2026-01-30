@@ -350,8 +350,8 @@ export default function RecursoModal({ isOpen, onClose, onCreated }: Props) {
                       <SelectItem key={emp.id} value={emp.id}>
                         <div className="flex items-center gap-2">
                           <span>{emp.user?.name || emp.user?.email}</span>
-                          {emp.cargo && (
-                            <span className="text-xs text-muted-foreground">({emp.cargo})</span>
+                          {emp.cargo?.nombre && (
+                            <span className="text-xs text-muted-foreground">({emp.cargo.nombre})</span>
                           )}
                         </div>
                       </SelectItem>

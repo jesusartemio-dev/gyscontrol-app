@@ -11,6 +11,7 @@ export async function GET(req: Request) {
     const data = await prisma.empleado.findMany({
       where,
       include: {
+        cargo: true,
         user: {
           select: {
             id: true,
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
     const data = await prisma.empleado.create({
       data: {
         userId: body.userId,
-        cargo: body.cargo,
+        cargoId: body.cargoId || null,
         sueldoMensual: body.sueldoMensual ? parseFloat(body.sueldoMensual) : null,
         fechaIngreso: body.fechaIngreso ? new Date(body.fechaIngreso) : null,
         fechaCese: body.fechaCese ? new Date(body.fechaCese) : null,
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
         observaciones: body.observaciones,
       },
       include: {
+        cargo: true,
         user: {
           select: {
             id: true,

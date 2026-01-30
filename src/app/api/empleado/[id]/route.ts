@@ -7,6 +7,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const data = await prisma.empleado.findUnique({
       where: { id },
       include: {
+        cargo: true,
         user: {
           select: {
             id: true,
@@ -49,7 +50,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const updateData: Record<string, unknown> = {}
 
-    if (body.cargo !== undefined) updateData.cargo = body.cargo
+    if (body.cargoId !== undefined) updateData.cargoId = body.cargoId || null
     if (body.sueldoMensual !== undefined) updateData.sueldoMensual = body.sueldoMensual ? parseFloat(body.sueldoMensual) : null
     if (body.fechaIngreso !== undefined) updateData.fechaIngreso = body.fechaIngreso ? new Date(body.fechaIngreso) : null
     if (body.fechaCese !== undefined) updateData.fechaCese = body.fechaCese ? new Date(body.fechaCese) : null
@@ -65,6 +66,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       where: { id },
       data: updateData,
       include: {
+        cargo: true,
         user: {
           select: {
             id: true,

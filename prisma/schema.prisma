@@ -1131,10 +1131,24 @@ model User {
   @@map("user")
 }
 
+model Cargo {
+  id           String     @id @default(cuid())
+  nombre       String     @unique
+  descripcion  String?
+  sueldoBase   Float?     // Sueldo de referencia (no se usa en cálculos)
+  departamento String?
+  activo       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  empleados    Empleado[]
+
+  @@map("cargo")
+}
+
 model Empleado {
   id                   String               @id @default(cuid())
   userId               String               @unique
-  cargo                String?
+  cargoId              String?
   sueldoMensual        Float?
   fechaIngreso         DateTime?
   fechaCese            DateTime?
@@ -1147,6 +1161,7 @@ model Empleado {
   observaciones        String?
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
+  cargo                Cargo?               @relation(fields: [cargoId], references: [id])
   user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   recursoComposiciones RecursoComposicion[]
 

@@ -56,13 +56,14 @@ import {
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { Empleado, User } from '@/types/modelos'
+import type { Empleado, User, Cargo } from '@/types/modelos'
 import { getEmpleados, createEmpleado, updateEmpleado, deleteEmpleado, EmpleadoPayload } from '@/lib/services/empleado'
+import { getCargos } from '@/lib/services/cargo'
 
 // Schema de validación
 const empleadoSchema = z.object({
   userId: z.string().min(1, 'Selecciona un usuario'),
-  cargo: z.string().optional(),
+  cargoId: z.string().optional(),
   sueldoMensual: z.string().optional(),
   fechaIngreso: z.string().optional(),
   fechaCese: z.string().optional(),
@@ -79,7 +80,7 @@ type EmpleadoForm = z.infer<typeof empleadoSchema>
 
 const defaultForm: EmpleadoForm = {
   userId: '',
-  cargo: '',
+  cargoId: '',
   sueldoMensual: '',
   fechaIngreso: '',
   fechaCese: '',
@@ -126,6 +127,7 @@ const getInitials = (name: string | null | undefined) => {
 export default function PersonalClient() {
   const [empleados, setEmpleados] = useState<Empleado[]>([])
   const [usuarios, setUsuarios] = useState<User[]>([])
+  const [cargos, setCargos] = useState<Cargo[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -150,12 +152,14 @@ export default function PersonalClient() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [empleadosData, usuariosRes] = await Promise.all([
+      const [empleadosData, usuariosRes, cargosData] = await Promise.all([
         getEmpleados(),
-        fetch('/api/admin/usuarios').then(r => r.json())
+        fetch('/api/admin/usuarios').then(r => r.json()),
+        getCargos()
       ])
       setEmpleados(empleadosData)
       setUsuarios(usuariosRes)
+      setCargos(cargosData.filter((c: Cargo) => c.activo))
     } catch (error) {
       console.error('Error al cargar datos:', error)
       toast.error('Error al cargar los datos')
@@ -176,7 +180,7 @@ export default function PersonalClient() {
       const matchesSearch = !searchTerm ||
         emp.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.cargo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.cargo?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.documentoIdentidad?.toLowerCase().includes(searchTerm.toLowerCase())
 
       const matchesFilter = filterActivo === 'all' ||
@@ -199,7 +203,7 @@ export default function PersonalClient() {
     setEditingEmpleado(empleado)
     setForm({
       userId: empleado.userId,
-      cargo: empleado.cargo || '',
+      cargoId: empleado.cargoId || '',
       sueldoMensual: empleado.sueldoMensual?.toString() || '',
       fechaIngreso: empleado.fechaIngreso ? empleado.fechaIngreso.split('T')[0] : '',
       fechaCese: empleado.fechaCese ? empleado.fechaCese.split('T')[0] : '',
@@ -245,7 +249,7 @@ export default function PersonalClient() {
     try {
       const payload: EmpleadoPayload = {
         userId: form.userId,
-        cargo: form.cargo || undefined,
+        cargoId: form.cargoId || undefined,
         sueldoMensual: form.sueldoMensual ? parseFloat(form.sueldoMensual) : undefined,
         fechaIngreso: form.fechaIngreso || undefined,
         fechaCese: form.fechaCese || undefined,
@@ -489,7 +493,7 @@ export default function PersonalClient() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{emp.cargo || '-'}</TableCell>
+                      <TableCell>{emp.cargo?.nombre || '-'}</TableCell>
                       <TableCell className="font-mono text-sm">{emp.documentoIdentidad || '-'}</TableCell>
                       <TableCell>{emp.telefono || '-'}</TableCell>
                       <TableCell className="text-right font-mono">
@@ -562,7 +566,7 @@ export default function PersonalClient() {
                           </div>
                           <div>
                             <p className="font-semibold">{emp.user?.name || 'Sin nombre'}</p>
-                            <p className="text-sm text-muted-foreground">{emp.cargo || 'Sin cargo'}</p>
+                            <p className="text-sm text-muted-foreground">{emp.cargo?.nombre || 'Sin cargo'}</p>
                           </div>
                         </div>
                         <Badge variant={emp.activo ? 'default' : 'secondary'} className="text-xs">
@@ -671,13 +675,22 @@ export default function PersonalClient() {
               {/* Cargo y Sueldo */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="cargo">Cargo</Label>
-                  <Input
-                    id="cargo"
-                    value={form.cargo}
-                    onChange={(e) => setForm({ ...form, cargo: e.target.value })}
-                    placeholder="Ej: Ingeniero de Campo"
-                  />
+                  <Label htmlFor="cargoId">Cargo</Label>
+                  <Select
+                    value={form.cargoId}
+                    onValueChange={(v) => setForm({ ...form, cargoId: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un cargo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cargos.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="sueldoMensual">Sueldo Mensual (PEN)</Label>

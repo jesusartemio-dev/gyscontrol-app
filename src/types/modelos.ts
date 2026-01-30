@@ -429,12 +429,29 @@ export interface Recurso {
 }
 
 // ======================
+// 💼 Cargo (Puesto de trabajo)
+// ======================
+export interface Cargo {
+  id: string
+  nombre: string
+  descripcion?: string
+  sueldoBase?: number  // Solo referencia, no se usa en cálculos
+  departamento?: string
+  activo: boolean
+  createdAt: string
+  updatedAt: string
+  _count?: {
+    empleados: number
+  }
+}
+
+// ======================
 // 👤 Empleado (RRHH)
 // ======================
 export interface Empleado {
   id: string
   userId: string
-  cargo?: string
+  cargoId?: string
   sueldoMensual?: number
   fechaIngreso?: string
   fechaCese?: string
@@ -447,6 +464,7 @@ export interface Empleado {
   observaciones?: string
   createdAt: string
   updatedAt: string
+  cargo?: Cargo
   user?: User
   recursoComposiciones?: RecursoComposicion[]
 }
