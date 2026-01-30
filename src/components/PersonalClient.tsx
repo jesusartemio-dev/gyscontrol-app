@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react'
 import { z } from 'zod'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users,
@@ -11,7 +11,6 @@ import {
   Trash2,
   Save,
   Loader2,
-  Briefcase,
   Mail,
   Phone,
   DollarSign,
@@ -20,14 +19,14 @@ import {
   Home,
   Search,
   Filter,
-  X,
   LayoutGrid,
   List,
   FileText,
-  MapPin,
-  AlertCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  Download,
+  Upload,
+  FileDown
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -60,6 +59,20 @@ import type { Empleado, User, Cargo, Departamento } from '@/types/modelos'
 import { getEmpleados, createEmpleado, updateEmpleado, deleteEmpleado, EmpleadoPayload } from '@/lib/services/empleado'
 import { getCargos } from '@/lib/services/cargo'
 import { getDepartamentos } from '@/lib/services/departamento'
+import {
+  exportarEmpleadosAExcel,
+  generarPlantillaEmpleados,
+  leerEmpleadosDesdeExcel,
+  validarEmpleados,
+  crearEmpleadosEnBD
+} from '@/lib/utils/empleadoExcel'
+import {
+  getConfiguracionCostos,
+  ConfiguracionCostos,
+  DEFAULTS,
+  formatUSD,
+  penToUSD
+} from '@/lib/costos'
 
 // Schema de validación
 const empleadoSchema = z.object({
@@ -141,9 +154,18 @@ export default function PersonalClient() {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [importando, setImportando] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterActivo, setFilterActivo] = useState<'all' | 'activo' | 'inactivo'>('all')
+  const [filterDepartamento, setFilterDepartamento] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [config, setConfig] = useState<ConfiguracionCostos>({
+    tipoCambio: DEFAULTS.TIPO_CAMBIO,
+    horasSemanales: DEFAULTS.HORAS_SEMANALES,
+    diasLaborables: DEFAULTS.DIAS_LABORABLES,
+    semanasxMes: DEFAULTS.SEMANAS_X_MES,
+    horasMensuales: DEFAULTS.HORAS_MENSUALES,
+  })
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -158,6 +180,7 @@ export default function PersonalClient() {
   // Cargar datos iniciales
   useEffect(() => {
     loadData()
+    getConfiguracionCostos().then(setConfig)
   }, [])
 
   const loadData = async () => {
@@ -194,15 +217,19 @@ export default function PersonalClient() {
         emp.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.cargo?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.departamento?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.documentoIdentidad?.toLowerCase().includes(searchTerm.toLowerCase())
 
       const matchesFilter = filterActivo === 'all' ||
         (filterActivo === 'activo' && emp.activo) ||
         (filterActivo === 'inactivo' && !emp.activo)
 
-      return matchesSearch && matchesFilter
+      const matchesDepartamento = filterDepartamento === 'all' ||
+        emp.departamentoId === filterDepartamento
+
+      return matchesSearch && matchesFilter && matchesDepartamento
     })
-  }, [empleados, searchTerm, filterActivo])
+  }, [empleados, searchTerm, filterActivo, filterDepartamento])
 
   // Handlers
   const handleOpenCreate = () => {
@@ -326,6 +353,55 @@ export default function PersonalClient() {
     }
   }, [empleados])
 
+  // Export/Import handlers
+  const handleExportar = () => {
+    if (filteredEmpleados.length === 0) {
+      toast.error('No hay empleados para exportar')
+      return
+    }
+    exportarEmpleadosAExcel(filteredEmpleados)
+    toast.success('Archivo exportado correctamente')
+  }
+
+  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImportando(true)
+    try {
+      const datos = await leerEmpleadosDesdeExcel(file)
+      const emailsUsuarios = usuarios.map(u => u.email || '')
+      const emailsEmpleadosExistentes = empleados.map(e => e.user?.email || '')
+      const { nuevos, errores, duplicados, sinUsuario } = validarEmpleados(datos, emailsUsuarios, emailsEmpleadosExistentes)
+
+      if (errores.length > 0) {
+        toast.error(`${errores.length} error(es): ${errores.slice(0, 2).join(', ')}`)
+      }
+
+      if (duplicados.length > 0) {
+        toast.warning(`${duplicados.length} empleado(s) ya existen y fueron omitidos`)
+      }
+
+      if (sinUsuario.length > 0) {
+        toast.warning(`${sinUsuario.length} usuario(s) no encontrados: ${sinUsuario.slice(0, 2).join(', ')}`)
+      }
+
+      if (nuevos.length === 0) {
+        toast.error('No hay empleados nuevos para importar')
+        return
+      }
+
+      const resultado = await crearEmpleadosEnBD(nuevos)
+      toast.success(`${resultado.creados} empleado(s) importados correctamente`)
+      await loadData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al procesar archivo')
+    } finally {
+      setImportando(false)
+      e.target.value = ''
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -421,8 +497,8 @@ export default function PersonalClient() {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex flex-1 gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:max-w-xs">
+          <div className="flex flex-1 gap-3 w-full sm:w-auto flex-wrap">
+            <div className="relative flex-1 sm:max-w-xs min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nombre, email, cargo..."
@@ -442,22 +518,99 @@ export default function PersonalClient() {
                 <SelectItem value="inactivo">Inactivos</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={filterDepartamento} onValueChange={setFilterDepartamento}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Departamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los Dptos.</SelectItem>
+                {departamentos.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex gap-1 border rounded-lg p-1">
-            <Button
-              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('table')}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('cards')}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Import/Export */}
+            <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-muted/50">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={handleExportar} className="h-8 px-2">
+                    <Download className="h-4 w-4 mr-1" />
+                    Exportar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Exportar a Excel</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <label className={cn(
+                    "flex items-center gap-1 h-8 px-2 rounded-md cursor-pointer transition-colors",
+                    importando ? "opacity-50 cursor-not-allowed" : "hover:bg-accent"
+                  )}>
+                    {importando ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    <span className="text-sm">Importar</span>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleImportar}
+                      className="hidden"
+                      disabled={importando}
+                    />
+                  </label>
+                </TooltipTrigger>
+                <TooltipContent>Importar desde Excel</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={generarPlantillaEmpleados} className="h-8 w-8 p-0">
+                    <FileDown className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Descargar plantilla</TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* View Toggle */}
+            <div className="flex items-center border rounded-lg p-0.5 bg-muted/50">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewMode('table')}
+                    className={cn(
+                      "h-8 w-8 p-0 rounded-md",
+                      viewMode === 'table' && "bg-white shadow-sm"
+                    )}
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Vista tabla</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewMode('cards')}
+                    className={cn(
+                      "h-8 w-8 p-0 rounded-md",
+                      viewMode === 'cards' && "bg-white shadow-sm"
+                    )}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Vista tarjetas</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
 
@@ -480,83 +633,98 @@ export default function PersonalClient() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Empleado</TableHead>
+                  <TableHead>DNI</TableHead>
                   <TableHead>Cargo</TableHead>
-                  <TableHead>Documento</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead className="text-right">Sueldo</TableHead>
-                  <TableHead>Ingreso</TableHead>
+                  <TableHead>Departamento</TableHead>
+                  <TableHead className="text-right">Planilla</TableHead>
+                  <TableHead className="text-right">Honorarios</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Costo/Hora</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <AnimatePresence>
-                  {filteredEmpleados.map((emp) => (
-                    <motion.tr
-                      key={emp.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="group"
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium",
-                            emp.activo ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
-                          )}>
-                            {getInitials(emp.user?.name)}
+                  {filteredEmpleados.map((emp) => {
+                    const sueldoTotal = getSueldoTotal(emp.sueldoPlanilla, emp.sueldoHonorarios)
+                    const costoHora = penToUSD(sueldoTotal, config.tipoCambio) / config.horasMensuales
+                    return (
+                      <motion.tr
+                        key={emp.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="group"
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium",
+                              emp.activo ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                            )}>
+                              {getInitials(emp.user?.name)}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{emp.user?.name || 'Sin nombre'}</p>
+                              <p className="text-[10px] text-muted-foreground">{emp.user?.email}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{emp.user?.name || 'Sin nombre'}</p>
-                            <p className="text-xs text-muted-foreground">{emp.user?.email}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{emp.cargo?.nombre || '-'}</TableCell>
-                      <TableCell className="font-mono text-sm">{emp.documentoIdentidad || '-'}</TableCell>
-                      <TableCell>{emp.telefono || '-'}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(getSueldoTotal(emp.sueldoPlanilla, emp.sueldoHonorarios))}
-                      </TableCell>
-                      <TableCell>{formatDate(emp.fechaIngreso)}</TableCell>
-                      <TableCell>
-                        <Badge variant={emp.activo ? 'default' : 'secondary'}>
-                          {emp.activo ? 'Activo' : 'Inactivo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        </TableCell>
+                        <TableCell className="text-sm font-mono">{emp.documentoIdentidad || '-'}</TableCell>
+                        <TableCell className="text-sm">{emp.cargo?.nombre || '-'}</TableCell>
+                        <TableCell className="text-sm">{emp.departamento?.nombre || '-'}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {emp.sueldoPlanilla ? formatCurrency(emp.sueldoPlanilla) : <span className="text-gray-400">-</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {emp.sueldoHonorarios ? formatCurrency(emp.sueldoHonorarios) : <span className="text-gray-400">-</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm font-semibold">
+                          {formatCurrency(sueldoTotal)}
+                        </TableCell>
+                        <TableCell className="text-right">
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenEdit(emp)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              <span className="font-mono text-sm font-bold text-blue-600 cursor-help">
+                                {formatUSD(costoHora)}/h
+                              </span>
                             </TooltipTrigger>
-                            <TooltipContent>Editar</TooltipContent>
+                            <TooltipContent side="left">
+                              <p className="font-mono text-xs">
+                                ({formatCurrency(sueldoTotal)} / {config.tipoCambio}) / {config.horasMensuales}h
+                              </p>
+                            </TooltipContent>
                           </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenDelete(emp)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Eliminar</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TableCell>
-                    </motion.tr>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={emp.activo ? 'default' : 'secondary'} className="text-[10px]">
+                            {emp.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenEdit(emp)}
+                              className="h-7 w-7 p-0 hover:bg-blue-50 hover:text-blue-600"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenDelete(emp)}
+                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </motion.tr>
+                    )
+                  })}
                 </AnimatePresence>
               </TableBody>
             </Table>
@@ -614,9 +782,14 @@ export default function PersonalClient() {
                         </div>
                       </div>
                       <div className="pt-3 border-t flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-amber-600" />
-                          <span className="font-semibold">{formatCurrency(getSueldoTotal(emp.sueldoPlanilla, emp.sueldoHonorarios))}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-amber-600" />
+                            <span className="font-semibold">{formatCurrency(getSueldoTotal(emp.sueldoPlanilla, emp.sueldoHonorarios))}</span>
+                          </div>
+                          <span className="text-xs text-blue-600 font-mono ml-6">
+                            {formatUSD(penToUSD(getSueldoTotal(emp.sueldoPlanilla, emp.sueldoHonorarios), config.tipoCambio) / config.horasMensuales)}/h
+                          </span>
                         </div>
                         <div className="flex gap-1">
                           <Button
@@ -647,234 +820,193 @@ export default function PersonalClient() {
 
         {/* Modal de Crear/Editar */}
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {editingEmpleado ? (
-                  <>
-                    <Edit className="h-5 w-5" />
-                    Editar Empleado
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-5 w-5" />
-                    Registrar Empleado
-                  </>
-                )}
+          <DialogContent className="max-w-xl">
+            <DialogHeader className="pb-2">
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                {editingEmpleado ? <Edit className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                {editingEmpleado ? 'Editar Empleado' : 'Registrar Empleado'}
               </DialogTitle>
-              <DialogDescription>
-                {editingEmpleado
-                  ? 'Modifica los datos del empleado'
-                  : 'Completa los datos para registrar un nuevo empleado'}
-              </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-6 py-4">
-              {/* Usuario */}
-              <div className="space-y-2">
-                <Label htmlFor="userId">Usuario del Sistema *</Label>
-                <Select
-                  value={form.userId}
-                  onValueChange={(v) => setForm({ ...form, userId: v })}
-                  disabled={!!editingEmpleado}
-                >
-                  <SelectTrigger className={errors.userId ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Selecciona un usuario" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {usuariosDisponibles.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.name || u.email} ({u.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.userId && <p className="text-xs text-red-500">{errors.userId}</p>}
+            <div className="grid gap-4">
+              {/* Usuario + Estado */}
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor="userId" className="text-xs">Usuario del Sistema *</Label>
+                  <Select
+                    value={form.userId}
+                    onValueChange={(v) => setForm({ ...form, userId: v })}
+                    disabled={!!editingEmpleado}
+                  >
+                    <SelectTrigger className={cn("h-9", errors.userId && 'border-red-500')}>
+                      <SelectValue placeholder="Selecciona un usuario" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {usuariosDisponibles.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name || u.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 pb-0.5">
+                  <Switch
+                    id="activo"
+                    checked={form.activo}
+                    onCheckedChange={(checked) => setForm({ ...form, activo: checked })}
+                  />
+                  <Label htmlFor="activo" className="text-xs cursor-pointer">
+                    {form.activo ? 'Activo' : 'Inactivo'}
+                  </Label>
+                </div>
               </div>
 
               {/* Cargo y Departamento */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cargoId">Cargo</Label>
-                  <Select
-                    value={form.cargoId}
-                    onValueChange={(v) => setForm({ ...form, cargoId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un cargo" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="cargoId" className="text-xs">Cargo</Label>
+                  <Select value={form.cargoId} onValueChange={(v) => setForm({ ...form, cargoId: v })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
                       {cargos.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nombre}
-                        </SelectItem>
+                        <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="departamentoId">Departamento</Label>
-                  <Select
-                    value={form.departamentoId}
-                    onValueChange={(v) => setForm({ ...form, departamentoId: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un departamento" />
+                <div className="space-y-1">
+                  <Label htmlFor="departamentoId" className="text-xs">Departamento</Label>
+                  <Select value={form.departamentoId} onValueChange={(v) => setForm({ ...form, departamentoId: v })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
                       {departamentos.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.nombre}
-                        </SelectItem>
+                        <SelectItem key={d.id} value={d.id}>{d.nombre}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              {/* Sueldos */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sueldoPlanilla">Sueldo Planilla (PEN)</Label>
-                  <Input
-                    id="sueldoPlanilla"
-                    type="number"
-                    step="0.01"
-                    value={form.sueldoPlanilla}
-                    onChange={(e) => setForm({ ...form, sueldoPlanilla: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sueldoHonorarios">Sueldo Honorarios (PEN)</Label>
-                  <Input
-                    id="sueldoHonorarios"
-                    type="number"
-                    step="0.01"
-                    value={form.sueldoHonorarios}
-                    onChange={(e) => setForm({ ...form, sueldoHonorarios: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
+              {/* Sueldos + Cálculo */}
+              {(() => {
+                const sueldoTotal = getSueldoTotal(
+                  form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : 0,
+                  form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0
+                )
+                const sueldoUSD = penToUSD(sueldoTotal, config.tipoCambio)
+                const costoHora = sueldoTotal > 0 ? sueldoUSD / config.horasMensuales : 0
 
-              {/* Sueldo Total */}
-              <div className="space-y-2">
-                <Label>Sueldo Total</Label>
-                <div className="h-10 px-3 py-2 bg-muted rounded-md flex items-center font-mono">
-                  {formatCurrency(getSueldoTotal(
-                    form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : 0,
-                    form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0
-                  ))}
-                </div>
-              </div>
+                return (
+                  <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-lg">
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="sueldoPlanilla" className="text-xs">Sueldo Planilla (PEN)</Label>
+                        <Input
+                          id="sueldoPlanilla"
+                          type="number"
+                          step="0.01"
+                          value={form.sueldoPlanilla}
+                          onChange={(e) => setForm({ ...form, sueldoPlanilla: e.target.value })}
+                          placeholder="0.00"
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="sueldoHonorarios" className="text-xs">Sueldo Honorarios (PEN)</Label>
+                        <Input
+                          id="sueldoHonorarios"
+                          type="number"
+                          step="0.01"
+                          value={form.sueldoHonorarios}
+                          onChange={(e) => setForm({ ...form, sueldoHonorarios: e.target.value })}
+                          placeholder="0.00"
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-blue-200">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Total: </span>
+                          <span className="font-semibold text-sm">{formatCurrency(sueldoTotal)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">USD: </span>
+                          <span className="font-semibold text-sm text-green-600">{formatUSD(sueldoUSD)}</span>
+                        </div>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 cursor-help">
+                            <span className="text-[10px] text-muted-foreground">Costo/Hora:</span>
+                            <span className="font-bold text-blue-600">{formatUSD(costoHora)}/h</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-xs">
+                          <p className="font-mono text-xs">
+                            ({formatCurrency(sueldoTotal)} / {config.tipoCambio}) / {config.horasMensuales}h
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            TC: {config.tipoCambio} · {config.horasSemanales}h/sem × {config.semanasxMes} = {config.horasMensuales}h/mes
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )
+              })()}
 
-              {/* Documento y Teléfono */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="documentoIdentidad">Documento de Identidad</Label>
+              {/* Documento, Teléfono, Fechas - todo en una fila */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="documentoIdentidad" className="text-xs">DNI / CE</Label>
                   <Input
                     id="documentoIdentidad"
                     value={form.documentoIdentidad}
                     onChange={(e) => setForm({ ...form, documentoIdentidad: e.target.value })}
-                    placeholder="DNI / CE"
+                    placeholder="12345678"
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telefono">Teléfono</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="telefono" className="text-xs">Teléfono</Label>
                   <Input
                     id="telefono"
                     value={form.telefono}
                     onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                    placeholder="+51 999 999 999"
+                    placeholder="999999999"
+                    className="h-9"
                   />
                 </div>
-              </div>
-
-              {/* Fechas */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fechaIngreso">Fecha de Ingreso</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="fechaIngreso" className="text-xs">Ingreso</Label>
                   <Input
                     id="fechaIngreso"
                     type="date"
                     value={form.fechaIngreso}
                     onChange={(e) => setForm({ ...form, fechaIngreso: e.target.value })}
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fechaCese">Fecha de Cese</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="fechaCese" className="text-xs">Cese</Label>
                   <Input
                     id="fechaCese"
                     type="date"
                     value={form.fechaCese}
                     onChange={(e) => setForm({ ...form, fechaCese: e.target.value })}
+                    className="h-9"
                   />
                 </div>
-              </div>
-
-              {/* Dirección */}
-              <div className="space-y-2">
-                <Label htmlFor="direccion">Dirección</Label>
-                <Input
-                  id="direccion"
-                  value={form.direccion}
-                  onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-                  placeholder="Dirección completa"
-                />
-              </div>
-
-              {/* Contacto de Emergencia */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="contactoEmergencia">Contacto de Emergencia</Label>
-                  <Input
-                    id="contactoEmergencia"
-                    value={form.contactoEmergencia}
-                    onChange={(e) => setForm({ ...form, contactoEmergencia: e.target.value })}
-                    placeholder="Nombre del contacto"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telefonoEmergencia">Teléfono de Emergencia</Label>
-                  <Input
-                    id="telefonoEmergencia"
-                    value={form.telefonoEmergencia}
-                    onChange={(e) => setForm({ ...form, telefonoEmergencia: e.target.value })}
-                    placeholder="+51 999 999 999"
-                  />
-                </div>
-              </div>
-
-              {/* Observaciones */}
-              <div className="space-y-2">
-                <Label htmlFor="observaciones">Observaciones</Label>
-                <Textarea
-                  id="observaciones"
-                  value={form.observaciones}
-                  onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
-                  placeholder="Notas adicionales..."
-                  rows={3}
-                />
-              </div>
-
-              {/* Estado */}
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                <div>
-                  <Label htmlFor="activo" className="text-base">Estado del Empleado</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {form.activo ? 'El empleado está activo en el sistema' : 'El empleado está marcado como inactivo'}
-                  </p>
-                </div>
-                <Switch
-                  id="activo"
-                  checked={form.activo}
-                  onCheckedChange={(checked) => setForm({ ...form, activo: checked })}
-                />
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="pt-2">
               <Button variant="outline" onClick={handleCloseModal} disabled={saving}>
                 Cancelar
               </Button>

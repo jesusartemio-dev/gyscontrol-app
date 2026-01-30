@@ -244,6 +244,7 @@ export default function Sidebar() {
       color: 'text-blue-400',
       roles: ['admin', 'gerente', 'comercial', 'logistico', 'proyectos'],
       links: [
+        { href: '/configuracion/general', label: 'General', icon: Settings },
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
         { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
         { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },

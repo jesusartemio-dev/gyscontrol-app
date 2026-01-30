@@ -1128,6 +1128,7 @@ model User {
   userPermissions           UserPermission[]
   empleado                  Empleado?
   departamentosResponsable  Departamento[]              @relation("DepartamentoResponsable")
+  configuracionGeneral      ConfiguracionGeneral[]
 
   @@map("user")
 }
@@ -2319,6 +2320,21 @@ model UserPermission {
   @@index([permissionId])
   @@index([userId])
   @@map("user_permissions")
+}
+
+// Configuración general del sistema (singleton - solo un registro)
+model ConfiguracionGeneral {
+  id               String   @id @default("default")
+  tipoCambio       Decimal  @default(3.75) @db.Decimal(10, 4) // PEN a USD
+  horasSemanales   Int      @default(48) // Horas laborales por semana
+  diasLaborables   Int      @default(5) // Días laborables por semana (L-V)
+  semanasxMes      Int      @default(4) // Semanas por mes para cálculo
+  horasMensuales   Int      @default(192) // Calculado: horasSemanales * semanasxMes
+  updatedAt        DateTime @updatedAt
+  updatedBy        String?
+  user             User?    @relation(fields: [updatedBy], references: [id])
+
+  @@map("configuracion_general")
 }
 
 enum DiaSemana {

@@ -18,6 +18,12 @@ export async function GET() {
                     name: true,
                     email: true,
                   }
+                },
+                cargo: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                  }
                 }
               }
             }
@@ -66,6 +72,12 @@ export async function POST(req: Request) {
                     id: true,
                     name: true,
                     email: true,
+                  }
+                },
+                cargo: {
+                  select: {
+                    id: true,
+                    nombre: true,
                   }
                 }
               }

@@ -46,7 +46,8 @@ export default function RecursosPage() {
   const [errores, setErrores] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [recursoEditar, setRecursoEditar] = useState<Recurso | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState<'all' | 'individual' | 'cuadrilla'>('all')
@@ -69,16 +70,29 @@ export default function RecursosPage() {
     cargarRecursos()
   }, [])
 
+  const openCreateModal = () => {
+    setRecursoEditar(null)
+    setShowModal(true)
+  }
+
+  const openEditModal = (recurso: Recurso) => {
+    setRecursoEditar(recurso)
+    setShowModal(true)
+  }
+
+  const closeModal = () => {
+    setShowModal(false)
+    setRecursoEditar(null)
+  }
+
   const handleCreated = (nuevo: Recurso) => {
     setRecursos((prev) => [nuevo, ...prev])
-    toast.success('Recurso creado exitosamente')
   }
 
   const handleUpdated = (actualizado: Recurso) => {
     setRecursos((prev) =>
       prev.map((r) => (r.id === actualizado.id ? actualizado : r))
     )
-    toast.success('Recurso actualizado')
   }
 
   const handleDeleted = (id: string) => {
@@ -222,7 +236,7 @@ export default function RecursosPage() {
           </Button>
 
           {/* New */}
-          <Button size="sm" className="h-8" onClick={() => setShowCreateModal(true)}>
+          <Button size="sm" className="h-8" onClick={openCreateModal}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             Nuevo
           </Button>
@@ -332,7 +346,7 @@ export default function RecursosPage() {
       ) : viewMode === 'table' ? (
         <RecursoTableView
           data={filteredRecursos}
-          onUpdate={handleUpdated}
+          onEdit={openEditModal}
           onDelete={handleDeleted}
           loading={loading}
           error={error}
@@ -340,7 +354,7 @@ export default function RecursosPage() {
       ) : (
         <RecursoCardView
           data={filteredRecursos}
-          onUpdate={handleUpdated}
+          onEdit={openEditModal}
           onDelete={handleDeleted}
           loading={loading}
           error={error}
@@ -349,9 +363,11 @@ export default function RecursosPage() {
 
       {/* Modal */}
       <RecursoModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        isOpen={showModal}
+        onClose={closeModal}
+        recurso={recursoEditar}
         onCreated={handleCreated}
+        onUpdated={handleUpdated}
       />
     </div>
   )

@@ -1,6 +1,24 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
+const empleadoInclude = {
+  include: {
+    user: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      }
+    },
+    cargo: {
+      select: {
+        id: true,
+        nombre: true,
+      }
+    }
+  }
+}
+
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -9,17 +27,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       include: {
         composiciones: {
           include: {
-            empleado: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                  }
-                }
-              }
-            }
+            empleado: empleadoInclude
           }
         }
       }
@@ -74,17 +82,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       include: {
         composiciones: {
           include: {
-            empleado: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                  }
-                }
-              }
-            }
+            empleado: empleadoInclude
           }
         }
       }
