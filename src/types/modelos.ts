@@ -418,11 +418,54 @@ export interface Edt {
 export interface Recurso {
   id: string
   nombre: string
+  tipo: 'individual' | 'cuadrilla'
   costoHora: number
+  descripcion?: string
   createdAt: string
   updatedAt: string
   servicios?: CatalogoServicio[]
   plantillaServicioItems?: PlantillaServicioItem[]
+  composiciones?: RecursoComposicion[]
+}
+
+// ======================
+// 👤 Empleado (RRHH)
+// ======================
+export interface Empleado {
+  id: string
+  userId: string
+  cargo?: string
+  sueldoMensual?: number
+  fechaIngreso?: string
+  fechaCese?: string
+  activo: boolean
+  documentoIdentidad?: string
+  telefono?: string
+  direccion?: string
+  contactoEmergencia?: string
+  telefonoEmergencia?: string
+  observaciones?: string
+  createdAt: string
+  updatedAt: string
+  user?: User
+  recursoComposiciones?: RecursoComposicion[]
+}
+
+// ======================
+// 🔗 Composición de Recurso
+// ======================
+export interface RecursoComposicion {
+  id: string
+  recursoId: string
+  empleadoId: string
+  porcentaje: number
+  horasAsignadas?: number
+  rol?: string
+  activo: boolean
+  createdAt: string
+  updatedAt: string
+  recurso?: Recurso
+  empleado?: Empleado
 }
 
 // ======================

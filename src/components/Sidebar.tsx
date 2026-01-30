@@ -244,6 +244,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'comercial', 'logistico', 'proyectos'],
       links: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+        { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
         { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },

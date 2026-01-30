@@ -24,8 +24,12 @@ import {
   LayoutList,
   LayoutGrid,
   FileSpreadsheet,
-  Upload
+  Upload,
+  Filter,
+  User,
+  UsersRound
 } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 const formatCurrency = (amount: number): string => {
@@ -45,6 +49,7 @@ export default function RecursosPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [searchTerm, setSearchTerm] = useState('')
+  const [filterTipo, setFilterTipo] = useState<'all' | 'individual' | 'cuadrilla'>('all')
 
   const cargarRecursos = async () => {
     try {
@@ -90,9 +95,11 @@ export default function RecursosPage() {
     }
   }
 
-  const filteredRecursos = recursos.filter(recurso =>
-    recurso.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredRecursos = recursos.filter(recurso => {
+    const matchesSearch = recurso.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesTipo = filterTipo === 'all' || recurso.tipo === filterTipo
+    return matchesSearch && matchesTipo
+  })
 
   const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -125,6 +132,8 @@ export default function RecursosPage() {
   // Stats
   const stats = {
     total: recursos.length,
+    individuales: recursos.filter(r => r.tipo === 'individual' || !r.tipo).length,
+    cuadrillas: recursos.filter(r => r.tipo === 'cuadrilla').length,
     promedio: recursos.length > 0
       ? recursos.reduce((sum, r) => sum + r.costoHora, 0) / recursos.length
       : 0,
@@ -232,9 +241,9 @@ export default function RecursosPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-md">
+      {/* Search and Filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar recurso por nombre..."
@@ -243,7 +252,33 @@ export default function RecursosPage() {
             className="pl-9 h-9"
           />
         </div>
-        {searchTerm && (
+        <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v as typeof filterTipo)}>
+          <SelectTrigger className="w-[150px] h-9">
+            <Filter className="h-3.5 w-3.5 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">
+              <div className="flex items-center gap-2">
+                <Users className="h-3.5 w-3.5" />
+                <span>Todos ({stats.total})</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="individual">
+              <div className="flex items-center gap-2">
+                <User className="h-3.5 w-3.5 text-blue-600" />
+                <span>Individual ({stats.individuales})</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="cuadrilla">
+              <div className="flex items-center gap-2">
+                <UsersRound className="h-3.5 w-3.5 text-purple-600" />
+                <span>Cuadrilla ({stats.cuadrillas})</span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        {(searchTerm || filterTipo !== 'all') && (
           <Badge variant="outline" className="text-xs">
             {filteredRecursos.length} resultado{filteredRecursos.length !== 1 ? 's' : ''}
           </Badge>

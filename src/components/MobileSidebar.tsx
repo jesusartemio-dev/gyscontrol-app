@@ -45,6 +45,7 @@ import {
   FileCheck,
   Target,
   Shield,
+  UserCheck,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -189,6 +190,7 @@ export default function MobileSidebar() {
       roles: ['admin', 'gerente', 'comercial', 'logistico', 'proyectos'],
       links: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
+        { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
         { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },

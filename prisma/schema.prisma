@@ -995,7 +995,9 @@ model ProyectoServicioCotizadoItem {
 model Recurso {
   id                                 String                               @id @default(cuid())
   nombre                             String                               @unique
+  tipo                               TipoRecurso                          @default(individual)
   costoHora                          Float
+  descripcion                        String?
   createdAt                          DateTime                             @default(now())
   updatedAt                          DateTime                             @updatedAt
   catalogoServicio                   CatalogoServicio[]
@@ -1003,6 +1005,7 @@ model Recurso {
   plantillaServicioItem              PlantillaServicioItem[]
   registroHoras                      RegistroHoras[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
+  composiciones                      RecursoComposicion[]
 
   @@map("recurso")
 }
@@ -1123,8 +1126,48 @@ model User {
   subtareas                 Subtarea[]
   tareas                    Tarea[]
   userPermissions           UserPermission[]
+  empleado                  Empleado?
 
   @@map("user")
+}
+
+model Empleado {
+  id                   String               @id @default(cuid())
+  userId               String               @unique
+  cargo                String?
+  sueldoMensual        Float?
+  fechaIngreso         DateTime?
+  fechaCese            DateTime?
+  activo               Boolean              @default(true)
+  documentoIdentidad   String?
+  telefono             String?
+  direccion            String?
+  contactoEmergencia   String?
+  telefonoEmergencia   String?
+  observaciones        String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recursoComposiciones RecursoComposicion[]
+
+  @@map("empleado")
+}
+
+model RecursoComposicion {
+  id             String   @id @default(cuid())
+  recursoId      String
+  empleadoId     String
+  porcentaje     Float    @default(100) // % de dedicación al recurso
+  horasAsignadas Float?   // Horas asignadas (opcional, alternativa a %)
+  rol            String?  // Rol dentro del recurso (ej: "Líder", "Ayudante")
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  recurso        Recurso  @relation(fields: [recursoId], references: [id], onDelete: Cascade)
+  empleado       Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([recursoId, empleadoId])
+  @@map("recurso_composicion")
 }
 
 model Valorizacion {
@@ -2457,4 +2500,9 @@ enum TipoNotificacion {
   warning
   success
   error
+}
+
+enum TipoRecurso {
+  individual
+  cuadrilla
 }

@@ -118,11 +118,21 @@ export interface EdtPayload {
 export interface EdtUpdatePayload extends EdtPayload {}
 
 // ✅ Recurso
+export interface RecursoComposicionPayload {
+  empleadoId: string
+  porcentaje?: number
+  horasAsignadas?: number
+  rol?: string
+}
+
 export interface RecursoPayload {
   nombre: string
+  tipo?: 'individual' | 'cuadrilla'
   costoHora: number
+  descripcion?: string
+  composiciones?: RecursoComposicionPayload[]
 }
-export interface RecursoUpdatePayload extends RecursoPayload {}
+export interface RecursoUpdatePayload extends Partial<RecursoPayload> {}
 
 
 
