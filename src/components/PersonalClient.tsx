@@ -64,8 +64,10 @@ import {
   generarPlantillaEmpleados,
   leerEmpleadosDesdeExcel,
   validarEmpleados,
-  crearEmpleadosEnBD
+  crearEmpleadosEnBD,
+  EmpleadoImportado
 } from '@/lib/utils/empleadoExcel'
+import { ImportPreviewModal } from '@/components/admin/ImportPreviewModal'
 import {
   getConfiguracionCostos,
   ConfiguracionCostos,
@@ -176,6 +178,16 @@ export default function PersonalClient() {
   // Form state
   const [form, setForm] = useState<EmpleadoForm>(defaultForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Import preview modal state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importPreviewData, setImportPreviewData] = useState<{
+    validos: EmpleadoImportado[]
+    nuevos: number
+    actualizaciones: number
+    errores: string[]
+    sinUsuario: string[]
+  } | null>(null)
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -370,35 +382,60 @@ export default function PersonalClient() {
     setImportando(true)
     try {
       const datos = await leerEmpleadosDesdeExcel(file)
-      const emailsUsuarios = usuarios.map(u => u.email || '')
-      const emailsEmpleadosExistentes = empleados.map(e => e.user?.email || '')
-      const { nuevos, errores, duplicados, sinUsuario } = validarEmpleados(datos, emailsUsuarios, emailsEmpleadosExistentes)
+      console.log('📥 Datos leídos del Excel:', datos)
 
-      if (errores.length > 0) {
-        toast.error(`${errores.length} error(es): ${errores.slice(0, 2).join(', ')}`)
-      }
-
-      if (duplicados.length > 0) {
-        toast.warning(`${duplicados.length} empleado(s) ya existen y fueron omitidos`)
-      }
-
-      if (sinUsuario.length > 0) {
-        toast.warning(`${sinUsuario.length} usuario(s) no encontrados: ${sinUsuario.slice(0, 2).join(', ')}`)
-      }
-
-      if (nuevos.length === 0) {
-        toast.error('No hay empleados nuevos para importar')
+      if (datos.length === 0) {
+        toast.error('El archivo no contiene datos para importar')
         return
       }
 
-      const resultado = await crearEmpleadosEnBD(nuevos)
-      toast.success(`${resultado.creados} empleado(s) importados correctamente`)
-      await loadData()
+      const emailsUsuarios = usuarios.map(u => u.email || '')
+      const emailsEmpleadosExistentes = empleados.map(emp => emp.user?.email || '')
+
+      console.log('📧 Emails de usuarios en sistema:', emailsUsuarios)
+      console.log('👥 Emails de empleados existentes:', emailsEmpleadosExistentes)
+
+      const resultado = validarEmpleados(datos, emailsUsuarios, emailsEmpleadosExistentes)
+      console.log('✅ Validación:', resultado)
+
+      // Guardar datos para el modal y mostrarlo
+      setImportPreviewData(resultado)
+      setIsImportModalOpen(true)
     } catch (error) {
+      console.error('❌ Error leyendo Excel:', error)
       toast.error(error instanceof Error ? error.message : 'Error al procesar archivo')
     } finally {
       setImportando(false)
       e.target.value = ''
+    }
+  }
+
+  const executeImport = async () => {
+    if (!importPreviewData || importPreviewData.validos.length === 0) return
+
+    setImportando(true)
+    try {
+      const resultado = await crearEmpleadosEnBD(importPreviewData.validos)
+      console.log('📤 Resultado de importación:', resultado)
+
+      const mensajes = []
+      if (resultado.creados > 0) mensajes.push(`${resultado.creados} creado(s)`)
+      if (resultado.actualizados > 0) mensajes.push(`${resultado.actualizados} actualizado(s)`)
+
+      if (mensajes.length > 0) {
+        toast.success(`Importación completada: ${mensajes.join(', ')}`)
+      } else {
+        toast.info('No se realizaron cambios')
+      }
+
+      setIsImportModalOpen(false)
+      setImportPreviewData(null)
+      await loadData()
+    } catch (error) {
+      console.error('❌ Error en importación:', error)
+      toast.error(error instanceof Error ? error.message : 'Error al importar')
+    } finally {
+      setImportando(false)
     }
   }
 
@@ -1035,6 +1072,20 @@ export default function PersonalClient() {
           title="¿Eliminar registro de empleado?"
           description={`Se eliminará el registro de "${empleadoToDelete?.user?.name}". Esta acción no se puede deshacer.`}
         />
+
+        {/* Import Preview Modal */}
+        {importPreviewData && (
+          <ImportPreviewModal
+            open={isImportModalOpen}
+            onOpenChange={(open) => {
+              setIsImportModalOpen(open)
+              if (!open) setImportPreviewData(null)
+            }}
+            onConfirm={executeImport}
+            datos={importPreviewData}
+            isLoading={importando}
+          />
+        )}
       </div>
     </TooltipProvider>
   )
