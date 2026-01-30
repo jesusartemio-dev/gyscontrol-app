@@ -66,7 +66,8 @@ export async function POST(req: Request) {
       data: {
         userId: body.userId,
         cargoId: body.cargoId || null,
-        sueldoMensual: body.sueldoMensual ? parseFloat(body.sueldoMensual) : null,
+        sueldoPlanilla: body.sueldoPlanilla ? parseFloat(body.sueldoPlanilla) : null,
+        sueldoHonorarios: body.sueldoHonorarios ? parseFloat(body.sueldoHonorarios) : null,
         fechaIngreso: body.fechaIngreso ? new Date(body.fechaIngreso) : null,
         fechaCese: body.fechaCese ? new Date(body.fechaCese) : null,
         activo: body.activo ?? true,

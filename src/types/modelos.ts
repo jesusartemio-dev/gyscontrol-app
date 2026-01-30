@@ -429,6 +429,27 @@ export interface Recurso {
 }
 
 // ======================
+// 🏢 Departamento
+// ======================
+export interface Departamento {
+  id: string
+  nombre: string
+  descripcion?: string
+  responsableId?: string
+  activo: boolean
+  createdAt: string
+  updatedAt: string
+  responsable?: {
+    id: string
+    name: string | null
+    email: string
+  }
+  _count?: {
+    cargos: number
+  }
+}
+
+// ======================
 // 💼 Cargo (Puesto de trabajo)
 // ======================
 export interface Cargo {
@@ -436,10 +457,11 @@ export interface Cargo {
   nombre: string
   descripcion?: string
   sueldoBase?: number  // Solo referencia, no se usa en cálculos
-  departamento?: string
+  departamentoId?: string
   activo: boolean
   createdAt: string
   updatedAt: string
+  departamento?: Departamento
   _count?: {
     empleados: number
   }
@@ -452,7 +474,8 @@ export interface Empleado {
   id: string
   userId: string
   cargoId?: string
-  sueldoMensual?: number
+  sueldoPlanilla?: number    // Sueldo en planilla
+  sueldoHonorarios?: number  // Sueldo adicional en honorarios
   fechaIngreso?: string
   fechaCese?: string
   activo: boolean

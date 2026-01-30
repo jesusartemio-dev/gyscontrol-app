@@ -51,7 +51,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const updateData: Record<string, unknown> = {}
 
     if (body.cargoId !== undefined) updateData.cargoId = body.cargoId || null
-    if (body.sueldoMensual !== undefined) updateData.sueldoMensual = body.sueldoMensual ? parseFloat(body.sueldoMensual) : null
+    if (body.sueldoPlanilla !== undefined) updateData.sueldoPlanilla = body.sueldoPlanilla ? parseFloat(body.sueldoPlanilla) : null
+    if (body.sueldoHonorarios !== undefined) updateData.sueldoHonorarios = body.sueldoHonorarios ? parseFloat(body.sueldoHonorarios) : null
     if (body.fechaIngreso !== undefined) updateData.fechaIngreso = body.fechaIngreso ? new Date(body.fechaIngreso) : null
     if (body.fechaCese !== undefined) updateData.fechaCese = body.fechaCese ? new Date(body.fechaCese) : null
     if (body.activo !== undefined) updateData.activo = body.activo

@@ -64,7 +64,8 @@ import { getCargos } from '@/lib/services/cargo'
 const empleadoSchema = z.object({
   userId: z.string().min(1, 'Selecciona un usuario'),
   cargoId: z.string().optional(),
-  sueldoMensual: z.string().optional(),
+  sueldoPlanilla: z.string().optional(),
+  sueldoHonorarios: z.string().optional(),
   fechaIngreso: z.string().optional(),
   fechaCese: z.string().optional(),
   activo: z.boolean().default(true),
@@ -81,7 +82,8 @@ type EmpleadoForm = z.infer<typeof empleadoSchema>
 const defaultForm: EmpleadoForm = {
   userId: '',
   cargoId: '',
-  sueldoMensual: '',
+  sueldoPlanilla: '',
+  sueldoHonorarios: '',
   fechaIngreso: '',
   fechaCese: '',
   activo: true,
@@ -91,6 +93,11 @@ const defaultForm: EmpleadoForm = {
   contactoEmergencia: '',
   telefonoEmergencia: '',
   observaciones: '',
+}
+
+// Helper para calcular sueldo total
+const getSueldoTotal = (planilla?: number | null, honorarios?: number | null): number => {
+  return (planilla || 0) + (honorarios || 0)
 }
 
 // Helper para formatear moneda
@@ -204,7 +211,8 @@ export default function PersonalClient() {
     setForm({
       userId: empleado.userId,
       cargoId: empleado.cargoId || '',
-      sueldoMensual: empleado.sueldoMensual?.toString() || '',
+      sueldoPlanilla: empleado.sueldoPlanilla?.toString() || '',
+      sueldoHonorarios: empleado.sueldoHonorarios?.toString() || '',
       fechaIngreso: empleado.fechaIngreso ? empleado.fechaIngreso.split('T')[0] : '',
       fechaCese: empleado.fechaCese ? empleado.fechaCese.split('T')[0] : '',
       activo: empleado.activo,
@@ -250,7 +258,8 @@ export default function PersonalClient() {
       const payload: EmpleadoPayload = {
         userId: form.userId,
         cargoId: form.cargoId || undefined,
-        sueldoMensual: form.sueldoMensual ? parseFloat(form.sueldoMensual) : undefined,
+        sueldoPlanilla: form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : undefined,
+        sueldoHonorarios: form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : undefined,
         fechaIngreso: form.fechaIngreso || undefined,
         fechaCese: form.fechaCese || undefined,
         activo: form.activo,
@@ -297,14 +306,17 @@ export default function PersonalClient() {
   }
 
   // Stats
-  const stats = useMemo(() => ({
-    total: empleados.length,
-    activos: empleados.filter(e => e.activo).length,
-    inactivos: empleados.filter(e => !e.activo).length,
-    sueldoPromedio: empleados.filter(e => e.sueldoMensual).length > 0
-      ? empleados.reduce((sum, e) => sum + (e.sueldoMensual || 0), 0) / empleados.filter(e => e.sueldoMensual).length
-      : 0
-  }), [empleados])
+  const stats = useMemo(() => {
+    const empleadosConSueldo = empleados.filter(e => e.sueldoPlanilla || e.sueldoHonorarios)
+    return {
+      total: empleados.length,
+      activos: empleados.filter(e => e.activo).length,
+      inactivos: empleados.filter(e => !e.activo).length,
+      sueldoPromedio: empleadosConSueldo.length > 0
+        ? empleadosConSueldo.reduce((sum, e) => sum + getSueldoTotal(e.sueldoPlanilla, e.sueldoHonorarios), 0) / empleadosConSueldo.length
+        : 0
+    }
+  }, [empleados])
 
   if (loading) {
     return (
@@ -497,7 +509,7 @@ export default function PersonalClient() {
                       <TableCell className="font-mono text-sm">{emp.documentoIdentidad || '-'}</TableCell>
                       <TableCell>{emp.telefono || '-'}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(emp.sueldoMensual)}
+                        {formatCurrency(getSueldoTotal(emp.sueldoPlanilla, emp.sueldoHonorarios))}
                       </TableCell>
                       <TableCell>{formatDate(emp.fechaIngreso)}</TableCell>
                       <TableCell>
@@ -596,7 +608,7 @@ export default function PersonalClient() {
                       <div className="pt-3 border-t flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <DollarSign className="h-4 w-4 text-amber-600" />
-                          <span className="font-semibold">{formatCurrency(emp.sueldoMensual)}</span>
+                          <span className="font-semibold">{formatCurrency(getSueldoTotal(emp.sueldoPlanilla, emp.sueldoHonorarios))}</span>
                         </div>
                         <div className="flex gap-1">
                           <Button
@@ -693,15 +705,39 @@ export default function PersonalClient() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sueldoMensual">Sueldo Mensual (PEN)</Label>
+                  <Label htmlFor="sueldoPlanilla">Sueldo Planilla (PEN)</Label>
                   <Input
-                    id="sueldoMensual"
+                    id="sueldoPlanilla"
                     type="number"
                     step="0.01"
-                    value={form.sueldoMensual}
-                    onChange={(e) => setForm({ ...form, sueldoMensual: e.target.value })}
+                    value={form.sueldoPlanilla}
+                    onChange={(e) => setForm({ ...form, sueldoPlanilla: e.target.value })}
                     placeholder="0.00"
                   />
+                </div>
+              </div>
+
+              {/* Sueldo Honorarios */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sueldoHonorarios">Sueldo Honorarios (PEN)</Label>
+                  <Input
+                    id="sueldoHonorarios"
+                    type="number"
+                    step="0.01"
+                    value={form.sueldoHonorarios}
+                    onChange={(e) => setForm({ ...form, sueldoHonorarios: e.target.value })}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Sueldo Total</Label>
+                  <div className="h-10 px-3 py-2 bg-muted rounded-md flex items-center font-mono">
+                    {formatCurrency(getSueldoTotal(
+                      form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : 0,
+                      form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0
+                    ))}
+                  </div>
                 </div>
               </div>
 

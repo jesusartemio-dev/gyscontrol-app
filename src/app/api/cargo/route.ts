@@ -6,6 +6,7 @@ export async function GET() {
     const data = await prisma.cargo.findMany({
       orderBy: { nombre: 'asc' },
       include: {
+        departamento: true,
         _count: {
           select: { empleados: true }
         }
@@ -39,8 +40,11 @@ export async function POST(req: Request) {
         nombre: body.nombre,
         descripcion: body.descripcion,
         sueldoBase: body.sueldoBase ? parseFloat(body.sueldoBase) : null,
-        departamento: body.departamento,
+        departamentoId: body.departamentoId || null,
         activo: body.activo ?? true,
+      },
+      include: {
+        departamento: true,
       }
     })
     return NextResponse.json(data)

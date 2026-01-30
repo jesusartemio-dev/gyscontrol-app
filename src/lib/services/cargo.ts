@@ -1,14 +1,17 @@
 'use client'
 
+import type { Departamento } from './departamento'
+
 export interface Cargo {
   id: string
   nombre: string
   descripcion?: string
   sueldoBase?: number
-  departamento?: string
+  departamentoId?: string
   activo: boolean
   createdAt: string
   updatedAt: string
+  departamento?: Departamento
   _count?: {
     empleados: number
   }
@@ -18,7 +21,7 @@ export interface CargoPayload {
   nombre: string
   descripcion?: string
   sueldoBase?: number
-  departamento?: string
+  departamentoId?: string
   activo?: boolean
 }
 

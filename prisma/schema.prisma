@@ -1127,20 +1127,42 @@ model User {
   tareas                    Tarea[]
   userPermissions           UserPermission[]
   empleado                  Empleado?
+  departamentosResponsable  Departamento[]              @relation("DepartamentoResponsable")
 
   @@map("user")
 }
 
+// ======================
+// 🏢 Departamento
+// ======================
+model Departamento {
+  id            String   @id @default(cuid())
+  nombre        String   @unique
+  descripcion   String?
+  responsableId String?
+  activo        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  responsable   User?    @relation("DepartamentoResponsable", fields: [responsableId], references: [id])
+  cargos        Cargo[]
+
+  @@map("departamento")
+}
+
+// ======================
+// 💼 Cargo (Puesto de trabajo)
+// ======================
 model Cargo {
-  id           String     @id @default(cuid())
-  nombre       String     @unique
-  descripcion  String?
-  sueldoBase   Float?     // Sueldo de referencia (no se usa en cálculos)
-  departamento String?
-  activo       Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  empleados    Empleado[]
+  id             String        @id @default(cuid())
+  nombre         String        @unique
+  descripcion    String?
+  sueldoBase     Float?        // Sueldo de referencia (no se usa en cálculos)
+  departamentoId String?
+  activo         Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id])
+  empleados      Empleado[]
 
   @@map("cargo")
 }
@@ -1149,7 +1171,8 @@ model Empleado {
   id                   String               @id @default(cuid())
   userId               String               @unique
   cargoId              String?
-  sueldoMensual        Float?
+  sueldoPlanilla       Float?               // Sueldo en planilla
+  sueldoHonorarios     Float?               // Sueldo adicional en honorarios
   fechaIngreso         DateTime?
   fechaCese            DateTime?
   activo               Boolean              @default(true)
