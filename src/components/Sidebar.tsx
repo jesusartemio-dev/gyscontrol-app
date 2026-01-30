@@ -43,7 +43,8 @@ import {
   Target,
   Shield,
   UserCheck,
-  History
+  History,
+  Briefcase
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -245,6 +246,8 @@ export default function Sidebar() {
       links: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
         { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
+        { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },
+        { href: '/configuracion/departamentos', label: 'Departamentos', icon: Building2 },
         { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },

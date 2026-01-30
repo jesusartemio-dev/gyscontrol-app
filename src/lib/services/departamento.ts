@@ -1,22 +1,8 @@
 'use client'
 
-export interface Departamento {
-  id: string
-  nombre: string
-  descripcion?: string
-  responsableId?: string
-  activo: boolean
-  createdAt: string
-  updatedAt: string
-  responsable?: {
-    id: string
-    name: string | null
-    email: string
-  }
-  _count?: {
-    cargos: number
-  }
-}
+import type { Departamento } from '@/types/modelos'
+
+export type { Departamento }
 
 export interface DepartamentoPayload {
   nombre: string

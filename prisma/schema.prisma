@@ -1136,15 +1136,15 @@ model User {
 // 🏢 Departamento
 // ======================
 model Departamento {
-  id            String   @id @default(cuid())
-  nombre        String   @unique
+  id            String     @id @default(cuid())
+  nombre        String     @unique
   descripcion   String?
   responsableId String?
-  activo        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  responsable   User?    @relation("DepartamentoResponsable", fields: [responsableId], references: [id])
-  cargos        Cargo[]
+  activo        Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  responsable   User?      @relation("DepartamentoResponsable", fields: [responsableId], references: [id])
+  empleados     Empleado[]
 
   @@map("departamento")
 }
@@ -1153,16 +1153,14 @@ model Departamento {
 // 💼 Cargo (Puesto de trabajo)
 // ======================
 model Cargo {
-  id             String        @id @default(cuid())
-  nombre         String        @unique
-  descripcion    String?
-  sueldoBase     Float?        // Sueldo de referencia (no se usa en cálculos)
-  departamentoId String?
-  activo         Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  departamento   Departamento? @relation(fields: [departamentoId], references: [id])
-  empleados      Empleado[]
+  id          String     @id @default(cuid())
+  nombre      String     @unique
+  descripcion String?
+  sueldoBase  Float?     // Sueldo de referencia (no se usa en cálculos)
+  activo      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  empleados   Empleado[]
 
   @@map("cargo")
 }
@@ -1171,6 +1169,7 @@ model Empleado {
   id                   String               @id @default(cuid())
   userId               String               @unique
   cargoId              String?
+  departamentoId       String?
   sueldoPlanilla       Float?               // Sueldo en planilla
   sueldoHonorarios     Float?               // Sueldo adicional en honorarios
   fechaIngreso         DateTime?
@@ -1185,6 +1184,7 @@ model Empleado {
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   cargo                Cargo?               @relation(fields: [cargoId], references: [id])
+  departamento         Departamento?        @relation(fields: [departamentoId], references: [id])
   user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   recursoComposiciones RecursoComposicion[]
 

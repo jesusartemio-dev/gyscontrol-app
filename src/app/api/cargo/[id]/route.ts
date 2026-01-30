@@ -7,7 +7,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const data = await prisma.cargo.findUnique({
       where: { id },
       include: {
-        departamento: true,
         empleados: {
           include: {
             user: {
@@ -42,15 +41,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (body.nombre !== undefined) updateData.nombre = body.nombre
     if (body.descripcion !== undefined) updateData.descripcion = body.descripcion
     if (body.sueldoBase !== undefined) updateData.sueldoBase = body.sueldoBase ? parseFloat(body.sueldoBase) : null
-    if (body.departamentoId !== undefined) updateData.departamentoId = body.departamentoId || null
     if (body.activo !== undefined) updateData.activo = body.activo
 
     const data = await prisma.cargo.update({
       where: { id },
       data: updateData,
-      include: {
-        departamento: true,
-      }
     })
     return NextResponse.json(data)
   } catch (error) {

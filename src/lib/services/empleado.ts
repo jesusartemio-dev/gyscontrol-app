@@ -7,6 +7,7 @@ const BASE_URL = '/api/empleado'
 export interface EmpleadoPayload {
   userId: string
   cargoId?: string
+  departamentoId?: string
   sueldoPlanilla?: number
   sueldoHonorarios?: number
   fechaIngreso?: string

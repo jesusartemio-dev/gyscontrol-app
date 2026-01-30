@@ -56,14 +56,16 @@ import {
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { Empleado, User, Cargo } from '@/types/modelos'
+import type { Empleado, User, Cargo, Departamento } from '@/types/modelos'
 import { getEmpleados, createEmpleado, updateEmpleado, deleteEmpleado, EmpleadoPayload } from '@/lib/services/empleado'
 import { getCargos } from '@/lib/services/cargo'
+import { getDepartamentos } from '@/lib/services/departamento'
 
 // Schema de validación
 const empleadoSchema = z.object({
   userId: z.string().min(1, 'Selecciona un usuario'),
   cargoId: z.string().optional(),
+  departamentoId: z.string().optional(),
   sueldoPlanilla: z.string().optional(),
   sueldoHonorarios: z.string().optional(),
   fechaIngreso: z.string().optional(),
@@ -82,6 +84,7 @@ type EmpleadoForm = z.infer<typeof empleadoSchema>
 const defaultForm: EmpleadoForm = {
   userId: '',
   cargoId: '',
+  departamentoId: '',
   sueldoPlanilla: '',
   sueldoHonorarios: '',
   fechaIngreso: '',
@@ -135,6 +138,7 @@ export default function PersonalClient() {
   const [empleados, setEmpleados] = useState<Empleado[]>([])
   const [usuarios, setUsuarios] = useState<User[]>([])
   const [cargos, setCargos] = useState<Cargo[]>([])
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -159,14 +163,16 @@ export default function PersonalClient() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [empleadosData, usuariosRes, cargosData] = await Promise.all([
+      const [empleadosData, usuariosRes, cargosData, departamentosData] = await Promise.all([
         getEmpleados(),
         fetch('/api/admin/usuarios').then(r => r.json()),
-        getCargos()
+        getCargos(),
+        getDepartamentos()
       ])
       setEmpleados(empleadosData)
       setUsuarios(usuariosRes)
       setCargos(cargosData.filter((c: Cargo) => c.activo))
+      setDepartamentos(departamentosData.filter((d: Departamento) => d.activo))
     } catch (error) {
       console.error('Error al cargar datos:', error)
       toast.error('Error al cargar los datos')
@@ -211,6 +217,7 @@ export default function PersonalClient() {
     setForm({
       userId: empleado.userId,
       cargoId: empleado.cargoId || '',
+      departamentoId: empleado.departamentoId || '',
       sueldoPlanilla: empleado.sueldoPlanilla?.toString() || '',
       sueldoHonorarios: empleado.sueldoHonorarios?.toString() || '',
       fechaIngreso: empleado.fechaIngreso ? empleado.fechaIngreso.split('T')[0] : '',
@@ -258,6 +265,7 @@ export default function PersonalClient() {
       const payload: EmpleadoPayload = {
         userId: form.userId,
         cargoId: form.cargoId || undefined,
+        departamentoId: form.departamentoId || undefined,
         sueldoPlanilla: form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : undefined,
         sueldoHonorarios: form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : undefined,
         fechaIngreso: form.fechaIngreso || undefined,
@@ -684,7 +692,7 @@ export default function PersonalClient() {
                 {errors.userId && <p className="text-xs text-red-500">{errors.userId}</p>}
               </div>
 
-              {/* Cargo y Sueldo */}
+              {/* Cargo y Departamento */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="cargoId">Cargo</Label>
@@ -705,6 +713,28 @@ export default function PersonalClient() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="departamentoId">Departamento</Label>
+                  <Select
+                    value={form.departamentoId}
+                    onValueChange={(v) => setForm({ ...form, departamentoId: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un departamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departamentos.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Sueldos */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="sueldoPlanilla">Sueldo Planilla (PEN)</Label>
                   <Input
                     id="sueldoPlanilla"
@@ -715,10 +745,6 @@ export default function PersonalClient() {
                     placeholder="0.00"
                   />
                 </div>
-              </div>
-
-              {/* Sueldo Honorarios */}
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="sueldoHonorarios">Sueldo Honorarios (PEN)</Label>
                   <Input
@@ -730,14 +756,16 @@ export default function PersonalClient() {
                     placeholder="0.00"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Sueldo Total</Label>
-                  <div className="h-10 px-3 py-2 bg-muted rounded-md flex items-center font-mono">
-                    {formatCurrency(getSueldoTotal(
-                      form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : 0,
-                      form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0
-                    ))}
-                  </div>
+              </div>
+
+              {/* Sueldo Total */}
+              <div className="space-y-2">
+                <Label>Sueldo Total</Label>
+                <div className="h-10 px-3 py-2 bg-muted rounded-md flex items-center font-mono">
+                  {formatCurrency(getSueldoTotal(
+                    form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : 0,
+                    form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0
+                  ))}
                 </div>
               </div>
 

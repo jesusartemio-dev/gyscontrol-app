@@ -12,6 +12,7 @@ export async function GET(req: Request) {
       where,
       include: {
         cargo: true,
+        departamento: true,
         user: {
           select: {
             id: true,
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
       data: {
         userId: body.userId,
         cargoId: body.cargoId || null,
+        departamentoId: body.departamentoId || null,
         sueldoPlanilla: body.sueldoPlanilla ? parseFloat(body.sueldoPlanilla) : null,
         sueldoHonorarios: body.sueldoHonorarios ? parseFloat(body.sueldoHonorarios) : null,
         fechaIngreso: body.fechaIngreso ? new Date(body.fechaIngreso) : null,
@@ -80,6 +82,7 @@ export async function POST(req: Request) {
       },
       include: {
         cargo: true,
+        departamento: true,
         user: {
           select: {
             id: true,

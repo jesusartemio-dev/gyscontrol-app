@@ -445,7 +445,7 @@ export interface Departamento {
     email: string
   }
   _count?: {
-    cargos: number
+    empleados: number
   }
 }
 
@@ -457,11 +457,9 @@ export interface Cargo {
   nombre: string
   descripcion?: string
   sueldoBase?: number  // Solo referencia, no se usa en cálculos
-  departamentoId?: string
   activo: boolean
   createdAt: string
   updatedAt: string
-  departamento?: Departamento
   _count?: {
     empleados: number
   }
@@ -474,6 +472,7 @@ export interface Empleado {
   id: string
   userId: string
   cargoId?: string
+  departamentoId?: string    // Departamento directo del empleado
   sueldoPlanilla?: number    // Sueldo en planilla
   sueldoHonorarios?: number  // Sueldo adicional en honorarios
   fechaIngreso?: string
@@ -488,6 +487,7 @@ export interface Empleado {
   createdAt: string
   updatedAt: string
   cargo?: Cargo
+  departamento?: Departamento
   user?: User
   recursoComposiciones?: RecursoComposicion[]
 }

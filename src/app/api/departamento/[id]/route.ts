@@ -14,9 +14,15 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
             email: true,
           }
         },
-        cargos: {
+        empleados: {
           include: {
-            _count: { select: { empleados: true } }
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            }
           }
         }
       }
@@ -68,15 +74,15 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params
 
-    // Verificar si tiene cargos asociados
+    // Verificar si tiene empleados asociados
     const departamento = await prisma.departamento.findUnique({
       where: { id },
-      include: { _count: { select: { cargos: true } } }
+      include: { _count: { select: { empleados: true } } }
     })
 
-    if (departamento?._count.cargos && departamento._count.cargos > 0) {
+    if (departamento?._count.empleados && departamento._count.empleados > 0) {
       return NextResponse.json(
-        { message: `No se puede eliminar: hay ${departamento._count.cargos} cargo(s) en este departamento` },
+        { message: `No se puede eliminar: hay ${departamento._count.empleados} empleado(s) en este departamento` },
         { status: 400 }
       )
     }

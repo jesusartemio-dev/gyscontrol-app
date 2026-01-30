@@ -8,6 +8,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       where: { id },
       include: {
         cargo: true,
+        departamento: true,
         user: {
           select: {
             id: true,
@@ -51,6 +52,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const updateData: Record<string, unknown> = {}
 
     if (body.cargoId !== undefined) updateData.cargoId = body.cargoId || null
+    if (body.departamentoId !== undefined) updateData.departamentoId = body.departamentoId || null
     if (body.sueldoPlanilla !== undefined) updateData.sueldoPlanilla = body.sueldoPlanilla ? parseFloat(body.sueldoPlanilla) : null
     if (body.sueldoHonorarios !== undefined) updateData.sueldoHonorarios = body.sueldoHonorarios ? parseFloat(body.sueldoHonorarios) : null
     if (body.fechaIngreso !== undefined) updateData.fechaIngreso = body.fechaIngreso ? new Date(body.fechaIngreso) : null
@@ -68,6 +70,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       data: updateData,
       include: {
         cargo: true,
+        departamento: true,
         user: {
           select: {
             id: true,

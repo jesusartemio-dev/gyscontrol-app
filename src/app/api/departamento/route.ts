@@ -14,7 +14,7 @@ export async function GET() {
           }
         },
         _count: {
-          select: { cargos: true }
+          select: { empleados: true }
         }
       }
     })
