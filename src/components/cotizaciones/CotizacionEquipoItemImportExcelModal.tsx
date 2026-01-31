@@ -303,7 +303,7 @@ export default function CotizacionEquipoItemImportExcelModal({
                   Arrastra un archivo Excel o haz clic para seleccionar
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Formato .xlsx con columnas: Código, Descripción, Cantidad, Precio Cliente
+                  Formato .xlsx con columnas: Código, Descripción, Cantidad, P.Unit. Cliente
                 </p>
               </label>
             </div>
@@ -412,8 +412,8 @@ export default function CotizacionEquipoItemImportExcelModal({
                       <th className="px-2 py-1.5 text-left w-20">Código</th>
                       <th className="px-2 py-1.5 text-left">Descripción</th>
                       <th className="px-2 py-1.5 text-center w-12">Cant.</th>
-                      <th className="px-2 py-1.5 text-right w-20">P.Unit</th>
-                      <th className="px-2 py-1.5 text-right w-20">Total</th>
+                      <th className="px-2 py-1.5 text-right w-20">P.Unit.</th>
+                      <th className="px-2 py-1.5 text-right w-24">Total Cliente</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">

@@ -24,10 +24,10 @@ export function exportarCotizacionEquipoItemsAExcel(
     'Unidad': item.unidad || '',
     'Marca': item.marca || '',
     'Cantidad': item.cantidad || 1,
-    'Precio Interno': item.precioInterno || 0,
-    'Precio Cliente': item.precioCliente || 0,
-    'Costo Interno': item.costoInterno || 0,
-    'Costo Cliente': item.costoCliente || 0
+    'P.Unit. Interno': item.precioInterno || 0,
+    'P.Unit. Cliente': item.precioCliente || 0,
+    'Total Interno': item.costoInterno || 0,
+    'Total Cliente': item.costoCliente || 0
   }))
 
   const worksheet = XLSX.utils.json_to_sheet(data)
@@ -41,10 +41,10 @@ export function exportarCotizacionEquipoItemsAExcel(
     { wch: 10 },  // Unidad
     { wch: 15 },  // Marca
     { wch: 10 },  // Cantidad
-    { wch: 14 },  // Precio Interno
-    { wch: 14 },  // Precio Cliente
-    { wch: 14 },  // Costo Interno
-    { wch: 14 },  // Costo Cliente
+    { wch: 14 },  // P.Unit. Interno
+    { wch: 14 },  // P.Unit. Cliente
+    { wch: 14 },  // Total Interno
+    { wch: 14 },  // Total Cliente
   ]
 
   const workbook = XLSX.utils.book_new()
@@ -75,7 +75,7 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
       'Unidad': 'Unidad',
       'Marca': 'Siemens',
       'Cantidad': 2,
-      'Precio Cliente': 150.00
+      'P.Unit. Cliente': 150.00
     },
     {
       'Código': 'EQ-002',
@@ -84,7 +84,7 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
       'Unidad': 'Unidad',
       'Marca': 'Siemens',
       'Cantidad': 1,
-      'Precio Cliente': 850.00
+      'P.Unit. Cliente': 850.00
     }
   ]
 
@@ -97,7 +97,7 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
     { wch: 10 },  // Unidad
     { wch: 15 },  // Marca
     { wch: 10 },  // Cantidad
-    { wch: 14 },  // Precio Cliente
+    { wch: 14 },  // P.Unit. Cliente
   ]
 
   const workbook = XLSX.utils.book_new()
@@ -193,7 +193,9 @@ export function validarEImportarEquipoItems(
     const unidad = String(row['Unidad'] || '').trim()
     const marca = String(row['Marca'] || '').trim()
     const cantidad = parseInt(row['Cantidad'] || 1) || 1
-    const precioCliente = parseFloat(row['Precio Cliente'] || row['PrecioCliente'] || 0) || 0
+    const precioCliente = parseFloat(
+      row['P.Unit. Cliente'] || row['Precio Cliente'] || row['PrecioCliente'] || row['P.Unit Cliente'] || 0
+    ) || 0
 
     // Validaciones básicas
     if (!codigo) {
