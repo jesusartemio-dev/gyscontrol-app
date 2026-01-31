@@ -6,16 +6,22 @@ import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import CotizacionEquipoItemTable from './CotizacionEquipoItemTable'
 import CotizacionEquipoMultiAddModal from './CotizacionEquipoMultiAddModal'
+import CotizacionEquipoItemImportExcelModal from './CotizacionEquipoItemImportExcelModal'
 import type { CotizacionEquipo, CotizacionEquipoItem } from '@/types'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { cn } from '@/lib/utils'
+import { exportarCotizacionEquipoItemsAExcel } from '@/lib/utils/cotizacionEquipoItemExcel'
+import { toast } from 'sonner'
 import {
   Pencil,
   Trash2,
   Package,
   TrendingUp,
   ChevronRight,
-  Plus
+  Plus,
+  Upload,
+  FileDown,
+  BookOpen
 } from 'lucide-react'
 
 const formatCurrency = (amount: number): string => {
@@ -34,6 +40,7 @@ interface Props {
   onUpdated: (item: CotizacionEquipoItem) => void
   onDeletedGrupo: () => void
   onUpdatedNombre: (nuevoNombre: string) => void
+  onRefresh?: () => Promise<void>
 }
 
 export default function CotizacionEquipoAccordion({
@@ -43,12 +50,14 @@ export default function CotizacionEquipoAccordion({
   onDeleted,
   onUpdated,
   onDeletedGrupo,
-  onUpdatedNombre
+  onUpdatedNombre,
+  onRefresh
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(equipo.nombre)
   const [showMultiAddModal, setShowMultiAddModal] = useState(false)
+  const [showExcelModal, setShowExcelModal] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
@@ -86,6 +95,28 @@ export default function CotizacionEquipoAccordion({
       }
     }
     setShowMultiAddModal(false)
+  }
+
+  const handleExcelItemsCreated = async (items: CotizacionEquipoItem[]) => {
+    setShowExcelModal(false)
+    if (onRefresh) {
+      await onRefresh()
+    } else if (items.length > 0) {
+      if (onMultipleCreated) {
+        onMultipleCreated(items)
+      } else {
+        items.forEach(item => onCreated(item))
+      }
+    }
+  }
+
+  const handleExportExcel = () => {
+    if (equipo.items.length === 0) {
+      toast.error('No hay items para exportar')
+      return
+    }
+    exportarCotizacionEquipoItemsAExcel(equipo.items, `Equipos_${equipo.nombre}`)
+    toast.success('Excel exportado')
   }
 
   return (
@@ -197,15 +228,37 @@ export default function CotizacionEquipoAccordion({
                 <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
                   Items del grupo
                 </span>
-                <Button
-                  onClick={() => setShowMultiAddModal(true)}
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 text-xs px-2"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Agregar
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    onClick={() => setShowMultiAddModal(true)}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  >
+                    <BookOpen className="h-3 w-3 mr-1" />
+                    Catálogo
+                  </Button>
+                  <Button
+                    onClick={() => setShowExcelModal(true)}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  >
+                    <Upload className="h-3 w-3 mr-1" />
+                    Excel
+                  </Button>
+                  {equipo.items.length > 0 && (
+                    <Button
+                      onClick={handleExportExcel}
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs px-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100"
+                      title="Exportar a Excel"
+                    >
+                      <FileDown className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Lista de Items */}
@@ -213,15 +266,27 @@ export default function CotizacionEquipoAccordion({
                 {equipo.items.length === 0 ? (
                   <div className="text-center py-6">
                     <Package className="h-6 w-6 text-gray-300 mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground mb-2">Sin equipos en este grupo</p>
-                    <Button
-                      onClick={() => setShowMultiAddModal(true)}
-                      size="sm"
-                      variant="link"
-                      className="h-auto p-0 text-xs"
-                    >
-                      Agregar equipos
-                    </Button>
+                    <p className="text-xs text-muted-foreground mb-3">Sin equipos en este grupo</p>
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <Button
+                        onClick={() => setShowMultiAddModal(true)}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                      >
+                        <BookOpen className="h-3 w-3 mr-1" />
+                        Catálogo
+                      </Button>
+                      <Button
+                        onClick={() => setShowExcelModal(true)}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Importar Excel
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <CotizacionEquipoItemTable
@@ -256,6 +321,14 @@ export default function CotizacionEquipoAccordion({
         onClose={() => setShowMultiAddModal(false)}
         cotizacionEquipoId={equipo.id}
         onItemsCreated={handleMultipleItemsCreated}
+      />
+
+      {/* Modal para importar desde Excel */}
+      <CotizacionEquipoItemImportExcelModal
+        isOpen={showExcelModal}
+        onClose={() => setShowExcelModal(false)}
+        equipo={equipo}
+        onItemsCreated={handleExcelItemsCreated}
       />
 
       {/* Delete confirmation dialog */}
