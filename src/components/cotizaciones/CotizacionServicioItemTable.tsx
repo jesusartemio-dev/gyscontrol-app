@@ -263,7 +263,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                     ) : (
                       <div>
                         <div className="text-gray-700">{item.recursoNombre}</div>
-                        <div className="text-[10px] text-gray-400">${item.costoHora}/h</div>
+                        <div className="text-[10px] text-gray-400">${(item.costoHora ?? 0).toFixed(2)}/h</div>
                       </div>
                     )}
                   </td>
