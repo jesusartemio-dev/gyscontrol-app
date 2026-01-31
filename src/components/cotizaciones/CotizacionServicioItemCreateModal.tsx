@@ -131,11 +131,12 @@ export default function CotizacionServicioItemCreateModal({
 
     if (modoInverso && precioClienteInput > 0) {
       // MODO INVERSO: Precio Cliente → Horas
-      // costoCliente = horaTotal × costoHora × factorSeguridad × dificultadMultiplier × margen
-      // horaTotal = costoCliente / (costoHora × factorSeguridad × dificultadMultiplier × margen)
-      const divisor = costoHora * factorSeguridad * dificultadMultiplier * margen
+      // costoCliente = horaTotal × costoHora × factorSeguridad × dificultadMultiplier
+      // horaTotal = costoCliente / (costoHora × factorSeguridad × dificultadMultiplier)
+      const divisor = costoHora * factorSeguridad * dificultadMultiplier
       const horaTotal = divisor > 0 ? precioClienteInput / divisor : 0
-      const costoInterno = horaTotal * costoHora * factorSeguridad * dificultadMultiplier
+      // costoInterno se deriva del margen
+      const costoInterno = precioClienteInput / margen
 
       return {
         horaTotal: +horaTotal.toFixed(2),
@@ -148,8 +149,10 @@ export default function CotizacionServicioItemCreateModal({
       // Fórmula escalonada: HH = HH_base + (cantidad - 1) × HH_repetido
       const horasBase = horaBase + Math.max(0, cantidad - 1) * horaRepetido
       const horaTotal = horasBase * dificultadMultiplier
-      const costoInterno = horaTotal * costoHora * factorSeguridad
-      const costoCliente = costoInterno * margen
+      // Nueva fórmula: costoCliente es el cálculo directo
+      const costoCliente = horaTotal * costoHora * factorSeguridad
+      // costoInterno se deriva del margen
+      const costoInterno = costoCliente / margen
 
       return {
         horaTotal: +horaTotal.toFixed(2),

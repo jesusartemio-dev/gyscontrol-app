@@ -146,9 +146,10 @@ export default function PlantillaServicioItemsModal({
           cantidad,
           horaTotal: horas,
           factorSeguridad: 1.0,
-          costoInterno: horas * costoHora,
           margen: 1.35,
-          costoCliente: horas * costoHora * 1.35
+          // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+          costoCliente: horas * costoHora * 1.0, // factorSeguridad = 1.0
+          costoInterno: (horas * costoHora * 1.0) / 1.35
         }
 
         const nuevoItem = await createPlantillaServicioItem(payload)

@@ -58,8 +58,9 @@ export default function PlantillaServicioItemList({ items, onUpdated, onDeleted 
       horaFijo: item.horaFijo
     })
 
-    const costoInterno = horas * item.costoHora * factorSeguridad
-    const costoCliente = costoInterno * margen
+    // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+    const costoCliente = horas * item.costoHora * factorSeguridad
+    const costoInterno = costoCliente / (margen || 1.35)
 
     setLoadingId(item.id)
     try {
@@ -107,8 +108,9 @@ export default function PlantillaServicioItemList({ items, onUpdated, onDeleted 
           horaFijo: item.horaFijo
         })
 
-        const costoInternoEditado = horas * item.costoHora * factorSeguridad
-        const costoClienteEditado = costoInternoEditado * margen
+        // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+        const costoClienteEditado = horas * item.costoHora * factorSeguridad
+        const costoInternoEditado = costoClienteEditado / (margen || 1.35)
 
         return (
           <div

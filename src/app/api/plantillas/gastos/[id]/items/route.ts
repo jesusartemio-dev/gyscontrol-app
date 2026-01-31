@@ -40,11 +40,12 @@ export async function POST(
       )
     }
 
-    // Calcular costos
-    const factorSeguridad = 1.1 // 10% de seguridad
-    const margen = 1.2 // 20% de margen
-    const costoInterno = cantidad * precioUnitario
-    const costoCliente = costoInterno * factorSeguridad * margen
+    // Calcular costos - Nueva fórmula (2025-01)
+    // costoCliente es el cálculo directo, costoInterno se deriva del margen
+    const factorSeguridad = 1.0 // Sin factor de seguridad adicional
+    const margen = 1.25 // 25% de margen para gastos
+    const costoCliente = cantidad * precioUnitario * factorSeguridad
+    const costoInterno = costoCliente / margen
 
     // Crear el item
     const nuevoItem = await prisma.plantillaGastoItemIndependiente.create({

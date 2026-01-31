@@ -23,6 +23,11 @@ interface ServicioBasico {
 
 /**
  * Recalcula las horas, costo interno y costo cliente de un servicio.
+ *
+ * NUEVA LÓGICA (2025-01):
+ * - costoCliente = horaTotal × costoHora × factorSeguridad (cálculo directo)
+ * - costoInterno = costoCliente / margen (derivado del margen)
+ *
  * @param servicio Datos de entrada del servicio
  * @returns Objeto con horaTotal, costoInterno y costoCliente
  */
@@ -36,8 +41,9 @@ export function recalcularServicio(servicio: ServicioBasico) {
     horaFijo: servicio.horaFijo,
   })
 
-  const costoInterno = +(horaTotal * servicio.costoHora * servicio.factorSeguridad).toFixed(2)
-  const costoCliente = +(costoInterno * servicio.margen).toFixed(2)
+  // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+  const costoCliente = +(horaTotal * servicio.costoHora * servicio.factorSeguridad).toFixed(2)
+  const costoInterno = +(costoCliente / servicio.margen).toFixed(2)
 
   return { horaTotal, costoInterno, costoCliente }
 }

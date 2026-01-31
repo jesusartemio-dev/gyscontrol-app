@@ -105,13 +105,15 @@ export default function CotizacionGastoItemModal({
       cantidad: 1,
       precioUnitario: 0,
       factorSeguridad: 1,
-      margen: 1
+      margen: 1.25 // 25% margen por defecto para gastos
     }
   })
 
   const watchedValues = form.watch()
-  const costoInterno = (watchedValues.cantidad || 0) * (watchedValues.precioUnitario || 0) * (watchedValues.factorSeguridad || 1)
-  const costoCliente = costoInterno * (watchedValues.margen || 1)
+  // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+  const costoCliente = (watchedValues.cantidad || 0) * (watchedValues.precioUnitario || 0) * (watchedValues.factorSeguridad || 1)
+  const margenValue = watchedValues.margen || 1.25
+  const costoInterno = costoCliente / margenValue
   const rentabilidad = costoInterno > 0 ? ((costoCliente - costoInterno) / costoInterno) * 100 : 0
 
   // Reset form when modal closes

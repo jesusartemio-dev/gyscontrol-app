@@ -90,8 +90,10 @@ export default function CotizacionServicioItemForm({
     horaFijo
   })
 
-  const costoInterno = horas * costoHora * (watchedValues.factorSeguridad || 1)
-  const costoCliente = costoInterno * (watchedValues.margen || 1)
+  // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+  const costoCliente = horas * costoHora * (watchedValues.factorSeguridad || 1)
+  const margenValue = watchedValues.margen || 1.35
+  const costoInterno = costoCliente / margenValue
   const rentabilidad = costoInterno > 0 ? ((costoCliente - costoInterno) / costoInterno) * 100 : 0
 
   const onSubmit = async (data: FormValues) => {

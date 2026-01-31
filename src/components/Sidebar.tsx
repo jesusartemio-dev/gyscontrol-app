@@ -246,9 +246,6 @@ export default function Sidebar() {
       links: [
         { href: '/configuracion/general', label: 'General', icon: Settings },
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
-        { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
-        { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },
-        { href: '/configuracion/departamentos', label: 'Departamentos', icon: Building2 },
         { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },
@@ -264,6 +261,10 @@ export default function Sidebar() {
         { href: '/catalogo/unidades', label: 'Unidades Equipos', icon: Calculator },
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },
         { href: '/catalogo/recursos', label: 'Recursos', icon: Wrench },
+        // 👥 RRHH - Personal y estructura organizacional
+        { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
+        { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },
+        { href: '/configuracion/departamentos', label: 'Departamentos', icon: Building2 },
         // 📋 Plantillas para cotizaciones
         { href: '/catalogo/exclusiones', label: 'Exclusiones', icon: FileText },
         { href: '/catalogo/condiciones', label: 'Condiciones', icon: FileCheck },

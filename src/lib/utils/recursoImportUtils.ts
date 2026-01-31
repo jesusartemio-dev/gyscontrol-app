@@ -1,46 +1,147 @@
 // ===============================
 // 📁 recursoImportUtils.ts
+// 🔧 Utilidades para importar recursos desde Excel
 // ===============================
 import * as XLSX from 'xlsx'
 
 export interface RecursoImportado {
   nombre: string
+  tipo: 'individual' | 'cuadrilla'
   costoHora: number
+  descripcion?: string
 }
 
+/**
+ * Helper para obtener valor de columna con múltiples nombres posibles
+ */
+function getColumn(row: Record<string, any>, ...names: string[]): any {
+  for (const name of names) {
+    if (row[name] !== undefined && row[name] !== '') {
+      return row[name]
+    }
+  }
+  return undefined
+}
+
+/**
+ * Lee recursos desde un archivo Excel
+ */
 export async function leerRecursosDesdeExcel(file: File): Promise<RecursoImportado[]> {
   const data = await file.arrayBuffer()
   const workbook = XLSX.read(data)
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const json: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
 
-  return json.map((row) => ({
-    nombre: row['Nombre']?.trim() || '',
-    costoHora: parseFloat(row['Costo Hora']) || 0,
-  }))
+  console.log('📊 Columnas en Excel:', json.length > 0 ? Object.keys(json[0]) : 'vacío')
+  console.log('📊 Primera fila:', json[0])
+
+  return json.map((row, index) => {
+    // Nombre - requerido
+    const nombre = getColumn(row, 'Nombre', 'nombre', 'NOMBRE', 'Name', 'name')
+    if (!nombre || String(nombre).trim() === '') {
+      throw new Error(`Fila ${index + 2}: El nombre es obligatorio`)
+    }
+
+    // Tipo
+    const tipoRaw = getColumn(row, 'Tipo', 'tipo', 'TIPO', 'Type', 'type')
+    const tipoStr = typeof tipoRaw === 'string' ? tipoRaw.toLowerCase().trim() : 'individual'
+    const tipo: 'individual' | 'cuadrilla' =
+      tipoStr === 'cuadrilla' || tipoStr === 'crew' || tipoStr === 'equipo' || tipoStr === 'grupo'
+        ? 'cuadrilla'
+        : 'individual'
+
+    // Costo Hora - requerido
+    const costoRaw = getColumn(row, 'Costo Hora', 'CostoHora', 'costo_hora', 'Costo', 'costo', 'Cost', 'cost', 'Precio', 'precio')
+    const costoHora = parseFloat(String(costoRaw)) || 0
+    if (costoHora <= 0) {
+      throw new Error(`Fila ${index + 2}: El costo por hora debe ser mayor a 0`)
+    }
+
+    // Descripción - opcional
+    const descripcion = getColumn(row, 'Descripción', 'Descripcion', 'descripcion', 'DESCRIPCION', 'Description', 'description')
+
+    return {
+      nombre: String(nombre).trim(),
+      tipo,
+      costoHora,
+      descripcion: descripcion ? String(descripcion).trim() : undefined
+    }
+  })
 }
 
+/**
+ * Valida los recursos importados
+ * Ya no omite duplicados - el API los actualizará
+ */
 export function validarRecursos(
   recursos: RecursoImportado[],
-  existentes: string[]
+  nombresExistentes: string[]
 ): {
-  nuevos: RecursoImportado[]
+  validos: RecursoImportado[]
+  nuevos: number
+  actualizaciones: number
   errores: string[]
-  duplicados: string[]
 } {
-  const nuevos: RecursoImportado[] = []
+  const validos: RecursoImportado[] = []
   const errores: string[] = []
-  const duplicados: string[] = []
+  const nombresVistos = new Set<string>()
+  let nuevos = 0
+  let actualizaciones = 0
 
   for (const r of recursos) {
-    if (!r.nombre) {
-      errores.push('Recurso sin nombre válido.')
-    } else if (existentes.includes(r.nombre)) {
-      duplicados.push(r.nombre)
+    if (!r.nombre || r.nombre.trim() === '') {
+      errores.push('Recurso sin nombre válido')
+      continue
+    }
+
+    const nombreNorm = r.nombre.toLowerCase()
+
+    // Check for duplicates in import file
+    if (nombresVistos.has(nombreNorm)) {
+      errores.push(`Nombre duplicado en archivo: ${r.nombre}`)
+      continue
+    }
+
+    nombresVistos.add(nombreNorm)
+
+    // Count if it's new or update
+    if (nombresExistentes.map(n => n.toLowerCase()).includes(nombreNorm)) {
+      actualizaciones++
     } else {
-      nuevos.push(r)
+      nuevos++
+    }
+
+    validos.push(r)
+  }
+
+  return { validos, nuevos, actualizaciones, errores }
+}
+
+/**
+ * Crea o actualiza recursos en la base de datos a través de la API
+ */
+export async function importarRecursosEnBD(recursos: RecursoImportado[]): Promise<{
+  message: string
+  creados: number
+  actualizados: number
+  total: number
+  errores?: string[]
+}> {
+  const response = await fetch('/api/recurso/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ recursos }),
+  })
+
+  if (!response.ok) {
+    try {
+      const errorData = await response.json()
+      throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`)
+    } catch {
+      throw new Error(`Error ${response.status}: ${response.statusText}`)
     }
   }
 
-  return { nuevos, errores, duplicados }
+  return await response.json()
 }

@@ -18,7 +18,7 @@ export default function PlantillaGastoItemForm({ gastoId, onCreated }: Props) {
   const [cantidad, setCantidad] = useState(1)
   const [precioUnitario, setPrecioUnitario] = useState(0)
   const [factorSeguridad, setFactorSeguridad] = useState(1)
-  const [margen, setMargen] = useState(1)
+  const [margen, setMargen] = useState(1.25) // 25% margen por defecto para gastos
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
@@ -30,6 +30,10 @@ export default function PlantillaGastoItemForm({ gastoId, onCreated }: Props) {
     try {
       setLoading(true)
 
+      // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+      const costoCliente = cantidad * precioUnitario * factorSeguridad
+      const costoInterno = costoCliente / (margen || 1.25)
+
       const payload: PlantillaGastoItemPayload = {
         gastoId,
         nombre,
@@ -38,8 +42,8 @@ export default function PlantillaGastoItemForm({ gastoId, onCreated }: Props) {
         precioUnitario,
         factorSeguridad,
         margen,
-        costoInterno: cantidad * precioUnitario * factorSeguridad,
-        costoCliente: cantidad * precioUnitario * factorSeguridad * margen
+        costoInterno,
+        costoCliente
       }
 
       const nuevo = await createPlantillaGastoItem(payload)
@@ -53,7 +57,7 @@ export default function PlantillaGastoItemForm({ gastoId, onCreated }: Props) {
       setCantidad(1)
       setPrecioUnitario(0)
       setFactorSeguridad(1)
-      setMargen(1)
+      setMargen(1.25)
     } catch (err) {
       console.error(err)
       toast.error('Error al agregar ítem')

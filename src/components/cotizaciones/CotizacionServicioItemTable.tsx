@@ -87,8 +87,9 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
             }
           })()
 
-          const costoInterno = horas * costoHora * (merged.factorSeguridad ?? 1) * dificultadMultiplier
-          const costoCliente = costoInterno * (merged.margen ?? 1)
+          // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+          const costoCliente = horas * costoHora * (merged.factorSeguridad ?? 1) * dificultadMultiplier
+          const costoInterno = costoCliente / (merged.margen ?? 1.35)
 
           // Redondear a 2 decimales para evitar errores de precisión
           updated.horaTotal = isNaN(horas) ? 0 : Math.round(horas * 100) / 100
@@ -131,8 +132,9 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
       }
     })()
 
-    const costoInterno = horas * costoHora * (updated.factorSeguridad ?? 1) * dificultadMultiplier
-    const costoCliente = costoInterno * (updated.margen ?? 1)
+    // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+    const costoCliente = horas * costoHora * (updated.factorSeguridad ?? 1) * dificultadMultiplier
+    const costoInterno = costoCliente / (updated.margen ?? 1.35)
 
     // Redondear a 2 decimales para evitar errores de precisión
     const finalUpdated = {

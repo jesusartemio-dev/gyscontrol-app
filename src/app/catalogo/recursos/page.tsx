@@ -1,14 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getRecursos, createRecurso } from '@/lib/services/recurso'
+import { getRecursos } from '@/lib/services/recurso'
 import { Recurso } from '@/types'
 import RecursoModal from '@/components/catalogo/RecursoModal'
 import RecursoTableView from '@/components/catalogo/RecursoTableView'
 import RecursoCardView from '@/components/catalogo/RecursoCardView'
 import { toast } from 'sonner'
-import { exportarRecursosAExcel } from '@/lib/utils/recursoExcel'
-import { leerRecursosDesdeExcel, validarRecursos } from '@/lib/utils/recursoImportUtils'
+import { exportarRecursosAExcel, generarPlantillaRecursos } from '@/lib/utils/recursoExcel'
+import { leerRecursosDesdeExcel, validarRecursos, importarRecursosEnBD, type RecursoImportado } from '@/lib/utils/recursoImportUtils'
+import { RecursoImportPreviewModal } from '@/components/catalogo/RecursoImportPreviewModal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,7 +28,8 @@ import {
   Upload,
   Filter,
   User,
-  UsersRound
+  UsersRound,
+  Download
 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -51,6 +53,15 @@ export default function RecursosPage() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState<'all' | 'individual' | 'cuadrilla'>('all')
+
+  // Import preview modal state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importPreviewData, setImportPreviewData] = useState<{
+    validos: RecursoImportado[]
+    nuevos: number
+    actualizaciones: number
+    errores: string[]
+  } | null>(null)
 
   const cargarRecursos = async () => {
     try {
@@ -118,28 +129,53 @@ export default function RecursosPage() {
   const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setImportando(true)
     setErrores([])
 
     try {
       const datos = await leerRecursosDesdeExcel(file)
       const nombresExistentes = recursos.map(r => r.nombre)
-      const { nuevos, errores: erroresImport } = validarRecursos(datos, nombresExistentes)
+      const validacionResult = validarRecursos(datos, nombresExistentes)
 
-      if (erroresImport.length > 0) {
-        setErrores(erroresImport)
-        toast.error('Errores en la importación')
-        return
+      // Show preview modal instead of direct import
+      setImportPreviewData(validacionResult)
+      setIsImportModalOpen(true)
+    } catch (err) {
+      console.error('Error reading Excel:', err)
+      toast.error(err instanceof Error ? err.message : 'Error al leer el archivo Excel')
+    } finally {
+      e.target.value = ''
+    }
+  }
+
+  const executeImport = async () => {
+    if (!importPreviewData || importPreviewData.validos.length === 0) return
+
+    setImportando(true)
+    try {
+      const result = await importarRecursosEnBD(importPreviewData.validos)
+      toast.success(result.message)
+
+      if (result.errores && result.errores.length > 0) {
+        setErrores(result.errores)
       }
 
-      await Promise.all(nuevos.map(r => createRecurso({ nombre: r.nombre, costoHora: r.costoHora })))
-      toast.success(`${nuevos.length} recursos importados`)
-      cargarRecursos()
-    } catch {
-      toast.error('Error en la importación')
+      await cargarRecursos()
+      setIsImportModalOpen(false)
+      setImportPreviewData(null)
+    } catch (err) {
+      console.error('Import error:', err)
+      toast.error(err instanceof Error ? err.message : 'Error al importar recursos')
     } finally {
       setImportando(false)
-      e.target.value = ''
+    }
+  }
+
+  const handleDescargarPlantilla = () => {
+    try {
+      generarPlantillaRecursos()
+      toast.success('Plantilla descargada')
+    } catch {
+      toast.error('Error al generar plantilla')
     }
   }
 
@@ -216,6 +252,12 @@ export default function RecursosPage() {
           <Button variant="outline" size="sm" className="h-8" onClick={handleExportar}>
             <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5 text-green-600" />
             Excel
+          </Button>
+
+          {/* Template */}
+          <Button variant="outline" size="sm" className="h-8" onClick={handleDescargarPlantilla}>
+            <Download className="h-3.5 w-3.5 mr-1.5 text-blue-600" />
+            Plantilla
           </Button>
 
           {/* Import */}
@@ -369,6 +411,20 @@ export default function RecursosPage() {
         onCreated={handleCreated}
         onUpdated={handleUpdated}
       />
+
+      {/* Import Preview Modal */}
+      {importPreviewData && (
+        <RecursoImportPreviewModal
+          open={isImportModalOpen}
+          onOpenChange={(open) => {
+            setIsImportModalOpen(open)
+            if (!open) setImportPreviewData(null)
+          }}
+          onConfirm={executeImport}
+          datos={importPreviewData}
+          isLoading={importando}
+        />
+      )}
     </div>
   )
 }

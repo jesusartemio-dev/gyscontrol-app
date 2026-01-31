@@ -40,8 +40,9 @@ export default function CotizacionServicioItemList({ items, onUpdated, onDeleted
       return
     }
 
-    const costoInterno = item.costoHora * cantidad * factorSeguridad
-    const costoCliente = costoInterno * margen
+    // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+    const costoCliente = item.costoHora * cantidad * factorSeguridad
+    const costoInterno = costoCliente / margen
 
     setLoadingId(item.id)
     try {
@@ -79,8 +80,9 @@ export default function CotizacionServicioItemList({ items, onUpdated, onDeleted
       {error && <p className="text-red-500 text-sm">{error}</p>}
 
       {items.map((item) => {
-        const costoInternoEditado = item.costoHora * cantidad * factorSeguridad
-        const costoClienteEditado = costoInternoEditado * margen
+        // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+        const costoClienteEditado = item.costoHora * cantidad * factorSeguridad
+        const costoInternoEditado = costoClienteEditado / margen
 
         return (
           <div

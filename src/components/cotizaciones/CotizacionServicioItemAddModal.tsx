@@ -92,8 +92,9 @@ export default function CotizacionServicioItemAddModal({
       const costoHora = s.recurso?.costoHora || 0
       const factorSeguridad = 1.0
       const margen = 1.35
-      const costoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
-      const costoCliente = +(costoInterno * margen).toFixed(2)
+      // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+      const costoCliente = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
+      const costoInterno = +(costoCliente / margen).toFixed(2)
 
       return {
         catalogoServicioId: s.id,

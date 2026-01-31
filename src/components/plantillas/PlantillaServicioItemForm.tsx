@@ -67,8 +67,9 @@ export default function PlantillaServicioItemForm({
     horaFijo
   })
 
-  const costoInterno = horas * costoHora * factorSeguridad
-  const costoCliente = costoInterno * margen
+  // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
+  const costoCliente = horas * costoHora * factorSeguridad
+  const costoInterno = costoCliente / (margen || 1.35)
 
   const handleAdd = async () => {
     setLoading(true)

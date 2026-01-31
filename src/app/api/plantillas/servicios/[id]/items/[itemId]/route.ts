@@ -59,9 +59,11 @@ export async function PATCH(
       horaTotal = horasBase * factorDificultad;
     }
 
-    // Recalcular costos
-    const costoInterno = +(horaTotal * item.costoHora).toFixed(2)
-    const costoCliente = +(costoInterno * (1 + item.margen)).toFixed(2)
+    // Recalcular costos - Nueva fórmula (2025-01)
+    // costoCliente es el cálculo directo, costoInterno se deriva del margen
+    const margenMultiplier = item.margen > 2 ? item.margen : (1 + item.margen) // Handle both formats
+    const costoCliente = +(horaTotal * item.costoHora * (item.factorSeguridad || 1)).toFixed(2)
+    const costoInterno = +(costoCliente / margenMultiplier).toFixed(2)
 
     // Preparar datos de actualización
     const updateData: any = {
@@ -76,9 +78,9 @@ export async function PATCH(
 
     if (factorSeguridad !== undefined) {
       updateData.factorSeguridad = factorSeguridad
-      // Recalcular costos con el nuevo factor de seguridad
-      updateData.costoInterno = +(horaTotal * item.costoHora * factorSeguridad).toFixed(2)
-      updateData.costoCliente = +(updateData.costoInterno * (1 + item.margen)).toFixed(2)
+      // Recalcular costos con el nuevo factor de seguridad - Nueva fórmula
+      updateData.costoCliente = +(horaTotal * item.costoHora * factorSeguridad).toFixed(2)
+      updateData.costoInterno = +(updateData.costoCliente / margenMultiplier).toFixed(2)
     }
 
     // Actualizar el item

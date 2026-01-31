@@ -65,16 +65,16 @@ export async function POST(
     const horaTotal = horasBase * factorDificultad;
 
     // Calcular costos
-    // ✅ FÓRMULA CORRECTA:
+    // ✅ NUEVA FÓRMULA (2025-01):
     // 1. costoHora = costo por hora del recurso (ej: $11)
-    // 2. costoInterno = horaTotal × costoHora × factorSeguridad
-    // 3. costoCliente = costoInterno × (1 + margen)
+    // 2. costoCliente = horaTotal × costoHora × factorSeguridad (cálculo directo)
+    // 3. costoInterno = costoCliente / margen (derivado del margen)
     const costoHora = recurso?.costoHora || 0
     const factorSeguridad = 1.0 // Factor de seguridad (puede ser 1.0, 1.1, etc.)
-    const margen = 0.35 // Margen de ganancia del 35%
+    const margen = 1.35 // Margen de 35% (1.35x)
 
-    const costoInterno = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
-    const costoCliente = +(costoInterno * (1 + margen)).toFixed(2)
+    const costoCliente = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
+    const costoInterno = +(costoCliente / margen).toFixed(2)
 
     // Crear el item
     const nuevoItem = await prisma.plantillaServicioItemIndependiente.create({
