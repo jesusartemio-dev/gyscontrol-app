@@ -78,24 +78,30 @@ export function exportarPlantillaEquipoItemsAExcel(
 // GENERAR PLANTILLA EXCEL PARA IMPORTACIÓN
 // ============================================
 export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'PlantillaEquipos') {
+  // Columnas: Código, Descripción, Marca, Categoría, Unidad, Cantidad, P.Lista, P.Real, Margen %
+  // P.Cliente se calcula: P.Real × (1 + Margen/100)
   const ejemplos = [
     {
       'Código': 'EQ-001',
       'Descripción': 'Sensor de temperatura PT100',
+      'Marca': 'Siemens',
       'Categoría': 'Sensores',
       'Unidad': 'Unidad',
-      'Marca': 'Siemens',
       'Cantidad': 2,
-      'P.Cliente': 150.00
+      'P.Lista': 120.00,
+      'P.Real': 130.00,
+      'Margen %': 15
     },
     {
       'Código': 'EQ-002',
       'Descripción': 'PLC Compacto S7-1200',
+      'Marca': 'Siemens',
       'Categoría': 'Controladores',
       'Unidad': 'Unidad',
-      'Marca': 'Siemens',
       'Cantidad': 1,
-      'P.Cliente': 850.00
+      'P.Lista': 700.00,
+      'P.Real': 739.13,
+      'Margen %': 15
     }
   ]
 
@@ -104,11 +110,13 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
   worksheet['!cols'] = [
     { wch: 15 },  // Código
     { wch: 40 },  // Descripción
+    { wch: 15 },  // Marca
     { wch: 18 },  // Categoría
     { wch: 10 },  // Unidad
-    { wch: 15 },  // Marca
     { wch: 10 },  // Cantidad
-    { wch: 14 },  // P.Cliente
+    { wch: 12 },  // P.Lista
+    { wch: 12 },  // P.Real
+    { wch: 10 },  // Margen %
   ]
 
   const workbook = XLSX.utils.book_new()
@@ -199,16 +207,18 @@ export function validarEImportarPlantillaEquipoItems(
   for (let [index, row] of rows.entries()) {
     const fila = index + 2 // +2 porque fila 1 es header
 
-    // Leer campos
+    // Leer campos en el nuevo orden: Código, Descripción, Marca, Categoría, Unidad, Cantidad, P.Lista, P.Real, Margen %
     const codigo = String(row['Código'] || row['Codigo'] || '').trim()
     const descripcion = String(row['Descripción'] || row['Descripcion'] || '').trim()
+    const marca = String(row['Marca'] || '').trim()
     const categoria = String(row['Categoría'] || row['Categoria'] || '').trim()
     const unidad = String(row['Unidad'] || '').trim()
-    const marca = String(row['Marca'] || '').trim()
     const cantidad = parseInt(row['Cantidad'] || 1) || 1
-    const precioCliente = parseFloat(
-      row['P.Cliente'] || row['Precio Cliente'] || row['PrecioCliente'] || 0
-    ) || 0
+
+    // Leer precios y margen del Excel
+    const precioListaExcel = parseFloat(row['P.Lista'] || row['Precio Lista'] || row['PrecioLista'] || 0) || undefined
+    const precioRealExcel = parseFloat(row['P.Real'] || row['Precio Real'] || row['PrecioReal'] || row['P.Interno'] || 0) || undefined
+    const margenExcel = parseFloat(row['Margen %'] || row['Margen'] || 0) || undefined
 
     // Validaciones básicas
     if (!codigo) {
@@ -226,28 +236,24 @@ export function validarEImportarPlantillaEquipoItems(
       continue
     }
 
-    if (precioCliente <= 0) {
-      errores.push(`Fila ${fila}: El precio cliente debe ser mayor a 0`)
-      continue
-    }
-
-    // Buscar en catálogo para obtener precio interno, margen y precioLista
+    // Buscar en catálogo para heredar valores faltantes
     const catalogoEquipo = catalogoEquipos.find(
       eq => eq.codigo.toLowerCase() === codigo.toLowerCase()
     )
 
-    // Leer precioLista del Excel o del catálogo
-    const precioListaExcel = parseFloat(row['P.Lista'] || row['Precio Lista'] || row['PrecioLista'] || 0) || undefined
-    const precioLista = precioListaExcel || catalogoEquipo?.precioLista || undefined
+    // Prioridad: Excel > Catálogo > Default
+    const precioLista = precioListaExcel ?? catalogoEquipo?.precioLista ?? undefined
+    const precioInterno = precioRealExcel ?? catalogoEquipo?.precioInterno ?? 0
+    const margen = margenExcel !== undefined ? margenExcel / 100 : (catalogoEquipo?.margen ?? 0.15)
 
-    // Usar precio interno y margen del catálogo si existe
-    const precioInterno = catalogoEquipo?.precioInterno || Math.round(precioCliente / 1.15 * 100) / 100
-    const margen = catalogoEquipo?.margen || 0.15
+    // Validar que tengamos precio interno
+    if (precioInterno <= 0) {
+      errores.push(`Fila ${fila}: El precio real (P.Real) es requerido y debe ser mayor a 0`)
+      continue
+    }
 
-    // Si el precioCliente viene del Excel, recalcular el margen real
-    const margenReal = precioInterno > 0
-      ? Math.round((precioCliente / precioInterno - 1) * 100) / 100
-      : margen
+    // CALCULAR precioCliente = precioInterno × (1 + margen)
+    const precioCliente = Math.round(precioInterno * (1 + margen) * 100) / 100
 
     // Calcular costos
     const costoInterno = Math.round(precioInterno * cantidad * 100) / 100
@@ -267,8 +273,8 @@ export function validarEImportarPlantillaEquipoItems(
       cantidad,
       precioLista,
       precioInterno,
-      margen: margenReal,
-      precioCliente: Math.round(precioCliente * 100) / 100,
+      margen,
+      precioCliente,
       costoInterno,
       costoCliente,
       catalogoEquipoId: catalogoEquipo?.id,
