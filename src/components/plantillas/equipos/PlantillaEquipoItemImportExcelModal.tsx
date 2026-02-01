@@ -1,7 +1,7 @@
 // ===================================================
-// Archivo: CotizacionEquipoItemImportExcelModal.tsx
-// Ubicación: src/components/cotizaciones/
-// Descripción: Modal para importar items de equipo desde Excel
+// Archivo: PlantillaEquipoItemImportExcelModal.tsx
+// Ubicación: src/components/plantillas/equipos/
+// Descripción: Modal para importar items de equipo de plantilla desde Excel
 // Autor: Jesús Artemio
 // Última actualización: 2025-01-31
 // ===================================================
@@ -24,26 +24,25 @@ import {
   X,
   FileWarning,
   RefreshCw,
-  Plus,
-  Package
+  Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
 import {
   leerExcelEquipoItems,
-  validarEImportarEquipoItems,
+  validarEImportarPlantillaEquipoItems,
   generarPlantillaEquiposImportacion,
-  type ImportedEquipoItem
-} from '@/lib/utils/cotizacionEquipoItemExcel'
+  type ImportedPlantillaEquipoItem
+} from '@/lib/utils/plantillaEquipoItemExcel'
 
-import type { CatalogoEquipo, CotizacionEquipo, CotizacionEquipoItem } from '@/types'
+import type { CatalogoEquipo, PlantillaEquipo, PlantillaEquipoItem } from '@/types'
 
 interface Props {
   isOpen: boolean
   onClose: () => void
-  equipo: CotizacionEquipo
-  onItemsCreated: (items: CotizacionEquipoItem[]) => void
+  equipo: PlantillaEquipo
+  onItemsCreated: (items: PlantillaEquipoItem[]) => void
 }
 
 const formatCurrency = (amount: number): string => {
@@ -54,7 +53,7 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-export default function CotizacionEquipoItemImportExcelModal({
+export default function PlantillaEquipoItemImportExcelModal({
   isOpen,
   onClose,
   equipo,
@@ -65,8 +64,8 @@ export default function CotizacionEquipoItemImportExcelModal({
   const [saving, setSaving] = useState(false)
 
   const [file, setFile] = useState<File | null>(null)
-  const [itemsNuevos, setItemsNuevos] = useState<ImportedEquipoItem[]>([])
-  const [itemsActualizar, setItemsActualizar] = useState<ImportedEquipoItem[]>([])
+  const [itemsNuevos, setItemsNuevos] = useState<ImportedPlantillaEquipoItem[]>([])
+  const [itemsActualizar, setItemsActualizar] = useState<ImportedPlantillaEquipoItem[]>([])
   const [errores, setErrores] = useState<string[]>([])
   const [selectedNuevos, setSelectedNuevos] = useState<Set<number>>(new Set())
   const [selectedActualizar, setSelectedActualizar] = useState<Set<number>>(new Set())
@@ -126,7 +125,7 @@ export default function CotizacionEquipoItemImportExcelModal({
         codigo: item.codigo
       }))
 
-      const result = validarEImportarEquipoItems(rows, catalogoEquipos, existingItems)
+      const result = validarEImportarPlantillaEquipoItems(rows, catalogoEquipos, existingItems)
       setItemsNuevos(result.itemsNuevos)
       setItemsActualizar(result.itemsActualizar)
       setErrores(result.errores)
@@ -145,7 +144,7 @@ export default function CotizacionEquipoItemImportExcelModal({
   }
 
   const handleDownloadTemplate = () => {
-    generarPlantillaEquiposImportacion('PlantillaEquiposCotizacion')
+    generarPlantillaEquiposImportacion('PlantillaEquiposPlantilla')
     toast.success('Plantilla descargada')
   }
 
@@ -179,13 +178,13 @@ export default function CotizacionEquipoItemImportExcelModal({
     }
 
     setSaving(true)
-    const resultItems: CotizacionEquipoItem[] = []
+    const resultItems: PlantillaEquipoItem[] = []
 
     try {
       // Crear nuevos items
       for (const item of nuevosToCreate) {
         const payload = {
-          cotizacionEquipoId: equipo.id,
+          plantillaEquipoId: equipo.id,
           catalogoEquipoId: item.catalogoEquipoId,
           codigo: item.codigo,
           descripcion: item.descripcion,
@@ -201,9 +200,10 @@ export default function CotizacionEquipoItemImportExcelModal({
           costoCliente: item.costoCliente
         }
 
-        const res = await fetch('/api/cotizacion-equipo-item', {
+        const res = await fetch('/api/plantilla-equipo-item', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(payload)
         })
 
@@ -227,9 +227,10 @@ export default function CotizacionEquipoItemImportExcelModal({
           costoCliente: item.costoCliente
         }
 
-        const res = await fetch(`/api/cotizacion-equipo-item/${item.existingItemId}`, {
+        const res = await fetch(`/api/plantilla-equipo-item/${item.existingItemId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(updatePayload)
         })
 
@@ -274,8 +275,8 @@ export default function CotizacionEquipoItemImportExcelModal({
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader className="pb-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-orange-100 rounded-lg">
-              <FileSpreadsheet className="h-4 w-4 text-orange-600" />
+            <div className="p-1.5 bg-purple-100 rounded-lg">
+              <FileSpreadsheet className="h-4 w-4 text-purple-600" />
             </div>
             <div>
               <DialogTitle className="text-base">Importar Equipos desde Excel</DialogTitle>
@@ -293,21 +294,21 @@ export default function CotizacionEquipoItemImportExcelModal({
         ) : step === 'upload' ? (
           <div className="space-y-4 py-4">
             {/* Zona de upload */}
-            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-orange-300 transition-colors">
+            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-purple-300 transition-colors">
               <input
                 type="file"
                 accept=".xlsx,.xls"
                 onChange={handleFileChange}
                 className="hidden"
-                id="excel-equipo-upload"
+                id="excel-plantilla-equipo-upload"
               />
-              <label htmlFor="excel-equipo-upload" className="cursor-pointer">
+              <label htmlFor="excel-plantilla-equipo-upload" className="cursor-pointer">
                 <Upload className="h-10 w-10 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm font-medium mb-1">
                   Arrastra un archivo Excel o haz clic para seleccionar
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Formato .xlsx con columnas: Código, Descripción, Cantidad, P.Unit. Cliente
+                  Formato .xlsx con columnas: Código, Descripción, Cantidad, P.Cliente
                 </p>
               </label>
             </div>
@@ -349,7 +350,7 @@ export default function CotizacionEquipoItemImportExcelModal({
             {/* Archivo cargado */}
             <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg mb-3">
               <div className="flex items-center gap-2">
-                <FileSpreadsheet className="h-4 w-4 text-orange-500" />
+                <FileSpreadsheet className="h-4 w-4 text-purple-500" />
                 <span className="text-xs font-medium">{file?.name}</span>
               </div>
               <Button
@@ -532,7 +533,7 @@ export default function CotizacionEquipoItemImportExcelModal({
               size="sm"
               onClick={handleImport}
               disabled={saving || totalSelected === 0}
-              className="bg-orange-600 hover:bg-orange-700"
+              className="bg-purple-600 hover:bg-purple-700"
             >
               {saving ? (
                 <>

@@ -8,9 +8,12 @@ import {
 } from '@/components/ui/accordion'
 import PlantillaEquipoItemTable from './PlantillaEquipoItemTable'
 import PlantillaEquipoMultiAddModal from './PlantillaEquipoMultiAddModal'
+import PlantillaEquipoItemImportExcelModal from './PlantillaEquipoItemImportExcelModal'
 import type { PlantillaEquipo, PlantillaEquipoItem } from '@/types'
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2, Briefcase, ChevronDown } from 'lucide-react'
+import { Pencil, Trash2, Briefcase, FileSpreadsheet, Download, Upload } from 'lucide-react'
+import { exportarPlantillaEquipoItemsAExcel, generarPlantillaEquiposImportacion } from '@/lib/utils/plantillaEquipoItemExcel'
+import { toast } from 'sonner'
 
 interface Props {
   equipo: PlantillaEquipo
@@ -30,6 +33,7 @@ export default function PlantillaEquipoAccordion({
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(equipo.nombre)
   const [showMultiAddModal, setShowMultiAddModal] = useState(false)
+  const [showImportExcelModal, setShowImportExcelModal] = useState(false)
 
   useEffect(() => {
     setNuevoNombre(equipo.nombre)
@@ -45,6 +49,32 @@ export default function PlantillaEquipoAccordion({
   const handleMultipleItemsCreated = (items: PlantillaEquipoItem[]) => {
     onItemChange([...equipo.items, ...items])
     setShowMultiAddModal(false)
+  }
+
+  const handleExcelImportItems = (items: PlantillaEquipoItem[]) => {
+    // Merge with existing items, updating existing ones
+    const existingIds = new Set(items.filter(i => equipo.items.some(e => e.id === i.id)).map(i => i.id))
+    const updatedItems = equipo.items.map(existing => {
+      const imported = items.find(i => i.id === existing.id)
+      return imported || existing
+    })
+    const newItems = items.filter(i => !existingIds.has(i.id) && !equipo.items.some(e => e.id === i.id))
+    onItemChange([...updatedItems, ...newItems])
+    setShowImportExcelModal(false)
+  }
+
+  const handleExportExcel = () => {
+    if (equipo.items.length === 0) {
+      toast.error('No hay items para exportar')
+      return
+    }
+    exportarPlantillaEquipoItemsAExcel(equipo.items, `Equipos_${equipo.nombre}`)
+    toast.success('Excel exportado correctamente')
+  }
+
+  const handleDownloadTemplate = () => {
+    generarPlantillaEquiposImportacion('PlantillaEquipos')
+    toast.success('Plantilla descargada')
   }
 
   const renta =
@@ -121,10 +151,38 @@ export default function PlantillaEquipoAccordion({
           </div>
 
           <AccordionContent className="px-6 pb-6 space-y-4">
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              {/* Botones Excel */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowImportExcelModal(true)}
+                  className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs"
+                  title="Importar desde Excel"
+                >
+                  <Upload size={14} />
+                  Importar Excel
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs"
+                  title="Exportar a Excel"
+                >
+                  <Download size={14} />
+                  Exportar Excel
+                </button>
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center gap-1 border border-gray-300 hover:bg-gray-100 text-gray-700 px-3 py-1.5 rounded text-xs"
+                  title="Descargar plantilla Excel"
+                >
+                  <FileSpreadsheet size={14} />
+                  Plantilla
+                </button>
+              </div>
+              {/* Botón agregar items */}
               <button
                 onClick={() => setShowMultiAddModal(true)}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
               >
                 ➕ Agregar Items
               </button>
@@ -151,6 +209,14 @@ export default function PlantillaEquipoAccordion({
         onClose={() => setShowMultiAddModal(false)}
         onItemsCreated={handleMultipleItemsCreated}
         plantillaEquipoId={equipo.id}
+      />
+
+      {/* Modal para importar desde Excel */}
+      <PlantillaEquipoItemImportExcelModal
+        isOpen={showImportExcelModal}
+        onClose={() => setShowImportExcelModal(false)}
+        equipo={equipo}
+        onItemsCreated={handleExcelImportItems}
       />
     </>
   )

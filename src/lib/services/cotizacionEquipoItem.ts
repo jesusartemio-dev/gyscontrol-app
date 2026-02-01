@@ -27,6 +27,12 @@ export async function createCotizacionEquipoItem(data: {
     const equipo = await equipoRes.json()
 
     // 🔁 Transformar datos al formato requerido por la API
+    const precioLista = equipo.precioLista ? Number(equipo.precioLista) : undefined
+    const precioInterno = Number(equipo.precioInterno) || 0
+    const margen = Number(equipo.margen) || 0.15
+    const precioCliente = Number(data.precioUnitario) || 0
+    const cantidad = Number(data.cantidad) || 1
+
     const itemPayload = {
       cotizacionEquipoId: data.cotizacionEquipoId,
       catalogoEquipoId: data.catalogoEquipoId,
@@ -35,11 +41,13 @@ export async function createCotizacionEquipoItem(data: {
       categoria: equipo.categoria?.nombre || equipo.categoria || 'Sin categoría',
       unidad: equipo.unidad?.nombre || equipo.unidad || 'Unidad',
       marca: equipo.marca || 'Sin marca',
-      precioInterno: Number(equipo.precioInterno) || 0,
-      precioCliente: Number(data.precioUnitario) || 0,
-      cantidad: Number(data.cantidad) || 1,
-      costoInterno: Number(equipo.precioInterno || 0) * Number(data.cantidad || 1),
-      costoCliente: Number(data.precioUnitario || 0) * Number(data.cantidad || 1)
+      precioLista,
+      precioInterno,
+      margen,
+      precioCliente,
+      cantidad,
+      costoInterno: +(precioInterno * cantidad).toFixed(2),
+      costoCliente: +(precioCliente * cantidad).toFixed(2)
     }
 
     // 🐛 Debug: Log payload para debugging

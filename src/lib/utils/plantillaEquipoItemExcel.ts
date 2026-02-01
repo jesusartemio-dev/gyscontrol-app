@@ -1,20 +1,20 @@
 // ===================================================
-// Archivo: cotizacionEquipoItemExcel.ts
+// Archivo: plantillaEquipoItemExcel.ts
 // Ubicación: src/lib/utils/
-// Descripción: Import/Export de items de equipo de cotización desde/hacia Excel
+// Descripción: Import/Export de items de equipo de plantilla desde/hacia Excel
 // Autor: Jesús Artemio
 // Última actualización: 2025-01-31
 // ===================================================
 
 import * as XLSX from 'xlsx'
-import type { CotizacionEquipoItem, CatalogoEquipo } from '@/types'
+import type { PlantillaEquipoItem, CatalogoEquipo } from '@/types'
 
 // ============================================
 // EXPORTAR A EXCEL
 // ============================================
-export function exportarCotizacionEquipoItemsAExcel(
-  items: CotizacionEquipoItem[],
-  nombreArchivo: string = 'EquiposCotizacion'
+export function exportarPlantillaEquipoItemsAExcel(
+  items: PlantillaEquipoItem[],
+  nombreArchivo: string = 'EquiposPlantilla'
 ) {
   const data = items.map((item, idx) => {
     const diferencia = item.precioLista && item.precioInterno
@@ -86,7 +86,7 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
       'Unidad': 'Unidad',
       'Marca': 'Siemens',
       'Cantidad': 2,
-      'P.Unit. Cliente': 150.00
+      'P.Cliente': 150.00
     },
     {
       'Código': 'EQ-002',
@@ -95,7 +95,7 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
       'Unidad': 'Unidad',
       'Marca': 'Siemens',
       'Cantidad': 1,
-      'P.Unit. Cliente': 850.00
+      'P.Cliente': 850.00
     }
   ]
 
@@ -108,7 +108,7 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
     { wch: 10 },  // Unidad
     { wch: 15 },  // Marca
     { wch: 10 },  // Cantidad
-    { wch: 14 },  // P.Unit. Cliente
+    { wch: 14 },  // P.Cliente
   ]
 
   const workbook = XLSX.utils.book_new()
@@ -153,7 +153,7 @@ export async function leerExcelEquipoItems(file: File): Promise<any[]> {
 // ============================================
 // TIPOS PARA IMPORTACIÓN
 // ============================================
-export interface ImportedEquipoItem {
+export interface ImportedPlantillaEquipoItem {
   codigo: string
   descripcion: string
   categoria: string
@@ -173,28 +173,28 @@ export interface ImportedEquipoItem {
   existingItemId?: string
 }
 
-export interface ExistingEquipoItem {
+export interface ExistingPlantillaEquipoItem {
   id: string
   codigo: string
 }
 
-export interface EquipoImportValidationResult {
-  itemsNuevos: ImportedEquipoItem[]
-  itemsActualizar: ImportedEquipoItem[]
+export interface PlantillaEquipoImportValidationResult {
+  itemsNuevos: ImportedPlantillaEquipoItem[]
+  itemsActualizar: ImportedPlantillaEquipoItem[]
   errores: string[]
 }
 
 // ============================================
 // VALIDAR E IMPORTAR
 // ============================================
-export function validarEImportarEquipoItems(
+export function validarEImportarPlantillaEquipoItems(
   rows: any[],
   catalogoEquipos: CatalogoEquipo[],
-  existingItems: ExistingEquipoItem[] = []
-): EquipoImportValidationResult {
+  existingItems: ExistingPlantillaEquipoItem[] = []
+): PlantillaEquipoImportValidationResult {
   const errores: string[] = []
-  const itemsNuevos: ImportedEquipoItem[] = []
-  const itemsActualizar: ImportedEquipoItem[] = []
+  const itemsNuevos: ImportedPlantillaEquipoItem[] = []
+  const itemsActualizar: ImportedPlantillaEquipoItem[] = []
 
   for (let [index, row] of rows.entries()) {
     const fila = index + 2 // +2 porque fila 1 es header
@@ -207,7 +207,7 @@ export function validarEImportarEquipoItems(
     const marca = String(row['Marca'] || '').trim()
     const cantidad = parseInt(row['Cantidad'] || 1) || 1
     const precioCliente = parseFloat(
-      row['P.Unit. Cliente'] || row['Precio Cliente'] || row['PrecioCliente'] || row['P.Unit Cliente'] || 0
+      row['P.Cliente'] || row['Precio Cliente'] || row['PrecioCliente'] || 0
     ) || 0
 
     // Validaciones básicas
@@ -258,7 +258,7 @@ export function validarEImportarEquipoItems(
       item => item.codigo.toLowerCase().trim() === codigo.toLowerCase().trim()
     )
 
-    const importedItem: ImportedEquipoItem = {
+    const importedItem: ImportedPlantillaEquipoItem = {
       codigo,
       descripcion: catalogoEquipo?.descripcion || descripcion,
       categoria: catalogoEquipo?.categoriaEquipo?.nombre || categoria,

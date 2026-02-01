@@ -527,13 +527,14 @@ export interface CatalogoEquipo {
     nombre: string
   }
   marca: string
+  precioLista?: number
   precioInterno: number
   margen: number
   precioVenta: number
   estado: string
   createdAt: string
   updatedAt: string
-  
+
   // 🔗 Relaciones
   listaEquipoItems?: ListaEquipoItem[]
 }
@@ -629,7 +630,9 @@ export interface PlantillaEquipoItem {
   categoria: string
   unidad: string
   marca: string
+  precioLista?: number
   precioInterno: number
+  margen: number
   precioCliente: number
   cantidad: number
   costoInterno: number
@@ -826,7 +829,9 @@ export interface CotizacionEquipoItem {
   categoria: string
   unidad: string
   marca: string
+  precioLista?: number
   precioInterno: number
+  margen: number
   precioCliente: number
   cantidad: number
   costoInterno: number

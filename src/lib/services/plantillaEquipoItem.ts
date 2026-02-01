@@ -34,6 +34,12 @@ export async function createPlantillaEquipoItem(data: {
     console.log('📦 Equipo obtenido:', equipo)
     
     // 🔄 Construir payload completo con todos los campos requeridos
+    const precioLista = equipo.precioLista ? Number(equipo.precioLista) : undefined
+    const precioInterno = Number(equipo.precioInterno) || 0
+    const margen = Number(equipo.margen) || 0.15
+    const precioCliente = Number(equipo.precioVenta) || 0
+    const cantidad = Number(data.cantidad) || 1
+
     const payload: PlantillaEquipoItemPayload = {
       plantillaEquipoId: data.plantillaEquipoId,
       catalogoEquipoId: data.catalogoEquipoId,
@@ -42,11 +48,13 @@ export async function createPlantillaEquipoItem(data: {
       categoria: equipo.categoria?.nombre || 'Sin categoría',
       unidad: equipo.unidad?.nombre || 'Sin unidad',
       marca: equipo.marca,
-      precioInterno: equipo.precioInterno,
-      precioCliente: equipo.precioVenta,
-      cantidad: data.cantidad,
-      costoInterno: data.cantidad * equipo.precioInterno,
-      costoCliente: data.cantidad * equipo.precioVenta
+      precioLista,
+      precioInterno,
+      margen,
+      precioCliente,
+      cantidad,
+      costoInterno: +(precioInterno * cantidad).toFixed(2),
+      costoCliente: +(precioCliente * cantidad).toFixed(2)
     }
     
     console.log('📡 Payload a enviar:', payload)

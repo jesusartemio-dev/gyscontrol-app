@@ -103,9 +103,10 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
             <tbody className="divide-y">
               {filteredItems.map((item, idx) => {
                 const isEdit = editModeId === item.id
-                const margen = item.costoInterno > 0
+                // Usar el campo margen si existe, sino calcular
+                const margenPct = (item.margen ?? 0) * 100 || (item.costoInterno > 0
                   ? ((item.costoCliente - item.costoInterno) / item.costoInterno) * 100
-                  : 0
+                  : 0)
 
                 return (
                   <tr
@@ -161,9 +162,9 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
                     <td className="px-2 py-1.5 text-center">
                       <span className={cn(
                         'font-medium',
-                        margen >= 20 ? 'text-emerald-600' : margen >= 10 ? 'text-amber-600' : 'text-red-500'
+                        margenPct >= 20 ? 'text-emerald-600' : margenPct >= 10 ? 'text-amber-600' : 'text-red-500'
                       )}>
-                        {margen.toFixed(0)}%
+                        {margenPct.toFixed(0)}%
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-center">
