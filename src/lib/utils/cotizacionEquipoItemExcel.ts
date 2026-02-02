@@ -275,11 +275,13 @@ export function validarEImportarEquipoItems(
     }
 
     // CALCULAR precioCliente = precioInterno × (1 + margen) = precioInterno × margenMultiplier
-    const precioCliente = Math.round(precioInterno * (1 + margen) * 100) / 100
+    // Mantener precisión completa para cálculo del total (como Excel)
+    const precioClienteExact = precioInterno * (1 + margen)
+    const precioCliente = Math.round(precioClienteExact * 100) / 100
 
-    // Calcular costos
+    // Calcular costos - usar precioClienteExact para mantener precisión como Excel
     const costoInterno = Math.round(precioInterno * cantidad * 100) / 100
-    const costoCliente = Math.round(precioCliente * cantidad * 100) / 100
+    const costoCliente = Math.round(precioClienteExact * cantidad * 100) / 100
 
     // Detectar si ya existe un item con el mismo código
     const existingItem = existingItems.find(

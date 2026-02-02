@@ -4,6 +4,12 @@ import { useState } from 'react'
 import { Edit, Trash2, Search, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import type { CotizacionEquipoItem } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -121,8 +127,17 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
                     <td className="px-1.5 py-1">
                       <span className="font-mono text-[10px] text-gray-600">{item.codigo}</span>
                     </td>
-                    <td className="px-1.5 py-1 max-w-[200px]">
-                      <span className="line-clamp-1 text-[10px]" title={item.descripcion}>{item.descripcion}</span>
+                    <td className="px-1.5 py-1 max-w-[250px]">
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="line-clamp-2 text-[10px] cursor-help leading-tight">{item.descripcion}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[300px] text-xs">
+                            <p>{item.descripcion}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </td>
                     <td className="px-1.5 py-1">
                       <span className="line-clamp-1 text-[10px] text-gray-600" title={item.marca}>{item.marca || '-'}</span>
