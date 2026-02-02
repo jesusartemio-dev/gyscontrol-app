@@ -64,7 +64,7 @@ export async function importarEquiposDesdeExcelValidado(
 
     const yaExiste = codigosExistentes.includes(codigo)
     const precioInterno = parseFloat(row['PrecioInterno']) || 0
-    const margen = 0.25
+    const margen = 0.15
     const precioVenta = calcularPrecioVenta(precioInterno, margen)
 
     equiposValidos.push({

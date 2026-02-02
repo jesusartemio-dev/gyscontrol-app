@@ -26,7 +26,7 @@ export default function LogisticaCatalogoEquipoCrearAcordeon({ onCreated }: Prop
     descripcion: '',
     marca: '',
     precioInterno: 0,
-    margen: 0.25,
+    margen: 0.15,
   })
 
   const handleSubmit = () => {
@@ -47,7 +47,7 @@ export default function LogisticaCatalogoEquipoCrearAcordeon({ onCreated }: Prop
         descripcion: '',
         marca: '',
         precioInterno: 0,
-        margen: 0.25,
+        margen: 0.15,
       })
       setOpen(false)
     } else {

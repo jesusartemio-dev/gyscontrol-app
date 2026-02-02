@@ -59,7 +59,7 @@ export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProp
       descripcion: '',
       marca: '',
       precioInterno: 0,
-      margen: 0.25
+      margen: 0.15
     }
   })
 

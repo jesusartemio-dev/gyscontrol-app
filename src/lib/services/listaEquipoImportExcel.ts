@@ -173,7 +173,7 @@ export async function verificarExistenciaEquipos(
           categoriaId,
           unidadId,
           precioInterno: 0,
-          margen: 0.25,
+          margen: 0.15,
           precioVenta: 0,
           estado: 'pendiente'
         })
