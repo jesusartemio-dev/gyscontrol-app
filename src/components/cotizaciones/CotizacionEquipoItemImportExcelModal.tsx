@@ -268,10 +268,16 @@ export default function CotizacionEquipoItemImportExcelModal({
   }
 
   const totalItems = itemsNuevos.length + itemsActualizar.length
-  const totalSeleccionado = [
+  // Calcular total sin redondeo intermedio (como Excel)
+  const itemsSeleccionados = [
     ...itemsNuevos.filter((_, idx) => selectedNuevos.has(idx)),
     ...itemsActualizar.filter((_, idx) => selectedActualizar.has(idx))
-  ].reduce((sum, item) => sum + item.costoCliente, 0)
+  ]
+  const totalSeleccionado = Math.round(
+    itemsSeleccionados.reduce((sum, item) =>
+      sum + item.precioInterno * (1 + item.margen) * item.cantidad, 0
+    ) * 100
+  ) / 100
 
   const totalSelected = selectedNuevos.size + selectedActualizar.size
 
