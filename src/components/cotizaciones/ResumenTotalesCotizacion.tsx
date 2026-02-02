@@ -65,6 +65,11 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+// Formato compacto sin símbolo
+function formatCompact(amount: number): string {
+  return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 interface Props {
   cotizacion: Cotizacion
 }
@@ -107,92 +112,59 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="w-full max-w-2xl mx-auto lg:max-w-md lg:ml-auto"
+      className="w-full max-w-xs"
     >
       <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-gray-50">
-        <CardHeader className="pb-1 pt-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-800">
-            <Receipt className="h-4 w-4 text-blue-600" />
+        <CardHeader className="pb-1 pt-2 px-3">
+          <CardTitle className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
+            <Receipt className="h-3.5 w-3.5 text-blue-600" />
             Resumen Financiero
           </CardTitle>
         </CardHeader>
-        
-        <CardContent className="space-y-2 pt-2">
-          {/* Header de columnas - Solo visible en desktop */}
-          <div className="hidden sm:grid grid-cols-4 gap-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+
+        <CardContent className="space-y-1.5 pt-1 px-3 pb-3">
+          {/* Header de columnas */}
+          <div className="grid grid-cols-4 gap-1 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
             <span>Categoría</span>
-            <span className="text-center">Interno</span>
-            <span className="text-center">Cliente</span>
-            <span className="text-center">Rentabilidad</span>
+            <span className="text-right">Interno</span>
+            <span className="text-right">Cliente</span>
+            <span className="text-center">Rent.</span>
           </div>
 
           {/* Categorías */}
-          <div className="space-y-2">
+          <div className="space-y-1">
             {categorias.map((categoria, index) => {
               const IconComponent = categoria.config.icon
               const rentabilidad = calcularRenta(categoria.totalCliente, categoria.totalInterno)
-              
+
               return (
                 <motion.div
                   key={categoria.key}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.1 }}
-                  className={`p-2 rounded-lg border ${categoria.config.borderColor} ${categoria.config.bgColor} transition-all hover:shadow-md`}
+                  className={`px-1.5 py-1 rounded border ${categoria.config.borderColor} ${categoria.config.bgColor}`}
                 >
-                  {/* Layout responsivo */}
-                  <div className="sm:hidden space-y-2">
-                    {/* Mobile: Layout vertical */}
-                    <div className="flex items-center gap-2">
-                      <IconComponent className={`h-3 w-3 ${categoria.config.color}`} />
-                      <span className={`text-sm font-medium ${categoria.config.color}`}>
+                  <div className="grid grid-cols-4 gap-1 items-center">
+                    <div className="flex items-center gap-1">
+                      <IconComponent className={`h-3 w-3 ${categoria.config.color} flex-shrink-0`} />
+                      <span className={`text-[10px] font-medium ${categoria.config.color} truncate`}>
                         {categoria.config.label}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-gray-500 text-xs block">Interno</span>
-                        <span className="font-medium text-gray-700 text-xs">
-                          {formatCurrency(categoria.totalInterno)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500 text-xs block">Cliente</span>
-                        <span className={`font-semibold ${categoria.config.color} text-xs`}>
-                          {formatCurrency(categoria.totalCliente)}
-                        </span>
-                      </div>
+                    <div className="text-right">
+                      <span className="font-mono text-[10px] text-gray-600">
+                        ${formatCompact(categoria.totalInterno)}
+                      </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-xs">Rentabilidad</span>
-                      <Badge variant="outline" className={`${rentabilidad.color} border-current text-xs`}>
-                        <Percent className="h-2 w-2 mr-1" />
-                        {rentabilidad.valor}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Desktop: Layout horizontal */}
-                  <div className="hidden sm:grid grid-cols-4 gap-3 items-center">
-                    <div className="flex items-center gap-2">
-                      <IconComponent className={`h-3 w-3 ${categoria.config.color}`} />
-                      <span className={`text-sm font-medium ${categoria.config.color}`}>
-                        {categoria.config.label}
+                    <div className="text-right">
+                      <span className={`font-mono text-[10px] font-medium ${categoria.config.color}`}>
+                        ${formatCompact(categoria.totalCliente)}
                       </span>
                     </div>
                     <div className="text-center">
-                      <span className="font-medium text-gray-700 text-xs">
-                        {formatCurrency(categoria.totalInterno)}
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <span className={`font-semibold ${categoria.config.color} text-xs`}>
-                        {formatCurrency(categoria.totalCliente)}
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <Badge variant="outline" className={`${rentabilidad.color} border-current text-xs`}>
-                        <Percent className="h-2 w-2 mr-1" />
+                      <Badge variant="outline" className={`${rentabilidad.color} border-current text-[9px] px-1 py-0`}>
+                        <Percent className="h-2 w-2 mr-0.5" />
                         {rentabilidad.valor}
                       </Badge>
                     </div>
@@ -202,47 +174,45 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
             })}
           </div>
 
-          <Separator className="my-2" />
+          <Separator className="my-1.5" />
 
           {/* Totales */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.3 }}
-            className="space-y-2"
+            className="space-y-1"
           >
-            {/* Totales intermedios */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-              <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-1">
-                  <Target className="h-3 w-3 text-gray-600" />
-                  <span className="text-xs font-medium text-gray-700">Total Interno</span>
-                </div>
-                <span className="text-xs font-semibold text-gray-800">
-                  {formatCurrency(cotizacion.totalInterno)}
-                </span>
+            {/* Totales intermedios en una fila */}
+            <div className="flex items-center justify-between text-[10px] px-1">
+              <div className="flex items-center gap-1">
+                <Target className="h-2.5 w-2.5 text-gray-500" />
+                <span className="text-gray-600">Total Interno</span>
               </div>
-              
-              <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
-                <div className="flex items-center gap-1">
-                  <DollarSign className="h-3 w-3 text-blue-600" />
-                  <span className="text-xs font-medium text-blue-700">Total Cliente</span>
-                </div>
-                <span className="text-xs font-semibold text-blue-800">
-                  {formatCurrency(cotizacion.totalCliente)}
-                </span>
+              <span className="font-mono font-semibold text-gray-700">
+                ${formatCompact(cotizacion.totalInterno)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] px-1">
+              <div className="flex items-center gap-1">
+                <DollarSign className="h-2.5 w-2.5 text-blue-600" />
+                <span className="text-blue-700">Total Cliente</span>
               </div>
+              <span className="font-mono font-semibold text-blue-800">
+                ${formatCompact(cotizacion.totalCliente)}
+              </span>
             </div>
 
             {/* Descuento */}
             {cotizacion.descuento > 0 && (
-              <div className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="flex items-center justify-between text-[10px] px-1 py-0.5 bg-yellow-50 rounded border border-yellow-200">
                 <div className="flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3 text-yellow-600 rotate-180" />
-                  <span className="text-xs font-medium text-yellow-700">Descuento Aplicado</span>
+                  <TrendingUp className="h-2.5 w-2.5 text-yellow-600 rotate-180" />
+                  <span className="text-yellow-700">Descuento</span>
                 </div>
-                <span className="text-xs font-semibold text-yellow-800">
-                  -{formatCurrency(cotizacion.descuento)}
+                <span className="font-mono font-semibold text-yellow-800">
+                  -${formatCompact(cotizacion.descuento)}
                 </span>
               </div>
             )}
@@ -252,23 +222,23 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.3, delay: 0.5 }}
-              className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl text-white shadow-lg"
+              className="p-2 bg-gradient-to-r from-green-500 to-green-600 rounded-lg text-white shadow-md"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span className="font-bold text-base">Total Final</span>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span className="font-bold text-sm">Total Final</span>
                 </div>
-                <span className="font-bold text-lg">
+                <span className="font-bold text-base font-mono">
                   {formatCurrency(cotizacion.grandTotal)}
                 </span>
               </div>
-              
+
               {/* Rentabilidad total */}
-              <div className="flex items-center justify-between mt-1 pt-1 border-t border-green-400">
-                <span className="text-green-100 text-xs">Rentabilidad Total</span>
-                <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs">
-                  <TrendingUp className="h-2 w-2 mr-1" />
+              <div className="flex items-center justify-between mt-1 pt-1 border-t border-green-400/50">
+                <span className="text-green-100 text-[10px]">Rentabilidad Total</span>
+                <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-[10px] px-1.5 py-0">
+                  <TrendingUp className="h-2 w-2 mr-0.5" />
                   {rentabilidadTotal.valor}
                 </Badge>
               </div>

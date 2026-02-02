@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import CotizacionEquipoItemTable from './CotizacionEquipoItemTable'
 import CotizacionEquipoMultiAddModal from './CotizacionEquipoMultiAddModal'
 import CotizacionEquipoItemImportExcelModal from './CotizacionEquipoItemImportExcelModal'
+import CotizacionEquipoItemCreateModal from './CotizacionEquipoItemCreateModal'
 import type { CotizacionEquipo, CotizacionEquipoItem } from '@/types'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { cn } from '@/lib/utils'
@@ -59,6 +60,8 @@ export default function CotizacionEquipoAccordion({
   const [showMultiAddModal, setShowMultiAddModal] = useState(false)
   const [showExcelModal, setShowExcelModal] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingItem, setEditingItem] = useState<CotizacionEquipoItem | undefined>(undefined)
 
   useEffect(() => {
     setNuevoNombre(equipo.nombre)
@@ -117,6 +120,31 @@ export default function CotizacionEquipoAccordion({
     }
     exportarCotizacionEquipoItemsAExcel(equipo.items, `Equipos_${equipo.nombre}`)
     toast.success('Excel exportado')
+  }
+
+  const handleOpenCreateModal = () => {
+    setEditingItem(undefined)
+    setShowCreateModal(true)
+  }
+
+  const handleOpenEditModal = (item: CotizacionEquipoItem) => {
+    setEditingItem(item)
+    setShowCreateModal(true)
+  }
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false)
+    setEditingItem(undefined)
+  }
+
+  const handleItemCreated = (item: CotizacionEquipoItem) => {
+    onCreated(item)
+    handleCloseCreateModal()
+  }
+
+  const handleItemUpdated = (item: CotizacionEquipoItem) => {
+    onUpdated(item)
+    handleCloseCreateModal()
   }
 
   return (
@@ -230,6 +258,15 @@ export default function CotizacionEquipoAccordion({
                 </span>
                 <div className="flex items-center gap-1">
                   <Button
+                    onClick={handleOpenCreateModal}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Nuevo
+                  </Button>
+                  <Button
                     onClick={() => setShowMultiAddModal(true)}
                     size="sm"
                     variant="ghost"
@@ -269,6 +306,15 @@ export default function CotizacionEquipoAccordion({
                     <p className="text-xs text-muted-foreground mb-3">Sin equipos en este grupo</p>
                     <div className="flex items-center justify-center gap-2 flex-wrap">
                       <Button
+                        onClick={handleOpenCreateModal}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Nuevo
+                      </Button>
+                      <Button
                         onClick={() => setShowMultiAddModal(true)}
                         size="sm"
                         variant="outline"
@@ -293,6 +339,7 @@ export default function CotizacionEquipoAccordion({
                     items={equipo.items}
                     onDeleted={onDeleted}
                     onUpdated={onUpdated}
+                    onEdit={handleOpenEditModal}
                   />
                 )}
               </div>
@@ -329,6 +376,16 @@ export default function CotizacionEquipoAccordion({
         onClose={() => setShowExcelModal(false)}
         equipo={equipo}
         onItemsCreated={handleExcelItemsCreated}
+      />
+
+      {/* Modal para crear/editar item manualmente */}
+      <CotizacionEquipoItemCreateModal
+        isOpen={showCreateModal}
+        onClose={handleCloseCreateModal}
+        equipo={{ id: equipo.id, nombre: equipo.nombre }}
+        item={editingItem}
+        onItemCreated={handleItemCreated}
+        onItemUpdated={handleItemUpdated}
       />
 
       {/* Delete confirmation dialog */}

@@ -192,17 +192,26 @@ export interface EquipoImportValidationResult {
   errores: string[]
 }
 
+export interface CategoriaEquipoSimple {
+  id: string
+  nombre: string
+}
+
 // ============================================
 // VALIDAR E IMPORTAR
 // ============================================
 export function validarEImportarEquipoItems(
   rows: any[],
   catalogoEquipos: CatalogoEquipo[],
-  existingItems: ExistingEquipoItem[] = []
+  existingItems: ExistingEquipoItem[] = [],
+  categoriasValidas: CategoriaEquipoSimple[] = []
 ): EquipoImportValidationResult {
   const errores: string[] = []
   const itemsNuevos: ImportedEquipoItem[] = []
   const itemsActualizar: ImportedEquipoItem[] = []
+
+  // Crear set de nombres de categorías válidas (lowercase para comparación)
+  const categoriasSet = new Set(categoriasValidas.map(c => c.nombre.toLowerCase().trim()))
 
   for (let [index, row] of rows.entries()) {
     const fila = index + 2 // +2 porque fila 1 es header
@@ -211,7 +220,7 @@ export function validarEImportarEquipoItems(
     const codigo = String(row['Código'] || row['Codigo'] || '').trim()
     const descripcion = String(row['Descripción'] || row['Descripcion'] || '').trim()
     const marca = String(row['Marca'] || '').trim()
-    const categoria = String(row['Categoría'] || row['Categoria'] || '').trim()
+    const categoriaExcel = String(row['Categoría'] || row['Categoria'] || '').trim()
     const unidad = String(row['Unidad'] || '').trim()
     const cantidad = parseInt(row['Cantidad'] || 1) || 1
 
@@ -241,6 +250,17 @@ export function validarEImportarEquipoItems(
       eq => eq.codigo.toLowerCase() === codigo.toLowerCase()
     )
 
+    // Determinar categoría final: Catálogo > Excel > Default
+    const categoriaFinal = catalogoEquipo?.categoriaEquipo?.nombre || categoriaExcel || 'Sin categoría'
+
+    // Validar que la categoría exista (si no viene del catálogo y se especificó una)
+    if (!catalogoEquipo && categoriaExcel && categoriasValidas.length > 0) {
+      if (!categoriasSet.has(categoriaExcel.toLowerCase().trim())) {
+        errores.push(`Fila ${fila}: La categoría '${categoriaExcel}' no existe en el sistema`)
+        continue
+      }
+    }
+
     // Prioridad: Excel > Catálogo > Default
     const precioLista = precioListaExcel ?? catalogoEquipo?.precioLista ?? undefined
     const precioInterno = precioRealExcel ?? catalogoEquipo?.precioInterno ?? 0
@@ -269,7 +289,7 @@ export function validarEImportarEquipoItems(
     const importedItem: ImportedEquipoItem = {
       codigo,
       descripcion: catalogoEquipo?.descripcion || descripcion,
-      categoria: catalogoEquipo?.categoriaEquipo?.nombre || categoria,
+      categoria: categoriaFinal,
       unidad: catalogoEquipo?.unidad?.nombre || unidad,
       marca: catalogoEquipo?.marca || marca,
       cantidad,

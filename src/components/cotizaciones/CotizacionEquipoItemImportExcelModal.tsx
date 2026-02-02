@@ -24,17 +24,18 @@ import {
   X,
   FileWarning,
   RefreshCw,
-  Plus,
-  Package
+  Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
+import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import {
   leerExcelEquipoItems,
   validarEImportarEquipoItems,
   generarPlantillaEquiposImportacion,
-  type ImportedEquipoItem
+  type ImportedEquipoItem,
+  type CategoriaEquipoSimple
 } from '@/lib/utils/cotizacionEquipoItemExcel'
 
 import type { CatalogoEquipo, CotizacionEquipo, CotizacionEquipoItem } from '@/types'
@@ -61,6 +62,7 @@ export default function CotizacionEquipoItemImportExcelModal({
   onItemsCreated
 }: Props) {
   const [catalogoEquipos, setCatalogoEquipos] = useState<CatalogoEquipo[]>([])
+  const [categoriasEquipo, setCategoriasEquipo] = useState<CategoriaEquipoSimple[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -82,11 +84,15 @@ export default function CotizacionEquipoItemImportExcelModal({
   const loadData = async () => {
     setLoading(true)
     try {
-      const catalogoData = await getCatalogoEquipos()
+      const [catalogoData, categoriasData] = await Promise.all([
+        getCatalogoEquipos(),
+        getCategoriasEquipo()
+      ])
       setCatalogoEquipos(catalogoData)
+      setCategoriasEquipo(categoriasData)
     } catch (error) {
       console.error('Error loading data:', error)
-      toast.error('Error al cargar catálogo de equipos')
+      toast.error('Error al cargar datos')
     } finally {
       setLoading(false)
     }
@@ -126,7 +132,7 @@ export default function CotizacionEquipoItemImportExcelModal({
         codigo: item.codigo
       }))
 
-      const result = validarEImportarEquipoItems(rows, catalogoEquipos, existingItems)
+      const result = validarEImportarEquipoItems(rows, catalogoEquipos, existingItems, categoriasEquipo)
       setItemsNuevos(result.itemsNuevos)
       setItemsActualizar(result.itemsActualizar)
       setErrores(result.errores)
@@ -338,8 +344,8 @@ export default function CotizacionEquipoItemImportExcelModal({
             <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
               <p className="text-xs font-medium text-amber-800 mb-1">Información</p>
               <ul className="text-[10px] text-amber-700 space-y-0.5">
-                <li>- Si el código existe en el catálogo, se usará el precio interno del catálogo</li>
-                <li>- Si no existe, se estimará el precio interno (70% del precio cliente)</li>
+                <li>- Si el código existe en el catálogo, se usarán los datos del catálogo</li>
+                <li>- La categoría debe existir en el sistema (se valida automáticamente)</li>
                 <li>- Los items con código duplicado se actualizarán</li>
               </ul>
             </div>
