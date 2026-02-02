@@ -10,14 +10,42 @@
 
 /**
  * Calcula los subtotales interno y cliente de un arreglo de ítems.
- * Cada ítem debe tener los campos: `costoInterno` y `costoCliente`.
+ * Si los ítems tienen precioInterno, margen y cantidad, calcula sin redondeo intermedio (como Excel).
+ * De lo contrario, suma los costoInterno y costoCliente ya calculados.
  *
  * @param items Lista de ítems
  * @returns Subtotales: subtotalInterno y subtotalCliente
  */
 export function calcularSubtotal(
-  items: { costoInterno: number; costoCliente: number }[]
+  items: {
+    costoInterno: number
+    costoCliente: number
+    precioInterno?: number
+    margen?: number | null
+    cantidad?: number
+  }[]
 ): { subtotalInterno: number; subtotalCliente: number } {
+  // Si los items tienen los campos necesarios, calcular sin redondeo intermedio (como Excel)
+  const tieneFieldsParaCalculo = items.length > 0 && items.every(
+    item => item.precioInterno !== undefined && item.cantidad !== undefined
+  )
+
+  if (tieneFieldsParaCalculo) {
+    const subtotalInterno = Math.round(
+      items.reduce((sum, item) => sum + (item.precioInterno ?? 0) * (item.cantidad ?? 0), 0) * 100
+    ) / 100
+
+    const subtotalCliente = Math.round(
+      items.reduce((sum, item) => {
+        const margen = item.margen ?? 0.15
+        return sum + (item.precioInterno ?? 0) * (1 + margen) * (item.cantidad ?? 0)
+      }, 0) * 100
+    ) / 100
+
+    return { subtotalInterno, subtotalCliente }
+  }
+
+  // Fallback: sumar valores ya redondeados
   return {
     subtotalInterno: items.reduce((sum, item) => sum + item.costoInterno, 0),
     subtotalCliente: items.reduce((sum, item) => sum + item.costoCliente, 0),
