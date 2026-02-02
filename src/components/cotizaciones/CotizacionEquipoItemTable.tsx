@@ -124,7 +124,7 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
 
                 return (
                   <tr
-                    key={item.id}
+                    key={`equipo-item-${item.id}-${item.codigo}-${idx}`}
                     className={cn(
                       'hover:bg-orange-50/50 transition-colors group',
                       idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
@@ -134,7 +134,14 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
                       <span className="font-mono text-[10px] text-gray-400">{idx + 1}</span>
                     </td>
                     <td className="px-1.5 py-1">
-                      <span className="font-mono text-[10px] text-gray-600">{item.codigo}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-[10px] text-gray-600">{item.codigo}</span>
+                        {!item.catalogoEquipoId && (
+                          <span className="px-1 py-0.5 text-[8px] font-medium bg-amber-100 text-amber-700 rounded" title="Item temporal: solo existe en esta cotización, no está en el catálogo">
+                            Temp
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-1.5 py-1 max-w-[250px]">
                       <TooltipProvider delayDuration={300}>

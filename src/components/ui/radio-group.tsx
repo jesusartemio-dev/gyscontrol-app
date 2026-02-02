@@ -16,7 +16,7 @@ interface RadioGroupItemProps {
   value: string
   id?: string
   className?: string
-  children: React.ReactNode
+  children?: React.ReactNode
   onClick?: () => void
 }
 

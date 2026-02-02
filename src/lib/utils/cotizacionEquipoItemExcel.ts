@@ -180,7 +180,7 @@ export interface CatalogComparisonInfo {
   catalogoPrecioInterno: number
   catalogoPrecioLista?: number
   catalogoMargen: number
-  catalogoUpdatedAt: Date
+  catalogoUpdatedAt: Date | string
   priceDifference: number       // Diferencia absoluta
   priceDifferencePercent: number // Diferencia porcentual
 }
@@ -207,6 +207,12 @@ export interface ImportedEquipoItem {
   catalogStatus: CatalogStatus
   catalogComparison?: CatalogComparisonInfo
   priceSource: PriceSource
+  // Para items nuevos: opción de agregar al catálogo
+  addToCatalog?: boolean
+  // Para items sin código: código generado automáticamente
+  codigoProvisional?: boolean
+  // Para items con código duplicado en el Excel (no se pueden agregar al catálogo)
+  codigoDuplicadoEnExcel?: boolean
 }
 
 export interface ExistingEquipoItem {
@@ -219,12 +225,15 @@ export interface EquipoImportValidationResult {
   itemsActualizar: ImportedEquipoItem[]
   itemsConflicto: ImportedEquipoItem[]  // Items con diferencia de precio
   errores: string[]
+  advertencias: string[]  // Advertencias no bloqueantes (ej: duplicados)
   // Resumen
   summary: {
     totalNew: number           // No están en catálogo
     totalMatch: number         // Coinciden con catálogo
     totalConflict: number      // Diferencia de precio
     totalUpdate: number        // Ya existen en cotización
+    codigosDuplicados: number  // Códigos que se repiten en el Excel
+    codigosProvisionales: number // Items sin código que recibieron código provisional
   }
 }
 
@@ -236,6 +245,17 @@ export interface CategoriaEquipoSimple {
 // ============================================
 // VALIDAR E IMPORTAR
 // ============================================
+
+// Función auxiliar para generar código provisional: TEMP-YYMMDD-XX
+function generarCodigoProvisional(correlativo: number): string {
+  const now = new Date()
+  const yy = String(now.getFullYear()).slice(-2)
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const xx = String(correlativo).padStart(2, '0')
+  return `TEMP-${yy}${mm}${dd}-${xx}`
+}
+
 export function validarEImportarEquipoItems(
   rows: any[],
   catalogoEquipos: CatalogoEquipo[],
@@ -243,6 +263,7 @@ export function validarEImportarEquipoItems(
   categoriasValidas: CategoriaEquipoSimple[] = []
 ): EquipoImportValidationResult {
   const errores: string[] = []
+  const advertencias: string[] = []
   const itemsNuevos: ImportedEquipoItem[] = []
   const itemsActualizar: ImportedEquipoItem[] = []
   const itemsConflicto: ImportedEquipoItem[] = []
@@ -251,6 +272,8 @@ export function validarEImportarEquipoItems(
   let totalNew = 0
   let totalMatch = 0
   let totalConflict = 0
+  let codigosProvisionales = 0
+  let contadorProvisional = 1
 
   // Crear set de nombres de categorías válidas (lowercase para comparación)
   const categoriasSet = new Set(categoriasValidas.map(c => c.nombre.toLowerCase().trim()))
@@ -258,11 +281,47 @@ export function validarEImportarEquipoItems(
   // Tolerancia para comparación de precios (0.01 = 1 centavo)
   const PRICE_TOLERANCE = 0.01
 
+  // ============================================
+  // DETECCIÓN DE CÓDIGOS DUPLICADOS EN EL EXCEL
+  // ============================================
+  const codigoConteo = new Map<string, number[]>() // codigo -> [filas donde aparece]
+  for (let [index, row] of rows.entries()) {
+    const codigo = String(row['Código'] || row['Codigo'] || '').trim().toLowerCase()
+    if (codigo) {
+      const filas = codigoConteo.get(codigo) || []
+      filas.push(index + 2) // +2 porque fila 1 es header
+      codigoConteo.set(codigo, filas)
+    }
+  }
+
+  // Identificar códigos duplicados
+  const codigosDuplicadosMap = new Map<string, number[]>()
+  for (const [codigo, filas] of codigoConteo.entries()) {
+    if (filas.length > 1) {
+      codigosDuplicadosMap.set(codigo, filas)
+    }
+  }
+
+  // Agregar advertencias por códigos duplicados
+  if (codigosDuplicadosMap.size > 0) {
+    // Calcular total de filas afectadas
+    let totalFilasDuplicadas = 0
+    for (const filas of codigosDuplicadosMap.values()) {
+      totalFilasDuplicadas += filas.length
+    }
+    advertencias.push(`⚠️ Se detectaron ${codigosDuplicadosMap.size} código(s) repetido(s) en ${totalFilasDuplicadas} filas:`)
+    for (const [codigo, filas] of codigosDuplicadosMap.entries()) {
+      advertencias.push(`   • "${codigo.toUpperCase()}" aparece ${filas.length} veces (filas: ${filas.join(', ')})`)
+    }
+    advertencias.push(`   Cada item se importará por separado en la cotización.`)
+    advertencias.push(`   ⚠️ Items con código duplicado NO se pueden agregar al catálogo.`)
+  }
+
   for (let [index, row] of rows.entries()) {
     const fila = index + 2 // +2 porque fila 1 es header
 
     // Leer campos en el nuevo orden: Código, Descripción, Marca, Categoría, Unidad, Cantidad, P.Lista, P.Real, Margen
-    const codigo = String(row['Código'] || row['Codigo'] || '').trim()
+    let codigo = String(row['Código'] || row['Codigo'] || '').trim()
     const descripcion = String(row['Descripción'] || row['Descripcion'] || '').trim()
     const marca = String(row['Marca'] || '').trim()
     const categoriaExcel = String(row['Categoría'] || row['Categoria'] || '').trim()
@@ -275,9 +334,14 @@ export function validarEImportarEquipoItems(
     const margenExcel = parseFloat(row['Margen'] || row['Margen %'] || 0) || undefined
 
     // Validaciones básicas
+    // Si no hay código, generar uno provisional
+    let esCodigoProvisional = false
     if (!codigo) {
-      errores.push(`Fila ${fila}: El código es requerido`)
-      continue
+      // Formato: TEMP-YYMMDD-XX (temporal, solo para cotización)
+      codigo = generarCodigoProvisional(contadorProvisional)
+      contadorProvisional++
+      codigosProvisionales++
+      esCodigoProvisional = true
     }
 
     if (!descripcion) {
@@ -290,10 +354,10 @@ export function validarEImportarEquipoItems(
       continue
     }
 
-    // Buscar en catálogo para heredar valores faltantes
-    const catalogoEquipo = catalogoEquipos.find(
-      eq => eq.codigo.toLowerCase() === codigo.toLowerCase()
-    )
+    // Buscar en catálogo para heredar valores faltantes (solo si no es código provisional)
+    const catalogoEquipo = !esCodigoProvisional
+      ? catalogoEquipos.find(eq => eq.codigo.toLowerCase() === codigo.toLowerCase())
+      : undefined
 
     // Determinar categoría final: Catálogo > Excel > Default
     const categoriaFinal = catalogoEquipo?.categoriaEquipo?.nombre || categoriaExcel || 'Sin categoría'
@@ -382,6 +446,9 @@ export function validarEImportarEquipoItems(
       item => item.codigo.toLowerCase().trim() === codigo.toLowerCase().trim()
     )
 
+    // Verificar si el código está duplicado en el Excel (no se puede agregar al catálogo)
+    const esCodigoDuplicado = codigosDuplicadosMap.has(codigo.toLowerCase())
+
     const importedItem: ImportedEquipoItem = {
       codigo,
       descripcion: catalogoEquipo?.descripcion || descripcion,
@@ -401,7 +468,9 @@ export function validarEImportarEquipoItems(
       // Nuevos campos
       catalogStatus,
       catalogComparison,
-      priceSource
+      priceSource,
+      codigoProvisional: esCodigoProvisional,
+      codigoDuplicadoEnExcel: esCodigoDuplicado
     }
 
     // Clasificar el item
@@ -414,16 +483,26 @@ export function validarEImportarEquipoItems(
     }
   }
 
+  // Agregar advertencia sobre códigos provisionales
+  if (codigosProvisionales > 0) {
+    advertencias.push(`📝 Se generaron ${codigosProvisionales} código(s) provisional(es) para items sin código.`)
+    advertencias.push(`   Formato: TEMP-YYMMDD-XX (ej: TEMP-260202-01)`)
+    advertencias.push(`   Puedes editar estos códigos después de importar.`)
+  }
+
   return {
     itemsNuevos,
     itemsActualizar,
     itemsConflicto,
     errores,
+    advertencias,
     summary: {
       totalNew,
       totalMatch,
       totalConflict,
-      totalUpdate: itemsActualizar.length
+      totalUpdate: itemsActualizar.length,
+      codigosDuplicados: codigosDuplicadosMap.size,
+      codigosProvisionales
     }
   }
 }

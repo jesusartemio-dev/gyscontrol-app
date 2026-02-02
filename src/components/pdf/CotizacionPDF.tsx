@@ -904,7 +904,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
               
               {/* Equipment Rows */}
               {cotizacion.equipos.map((equipo, equipoIndex) => (
-                <View key={equipo.id || equipoIndex}>
+                <View key={`detail-equipo-${equipo.id}-${equipoIndex}`}>
                   {/* Equipment Category Header */}
                   <View style={[styles.detailRow, { backgroundColor: colors.accent, minHeight: 40 }]}>
                     <Text style={[styles.detailCell, { flex: 1, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
@@ -916,10 +916,10 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                     <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'center' }]}>-</Text>
                     <Text style={[styles.detailCell, { flex: 1, color: colors.white, textAlign: 'center' }]}>-</Text>
                   </View>
-                  
+
                   {/* Equipment Items */}
                   {equipo.items?.map((item, itemIndex) => (
-                    <View key={item.id || itemIndex} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
+                    <View key={`detail-equipo-item-${equipo.id}-${item.id}-${itemIndex}`} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
                       <Text style={[styles.detailCell, styles.detailItemCell]}>
                         {equipoIndex + 1}.{itemIndex + 1}
                       </Text>
@@ -1016,7 +1016,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
               {/* Services Rows */}
               {servicios.map((servicio, servicioIndex) => (
-                <View key={servicio.id || servicioIndex}>
+                <View key={`detail-servicio-${servicio.id}-${servicioIndex}`}>
                   {/* Service Category Header */}
                   <View style={[styles.detailRow, { backgroundColor: colors.accent, minHeight: 40 }]}>
                     <Text style={[styles.detailCell, { flex: 1, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
@@ -1035,7 +1035,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
                   {/* Service Items/Tasks */}
                   {servicio.items?.map((item: any, itemIndex: number) => (
-                    <View key={item.id || itemIndex} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
+                    <View key={`detail-servicio-item-${servicio.id}-${item.id}-${itemIndex}`} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
                       <Text style={[styles.detailCell, styles.detailItemCell]}>
                         {servicioIndex + 1}.{itemIndex + 1}
                       </Text>
@@ -1126,7 +1126,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
               {/* Gastos Rows */}
               {gastos.map((gasto, gastoIndex) => (
-                <View key={gasto.id || gastoIndex}>
+                <View key={`detail-gasto-${gasto.id}-${gastoIndex}`}>
                   {/* Gasto Category Header */}
                   <View style={[styles.detailRow, { backgroundColor: colors.accent, minHeight: 40 }]}>
                     <Text style={[styles.detailCell, { flex: 1, color: colors.white, fontWeight: 600, fontSize: 11 }]}>
@@ -1145,7 +1145,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
 
                   {/* Gasto Items if any */}
                   {gasto.items?.map((item: any, itemIndex: number) => (
-                    <View key={item.id || itemIndex} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
+                    <View key={`detail-gasto-item-${gasto.id}-${item.id}-${itemIndex}`} style={[styles.detailRow, ...(itemIndex % 2 === 1 ? [styles.detailRowAlt] : [])]}>
                       <Text style={[styles.detailCell, styles.detailItemCell]}>
                         {gastoIndex + 1}.{itemIndex + 1}
                       </Text>
@@ -1328,7 +1328,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
             {cotizacion.exclusiones && cotizacion.exclusiones.length > 0 ? (
               <View style={styles.contentList}>
                 {cotizacion.exclusiones.map((exclusion, index) => (
-                  <Text key={exclusion.id || index} style={styles.contentListItem}>
+                  <Text key={`exclusion-${exclusion.id}-${index}`} style={styles.contentListItem}>
                     • {exclusion.descripcion}
                   </Text>
                 ))}
@@ -1350,7 +1350,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
             {cotizacion.condiciones && cotizacion.condiciones.length > 0 ? (
               <View style={styles.contentList}>
                 {cotizacion.condiciones.map((condicion, index) => (
-                  <Text key={condicion.id || index} style={styles.contentListItem}>
+                  <Text key={`condicion-${condicion.id}-${index}`} style={styles.contentListItem}>
                     • {condicion.descripcion}
                     {condicion.tipo && (
                       <Text style={{ fontWeight: 600 }}> ({condicion.tipo})</Text>
@@ -1413,7 +1413,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                 </Text>
                 <View style={{ marginTop: 15 }}>
                   {cotizacion.cronograma.map((edt, index) => (
-                    <View key={edt.id || index} style={{ marginBottom: 15 }}>
+                    <View key={`cronograma-edt-${edt.id}-${index}`} style={{ marginBottom: 15 }}>
                       <Text style={[styles.contentText, { fontWeight: 600, marginBottom: 8 }]}>
                         {edt.edt?.nombre || 'Sin categoría'} - {edt.zona || 'Sin zona'}
                       </Text>
@@ -1437,7 +1437,7 @@ const CotizacionPDF = ({ cotizacion }: Props) => {
                             Tareas programadas:
                           </Text>
                           {edt.tareas.map((tarea, tareaIndex) => (
-                            <Text key={tarea.id || tareaIndex} style={[styles.contentText, { marginLeft: 10 }]}>
+                            <Text key={`cronograma-tarea-${edt.id}-${tarea.id}-${tareaIndex}`} style={[styles.contentText, { marginLeft: 10 }]}>
                               - {tarea.nombre}: {tarea.fechaInicioCom ? formatDate(tarea.fechaInicioCom) : 'No definida'} - {tarea.fechaFinCom ? formatDate(tarea.fechaFinCom) : 'No definida'}
                             </Text>
                           ))}

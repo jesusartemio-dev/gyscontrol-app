@@ -29,13 +29,13 @@ import {
   Plus,
   AlertTriangle,
   Database,
-  ArrowRight,
-  Clock
+  ArrowRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
+import { getUnidades } from '@/lib/services/unidad'
 import {
   leerExcelEquipoItems,
   validarEImportarEquipoItems,
@@ -47,7 +47,7 @@ import {
   type EquipoImportValidationResult
 } from '@/lib/utils/cotizacionEquipoItemExcel'
 
-import type { CatalogoEquipo, CotizacionEquipo, CotizacionEquipoItem } from '@/types'
+import type { CatalogoEquipo, CotizacionEquipo, CotizacionEquipoItem, Unidad } from '@/types'
 
 interface Props {
   isOpen: boolean
@@ -64,7 +64,7 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-const formatTimeAgo = (date: Date): string => {
+const formatTimeAgo = (date: Date | string): string => {
   const now = new Date()
   const diffMs = now.getTime() - new Date(date).getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
@@ -85,6 +85,7 @@ export default function CotizacionEquipoItemImportExcelModal({
 }: Props) {
   const [catalogoEquipos, setCatalogoEquipos] = useState<CatalogoEquipo[]>([])
   const [categoriasEquipo, setCategoriasEquipo] = useState<CategoriaEquipoSimple[]>([])
+  const [unidades, setUnidades] = useState<Unidad[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -93,6 +94,7 @@ export default function CotizacionEquipoItemImportExcelModal({
   const [itemsActualizar, setItemsActualizar] = useState<ImportedEquipoItem[]>([])
   const [itemsConflicto, setItemsConflicto] = useState<ImportedEquipoItem[]>([])
   const [errores, setErrores] = useState<string[]>([])
+  const [advertencias, setAdvertencias] = useState<string[]>([])
   const [summary, setSummary] = useState<EquipoImportValidationResult['summary'] | null>(null)
 
   const [selectedNuevos, setSelectedNuevos] = useState<Set<number>>(new Set())
@@ -101,6 +103,9 @@ export default function CotizacionEquipoItemImportExcelModal({
 
   // Estado para las selecciones de precio en conflictos
   const [priceSourceSelections, setPriceSourceSelections] = useState<Map<number, PriceSource>>(new Map())
+
+  // Estado para items nuevos que se agregarán al catálogo
+  const [addToCatalogSelections, setAddToCatalogSelections] = useState<Set<number>>(new Set())
 
   const [step, setStep] = useState<'upload' | 'preview'>('upload')
 
@@ -114,12 +119,14 @@ export default function CotizacionEquipoItemImportExcelModal({
   const loadData = async () => {
     setLoading(true)
     try {
-      const [catalogoData, categoriasData] = await Promise.all([
+      const [catalogoData, categoriasData, unidadesData] = await Promise.all([
         getCatalogoEquipos(),
-        getCategoriasEquipo()
+        getCategoriasEquipo(),
+        getUnidades()
       ])
       setCatalogoEquipos(catalogoData)
       setCategoriasEquipo(categoriasData)
+      setUnidades(unidadesData)
     } catch (error) {
       console.error('Error loading data:', error)
       toast.error('Error al cargar datos')
@@ -134,11 +141,13 @@ export default function CotizacionEquipoItemImportExcelModal({
     setItemsActualizar([])
     setItemsConflicto([])
     setErrores([])
+    setAdvertencias([])
     setSummary(null)
     setSelectedNuevos(new Set())
     setSelectedActualizar(new Set())
     setSelectedConflicto(new Set())
     setPriceSourceSelections(new Map())
+    setAddToCatalogSelections(new Set())
     setStep('upload')
   }
 
@@ -172,6 +181,7 @@ export default function CotizacionEquipoItemImportExcelModal({
       setItemsActualizar(result.itemsActualizar)
       setItemsConflicto(result.itemsConflicto)
       setErrores(result.errores)
+      setAdvertencias(result.advertencias)
       setSummary(result.summary)
 
       // Seleccionar todos los items por defecto
@@ -237,8 +247,24 @@ export default function CotizacionEquipoItemImportExcelModal({
     setPriceSourceSelections(newSelections)
   }
 
+  const toggleAddToCatalog = (index: number) => {
+    const newSet = new Set(addToCatalogSelections)
+    if (newSet.has(index)) {
+      newSet.delete(index)
+    } else {
+      newSet.add(index)
+    }
+    setAddToCatalogSelections(newSet)
+  }
+
   const handleImport = async () => {
-    const nuevosToCreate = itemsNuevos.filter((_, idx) => selectedNuevos.has(idx))
+    // Marcar items nuevos que deben agregarse al catálogo
+    const nuevosToCreate = itemsNuevos
+      .filter((_, idx) => selectedNuevos.has(idx))
+      .map((item, idx) => ({
+        ...item,
+        addToCatalog: item.catalogStatus === 'new' && addToCatalogSelections.has(idx)
+      }))
     const existentesToUpdate = itemsActualizar.filter((_, idx) => selectedActualizar.has(idx))
     const conflictosToCreate = itemsConflicto
       .filter((_, idx) => selectedConflicto.has(idx))
@@ -257,6 +283,7 @@ export default function CotizacionEquipoItemImportExcelModal({
     setSaving(true)
     const resultItems: CotizacionEquipoItem[] = []
     let catalogUpdates = 0
+    let catalogCreates = 0
 
     try {
       // Crear nuevos items (incluyendo conflictos)
@@ -308,6 +335,50 @@ export default function CotizacionEquipoItemImportExcelModal({
             console.error('Error updating catalog:', err)
           }
         }
+
+        // Si el item es nuevo y debe agregarse al catálogo (no duplicados ni provisionales)
+        if (item.addToCatalog && item.catalogStatus === 'new' && !item.codigoDuplicadoEnExcel && !item.codigoProvisional) {
+          try {
+            // Buscar categoriaId por nombre
+            const categoria = categoriasEquipo.find(
+              c => c.nombre.toLowerCase().trim() === item.categoria.toLowerCase().trim()
+            )
+            // Buscar unidadId por nombre
+            const unidad = unidades.find(
+              u => u.nombre.toLowerCase().trim() === (item.unidad || '').toLowerCase().trim()
+            )
+
+            // Si no encontramos categoría o unidad, usar valores por defecto o saltar
+            if (categoria && unidad) {
+              const precioVenta = Math.round(item.precioInterno * (1 + item.margen) * 100) / 100
+              const catalogPayload = {
+                codigo: item.codigo,
+                descripcion: item.descripcion,
+                marca: item.marca || '',
+                precioInterno: item.precioInterno,
+                margen: item.margen,
+                precioVenta,
+                categoriaId: categoria.id,
+                unidadId: unidad.id,
+                estado: 'ACTIVO'
+              }
+
+              const catalogCreateRes = await fetch('/api/catalogo-equipo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(catalogPayload)
+              })
+
+              if (catalogCreateRes.ok) {
+                catalogCreates++
+              }
+            } else {
+              console.warn(`No se pudo crear en catálogo: categoría=${item.categoria}, unidad=${item.unidad}`)
+            }
+          } catch (err) {
+            console.error('Error creating catalog entry:', err)
+          }
+        }
       }
 
       // Actualizar items existentes
@@ -342,6 +413,7 @@ export default function CotizacionEquipoItemImportExcelModal({
       if (creados > 0) mensaje.push(`${creados} creados`)
       if (actualizados > 0) mensaje.push(`${actualizados} actualizados`)
       if (catalogUpdates > 0) mensaje.push(`${catalogUpdates} catálogo actualizado`)
+      if (catalogCreates > 0) mensaje.push(`${catalogCreates} agregados al catálogo`)
       toast.success(`Equipos importados: ${mensaje.join(', ')}`)
 
       onItemsCreated(resultItems)
@@ -496,6 +568,23 @@ export default function CotizacionEquipoItemImportExcelModal({
               </div>
             )}
 
+            {/* Advertencias (códigos duplicados, provisionales, etc) */}
+            {advertencias.length > 0 && (
+              <div className="mb-3 p-2 bg-amber-50 rounded-lg border border-amber-200 max-h-32 overflow-y-auto">
+                <div className="flex items-center gap-1 mb-1">
+                  <AlertTriangle className="h-3 w-3 text-amber-500" />
+                  <span className="text-xs font-medium text-amber-700">
+                    Advertencias
+                  </span>
+                </div>
+                <ul className="text-[10px] text-amber-600 space-y-0.5">
+                  {advertencias.map((advertencia, idx) => (
+                    <li key={idx} className="whitespace-pre-wrap">{advertencia}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Resumen con badges */}
             {totalItems > 0 && (
               <div className="flex items-center justify-between mb-3">
@@ -522,6 +611,18 @@ export default function CotizacionEquipoItemImportExcelModal({
                     <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 bg-blue-50">
                       <RefreshCw className="h-3 w-3 mr-1" />
                       {itemsActualizar.length} a actualizar
+                    </Badge>
+                  )}
+                  {summary && summary.codigosDuplicados > 0 && (
+                    <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 bg-orange-50">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      {summary.codigosDuplicados} código(s) duplicado(s)
+                    </Badge>
+                  )}
+                  {summary && summary.codigosProvisionales > 0 && (
+                    <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      {summary.codigosProvisionales} código(s) provisional(es)
                     </Badge>
                   )}
                 </div>
@@ -674,35 +775,23 @@ export default function CotizacionEquipoItemImportExcelModal({
                         </span>
                       </div>
                     </div>
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left w-8"></th>
-                          <th className="px-2 py-1.5 text-left w-20">Estado</th>
-                          <th className="px-2 py-1.5 text-left w-24">Código</th>
-                          <th className="px-2 py-1.5 text-left">Descripción</th>
-                          <th className="px-2 py-1.5 text-center w-12">Cant.</th>
-                          <th className="px-2 py-1.5 text-right w-20">P.Real</th>
-                          <th className="px-2 py-1.5 text-right w-24">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {itemsNuevos.map((item, idx) => (
-                          <tr
-                            key={`new-${idx}`}
+                    <div className="divide-y">
+                      {itemsNuevos.map((item, idx) => (
+                        <div key={`new-${idx}`}>
+                          <div
                             className={cn(
-                              'hover:bg-green-50/50 transition-colors cursor-pointer',
+                              'flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-green-50/50 transition-colors cursor-pointer',
                               selectedNuevos.has(idx) ? 'bg-green-50/30' : ''
                             )}
                             onClick={() => toggleNuevo(idx)}
                           >
-                            <td className="px-2 py-1.5">
+                            <div className="w-6">
                               <Checkbox
                                 checked={selectedNuevos.has(idx)}
                                 onCheckedChange={() => toggleNuevo(idx)}
                               />
-                            </td>
-                            <td className="px-2 py-1.5">
+                            </div>
+                            <div className="w-20">
                               {item.catalogStatus === 'new' ? (
                                 <Badge className="text-[9px] bg-gray-100 text-gray-600 hover:bg-gray-100">
                                   Sin catálogo
@@ -713,28 +802,67 @@ export default function CotizacionEquipoItemImportExcelModal({
                                   Coincide
                                 </Badge>
                               )}
-                            </td>
-                            <td className="px-2 py-1.5 font-mono text-[10px]">
-                              {item.codigo}
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <div className="truncate max-w-[200px]" title={item.descripcion}>
-                                {item.descripcion}
+                            </div>
+                            <div className="w-28 font-mono text-[10px]">
+                              <div className="flex items-center gap-1">
+                                <span className={item.codigoProvisional ? 'text-amber-600' : ''}>
+                                  {item.codigo}
+                                </span>
+                                {item.codigoProvisional && (
+                                  <Badge className="text-[8px] bg-amber-100 text-amber-700 hover:bg-amber-100 px-1 py-0">
+                                    Prov.
+                                  </Badge>
+                                )}
                               </div>
-                            </td>
-                            <td className="px-2 py-1.5 text-center">
+                            </div>
+                            <div className="flex-1 truncate" title={item.descripcion}>
+                              {item.descripcion}
+                            </div>
+                            <div className="w-12 text-center">
                               {item.cantidad}
-                            </td>
-                            <td className="px-2 py-1.5 text-right font-mono">
+                            </div>
+                            <div className="w-20 text-right font-mono">
                               {formatCurrency(item.precioInterno)}
-                            </td>
-                            <td className="px-2 py-1.5 text-right font-mono font-medium text-green-600">
+                            </div>
+                            <div className="w-24 text-right font-mono font-medium text-green-600">
                               {formatCurrency(item.costoCliente)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </div>
+                          </div>
+                          {/* Checkbox para agregar al catálogo si es item nuevo */}
+                          {item.catalogStatus === 'new' && selectedNuevos.has(idx) && (
+                            <div
+                              className="flex items-center gap-2 px-2 py-1.5 pl-10 bg-gray-50 border-t border-dashed"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {/* No permitir agregar al catálogo si es código duplicado o provisional */}
+                              {item.codigoDuplicadoEnExcel || item.codigoProvisional ? (
+                                <span className="text-[10px] text-gray-400 italic flex items-center gap-1">
+                                  <Database className="h-3 w-3" />
+                                  {item.codigoDuplicadoEnExcel
+                                    ? 'No se puede agregar al catálogo (código duplicado)'
+                                    : 'No se puede agregar al catálogo (código provisional)'}
+                                </span>
+                              ) : (
+                                <>
+                                  <Checkbox
+                                    id={`add-catalog-${idx}`}
+                                    checked={addToCatalogSelections.has(idx)}
+                                    onCheckedChange={() => toggleAddToCatalog(idx)}
+                                  />
+                                  <Label
+                                    htmlFor={`add-catalog-${idx}`}
+                                    className="text-[11px] text-gray-600 cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Database className="h-3 w-3 text-gray-400" />
+                                    Agregar también al catálogo de equipos
+                                  </Label>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
