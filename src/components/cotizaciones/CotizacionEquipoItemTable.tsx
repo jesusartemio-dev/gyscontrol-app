@@ -86,18 +86,28 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
+              {/* Fila 1: Grupos */}
+              <tr className="bg-gray-100 border-b">
+                <th rowSpan={2} className="px-2 py-1 text-left font-semibold text-gray-700 w-20 border-r">Código</th>
+                <th rowSpan={2} className="px-2 py-1 text-left font-semibold text-gray-700 border-r">Descripción</th>
+                <th rowSpan={2} className="px-2 py-1 text-left font-semibold text-gray-700 w-20 border-r">Marca</th>
+                <th rowSpan={2} className="px-2 py-1 text-center font-semibold text-gray-700 w-12 border-r">Und</th>
+                <th rowSpan={2} className="px-2 py-1 text-center font-semibold text-gray-700 w-14 border-r">Cant</th>
+                <th colSpan={2} className="px-2 py-1 text-center font-semibold text-green-700 bg-green-50 border-r">CLIENTE</th>
+                <th colSpan={2} className="px-2 py-1 text-center font-semibold text-blue-700 bg-blue-50 border-r">GYS CONTROL</th>
+                <th rowSpan={2} className="px-2 py-1 text-center font-semibold text-gray-700 w-14 border-r">Renta%</th>
+                <th colSpan={3} className="px-2 py-1 text-center font-semibold text-gray-500 bg-gray-50 border-r">REFERENCIA</th>
+                <th rowSpan={2} className="px-2 py-1 text-center font-semibold text-gray-700 w-14"></th>
+              </tr>
+              {/* Fila 2: Columnas */}
               <tr className="bg-gray-50/80 border-b">
-                <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-20">Código</th>
-                <th className="px-2 py-1.5 text-left font-semibold text-gray-700">Descripción</th>
-                <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-24">Marca</th>
-                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16">Cant.</th>
-                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-12">Und.</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-20">P.Int</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-20">P.Cli</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">Interno</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">Cliente</th>
-                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">%</th>
-                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16"></th>
+                <th className="px-2 py-1 text-right font-medium text-green-600 bg-green-50/50 w-20">P.Unit</th>
+                <th className="px-2 py-1 text-right font-medium text-green-600 bg-green-50/50 w-24 border-r">P.Total</th>
+                <th className="px-2 py-1 text-right font-medium text-blue-600 bg-blue-50/50 w-20">P.Unit</th>
+                <th className="px-2 py-1 text-right font-medium text-blue-600 bg-blue-50/50 w-24 border-r">P.Total</th>
+                <th className="px-2 py-1 text-right font-medium text-gray-500 w-20">P.Lista</th>
+                <th className="px-2 py-1 text-right font-medium text-gray-500 w-20">P.Real</th>
+                <th className="px-2 py-1 text-right font-medium text-gray-500 w-20 border-r">Difer.</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -107,6 +117,11 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
                 const margenPct = (item.margen ?? 0) * 100 || (item.costoInterno > 0
                   ? ((item.costoCliente - item.costoInterno) / item.costoInterno) * 100
                   : 0)
+
+                // Calcular diferencia
+                const diferencia = item.precioLista && item.precioInterno
+                  ? (item.precioInterno - item.precioLista) * item.cantidad
+                  : null
 
                 return (
                   <tr
@@ -125,6 +140,7 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
                     <td className="px-2 py-1.5">
                       <span className="line-clamp-1 text-gray-600" title={item.marca}>{item.marca || '-'}</span>
                     </td>
+                    <td className="px-2 py-1.5 text-center text-gray-500">{item.unidad}</td>
                     <td className="px-2 py-1.5 text-center">
                       {isEdit ? (
                         <input
@@ -146,19 +162,21 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
                         </div>
                       )}
                     </td>
-                    <td className="px-2 py-1.5 text-center text-gray-500">{item.unidad}</td>
-                    <td className="px-2 py-1.5 text-right font-mono text-gray-500">
-                      {formatCurrency(item.precioInterno)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-mono text-gray-500">
+                    {/* CLIENTE */}
+                    <td className="px-2 py-1.5 text-right font-mono text-green-600 bg-green-50/30">
                       {formatCurrency(item.precioCliente)}
                     </td>
-                    <td className="px-2 py-1.5 text-right font-mono text-gray-700">
-                      {formatCurrency(item.costoInterno)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-mono font-medium text-green-600">
+                    <td className="px-2 py-1.5 text-right font-mono font-medium text-green-700 bg-green-50/30">
                       {formatCurrency(item.costoCliente)}
                     </td>
+                    {/* GYS CONTROL */}
+                    <td className="px-2 py-1.5 text-right font-mono text-blue-600 bg-blue-50/30">
+                      {formatCurrency(item.precioInterno)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono font-medium text-blue-700 bg-blue-50/30">
+                      {formatCurrency(item.costoInterno)}
+                    </td>
+                    {/* Renta % */}
                     <td className="px-2 py-1.5 text-center">
                       <span className={cn(
                         'font-medium',
@@ -167,6 +185,21 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
                         {margenPct.toFixed(0)}%
                       </span>
                     </td>
+                    {/* REFERENCIA */}
+                    <td className="px-2 py-1.5 text-right font-mono text-gray-400">
+                      {item.precioLista ? formatCurrency(item.precioLista) : '-'}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-gray-400">
+                      {formatCurrency(item.precioInterno)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono">
+                      {diferencia !== null ? (
+                        <span className={diferencia >= 0 ? 'text-green-600' : 'text-red-500'}>
+                          {formatCurrency(diferencia)}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    {/* Acciones */}
                     <td className="px-2 py-1.5 text-center">
                       {isEdit ? (
                         <div className="flex items-center justify-center gap-0.5">
@@ -230,17 +263,18 @@ export default function CotizacionEquipoItemTable({ items, onUpdated, onDeleted 
             </tbody>
             <tfoot>
               <tr className="bg-gray-100/80 border-t-2">
-                <td colSpan={7} className="px-2 py-1.5 text-right font-medium text-gray-700">
+                <td colSpan={5} className="px-2 py-1.5 text-right font-medium text-gray-700">
                   Total ({filteredItems.length} items):
                 </td>
-                <td className="px-2 py-1.5 text-right font-mono font-medium text-gray-700">
-                  {formatCurrency(totalInterno)}
-                </td>
-                <td className="px-2 py-1.5 text-right font-mono font-bold text-green-700">
+                <td className="px-2 py-1.5 text-right font-mono text-green-600 bg-green-50/50"></td>
+                <td className="px-2 py-1.5 text-right font-mono font-bold text-green-700 bg-green-50/50">
                   {formatCurrency(totalCliente)}
                 </td>
-                <td></td>
-                <td></td>
+                <td className="px-2 py-1.5 text-right font-mono text-blue-600 bg-blue-50/50"></td>
+                <td className="px-2 py-1.5 text-right font-mono font-bold text-blue-700 bg-blue-50/50">
+                  {formatCurrency(totalInterno)}
+                </td>
+                <td colSpan={5}></td>
               </tr>
             </tfoot>
           </table>
