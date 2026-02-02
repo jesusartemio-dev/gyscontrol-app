@@ -72,10 +72,6 @@ export default function UnidadCardView({ data, onUpdate, onDelete, loading = fal
       return
     }
 
-    if (nombre.trim().length < 2) {
-      toast.error('El nombre debe tener al menos 2 caracteres')
-      return
-    }
 
     setGuardando(true)
     try {

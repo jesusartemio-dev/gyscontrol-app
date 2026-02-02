@@ -45,10 +45,6 @@ export default function UnidadModal({ isOpen, onClose, onCreated }: Props) {
       return
     }
 
-    if (nombre.trim().length < 2) {
-      toast.error('El nombre debe tener al menos 2 caracteres')
-      return
-    }
 
     setLoading(true)
     try {

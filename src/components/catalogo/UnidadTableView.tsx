@@ -57,10 +57,6 @@ export default function UnidadTableView({ data, onUpdate, onDelete, loading = fa
       return
     }
 
-    if (nombre.trim().length < 2) {
-      toast.error('El nombre debe tener al menos 2 caracteres')
-      return
-    }
 
     setGuardando(true)
     try {
