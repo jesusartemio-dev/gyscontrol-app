@@ -161,6 +161,30 @@ export async function leerExcelEquipoItems(file: File): Promise<any[]> {
 // ============================================
 // TIPOS PARA IMPORTACIÓN
 // ============================================
+
+// Tipo de estado del item respecto al catálogo
+export type CatalogStatus =
+  | 'new'           // No existe en catálogo
+  | 'match'         // Existe y precio coincide
+  | 'conflict'      // Existe pero precio diferente
+
+// Fuente de precio seleccionada para conflictos
+export type PriceSource =
+  | 'excel'                  // Usar precio del Excel
+  | 'catalog'                // Usar precio del catálogo
+  | 'excel_update_catalog'   // Usar Excel y actualizar catálogo
+
+// Info del catálogo para comparación
+export interface CatalogComparisonInfo {
+  catalogoEquipoId: string
+  catalogoPrecioInterno: number
+  catalogoPrecioLista?: number
+  catalogoMargen: number
+  catalogoUpdatedAt: Date
+  priceDifference: number       // Diferencia absoluta
+  priceDifferencePercent: number // Diferencia porcentual
+}
+
 export interface ImportedEquipoItem {
   codigo: string
   descripcion: string
@@ -176,9 +200,13 @@ export interface ImportedEquipoItem {
   costoCliente: number
   // Para catálogo
   catalogoEquipoId?: string
-  // Para detectar si es actualización
+  // Para detectar si es actualización en cotización
   isUpdate: boolean
   existingItemId?: string
+  // Nuevos campos para comparación con catálogo
+  catalogStatus: CatalogStatus
+  catalogComparison?: CatalogComparisonInfo
+  priceSource: PriceSource
 }
 
 export interface ExistingEquipoItem {
@@ -189,7 +217,15 @@ export interface ExistingEquipoItem {
 export interface EquipoImportValidationResult {
   itemsNuevos: ImportedEquipoItem[]
   itemsActualizar: ImportedEquipoItem[]
+  itemsConflicto: ImportedEquipoItem[]  // Items con diferencia de precio
   errores: string[]
+  // Resumen
+  summary: {
+    totalNew: number           // No están en catálogo
+    totalMatch: number         // Coinciden con catálogo
+    totalConflict: number      // Diferencia de precio
+    totalUpdate: number        // Ya existen en cotización
+  }
 }
 
 export interface CategoriaEquipoSimple {
@@ -209,9 +245,18 @@ export function validarEImportarEquipoItems(
   const errores: string[] = []
   const itemsNuevos: ImportedEquipoItem[] = []
   const itemsActualizar: ImportedEquipoItem[] = []
+  const itemsConflicto: ImportedEquipoItem[] = []
+
+  // Contadores para resumen
+  let totalNew = 0
+  let totalMatch = 0
+  let totalConflict = 0
 
   // Crear set de nombres de categorías válidas (lowercase para comparación)
   const categoriasSet = new Set(categoriasValidas.map(c => c.nombre.toLowerCase().trim()))
+
+  // Tolerancia para comparación de precios (0.01 = 1 centavo)
+  const PRICE_TOLERANCE = 0.01
 
   for (let [index, row] of rows.entries()) {
     const fila = index + 2 // +2 porque fila 1 es header
@@ -261,18 +306,67 @@ export function validarEImportarEquipoItems(
       }
     }
 
-    // Prioridad: Excel > Catálogo > Default
-    const precioLista = precioListaExcel ?? catalogoEquipo?.precioLista ?? undefined
-    const precioInterno = precioRealExcel ?? catalogoEquipo?.precioInterno ?? 0
+    // Determinar precio interno a usar (Excel tiene prioridad si está definido)
+    const precioInternoExcel = precioRealExcel ?? 0
+    const precioInternoCatalogo = catalogoEquipo?.precioInterno ?? 0
+
+    // Si no hay precio en Excel, usar catálogo
+    const precioInterno = precioInternoExcel > 0 ? precioInternoExcel : precioInternoCatalogo
+
     // margenExcel es multiplicador (1.15), convertir a decimal (0.15) para almacenar
-    // catalogoEquipo.margen ya está en decimal (0.15)
-    const margen = margenExcel !== undefined ? (margenExcel - 1) : (catalogoEquipo?.margen ?? 0.15)
+    const margenExcelDecimal = margenExcel !== undefined ? (margenExcel - 1) : undefined
+    const margenCatalogo = catalogoEquipo?.margen ?? 0.15
+    const margen = margenExcelDecimal ?? margenCatalogo
 
     // Validar que tengamos precio interno
     if (precioInterno <= 0) {
       errores.push(`Fila ${fila}: El precio real (P.Real) es requerido y debe ser mayor a 0`)
       continue
     }
+
+    // Determinar estado del catálogo y si hay conflicto de precios
+    let catalogStatus: CatalogStatus = 'new'
+    let catalogComparison: CatalogComparisonInfo | undefined = undefined
+    let priceSource: PriceSource = 'excel'
+
+    if (catalogoEquipo) {
+      // Calcular diferencia de precio
+      const priceDifference = precioInternoExcel > 0
+        ? Math.round((precioInternoExcel - precioInternoCatalogo) * 100) / 100
+        : 0
+      const priceDifferencePercent = precioInternoCatalogo > 0
+        ? Math.round((priceDifference / precioInternoCatalogo) * 10000) / 100
+        : 0
+
+      // Si hay precio en Excel y es diferente al catálogo
+      if (precioInternoExcel > 0 && Math.abs(priceDifference) > PRICE_TOLERANCE) {
+        catalogStatus = 'conflict'
+        totalConflict++
+        priceSource = 'excel' // Por defecto usar Excel, usuario puede cambiar
+      } else {
+        catalogStatus = 'match'
+        totalMatch++
+        // Si no hay precio en Excel, usar catálogo
+        priceSource = precioInternoExcel > 0 ? 'excel' : 'catalog'
+      }
+
+      catalogComparison = {
+        catalogoEquipoId: catalogoEquipo.id,
+        catalogoPrecioInterno: precioInternoCatalogo,
+        catalogoPrecioLista: catalogoEquipo.precioLista ?? undefined,
+        catalogoMargen: margenCatalogo,
+        catalogoUpdatedAt: catalogoEquipo.updatedAt,
+        priceDifference,
+        priceDifferencePercent
+      }
+    } else {
+      catalogStatus = 'new'
+      totalNew++
+      priceSource = 'excel'
+    }
+
+    // Usar precio según priceSource para los cálculos
+    const precioLista = precioListaExcel ?? catalogoEquipo?.precioLista ?? undefined
 
     // CALCULAR precioCliente = precioInterno × (1 + margen) = precioInterno × margenMultiplier
     // Mantener precisión completa para cálculo del total (como Excel)
@@ -283,7 +377,7 @@ export function validarEImportarEquipoItems(
     const costoInterno = Math.round(precioInterno * cantidad * 100) / 100
     const costoCliente = Math.round(precioClienteExact * cantidad * 100) / 100
 
-    // Detectar si ya existe un item con el mismo código
+    // Detectar si ya existe un item con el mismo código en la cotización
     const existingItem = existingItems.find(
       item => item.codigo.toLowerCase().trim() === codigo.toLowerCase().trim()
     )
@@ -303,15 +397,63 @@ export function validarEImportarEquipoItems(
       costoCliente,
       catalogoEquipoId: catalogoEquipo?.id,
       isUpdate: !!existingItem,
-      existingItemId: existingItem?.id
+      existingItemId: existingItem?.id,
+      // Nuevos campos
+      catalogStatus,
+      catalogComparison,
+      priceSource
     }
 
+    // Clasificar el item
     if (existingItem) {
       itemsActualizar.push(importedItem)
+    } else if (catalogStatus === 'conflict') {
+      itemsConflicto.push(importedItem)
     } else {
       itemsNuevos.push(importedItem)
     }
   }
 
-  return { itemsNuevos, itemsActualizar, errores }
+  return {
+    itemsNuevos,
+    itemsActualizar,
+    itemsConflicto,
+    errores,
+    summary: {
+      totalNew,
+      totalMatch,
+      totalConflict,
+      totalUpdate: itemsActualizar.length
+    }
+  }
+}
+
+// Función auxiliar para recalcular precios cuando cambia priceSource
+export function recalcularItemConPriceSource(
+  item: ImportedEquipoItem,
+  priceSource: PriceSource
+): ImportedEquipoItem {
+  let precioInterno = item.precioInterno
+  let margen = item.margen
+
+  if (priceSource === 'catalog' && item.catalogComparison) {
+    precioInterno = item.catalogComparison.catalogoPrecioInterno
+    margen = item.catalogComparison.catalogoMargen
+  }
+  // Para 'excel' y 'excel_update_catalog' usamos los valores originales del Excel
+
+  const precioClienteExact = precioInterno * (1 + margen)
+  const precioCliente = Math.round(precioClienteExact * 100) / 100
+  const costoInterno = Math.round(precioInterno * item.cantidad * 100) / 100
+  const costoCliente = Math.round(precioClienteExact * item.cantidad * 100) / 100
+
+  return {
+    ...item,
+    precioInterno,
+    margen,
+    precioCliente,
+    costoInterno,
+    costoCliente,
+    priceSource
+  }
 }

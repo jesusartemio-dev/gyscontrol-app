@@ -53,7 +53,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     // 🔎 Validación mínima de campos importantes (actualización parcial permitida)
     const allowedFields = [
       'nombre', 'descripcion', 'categoriaEquipoId', 'unidadId', 'precio',
-      'codigo', 'marca', 'precioInterno', 'margen', 'precioVenta', 'categoriaId', 'estado'
+      'codigo', 'marca', 'precioInterno', 'precioLista', 'margen', 'precioVenta', 'categoriaId', 'estado'
     ]
 
     const payload: Record<string, any> = {}
