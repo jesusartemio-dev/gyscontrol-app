@@ -76,6 +76,7 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
             <thead>
               {/* Fila 1: Grupos */}
               <tr className="bg-gray-100 border-b">
+                <th rowSpan={2} className="px-1 py-0.5 text-center font-semibold text-gray-700 border-r w-8">#</th>
                 <th rowSpan={2} className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r">Cód.</th>
                 <th rowSpan={2} className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r">Descripción</th>
                 <th rowSpan={2} className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r">Marca</th>
@@ -124,6 +125,9 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
                       idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                     )}
                   >
+                    <td className="px-1 py-1 text-center">
+                      <span className="font-mono text-[10px] text-gray-400">{idx + 1}</span>
+                    </td>
                     <td className="px-1.5 py-1">
                       <span className="font-mono text-[10px] text-gray-600">{item.codigo}</span>
                     </td>
@@ -226,7 +230,7 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
             </tbody>
             <tfoot>
               <tr className="bg-gray-100/80 border-t-2 text-[10px]">
-                <td colSpan={5} className="px-1.5 py-1 text-right font-medium text-gray-700">
+                <td colSpan={6} className="px-1.5 py-1 text-right font-medium text-gray-700">
                   Total ({filteredItems.length}):
                 </td>
                 <td className="px-1 py-1 text-right font-mono text-green-600 bg-green-50/50"></td>
