@@ -29,8 +29,13 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
   const [filter, setFilter] = useState('')
   const [showReferencia, setShowReferencia] = useState(false)
 
-  const totalInterno = items.reduce((sum, i) => sum + i.costoInterno, 0)
-  const totalCliente = items.reduce((sum, i) => sum + i.costoCliente, 0)
+  // Calcular totales sin redondeo intermedio (como Excel)
+  const totalInterno = Math.round(
+    items.reduce((sum, i) => sum + i.precioInterno * i.cantidad, 0) * 100
+  ) / 100
+  const totalCliente = Math.round(
+    items.reduce((sum, i) => sum + i.precioInterno * (1 + (i.margen ?? 0.15)) * i.cantidad, 0) * 100
+  ) / 100
 
   const filteredItems = items.filter(i =>
     i.descripcion.toLowerCase().includes(filter.toLowerCase()) ||
