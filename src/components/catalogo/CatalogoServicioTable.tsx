@@ -1,73 +1,55 @@
 'use client'
 
-// ===================================================
-// 📁 Archivo: CatalogoServicioTable.tsx (Mejorado con UX/UI moderno)
-// 📍 Ubicación: src/components/catalogo/
-// ===================================================
-
 import { useEffect, useState } from 'react'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { getRecursos } from '@/lib/services/recurso'
 import { getEdts } from '@/lib/services/edt'
-import type { CatalogoServicio, TipoFormula } from '@/types'
+import type { CatalogoServicio } from '@/types'
 
 // UI Components
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem
 } from '@/components/ui/select'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 
 // Icons
-import { 
-  Pencil, 
-  Save, 
-  Trash2, 
-  Search, 
-  Filter,
+import {
+  Pencil,
+  Trash2,
+  Search,
   Calculator,
-  DollarSign,
   Clock,
   AlertCircle,
-  CheckCircle,
-  X
+  Check,
+  X,
+  Loader2,
+  ChevronDown
 } from 'lucide-react'
-
-// Animations
-import { motion, AnimatePresence } from 'framer-motion'
-
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      duration: 0.6,
-      staggerChildren: 0.1
-    }
-  }
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5 }
-  }
-}
 
 interface Props {
   data: CatalogoServicio[]
@@ -90,7 +72,10 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Partial<CatalogoServicio>>({})
-  const [cantidad, setCantidad] = useState<number>(1)
+  const [guardando, setGuardando] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<CatalogoServicio | null>(null)
+  const [eliminando, setEliminando] = useState(false)
+  const [formulaOpen, setFormulaOpen] = useState(false)
 
   useEffect(() => {
     setServicios(data)
@@ -110,7 +95,7 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
         setRecursos(recursosData)
         setCategorias(categoriasData)
       } catch (err) {
-        setError('Error al cargar los datos. Por favor, intenta nuevamente.')
+        setError('Error al cargar los datos.')
         console.error('Error loading data:', err)
       } finally {
         setLoading(false)
@@ -119,31 +104,12 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
     loadData()
   }, [])
 
-  // Utility functions
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2
     }).format(amount)
-  }
-
-  const getFormulaVariant = (formula: TipoFormula): "default" | "secondary" | "outline" => {
-    switch (formula) {
-      case 'Proporcional': return 'default'
-      case 'Escalonada': return 'secondary'
-      case 'Fijo': return 'outline'
-      default: return 'outline'
-    }
-  }
-
-  const getFormulaColor = (formula: TipoFormula): string => {
-    switch (formula) {
-      case 'Proporcional': return 'bg-blue-100 text-blue-700 border-blue-300'
-      case 'Escalonada': return 'bg-green-100 text-green-700 border-green-300'
-      case 'Fijo': return 'bg-orange-100 text-orange-700 border-orange-300'
-      default: return 'bg-gray-100 text-gray-700 border-gray-300'
-    }
   }
 
   const serviciosFiltrados = servicios
@@ -154,60 +120,80 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
       (`${s.nombre} ${s.descripcion}`.toLowerCase().includes(filtroTexto.toLowerCase()))
     )
     .sort((a, b) => {
-      // Primero ordenar por EDT
       const edtA = a.edt?.nombre || ''
       const edtB = b.edt?.nombre || ''
-
-      if (edtA !== edtB) {
-        return edtA.localeCompare(edtB)
-      }
-
-      // Luego ordenar por orden dentro del EDT
+      if (edtA !== edtB) return edtA.localeCompare(edtB)
       return (a.orden || 0) - (b.orden || 0)
     })
 
-  const handleSave = (id: string) => {
+  const handleSave = async (id: string) => {
     const original = servicios.find(s => s.id === id)
     if (!original) return
+
+    // Check if there are actual changes
+    const hasChanges = Object.keys(editData).some(key => {
+      const k = key as keyof CatalogoServicio
+      return editData[k] !== original[k]
+    })
+
+    if (!hasChanges) {
+      cancelarEdicion()
+      return
+    }
+
+    setGuardando(true)
     const updated = { ...original, ...editData }
     onUpdate(updated)
+    setGuardando(false)
+    cancelarEdicion()
+  }
+
+  const cancelarEdicion = () => {
     setEditingId(null)
     setEditData({})
   }
 
   const calcularHoras = (cantidad: number, data: Partial<CatalogoServicio>) => {
-    // Solo fórmula escalonada: HH = HH_base + (cantidad - 1) × HH_repetido
-    const horasBase = (data.horaBase ?? 0) + Math.max(0, cantidad - 1) * (data.horaRepetido ?? 0);
-
-    // Aplicar factor de dificultad
-    const factorDificultad = data.nivelDificultad ?? 1;
-    return horasBase * factorDificultad;
+    const horasBase = (data.horaBase ?? 0) + Math.max(0, cantidad - 1) * (data.horaRepetido ?? 0)
+    const factorDificultad = data.nivelDificultad ?? 1
+    return horasBase * factorDificultad
   }
 
-  // Loading state
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setEliminando(true)
+    onDelete(deleteTarget.id)
+    setEliminando(false)
+    setDeleteTarget(null)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSave(id)
+    } else if (e.key === 'Escape') {
+      cancelarEdicion()
+    }
+  }
+
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-3">
+          <Skeleton className="h-9 w-[200px]" />
+          <Skeleton className="h-9 w-[150px]" />
+          <Skeleton className="h-9 w-[150px]" />
+          <Skeleton className="h-9 w-[150px]" />
+        </div>
         <Card>
-          <CardHeader>
-            <div className="flex items-center space-x-2">
-              <Skeleton className="h-6 w-6" />
-              <Skeleton className="h-6 w-32" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4 p-3">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 flex-1" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
               ))}
             </div>
           </CardContent>
@@ -216,468 +202,443 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
     )
   }
 
-  // Error state
   if (error) {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <Alert className="border-red-200 bg-red-50">
-          <AlertCircle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
-            {error}
-          </AlertDescription>
-        </Alert>
-      </motion.div>
+      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-center gap-2 text-sm text-red-700">
+          <AlertCircle className="h-4 w-4" />
+          {error}
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Temporarily disabled motion for debugging */}
-      {/* Filtros Modernos */}
-      <motion.div variants={itemVariants}>
-        <Card className="border-0 shadow-sm bg-gradient-to-r from-slate-50 to-gray-50">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Filter className="h-4 w-4 text-blue-600" />
-              </div>
-              <CardTitle className="text-lg font-semibold text-gray-800">
-                Filtros de Búsqueda
-              </CardTitle>
-            </div>
-            <CardDescription className="text-sm text-gray-600">
-              Utiliza los filtros para encontrar servicios específicos
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {/* Búsqueda por texto */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar servicios..."
-                  value={filtroTexto}
-                  onChange={(e) => setFiltroTexto(e.target.value)}
-                  className="pl-10 border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                />
-              </div>
-              
-              {/* Filtro por EDT */}
-              <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-                <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                  <SelectValue placeholder="Todos los EDTs" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__ALL__">Todos los EDTs</SelectItem>
-                  {categorias.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {/* Filtro por Unidad */}
-              <Select value={filtroUnidad} onValueChange={setFiltroUnidad}>
-                <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                  <SelectValue placeholder="Todas las unidades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__ALL__">Todas las unidades</SelectItem>
-                  {unidades.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {/* Filtro por Recurso */}
-              <Select value={filtroRecurso} onValueChange={setFiltroRecurso}>
-                <SelectTrigger className="border-gray-200 focus:border-blue-400 focus:ring-blue-400">
-                  <SelectValue placeholder="Todos los recursos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__ALL__">Todos los recursos</SelectItem>
-                  {recursos.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {/* Contador de resultados */}
-              <div className="flex items-center justify-center bg-white rounded-lg border border-gray-200 px-4 py-2">
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-blue-600">
-                    {serviciosFiltrados.length}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {serviciosFiltrados.length === 1 ? 'servicio' : 'servicios'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Leyenda de Cálculo de Horas Hombre - Mejorada */}
-      <motion.div variants={itemVariants}>
-        <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Calculator className="h-4 w-4 text-blue-600" />
-              </div>
-              <CardTitle className="text-lg font-semibold text-gray-800">
-                Cálculo de Horas Hombre
-              </CardTitle>
-            </div>
-            <CardDescription className="text-sm text-gray-600">
-              Cálculo automático de horas hombre con factor de dificultad
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Escalonada */}
-              <motion.div
-                className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-green-200"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
+    <TooltipProvider>
+      <div className="space-y-4">
+        {/* Filtros compactos */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o descripción..."
+              value={filtroTexto}
+              onChange={(e) => setFiltroTexto(e.target.value)}
+              className="pl-9 pr-9 h-9"
+            />
+            {filtroTexto && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                onClick={() => setFiltroTexto('')}
               >
-                <Badge className="bg-green-100 text-green-700 border-green-300 hover:bg-green-200">
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue>
+                {filtroCategoria === '__ALL__' ? 'EDT: Todos' : categorias.find(c => c.id === filtroCategoria)?.nombre || 'EDT'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todos los EDTs</SelectItem>
+              {categorias.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filtroUnidad} onValueChange={setFiltroUnidad}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue>
+                {filtroUnidad === '__ALL__' ? 'Unidad: Todas' : unidades.find(u => u.id === filtroUnidad)?.nombre || 'Unidad'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todas las unidades</SelectItem>
+              {unidades.map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filtroRecurso} onValueChange={setFiltroRecurso}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue>
+                {filtroRecurso === '__ALL__' ? 'Recurso: Todos' : recursos.find(r => r.id === filtroRecurso)?.nombre || 'Recurso'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todos los recursos</SelectItem>
+              {recursos.map((r) => (
+                <SelectItem key={r.id} value={r.id}>{r.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {(filtroTexto || filtroCategoria !== '__ALL__' || filtroUnidad !== '__ALL__' || filtroRecurso !== '__ALL__') && (
+            <span className="text-sm text-muted-foreground">
+              {serviciosFiltrados.length} de {servicios.length}
+            </span>
+          )}
+        </div>
+
+        {/* Card de fórmula compacta y colapsable */}
+        <Collapsible open={formulaOpen} onOpenChange={setFormulaOpen}>
+          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <Calculator className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-700">Cálculo de Horas Hombre</span>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-auto">
+                <ChevronDown className={`h-4 w-4 text-blue-600 transition-transform ${formulaOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent>
+            <div className="flex flex-wrap gap-3 mt-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-xs">
                   Escalonada
                 </Badge>
-                <div className="text-sm text-gray-700">
-                  <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                    HH = HH_base + (cantidad - 1) × HH_repetido
-                  </code>
-                </div>
-              </motion.div>
-
-              {/* Factor de Dificultad */}
-              <motion.div
-                className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-purple-200"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Badge className="bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200">
+                <code className="text-xs bg-white px-2 py-1 rounded border">
+                  HH = HH_base + (cantidad - 1) × HH_repetido
+                </code>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 text-xs">
                   Dificultad
                 </Badge>
-                <div className="text-sm text-gray-700">
-                  <code className="bg-gray-100 px-2 py-1 rounded text-xs">
-                    HH_total = HH_base × factor_dificultad
-                  </code>
-                </div>
-              </motion.div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Tabla Moderna */}
-      <motion.div variants={itemVariants}>
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Clock className="h-4 w-4 text-green-600" />
-                </div>
-                <CardTitle className="text-lg font-semibold text-gray-800">
-                  Catálogo de Servicios
-                </CardTitle>
+                <code className="text-xs bg-white px-2 py-1 rounded border">
+                  HH_total = HH × factor_dificultad
+                </code>
               </div>
-              {serviciosFiltrados.length > 0 && (
-                <Badge variant="outline" className="text-sm">
-                  {serviciosFiltrados.length} {serviciosFiltrados.length === 1 ? 'servicio' : 'servicios'}
-                </Badge>
-              )}
             </div>
-          </CardHeader>
-          <CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Tabla */}
+        <Card>
+          <CardContent className="p-0">
             {serviciosFiltrados.length === 0 ? (
-              // Estado vacío
-              <motion.div 
-                className="text-center py-12"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <Search className="h-8 w-8 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  No se encontraron servicios
-                </h3>
-                <p className="text-gray-500 mb-4">
-                  No hay servicios que coincidan con los filtros aplicados.
+              <div className="text-center py-12">
+                <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Sin resultados</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  No hay servicios que coincidan con los filtros
                 </p>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setFiltroTexto('')
                     setFiltroCategoria('__ALL__')
                     setFiltroUnidad('__ALL__')
                     setFiltroRecurso('__ALL__')
                   }}
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
                 >
                   <X className="h-4 w-4 mr-2" />
                   Limpiar filtros
                 </Button>
-              </motion.div>
+              </div>
             ) : (
-              // Tabla con datos
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100">
-                      <TableHead className="text-left font-semibold text-gray-700">Servicio</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">EDT</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Orden</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Recurso</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Unidad</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Cantidad</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Dificultad</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">HH Base</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">HH Repetido</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">HH Total</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Costo/Hora</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Costo Total</TableHead>
-                      <TableHead className="text-center font-semibold text-gray-700">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-            {serviciosFiltrados.map((item) => {
-              const isEditing = editingId === item.id
-              const recursoId = editData.recursoId ?? item.recursoId
-              const formula = editData.formula ?? item.formula
-              const cantidadUsar = editData.cantidad ?? item.cantidad ?? 1
-              const horasCalculadas = calcularHoras(cantidadUsar, { ...item, ...editData })
-              const costoHora = recursos.find(r => r.id === recursoId)?.costoHora ?? item.recurso?.costoHora ?? 0
-              const costoTotal = horasCalculadas * costoHora
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/40">
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider min-w-[250px]">
+                        Servicio
+                      </th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        EDT
+                      </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-16">
+                        Orden
+                      </th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Recurso
+                      </th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Unidad
+                      </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-16">
+                        Cant.
+                      </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-16">
+                        Dif.
+                      </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider" title="HH Base / HH Repetido">
+                        HH B/R
+                      </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-20">
+                        HH Total
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        $/Hora
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Costo
+                      </th>
+                      <th className="w-20 py-2 px-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {serviciosFiltrados.map((item) => {
+                      const isEditing = editingId === item.id
+                      const recursoId = editData.recursoId ?? item.recursoId
+                      const cantidadUsar = editData.cantidad ?? item.cantidad ?? 1
+                      const horasCalculadas = calcularHoras(cantidadUsar, { ...item, ...editData })
+                      const costoHora = recursos.find(r => r.id === recursoId)?.costoHora ?? item.recurso?.costoHora ?? 0
+                      const costoTotal = horasCalculadas * costoHora
 
-              return (
-                <TableRow 
-                  key={item.id}
-                  className="group hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200"
-                >
-                    {/* Nombre del Servicio */}
-                    <TableCell className="text-left">
-                      <div
-                        className="font-medium text-gray-900 cursor-help"
-                        title={item.descripcion || 'Sin descripción'}
-                      >
-                        {item.nombre}
-                      </div>
-                    </TableCell>
-
-                    {/* EDT */}
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className="text-xs">
-                        {item.edt?.nombre || 'Sin EDT'}
-                      </Badge>
-                    </TableCell>
-
-                    {/* Orden */}
-                    <TableCell className="text-center">
-                      {isEditing ? (
-                        <Input
-                          type="number"
-                          value={(editData.orden ?? item.orden) ?? 0}
-                          onChange={(e) => setEditData(d => ({ ...d, orden: parseInt(e.target.value) }))}
-                          className="w-20 text-right h-8 text-xs"
-                          min="0"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium text-gray-700">
-                          {item.orden ?? 0}
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* Recurso */}
-                    <TableCell className="text-center">
-                      {isEditing ? (
-                        <Select value={recursoId} onValueChange={(v) => setEditData(d => ({ ...d, recursoId: v }))}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {recursos.map(r => (
-                              <SelectItem key={r.id} value={r.id}>{r.nombre}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          {item.recurso?.nombre || 'Sin recurso'}
-                        </Badge>
-                      )}
-                    </TableCell>
-
-                    {/* Unidad */}
-                    <TableCell className="text-center">
-                      {isEditing ? (
-                        <Select value={editData.unidadServicioId ?? item.unidadServicioId} onValueChange={(v) => setEditData(d => ({ ...d, unidadServicioId: v }))}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {unidades.map(u => (
-                              <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">
-                          {item.unidadServicio?.nombre || 'Sin unidad'}
-                        </Badge>
-                      )}
-                    </TableCell>
-
-                    {/* Cantidad */}
-                    <TableCell className="text-center">
-                      {isEditing ? (
-                        <Input
-                          type="number"
-                          value={(editData.cantidad ?? item.cantidad) ?? 1}
-                          onChange={(e) => setEditData(d => ({ ...d, cantidad: parseInt(e.target.value) }))}
-                          className="w-20 text-right h-8 text-xs"
-                          min="1"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium text-gray-700">
-                          {item.cantidad ?? 1}
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* Dificultad */}
-                    <TableCell className="text-center">
-                      {isEditing ? (
-                        <Select value={(editData.nivelDificultad ?? item.nivelDificultad ?? 1).toString()} onValueChange={(v) => setEditData(d => ({ ...d, nivelDificultad: parseInt(v) }))}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[1,2,3,4,5].map(level => (
-                              <SelectItem key={level} value={level.toString()}>
-                                Nivel {level} {level === 1 ? '(Fácil)' : level === 3 ? '(Medio)' : level === 5 ? '(Difícil)' : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">
-                          Nivel {item.nivelDificultad ?? 1}
-                        </Badge>
-                      )}
-                    </TableCell>
-
-                    {/* Campos de Horas - Solo Base y Repetido */}
-                    {(['horaBase', 'horaRepetido'] as const).map(field => (
-                      <TableCell className="text-center" key={field}>
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            value={(editData[field] ?? item[field]) ?? 0}
-                            onChange={(e) => setEditData(d => ({ ...d, [field]: parseFloat(e.target.value) }))}
-                            className="w-20 text-right h-8 text-xs"
-                            step="0.1"
-                            min="0"
-                          />
-                        ) : (
-                          <span className="text-sm font-medium text-gray-700">
-                            {(item[field] ?? 0).toFixed(1)}
-                          </span>
-                        )}
-                      </TableCell>
-                    ))}
-                    
-                    {/* Total Horas Hombre */}
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center space-x-1">
-                        <Clock className="h-3 w-3 text-blue-600" />
-                        <span className="font-semibold text-blue-700">
-                          {horasCalculadas.toFixed(1)}
-                        </span>
-                      </div>
-                    </TableCell>
-
-                    {/* Costo por Hora */}
-                    <TableCell className="text-center">
-                      <span className="font-semibold text-green-700">
-                        {formatCurrency(costoHora)}
-                      </span>
-                    </TableCell>
-
-                    {/* Costo Total */}
-                    <TableCell className="text-center">
-                      <span className="font-semibold text-green-700">
-                        {formatCurrency(costoTotal)}
-                      </span>
-                    </TableCell>
-                    
-                    {/* Acciones */}
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center space-x-1">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleSave(item.id)}
-                              className="h-8 w-8 p-0 text-green-600 hover:text-green-800 hover:bg-green-50"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => { setEditingId(null); setEditData({}) }}
-                              className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => { setEditingId(item.id); setEditData({}) }}
-                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onDelete(item.id)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-              )
-            })}
-                  </TableBody>
-                </Table>
+                      return (
+                        <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-2 px-3">
+                            <div>
+                              <div className="font-medium text-sm line-clamp-2" title={item.nombre}>
+                                {item.nombre}
+                              </div>
+                              {item.descripcion && (
+                                <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5" title={item.descripcion}>
+                                  {item.descripcion}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              {item.edt?.nombre || '—'}
+                            </Badge>
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={(editData.orden ?? item.orden) ?? 0}
+                                onChange={(e) => setEditData(d => ({ ...d, orden: parseInt(e.target.value) }))}
+                                onKeyDown={(e) => handleKeyDown(e, item.id)}
+                                className="w-14 h-7 text-center text-xs"
+                                min="0"
+                              />
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{item.orden ?? 0}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3">
+                            {isEditing ? (
+                              <Select value={recursoId} onValueChange={(v) => setEditData(d => ({ ...d, recursoId: v }))}>
+                                <SelectTrigger className="h-7 text-xs w-[100px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {recursos.map(r => (
+                                    <SelectItem key={r.id} value={r.id}>{r.nombre}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{item.recurso?.nombre || '—'}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3">
+                            {isEditing ? (
+                              <Select value={editData.unidadServicioId ?? item.unidadServicioId} onValueChange={(v) => setEditData(d => ({ ...d, unidadServicioId: v }))}>
+                                <SelectTrigger className="h-7 text-xs w-[80px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {unidades.map(u => (
+                                    <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{item.unidadServicio?.nombre || '—'}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={(editData.cantidad ?? item.cantidad) ?? 1}
+                                onChange={(e) => setEditData(d => ({ ...d, cantidad: parseInt(e.target.value) }))}
+                                onKeyDown={(e) => handleKeyDown(e, item.id)}
+                                className="w-14 h-7 text-center text-xs"
+                                min="1"
+                              />
+                            ) : (
+                              <span className="text-sm">{item.cantidad ?? 1}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {isEditing ? (
+                              <Select value={(editData.nivelDificultad ?? item.nivelDificultad ?? 1).toString()} onValueChange={(v) => setEditData(d => ({ ...d, nivelDificultad: parseInt(v) }))}>
+                                <SelectTrigger className="h-7 text-xs w-14">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[1, 2, 3, 4, 5].map(level => (
+                                    <SelectItem key={level} value={level.toString()}>{level}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{item.nivelDificultad ?? 1}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {isEditing ? (
+                              <div className="flex items-center gap-1 justify-center">
+                                <Input
+                                  type="number"
+                                  value={(editData.horaBase ?? item.horaBase) ?? 0}
+                                  onChange={(e) => setEditData(d => ({ ...d, horaBase: parseFloat(e.target.value) }))}
+                                  onKeyDown={(e) => handleKeyDown(e, item.id)}
+                                  className="w-12 h-7 text-center text-xs"
+                                  step="0.1"
+                                  min="0"
+                                  title="HH Base"
+                                />
+                                <span className="text-muted-foreground">/</span>
+                                <Input
+                                  type="number"
+                                  value={(editData.horaRepetido ?? item.horaRepetido) ?? 0}
+                                  onChange={(e) => setEditData(d => ({ ...d, horaRepetido: parseFloat(e.target.value) }))}
+                                  onKeyDown={(e) => handleKeyDown(e, item.id)}
+                                  className="w-12 h-7 text-center text-xs"
+                                  step="0.1"
+                                  min="0"
+                                  title="HH Repetido"
+                                />
+                              </div>
+                            ) : (
+                              <span className="text-sm" title={`Base: ${(item.horaBase ?? 0).toFixed(1)} / Rep: ${(item.horaRepetido ?? 0).toFixed(1)}`}>
+                                {(item.horaBase ?? 0).toFixed(1)}<span className="text-muted-foreground mx-0.5">/</span>{(item.horaRepetido ?? 0).toFixed(1)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Clock className="h-3 w-3 text-blue-600" />
+                              <span className="text-sm font-medium text-blue-700">
+                                {horasCalculadas.toFixed(1)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono text-sm text-muted-foreground">
+                            {formatCurrency(costoHora)}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono text-sm font-medium text-emerald-600">
+                            {formatCurrency(costoTotal)}
+                          </td>
+                          <td className="py-2 px-3">
+                            <div className="flex justify-end gap-1">
+                              {isEditing ? (
+                                <>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 w-7 p-0"
+                                        onClick={cancelarEdicion}
+                                        disabled={guardando}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Cancelar (Esc)</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => handleSave(item.id)}
+                                        disabled={guardando}
+                                      >
+                                        {guardando ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Check className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Guardar (Enter)</TooltipContent>
+                                  </Tooltip>
+                                </>
+                              ) : (
+                                <>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => {
+                                          setEditingId(item.id)
+                                          setEditData({})
+                                        }}
+                                        disabled={editingId !== null}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Editar</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => setDeleteTarget(item)}
+                                        disabled={editingId !== null}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Eliminar</TooltipContent>
+                                  </Tooltip>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>
         </Card>
-      </motion.div>
-    </div>
+
+        {/* Delete confirmation */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar servicio?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se eliminará el servicio "{deleteTarget?.nombre}". Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={eliminando}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {eliminando ? 'Eliminando...' : 'Eliminar'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </TooltipProvider>
   )
 }

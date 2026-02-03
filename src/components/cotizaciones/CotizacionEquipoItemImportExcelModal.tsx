@@ -550,38 +550,39 @@ export default function CotizacionEquipoItemImportExcelModal({
 
             {/* Errores */}
             {errores.length > 0 && (
-              <div className="mb-3 p-2 bg-red-50 rounded-lg border border-red-200 max-h-24 overflow-y-auto">
-                <div className="flex items-center gap-1 mb-1">
-                  <AlertCircle className="h-3 w-3 text-red-500" />
-                  <span className="text-xs font-medium text-red-700">
+              <div className="mb-3 p-3 bg-red-50 rounded-lg border border-red-200 max-h-48 overflow-y-auto">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-red-700">
                     {errores.length} error(es) encontrado(s)
                   </span>
                 </div>
-                <ul className="text-[10px] text-red-600 space-y-0.5 pl-4">
-                  {errores.slice(0, 5).map((error, idx) => (
-                    <li key={idx}>{error}</li>
+                <div className="space-y-1 pl-6">
+                  {errores.map((error, idx) => (
+                    <div key={idx} className="text-xs text-red-600 py-0.5 border-l-2 border-red-300 pl-2">
+                      {error}
+                    </div>
                   ))}
-                  {errores.length > 5 && (
-                    <li>... y {errores.length - 5} más</li>
-                  )}
-                </ul>
+                </div>
               </div>
             )}
 
             {/* Advertencias (códigos duplicados, provisionales, etc) */}
             {advertencias.length > 0 && (
-              <div className="mb-3 p-2 bg-amber-50 rounded-lg border border-amber-200 max-h-32 overflow-y-auto">
-                <div className="flex items-center gap-1 mb-1">
-                  <AlertTriangle className="h-3 w-3 text-amber-500" />
-                  <span className="text-xs font-medium text-amber-700">
-                    Advertencias
+              <div className="mb-3 p-3 bg-amber-50 rounded-lg border border-amber-200 max-h-56 overflow-y-auto">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-amber-700">
+                    Advertencias ({advertencias.length})
                   </span>
                 </div>
-                <ul className="text-[10px] text-amber-600 space-y-0.5">
+                <div className="space-y-1 pl-6">
                   {advertencias.map((advertencia, idx) => (
-                    <li key={idx} className="whitespace-pre-wrap">{advertencia}</li>
+                    <div key={idx} className="text-xs text-amber-700 py-0.5 border-l-2 border-amber-300 pl-2 whitespace-pre-wrap">
+                      {advertencia}
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
 

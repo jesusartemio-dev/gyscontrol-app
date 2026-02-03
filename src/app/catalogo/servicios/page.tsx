@@ -1,12 +1,6 @@
 'use client'
 
-// ===================================================
-// 📁 Archivo: page.tsx (Mejorado con UX/UI moderno)
-// 📍 Ubicación: src/app/catalogo/servicios/
-// ===================================================
-
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 // Services
@@ -26,7 +20,6 @@ import {
 } from '@/lib/utils/serviciosImportUtils'
 
 // Components
-import CatalogoServicioCrearAcordeon from '@/components/catalogo/CatalogoServicioCrearAcordeon'
 import CatalogoServicioTable from '@/components/catalogo/CatalogoServicioTable'
 import CatalogoServicioForm from '@/components/catalogo/CatalogoServicioForm'
 import ModalDuplicadosServicios from '@/components/catalogo/ModalDuplicadosServicios'
@@ -34,53 +27,22 @@ import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 
 // UI Components
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
 // Icons
 import {
-  ChevronRight,
   Settings,
-  TrendingUp,
   AlertCircle,
-  FileText,
-  Upload,
   Loader2,
   Plus
 } from 'lucide-react'
 
-// Animation
-import { motion } from 'framer-motion'
-
 import type { CatalogoServicio } from '@/types'
 
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      duration: 0.6,
-      staggerChildren: 0.1
-    }
-  }
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5 }
-  }
-}
-
 export default function CatalogoServicioPage() {
-  const router = useRouter()
   const [servicios, setServicios] = useState<CatalogoServicio[]>([])
   const [loading, setLoading] = useState(true)
   const [importando, setImportando] = useState(false)
@@ -96,7 +58,7 @@ export default function CatalogoServicioPage() {
       const data = await getCatalogoServicios()
       setServicios(data)
     } catch (err) {
-      console.error('❌ Error al cargar servicios:', err)
+      console.error('Error al cargar servicios:', err)
       toast.error('Error al cargar servicios.')
     } finally {
       setLoading(false)
@@ -119,7 +81,7 @@ export default function CatalogoServicioPage() {
       await cargarServicios()
     } catch (err) {
       toast.error('Error al actualizar servicio')
-      console.error('❌ Error al actualizar servicio:', err)
+      console.error('Error al actualizar servicio:', err)
     }
   }
 
@@ -130,7 +92,7 @@ export default function CatalogoServicioPage() {
       await cargarServicios()
     } catch (error) {
       toast.error('Error al eliminar servicio')
-      console.error('❌ Error al eliminar servicio:', error)
+      console.error('Error al eliminar servicio:', error)
     }
   }
 
@@ -139,7 +101,7 @@ export default function CatalogoServicioPage() {
       await exportarServiciosAExcel(servicios)
       toast.success('Servicios exportados exitosamente.')
     } catch (err) {
-      console.error('❌ Error al exportar servicios:', err)
+      console.error('Error al exportar servicios:', err)
       toast.error('Error al exportar servicios.')
     }
   }
@@ -187,7 +149,7 @@ export default function CatalogoServicioPage() {
         await cargarServicios()
       }
     } catch (err) {
-      console.error('❌ Error inesperado al importar servicios:', err)
+      console.error('Error inesperado al importar servicios:', err)
       toast.error('Error inesperado en la importación.')
     } finally {
       setImportando(false)
@@ -201,7 +163,7 @@ export default function CatalogoServicioPage() {
       toast.success('Servicios duplicados sobrescritos exitosamente.')
       await cargarServicios()
     } catch (err) {
-      console.error('❌ Error al sobrescribir duplicados:', err)
+      console.error('Error al sobrescribir duplicados:', err)
       toast.error('Error al sobrescribir duplicados.')
     } finally {
       setMostrarModal(false)
@@ -219,115 +181,59 @@ export default function CatalogoServicioPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 space-y-6">
-        {/* Breadcrumb Skeleton */}
-        <div className="flex items-center space-x-2">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-4" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-
-        {/* Header Skeleton */}
+      <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-48" />
-          </div>
+          <Skeleton className="h-8 w-32" />
           <div className="flex gap-2">
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-20" />
           </div>
         </div>
-
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-8 w-8" />
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-6 w-12" />
-                  </div>
+        <Skeleton className="h-10 w-full max-w-md" />
+        <Card>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="flex items-center gap-4 p-3">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 flex-1" />
+                  <Skeleton className="h-4 w-20" />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Content Skeleton */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-48" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-32 w-full" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <Skeleton className="h-64 w-full" />
-            </CardContent>
-          </Card>
-        </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <motion.div 
-      className="container mx-auto px-4 py-8 space-y-6"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Breadcrumb Navigation */}
-      <motion.nav 
-        className="flex items-center space-x-2 text-sm text-muted-foreground"
-        variants={itemVariants}
-      >
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => router.push('/catalogo')}
-          className="h-auto p-0 font-normal"
-        >
-          Catálogo
-        </Button>
-        <ChevronRight className="h-4 w-4" />
-        <span className="font-medium text-foreground">Servicios</span>
-      </motion.nav>
-
-      {/* Header Section */}
-      <motion.div 
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-        variants={itemVariants}
-      >
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Settings className="h-8 w-8 text-primary" />
-            Catálogo de Servicios
-          </h1>
-          <p className="text-muted-foreground">
-            Gestiona los servicios disponibles para tus proyectos
-          </p>
+    <div className="space-y-4">
+      {/* Header compacto */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-semibold">Servicios</h1>
+          </div>
+          <Badge variant="secondary" className="font-normal">
+            {servicios.length}
+          </Badge>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Servicio
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Nuevo
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Crear Nuevo Servicio</DialogTitle>
+                <DialogTitle>Nuevo Servicio</DialogTitle>
                 <DialogDescription>
-                  Agrega un nuevo servicio al catálogo con toda su configuración
+                  Agrega un servicio al catálogo
                 </DialogDescription>
               </DialogHeader>
               <CatalogoServicioForm onCreated={handleCreated} />
@@ -335,126 +241,54 @@ export default function CatalogoServicioPage() {
           </Dialog>
           <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
         </div>
-      </motion.div>
-
-      {/* Quick Stats */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
-        variants={itemVariants}
-      >
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileText className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Servicios</p>
-                <p className="text-2xl font-bold">{servicios.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Servicios Activos</p>
-                <p className="text-2xl font-bold text-green-600">{servicios.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Settings className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Categorías</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {new Set(servicios.map(s => s.categoriaId)).size}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
+      </div>
 
       {/* Import Status */}
       {importando && (
-        <motion.div variants={itemVariants}>
-          <Alert>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <AlertDescription>
-              Importando datos, por favor espere...
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Importando servicios...
+        </div>
       )}
 
       {/* Error Display */}
       {errores.length > 0 && (
-        <motion.div variants={itemVariants}>
-          <Alert variant="destructive">
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2 text-sm font-medium text-red-700 mb-2">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-2">
-                <p className="font-semibold">Errores encontrados en la importación:</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  {errores.map((err, idx) => (
-                    <li key={idx} className="text-sm">{err}</li>
-                  ))}
-                </ul>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+            Errores de importación:
+          </div>
+          <ul className="text-xs text-red-600 space-y-1 ml-6 list-disc">
+            {errores.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
+            {errores.length > 5 && <li>... y {errores.length - 5} más</li>}
+          </ul>
+        </div>
       )}
 
-
       {/* Services Table */}
-      <motion.div variants={itemVariants}>
+      {servicios.length === 0 ? (
         <Card>
-          <CardHeader>
-            <CardTitle>Lista de Servicios</CardTitle>
-            <CardDescription>
-              {servicios.length === 0 
-                ? "No hay servicios registrados" 
-                : `${servicios.length} servicio${servicios.length !== 1 ? 's' : ''} registrado${servicios.length !== 1 ? 's' : ''}`
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {servicios.length === 0 ? (
-              <div className="text-center py-12">
-                <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No hay servicios</h3>
-                <p className="text-muted-foreground mb-4">
-                  Comienza agregando tu primer servicio al catálogo
-                </p>
-                <Button variant="outline" size="sm">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Crear Servicio
-                </Button>
-              </div>
-            ) : (
-              <CatalogoServicioTable
-                data={servicios}
-                onUpdate={actualizarServicio}
-                onDelete={eliminarServicio}
-              />
-            )}
+          <CardContent className="py-12">
+            <div className="text-center">
+              <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No hay servicios</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Comienza agregando tu primer servicio al catálogo
+              </p>
+              <Button variant="outline" size="sm" onClick={() => setShowCreateModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Crear servicio
+              </Button>
+            </div>
           </CardContent>
         </Card>
-      </motion.div>
+      ) : (
+        <CatalogoServicioTable
+          data={servicios}
+          onUpdate={actualizarServicio}
+          onDelete={eliminarServicio}
+        />
+      )}
 
       {/* Modal for Duplicates */}
       {mostrarModal && (
@@ -464,6 +298,6 @@ export default function CatalogoServicioPage() {
           onCancel={cancelarImportacion}
         />
       )}
-    </motion.div>
+    </div>
   )
 }

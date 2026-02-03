@@ -1,44 +1,48 @@
-// ===================================================
-// 📁 Archivo: EdtTableView.tsx
-// 📌 Ubicación: src/components/catalogo/
-// 🔧 Vista de tabla para EDTs
-//
-// 🧠 Uso: Vista tabular con edición inline para EDTs
-// ✍️ Autor: Jesús Artemio
-// 📅 Creación: 2025-10-15
-// ===================================================
-
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FolderOpen, Edit, Trash2, Save, X, Loader2 } from 'lucide-react'
+import { Pencil, Trash2, Check, X, Loader2 } from 'lucide-react'
 import { Edt, FaseDefault } from '@/types'
 import { updateEdt, deleteEdt } from '@/lib/services/edt'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface Props {
   data?: Edt[]
   onUpdate?: (edt: Edt) => void
   onDelete?: (id: string) => void
   loading?: boolean
-  error?: string | null
 }
 
-export default function EdtTableView({ data, onUpdate, onDelete, loading = false, error = null }: Props) {
+export default function EdtTableView({ data, onUpdate, onDelete, loading = false }: Props) {
   const [editando, setEditando] = useState<string | null>(null)
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [faseDefaultId, setFaseDefaultId] = useState<string>('')
   const [fasesDefault, setFasesDefault] = useState<FaseDefault[]>([])
   const [guardando, setGuardando] = useState(false)
-  const [eliminando, setEliminando] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [edtAEliminar, setEdtAEliminar] = useState<Edt | null>(null)
+  const [eliminando, setEliminando] = useState(false)
 
-  // Cargar fases por defecto
   useEffect(() => {
     const cargarFasesDefault = async () => {
       try {
@@ -74,11 +78,6 @@ export default function EdtTableView({ data, onUpdate, onDelete, loading = false
       return
     }
 
-    if (nombre.trim().length < 2) {
-      toast.error('El nombre debe tener al menos 2 caracteres')
-      return
-    }
-
     setGuardando(true)
     try {
       const actualizada = await updateEdt(id, {
@@ -87,18 +86,14 @@ export default function EdtTableView({ data, onUpdate, onDelete, loading = false
         faseDefaultId: faseDefaultId || undefined
       })
 
-      // ✅ Asegurar que el EDT actualizado tenga la información de faseDefault
       const edtConFaseDefault = {
         ...actualizada,
         faseDefault: faseDefaultId ? fasesDefault.find(f => f.id === faseDefaultId) : undefined
       }
 
-      toast.success('EDT actualizado exitosamente')
+      toast.success('EDT actualizado')
       onUpdate?.(edtConFaseDefault)
-      setEditando(null)
-      setNombre('')
-      setDescripcion('')
-      setFaseDefaultId('')
+      cancelarEdicion()
     } catch (err) {
       console.error('Error updating edt:', err)
       toast.error('Error al actualizar el EDT')
@@ -107,185 +102,210 @@ export default function EdtTableView({ data, onUpdate, onDelete, loading = false
     }
   }
 
-  const eliminar = async (id: string) => {
-    setEliminando(id)
+  const handleConfirmarEliminar = (edt: Edt) => {
+    setEdtAEliminar(edt)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleEliminar = async () => {
+    if (!edtAEliminar) return
+    setEliminando(true)
     try {
-      await deleteEdt(id)
-      toast.success('EDT eliminado exitosamente')
-      onDelete?.(id)
+      await deleteEdt(edtAEliminar.id)
+      toast.success('EDT eliminado')
+      onDelete?.(edtAEliminar.id)
+      setDeleteDialogOpen(false)
+      setEdtAEliminar(null)
     } catch (err) {
       console.error('Error deleting edt:', err)
       toast.error('Error al eliminar el EDT')
     } finally {
-      setEliminando(null)
+      setEliminando(false)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
-            <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
-            <div className="flex-1 space-y-2">
-              <div className="h-4 bg-gray-200 rounded animate-pulse w-1/4"></div>
-              <div className="h-3 bg-gray-200 rounded animate-pulse w-3/4"></div>
-            </div>
-            <div className="flex space-x-2">
-              <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
-              <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
+  const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      guardar(id)
+    } else if (e.key === 'Escape') {
+      cancelarEdicion()
+    }
   }
 
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-red-500 mb-2">Error al cargar los EDTs</div>
-        <div className="text-sm text-gray-500">{error}</div>
-      </div>
-    )
-  }
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No hay EDTs registrados</h3>
-        <p className="text-muted-foreground">
-          Los EDTs aparecerán aquí una vez que sean creados
-        </p>
-      </div>
-    )
+  if (loading || !data || data.length === 0) {
+    return null
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12"></TableHead>
-            <TableHead>Nombre</TableHead>
-            <TableHead>Descripción</TableHead>
-            <TableHead>Fase por Defecto</TableHead>
-            <TableHead className="w-32">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((edt) => (
-            <TableRow key={edt.id}>
-              <TableCell>
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <FolderOpen className="h-4 w-4 text-blue-600" />
-                </div>
-              </TableCell>
-              <TableCell>
-                {editando === edt.id ? (
-                  <Input
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                    className="h-8"
-                    placeholder="Nombre del EDT"
-                  />
-                ) : (
-                  <div className="font-medium">{edt.nombre}</div>
-                )}
-              </TableCell>
-              <TableCell>
-                {editando === edt.id ? (
-                  <Textarea
-                    value={descripcion}
-                    onChange={(e) => setDescripcion(e.target.value)}
-                    className="min-h-8 resize-none"
-                    placeholder="Descripción opcional"
-                    rows={2}
-                  />
-                ) : (
-                  <div className="text-sm text-gray-600 max-w-xs truncate">
-                    {edt.descripcion || 'Sin descripción'}
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>
-                {editando === edt.id ? (
-                  <Select value={faseDefaultId || "none"} onValueChange={(value) => setFaseDefaultId(value === "none" ? "" : value)}>
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Seleccionar fase..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin fase por defecto</SelectItem>
-                      {fasesDefault.map((fase) => (
-                        <SelectItem key={fase.id} value={fase.id}>
-                          {fase.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="text-sm">
-                    {edt.faseDefault?.nombre || 'Sin asignar'}
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>
-                {editando === edt.id ? (
-                  <div className="flex space-x-1">
-                    <Button
-                      size="sm"
-                      onClick={() => guardar(edt.id)}
-                      disabled={guardando}
-                      className="h-7 px-2"
+    <TooltipProvider>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b bg-muted/40">
+              <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Nombre
+              </th>
+              <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Descripción
+              </th>
+              <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Fase por Defecto
+              </th>
+              <th className="w-24 py-2 px-3"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {data.map((edt) => (
+              <tr key={edt.id} className="hover:bg-muted/30 transition-colors">
+                <td className="py-2 px-3">
+                  {editando === edt.id ? (
+                    <Input
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, edt.id)}
+                      className="h-8 text-sm"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="text-sm font-medium">{edt.nombre}</span>
+                  )}
+                </td>
+                <td className="py-2 px-3">
+                  {editando === edt.id ? (
+                    <Input
+                      value={descripcion}
+                      onChange={(e) => setDescripcion(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, edt.id)}
+                      placeholder="Sin descripción"
+                      className="h-8 text-sm"
+                    />
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      {edt.descripcion || '—'}
+                    </span>
+                  )}
+                </td>
+                <td className="py-2 px-3">
+                  {editando === edt.id ? (
+                    <Select
+                      value={faseDefaultId || "none"}
+                      onValueChange={(value) => setFaseDefaultId(value === "none" ? "" : value)}
                     >
-                      {guardando ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Save className="h-3 w-3" />
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={cancelarEdicion}
-                      disabled={guardando}
-                      className="h-7 px-2"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Seleccionar..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin fase</SelectItem>
+                        {fasesDefault.map((fase) => (
+                          <SelectItem key={fase.id} value={fase.id}>
+                            {fase.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      {edt.faseDefault?.nombre || '—'}
+                    </span>
+                  )}
+                </td>
+                <td className="py-2 px-3">
+                  <div className="flex justify-end gap-1">
+                    {editando === edt.id ? (
+                      <>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={cancelarEdicion}
+                              disabled={guardando}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Cancelar (Esc)</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => guardar(edt.id)}
+                              disabled={guardando}
+                            >
+                              {guardando ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Check className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Guardar (Enter)</TooltipContent>
+                        </Tooltip>
+                      </>
+                    ) : (
+                      <div className="flex gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={() => iniciarEdicion(edt)}
+                              disabled={editando !== null}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleConfirmarEliminar(edt)}
+                              disabled={editando !== null}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Eliminar</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex space-x-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => iniciarEdicion(edt)}
-                      disabled={editando !== null || eliminando !== null}
-                      className="h-7 px-2"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => eliminar(edt.id)}
-                      disabled={editando !== null || eliminando === edt.id}
-                      className="h-7 px-2"
-                    >
-                      {eliminando === edt.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar EDT?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará el EDT "{edtAEliminar?.nombre}". Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEliminar}
+              disabled={eliminando}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {eliminando ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </TooltipProvider>
   )
 }

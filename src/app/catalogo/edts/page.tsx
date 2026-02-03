@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
 import EdtModal from '@/components/catalogo/EdtModal'
 import EdtTableView from '@/components/catalogo/EdtTableView'
 import EdtCardView from '@/components/catalogo/EdtCardView'
@@ -16,33 +14,38 @@ import {
 import type { Edt } from '@/types'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Input } from '@/components/ui/input'
 import {
-  ChevronRight,
   FolderOpen,
   Plus,
-  BarChart3,
-  FileText,
   AlertCircle,
   Loader2,
-  Package,
-  Grid3X3,
-  List
+  Search,
+  X
 } from 'lucide-react'
 
 export default function Page() {
-  const router = useRouter()
   const [edts, setEdts] = useState<Edt[]>([])
   const [loading, setLoading] = useState(true)
   const [importando, setImportando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Filtrar EDTs
+  const edtsFiltrados = edts.filter(edt => {
+    if (!searchTerm.trim()) return true
+    const term = searchTerm.toLowerCase().trim()
+    const nombreMatch = edt.nombre.toLowerCase().includes(term)
+    const descripcionMatch = edt.descripcion?.toLowerCase().includes(term) || false
+    return nombreMatch || descripcionMatch
+  })
 
   const cargarEdts = async () => {
     try {
@@ -101,7 +104,6 @@ export default function Page() {
         return
       }
 
-      // Función auxiliar para encontrar fase por defecto por nombre
       const encontrarFasePorNombre = async (nombreFase: string): Promise<string | undefined> => {
         if (!nombreFase) return undefined
         try {
@@ -128,7 +130,7 @@ export default function Page() {
       toast.success(`${nuevos.length} EDTs importados correctamente`)
       cargarEdts()
     } catch (err) {
-      console.error('Error al importar categorías:', err)
+      console.error('Error al importar EDTs:', err)
       toast.error('Error inesperado en la importación')
     } finally {
       setImportando(false)
@@ -136,83 +138,26 @@ export default function Page() {
     }
   }
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.3,
-        staggerChildren: 0.1
-      }
-    }
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.3 }
-    }
-  }
-
   if (loading) {
     return (
-      <div className="space-y-6">
-        {/* Breadcrumb Skeleton */}
-        <div className="flex items-center space-x-2">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-4" />
-          <Skeleton className="h-4 w-32" />
-        </div>
-        
-        {/* Header Skeleton */}
-        <div className="flex justify-between items-start">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-48" />
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-8 w-32" />
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-9 w-20" />
           </div>
-          <Skeleton className="h-10 w-32" />
         </div>
-        
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-8 w-8" />
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-6 w-8" />
-                  </div>
+        <Skeleton className="h-10 w-full max-w-sm" />
+        <Card>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4 p-3">
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-4 w-64 flex-1" />
+                  <Skeleton className="h-8 w-20" />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        
-        {/* Form Skeleton */}
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-32" />
-          </CardContent>
-        </Card>
-        
-        {/* List Skeleton */}
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
           </CardContent>
@@ -222,131 +167,53 @@ export default function Page() {
   }
 
   return (
-    <motion.div 
-      className="space-y-6"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Breadcrumb Navigation */}
-      <motion.nav 
-        className="flex items-center space-x-2 text-sm text-muted-foreground"
-        variants={itemVariants}
-      >
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => router.push('/catalogo')}
-          className="h-auto p-0 font-normal"
-        >
-          Catálogo
-        </Button>
-        <ChevronRight className="h-4 w-4" />
-        <span className="font-medium text-foreground">EDTs</span>
-      </motion.nav>
-
-      {/* Header Section */}
-      <motion.div 
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-        variants={itemVariants}
-      >
-        <div className="space-y-1">
+    <div className="space-y-4">
+      {/* Header compacto */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <FolderOpen className="h-6 w-6 text-blue-600" />
-            <h1 className="text-2xl font-bold tracking-tight">EDTs</h1>
+            <FolderOpen className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-semibold">EDTs</h1>
           </div>
-          <p className="text-muted-foreground">
-            Gestiona los EDTs para organizar los servicios del catálogo
-          </p>
+          <Badge variant="secondary" className="font-normal">
+            {edts.length}
+          </Badge>
         </div>
-        <div className="flex items-center gap-2">
-          <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
-          <Button onClick={() => setShowCreateModal(true)} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo EDT
-          </Button>
-        </div>
-      </motion.div>
 
-      {/* Quick Stats */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
-        variants={itemVariants}
-      >
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Package className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total EDTs</p>
-                <p className="text-2xl font-bold">{edts.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <BarChart3 className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">EDTs Activos</p>
-                <p className="text-2xl font-bold">{edts.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <FileText className="h-4 w-4 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Estado</p>
-                <Badge variant="secondary" className="mt-1">
-                  Operativo
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Nuevo
+          </Button>
+          <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
+        </div>
+      </div>
 
       {/* Import Status */}
       {importando && (
-        <motion.div variants={itemVariants}>
-          <Alert>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <AlertDescription>
-              Importando categorías, por favor espera...
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+        <Alert>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            Importando EDTs, por favor espera...
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Import Errors */}
       {errores.length > 0 && (
-        <motion.div variants={itemVariants}>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-2">
-                <p className="font-semibold">Errores encontrados durante la importación:</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  {errores.map((err, idx) => (
-                    <li key={idx} className="text-sm">{err}</li>
-                  ))}
-                </ul>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p className="font-semibold">Errores encontrados durante la importación:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                {errores.map((err, idx) => (
+                  <li key={idx} className="text-sm">{err}</li>
+                ))}
+              </ul>
+            </div>
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Create Modal */}
@@ -356,74 +223,85 @@ export default function Page() {
         onCreated={handleCreated}
       />
 
-      <Separator />
+      {/* Barra de búsqueda y controles */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o descripción..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-9 h-9"
+          />
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+              onClick={() => setSearchTerm('')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
 
-      {/* Categories List */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5" />
-                  EDTs Existentes
-                </CardTitle>
-                <CardDescription>
-                  {edts.length === 0
-                    ? 'No hay EDTs registrados aún'
-                    : `${edts.length} EDT${edts.length !== 1 ? 's' : ''} registrado${edts.length !== 1 ? 's' : ''}`
-                  }
-                </CardDescription>
-              </div>
-              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'cards')}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="table" className="flex items-center gap-2">
-                    <List className="h-4 w-4" />
-                    Tabla
-                  </TabsTrigger>
-                  <TabsTrigger value="cards" className="flex items-center gap-2">
-                    <Grid3X3 className="h-4 w-4" />
-                    Cards
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+        <div className="flex items-center gap-2">
+          {searchTerm && edtsFiltrados.length !== edts.length && (
+            <span className="text-sm text-muted-foreground">
+              {edtsFiltrados.length} de {edts.length}
+            </span>
+          )}
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'cards')}>
+            <TabsList className="h-9">
+              <TabsTrigger value="table" className="text-xs px-3">Tabla</TabsTrigger>
+              <TabsTrigger value="cards" className="text-xs px-3">Cards</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* Lista */}
+      <Card>
+        <CardContent className="p-0">
+          {edts.length === 0 ? (
+            <div className="text-center py-12">
+              <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No hay EDTs registrados</h3>
+              <p className="text-muted-foreground mb-4">
+                Comienza creando tu primer EDT para organizar el catálogo
+              </p>
+              <Button variant="outline" size="sm" onClick={() => setShowCreateModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Crear EDT
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            {edts.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <FolderOpen className="h-12 w-12 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  No hay EDTs
-                </h3>
-                <p className="text-gray-500 mb-4 max-w-sm mx-auto">
-                  Comienza creando tu primer EDT para organizar el catálogo.
-                </p>
-                <Button variant="outline" size="sm" onClick={() => setShowCreateModal(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear primer EDT
-                </Button>
-              </div>
-            ) : viewMode === 'table' ? (
-              <EdtTableView
-                data={edts}
-                onUpdate={handleUpdated}
-                onDelete={handleDeleted}
-                loading={loading}
-              />
-            ) : (
-              <EdtCardView
-                data={edts}
-                onUpdate={handleUpdated}
-                onDelete={handleDeleted}
-                loading={loading}
-              />
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
+          ) : edtsFiltrados.length === 0 ? (
+            <div className="text-center py-12">
+              <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Sin resultados</h3>
+              <p className="text-muted-foreground mb-4">
+                No se encontraron EDTs que coincidan con "{searchTerm}"
+              </p>
+              <Button variant="outline" size="sm" onClick={() => setSearchTerm('')}>
+                <X className="h-4 w-4 mr-2" />
+                Limpiar búsqueda
+              </Button>
+            </div>
+          ) : viewMode === 'table' ? (
+            <EdtTableView
+              data={edtsFiltrados}
+              onUpdate={handleUpdated}
+              onDelete={handleDeleted}
+            />
+          ) : (
+            <EdtCardView
+              data={edtsFiltrados}
+              onUpdate={handleUpdated}
+              onDelete={handleDeleted}
+            />
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

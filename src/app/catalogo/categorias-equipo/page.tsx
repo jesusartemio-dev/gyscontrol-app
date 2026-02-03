@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   getCategoriasEquipo,
   createCategoriaEquipo
@@ -19,36 +18,41 @@ import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 
 // UI Components
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Input } from '@/components/ui/input'
 
 // Icons
-import { 
-  ChevronRight, 
-  Package, 
-  TrendingUp, 
-  AlertCircle, 
-  FileText, 
-  Upload,
-  Loader2
+import {
+  Package,
+  AlertCircle,
+  Loader2,
+  Search,
+  X,
+  Plus
 } from 'lucide-react'
 
-// Animations
-import { motion } from 'framer-motion'
-
 export default function CategoriasEquipoPage() {
-  const router = useRouter()
   const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
   const [importando, setImportando] = useState(false)
   const [errores, setErrores] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Filtrar categorías por nombre y descripción
+  const categoriasFiltradas = categorias.filter(cat => {
+    if (!searchTerm.trim()) return true
+    const term = searchTerm.toLowerCase().trim()
+    const nombreMatch = cat.nombre.toLowerCase().includes(term)
+    const descripcionMatch = cat.descripcion?.toLowerCase().includes(term) || false
+    return nombreMatch || descripcionMatch
+  })
 
   const cargarCategorias = async () => {
     try {
@@ -123,139 +127,57 @@ export default function CategoriasEquipoPage() {
     }
   }
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.6,
-        staggerChildren: 0.1
-      }
-    }
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 }
-    }
-  }
-
   if (loading) {
     return (
-      <div className="space-y-6">
-        {/* Breadcrumb Skeleton */}
-        <div className="flex items-center space-x-2">
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-4 w-4" />
-          <Skeleton className="h-4 w-32" />
-        </div>
-
+      <div className="space-y-4">
         {/* Header Skeleton */}
         <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-48" />
-          </div>
+          <Skeleton className="h-8 w-48" />
           <div className="flex gap-2">
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-9 w-20" />
           </div>
         </div>
-
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-8 w-8" />
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-6 w-8" />
-                  </div>
+        {/* Search Skeleton */}
+        <Skeleton className="h-10 w-full max-w-sm" />
+        {/* Table Skeleton */}
+        <Card>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="flex items-center gap-4 p-3">
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-4 w-64 flex-1" />
+                  <Skeleton className="h-8 w-20" />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Form and List Skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <Skeleton className="h-6 w-40" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <motion.div 
-      className="space-y-6"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Breadcrumb Navigation */}
-      <motion.nav 
-        className="flex items-center space-x-2 text-sm text-muted-foreground"
-        variants={itemVariants}
-      >
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={() => router.push('/catalogo')}
-          className="h-auto p-0 font-normal"
-        >
-          Catálogo
-        </Button>
-        <ChevronRight className="h-4 w-4" />
-        <span className="font-medium text-foreground">Categorías de Equipos</span>
-      </motion.nav>
-
-      {/* Header Section */}
-      <motion.div 
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-        variants={itemVariants}
-      >
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Package className="h-8 w-8 text-primary" />
-            Categorías de Equipos
-          </h1>
-          <p className="text-muted-foreground">
-            Gestiona las categorías para organizar tu inventario de equipos
-          </p>
+    <div className="space-y-4">
+      {/* Header compacto */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Package className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-semibold">Categorías de Equipos</h1>
+          </div>
+          <Badge variant="secondary" className="font-normal">
+            {categorias.length}
+          </Badge>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Dialog open={modalOpen} onOpenChange={setModalOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Package className="h-4 w-4 mr-2" />
-                Nueva Categoría
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Nueva
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -270,143 +192,110 @@ export default function CategoriasEquipoPage() {
           </Dialog>
           <BotonesImportExport onExportar={handleExportar} onImportar={handleImportar} />
         </div>
-      </motion.div>
-
-      {/* Quick Stats */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
-        variants={itemVariants}
-      >
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Package className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Categorías</p>
-                <p className="text-2xl font-bold">{categorias.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Categorías Activas</p>
-                <p className="text-2xl font-bold text-green-600">{categorias.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <FileText className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Última Actualización</p>
-                <p className="text-sm font-medium">
-                  {categorias.length > 0 ? 'Hoy' : 'Sin datos'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      </div>
 
       {/* Import Status */}
       {importando && (
-        <motion.div variants={itemVariants}>
-          <Alert>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <AlertDescription>
-              Importando categorías, por favor espera...
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+        <Alert>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            Importando categorías, por favor espera...
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Import Errors */}
       {errores.length > 0 && (
-        <motion.div variants={itemVariants}>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-2">
-                <p className="font-semibold">Errores encontrados durante la importación:</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  {errores.map((err, idx) => (
-                    <li key={idx} className="text-sm">{err}</li>
-                  ))}
-                </ul>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p className="font-semibold">Errores encontrados durante la importación:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                {errores.map((err, idx) => (
+                  <li key={idx} className="text-sm">{err}</li>
+                ))}
+              </ul>
+            </div>
+          </AlertDescription>
+        </Alert>
       )}
 
-      {/* Main Content */}
-      <motion.div
-        className="space-y-6"
-        variants={itemVariants}
-      >
-        {/* List Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Lista de Categorías
-              </span>
-              <div className="flex items-center gap-2">
-                <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'card')}>
-                  <TabsList>
-                    <TabsTrigger value="table">Tabla</TabsTrigger>
-                    <TabsTrigger value="card">Cards</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                <Badge variant="secondary">
-                  {categorias.length} {categorias.length === 1 ? 'categoría' : 'categorías'}
-                </Badge>
-              </div>
-            </CardTitle>
-            <CardDescription>
-              Administra las categorías existentes de equipos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {categorias.length === 0 ? (
-              <div className="text-center py-12">
-                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No hay categorías registradas</h3>
-                <p className="text-muted-foreground mb-4">
-                  Comienza agregando tu primera categoría de equipo
-                </p>
-                <Button variant="outline" size="sm">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Importar desde Excel
-                </Button>
-              </div>
-            ) : (
-              <CategoriaEquipoList
-                data={categorias}
-                onUpdate={handleUpdated}
-                onDelete={handleDeleted}
-                onRefresh={cargarCategorias}
-                viewMode={viewMode}
-              />
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
+      {/* Barra de búsqueda y controles */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o descripción..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-9 h-9"
+          />
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+              onClick={() => setSearchTerm('')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {searchTerm && categoriasFiltradas.length !== categorias.length && (
+            <span className="text-sm text-muted-foreground">
+              {categoriasFiltradas.length} de {categorias.length}
+            </span>
+          )}
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'card')}>
+            <TabsList className="h-9">
+              <TabsTrigger value="table" className="text-xs px-3">Tabla</TabsTrigger>
+              <TabsTrigger value="card" className="text-xs px-3">Cards</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* Lista */}
+      <Card>
+        <CardContent className="p-0">
+          {categorias.length === 0 ? (
+            <div className="text-center py-12">
+              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No hay categorías registradas</h3>
+              <p className="text-muted-foreground mb-4">
+                Comienza agregando tu primera categoría de equipo
+              </p>
+              <Button variant="outline" size="sm" onClick={() => setModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Crear categoría
+              </Button>
+            </div>
+          ) : categoriasFiltradas.length === 0 ? (
+            <div className="text-center py-12">
+              <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Sin resultados</h3>
+              <p className="text-muted-foreground mb-4">
+                No se encontraron categorías que coincidan con "{searchTerm}"
+              </p>
+              <Button variant="outline" size="sm" onClick={() => setSearchTerm('')}>
+                <X className="h-4 w-4 mr-2" />
+                Limpiar búsqueda
+              </Button>
+            </div>
+          ) : (
+            <CategoriaEquipoList
+              data={categoriasFiltradas}
+              onUpdate={handleUpdated}
+              onDelete={handleDeleted}
+              onRefresh={cargarCategorias}
+              viewMode={viewMode}
+            />
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
