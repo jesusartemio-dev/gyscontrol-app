@@ -627,11 +627,9 @@ export function RegistroHorasWizard({
                   console.log(`🎨 REACT: Renderizando SelectItem ${index + 1}`, { proyecto, index })
                   return (
                     <SelectItem key={proyecto.id} value={proyecto.id}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{proyecto.nombre}</span>
-                        <span className="text-sm text-gray-600">
-                          {proyecto.codigo} • {proyecto.responsableNombre}
-                        </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold text-blue-700">{proyecto.codigo}</span>
+                        <span className="text-xs text-gray-500">• {proyecto.responsableNombre}</span>
                       </div>
                     </SelectItem>
                   )
@@ -643,12 +641,12 @@ export function RegistroHorasWizard({
         {proyectoSeleccionado && (
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="p-3">
-              <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-blue-600" />
-                <div>
-                  <div className="font-medium">{proyectoSeleccionado.nombre}</div>
-                  <div className="text-sm text-gray-600">
-                    {proyectoSeleccionado.codigo} • {proyectoSeleccionado.responsableNombre}
+              <div className="flex items-center gap-3">
+                <Building className="h-5 w-5 text-blue-600 shrink-0" />
+                <div className="min-w-0">
+                  <div className="font-mono font-bold text-blue-800 text-lg">{proyectoSeleccionado.codigo}</div>
+                  <div className="text-xs text-gray-600 truncate">
+                    {proyectoSeleccionado.responsableNombre}
                   </div>
                 </div>
               </div>
@@ -1131,18 +1129,18 @@ export function RegistroHorasWizard({
     <div className="space-y-6">
       {/* Header con progreso */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+          <h3 className="text-base sm:text-lg font-semibold">
             Paso {pasoActual} de {pasos.length}: {pasos[pasoActual - 1].titulo}
           </h3>
-          <Badge variant="outline">
-            {Math.round(progreso)}% completado
+          <Badge variant="outline" className="w-fit">
+            {Math.round(progreso)}%
           </Badge>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-xs sm:text-sm text-gray-600">
           {pasos[pasoActual - 1].descripcion}
         </p>
-        <Progress value={progreso} className="w-full" />
+        <Progress value={progreso} className="w-full h-2" />
       </div>
 
       {/* Contenido del paso */}
@@ -1195,7 +1193,7 @@ export function RegistroHorasWizard({
   if (open !== undefined && onOpenChange) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
