@@ -10,6 +10,8 @@ export interface EmpleadoPayload {
   departamentoId?: string
   sueldoPlanilla?: number
   sueldoHonorarios?: number
+  asignacionFamiliar?: number
+  emo?: number
   fechaIngreso?: string
   fechaCese?: string
   activo?: boolean

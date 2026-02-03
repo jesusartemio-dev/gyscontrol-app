@@ -1176,8 +1176,10 @@ model Empleado {
   userId               String               @unique
   cargoId              String?
   departamentoId       String?
-  sueldoPlanilla       Float?               // Sueldo en planilla
+  sueldoPlanilla       Float?               // Sueldo en planilla (remuneración base)
   sueldoHonorarios     Float?               // Sueldo adicional en honorarios
+  asignacionFamiliar   Float                @default(0)  // Asignación familiar (10% RMV si aplica)
+  emo                  Float                @default(25) // EMO mensual (Examen Médico Ocupacional)
   fechaIngreso         DateTime?
   fechaCese            DateTime?
   activo               Boolean              @default(true)

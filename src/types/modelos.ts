@@ -474,8 +474,10 @@ export interface Empleado {
   userId: string
   cargoId?: string
   departamentoId?: string    // Departamento directo del empleado
-  sueldoPlanilla?: number    // Sueldo en planilla
+  sueldoPlanilla?: number    // Sueldo en planilla (remuneración base)
   sueldoHonorarios?: number  // Sueldo adicional en honorarios
+  asignacionFamiliar: number // Asignación familiar (10% RMV si aplica)
+  emo: number                // EMO mensual (Examen Médico Ocupacional)
   fechaIngreso?: string
   fechaCese?: string
   activo: boolean

@@ -48,6 +48,7 @@ import {
   formatUSD,
   penToUSD
 } from '@/lib/costos'
+import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
 
 // Schema de validación
 const empleadoSchema = z.object({
@@ -56,6 +57,8 @@ const empleadoSchema = z.object({
   departamentoId: z.string().optional(),
   sueldoPlanilla: z.string().optional(),
   sueldoHonorarios: z.string().optional(),
+  asignacionFamiliar: z.string().optional(),
+  emo: z.string().optional(),
   fechaIngreso: z.string().optional(),
   fechaCese: z.string().optional(),
   activo: z.boolean().default(true),
@@ -75,6 +78,8 @@ const defaultForm: EmpleadoForm = {
   departamentoId: '',
   sueldoPlanilla: '',
   sueldoHonorarios: '',
+  asignacionFamiliar: '0',
+  emo: '25',
   fechaIngreso: '',
   fechaCese: '',
   activo: true,
@@ -223,6 +228,8 @@ export default function PersonalClient() {
       departamentoId: empleado.departamentoId || '',
       sueldoPlanilla: empleado.sueldoPlanilla?.toString() || '',
       sueldoHonorarios: empleado.sueldoHonorarios?.toString() || '',
+      asignacionFamiliar: empleado.asignacionFamiliar?.toString() || '0',
+      emo: empleado.emo?.toString() || '25',
       fechaIngreso: empleado.fechaIngreso ? empleado.fechaIngreso.split('T')[0] : '',
       fechaCese: empleado.fechaCese ? empleado.fechaCese.split('T')[0] : '',
       activo: empleado.activo,
@@ -271,6 +278,8 @@ export default function PersonalClient() {
         departamentoId: form.departamentoId || undefined,
         sueldoPlanilla: form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : undefined,
         sueldoHonorarios: form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : undefined,
+        asignacionFamiliar: form.asignacionFamiliar ? parseFloat(form.asignacionFamiliar) : 0,
+        emo: form.emo ? parseFloat(form.emo) : 25,
         fechaIngreso: form.fechaIngreso || undefined,
         fechaCese: form.fechaCese || undefined,
         activo: form.activo,
@@ -546,7 +555,7 @@ export default function PersonalClient() {
                         Honorarios
                       </th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Total
+                        Costo Total
                       </th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         $/Hora
@@ -561,8 +570,7 @@ export default function PersonalClient() {
                   </thead>
                   <tbody className="divide-y">
                     {filteredEmpleados.map((emp) => {
-                      const sueldoTotal = getSueldoTotal(emp.sueldoPlanilla, emp.sueldoHonorarios)
-                      const costoHora = penToUSD(sueldoTotal, config.tipoCambio) / config.horasMensuales
+                      const costos = calcularCostosLaborales(emp, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
                       return (
                         <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
                           <td className="py-2 px-3">
@@ -599,18 +607,36 @@ export default function PersonalClient() {
                             </span>
                           </td>
                           <td className="py-2 px-3 text-right">
-                            <span className="font-mono text-sm font-semibold">{formatCurrency(sueldoTotal)}</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-mono text-sm font-semibold text-orange-600 cursor-help">
+                                  {formatCurrency(costos.totalMensual)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-xs">
+                                <div className="text-xs space-y-1">
+                                  <p><span className="text-muted-foreground">Remuneración:</span> {formatCurrency(costos.totalRemuneracion)}</p>
+                                  <p><span className="text-muted-foreground">Essalud (9%):</span> {formatCurrency(costos.essalud)}</p>
+                                  <p><span className="text-muted-foreground">CTS mensual:</span> {formatCurrency(costos.ctsMensual)}</p>
+                                  <p><span className="text-muted-foreground">Gratif. mensual:</span> {formatCurrency(costos.gratificacionMensual)}</p>
+                                  <p><span className="text-muted-foreground">SCTR (0.9%):</span> {formatCurrency(costos.sctr)}</p>
+                                  <p><span className="text-muted-foreground">Vida Ley (0.2%):</span> {formatCurrency(costos.vidaLey)}</p>
+                                  <p><span className="text-muted-foreground">EMO:</span> {formatCurrency(costos.emo)}</p>
+                                  <p><span className="text-muted-foreground">Honorarios:</span> {formatCurrency(costos.honorarios)}</p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
                           </td>
                           <td className="py-2 px-3 text-right">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="font-mono text-sm font-bold text-blue-600 cursor-help">
-                                  {formatUSD(costoHora)}/h
+                                  {formatUSD(costos.costoHoraUSD || 0)}/h
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent side="left">
                                 <p className="font-mono text-xs">
-                                  ({formatCurrency(sueldoTotal)} / {config.tipoCambio}) / {config.horasMensuales}h
+                                  ({formatCurrency(costos.totalMensual)} / {config.tipoCambio}) / {config.horasMensuales}h
                                 </p>
                               </TooltipContent>
                             </Tooltip>
@@ -734,20 +760,20 @@ export default function PersonalClient() {
                 </div>
               </div>
 
-              {/* Sueldos + Cálculo */}
+              {/* Sueldos + Costos Laborales */}
               {(() => {
-                const sueldoTotal = getSueldoTotal(
-                  form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : 0,
-                  form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0
-                )
-                const sueldoUSD = penToUSD(sueldoTotal, config.tipoCambio)
-                const costoHora = sueldoTotal > 0 ? sueldoUSD / config.horasMensuales : 0
+                const costos = calcularCostosLaborales({
+                  sueldoPlanilla: form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : 0,
+                  sueldoHonorarios: form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0,
+                  asignacionFamiliar: form.asignacionFamiliar ? parseFloat(form.asignacionFamiliar) : 0,
+                  emo: form.emo ? parseFloat(form.emo) : 25,
+                }, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
 
                 return (
-                  <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-lg">
-                    <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="p-3 bg-gradient-to-r from-blue-50 to-orange-50 border border-blue-100 rounded-lg">
+                    <div className="grid grid-cols-4 gap-3 mb-3">
                       <div className="space-y-1">
-                        <Label htmlFor="sueldoPlanilla" className="text-xs">Sueldo Planilla (PEN)</Label>
+                        <Label htmlFor="sueldoPlanilla" className="text-xs">Remuneración (PEN)</Label>
                         <Input
                           id="sueldoPlanilla"
                           type="number"
@@ -759,7 +785,19 @@ export default function PersonalClient() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label htmlFor="sueldoHonorarios" className="text-xs">Sueldo Honorarios (PEN)</Label>
+                        <Label htmlFor="asignacionFamiliar" className="text-xs">Asig. Familiar</Label>
+                        <Input
+                          id="asignacionFamiliar"
+                          type="number"
+                          step="0.01"
+                          value={form.asignacionFamiliar}
+                          onChange={(e) => setForm({ ...form, asignacionFamiliar: e.target.value })}
+                          placeholder="0.00"
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="sueldoHonorarios" className="text-xs">Honorarios</Label>
                         <Input
                           id="sueldoHonorarios"
                           type="number"
@@ -770,28 +808,55 @@ export default function PersonalClient() {
                           className="h-9"
                         />
                       </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="emo" className="text-xs">EMO mensual</Label>
+                        <Input
+                          id="emo"
+                          type="number"
+                          step="0.01"
+                          value={form.emo}
+                          onChange={(e) => setForm({ ...form, emo: e.target.value })}
+                          placeholder="25.00"
+                          className="h-9"
+                        />
+                      </div>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-blue-200">
                       <div className="flex items-center gap-4">
-                        <div>
-                          <span className="text-[10px] text-muted-foreground">Total: </span>
-                          <span className="font-semibold text-sm">{formatCurrency(sueldoTotal)}</span>
-                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="cursor-help">
+                              <span className="text-[10px] text-muted-foreground">Costo Total: </span>
+                              <span className="font-semibold text-sm text-orange-600">{formatCurrency(costos.totalMensual)}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <div className="text-xs space-y-0.5">
+                              <p>Remuneración: {formatCurrency(costos.totalRemuneracion)}</p>
+                              <p>Essalud (9%): {formatCurrency(costos.essalud)}</p>
+                              <p>CTS mensual: {formatCurrency(costos.ctsMensual)}</p>
+                              <p>Gratif. mensual: {formatCurrency(costos.gratificacionMensual)}</p>
+                              <p>SCTR + Vida Ley: {formatCurrency(costos.sctr + costos.vidaLey)}</p>
+                              <p>EMO: {formatCurrency(costos.emo)}</p>
+                              <p>Honorarios: {formatCurrency(costos.honorarios)}</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
                         <div>
                           <span className="text-[10px] text-muted-foreground">USD: </span>
-                          <span className="font-semibold text-sm text-green-600">{formatUSD(sueldoUSD)}</span>
+                          <span className="font-semibold text-sm text-green-600">{formatUSD(penToUSD(costos.totalMensual, config.tipoCambio))}</span>
                         </div>
                       </div>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex items-center gap-1 cursor-help">
                             <span className="text-[10px] text-muted-foreground">Costo/Hora:</span>
-                            <span className="font-bold text-blue-600">{formatUSD(costoHora)}/h</span>
+                            <span className="font-bold text-blue-600">{formatUSD(costos.costoHoraUSD || 0)}/h</span>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent side="left" className="max-w-xs">
                           <p className="font-mono text-xs">
-                            ({formatCurrency(sueldoTotal)} / {config.tipoCambio}) / {config.horasMensuales}h
+                            ({formatCurrency(costos.totalMensual)} / {config.tipoCambio}) / {config.horasMensuales}h
                           </p>
                           <p className="text-[10px] text-muted-foreground mt-1">
                             TC: {config.tipoCambio} · {config.horasSemanales}h/sem × {config.semanasxMes} = {config.horasMensuales}h/mes
