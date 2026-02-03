@@ -60,6 +60,7 @@ function getRolePermissions(role: RolUsuario): PermissionAction[] {
     coordinador: ['view', 'create', 'edit', 'manage_team', 'approve'],
     logistico: ['view', 'create', 'edit', 'manage_items', 'convert_to_orders', 'track_delivery'],
     gestor: ['view', 'create', 'edit', 'delete', 'manage_team', 'approve', 'manage_permissions'],
+    seguridad: ['view', 'view_all', 'manage_team'],
     colaborador: ['view']
   };
 
