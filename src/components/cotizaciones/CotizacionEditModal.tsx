@@ -54,8 +54,9 @@ export default function CotizacionEditModal({ cotizacion, open, onOpenChange, on
     if (open) {
       setNombre(cotizacion.nombre)
       // Obtener IDs del cliente y comercial desde los objetos anidados
+      // La API de lista usa 'user', la API de detalle usa 'comercial'
       const currentClienteId = cotizacion.cliente?.id || ''
-      const currentComercialId = cotizacion.comercial?.id || ''
+      const currentComercialId = cotizacion.comercial?.id || (cotizacion as any).user?.id || ''
       setClienteId(currentClienteId)
       setComercialId(currentComercialId)
       loadData()
@@ -67,7 +68,7 @@ export default function CotizacionEditModal({ cotizacion, open, onOpenChange, on
     try {
       const [clientesRes, usuariosRes] = await Promise.all([
         fetch(buildApiUrl('/api/clientes')),
-        fetch(buildApiUrl('/api/users'))
+        fetch(buildApiUrl('/api/admin/usuarios'))
       ])
 
       if (clientesRes.ok) {
