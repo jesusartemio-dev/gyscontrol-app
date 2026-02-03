@@ -16,7 +16,8 @@ import {
   Upload,
   FileSpreadsheet,
   Eye,
-  EyeOff
+  EyeOff,
+  ArrowUpDown
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -166,6 +167,9 @@ export default function PersonalClient() {
   const [showBeneficios, setShowBeneficios] = useState(false)
   const [showSeguros, setShowSeguros] = useState(false)
 
+  // Ordenamiento
+  const [sortBy, setSortBy] = useState<string>('nombre')
+
   // Cargar datos iniciales
   useEffect(() => {
     loadData()
@@ -199,9 +203,9 @@ export default function PersonalClient() {
     return usuarios.filter(u => !empleadoUserIds.has(u.id) || (editingEmpleado && editingEmpleado.userId === u.id))
   }, [usuarios, empleados, editingEmpleado])
 
-  // Filtrar empleados
+  // Filtrar y ordenar empleados
   const filteredEmpleados = useMemo(() => {
-    return empleados.filter(emp => {
+    const filtered = empleados.filter(emp => {
       const matchesSearch = !searchTerm ||
         emp.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -218,7 +222,38 @@ export default function PersonalClient() {
 
       return matchesSearch && matchesFilter && matchesDepartamento
     })
-  }, [empleados, searchTerm, filterActivo, filterDepartamento])
+
+    // Ordenar
+    return filtered.sort((a, b) => {
+      const costosA = calcularCostosLaborales(a, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
+      const costosB = calcularCostosLaborales(b, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
+
+      switch (sortBy) {
+        case 'nombre':
+          return (a.user?.name || '').localeCompare(b.user?.name || '')
+        case 'nombre-desc':
+          return (b.user?.name || '').localeCompare(a.user?.name || '')
+        case 'remuneracion-desc':
+          return costosB.remuneracion - costosA.remuneracion
+        case 'remuneracion-asc':
+          return costosA.remuneracion - costosB.remuneracion
+        case 'total-desc':
+          return costosB.totalMensual - costosA.totalMensual
+        case 'total-asc':
+          return costosA.totalMensual - costosB.totalMensual
+        case 'costo-hora-desc':
+          return costosB.costoHora - costosA.costoHora
+        case 'costo-hora-asc':
+          return costosA.costoHora - costosB.costoHora
+        case 'fecha-ingreso':
+          return new Date(b.fechaIngreso || 0).getTime() - new Date(a.fechaIngreso || 0).getTime()
+        case 'fecha-ingreso-asc':
+          return new Date(a.fechaIngreso || 0).getTime() - new Date(b.fechaIngreso || 0).getTime()
+        default:
+          return 0
+      }
+    })
+  }, [empleados, searchTerm, filterActivo, filterDepartamento, sortBy, config])
 
   // Handlers
   const handleOpenCreate = () => {
@@ -545,6 +580,26 @@ export default function PersonalClient() {
             </TooltipContent>
           </Tooltip>
 
+          {/* Ordenamiento */}
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-9 w-[180px]">
+              <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Ordenar por..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="nombre">Nombre A-Z</SelectItem>
+              <SelectItem value="nombre-desc">Nombre Z-A</SelectItem>
+              <SelectItem value="remuneracion-desc">Mayor sueldo</SelectItem>
+              <SelectItem value="remuneracion-asc">Menor sueldo</SelectItem>
+              <SelectItem value="total-desc">Mayor costo total</SelectItem>
+              <SelectItem value="total-asc">Menor costo total</SelectItem>
+              <SelectItem value="costo-hora-desc">Mayor $/hora</SelectItem>
+              <SelectItem value="costo-hora-asc">Menor $/hora</SelectItem>
+              <SelectItem value="fecha-ingreso">Más reciente</SelectItem>
+              <SelectItem value="fecha-ingreso-asc">Más antiguo</SelectItem>
+            </SelectContent>
+          </Select>
+
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -612,7 +667,7 @@ export default function PersonalClient() {
                       <th className="sticky left-8 z-10 bg-slate-100 text-left py-2 px-2 font-semibold text-slate-700 border-r min-w-[180px]">Apellidos y Nombres</th>
                       <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">DNI</th>
                       <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">F. Ingreso</th>
-                      <th className="text-left py-2 px-2 font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">Cargo</th>
+                      <th className="text-left py-2 px-2 font-semibold text-slate-700 min-w-[180px] max-w-[220px]">Cargo</th>
                       <th className="text-left py-2 px-2 font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">Area</th>
                       {/* Columnas de costos laborales */}
                       <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-blue-50">Remuneracion</th>
@@ -671,7 +726,9 @@ export default function PersonalClient() {
                             {emp.fechaIngreso ? new Date(emp.fechaIngreso).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                           </td>
                           {/* Cargo */}
-                          <td className="py-1.5 px-2 truncate" title={emp.cargo?.nombre}>{emp.cargo?.nombre || '—'}</td>
+                          <td className="py-1.5 px-2 text-sm leading-tight max-w-[220px]">
+                            <span className="line-clamp-2" title={emp.cargo?.nombre}>{emp.cargo?.nombre || '—'}</span>
+                          </td>
                           {/* Area/Departamento */}
                           <td className="py-1.5 px-2 truncate" title={emp.departamento?.nombre}>{emp.departamento?.nombre || '—'}</td>
                           {/* Remuneración */}
