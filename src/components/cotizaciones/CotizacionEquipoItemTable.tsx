@@ -23,9 +23,10 @@ interface Props {
   onUpdated?: (item: CotizacionEquipoItem) => void
   onDeleted?: (id: string) => void
   onEdit?: (item: CotizacionEquipoItem) => void
+  isLocked?: boolean
 }
 
-export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: Props) {
+export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, isLocked = false }: Props) {
   const [filter, setFilter] = useState('')
   const [showReferencia, setShowReferencia] = useState(false)
 
@@ -93,7 +94,7 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
                 {showReferencia && (
                   <th colSpan={3} className="px-1 py-0.5 text-center font-semibold text-gray-500 bg-gray-50 border-r">REF.</th>
                 )}
-                <th rowSpan={2} className="px-1 py-0.5 text-center font-semibold text-gray-700 w-10"></th>
+                {!isLocked && <th rowSpan={2} className="px-1 py-0.5 text-center font-semibold text-gray-700 w-10"></th>}
               </tr>
               {/* Fila 2: Columnas */}
               <tr className="bg-gray-50/80 border-b text-[10px]">
@@ -204,38 +205,40 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit }: 
                       </>
                     )}
                     {/* Acciones */}
-                    <td className="px-1 py-1 text-center">
-                      <div className="flex items-center justify-center gap-0.5">
-                        {onEdit && (
+                    {!isLocked && (
+                      <td className="px-1 py-1 text-center">
+                        <div className="flex items-center justify-center gap-0.5">
+                          {onEdit && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onEdit(item)
+                              }}
+                              className="h-5 w-5 p-0 hover:bg-blue-100 opacity-0 group-hover:opacity-100"
+                              title="Editar"
+                            >
+                              <Edit className="h-2.5 w-2.5 text-blue-500" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              onEdit(item)
+                              onDeleted?.(item.id)
                             }}
-                            className="h-5 w-5 p-0 hover:bg-blue-100 opacity-0 group-hover:opacity-100"
-                            title="Editar"
+                            className="h-5 w-5 p-0 hover:bg-red-100 opacity-0 group-hover:opacity-100"
+                            title="Eliminar"
                           >
-                            <Edit className="h-2.5 w-2.5 text-blue-500" />
+                            <Trash2 className="h-2.5 w-2.5 text-gray-500" />
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            onDeleted?.(item.id)
-                          }}
-                          className="h-5 w-5 p-0 hover:bg-red-100 opacity-0 group-hover:opacity-100"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="h-2.5 w-2.5 text-gray-500" />
-                        </Button>
-                      </div>
-                    </td>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 )
               })}

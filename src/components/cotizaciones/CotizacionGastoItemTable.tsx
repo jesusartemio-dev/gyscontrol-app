@@ -20,9 +20,10 @@ interface Props {
   items: CotizacionGastoItem[]
   onUpdate?: (item: CotizacionGastoItem) => void
   onDelete?: (id: string) => void
+  isLocked?: boolean
 }
 
-export default function CotizacionGastoItemTable({ items, onUpdate, onDelete }: Props) {
+export default function CotizacionGastoItemTable({ items, onUpdate, onDelete, isLocked = false }: Props) {
   const [editModeId, setEditModeId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, Partial<CotizacionGastoItem>>>({})
   const [filter, setFilter] = useState('')
@@ -126,7 +127,7 @@ export default function CotizacionGastoItemTable({ items, onUpdate, onDelete }: 
                 <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16">Margen</th>
                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">Cliente</th>
                 <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">%</th>
-                <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16"></th>
+                {!isLocked && <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16"></th>}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -223,63 +224,65 @@ export default function CotizacionGastoItemTable({ items, onUpdate, onDelete }: 
                         {margenPct.toFixed(0)}%
                       </span>
                     </td>
-                    <td className="px-2 py-1.5 text-center">
-                      {isEdit ? (
-                        <div className="flex items-center justify-center gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleSave(item.id)
-                            }}
-                            className="h-5 w-5 p-0"
-                          >
-                            <Save className="h-3 w-3 text-blue-600" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleCancel(item.id)
-                            }}
-                            className="h-5 w-5 p-0"
-                          >
-                            <X className="h-3 w-3 text-gray-500" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              iniciarEdicion(item)
-                            }}
-                            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
-                          >
-                            <Edit className="h-3 w-3 text-gray-500" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              onDelete?.(item.id)
-                            }}
-                            className="h-5 w-5 p-0 hover:bg-red-100"
-                          >
-                            <Trash2 className="h-3 w-3 text-gray-500" />
-                          </Button>
-                        </div>
-                      )}
-                    </td>
+                    {!isLocked && (
+                      <td className="px-2 py-1.5 text-center">
+                        {isEdit ? (
+                          <div className="flex items-center justify-center gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleSave(item.id)
+                              }}
+                              className="h-5 w-5 p-0"
+                            >
+                              <Save className="h-3 w-3 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleCancel(item.id)
+                              }}
+                              className="h-5 w-5 p-0"
+                            >
+                              <X className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                iniciarEdicion(item)
+                              }}
+                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
+                            >
+                              <Edit className="h-3 w-3 text-gray-500" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onDelete?.(item.id)
+                              }}
+                              className="h-5 w-5 p-0 hover:bg-red-100"
+                            >
+                              <Trash2 className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}

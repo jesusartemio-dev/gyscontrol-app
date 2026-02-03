@@ -33,6 +33,7 @@ interface Props {
   onDeleted?: (id: string) => void
   onDeletedGrupo?: () => void
   onUpdatedNombre?: (nuevoNombre: string) => void
+  isLocked?: boolean
 }
 
 export default function CotizacionGastoAccordion({
@@ -41,7 +42,8 @@ export default function CotizacionGastoAccordion({
   onUpdated,
   onDeleted,
   onDeletedGrupo,
-  onUpdatedNombre
+  onUpdatedNombre,
+  isLocked = false
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -136,30 +138,32 @@ export default function CotizacionGastoAccordion({
               </div>
 
               {/* Acciones */}
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setEditando(true)
-                  }}
-                >
-                  <Pencil className="h-3 w-3 text-gray-500" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-red-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setShowDeleteDialog(true)
-                  }}
-                >
-                  <Trash2 className="h-3 w-3 text-gray-500" />
-                </Button>
-              </div>
+              {!isLocked && (
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditando(true)
+                    }}
+                  >
+                    <Pencil className="h-3 w-3 text-gray-500" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-red-100"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowDeleteDialog(true)
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3 text-gray-500" />
+                  </Button>
+                </div>
+              )}
             </div>
           </CollapsibleTrigger>
 
@@ -181,15 +185,17 @@ export default function CotizacionGastoAccordion({
                 <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
                   Items del grupo
                 </span>
-                <Button
-                  onClick={() => setShowAddModal(true)}
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 text-xs px-2"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Agregar
-                </Button>
+                {!isLocked && (
+                  <Button
+                    onClick={() => setShowAddModal(true)}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Agregar
+                  </Button>
+                )}
               </div>
 
               {/* Lista de Items */}
@@ -198,20 +204,23 @@ export default function CotizacionGastoAccordion({
                   <div className="text-center py-6">
                     <Receipt className="h-6 w-6 text-gray-300 mx-auto mb-2" />
                     <p className="text-xs text-muted-foreground mb-2">Sin gastos en este grupo</p>
-                    <Button
-                      onClick={() => setShowAddModal(true)}
-                      size="sm"
-                      variant="link"
-                      className="h-auto p-0 text-xs"
-                    >
-                      Agregar gastos
-                    </Button>
+                    {!isLocked && (
+                      <Button
+                        onClick={() => setShowAddModal(true)}
+                        size="sm"
+                        variant="link"
+                        className="h-auto p-0 text-xs"
+                      >
+                        Agregar gastos
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <CotizacionGastoItemTable
                     items={gasto.items}
                     onUpdate={onUpdated}
                     onDelete={onDeleted}
+                    isLocked={isLocked}
                   />
                 )}
               </div>

@@ -16,6 +16,7 @@ interface Props {
   items: CotizacionServicioItem[]
   onUpdated: (item: CotizacionServicioItem) => void
   onDeleted: (id: string) => void
+  isLocked?: boolean
 }
 
 const formatCurrency = (amount: number): string => {
@@ -34,7 +35,7 @@ const dificultadColors: Record<number, string> = {
   4: 'bg-red-100 text-red-700'
 }
 
-export default function CotizacionServicioItemTable({ items, onUpdated, onDeleted }: Props) {
+export default function CotizacionServicioItemTable({ items, onUpdated, onDeleted, isLocked = false }: Props) {
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editableItem, setEditableItem] = useState<Partial<CotizacionServicioItem>>({})
@@ -211,7 +212,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
               <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Marg.</th>
               <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-20">Interno</th>
               <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-20">Cliente</th>
-              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14"></th>
+              {!isLocked && <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14"></th>}
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -366,39 +367,41 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                   </td>
 
                   {/* Acciones */}
-                  <td className="px-2 py-1.5 text-center">
-                    <div className="flex items-center justify-center gap-0.5">
-                      {editando ? (
-                        <>
-                          <Button size="sm" onClick={handleSave} disabled={saving} className="h-5 w-5 p-0">
-                            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={cancelEditing} disabled={saving} className="h-5 w-5 p-0">
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => startEditing(item)}
-                            className="h-5 w-5 p-0"
-                          >
-                            <Edit className="h-3 w-3 text-gray-500" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setItemToDelete(item)}
-                            className="h-5 w-5 p-0 hover:bg-red-100"
-                          >
-                            <Trash2 className="h-3 w-3 text-gray-500" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+                  {!isLocked && (
+                    <td className="px-2 py-1.5 text-center">
+                      <div className="flex items-center justify-center gap-0.5">
+                        {editando ? (
+                          <>
+                            <Button size="sm" onClick={handleSave} disabled={saving} className="h-5 w-5 p-0">
+                              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={cancelEditing} disabled={saving} className="h-5 w-5 p-0">
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => startEditing(item)}
+                              className="h-5 w-5 p-0"
+                            >
+                              <Edit className="h-3 w-3 text-gray-500" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setItemToDelete(item)}
+                              className="h-5 w-5 p-0 hover:bg-red-100"
+                            >
+                              <Trash2 className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               )
             })}

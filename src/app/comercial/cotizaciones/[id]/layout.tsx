@@ -36,6 +36,7 @@ interface CotizacionContextType {
   setCotizacion: (cotizacion: Cotizacion) => void
   refreshCotizacion: () => Promise<void>
   loading: boolean
+  isLocked: boolean // true cuando la cotización está aprobada (no se puede editar)
 }
 
 const CotizacionContext = createContext<CotizacionContextType | null>(null)
@@ -192,7 +193,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
     cotizacion.gastos.every(g => Array.isArray(g.items))
 
   return (
-    <CotizacionContext.Provider value={{ cotizacion, setCotizacion: handleDataUpdate, refreshCotizacion, loading }}>
+    <CotizacionContext.Provider value={{ cotizacion, setCotizacion: handleDataUpdate, refreshCotizacion, loading, isLocked: cotizacion.estado === 'aprobada' }}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="container mx-auto p-4 sm:p-6">
           {/* Header */}

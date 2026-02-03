@@ -18,7 +18,7 @@ import { useCotizacionContext } from '../layout'
 import type { CotizacionEquipoItem } from '@/types'
 
 export default function CotizacionEquiposPage() {
-  const { cotizacion, setCotizacion, refreshCotizacion } = useCotizacionContext()
+  const { cotizacion, setCotizacion, refreshCotizacion, isLocked } = useCotizacionContext()
   const [showEquipoModal, setShowEquipoModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -94,13 +94,17 @@ export default function CotizacionEquiposPage() {
         <h2 className="text-lg font-semibold">Equipos</h2>
         <span className="text-sm text-muted-foreground">({cotizacion.equipos?.length || 0} grupos)</span>
         <div className="flex-1" />
-        <Button onClick={() => setShowEquipoModal(true)} size="sm" variant="outline">
-          <Package className="h-4 w-4 mr-1" />
-          Agregar
-        </Button>
-        <Button onClick={() => setShowImportModal(true)} size="sm" variant="ghost">
-          Importar
-        </Button>
+        {!isLocked && (
+          <>
+            <Button onClick={() => setShowEquipoModal(true)} size="sm" variant="outline">
+              <Package className="h-4 w-4 mr-1" />
+              Agregar
+            </Button>
+            <Button onClick={() => setShowImportModal(true)} size="sm" variant="ghost">
+              Importar
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Contenido */}
@@ -137,6 +141,7 @@ export default function CotizacionEquiposPage() {
                 onDeleted={id => actualizarEquipo(e.id, items => items.filter(i => i.id !== id))}
                 onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)}
                 onUpdatedNombre={nuevo => handleActualizarNombreEquipo(e.id, nuevo)}
+                isLocked={isLocked}
               />
             ))}
           </div>

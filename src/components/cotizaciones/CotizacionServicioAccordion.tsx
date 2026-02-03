@@ -43,6 +43,7 @@ interface Props {
   onDeletedGrupo: () => void
   onUpdatedNombre: (nuevoNombre: string) => void
   onRefresh?: () => Promise<void>
+  isLocked?: boolean
 }
 
 export default function CotizacionServicioAccordion({
@@ -53,7 +54,8 @@ export default function CotizacionServicioAccordion({
   onUpdated,
   onDeletedGrupo,
   onUpdatedNombre,
-  onRefresh
+  onRefresh,
+  isLocked = false
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -200,30 +202,32 @@ export default function CotizacionServicioAccordion({
               </div>
 
               {/* Acciones */}
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setEditando(true)
-                  }}
-                >
-                  <Pencil className="h-3 w-3 text-gray-500" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-red-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setShowDeleteDialog(true)
-                  }}
-                >
-                  <Trash2 className="h-3 w-3 text-gray-500" />
-                </Button>
-              </div>
+              {!isLocked && (
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditando(true)
+                    }}
+                  >
+                    <Pencil className="h-3 w-3 text-gray-500" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-red-100"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowDeleteDialog(true)
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3 text-gray-500" />
+                  </Button>
+                </div>
+              )}
             </div>
           </CollapsibleTrigger>
 
@@ -246,33 +250,37 @@ export default function CotizacionServicioAccordion({
                   Items del grupo
                 </span>
                 <div className="flex items-center gap-1">
-                  <Button
-                    onClick={() => setModalNuevoAbierto(true)}
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 text-xs px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Nuevo
-                  </Button>
-                  <Button
-                    onClick={() => setModalCatalogoAbierto(true)}
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                  >
-                    <BookOpen className="h-3 w-3 mr-1" />
-                    Catálogo
-                  </Button>
-                  <Button
-                    onClick={() => setModalExcelAbierto(true)}
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 text-xs px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                  >
-                    <Upload className="h-3 w-3 mr-1" />
-                    Excel
-                  </Button>
+                  {!isLocked && (
+                    <>
+                      <Button
+                        onClick={() => setModalNuevoAbierto(true)}
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Nuevo
+                      </Button>
+                      <Button
+                        onClick={() => setModalCatalogoAbierto(true)}
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <BookOpen className="h-3 w-3 mr-1" />
+                        Catálogo
+                      </Button>
+                      <Button
+                        onClick={() => setModalExcelAbierto(true)}
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Excel
+                      </Button>
+                    </>
+                  )}
                   {servicio.items.length > 0 && (
                     <Button
                       onClick={handleExportExcel}
@@ -293,41 +301,44 @@ export default function CotizacionServicioAccordion({
                   <div className="text-center py-6">
                     <Wrench className="h-6 w-6 text-gray-300 mx-auto mb-2" />
                     <p className="text-xs text-muted-foreground mb-3">Sin servicios en este grupo</p>
-                    <div className="flex items-center justify-center gap-2 flex-wrap">
-                      <Button
-                        onClick={() => setModalNuevoAbierto(true)}
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Nuevo
-                      </Button>
-                      <Button
-                        onClick={() => setModalCatalogoAbierto(true)}
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
-                      >
-                        <BookOpen className="h-3 w-3 mr-1" />
-                        Catálogo
-                      </Button>
-                      <Button
-                        onClick={() => setModalExcelAbierto(true)}
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
-                      >
-                        <Upload className="h-3 w-3 mr-1" />
-                        Importar Excel
-                      </Button>
-                    </div>
+                    {!isLocked && (
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        <Button
+                          onClick={() => setModalNuevoAbierto(true)}
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Nuevo
+                        </Button>
+                        <Button
+                          onClick={() => setModalCatalogoAbierto(true)}
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                        >
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          Catálogo
+                        </Button>
+                        <Button
+                          onClick={() => setModalExcelAbierto(true)}
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs text-orange-600 border-orange-200 hover:bg-orange-50"
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          Importar Excel
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <CotizacionServicioItemTable
                     items={servicio.items}
                     onDeleted={onDeleted}
                     onUpdated={onUpdated}
+                    isLocked={isLocked}
                   />
                 )}
               </div>
