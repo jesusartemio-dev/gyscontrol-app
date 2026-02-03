@@ -7,6 +7,8 @@ interface EmpleadoImportado {
   departamento?: string
   sueldoPlanilla?: number
   sueldoHonorarios?: number
+  asignacionFamiliar?: number
+  emo?: number
   fechaIngreso?: string
   documentoIdentidad?: string
   telefono?: string
@@ -92,6 +94,8 @@ export async function POST(request: Request) {
           departamentoId,
           sueldoPlanilla: emp.sueldoPlanilla || null,
           sueldoHonorarios: emp.sueldoHonorarios || null,
+          asignacionFamiliar: emp.asignacionFamiliar ?? 0,
+          emo: emp.emo ?? 25,
           fechaIngreso: emp.fechaIngreso ? new Date(emp.fechaIngreso) : null,
           documentoIdentidad: emp.documentoIdentidad?.trim() || null,
           telefono: emp.telefono?.trim() || null,

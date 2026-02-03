@@ -13,7 +13,10 @@ import {
   Search,
   X,
   Download,
-  Upload
+  Upload,
+  FileSpreadsheet,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -38,7 +41,8 @@ import { getEmpleados, createEmpleado, updateEmpleado, deleteEmpleado, EmpleadoP
 import { getCargos } from '@/lib/services/cargo'
 import { getDepartamentos } from '@/lib/services/departamento'
 import {
-  exportarEmpleadosAExcel
+  exportarEmpleadosAExcel,
+  generarPlantillaEmpleados
 } from '@/lib/utils/empleadoExcel'
 import { EmpleadoImportModal } from '@/components/admin/EmpleadoImportModal'
 import {
@@ -157,6 +161,10 @@ export default function PersonalClient() {
 
   // Import modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
+  // Toggle para mostrar/ocultar columnas de beneficios y seguros
+  const [showBeneficios, setShowBeneficios] = useState(false)
+  const [showSeguros, setShowSeguros] = useState(false)
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -394,7 +402,7 @@ export default function PersonalClient() {
               Nuevo
             </Button>
 
-            {/* Import/Export */}
+            {/* Import/Export/Plantilla */}
             <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-muted/50">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -403,7 +411,7 @@ export default function PersonalClient() {
                     Exportar
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Exportar a Excel</TooltipContent>
+                <TooltipContent>Exportar tabla completa con costos calculados</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -417,7 +425,24 @@ export default function PersonalClient() {
                     Importar
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Importar desde Excel</TooltipContent>
+                <TooltipContent>Importar empleados desde Excel</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      generarPlantillaEmpleados()
+                      toast.success('Plantilla descargada')
+                    }}
+                    className="h-8 px-2"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-1" />
+                    Plantilla
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Descargar plantilla de ejemplo para importar</TooltipContent>
               </Tooltip>
             </div>
           </div>
@@ -474,6 +499,52 @@ export default function PersonalClient() {
             </SelectContent>
           </Select>
 
+          {/* Toggle Beneficios (verde como las columnas) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-9 border-green-300",
+                  showBeneficios
+                    ? "bg-green-100 text-green-800 hover:bg-green-200"
+                    : "bg-green-50 text-green-700 hover:bg-green-100"
+                )}
+                onClick={() => setShowBeneficios(!showBeneficios)}
+              >
+                {showBeneficios ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+                Beneficios
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {showBeneficios ? 'Ocultar' : 'Mostrar'} columnas: Essalud, CTS, Gratif., Bonif. Ext.
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Toggle Seguros (naranja como las columnas) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-9 border-orange-300",
+                  showSeguros
+                    ? "bg-orange-100 text-orange-800 hover:bg-orange-200"
+                    : "bg-orange-50 text-orange-700 hover:bg-orange-100"
+                )}
+                onClick={() => setShowSeguros(!showSeguros)}
+              >
+                {showSeguros ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+                Seguros
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {showSeguros ? 'Ocultar' : 'Mostrar'} columnas: SCTR, Vida Ley, EMO
+            </TooltipContent>
+          </Tooltip>
+
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -497,7 +568,7 @@ export default function PersonalClient() {
           )}
         </div>
 
-        {/* Tabla */}
+        {/* Tabla de Costos Laborales (estilo Excel) */}
         <Card>
           <CardContent className="p-0">
             {filteredEmpleados.length === 0 ? (
@@ -533,130 +604,160 @@ export default function PersonalClient() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b bg-muted/40">
-                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Empleado
-                      </th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        DNI
-                      </th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Cargo
-                      </th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Departamento
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Planilla
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Honorarios
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Costo Total
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        $/Hora
-                      </th>
-                      <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Estado
-                      </th>
-                      <th className="w-24 py-2 px-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Acciones
-                      </th>
+                    <tr className="border-b bg-slate-100">
+                      {/* Columnas fijas de información */}
+                      <th className="sticky left-0 z-10 bg-slate-100 text-center py-2 px-2 font-semibold text-slate-700 border-r w-8">N°</th>
+                      <th className="sticky left-8 z-10 bg-slate-100 text-left py-2 px-2 font-semibold text-slate-700 border-r min-w-[180px]">Apellidos y Nombres</th>
+                      <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">DNI</th>
+                      <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">F. Ingreso</th>
+                      <th className="text-left py-2 px-2 font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">Cargo</th>
+                      <th className="text-left py-2 px-2 font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">Area</th>
+                      {/* Columnas de costos laborales */}
+                      <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-blue-50">Remuneracion</th>
+                      <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-blue-50">Asig. Fam.</th>
+                      <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-blue-100">Total Rem.</th>
+                      {showBeneficios && (
+                        <>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-green-50">Essalud</th>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-green-50">CTS</th>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-green-50">Gratif.</th>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-green-50">Bonif. Ext.</th>
+                        </>
+                      )}
+                      <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-yellow-100">Costo Planilla</th>
+                      {showSeguros && (
+                        <>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-orange-50">SCTR</th>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-orange-50">Vida Ley</th>
+                          <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-orange-50">EMO</th>
+                        </>
+                      )}
+                      <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-purple-50">Honorarios</th>
+                      <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-orange-200">Total Mensual</th>
+                      <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-blue-200">$/Hora</th>
+                      <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">Estado</th>
+                      <th className="w-16 py-2 px-2 text-center font-semibold text-slate-700">Acc.</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {filteredEmpleados.map((emp) => {
+                    {filteredEmpleados.map((emp, index) => {
                       const costos = calcularCostosLaborales(emp, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
                       return (
                         <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-2 px-3">
-                            <div className="flex items-center gap-3">
+                          {/* N° */}
+                          <td className="sticky left-0 z-10 bg-white text-center py-1.5 px-2 font-mono text-slate-500 border-r">
+                            {index + 1}
+                          </td>
+                          {/* Nombre */}
+                          <td className="sticky left-8 z-10 bg-white py-1.5 px-2 border-r">
+                            <div className="flex items-center gap-2">
                               <div className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium",
+                                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium shrink-0",
                                 emp.activo ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-500"
                               )}>
                                 {getInitials(emp.user?.name)}
                               </div>
-                              <div>
-                                <p className="font-medium text-sm">{emp.user?.name || 'Sin nombre'}</p>
-                                <p className="text-xs text-muted-foreground">{emp.user?.email}</p>
-                              </div>
+                              <span className="font-medium truncate" title={emp.user?.name || 'Sin nombre'}>
+                                {emp.user?.name || 'Sin nombre'}
+                              </span>
                             </div>
                           </td>
-                          <td className="py-2 px-3">
-                            <span className="text-sm font-mono">{emp.documentoIdentidad || '—'}</span>
+                          {/* DNI */}
+                          <td className="py-1.5 px-2 text-center font-mono">{emp.documentoIdentidad || '—'}</td>
+                          {/* Fecha Ingreso */}
+                          <td className="py-1.5 px-2 text-center font-mono text-slate-600">
+                            {emp.fechaIngreso ? new Date(emp.fechaIngreso).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                           </td>
-                          <td className="py-2 px-3">
-                            <span className="text-sm">{emp.cargo?.nombre || '—'}</span>
+                          {/* Cargo */}
+                          <td className="py-1.5 px-2 truncate" title={emp.cargo?.nombre}>{emp.cargo?.nombre || '—'}</td>
+                          {/* Area/Departamento */}
+                          <td className="py-1.5 px-2 truncate" title={emp.departamento?.nombre}>{emp.departamento?.nombre || '—'}</td>
+                          {/* Remuneración */}
+                          <td className="py-1.5 px-2 text-right font-mono bg-blue-50/50">
+                            {costos.remuneracion > 0 ? costos.remuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
                           </td>
-                          <td className="py-2 px-3">
-                            <span className="text-sm">{emp.departamento?.nombre || '—'}</span>
+                          {/* Asignación Familiar */}
+                          <td className="py-1.5 px-2 text-right font-mono bg-blue-50/50">
+                            {costos.asignacionFamiliar > 0 ? costos.asignacionFamiliar.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
                           </td>
-                          <td className="py-2 px-3 text-right">
-                            <span className="font-mono text-sm">
-                              {emp.sueldoPlanilla ? formatCurrency(emp.sueldoPlanilla) : <span className="text-muted-foreground">—</span>}
-                            </span>
+                          {/* Total Remuneración */}
+                          <td className="py-1.5 px-2 text-right font-mono font-semibold bg-blue-100/50">
+                            {costos.totalRemuneracion > 0 ? costos.totalRemuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
                           </td>
-                          <td className="py-2 px-3 text-right">
-                            <span className="font-mono text-sm">
-                              {emp.sueldoHonorarios ? formatCurrency(emp.sueldoHonorarios) : <span className="text-muted-foreground">—</span>}
-                            </span>
+                          {/* Beneficios (condicional) */}
+                          {showBeneficios && (
+                            <>
+                              {/* Essalud */}
+                              <td className="py-1.5 px-2 text-right font-mono bg-green-50/50">
+                                {costos.essalud > 0 ? costos.essalud.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                              </td>
+                              {/* CTS mensual */}
+                              <td className="py-1.5 px-2 text-right font-mono bg-green-50/50">
+                                {costos.ctsMensual > 0 ? costos.ctsMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                              </td>
+                              {/* Gratificación mensual */}
+                              <td className="py-1.5 px-2 text-right font-mono bg-green-50/50">
+                                {costos.gratificacionMensual > 0 ? costos.gratificacionMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                              </td>
+                              {/* Bonificación Extraordinaria mensual */}
+                              <td className="py-1.5 px-2 text-right font-mono bg-green-50/50">
+                                {costos.bonifExtraordinariaMensual > 0 ? costos.bonifExtraordinariaMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                              </td>
+                            </>
+                          )}
+                          {/* Costo Mensual Planilla */}
+                          <td className="py-1.5 px-2 text-right font-mono font-semibold bg-yellow-100/50">
+                            {costos.costoMensualPlanilla > 0 ? costos.costoMensualPlanilla.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
                           </td>
-                          <td className="py-2 px-3 text-right">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="font-mono text-sm font-semibold text-orange-600 cursor-help">
-                                  {formatCurrency(costos.totalMensual)}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="left" className="max-w-xs">
-                                <div className="text-xs space-y-1">
-                                  <p><span className="text-muted-foreground">Remuneración:</span> {formatCurrency(costos.totalRemuneracion)}</p>
-                                  <p><span className="text-muted-foreground">Essalud (9%):</span> {formatCurrency(costos.essalud)}</p>
-                                  <p><span className="text-muted-foreground">CTS mensual:</span> {formatCurrency(costos.ctsMensual)}</p>
-                                  <p><span className="text-muted-foreground">Gratif. mensual:</span> {formatCurrency(costos.gratificacionMensual)}</p>
-                                  <p><span className="text-muted-foreground">SCTR (0.9%):</span> {formatCurrency(costos.sctr)}</p>
-                                  <p><span className="text-muted-foreground">Vida Ley (0.2%):</span> {formatCurrency(costos.vidaLey)}</p>
-                                  <p><span className="text-muted-foreground">EMO:</span> {formatCurrency(costos.emo)}</p>
-                                  <p><span className="text-muted-foreground">Honorarios:</span> {formatCurrency(costos.honorarios)}</p>
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
+                          {/* Seguros (condicional) */}
+                          {showSeguros && (
+                            <>
+                              {/* SCTR */}
+                              <td className="py-1.5 px-2 text-right font-mono bg-orange-50/50">
+                                {costos.sctr > 0 ? costos.sctr.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                              </td>
+                              {/* Vida Ley */}
+                              <td className="py-1.5 px-2 text-right font-mono bg-orange-50/50">
+                                {costos.vidaLey > 0 ? costos.vidaLey.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                              </td>
+                              {/* EMO */}
+                              <td className="py-1.5 px-2 text-right font-mono bg-orange-50/50">
+                                {costos.emo > 0 ? costos.emo.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                              </td>
+                            </>
+                          )}
+                          {/* Honorarios */}
+                          <td className="py-1.5 px-2 text-right font-mono bg-purple-50/50">
+                            {costos.honorarios > 0 ? costos.honorarios.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
                           </td>
-                          <td className="py-2 px-3 text-right">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="font-mono text-sm font-bold text-blue-600 cursor-help">
-                                  {formatUSD(costos.costoHoraUSD || 0)}/h
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="left">
-                                <p className="font-mono text-xs">
-                                  ({formatCurrency(costos.totalMensual)} / {config.tipoCambio}) / {config.horasMensuales}h
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
+                          {/* Total Mensual */}
+                          <td className="py-1.5 px-2 text-right font-mono font-bold text-orange-700 bg-orange-100/70">
+                            {costos.totalMensual > 0 ? costos.totalMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
                           </td>
-                          <td className="py-2 px-3 text-center">
-                            <Badge variant={emp.activo ? 'default' : 'secondary'} className="text-xs">
-                              {emp.activo ? 'Activo' : 'Inactivo'}
+                          {/* $/Hora */}
+                          <td className="py-1.5 px-2 text-right font-mono font-bold text-blue-700 bg-blue-100/50">
+                            {formatUSD(costos.costoHoraUSD || 0)}
+                          </td>
+                          {/* Estado */}
+                          <td className="py-1.5 px-2 text-center">
+                            <Badge variant={emp.activo ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
+                              {emp.activo ? 'Activo' : 'Inact.'}
                             </Badge>
                           </td>
-                          <td className="py-2 px-3">
-                            <div className="flex justify-end gap-1">
+                          {/* Acciones */}
+                          <td className="py-1.5 px-2">
+                            <div className="flex justify-center gap-0.5">
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 w-7 p-0"
+                                    className="h-6 w-6 p-0"
                                     onClick={() => handleOpenEdit(emp)}
                                   >
-                                    <Pencil className="h-3.5 w-3.5" />
+                                    <Pencil className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Editar</TooltipContent>
@@ -666,10 +767,10 @@ export default function PersonalClient() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                                     onClick={() => handleOpenDelete(emp)}
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Eliminar</TooltipContent>
@@ -680,6 +781,65 @@ export default function PersonalClient() {
                       )
                     })}
                   </tbody>
+                  {/* Fila de totales */}
+                  <tfoot>
+                    <tr className="border-t-2 bg-slate-50 font-semibold">
+                      <td colSpan={6} className="sticky left-0 z-10 bg-slate-50 py-2 px-2 text-right border-r">
+                        TOTALES ({filteredEmpleados.length} empleados)
+                      </td>
+                      {(() => {
+                        const totales = filteredEmpleados.reduce((acc, emp) => {
+                          const c = calcularCostosLaborales(emp, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
+                          return {
+                            remuneracion: acc.remuneracion + c.remuneracion,
+                            asignacionFamiliar: acc.asignacionFamiliar + c.asignacionFamiliar,
+                            totalRemuneracion: acc.totalRemuneracion + c.totalRemuneracion,
+                            essalud: acc.essalud + c.essalud,
+                            ctsMensual: acc.ctsMensual + c.ctsMensual,
+                            gratificacionMensual: acc.gratificacionMensual + c.gratificacionMensual,
+                            bonifExtraordinariaMensual: acc.bonifExtraordinariaMensual + c.bonifExtraordinariaMensual,
+                            costoMensualPlanilla: acc.costoMensualPlanilla + c.costoMensualPlanilla,
+                            sctr: acc.sctr + c.sctr,
+                            vidaLey: acc.vidaLey + c.vidaLey,
+                            emo: acc.emo + c.emo,
+                            honorarios: acc.honorarios + c.honorarios,
+                            totalMensual: acc.totalMensual + c.totalMensual,
+                          }
+                        }, {
+                          remuneracion: 0, asignacionFamiliar: 0, totalRemuneracion: 0, essalud: 0,
+                          ctsMensual: 0, gratificacionMensual: 0, bonifExtraordinariaMensual: 0,
+                          costoMensualPlanilla: 0, sctr: 0, vidaLey: 0, emo: 0, honorarios: 0, totalMensual: 0
+                        })
+                        return (
+                          <>
+                            <td className="py-2 px-2 text-right font-mono bg-blue-50">{totales.remuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono bg-blue-50">{totales.asignacionFamiliar.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono font-bold bg-blue-100">{totales.totalRemuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            {showBeneficios && (
+                              <>
+                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.essalud.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.ctsMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.gratificacionMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.bonifExtraordinariaMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                              </>
+                            )}
+                            <td className="py-2 px-2 text-right font-mono font-bold bg-yellow-100">{totales.costoMensualPlanilla.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            {showSeguros && (
+                              <>
+                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.sctr.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.vidaLey.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.emo.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                              </>
+                            )}
+                            <td className="py-2 px-2 text-right font-mono bg-purple-50">{totales.honorarios.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono font-bold text-orange-700 bg-orange-200">{totales.totalMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono text-blue-700 bg-blue-200">—</td>
+                            <td colSpan={2} className="py-2 px-2"></td>
+                          </>
+                        )
+                      })()}
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}

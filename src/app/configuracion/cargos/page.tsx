@@ -543,11 +543,20 @@ export default function CargosPage() {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="sm" onClick={generarPlantillaCargos} className="h-8 w-8 p-0">
-                        <FileDown className="h-4 w-4" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          generarPlantillaCargos()
+                          toast.success('Plantilla descargada')
+                        }}
+                        className="h-8 px-2"
+                      >
+                        <FileDown className="h-4 w-4 mr-1" />
+                        Plantilla
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Descargar plantilla</TooltipContent>
+                    <TooltipContent>Descargar plantilla de ejemplo para importar</TooltipContent>
                   </Tooltip>
                 </div>
 
