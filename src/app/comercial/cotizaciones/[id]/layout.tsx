@@ -222,22 +222,22 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => router.push(`/comercial/cotizaciones/${id}`)}
-                      className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                      className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline max-w-[400px]"
                     >
                       <span className="font-mono">{cotizacion.codigo || 'Sin código'}</span>
                       <span className="mx-1">:</span>
-                      <span className="truncate max-w-[150px]">{cotizacion.nombre}</span>
+                      <span className="line-clamp-1">{cotizacion.nombre}</span>
                     </Button>
                     <span className="text-muted-foreground">/</span>
                     <span className="font-medium text-foreground">{currentSubPage}</span>
                   </>
                 ) : (
                   // En hub: mostrar código + nombre de cotización (no clickeable, es la página actual)
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono bg-muted px-2 py-0.5 rounded border">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="font-mono bg-muted px-2 py-0.5 rounded border text-sm flex-shrink-0">
                       {cotizacion.codigo || 'Sin código'}
                     </span>
-                    <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate max-w-[300px]">
+                    <h1 className="text-base sm:text-lg font-semibold text-gray-900 line-clamp-2 leading-tight">
                       {cotizacion.nombre}
                     </h1>
                   </div>

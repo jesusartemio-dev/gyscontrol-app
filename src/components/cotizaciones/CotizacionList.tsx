@@ -15,7 +15,9 @@ import {
   Grid3X3,
   List,
   Search,
-  Filter
+  Filter,
+  Trash2,
+  Pencil
 } from 'lucide-react'
 import { deleteCotizacion, updateCotizacion } from '@/lib/services/cotizacion'
 import { Button } from '@/components/ui/button'
@@ -26,7 +28,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
+import CotizacionEditModal from './CotizacionEditModal'
 import type { Cotizacion } from '@/types'
 
 interface Props {
@@ -134,6 +138,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [editingCotizacion, setEditingCotizacion] = useState<Cotizacion | null>(null)
   const { toast } = useToast()
 
   // 📡 Handle edit with improved UX feedback
@@ -230,6 +235,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-4">
       {/* Filters Section */}
       <Card>
@@ -320,15 +326,15 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
           <table className="w-full table-fixed min-w-[850px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="w-[9%] px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                <th className="w-[17%] px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                <th className="w-[16%] px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th className="w-[10%] px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comercial</th>
-                <th className="w-[8%] px-3 py-2.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="w-[10%] px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Venta</th>
-                <th className="w-[10%] px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
-                <th className="w-[10%] px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Margen</th>
-                <th className="w-[10%] px-3 py-2.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                <th className="w-[8%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                <th className="w-[25%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                <th className="w-[11%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th className="w-[9%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Comercial</th>
+                <th className="w-[7%] px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="w-[10%] px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider">Venta</th>
+                <th className="w-[10%] px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                <th className="w-[10%] px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider">Margen</th>
+                <th className="w-[10%] px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -343,61 +349,106 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                     className="hover:bg-gray-50/80 transition-colors cursor-pointer group"
                     onClick={() => window.location.href = `/comercial/cotizaciones/${cotizacion.id}`}
                   >
-                    <td className="px-3 py-3">
-                      <span className="font-mono text-xs font-medium text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
+                    <td className="px-3 py-2">
+                      <span className="font-mono text-[10px] font-medium text-gray-700 bg-gray-100 px-1 py-0.5 rounded">
                         {cotizacion.codigo || '-'}
                       </span>
                     </td>
-                    <td className="px-3 py-3">
-                      <div className="text-sm font-medium text-gray-900 truncate" title={cotizacion.nombre}>
-                        {cotizacion.nombre}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {cotizacion.createdAt ? formatDate(cotizacion.createdAt) : ''}
-                      </div>
+                    <td className="px-3 py-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-default">
+                            <div className="text-xs font-medium text-gray-900 line-clamp-3 leading-snug">
+                              {cotizacion.nombre}
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-0.5">
+                              {cotizacion.createdAt ? formatDate(cotizacion.createdAt) : ''}
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-sm">
+                          <p className="font-medium">{cotizacion.nombre}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </td>
-                    <td className="px-3 py-3">
-                      <div className="text-sm text-gray-900 truncate" title={cotizacion.cliente?.nombre}>
-                        {cotizacion.cliente?.nombre ?? 'Sin cliente'}
-                      </div>
+                    <td className="px-3 py-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-xs text-gray-900 line-clamp-2 leading-snug cursor-default">
+                            {cotizacion.cliente?.nombre ?? 'Sin cliente'}
+                          </div>
+                        </TooltipTrigger>
+                        {cotizacion.cliente?.nombre && (
+                          <TooltipContent side="top" className="max-w-xs">
+                            <p>{cotizacion.cliente.nombre}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                     </td>
-                    <td className="px-3 py-3">
-                      <div className="text-sm text-gray-600 truncate">
-                        {(cotizacion as any).user?.name ?? '-'}
-                      </div>
+                    <td className="px-3 py-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-xs text-gray-600 line-clamp-2 leading-snug cursor-default">
+                            {(cotizacion as any).user?.name ?? '-'}
+                          </div>
+                        </TooltipTrigger>
+                        {(cotizacion as any).user?.name && (
+                          <TooltipContent side="top">
+                            <p>{(cotizacion as any).user.name}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                     </td>
-                    <td className="px-3 py-3 text-center">
-                      <Badge variant={getStatusVariant(cotizacion.estado ?? 'borrador')} className="text-xs">
+                    <td className="px-3 py-2 text-center">
+                      <Badge variant={getStatusVariant(cotizacion.estado ?? 'borrador')} className="text-[10px]">
                         {cotizacion.estado ?? 'borrador'}
                       </Badge>
                     </td>
-                    <td className="px-3 py-3 text-right">
-                      <span className="text-sm font-medium text-gray-900">
+                    <td className="px-3 py-2 text-right">
+                      <span className="text-xs font-medium text-gray-900">
                         {formatCurrency(cotizacion.totalCliente)}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-right">
-                      <span className="text-sm text-gray-600">
+                    <td className="px-3 py-2 text-right">
+                      <span className="text-xs text-gray-600">
                         {formatCurrency(cotizacion.totalInterno)}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-3 py-2 text-right">
                       <div className="flex flex-col items-end">
-                        <span className={`text-sm font-semibold ${margen >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`text-xs font-semibold ${margen >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {formatCurrency(margen)}
                         </span>
-                        <span className={`text-xs ${margen >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <span className={`text-[10px] ${margen >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                           {margenPct}%
                         </span>
                       </div>
                     </td>
-                    <td className="px-3 py-3">
-                      <div className="flex gap-1 justify-center" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" asChild className="h-8 w-8 p-0">
-                          <Link href={`/comercial/cotizaciones/${cotizacion.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-0.5 justify-center" onClick={(e) => e.stopPropagation()}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="sm" asChild className="h-7 w-7 p-0">
+                              <Link href={`/comercial/cotizaciones/${cotizacion.id}`}>
+                                <Eye className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => setEditingCotizacion(cotizacion)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar</TooltipContent>
+                        </Tooltip>
                         <DeleteAlertDialog
                           onConfirm={() => handleDelete(cotizacion.id)}
                           title="¿Eliminar cotización?"
@@ -565,6 +616,20 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
           </AnimatePresence>
         </motion.div>
       )}
+
+      {/* Modal de edición */}
+      {editingCotizacion && (
+        <CotizacionEditModal
+          cotizacion={editingCotizacion}
+          open={!!editingCotizacion}
+          onOpenChange={(open) => !open && setEditingCotizacion(null)}
+          onUpdated={(updated) => {
+            onUpdated(updated)
+            setEditingCotizacion(null)
+          }}
+        />
+      )}
     </div>
+    </TooltipProvider>
   )
 }
