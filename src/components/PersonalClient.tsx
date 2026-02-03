@@ -733,65 +733,65 @@ export default function PersonalClient() {
                           <td className="py-1.5 px-2 truncate" title={emp.departamento?.nombre}>{emp.departamento?.nombre || '—'}</td>
                           {/* Remuneración */}
                           <td className="py-1.5 px-2 text-right font-mono bg-blue-50/50">
-                            {costos.remuneracion > 0 ? costos.remuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                            {costos.remuneracion > 0 ? costos.remuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                           </td>
                           {/* Asignación Familiar */}
                           <td className="py-1.5 px-2 text-right font-mono bg-blue-50/50">
-                            {costos.asignacionFamiliar > 0 ? costos.asignacionFamiliar.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                            {costos.asignacionFamiliar > 0 ? costos.asignacionFamiliar.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                           </td>
                           {/* Total Remuneración */}
                           <td className="py-1.5 px-2 text-right font-mono font-semibold bg-blue-100/50">
-                            {costos.totalRemuneracion > 0 ? costos.totalRemuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                            {costos.totalRemuneracion > 0 ? costos.totalRemuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                           </td>
                           {/* Beneficios (condicional) */}
                           {showBeneficios && (
                             <>
                               {/* Essalud */}
                               <td className="py-1.5 px-2 text-right font-mono bg-green-50/50">
-                                {costos.essalud > 0 ? costos.essalud.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                                {costos.essalud > 0 ? costos.essalud.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                               </td>
                               {/* CTS mensual */}
                               <td className="py-1.5 px-2 text-right font-mono bg-green-50/50">
-                                {costos.ctsMensual > 0 ? costos.ctsMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                                {costos.ctsMensual > 0 ? costos.ctsMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                               </td>
                               {/* Gratificación mensual */}
                               <td className="py-1.5 px-2 text-right font-mono bg-green-50/50">
-                                {costos.gratificacionMensual > 0 ? costos.gratificacionMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                                {costos.gratificacionMensual > 0 ? costos.gratificacionMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                               </td>
                               {/* Bonificación Extraordinaria mensual */}
                               <td className="py-1.5 px-2 text-right font-mono bg-green-50/50">
-                                {costos.bonifExtraordinariaMensual > 0 ? costos.bonifExtraordinariaMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                                {costos.bonifExtraordinariaMensual > 0 ? costos.bonifExtraordinariaMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                               </td>
                             </>
                           )}
                           {/* Costo Mensual Planilla */}
                           <td className="py-1.5 px-2 text-right font-mono font-semibold bg-yellow-100/50">
-                            {costos.costoMensualPlanilla > 0 ? costos.costoMensualPlanilla.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                            {costos.costoMensualPlanilla > 0 ? costos.costoMensualPlanilla.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                           </td>
                           {/* Seguros (condicional) */}
                           {showSeguros && (
                             <>
                               {/* SCTR */}
                               <td className="py-1.5 px-2 text-right font-mono bg-orange-50/50">
-                                {costos.sctr > 0 ? costos.sctr.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                                {costos.sctr > 0 ? costos.sctr.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                               </td>
                               {/* Vida Ley */}
                               <td className="py-1.5 px-2 text-right font-mono bg-orange-50/50">
-                                {costos.vidaLey > 0 ? costos.vidaLey.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                                {costos.vidaLey > 0 ? costos.vidaLey.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                               </td>
                               {/* EMO */}
                               <td className="py-1.5 px-2 text-right font-mono bg-orange-50/50">
-                                {costos.emo > 0 ? costos.emo.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                                {costos.emo > 0 ? costos.emo.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                               </td>
                             </>
                           )}
                           {/* Honorarios */}
                           <td className="py-1.5 px-2 text-right font-mono bg-purple-50/50">
-                            {costos.honorarios > 0 ? costos.honorarios.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                            {costos.honorarios > 0 ? costos.honorarios.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                           </td>
                           {/* Total Mensual */}
                           <td className="py-1.5 px-2 text-right font-mono font-bold text-orange-700 bg-orange-100/70">
-                            {costos.totalMensual > 0 ? costos.totalMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                            {costos.totalMensual > 0 ? costos.totalMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                           </td>
                           {/* $/Hora */}
                           <td className="py-1.5 px-2 text-right font-mono font-bold text-blue-700 bg-blue-100/50">
@@ -869,27 +869,27 @@ export default function PersonalClient() {
                         })
                         return (
                           <>
-                            <td className="py-2 px-2 text-right font-mono bg-blue-50">{totales.remuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
-                            <td className="py-2 px-2 text-right font-mono bg-blue-50">{totales.asignacionFamiliar.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
-                            <td className="py-2 px-2 text-right font-mono font-bold bg-blue-100">{totales.totalRemuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono bg-blue-50">{totales.remuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono bg-blue-50">{totales.asignacionFamiliar.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono font-bold bg-blue-100">{totales.totalRemuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             {showBeneficios && (
                               <>
-                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.essalud.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
-                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.ctsMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
-                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.gratificacionMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
-                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.bonifExtraordinariaMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.essalud.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.ctsMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.gratificacionMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-green-50">{totales.bonifExtraordinariaMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               </>
                             )}
-                            <td className="py-2 px-2 text-right font-mono font-bold bg-yellow-100">{totales.costoMensualPlanilla.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono font-bold bg-yellow-100">{totales.costoMensualPlanilla.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             {showSeguros && (
                               <>
-                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.sctr.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
-                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.vidaLey.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
-                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.emo.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.sctr.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.vidaLey.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="py-2 px-2 text-right font-mono bg-orange-50">{totales.emo.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               </>
                             )}
-                            <td className="py-2 px-2 text-right font-mono bg-purple-50">{totales.honorarios.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
-                            <td className="py-2 px-2 text-right font-mono font-bold text-orange-700 bg-orange-200">{totales.totalMensual.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono bg-purple-50">{totales.honorarios.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono font-bold text-orange-700 bg-orange-200">{totales.totalMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             <td className="py-2 px-2 text-right font-mono text-blue-700 bg-blue-200">—</td>
                             <td colSpan={2} className="py-2 px-2"></td>
                           </>
