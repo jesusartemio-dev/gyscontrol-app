@@ -1483,6 +1483,7 @@ enum Role {
   logistico
   gestor
   gerente
+  seguridad
   admin
 }
 
