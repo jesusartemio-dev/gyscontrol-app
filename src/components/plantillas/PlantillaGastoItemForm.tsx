@@ -30,9 +30,9 @@ export default function PlantillaGastoItemForm({ gastoId, onCreated }: Props) {
     try {
       setLoading(true)
 
-      // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
-      const costoCliente = cantidad * precioUnitario * factorSeguridad
-      const costoInterno = costoCliente / (margen || 1.25)
+      // Fórmula: precioUnitario va al costoInterno, luego se multiplica por margen para costoCliente
+      const costoInterno = cantidad * precioUnitario * factorSeguridad
+      const costoCliente = costoInterno * (margen || 1.25)
 
       const payload: PlantillaGastoItemPayload = {
         gastoId,
@@ -126,7 +126,9 @@ export default function PlantillaGastoItemForm({ gastoId, onCreated }: Props) {
         <label className="text-sm font-medium text-gray-700 mb-1">Margen</label>
         <Input
           type="number"
-          placeholder="1.0"
+          step="0.01"
+          min="1"
+          placeholder="1.25"
           value={margen}
           onChange={(e) => setMargen(parseFloat(e.target.value))}
         />

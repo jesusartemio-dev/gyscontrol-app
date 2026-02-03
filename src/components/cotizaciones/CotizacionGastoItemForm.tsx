@@ -71,10 +71,10 @@ export default function CotizacionGastoItemForm({ gastoId, onCreated }: Props) {
   })
 
   const watchedValues = form.watch()
-  // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
-  const costoCliente = (watchedValues.cantidad || 0) * (watchedValues.precioUnitario || 0) * (watchedValues.factorSeguridad || 1)
+  // Fórmula: precioUnitario va al costoInterno, luego se multiplica por margen para costoCliente
+  const costoInterno = (watchedValues.cantidad || 0) * (watchedValues.precioUnitario || 0) * (watchedValues.factorSeguridad || 1)
   const margenValue = watchedValues.margen || 1.25
-  const costoInterno = costoCliente / margenValue
+  const costoCliente = costoInterno * margenValue
   const rentabilidad = costoInterno > 0 ? ((costoCliente - costoInterno) / costoInterno) * 100 : 0
 
   const onSubmit = async (data: FormValues) => {
@@ -295,10 +295,10 @@ export default function CotizacionGastoItemForm({ gastoId, onCreated }: Props) {
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.1"
+                          step="0.01"
                           min="1"
                           max="10"
-                          placeholder="1.0"
+                          placeholder="1.25"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
                           className="focus:border-orange-500"

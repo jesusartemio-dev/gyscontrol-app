@@ -1,13 +1,3 @@
-// ===================================================
-// 📁 Archivo: UnidadServicioTableView.tsx
-// 📌 Ubicación: src/components/catalogo/
-// 🔧 Vista de tabla para unidades de servicio
-//
-// 🧠 Uso: Vista tabular de unidades de servicio con edición inline
-// ✍️ Autor: Jesús Artemio
-// 📅 Creación: 2025-09-25
-// ===================================================
-
 'use client'
 
 import { useState } from 'react'
@@ -15,16 +5,23 @@ import { UnidadServicio } from '@/types'
 import { deleteUnidadServicio, updateUnidadServicio } from '@/lib/services/unidadServicio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  Edit,
-  Trash2,
-  Save,
-  X,
-  Calculator,
-  AlertCircle,
-  Loader2
-} from 'lucide-react'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { Pencil, Trash2, Check, X, Calculator, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Props {
@@ -32,14 +29,14 @@ interface Props {
   onUpdate?: (unidad: UnidadServicio) => void
   onDelete?: (id: string) => void
   loading?: boolean
-  error?: string | null
 }
 
-export default function UnidadServicioTableView({ data, onUpdate, onDelete, loading = false, error = null }: Props) {
+export default function UnidadServicioTableView({ data, onUpdate, onDelete }: Props) {
   const [editando, setEditando] = useState<string | null>(null)
   const [nombre, setNombre] = useState('')
   const [guardando, setGuardando] = useState(false)
-  const [eliminando, setEliminando] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<UnidadServicio | null>(null)
+  const [eliminando, setEliminando] = useState(false)
 
   const iniciarEdicion = (u: UnidadServicio) => {
     setEditando(u.id)
@@ -57,170 +54,185 @@ export default function UnidadServicioTableView({ data, onUpdate, onDelete, load
       return
     }
 
-    if (nombre.trim().length < 2) {
-      toast.error('El nombre debe tener al menos 2 caracteres')
-      return
-    }
-
     setGuardando(true)
     try {
       const actualizada = await updateUnidadServicio(id, { nombre: nombre.trim() })
-      toast.success('Unidad de servicio actualizada correctamente')
+      toast.success('Unidad actualizada')
       onUpdate?.(actualizada)
-      setEditando(null)
-      setNombre('')
+      cancelarEdicion()
     } catch (error) {
-      console.error('Error al actualizar unidad de servicio:', error)
-      toast.error('Error al actualizar la unidad de servicio')
+      console.error('Error al actualizar:', error)
+      toast.error('Error al actualizar')
     } finally {
       setGuardando(false)
     }
   }
 
-  const eliminar = async (id: string) => {
-    setEliminando(id)
+  const confirmarEliminar = async () => {
+    if (!deleteTarget) return
+    setEliminando(true)
     try {
-      await deleteUnidadServicio(id)
-      toast.success('Unidad de servicio eliminada correctamente')
-      onDelete?.(id)
+      await deleteUnidadServicio(deleteTarget.id)
+      toast.success('Unidad eliminada')
+      onDelete?.(deleteTarget.id)
+      setDeleteTarget(null)
     } catch (error) {
-      console.error('Error al eliminar unidad de servicio:', error)
-      toast.error('Error al eliminar la unidad de servicio')
+      console.error('Error al eliminar:', error)
+      toast.error('Error al eliminar')
     } finally {
-      setEliminando(null)
+      setEliminando(false)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
-        ))}
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <p className="text-red-600">{error}</p>
-      </div>
-    )
+  const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      guardar(id)
+    } else if (e.key === 'Escape') {
+      cancelarEdicion()
+    }
   }
 
   if (!data || data.length === 0) {
     return (
       <div className="text-center py-12">
-        <Calculator className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          No hay unidades disponibles
-        </h3>
-        <p className="text-gray-500">
-          Las unidades de servicio que agregues aparecerán aquí para su gestión.
+        <Calculator className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-lg font-semibold mb-2">No hay unidades</h3>
+        <p className="text-sm text-muted-foreground">
+          Las unidades de servicio que agregues aparecerán aquí
         </p>
       </div>
     )
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[60%]">Nombre de la Unidad</TableHead>
-            <TableHead className="w-[40%] text-right">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((unidad) => (
-            <TableRow key={unidad.id}>
-              {editando === unidad.id ? (
-                <>
-                  <TableCell>
+    <TooltipProvider>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b bg-muted/40">
+              <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Nombre
+              </th>
+              <th className="w-24 py-2 px-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {data.map((unidad) => (
+              <tr key={unidad.id} className="hover:bg-muted/30 transition-colors">
+                <td className="py-2 px-3">
+                  {editando === unidad.id ? (
                     <Input
                       value={nombre}
                       onChange={(e) => setNombre(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, unidad.id)}
                       placeholder="Nombre de la unidad"
-                      className="h-8"
+                      className="h-8 max-w-sm"
+                      autoFocus
                     />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={cancelarEdicion}
-                        disabled={guardando}
-                        className="h-7 px-2 text-xs"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Cancelar
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => guardar(unidad.id)}
-                        disabled={guardando}
-                        className="h-7 px-2 text-xs"
-                      >
-                        {guardando ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Guardando...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-3 w-3 mr-1" />
-                            Guardar
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </>
-              ) : (
-                <>
-                  <TableCell className="font-medium">{unidad.nombre}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => iniciarEdicion(unidad)}
-                        disabled={editando !== null || eliminando !== null}
-                        className="h-7 px-2 text-xs"
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Editar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => eliminar(unidad.id)}
-                        disabled={editando !== null || eliminando === unidad.id}
-                        className="h-7 px-2 text-xs"
-                      >
-                        {eliminando === unidad.id ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Eliminando...
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Eliminar
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+                  ) : (
+                    <span className="font-medium text-sm">{unidad.nombre}</span>
+                  )}
+                </td>
+                <td className="py-2 px-3">
+                  <div className="flex justify-end gap-1">
+                    {editando === unidad.id ? (
+                      <>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={cancelarEdicion}
+                              disabled={guardando}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Cancelar (Esc)</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => guardar(unidad.id)}
+                              disabled={guardando}
+                            >
+                              {guardando ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Check className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Guardar (Enter)</TooltipContent>
+                        </Tooltip>
+                      </>
+                    ) : (
+                      <>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={() => iniciarEdicion(unidad)}
+                              disabled={editando !== null}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteTarget(unidad)}
+                              disabled={editando !== null}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Eliminar</TooltipContent>
+                        </Tooltip>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar unidad?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la unidad "{deleteTarget?.nombre}". Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarEliminar}
+              disabled={eliminando}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {eliminando ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </TooltipProvider>
   )
 }

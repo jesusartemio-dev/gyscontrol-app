@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   getCategoriasCondicion,
@@ -17,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -27,28 +26,20 @@ import {
   DialogFooter
 } from '@/components/ui/dialog'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  ArrowLeft,
   Plus,
   FolderOpen,
   Loader2,
-  FileText
+  Search,
+  X
 } from 'lucide-react'
 
 export default function CategoriasCondicionPage() {
-  const router = useRouter()
   const [categorias, setCategorias] = useState<CategoriaCondicion[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [importando, setImportando] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const [formData, setFormData] = useState({ nombre: '', descripcion: '' })
 
   useEffect(() => {
@@ -80,13 +71,13 @@ export default function CategoriasCondicionPage() {
         nombre: formData.nombre.trim(),
         descripcion: formData.descripcion.trim() || undefined
       })
-      toast.success('Categoria creada correctamente')
+      toast.success('Categoría creada correctamente')
       setShowModal(false)
       setFormData({ nombre: '', descripcion: '' })
       cargarDatos()
     } catch (error) {
       console.error('Error creando categoria:', error)
-      toast.error('Error al crear la categoria')
+      toast.error('Error al crear la categoría')
     } finally {
       setSaving(false)
     }
@@ -140,153 +131,166 @@ export default function CategoriasCondicionPage() {
     }
   }
 
-  const totalCondiciones = categorias.reduce(
-    (sum, cat) => sum + (cat._count?.catalogoCondiciones || 0),
-    0
+  const filteredCategorias = categorias.filter(cat =>
+    cat.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    cat.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   if (loading) {
     return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-3 gap-4">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-8 w-48" />
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-32" />
+          </div>
         </div>
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-9 w-[250px]" />
+        <Card>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center justify-between p-3">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-6 w-12" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/catalogo/condiciones')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FolderOpen className="h-6 w-6" />
-              Categorias de Condiciones
-            </h1>
-            <p className="text-muted-foreground">
-              Organiza las condiciones del catalogo por categorias
-            </p>
+    <div className="space-y-4">
+      {/* Header compacto */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-semibold">Categorías de Condición</h1>
           </div>
+          <Badge variant="secondary" className="font-normal">
+            {categorias.length}
+          </Badge>
         </div>
-        <div className="flex items-center gap-4">
+
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => setShowModal(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Nueva
+          </Button>
           <BotonesImportExport
             onExportar={handleExportar}
             onImportar={handleImportar}
             importando={importando}
           />
-          <Button onClick={() => setShowModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Categoria
-          </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FolderOpen className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Categorias</p>
-                <p className="text-2xl font-bold">{categorias.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <FileText className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Condiciones</p>
-                <p className="text-2xl font-bold text-green-600">{totalCondiciones}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <FileText className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Promedio por Categoria</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {categorias.length > 0 ? Math.round(totalCondiciones / categorias.length) : 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Filtro */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar categorías..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-9 h-9"
+          />
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+              onClick={() => setSearchTerm('')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {searchTerm && (
+          <span className="text-sm text-muted-foreground">
+            {filteredCategorias.length} de {categorias.length}
+          </span>
+        )}
       </div>
 
-      {/* Table */}
+      {/* Tabla */}
       <Card>
-        <CardHeader>
-          <CardTitle>Lista de Categorias</CardTitle>
-          <CardDescription>
-            {categorias.length} categorias registradas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {categorias.length === 0 ? (
+        <CardContent className="p-0">
+          {filteredCategorias.length === 0 ? (
             <div className="text-center py-12">
               <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No hay categorias registradas</h3>
-              <p className="text-muted-foreground mb-4">
-                Comienza agregando tu primera categoria
+              <h3 className="text-lg font-semibold mb-2">
+                {categorias.length === 0 ? 'No hay categorías' : 'Sin resultados'}
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                {categorias.length === 0
+                  ? 'Comienza agregando tu primera categoría de condición'
+                  : `No hay categorías que coincidan con "${searchTerm}"`}
               </p>
-              <Button onClick={() => setShowModal(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Categoria
-              </Button>
+              {categorias.length === 0 ? (
+                <Button variant="outline" size="sm" onClick={() => setShowModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva categoría
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setSearchTerm('')}>
+                  <X className="h-4 w-4 mr-2" />
+                  Limpiar búsqueda
+                </Button>
+              )}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Descripcion</TableHead>
-                  <TableHead className="text-center">Condiciones</TableHead>
-                  <TableHead>Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {categorias.map(cat => (
-                  <TableRow key={cat.id}>
-                    <TableCell className="font-medium">{cat.nombre}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {cat.descripcion || '-'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="secondary">
-                        {cat._count?.catalogoCondiciones || 0}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={cat.activo ? 'default' : 'secondary'}>
-                        {cat.activo ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Nombre
+                    </th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Descripción
+                    </th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-24">
+                      Condiciones
+                    </th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-20">
+                      Estado
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filteredCategorias.map(cat => (
+                    <tr key={cat.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="font-medium text-sm">{cat.nombre}</span>
+                      </td>
+                      <td className="py-2 px-3">
+                        <span className="text-sm text-muted-foreground">
+                          {cat.descripcion || '—'}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <Badge variant="secondary" className="text-xs">
+                          {cat._count?.catalogoCondiciones || 0}
+                        </Badge>
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <Badge variant={cat.activo ? 'default' : 'secondary'} className="text-xs">
+                          {cat.activo ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -295,9 +299,9 @@ export default function CategoriasCondicionPage() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nueva Categoria</DialogTitle>
+            <DialogTitle>Nueva Categoría</DialogTitle>
             <DialogDescription>
-              Crea una nueva categoria para organizar las condiciones
+              Crea una nueva categoría para organizar las condiciones
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -306,15 +310,15 @@ export default function CategoriasCondicionPage() {
               <Input
                 value={formData.nombre}
                 onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                placeholder="Ej: Comercial, Tecnica, Entrega..."
+                placeholder="Ej: Comercial, Técnica, Entrega..."
               />
             </div>
             <div className="space-y-2">
-              <Label>Descripcion</Label>
+              <Label>Descripción</Label>
               <Input
                 value={formData.descripcion}
                 onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                placeholder="Descripcion opcional"
+                placeholder="Descripción opcional"
               />
             </div>
           </div>
@@ -324,7 +328,7 @@ export default function CategoriasCondicionPage() {
             </Button>
             <Button onClick={handleCreate} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Crear Categoria
+              Crear Categoría
             </Button>
           </DialogFooter>
         </DialogContent>
