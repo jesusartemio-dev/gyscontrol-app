@@ -13,8 +13,7 @@ import {
   Search,
   X,
   Download,
-  Upload,
-  FileDown
+  Upload
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,14 +38,9 @@ import { getEmpleados, createEmpleado, updateEmpleado, deleteEmpleado, EmpleadoP
 import { getCargos } from '@/lib/services/cargo'
 import { getDepartamentos } from '@/lib/services/departamento'
 import {
-  exportarEmpleadosAExcel,
-  generarPlantillaEmpleados,
-  leerEmpleadosDesdeExcel,
-  validarEmpleados,
-  crearEmpleadosEnBD,
-  EmpleadoImportado
+  exportarEmpleadosAExcel
 } from '@/lib/utils/empleadoExcel'
-import { ImportPreviewModal } from '@/components/admin/ImportPreviewModal'
+import { EmpleadoImportModal } from '@/components/admin/EmpleadoImportModal'
 import {
   getConfiguracionCostos,
   ConfiguracionCostos,
@@ -135,7 +129,6 @@ export default function PersonalClient() {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [importando, setImportando] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterActivo, setFilterActivo] = useState<'__ALL__' | 'activo' | 'inactivo'>('__ALL__')
   const [filterDepartamento, setFilterDepartamento] = useState<string>('__ALL__')
@@ -157,15 +150,8 @@ export default function PersonalClient() {
   const [form, setForm] = useState<EmpleadoForm>(defaultForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Import preview modal state
+  // Import modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [importPreviewData, setImportPreviewData] = useState<{
-    validos: EmpleadoImportado[]
-    nuevos: number
-    actualizaciones: number
-    errores: string[]
-    sinUsuario: string[]
-  } | null>(null)
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -330,7 +316,7 @@ export default function PersonalClient() {
     }
   }
 
-  // Export/Import handlers
+  // Export handler
   const handleExportar = () => {
     if (filteredEmpleados.length === 0) {
       toast.error('No hay empleados para exportar')
@@ -340,69 +326,9 @@ export default function PersonalClient() {
     toast.success('Archivo exportado correctamente')
   }
 
-  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setImportando(true)
-    try {
-      const datos = await leerEmpleadosDesdeExcel(file)
-      console.log('📥 Datos leídos del Excel:', datos)
-
-      if (datos.length === 0) {
-        toast.error('El archivo no contiene datos para importar')
-        return
-      }
-
-      const emailsUsuarios = usuarios.map(u => u.email || '')
-      const emailsEmpleadosExistentes = empleados.map(emp => emp.user?.email || '')
-
-      console.log('📧 Emails de usuarios en sistema:', emailsUsuarios)
-      console.log('👥 Emails de empleados existentes:', emailsEmpleadosExistentes)
-
-      const resultado = validarEmpleados(datos, emailsUsuarios, emailsEmpleadosExistentes)
-      console.log('✅ Validación:', resultado)
-
-      // Guardar datos para el modal y mostrarlo
-      setImportPreviewData(resultado)
-      setIsImportModalOpen(true)
-    } catch (error) {
-      console.error('❌ Error leyendo Excel:', error)
-      toast.error(error instanceof Error ? error.message : 'Error al procesar archivo')
-    } finally {
-      setImportando(false)
-      e.target.value = ''
-    }
-  }
-
-  const executeImport = async () => {
-    if (!importPreviewData || importPreviewData.validos.length === 0) return
-
-    setImportando(true)
-    try {
-      const resultado = await crearEmpleadosEnBD(importPreviewData.validos)
-      console.log('📤 Resultado de importación:', resultado)
-
-      const mensajes = []
-      if (resultado.creados > 0) mensajes.push(`${resultado.creados} creado(s)`)
-      if (resultado.actualizados > 0) mensajes.push(`${resultado.actualizados} actualizado(s)`)
-
-      if (mensajes.length > 0) {
-        toast.success(`Importación completada: ${mensajes.join(', ')}`)
-      } else {
-        toast.info('No se realizaron cambios')
-      }
-
-      setIsImportModalOpen(false)
-      setImportPreviewData(null)
-      await loadData()
-    } catch (error) {
-      console.error('❌ Error en importación:', error)
-      toast.error(error instanceof Error ? error.message : 'Error al importar')
-    } finally {
-      setImportando(false)
-    }
-  }
+  // Datos para el modal de importación
+  const emailsUsuarios = useMemo(() => usuarios.map(u => u.email || ''), [usuarios])
+  const emailsEmpleadosExistentes = useMemo(() => empleados.map(emp => emp.user?.email || ''), [empleados])
 
   if (loading) {
     return (
@@ -472,34 +398,17 @@ export default function PersonalClient() {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <label className={cn(
-                    "flex items-center gap-1 h-8 px-2 rounded-md cursor-pointer transition-colors",
-                    importando ? "opacity-50 cursor-not-allowed" : "hover:bg-accent"
-                  )}>
-                    {importando ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Upload className="h-4 w-4" />
-                    )}
-                    <span className="text-sm">Importar</span>
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls"
-                      onChange={handleImportar}
-                      className="hidden"
-                      disabled={importando}
-                    />
-                  </label>
-                </TooltipTrigger>
-                <TooltipContent>Importar desde Excel</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={generarPlantillaEmpleados} className="h-8 w-8 p-0">
-                    <FileDown className="h-4 w-4" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="h-8 px-2"
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Importar
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Descargar plantilla</TooltipContent>
+                <TooltipContent>Importar desde Excel</TooltipContent>
               </Tooltip>
             </div>
           </div>
@@ -969,19 +878,14 @@ export default function PersonalClient() {
           description={`Se eliminará el registro de "${empleadoToDelete?.user?.name}". Esta acción no se puede deshacer.`}
         />
 
-        {/* Import Preview Modal */}
-        {importPreviewData && (
-          <ImportPreviewModal
-            open={isImportModalOpen}
-            onOpenChange={(open) => {
-              setIsImportModalOpen(open)
-              if (!open) setImportPreviewData(null)
-            }}
-            onConfirm={executeImport}
-            datos={importPreviewData}
-            isLoading={importando}
-          />
-        )}
+        {/* Import Modal */}
+        <EmpleadoImportModal
+          open={isImportModalOpen}
+          onOpenChange={setIsImportModalOpen}
+          onSuccess={loadData}
+          emailsUsuarios={emailsUsuarios}
+          emailsEmpleadosExistentes={emailsEmpleadosExistentes}
+        />
       </div>
     </TooltipProvider>
   )
