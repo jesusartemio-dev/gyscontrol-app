@@ -26,6 +26,7 @@ export type RolUsuario =
   | 'logistico'
   | 'gestor'
   | 'gerente'
+  | 'seguridad'
   | 'admin'
 
 // ✅ Tipos para el sistema de notificaciones del sidebar
