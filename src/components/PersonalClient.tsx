@@ -242,9 +242,9 @@ export default function PersonalClient() {
         case 'total-asc':
           return costosA.totalMensual - costosB.totalMensual
         case 'costo-hora-desc':
-          return costosB.costoHoraUSD - costosA.costoHoraUSD
+          return (costosB.costoHoraUSD ?? 0) - (costosA.costoHoraUSD ?? 0)
         case 'costo-hora-asc':
-          return costosA.costoHoraUSD - costosB.costoHoraUSD
+          return (costosA.costoHoraUSD ?? 0) - (costosB.costoHoraUSD ?? 0)
         case 'fecha-ingreso':
           return new Date(b.fechaIngreso || 0).getTime() - new Date(a.fechaIngreso || 0).getTime()
         case 'fecha-ingreso-asc':
