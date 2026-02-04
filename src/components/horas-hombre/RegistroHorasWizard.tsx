@@ -26,20 +26,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Progress } from '@/components/ui/progress'
 import {
   Clock,
-  Calendar,
   FolderOpen,
   Wrench,
   CheckSquare,
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Target,
-  Building,
-  List
+  Building
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 
 interface RegistroHorasWizardProps {
   onSuccess: () => void
@@ -148,23 +144,23 @@ export function RegistroHorasWizard({
     },
     {
       id: 3,
-      titulo: 'Seleccionar Nivel',
+      titulo: 'Tipo de Registro',
       descripcion: 'Elige si registras en Actividad o Tarea',
-      icono: List,
+      icono: Wrench,
       validacion: (datos) => !!datos.nivelSeleccionado
     },
     {
       id: 4,
-      titulo: 'Seleccionar Elemento',
-      descripcion: 'Selecciona el elemento específico donde registras',
-      icono: Target,
+      titulo: 'Seleccionar Tarea',
+      descripcion: 'Selecciona la tarea donde registras',
+      icono: CheckSquare,
       validacion: (datos) => !!datos.elementoSeleccionado
     },
     {
       id: 5,
-      titulo: 'Completar Registro',
+      titulo: 'Completar',
       descripcion: 'Ingresa las horas y descripción del trabajo',
-      icono: CheckSquare,
+      icono: Clock,
       validacion: (datos) => !!datos.horas && !!datos.descripcion && !!datos.fecha
     }
   ]
@@ -501,14 +497,10 @@ export function RegistroHorasWizard({
       if (nuevoPaso === 2 && proyectoSeleccionado) {
         cargarEdts(proyectoSeleccionado.id)
       } else if (nuevoPaso === 4 && edtSeleccionado && nivelSeleccionado) {
-        if (nivelSeleccionado === 'actividad') {
-          cargarElementos(edtSeleccionado.id) // Solo cargar actividades para nivel actividad
-        } else if (nivelSeleccionado === 'tarea') {
-          // Para nivel tarea, preparar para crear nueva tarea
-          console.log('🆕 WIZARD: Preparando para crear nueva tarea')
-          setCreandoTarea(false) // Reset estado
-          setElementoSeleccionado(null)
-        }
+        // Cargar elementos para ambos niveles
+        cargarElementos(edtSeleccionado.id)
+        setCreandoTarea(false) // Reset estado
+        setElementoSeleccionado(null)
       }
       
       setPasoActual(nuevoPaso)
@@ -716,77 +708,66 @@ export function RegistroHorasWizard({
   )
 
   const renderPaso3 = () => (
-    <div className="space-y-4">
-      <Label>Selecciona el nivel donde registras *</Label>
+    <div className="space-y-3">
+      <Label className="text-sm">Selecciona el tipo de registro *</Label>
       <RadioGroup
         value={nivelSeleccionado}
         onValueChange={(value: string) => {
           setNivelSeleccionado(value as 'actividad' | 'tarea')
-          setElementoSeleccionado(null) // Limpiar elemento seleccionado
-          setActividadSeleccionada(null) // Limpiar actividad seleccionada
-          setElementos([]) // Limpiar lista de elementos
-          setActividades([]) // Limpiar actividades
-          setTareasDirectas([]) // Limpiar tareas directas
-          setTareasDeActividad([]) // Limpiar tareas de actividad
-          setCreandoTarea(false) // Reset crear tarea
-          setNombreNuevaTarea('') // Limpiar campos de nueva tarea
+          setElementoSeleccionado(null)
+          setActividadSeleccionada(null)
+          setElementos([])
+          setActividades([])
+          setTareasDirectas([])
+          setTareasDeActividad([])
+          setCreandoTarea(false)
+          setNombreNuevaTarea('')
           setDescripcionNuevaTarea('')
           setFechaInicioTarea('')
           setFechaFinTarea('')
         }}
+        className="space-y-2"
       >
-        <div className="flex items-center space-x-2 p-4 border-2 border-green-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors">
-          <RadioGroupItem value="actividad" id="actividad" className="mt-0">
-            <div className="flex items-center gap-3">
-              <Wrench className="h-5 w-5 text-green-600" />
-              <div>
-                <div className="font-semibold text-green-800">Actividad (Estructurado)</div>
-                <div className="text-sm text-gray-600 mt-1">
-                  Registro jerárquico: Actividad → Tarea específica
-                </div>
-                <div className="text-xs text-green-600 mt-1">
-                  ✓ Respeta estructura del cronograma • ✓ Organización clara • ✓ Tareas relacionadas a actividad
-                </div>
-              </div>
-            </div>
-          </RadioGroupItem>
-        </div>
-        <div className="flex items-center space-x-2 p-4 border-2 border-orange-200 rounded-lg hover:bg-orange-50 hover:border-orange-300 transition-colors">
-          <RadioGroupItem value="tarea" id="tarea" className="mt-0">
-            <div className="flex items-center gap-3">
-              <CheckSquare className="h-5 w-5 text-orange-600" />
-              <div>
-                <div className="font-semibold text-orange-800">Tarea Directa (Ágil)</div>
-                <div className="text-sm text-gray-600 mt-1">
-                  Registro directo: EDT → Tarea específica (sin actividad)
-                </div>
-                <div className="text-xs text-orange-600 mt-1">
-                  ✓ Proceso rápido • ✓ Trabajo independiente • ✓ Sin estructura de actividad
-                </div>
-              </div>
-            </div>
-          </RadioGroupItem>
-        </div>
-      </RadioGroup>
-      
-      {nivelSeleccionado && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-3">
+        <label
+          htmlFor="actividad"
+          className={`flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+            nivelSeleccionado === 'actividad'
+              ? 'border-green-500 bg-green-50'
+              : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+          }`}
+        >
+          <RadioGroupItem value="actividad" id="actividad" className="mt-1" />
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-blue-600" />
-              <div>
-                <div className="font-medium">Nivel seleccionado</div>
-                <div className="text-sm text-gray-600">
-                  {nivelSeleccionado === 'actividad'
-                    ? 'Siguiente: Seleccionar Actividad → Tarea específica'
-                    : 'Siguiente: Seleccionar Tarea directa del EDT'
-                  }
-                </div>
-              </div>
+              <Wrench className="h-4 w-4 text-green-600 shrink-0" />
+              <span className="font-medium text-green-800">Actividad → Tarea</span>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <p className="text-xs text-gray-600 mt-1">
+              Selecciona primero la actividad, luego la tarea específica
+            </p>
+          </div>
+        </label>
+
+        <label
+          htmlFor="tarea"
+          className={`flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+            nivelSeleccionado === 'tarea'
+              ? 'border-orange-500 bg-orange-50'
+              : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50/50'
+          }`}
+        >
+          <RadioGroupItem value="tarea" id="tarea" className="mt-1" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="h-4 w-4 text-orange-600 shrink-0" />
+              <span className="font-medium text-orange-800">Tarea Directa</span>
+            </div>
+            <p className="text-xs text-gray-600 mt-1">
+              Registra directamente en una tarea sin actividad padre
+            </p>
+          </div>
+        </label>
+      </RadioGroup>
     </div>
   )
 
@@ -888,24 +869,67 @@ export function RegistroHorasWizard({
             )}
           </div>
         ) : nivelSeleccionado === 'tarea' ? (
-          // LÓGICA PARA TAREA: Crear nueva tarea (ya que no tiene actividad)
+          // LÓGICA PARA TAREA DIRECTA: Mostrar tareas existentes o crear nueva
           <div className="space-y-4">
             <div className="text-sm text-orange-600 font-medium">
-              🆕 Crear nueva Tarea (ya que no tiene actividad)
+              Selecciona una tarea directa del EDT
             </div>
-            {!creandoTarea && !elementoSeleccionado ? (
+            {loadingData ? (
+              <div className="flex items-center gap-2 p-4">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Cargando tareas...</span>
+              </div>
+            ) : tareasDirectas.length > 0 && !creandoTarea ? (
+              // Hay tareas directas disponibles
+              <div className="space-y-3">
+                <Select
+                  value={elementoSeleccionado?.id || ''}
+                  onValueChange={(value) => {
+                    const tarea = tareasDirectas.find(t => t.id === value)
+                    console.log('🎯 WIZARD: Tarea directa seleccionada:', value, tarea)
+                    setElementoSeleccionado(tarea || null)
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tarea..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tareasDirectas.map((tarea) => (
+                      <SelectItem key={tarea.id} value={tarea.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{tarea.nombre}</span>
+                          <span className="text-sm text-gray-600">
+                            {tarea.responsableNombre} • {tarea.horasReales}h/{tarea.horasPlan}h • {tarea.estado}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCreandoTarea(true)}
+                    className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                  >
+                    + Crear tarea nueva
+                  </Button>
+                </div>
+              </div>
+            ) : !creandoTarea && !elementoSeleccionado ? (
               <div className="text-center p-6 border-2 border-dashed border-orange-300 rounded-lg bg-orange-50">
                 <div className="text-orange-600 font-medium mb-2">
-                  📋 Tarea no existe en el cronograma
+                  No hay tareas directas en este EDT
                 </div>
                 <div className="text-sm text-gray-600 mb-4">
-                  Esta tarea no tiene una actividad asociada, por lo que debe crearse nueva
+                  Crea una nueva tarea para registrar tus horas
                 </div>
                 <Button
                   onClick={() => setCreandoTarea(true)}
                   className="bg-orange-600 hover:bg-orange-700"
                 >
-                  ➕ Crear Nueva Tarea
+                  + Crear Nueva Tarea
                 </Button>
               </div>
             ) : creandoTarea ? (
@@ -1031,14 +1055,21 @@ export function RegistroHorasWizard({
   }
 
   const renderPaso5 = () => {
-    console.log('📅 REACT: Renderizando Paso 5 - Estado de fecha:', fecha)
-    console.log('📅 REACT: fechaInicial prop:', fechaInicial)
-    
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Resumen compacto de lo seleccionado */}
+        <div className="p-3 bg-gray-50 rounded-lg border text-sm">
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-gray-700">
+            <span><strong>Proyecto:</strong> {proyectoSeleccionado?.codigo}</span>
+            <span><strong>EDT:</strong> {edtSeleccionado?.nombre}</span>
+            <span><strong>Tarea:</strong> {elementoSeleccionado?.nombre}</span>
+          </div>
+        </div>
+
+        {/* Campos de registro */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label htmlFor="fecha">Fecha *</Label>
+            <Label htmlFor="fecha" className="text-sm">Fecha *</Label>
             <Input
               id="fecha"
               type="date"
@@ -1046,17 +1077,16 @@ export function RegistroHorasWizard({
               onChange={(e) => setFecha(e.target.value)}
               className="mt-1"
             />
-            <div className="text-xs text-gray-500 mt-1">
-              Estado: {fecha} | Prop: {fechaInicial}
-            </div>
           </div>
           <div>
-            <Label htmlFor="horas">Horas *</Label>
+            <Label htmlFor="horas" className="text-sm">Horas *</Label>
             <Input
               id="horas"
               type="number"
               step="0.5"
-              placeholder="8.0"
+              min="0.5"
+              max="24"
+              placeholder="8"
               value={horas}
               onChange={(e) => setHoras(e.target.value)}
               className="mt-1"
@@ -1065,51 +1095,16 @@ export function RegistroHorasWizard({
         </div>
 
         <div>
-          <Label htmlFor="descripcion">Descripción del trabajo *</Label>
+          <Label htmlFor="descripcion" className="text-sm">Descripcion del trabajo *</Label>
           <Textarea
             id="descripcion"
-            placeholder="Describa detalladamente el trabajo realizado..."
+            placeholder="Describe brevemente el trabajo realizado..."
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            rows={4}
+            rows={3}
             className="mt-1"
           />
         </div>
-
-        {/* Resumen de la selección con jerarquía mejorada */}
-        <Card className="bg-gray-50">
-          <CardHeader>
-            <CardTitle className="text-sm">📋 Resumen del registro - Jerarquía mejorada</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-2 text-sm">
-            <div><strong>📁 Proyecto:</strong> {proyectoSeleccionado?.nombre}</div>
-            <div><strong>📂 EDT:</strong> {edtSeleccionado?.nombre}</div>
-            <div><strong>⚙️ Nivel:</strong> {nivelSeleccionado === 'actividad' ? 'Estructurado (Actividad → Tarea)' : 'Ágil (Tarea directa)'}</div>
-            
-            {/* Mostrar jerarquía según el nivel seleccionado */}
-            {nivelSeleccionado === 'actividad' && actividadSeleccionada ? (
-              <>
-                <div><strong>🎯 Actividad:</strong> {actividadSeleccionada.nombre}</div>
-                <div><strong>✅ Tarea:</strong> {elementoSeleccionado?.nombre} (de la actividad)</div>
-                <div className="text-xs text-green-600 mt-2 p-2 bg-green-50 rounded">
-                  <strong>Jerarquía completa:</strong><br />
-                  📁 {proyectoSeleccionado?.nombre} → 📂 {edtSeleccionado?.nombre} → 🎯 {actividadSeleccionada.nombre} → ✅ {elementoSeleccionado?.nombre}
-                </div>
-              </>
-            ) : nivelSeleccionado === 'tarea' ? (
-              <>
-                <div><strong>✅ Tarea:</strong> {elementoSeleccionado?.nombre} (directa del EDT)</div>
-                <div className="text-xs text-orange-600 mt-2 p-2 bg-orange-50 rounded">
-                  <strong>Jerarquía simplificada:</strong><br />
-                  📁 {proyectoSeleccionado?.nombre} → 📂 {edtSeleccionado?.nombre} → ✅ {elementoSeleccionado?.nombre}
-                </div>
-              </>
-            ) : null}
-            
-            <div><strong>👤 Responsable:</strong> {elementoSeleccionado?.responsableNombre}</div>
-            <div><strong>⏰ Progreso:</strong> {elementoSeleccionado?.horasReales}h/{elementoSeleccionado?.horasPlan}h</div>
-          </CardContent>
-        </Card>
       </div>
     )
   }
@@ -1126,61 +1121,63 @@ export function RegistroHorasWizard({
   }
 
   const content = (
-    <div className="space-y-6">
-      {/* Header con progreso */}
+    <div className="space-y-4">
+      {/* Header compacto con progreso */}
       <div className="space-y-2">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-          <h3 className="text-base sm:text-lg font-semibold">
-            Paso {pasoActual} de {pasos.length}: {pasos[pasoActual - 1].titulo}
-          </h3>
-          <Badge variant="outline" className="w-fit">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Paso {pasoActual}/{pasos.length}</span>
+            <span className="font-medium text-sm">{pasos[pasoActual - 1].titulo}</span>
+          </div>
+          <Badge variant="outline" className="text-xs px-2 py-0.5">
             {Math.round(progreso)}%
           </Badge>
         </div>
-        <p className="text-xs sm:text-sm text-gray-600">
-          {pasos[pasoActual - 1].descripcion}
-        </p>
-        <Progress value={progreso} className="w-full h-2" />
+        <Progress value={progreso} className="w-full h-1.5" />
       </div>
 
       {/* Contenido del paso */}
-      <div className="min-h-[300px]">
+      <div className="min-h-[200px]">
         {renderPasoActual()}
       </div>
 
       {/* Botones de navegación */}
-      <div className="flex justify-between">
+      <div className="flex justify-between pt-2 border-t">
         <Button
-          variant="outline"
+          variant="ghost"
+          size="sm"
           onClick={retrocederPaso}
           disabled={!puedeRetroceder()}
         >
-          <ChevronLeft className="h-4 w-4 mr-2" />
+          <ChevronLeft className="h-4 w-4 mr-1" />
           Anterior
         </Button>
 
         {pasoActual < pasos.length ? (
           <Button
+            size="sm"
             onClick={avanzarPaso}
             disabled={!puedeAvanzar() || loadingData}
           >
             Siguiente
-            <ChevronRight className="h-4 w-4 ml-2" />
+            <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         ) : (
           <Button
+            size="sm"
             onClick={registrarHoras}
             disabled={loading || !puedeAvanzar()}
+            className="bg-green-600 hover:bg-green-700"
           >
             {loading ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Registrando...
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Guardando...
               </>
             ) : (
               <>
-                <Clock className="h-4 w-4 mr-2" />
-                Registrar Horas
+                <CheckSquare className="h-4 w-4 mr-1" />
+                Guardar
               </>
             )}
           </Button>
