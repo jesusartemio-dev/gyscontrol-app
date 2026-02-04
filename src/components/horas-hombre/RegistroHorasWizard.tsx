@@ -173,23 +173,22 @@ export function RegistroHorasWizard({
     cargarProyectos()
   }, [])
 
-  // Actualizar fecha cuando cambie fechaInicial
+  // ✅ CORREGIDO: Combinar useEffects para manejar apertura/cierre correctamente
+  // Esto evita race conditions donde la fecha no se actualiza al abrir
   useEffect(() => {
-    console.log('🔄 REACT: useEffect de fecha ejecutado, fechaInicial:', fechaInicial)
-    if (fechaInicial) {
-      console.log('🔄 REACT: Actualizando fecha inicial:', fechaInicial)
-      setFecha(fechaInicial)
+    console.log('🔄 REACT: useEffect open/fechaInicial ejecutado', { open, fechaInicial })
+    if (open) {
+      // Cuando se ABRE el wizard, siempre establecer la fecha desde fechaInicial
+      if (fechaInicial) {
+        console.log('🔄 REACT: Wizard abierto, estableciendo fecha:', fechaInicial)
+        setFecha(fechaInicial)
+      }
     } else {
-      console.log('🔄 REACT: fechaInicial está vacío, no actualizar')
-    }
-  }, [fechaInicial])
-
-  // Limpiar datos cuando se abre/cierra
-  useEffect(() => {
-    if (!open) {
+      // Cuando se CIERRA el wizard, limpiar todo
+      console.log('🔄 REACT: Wizard cerrado, limpiando formulario')
       limpiarFormulario()
     }
-  }, [open])
+  }, [open, fechaInicial])
 
   const cargarProyectos = async () => {
     try {
@@ -522,6 +521,9 @@ export function RegistroHorasWizard({
       })
       return
     }
+
+    // ✅ LOG: Verificar qué fecha se está enviando
+    console.log('📅 REGISTRO: Fecha a enviar:', fecha, '| fechaInicial:', fechaInicial)
 
     try {
       setLoading(true)
