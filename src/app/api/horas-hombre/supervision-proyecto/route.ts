@@ -207,9 +207,11 @@ export async function GET(request: NextRequest) {
         const codigoProyecto = `${proyecto.codigo} - ${proyecto.nombre}`
         const getTextoJerarquico = () => {
           let texto = proyecto.codigo
-          
-          if (registro.edt?.nombre && registro.edt.nombre !== 'Sin EDT') {
-            texto += `-"${registro.edt.nombre}"`
+
+          // ✅ Usar proyectoEdt.nombre primero, luego edt.nombre como fallback
+          const edtNombre = registro.proyectoEdt?.nombre || registro.edt?.nombre
+          if (edtNombre && edtNombre !== 'Sin EDT') {
+            texto += `-"${edtNombre}"`
           }
           
           if (registro.proyectoTarea?.proyectoActividad?.nombre) {

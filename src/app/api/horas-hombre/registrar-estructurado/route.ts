@@ -327,6 +327,12 @@ export async function GET(request: NextRequest) {
                 nombre: true
               }
             },
+            proyectoEdt: {
+              select: {
+                id: true,
+                nombre: true
+              }
+            },
             recurso: {
               select: {
                 id: true,
@@ -342,7 +348,8 @@ export async function GET(request: NextRequest) {
 
         // Calcular resumen por EDT
         const resumenPorEdt = registros.reduce((acc, registro) => {
-          const categoria = registro.edt?.nombre || 'Sin categoría'
+          // ✅ Usar proyectoEdt.nombre primero, luego edt.nombre como fallback
+          const categoria = registro.proyectoEdt?.nombre || registro.edt?.nombre || 'Sin categoría'
           if (!acc[categoria]) {
             acc[categoria] = {
               categoria: categoria,
