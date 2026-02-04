@@ -164,7 +164,8 @@ export async function GET(request: NextRequest) {
         descripcion: registro.descripcion || registro.observaciones || 'Sin descripción',
         // Formato jerárquico: Código Proyecto-EDT-Actividad:Tarea
         proyectoNombre: registro.proyecto ? `${registro.proyecto.codigo} - ${registro.proyecto.nombre}` : 'Sin proyecto',
-        edtNombre: registro.edt?.nombre || 'Sin EDT',
+        // ✅ Usar el nombre del ProyectoEdt seleccionado, no el del catálogo
+        edtNombre: registro.proyectoEdt?.nombre || registro.edt?.nombre || 'Sin EDT',
         actividadNombre: registro.proyectoTarea?.proyectoActividad?.nombre || null,
         tareaNombre: registro.proyectoTarea?.nombre || null,
         tareaTipo: 'registro',
