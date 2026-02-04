@@ -64,9 +64,12 @@ interface Tarea {
   responsableId: string | null
   responsableNombre: string | null
   responsableEmail: string | null
+  creadoPorId: string | null
+  creadoPorNombre: string | null
   fechaInicio: Date
   fechaFin: Date
   horasPlan: number
+  horasReales: number
   progreso: number
   estado: string
   prioridad: string
@@ -138,6 +141,10 @@ export default function SupervisionTareasPage() {
   // Modal de crear tarea
   const [showCrearModal, setShowCrearModal] = useState(false)
   const [creandoTarea, setCreandoTarea] = useState(false)
+  const [errorCrearTarea, setErrorCrearTarea] = useState<string | null>(null)
+
+  // Estado de actualización
+  const [actualizandoTarea, setActualizandoTarea] = useState<string | null>(null)
   const [edtsProyecto, setEdtsProyecto] = useState<ProyectoEdt[]>([])
   const [cargandoEdts, setCargandoEdts] = useState(false)
   const [nuevaTarea, setNuevaTarea] = useState<NuevaTarea>({
@@ -256,34 +263,57 @@ export default function SupervisionTareasPage() {
     setTareasFiltradas(resultado)
   }, [tareas, filtroProyecto, filtroResponsable, filtroEstado, filtroSinAsignar, filtroTipo, filtroBusqueda])
 
-  // Cargar EDTs cuando cambia el proyecto seleccionado en el modal
+  // Cargar EDTs del cronograma de EJECUCIÓN cuando cambia el proyecto seleccionado en el modal
   const cargarEdtsProyecto = async (proyectoId: string) => {
     if (!proyectoId) {
       setEdtsProyecto([])
+      setErrorCrearTarea(null)
       return
     }
 
     try {
       setCargandoEdts(true)
-      const response = await fetch(`/api/proyectos/${proyectoId}/edt`)
+      setErrorCrearTarea(null)
+
+      // Primero obtener los cronogramas del proyecto
+      const cronogramaResponse = await fetch(`/api/proyectos/${proyectoId}/cronograma`)
+
+      if (!cronogramaResponse.ok) {
+        setEdtsProyecto([])
+        setErrorCrearTarea('Error al obtener los cronogramas del proyecto.')
+        return
+      }
+
+      const cronogramaData = await cronogramaResponse.json()
+      const cronogramas = cronogramaData.data || cronogramaData || []
+
+      // Buscar el cronograma de ejecución
+      const cronogramaEjecucion = cronogramas.find((c: any) => c.tipo === 'ejecucion')
+
+      if (!cronogramaEjecucion) {
+        setEdtsProyecto([])
+        setErrorCrearTarea('Este proyecto no tiene un Cronograma de Ejecución configurado. Debe crearlo primero en la sección de Cronograma del proyecto.')
+        return
+      }
+
+      // Ahora obtener los EDTs del cronograma de ejecución
+      const response = await fetch(`/api/proyectos/${proyectoId}/edt?cronogramaId=${cronogramaEjecucion.id}`)
 
       if (response.ok) {
         const data = await response.json()
-        if (data.success && Array.isArray(data.data)) {
-          setEdtsProyecto(data.data.map((edt: any) => ({
-            id: edt.id,
-            nombre: edt.nombre,
-            descripcion: edt.descripcion
-          })))
-        } else if (Array.isArray(data)) {
-          setEdtsProyecto(data.map((edt: any) => ({
-            id: edt.id,
-            nombre: edt.nombre,
-            descripcion: edt.descripcion
-          })))
-        } else {
+        const edts = data.success && Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : [])
+
+        if (edts.length === 0) {
           setEdtsProyecto([])
+          setErrorCrearTarea('El Cronograma de Ejecución no tiene EDTs configurados. Debe agregar EDTs al cronograma primero.')
+          return
         }
+
+        setEdtsProyecto(edts.map((edt: any) => ({
+          id: edt.id,
+          nombre: edt.nombre,
+          descripcion: edt.descripcion
+        })))
       } else {
         setEdtsProyecto([])
       }
@@ -345,6 +375,46 @@ export default function SupervisionTareasPage() {
         variant: 'destructive'
       })
     }
+  }
+
+  // Actualizar estado de tarea
+  const actualizarEstado = async (tarea: Tarea, nuevoEstado: string) => {
+    try {
+      setActualizandoTarea(tarea.id)
+      const response = await fetch('/api/supervision/tareas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tareaId: tarea.id,
+          tipo: tarea.tipo,
+          estado: nuevoEstado
+        })
+      })
+
+      if (!response.ok) throw new Error('Error al actualizar')
+
+      // Actualizar localmente (si completada, progreso = 100)
+      setTareas(prev => prev.map(t =>
+        t.id === tarea.id ? {
+          ...t,
+          estado: nuevoEstado,
+          progreso: nuevoEstado === 'completada' ? 100 : t.progreso
+        } : t
+      ))
+      toast({ title: 'Estado actualizado', description: nuevoEstado.replace('_', ' ') })
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo actualizar', variant: 'destructive' })
+    } finally {
+      setActualizandoTarea(null)
+    }
+  }
+
+  // Calcular eficiencia (solo si está completada)
+  const calcularEficiencia = (horasPlan: number, horasReales: number, estado: string): number | null => {
+    // Solo mostrar eficiencia cuando la tarea está completada
+    if (estado !== 'completada') return null
+    if (horasPlan <= 0 || horasReales <= 0) return null
+    return Math.round((horasPlan / horasReales) * 100)
   }
 
   // Obtener color de estado
@@ -430,6 +500,7 @@ export default function SupervisionTareasPage() {
   // Abrir modal para crear
   const abrirCrearModal = () => {
     const proyectoIdInicial = filtroProyecto || ''
+    setErrorCrearTarea(null)
     setNuevaTarea({
       proyectoId: proyectoIdInicial,
       proyectoEdtId: '',
@@ -481,26 +552,33 @@ export default function SupervisionTareasPage() {
 
     try {
       setCreandoTarea(true)
+      setErrorCrearTarea(null)
+
+      const payload = {
+        proyectoId: nuevaTarea.proyectoId,
+        proyectoEdtId: nuevaTarea.proyectoEdtId,
+        nombre: nuevaTarea.nombre,
+        descripcion: nuevaTarea.descripcion,
+        fechaInicio: nuevaTarea.fechaInicio,
+        fechaFin: nuevaTarea.fechaFin,
+        responsableId: nuevaTarea.responsableId || null,
+        prioridad: nuevaTarea.prioridad,
+        horasEstimadas: nuevaTarea.horasEstimadas || null
+      }
+
+      console.log('📤 CREAR TAREA - Payload:', payload)
 
       const response = await fetch('/api/supervision/tareas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          proyectoId: nuevaTarea.proyectoId,
-          proyectoEdtId: nuevaTarea.proyectoEdtId,
-          nombre: nuevaTarea.nombre,
-          descripcion: nuevaTarea.descripcion,
-          fechaInicio: nuevaTarea.fechaInicio,
-          fechaFin: nuevaTarea.fechaFin,
-          responsableId: nuevaTarea.responsableId || null,
-          prioridad: nuevaTarea.prioridad,
-          horasEstimadas: nuevaTarea.horasEstimadas || null
-        })
+        body: JSON.stringify(payload)
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al crear tarea')
+        console.error('❌ CREAR TAREA - Error:', errorData)
+        setErrorCrearTarea(errorData.error || 'Error al crear tarea')
+        return
       }
 
       const data = await response.json()
@@ -513,11 +591,7 @@ export default function SupervisionTareasPage() {
         cargarDatos()
       }
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudo crear la tarea',
-        variant: 'destructive'
-      })
+      setErrorCrearTarea(error.message || 'No se pudo crear la tarea')
     } finally {
       setCreandoTarea(false)
     }
@@ -570,187 +644,130 @@ export default function SupervisionTareasPage() {
         </div>
       </div>
 
-      {/* Metricas */}
+      {/* Metricas - Minimalista */}
       {metricas && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <ClipboardList className="h-6 w-6 text-blue-500" />
-                <div>
-                  <p className="text-2xl font-bold">{metricas.totalTareas}</p>
-                  <p className="text-xs text-gray-600">Total</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="h-6 w-6 text-green-500" />
-                <div>
-                  <p className="text-2xl font-bold text-green-600">{metricas.tareasCompletadas}</p>
-                  <p className="text-xs text-gray-600">Completadas</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-6 w-6 text-blue-500" />
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">{metricas.tareasEnProgreso}</p>
-                  <p className="text-xs text-gray-600">En Progreso</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-6 w-6 text-yellow-500" />
-                <div>
-                  <p className="text-2xl font-bold text-yellow-600">{metricas.tareasPendientes}</p>
-                  <p className="text-xs text-gray-600">Pendientes</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:bg-orange-50" onClick={() => setFiltroSinAsignar(!filtroSinAsignar)}>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <UserPlus className="h-6 w-6 text-orange-500" />
-                <div>
-                  <p className="text-2xl font-bold text-orange-600">{metricas.tareasSinAsignar}</p>
-                  <p className="text-xs text-gray-600">Sin Asignar</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="h-6 w-6 text-red-500" />
-                <div>
-                  <p className="text-2xl font-bold text-red-600">{metricas.tareasVencidas}</p>
-                  <p className="text-xs text-gray-600">Vencidas</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="h-6 w-6 text-amber-500" />
-                <div>
-                  <p className="text-2xl font-bold text-amber-600">{metricas.tareasProximasVencer}</p>
-                  <p className="text-xs text-gray-600">Por Vencer</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-gray-500">Resumen:</span>
+          <Badge variant="outline" className="font-normal">
+            <ClipboardList className="h-3 w-3 mr-1" />
+            {metricas.totalTareas} total
+          </Badge>
+          <Badge variant="outline" className="font-normal text-green-600 border-green-200 bg-green-50">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            {metricas.tareasCompletadas} completadas
+          </Badge>
+          <Badge variant="outline" className="font-normal text-blue-600 border-blue-200 bg-blue-50">
+            <Clock className="h-3 w-3 mr-1" />
+            {metricas.tareasEnProgreso} en progreso
+          </Badge>
+          <Badge variant="outline" className="font-normal text-yellow-600 border-yellow-200 bg-yellow-50">
+            <Calendar className="h-3 w-3 mr-1" />
+            {metricas.tareasPendientes} pendientes
+          </Badge>
+          <Badge
+            variant="outline"
+            className={`font-normal cursor-pointer ${filtroSinAsignar ? 'text-orange-700 border-orange-400 bg-orange-100' : 'text-orange-600 border-orange-200 bg-orange-50'}`}
+            onClick={() => setFiltroSinAsignar(!filtroSinAsignar)}
+          >
+            <UserPlus className="h-3 w-3 mr-1" />
+            {metricas.tareasSinAsignar} sin asignar
+          </Badge>
+          {metricas.tareasVencidas > 0 && (
+            <Badge variant="outline" className="font-normal text-red-600 border-red-200 bg-red-50">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              {metricas.tareasVencidas} vencidas
+            </Badge>
+          )}
+          {metricas.tareasProximasVencer > 0 && (
+            <Badge variant="outline" className="font-normal text-amber-600 border-amber-200 bg-amber-50">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              {metricas.tareasProximasVencer} por vencer
+            </Badge>
+          )}
         </div>
       )}
 
-      {/* Filtros */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-            <div className="relative lg:col-span-2">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar tarea..."
-                value={filtroBusqueda}
-                onChange={(e) => setFiltroBusqueda(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+      {/* Filtros - Compactos */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar tarea..."
+            value={filtroBusqueda}
+            onChange={(e) => setFiltroBusqueda(e.target.value)}
+            className="pl-8 h-9 w-[180px]"
+          />
+        </div>
 
-            <Select value={filtroProyecto || 'all'} onValueChange={(v) => setFiltroProyecto(v === 'all' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos los proyectos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los proyectos</SelectItem>
-                {proyectos.map(p => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.codigo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <Select value={filtroProyecto || 'all'} onValueChange={(v) => setFiltroProyecto(v === 'all' ? '' : v)}>
+          <SelectTrigger className="h-9 w-[140px]">
+            <SelectValue placeholder="Proyectos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Proyectos</SelectItem>
+            {proyectos.map(p => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.codigo}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            <Select value={filtroResponsable || 'all'} onValueChange={(v) => setFiltroResponsable(v === 'all' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos los responsables" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los responsables</SelectItem>
-                {usuarios.map(u => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <Select value={filtroResponsable || 'all'} onValueChange={(v) => setFiltroResponsable(v === 'all' ? '' : v)}>
+          <SelectTrigger className="h-9 w-[150px]">
+            <SelectValue placeholder="Responsables" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Responsables</SelectItem>
+            {usuarios.map(u => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            <Select value={filtroEstado || 'all'} onValueChange={(v) => setFiltroEstado(v === 'all' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos los estados" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="en_progreso">En Progreso</SelectItem>
-                <SelectItem value="completada">Completada</SelectItem>
-                <SelectItem value="pausada">Pausada</SelectItem>
-              </SelectContent>
-            </Select>
+        <Select value={filtroEstado || 'all'} onValueChange={(v) => setFiltroEstado(v === 'all' ? '' : v)}>
+          <SelectTrigger className="h-9 w-[130px]">
+            <SelectValue placeholder="Estados" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Estados</SelectItem>
+            <SelectItem value="pendiente">Pendiente</SelectItem>
+            <SelectItem value="en_progreso">En Progreso</SelectItem>
+            <SelectItem value="completada">Completada</SelectItem>
+            <SelectItem value="pausada">Pausada</SelectItem>
+          </SelectContent>
+        </Select>
 
-            <Select value={filtroTipo || 'all'} onValueChange={(v) => setFiltroTipo(v === 'all' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos los tipos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los tipos</SelectItem>
-                <SelectItem value="cronograma">Planificada</SelectItem>
-                <SelectItem value="extra">Extra</SelectItem>
-              </SelectContent>
-            </Select>
+        <Select value={filtroTipo || 'all'} onValueChange={(v) => setFiltroTipo(v === 'all' ? '' : v)}>
+          <SelectTrigger className="h-9 w-[120px]">
+            <SelectValue placeholder="Tipos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tipos</SelectItem>
+            <SelectItem value="cronograma">Planificada</SelectItem>
+            <SelectItem value="extra">Extra</SelectItem>
+          </SelectContent>
+        </Select>
 
-            <Button variant="outline" onClick={limpiarFiltros}>
-              Limpiar
-            </Button>
-          </div>
+        <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="h-9 px-3">
+          <Filter className="h-4 w-4 mr-1" />
+          Limpiar
+        </Button>
 
-          {filtroSinAsignar && (
-            <div className="mt-3">
-              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                Mostrando solo tareas sin asignar
-                <button
-                  className="ml-2 hover:text-orange-600"
-                  onClick={() => setFiltroSinAsignar(false)}
-                >
-                  ×
-                </button>
-              </Badge>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {filtroSinAsignar && (
+          <Badge variant="secondary" className="bg-orange-100 text-orange-800 h-9 flex items-center">
+            Sin asignar
+            <button
+              className="ml-2 hover:text-orange-600"
+              onClick={() => setFiltroSinAsignar(false)}
+            >
+              ×
+            </button>
+          </Badge>
+        )}
+      </div>
 
       {/* Tabla de tareas */}
       <Card>
@@ -779,8 +796,9 @@ export default function SupervisionTareasPage() {
                     <TableHead>Tarea</TableHead>
                     <TableHead>Responsable</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Prioridad</TableHead>
                     <TableHead>Vencimiento</TableHead>
+                    <TableHead>Horas</TableHead>
+                    <TableHead>Eficiencia</TableHead>
                     <TableHead>Progreso</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -813,6 +831,11 @@ export default function SupervisionTareasPage() {
                                   Cronograma
                                 </Badge>
                               )}
+                              {tarea.creadoPorNombre && (
+                                <span className="text-[10px] text-gray-400">
+                                  por {tarea.creadoPorNombre}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -831,14 +854,21 @@ export default function SupervisionTareasPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge className={getEstadoColor(tarea.estado)}>
-                            {tarea.estado.replace('_', ' ')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getPrioridadColor(tarea.prioridad)}>
-                            {tarea.prioridad}
-                          </Badge>
+                          <Select
+                            value={tarea.estado}
+                            onValueChange={(v) => actualizarEstado(tarea, v)}
+                            disabled={actualizandoTarea === tarea.id}
+                          >
+                            <SelectTrigger className={`h-7 w-[110px] text-xs ${getEstadoColor(tarea.estado)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pendiente">Pendiente</SelectItem>
+                              <SelectItem value="en_progreso">En Progreso</SelectItem>
+                              <SelectItem value="completada">Completada</SelectItem>
+                              <SelectItem value="pausada">Pausada</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           <div>
@@ -847,14 +877,34 @@ export default function SupervisionTareasPage() {
                           </div>
                         </TableCell>
                         <TableCell>
+                          <div className="text-sm">
+                            <span className={tarea.horasReales > 0 ? 'font-medium' : 'text-gray-400'}>
+                              {tarea.horasReales}h
+                            </span>
+                            <span className="text-gray-400">/{tarea.horasPlan}h</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const eficiencia = calcularEficiencia(tarea.horasPlan, tarea.horasReales, tarea.estado)
+                            if (eficiencia === null) return <span className="text-gray-300 text-xs">-</span>
+                            const color = eficiencia >= 100 ? 'text-green-600 bg-green-50' : eficiencia >= 80 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50'
+                            return (
+                              <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${color}`}>
+                                {eficiencia}%
+                              </span>
+                            )
+                          })()}
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div className="w-12 bg-gray-200 rounded-full h-2">
                               <div
-                                className="bg-blue-500 h-2 rounded-full"
+                                className={`h-2 rounded-full ${tarea.progreso === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
                                 style={{ width: `${tarea.progreso}%` }}
                               />
                             </div>
-                            <span className="text-sm">{tarea.progreso}%</span>
+                            <span className="text-xs w-8">{tarea.progreso}%</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -945,6 +995,16 @@ export default function SupervisionTareasPage() {
           </DialogHeader>
 
           <div className="space-y-3">
+            {/* Error message */}
+            {errorCrearTarea && (
+              <div className="p-3 rounded-md bg-red-50 border border-red-200">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-red-700">{errorCrearTarea}</p>
+                </div>
+              </div>
+            )}
+
             {/* Proyecto y EDT en una fila */}
             <div className="grid grid-cols-2 gap-3">
               <div>

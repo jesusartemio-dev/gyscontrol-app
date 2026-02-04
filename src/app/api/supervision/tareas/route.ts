@@ -71,6 +71,12 @@ export async function GET(request: NextRequest) {
             role: true
           }
         },
+        creadoPor: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
         proyectoEdt: {
           include: {
             proyecto: {
@@ -192,9 +198,12 @@ export async function GET(request: NextRequest) {
         responsableId: t.responsableId,
         responsableNombre: t.user?.name || null,
         responsableEmail: t.user?.email || null,
+        creadoPorId: t.creadoPorId || null,
+        creadoPorNombre: t.creadoPor?.name || null,
         fechaInicio: t.fechaInicio,
         fechaFin: t.fechaFin,
         horasPlan: t.horasEstimadas ? Number(t.horasEstimadas) : 0,
+        horasReales: t.horasReales ? Number(t.horasReales) : 0,
         progreso: t.porcentajeCompletado || 0,
         estado: t.estado,
         prioridad: t.prioridad || 'media'
@@ -215,9 +224,12 @@ export async function GET(request: NextRequest) {
       responsableId: t.responsableId,
       responsableNombre: t.user?.name || null,
       responsableEmail: t.user?.email || null,
+      creadoPorId: null,
+      creadoPorNombre: null,
       fechaInicio: t.fechaInicio,
       fechaFin: t.fechaFin,
       horasPlan: t.horasEstimadas ? Number(t.horasEstimadas) : 0,
+      horasReales: t.horasReales ? Number(t.horasReales) : 0,
       progreso: t.porcentajeCompletado || 0,
       estado: t.estado,
       prioridad: t.prioridad || 'media'
@@ -308,7 +320,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { tareaId, tipo, responsableId, estado, prioridad } = body
+    const { tareaId, tipo, responsableId, estado, prioridad, porcentajeCompletado } = body
 
     if (!tareaId || !tipo) {
       return NextResponse.json(
@@ -322,8 +334,18 @@ export async function PATCH(request: NextRequest) {
     if (tipo === 'proyecto_tarea') {
       const updateData: any = { updatedAt: new Date() }
       if (responsableId !== undefined) updateData.responsableId = responsableId || null
-      if (estado) updateData.estado = estado
+      if (estado) {
+        updateData.estado = estado
+        // Si se marca como completada, automáticamente poner 100%
+        if (estado === 'completada') {
+          updateData.porcentajeCompletado = 100
+        }
+      }
       if (prioridad) updateData.prioridad = prioridad
+      // Permitir actualizar porcentaje manualmente (solo si no se está completando)
+      if (porcentajeCompletado !== undefined && estado !== 'completada') {
+        updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
+      }
 
       tareaActualizada = await prisma.proyectoTarea.update({
         where: { id: tareaId },
@@ -337,8 +359,16 @@ export async function PATCH(request: NextRequest) {
     } else {
       const updateData: any = { updatedAt: new Date() }
       if (responsableId !== undefined) updateData.responsableId = responsableId || null
-      if (estado) updateData.estado = estado
+      if (estado) {
+        updateData.estado = estado
+        if (estado === 'completada') {
+          updateData.porcentajeCompletado = 100
+        }
+      }
       if (prioridad) updateData.prioridad = prioridad
+      if (porcentajeCompletado !== undefined && estado !== 'completada') {
+        updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
+      }
 
       tareaActualizada = await prisma.tarea.update({
         where: { id: tareaId },
@@ -467,7 +497,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar el cronograma de EJECUCIÓN del proyecto
-    const cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
+    let cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
       where: {
         proyectoId: proyectoId,
         tipo: 'ejecucion'
@@ -476,7 +506,10 @@ export async function POST(request: NextRequest) {
 
     if (!cronogramaEjecucion) {
       return NextResponse.json(
-        { error: 'El proyecto no tiene un cronograma de ejecución configurado' },
+        {
+          error: 'El proyecto no tiene un Cronograma de Ejecución. Debe crear el cronograma de ejecución en la sección de Cronograma del proyecto antes de poder agregar tareas extra.',
+          code: 'MISSING_EXECUTION_SCHEDULE'
+        },
         { status: 400 }
       )
     }
@@ -509,6 +542,7 @@ export async function POST(request: NextRequest) {
         fechaInicio: new Date(fechaInicio),
         fechaFin: new Date(fechaFin),
         responsableId: responsableId || null,
+        creadoPorId: session.user.id,
         prioridad,
         horasEstimadas: horasEstimadas ? parseFloat(horasEstimadas) : null,
         estado: 'pendiente',
@@ -543,6 +577,8 @@ export async function POST(request: NextRequest) {
         esExtra: true,
         responsableId: nuevaTarea.responsableId,
         responsableNombre: nuevaTarea.user?.name || null,
+        creadoPorId: session.user.id,
+        creadoPorNombre: session.user.name || null,
         fechaInicio: nuevaTarea.fechaInicio,
         fechaFin: nuevaTarea.fechaFin,
         horasPlan: nuevaTarea.horasEstimadas ? Number(nuevaTarea.horasEstimadas) : 0,

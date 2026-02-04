@@ -139,6 +139,23 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ REGISTRO SIMPLE: Registro creado exitosamente:', registroHoras.id);
 
+    // ✅ Actualizar horasReales de la tarea si está asociada
+    if (proyectoTareaId) {
+      try {
+        await prisma.proyectoTarea.update({
+          where: { id: proyectoTareaId },
+          data: {
+            horasReales: { increment: parseFloat(horas) },
+            updatedAt: new Date()
+          }
+        });
+        console.log('✅ REGISTRO SIMPLE: horasReales actualizado en tarea:', proyectoTareaId);
+      } catch (updateError) {
+        // No fallar si la tarea no existe, solo loguear
+        console.warn('⚠️ REGISTRO SIMPLE: No se pudo actualizar horasReales de tarea:', updateError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: `Se registraron ${horas}h en ${proyecto.nombre}`,

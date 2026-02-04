@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const estadoFiltro = searchParams.get('estado') as ProyectoEstado | null
     const proyectoFiltro = searchParams.get('proyectoId')
 
-    // 🔍 OBTENER PROYECTOS CON INFORMACIÓN DE HORAS
+    // 🔍 OBTENER PROYECTOS CON INFORMACIÓN DE HORAS DESDE EJECUCIÓN
     const proyectos = await prisma.proyecto.findMany({
       where: {
         ...(estadoFiltro && { estado: estadoFiltro }),
@@ -68,25 +68,41 @@ export async function GET(request: NextRequest) {
             nombre: true
           }
         },
-        // 🔧 HORAS PLANIFICADAS: Desde servicios del proyecto
-        proyectoServicioCotizado: {
+        // ✅ SOLO cronograma de EJECUCIÓN (comercial y planificación son solo línea base)
+        proyectoCronograma: {
+          where: {
+            tipo: 'ejecucion'
+          },
           select: {
             id: true,
-            nombre: true,
-            // ❌ REMOVIDO: categoria (era un string, no el EDT real)
-            subtotalInterno: true,
-            subtotalReal: true,
-            // ✅ AGREGADO: Relación con EDTs del proyecto para obtener nombres reales
-            proyectoServicioCotizadoItem: {
+            tipo: true,
+            proyectoEdt: {
               select: {
+                id: true,
                 nombre: true,
-                horasEjecutadas: true,
-                costoInterno: true
+                horasPlan: true,
+                horasReales: true,
+                estado: true,
+                edt: {
+                  select: {
+                    nombre: true
+                  }
+                },
+                // ✅ Obtener tareas para calcular horas estimadas/reales a nivel tarea
+                proyectoTarea: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                    horasEstimadas: true,
+                    horasReales: true,
+                    estado: true
+                  }
+                }
               }
             }
           }
         },
-        // 🔧 HORAS REALES: Desde registroHoras
+        // 🔧 HORAS REALES: Desde registroHoras (backup)
         registroHoras: {
           select: {
             horasTrabajadas: true,
@@ -101,54 +117,74 @@ export async function GET(request: NextRequest) {
     })
 
     console.log(`✅ Encontrados ${proyectos.length} proyectos`)
-    
+
     // DEBUG: Verificar datos de los proyectos
     console.log(`🔍 DEBUG: Verificando datos de proyectos:`)
     proyectos.forEach((proyecto, index) => {
+      const cronogramaEjecucion = proyecto.proyectoCronograma?.[0]
+      const edts = cronogramaEjecucion?.proyectoEdt || []
       console.log(`   Proyecto ${index + 1}: ${proyecto.codigo} - ${proyecto.nombre}`)
-      console.log(`     Servicios: ${proyecto.proyectoServicioCotizado.length}`)
+      console.log(`     Cronograma ejecución: ${cronogramaEjecucion ? 'Sí' : 'No (sin planificación de ejecución)'}`)
+      console.log(`     EDTs: ${edts.length}`)
       console.log(`     Registros de horas: ${proyecto.registroHoras.length}`)
-      proyecto.proyectoServicioCotizado.forEach((servicio, servicioIndex) => {
-        const horasEstimadas = servicio.proyectoServicioCotizadoItem?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
-        console.log(`       Servicio ${servicioIndex + 1}: ${servicio.nombre} - ${horasEstimadas}h estimadas`)
+      edts.forEach((edt: any, edtIndex: number) => {
+        const horasPlan = Number(edt.horasPlan || 0)
+        const horasReales = Number(edt.horasReales || 0)
+        const tareasCount = edt.proyectoTarea?.length || 0
+        console.log(`       EDT ${edtIndex + 1}: ${edt.nombre} - Plan: ${horasPlan}h, Real: ${horasReales}h, Tareas: ${tareasCount}`)
       })
-      if (proyecto.registroHoras.length > 0) {
-        proyecto.registroHoras.slice(0, 2).forEach((registro, regIndex) => {
-          console.log(`       Registro ${regIndex + 1}: ${registro.horasTrabajadas}h - ${registro.nombreServicio}`)
-        })
-      }
-    })
-
-    // 🔍 OBTENER CATÁLOGO COMPLETO DE EDTs PARA NOMBRES ÚNICOS
-    const catalogoEdts = await prisma.edt.findMany({
-      select: {
-        id: true,
-        nombre: true
-      },
-      orderBy: {
-        nombre: 'asc'
-      }
-    })
-    console.log(`🔍 DEBUG: Catálogo de EDTs para resumen: ${catalogoEdts.length}`)
-    catalogoEdts.forEach((edt, index) => {
-      console.log(`   EDT ${index + 1}: ${edt.nombre}`)
     })
 
     //  PROCESAR DATOS PARA CALCULAR RESUMEN
     const resumenProyectos = proyectos.map(proyecto => {
-      // ✅ CORREGIDO: Calcular horas planificadas desde servicios del proyecto
-      const horasPlanificadas = proyecto.proyectoServicioCotizado.reduce((total, servicio) => {
-        const horasServicio = servicio.proyectoServicioCotizadoItem?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
-        return total + horasServicio
-      }, 0)
+      // ✅ SOLO usar cronograma de EJECUCIÓN (comercial y planificación son línea base)
+      const cronogramaEjecucion = proyecto.proyectoCronograma?.[0]
+      const edtsDelProyecto = cronogramaEjecucion?.proyectoEdt || []
+      const tieneCronogramaEjecucion = !!cronogramaEjecucion
 
-      // Calcular horas ejecutadas reales
-      const horasEjecutadas = proyecto.registroHoras.reduce((total, registro) => {
-        return total + registro.horasTrabajadas
-      }, 0)
+      // ✅ CORREGIDO: Calcular horas planificadas desde EDTs del proyecto
+      // Preferir suma de horasEstimadas de tareas (más preciso), fallback a horasPlan del EDT
+      let horasPlanificadas = 0
+      edtsDelProyecto.forEach((edt: any) => {
+        // Primero intentar suma de tareas (más preciso)
+        const horasTareasPlan = edt.proyectoTarea?.reduce((sum: number, tarea: any) => {
+          return sum + Number(tarea.horasEstimadas || 0)
+        }, 0) || 0
+
+        if (horasTareasPlan > 0) {
+          horasPlanificadas += horasTareasPlan
+        } else {
+          // Fallback: usar horasPlan del EDT si no hay tareas
+          horasPlanificadas += Number(edt.horasPlan || 0)
+        }
+      })
+
+      // ✅ CORREGIDO: Calcular horas ejecutadas desde:
+      // Preferir suma de horasReales de tareas (más preciso), fallback a horasReales del EDT
+      let horasEjecutadas = 0
+      edtsDelProyecto.forEach((edt: any) => {
+        // Primero intentar suma de tareas (más preciso)
+        const horasTareasReales = edt.proyectoTarea?.reduce((sum: number, tarea: any) => {
+          return sum + Number(tarea.horasReales || 0)
+        }, 0) || 0
+
+        if (horasTareasReales > 0) {
+          horasEjecutadas += horasTareasReales
+        } else {
+          // Fallback: usar horasReales del EDT si no hay tareas con horas
+          horasEjecutadas += Number(edt.horasReales || 0)
+        }
+      })
+
+      // Si aún no hay horas ejecutadas, usar registroHoras como fallback
+      if (horasEjecutadas === 0) {
+        horasEjecutadas = proyecto.registroHoras.reduce((total, registro) => {
+          return total + Number(registro.horasTrabajadas || 0)
+        }, 0)
+      }
 
       // Calcular porcentaje de avance
-      const porcentajeAvance = horasPlanificadas > 0 
+      const porcentajeAvance = horasPlanificadas > 0
         ? Math.round((horasEjecutadas / horasPlanificadas) * 100 * 10) / 10
         : 0
 
@@ -168,33 +204,30 @@ export async function GET(request: NextRequest) {
       // Contar registros de horas
       const totalRegistros = proyecto.registroHoras.length
 
-      // ✅ CORREGIDO: Usar servicios reales del proyecto
-      const nombresServiciosDelProyecto = [...new Set(proyecto.proyectoServicioCotizado.map(s => s.nombre))]
-      
-      console.log(`🔍 DEBUG: Proyecto ${proyecto.codigo} - Servicios: ${proyecto.proyectoServicioCotizado.length}, Nombres únicos: ${nombresServiciosDelProyecto.length}`)
-      console.log(`   Nombres: [${nombresServiciosDelProyecto.join(', ')}]`)
-      
-      // ✅ CORREGIDO: Obtener TODOS los servicios del proyecto
-      const todosServiciosProyecto = proyecto.proyectoServicioCotizado
-        .map((servicio, index) => {
-          const horasEstimadas = servicio.proyectoServicioCotizadoItem?.reduce((sum, item) => sum + (item.horasEjecutadas || 0), 0) || 0
-          
-          console.log(`🔍 DEBUG: Procesando Servicio ${index}: ${servicio.nombre}`)
-          
-          return {
-            id: servicio.id,
-            orden: index,
-            nombre: servicio.nombre,
-            // ❌ REMOVIDO: categoria (string)
-            edt: 'Programación PLC', // ✅ TEMPORAL: Nombre del EDT asociado
-            horasEstimadas: horasEstimadas,
-            subtotalInterno: servicio.subtotalInterno || 0,
-            subtotalReal: servicio.subtotalReal || 0,
-            itemsCount: servicio.proyectoServicioCotizadoItem?.length || 0
-          }
-        })
-        // ✅ MANTENER EL ORDEN ORIGINAL DE LA BD
-        // TODOS los servicios, no solo slice(0, 3)
+      console.log(`🔍 DEBUG: Proyecto ${proyecto.codigo} - Cronograma ejecución: ${tieneCronogramaEjecucion ? 'Sí' : 'No'}, EDTs: ${edtsDelProyecto.length}, Plan: ${horasPlanificadas}h, Real: ${horasEjecutadas}h`)
+
+      // ✅ CORREGIDO: Obtener los EDTs del proyecto como "servicios"
+      const todosServiciosProyecto = edtsDelProyecto.map((edt: any, index: number) => {
+        // Calcular horas de las tareas de este EDT
+        const horasEstimadas = edt.proyectoTarea?.reduce((sum: number, tarea: any) => {
+          return sum + Number(tarea.horasEstimadas || 0)
+        }, 0) || Number(edt.horasPlan || 0)
+
+        const horasReales = edt.proyectoTarea?.reduce((sum: number, tarea: any) => {
+          return sum + Number(tarea.horasReales || 0)
+        }, 0) || Number(edt.horasReales || 0)
+
+        return {
+          id: edt.id,
+          orden: index,
+          nombre: edt.nombre,
+          edt: edt.edt?.nombre || edt.nombre,
+          horasEstimadas: Math.round(horasEstimadas * 10) / 10,
+          subtotalInterno: 0,
+          subtotalReal: Math.round(horasReales * 10) / 10,
+          itemsCount: edt.proyectoTarea?.length || 0
+        }
+      })
 
       return {
         proyecto: {
@@ -244,12 +277,13 @@ export async function GET(request: NextRequest) {
     console.log(`   Total ejecutadas: ${totalHorasEjecutadas}h`)
     console.log(`   Proyectos en plazo: ${proyectosEnPlazo}`)
     console.log(`   Proyectos con exceso: ${proyectosConExceso}`)
-    
+    console.log(`   Proyectos sin planificación: ${proyectosSinPlanificacion}`)
+
     resumenOrdenado.forEach((proyecto: any, index: number) => {
-      console.log(`   Proyecto ${index + 1}: ${proyecto.proyecto.codigo}`)
-      console.log(`     Servicios: ${proyecto.servicios?.length || 0}`)
-      proyecto.servicios?.forEach((servicio: any, servicioIndex: number) => {
-        console.log(`       ${servicio.nombre}: ${servicio.horasEstimadas}h (${servicio.edt})`)
+      console.log(`   Proyecto ${index + 1}: ${proyecto.proyecto.codigo} - Plan: ${proyecto.metricas.horasPlanificadas}h, Real: ${proyecto.metricas.horasEjecutadas}h`)
+      console.log(`     EDTs/Servicios: ${proyecto.servicios?.length || 0}`)
+      proyecto.servicios?.slice(0, 3).forEach((servicio: any, servicioIndex: number) => {
+        console.log(`       ${servicio.nombre}: Plan ${servicio.horasEstimadas}h, Real ${servicio.subtotalReal}h`)
       })
     })
 

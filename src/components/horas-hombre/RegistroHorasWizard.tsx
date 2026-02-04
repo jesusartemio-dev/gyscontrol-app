@@ -20,7 +20,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
@@ -116,6 +115,7 @@ export function RegistroHorasWizard({
   const [descripcionNuevaTarea, setDescripcionNuevaTarea] = useState('')
   const [fechaInicioTarea, setFechaInicioTarea] = useState('')
   const [fechaFinTarea, setFechaFinTarea] = useState('')
+  const [horasEstimadasNuevaTarea, setHorasEstimadasNuevaTarea] = useState('')
 
   // Datos disponibles
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
@@ -373,7 +373,7 @@ export function RegistroHorasWizard({
   }
 
   const crearNuevaTarea = async () => {
-    if (!nombreNuevaTarea || !descripcionNuevaTarea || !fechaInicioTarea || !fechaFinTarea || !edtSeleccionado || !proyectoSeleccionado) {
+    if (!nombreNuevaTarea || !descripcionNuevaTarea || !fechaInicioTarea || !fechaFinTarea || !horasEstimadasNuevaTarea || !edtSeleccionado || !proyectoSeleccionado) {
       toast({
         title: 'Campos requeridos',
         description: 'Complete todos los campos de la nueva tarea',
@@ -386,6 +386,7 @@ export function RegistroHorasWizard({
       setLoading(true)
 
       // Crear la nueva tarea
+      const horasEst = horasEstimadasNuevaTarea ? parseFloat(horasEstimadasNuevaTarea) : 8
       const response = await fetch('/api/tareas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -396,7 +397,7 @@ export function RegistroHorasWizard({
           fechaFin: fechaFinTarea,
           proyectoEdtId: edtSeleccionado.id,
           proyectoId: proyectoSeleccionado.id,
-          horasEstimadas: 8, // Default
+          horasEstimadas: horasEst,
           estado: 'pendiente'
         })
       })
@@ -416,7 +417,7 @@ export function RegistroHorasWizard({
         nombre: nombreNuevaTarea,
         tipo: 'tarea' as const,
         responsableNombre: 'Usuario actual',
-        horasPlan: 8,
+        horasPlan: horasEst,
         horasReales: 0,
         estado: 'pendiente',
         progreso: 0,
@@ -706,36 +707,43 @@ export function RegistroHorasWizard({
     </div>
   )
 
+  const handleNivelChange = (value: 'actividad' | 'tarea') => {
+    setNivelSeleccionado(value)
+    setElementoSeleccionado(null)
+    setActividadSeleccionada(null)
+    setElementos([])
+    setActividades([])
+    setTareasDirectas([])
+    setTareasDeActividad([])
+    setCreandoTarea(false)
+    setNombreNuevaTarea('')
+    setDescripcionNuevaTarea('')
+    setFechaInicioTarea('')
+    setFechaFinTarea('')
+  }
+
   const renderPaso3 = () => (
     <div className="space-y-3">
       <Label className="text-sm">Selecciona el tipo de registro *</Label>
-      <RadioGroup
-        value={nivelSeleccionado}
-        onValueChange={(value: string) => {
-          setNivelSeleccionado(value as 'actividad' | 'tarea')
-          setElementoSeleccionado(null)
-          setActividadSeleccionada(null)
-          setElementos([])
-          setActividades([])
-          setTareasDirectas([])
-          setTareasDeActividad([])
-          setCreandoTarea(false)
-          setNombreNuevaTarea('')
-          setDescripcionNuevaTarea('')
-          setFechaInicioTarea('')
-          setFechaFinTarea('')
-        }}
-        className="space-y-2"
-      >
-        <label
-          htmlFor="actividad"
-          className={`flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+      <div className="space-y-2">
+        {/* Opción Actividad → Tarea */}
+        <div
+          onClick={() => handleNivelChange('actividad')}
+          className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all select-none ${
             nivelSeleccionado === 'actividad'
               ? 'border-green-500 bg-green-50'
               : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
           }`}
         >
-          <RadioGroupItem value="actividad" id="actividad" className="mt-1" />
+          <div className={`w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+            nivelSeleccionado === 'actividad'
+              ? 'border-green-500 bg-green-500'
+              : 'border-gray-300'
+          }`}>
+            {nivelSeleccionado === 'actividad' && (
+              <div className="w-2 h-2 rounded-full bg-white" />
+            )}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <Wrench className="h-4 w-4 text-green-600 shrink-0" />
@@ -745,17 +753,26 @@ export function RegistroHorasWizard({
               Selecciona primero la actividad, luego la tarea específica
             </p>
           </div>
-        </label>
+        </div>
 
-        <label
-          htmlFor="tarea"
-          className={`flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+        {/* Opción Tarea Directa */}
+        <div
+          onClick={() => handleNivelChange('tarea')}
+          className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all select-none ${
             nivelSeleccionado === 'tarea'
               ? 'border-orange-500 bg-orange-50'
               : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50/50'
           }`}
         >
-          <RadioGroupItem value="tarea" id="tarea" className="mt-1" />
+          <div className={`w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+            nivelSeleccionado === 'tarea'
+              ? 'border-orange-500 bg-orange-500'
+              : 'border-gray-300'
+          }`}>
+            {nivelSeleccionado === 'tarea' && (
+              <div className="w-2 h-2 rounded-full bg-white" />
+            )}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <CheckSquare className="h-4 w-4 text-orange-600 shrink-0" />
@@ -765,8 +782,8 @@ export function RegistroHorasWizard({
               Registra directamente en una tarea sin actividad padre
             </p>
           </div>
-        </label>
-      </RadioGroup>
+        </div>
+      </div>
     </div>
   )
 
@@ -933,71 +950,90 @@ export function RegistroHorasWizard({
               </div>
             ) : creandoTarea ? (
               // FORMULARIO DE CREACIÓN DE TAREA
-              <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
-                <div className="text-sm font-medium text-blue-800 mb-3">
+              <div className="space-y-3 p-4 border rounded-lg bg-blue-50">
+                <div className="text-sm font-medium text-blue-800">
                   📝 Datos de la nueva tarea
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                {/* Nombre - full width */}
+                <div>
+                  <Label htmlFor="nombreTarea" className="text-xs text-gray-600">Nombre *</Label>
+                  <Input
+                    id="nombreTarea"
+                    value={nombreNuevaTarea}
+                    onChange={(e) => setNombreNuevaTarea(e.target.value)}
+                    placeholder="Ej: Revisión de código módulo PLC"
+                    className="mt-1 h-9"
+                  />
+                </div>
+
+                {/* Descripción - full width, compact */}
+                <div>
+                  <Label htmlFor="descripcionTarea" className="text-xs text-gray-600">Descripción *</Label>
+                  <Textarea
+                    id="descripcionTarea"
+                    value={descripcionNuevaTarea}
+                    onChange={(e) => setDescripcionNuevaTarea(e.target.value)}
+                    placeholder="Describa brevemente la tarea..."
+                    className="mt-1 resize-none"
+                    rows={2}
+                  />
+                </div>
+
+                {/* Fechas y Horas - 3 columnas */}
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <Label htmlFor="nombreTarea">Nombre de la tarea *</Label>
-                    <Input
-                      id="nombreTarea"
-                      value={nombreNuevaTarea}
-                      onChange={(e) => setNombreNuevaTarea(e.target.value)}
-                      placeholder="Ej: Revisión de código módulo PLC"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="fechaInicioTarea">Fecha inicio *</Label>
+                    <Label htmlFor="fechaInicioTarea" className="text-xs text-gray-600">Fecha inicio *</Label>
                     <Input
                       id="fechaInicioTarea"
                       type="date"
                       value={fechaInicioTarea}
                       onChange={(e) => setFechaInicioTarea(e.target.value)}
-                      className="mt-1"
+                      className="mt-1 h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fechaFinTarea" className="text-xs text-gray-600">Fecha fin *</Label>
+                    <Input
+                      id="fechaFinTarea"
+                      type="date"
+                      value={fechaFinTarea}
+                      onChange={(e) => setFechaFinTarea(e.target.value)}
+                      className="mt-1 h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="horasEstimadasTarea" className="text-xs text-gray-600">Horas est. *</Label>
+                    <Input
+                      id="horasEstimadasTarea"
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={horasEstimadasNuevaTarea}
+                      onChange={(e) => setHorasEstimadasNuevaTarea(e.target.value)}
+                      placeholder="8"
+                      className="mt-1 h-9"
                     />
                   </div>
                 </div>
-                <div>
-                  <Label htmlFor="descripcionTarea">Descripción *</Label>
-                  <Textarea
-                    id="descripcionTarea"
-                    value={descripcionNuevaTarea}
-                    onChange={(e) => setDescripcionNuevaTarea(e.target.value)}
-                    placeholder="Describa detalladamente la tarea a realizar..."
-                    className="mt-1"
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="fechaFinTarea">Fecha fin *</Label>
-                  <Input
-                    id="fechaFinTarea"
-                    type="date"
-                    value={fechaFinTarea}
-                    onChange={(e) => setFechaFinTarea(e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div className="flex gap-2">
+
+                {/* Botones */}
+                <div className="flex gap-2 pt-1">
                   <Button
+                    size="sm"
                     onClick={crearNuevaTarea}
-                    disabled={loading || !nombreNuevaTarea || !descripcionNuevaTarea || !fechaInicioTarea || !fechaFinTarea}
+                    disabled={loading || !nombreNuevaTarea || !descripcionNuevaTarea || !fechaInicioTarea || !fechaFinTarea || !horasEstimadasNuevaTarea}
                     className="bg-green-600 hover:bg-green-700"
                   >
                     {loading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Creando...
-                      </>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                     ) : (
-                      <>
-                        ➕ Crear Tarea
-                      </>
+                      <span className="mr-1">✓</span>
                     )}
+                    {loading ? 'Creando...' : 'Crear Tarea'}
                   </Button>
                   <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => {
                       setCreandoTarea(false)
@@ -1005,9 +1041,10 @@ export function RegistroHorasWizard({
                       setDescripcionNuevaTarea('')
                       setFechaInicioTarea('')
                       setFechaFinTarea('')
+                      setHorasEstimadasNuevaTarea('')
                     }}
                   >
-                    ❌ Cancelar
+                    Cancelar
                   </Button>
                 </div>
               </div>

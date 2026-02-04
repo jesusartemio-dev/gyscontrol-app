@@ -1,18 +1,20 @@
 import { AnalisisTransversalEdt } from '@/components/horas-hombre/AnalisisTransversalEdt'
+import { Layers } from 'lucide-react'
 
 export default function AnalisisEdtPage() {
-  const currentYear = new Date().getFullYear()
-
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Analisis por EDT
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Visualizacion de horas y costos por EDT (PLC, HMI, ING) a traves de multiples proyectos.
-          Ideal para analisis de {currentYear} y planificacion de cotizaciones futuras.
-        </p>
+    <div className="container mx-auto p-6 space-y-4">
+      {/* Header compacto */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Layers className="h-6 w-6 text-blue-600" />
+            Análisis por EDT
+          </h1>
+          <p className="text-sm text-gray-500">
+            Horas por EDT (PLC, HMI, ING) a través de múltiples proyectos
+          </p>
+        </div>
       </div>
 
       <AnalisisTransversalEdt />

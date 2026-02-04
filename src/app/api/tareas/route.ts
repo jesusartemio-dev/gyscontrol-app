@@ -4,7 +4,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import Prisma from '@prisma/client';
 
 const crearTareaSchema = z.object({
   nombre: z.string().min(1),
@@ -19,6 +18,18 @@ const crearTareaSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Obtener sesión del usuario
+    const { getServerSession } = await import('next-auth')
+    const { authOptions } = await import('@/lib/auth')
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const validatedData = crearTareaSchema.parse(body);
 
@@ -49,8 +60,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar un cronograma de ejecución para el proyecto
-    const cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
-      where: { 
+    let cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
+      where: {
         proyectoId,
         tipo: 'ejecucion'
       },
@@ -59,8 +70,11 @@ export async function POST(request: NextRequest) {
 
     if (!cronogramaEjecucion) {
       return NextResponse.json(
-        { error: 'No se encontró cronograma de ejecución para el proyecto' },
-        { status: 404 }
+        {
+          error: 'El proyecto no tiene un Cronograma de Ejecución. Debe crear el cronograma de ejecución en la sección de Cronograma del proyecto antes de poder agregar tareas.',
+          code: 'MISSING_EXECUTION_SCHEDULE'
+        },
+        { status: 400 }
       );
     }
 
@@ -70,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     const nuevaTarea = await prisma.proyectoTarea.create({
       data: {
-        id: `tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `tarea-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
         nombre,
         descripcion: descripcionConMarcador,
         fechaInicio: new Date(fechaInicio),
@@ -81,7 +95,8 @@ export async function POST(request: NextRequest) {
         estado,
         porcentajeCompletado: 0,
         horasReales: 0,
-        orden: 999, // Orden al final por defecto
+        orden: 999,
+        creadoPorId: session.user.id,
         updatedAt: new Date()
       }
     });
