@@ -678,7 +678,7 @@ export function RegistroHorasWizard({
                 <div className="flex flex-col">
                   <span className="font-medium">{edt.nombre}</span>
                   <span className="text-sm text-gray-600">
-                    {edt.categoriaNombre} • {edt.responsableNombre} • {edt.horasReales}h/{edt.horasPlan}h
+                    {edt.responsableNombre} • {edt.horasReales}h/{edt.horasPlan}h
                   </span>
                 </div>
               </SelectItem>
@@ -694,10 +694,7 @@ export function RegistroHorasWizard({
               <div>
                 <div className="font-medium">{edtSeleccionado.nombre}</div>
                 <div className="text-sm text-gray-600">
-                  {edtSeleccionado.categoriaNombre} • {edtSeleccionado.responsableNombre}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {edtSeleccionado.horasReales}h registradas de {edtSeleccionado.horasPlan}h planificadas
+                  {edtSeleccionado.responsableNombre} • {edtSeleccionado.horasReales}h/{edtSeleccionado.horasPlan}h
                 </div>
               </div>
             </div>
