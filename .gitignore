@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local files
+backups/
+nul
+scripts/fix-codes.ts
+.claude/settings.local.json
