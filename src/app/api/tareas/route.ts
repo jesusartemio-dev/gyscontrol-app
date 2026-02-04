@@ -64,12 +64,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear la nueva tarea
+    // Crear la nueva tarea con marcador [EXTRA] para indicar que no fue planificada
+    // Las tareas creadas desde el wizard de timesheet son tareas extra (no planificadas originalmente)
+    const descripcionConMarcador = `[EXTRA]${descripcion || ''}`
+
     const nuevaTarea = await prisma.proyectoTarea.create({
       data: {
         id: `tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nombre,
-        descripcion,
+        descripcion: descripcionConMarcador,
         fechaInicio: new Date(fechaInicio),
         fechaFin: new Date(fechaFin),
         proyectoEdtId,

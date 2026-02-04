@@ -681,13 +681,13 @@ export default function SupervisionTareasPage() {
 
             <Select value={filtroProyecto || 'all'} onValueChange={(v) => setFiltroProyecto(v === 'all' ? '' : v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Proyecto" />
+                <SelectValue placeholder="Todos los proyectos" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los proyectos</SelectItem>
                 {proyectos.map(p => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.codigo} - {p.nombre}
+                    {p.codigo}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -695,10 +695,10 @@ export default function SupervisionTareasPage() {
 
             <Select value={filtroResponsable || 'all'} onValueChange={(v) => setFiltroResponsable(v === 'all' ? '' : v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Responsable" />
+                <SelectValue placeholder="Todos los responsables" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos los responsables</SelectItem>
                 {usuarios.map(u => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.name}
@@ -709,10 +709,10 @@ export default function SupervisionTareasPage() {
 
             <Select value={filtroEstado || 'all'} onValueChange={(v) => setFiltroEstado(v === 'all' ? '' : v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Estado" />
+                <SelectValue placeholder="Todos los estados" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos los estados</SelectItem>
                 <SelectItem value="pendiente">Pendiente</SelectItem>
                 <SelectItem value="en_progreso">En Progreso</SelectItem>
                 <SelectItem value="completada">Completada</SelectItem>
@@ -722,12 +722,12 @@ export default function SupervisionTareasPage() {
 
             <Select value={filtroTipo || 'all'} onValueChange={(v) => setFiltroTipo(v === 'all' ? '' : v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Tipo" />
+                <SelectValue placeholder="Todos los tipos" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los tipos</SelectItem>
-                <SelectItem value="cronograma">📅 Planificada</SelectItem>
-                <SelectItem value="extra">⚡ Extra</SelectItem>
+                <SelectItem value="cronograma">Planificada</SelectItem>
+                <SelectItem value="extra">Extra</SelectItem>
               </SelectContent>
             </Select>
 
