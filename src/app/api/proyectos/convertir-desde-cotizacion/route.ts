@@ -117,8 +117,8 @@ async function convertirCotizacionAProyecto(cotizacionId: string, proyectoId: st
         id: `proyecto-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         proyectoId,
         proyectoCronogramaId: cronogramaEjecucion.id,
-        nombre: edtComercial.nombre || `EDT ${edtComercial.edt?.nombre}`,
-        edtId: edtComercial.edtId || edtComercial.id,
+        nombre: edtComercial.nombre || edtComercial.edt?.nombre || 'EDT Sin Nombre',
+        edtId: edtComercial.edtId || null, // Solo usar edtId del catálogo, NO el ID del CotizacionEdt
         proyectoFaseId: asignacion.faseId,
         fechaInicioPlan: edtComercial.fechaInicioComercial,
         fechaFinPlan: edtComercial.fechaFinComercial,
