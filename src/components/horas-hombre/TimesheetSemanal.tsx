@@ -108,6 +108,7 @@ export function TimesheetSemanal({
         const dia = addDays(startOfWeek(semanaActual, { weekStartsOn: 1 }), i)
         return {
           fecha: dia,
+          fechaString: format(dia, 'yyyy-MM-dd'), // ✅ Agregar fechaString
           totalHoras: 0,
           registros: []
         }
