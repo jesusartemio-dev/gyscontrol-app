@@ -797,23 +797,23 @@ export default function SupervisionTareasPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="max-w-[250px]">
-                            <div className="flex items-center gap-2">
+                          <div className="max-w-[300px]">
+                            <p className="font-medium text-sm leading-tight" title={tarea.nombre}>
+                              {tarea.nombre}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
                               {tarea.esExtra ? (
-                                <Badge variant="outline" className="text-purple-600 border-purple-300 bg-purple-50 text-xs shrink-0">
-                                  <Zap className="h-3 w-3 mr-1" />
+                                <Badge variant="outline" className="text-purple-600 border-purple-300 bg-purple-50 text-[10px] px-1.5 py-0">
+                                  <Zap className="h-2.5 w-2.5 mr-0.5" />
                                   Extra
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 text-xs shrink-0">
-                                  <CalendarClock className="h-3 w-3 mr-1" />
-                                  Plan.
+                                <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 text-[10px] px-1.5 py-0">
+                                  <CalendarClock className="h-2.5 w-2.5 mr-0.5" />
+                                  Cronograma
                                 </Badge>
                               )}
                             </div>
-                            <p className="font-medium truncate mt-1" title={tarea.nombre}>
-                              {tarea.nombre}
-                            </p>
                           </div>
                         </TableCell>
                         <TableCell>
