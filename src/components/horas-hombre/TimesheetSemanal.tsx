@@ -47,6 +47,7 @@ interface RegistroHoras {
 
 interface ResumenDia {
   fecha: Date
+  fechaString: string // ✅ Fecha formateada sin problemas de timezone
   totalHoras: number
   registros: RegistroHoras[]
 }
@@ -132,20 +133,23 @@ export function TimesheetSemanal({
     setSemanaActual(nuevaSemana)
   }
 
-  const abrirRegistroDia = (dia: Date) => {
-    console.log('🎯 TIMESHEET: Abriendo registro para día:', dia)
-    console.log('🎯 TIMESHEET: Fecha formateada:', format(dia, 'yyyy-MM-dd'))
-    setDiaSeleccionado(dia)
-    setFechaWizard(format(dia, 'yyyy-MM-dd'))
-    console.log('🎯 TIMESHEET: fechaWizard establecido a:', format(dia, 'yyyy-MM-dd'))
+  // ✅ Usar fechaString directamente para evitar problemas de timezone
+  const abrirRegistroDia = (fechaString: string, fecha?: Date) => {
+    console.log('🎯 TIMESHEET: Abriendo registro para día:', fechaString)
+    setDiaSeleccionado(fecha || new Date(fechaString + 'T12:00:00')) // Usar mediodía para evitar desfase
+    setFechaWizard(fechaString)
+    console.log('🎯 TIMESHEET: fechaWizard establecido a:', fechaString)
     setShowWizard(true)
     console.log('🎯 TIMESHEET: Modal abierto')
   }
 
   const editarRegistro = (registro: RegistroHoras) => {
     console.log('🎯 TIMESHEET: Editando registro:', registro)
-    setDiaSeleccionado(registro.fecha)
-    setFechaWizard(format(registro.fecha, 'yyyy-MM-dd'))
+    // ✅ Usar fecha con hora mediodía para evitar desfase de timezone
+    const fechaRegistro = new Date(registro.fecha)
+    const fechaString = format(fechaRegistro, 'yyyy-MM-dd')
+    setDiaSeleccionado(fechaRegistro)
+    setFechaWizard(fechaString)
     setShowWizard(true)
   }
 
@@ -236,7 +240,7 @@ export function TimesheetSemanal({
           <div
             key={index}
             className={`min-h-[120px] border rounded-lg p-3 cursor-pointer transition-colors hover:shadow-md ${getColorPorHoras(dia.totalHoras)}`}
-            onClick={() => abrirRegistroDia(dia.fecha)}
+            onClick={() => abrirRegistroDia(dia.fechaString, dia.fecha)}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-lg font-bold">{dia.totalHoras}h</span>
@@ -245,7 +249,7 @@ export function TimesheetSemanal({
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation()
-                  abrirRegistroDia(dia.fecha)
+                  abrirRegistroDia(dia.fechaString, dia.fecha)
                 }}
                 className="h-6 w-6 p-0"
               >
