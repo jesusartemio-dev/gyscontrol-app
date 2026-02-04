@@ -34,33 +34,49 @@ export async function GET(request: NextRequest) {
 
     console.log('🔍 EDTS SIMPLE: Consultando EDTs para proyecto:', proyectoId);
 
-    // 1. Obtener TODOS los EDTs del proyecto (de cualquier cronograma)
-    let proyectoEdts: any[] = await prisma.proyectoEdt.findMany({
+    // 1. Buscar el cronograma de EJECUCIÓN del proyecto
+    const cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
       where: {
-        proyectoId
+        proyectoId,
+        tipo: 'ejecucion'
       },
-      select: {
-        id: true,
-        nombre: true,
-        descripcion: true,
-        horasPlan: true,
-        horasReales: true,
-        estado: true,
-        porcentajeAvance: true,
-        orden: true,
-        edtId: true,
-        proyectoCronogramaId: true,
-        edt: {
-          select: { id: true, nombre: true, descripcion: true }
-        },
-        user: {
-          select: { id: true, name: true }
-        }
-      },
-      orderBy: { orden: 'asc' }
+      select: { id: true }
     });
 
-    console.log(`🔍 EDTS SIMPLE: EDTs del proyecto:`, proyectoEdts.length);
+    console.log('🔍 EDTS SIMPLE: Cronograma de ejecución:', cronogramaEjecucion?.id || 'NO ENCONTRADO');
+
+    // 2. Obtener solo los EDTs del cronograma de EJECUCIÓN
+    let proyectoEdts: any[] = [];
+
+    if (cronogramaEjecucion) {
+      proyectoEdts = await prisma.proyectoEdt.findMany({
+        where: {
+          proyectoId,
+          proyectoCronogramaId: cronogramaEjecucion.id
+        },
+        select: {
+          id: true,
+          nombre: true,
+          descripcion: true,
+          horasPlan: true,
+          horasReales: true,
+          estado: true,
+          porcentajeAvance: true,
+          orden: true,
+          edtId: true,
+          proyectoCronogramaId: true,
+          edt: {
+            select: { id: true, nombre: true, descripcion: true }
+          },
+          user: {
+            select: { id: true, name: true }
+          }
+        },
+        orderBy: { orden: 'asc' }
+      });
+    }
+
+    console.log(`🔍 EDTS SIMPLE: EDTs del cronograma de ejecución:`, proyectoEdts.length);
     proyectoEdts.forEach((edt: any, index: number) => {
       console.log(`🔍 EDT ${index + 1}:`, {
         id: edt.id,
