@@ -936,111 +936,112 @@ export default function SupervisionTareasPage() {
 
       {/* Modal de crear tarea extra */}
       <Dialog open={showCrearModal} onOpenChange={setShowCrearModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-purple-500" />
+        <DialogContent className="max-w-md">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-purple-700">
+              <Zap className="h-5 w-5" />
               Nueva Tarea Extra
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="proyecto">Proyecto *</Label>
-              <Select
-                value={nuevaTarea.proyectoId || '__none__'}
-                onValueChange={(v) => handleProyectoChange(v === '__none__' ? '' : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar proyecto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Seleccionar proyecto...</SelectItem>
-                  {proyectos.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.codigo} - {p.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-3">
+            {/* Proyecto y EDT en una fila */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-gray-500">Proyecto *</Label>
+                <Select
+                  value={nuevaTarea.proyectoId || '__none__'}
+                  onValueChange={(v) => handleProyectoChange(v === '__none__' ? '' : v)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Proyecto..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Seleccionar...</SelectItem>
+                    {proyectos.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.codigo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500">EDT *</Label>
+                <Select
+                  value={nuevaTarea.proyectoEdtId || '__none__'}
+                  onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, proyectoEdtId: v === '__none__' ? '' : v })}
+                  disabled={!nuevaTarea.proyectoId || cargandoEdts}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={cargandoEdts ? 'Cargando...' : 'EDT...'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Seleccionar...</SelectItem>
+                    {edtsProyecto.map(edt => (
+                      <SelectItem key={edt.id} value={edt.id}>
+                        {edt.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
+            {/* Nombre de la tarea */}
             <div>
-              <Label htmlFor="edt">EDT *</Label>
-              <Select
-                value={nuevaTarea.proyectoEdtId || '__none__'}
-                onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, proyectoEdtId: v === '__none__' ? '' : v })}
-                disabled={!nuevaTarea.proyectoId || cargandoEdts}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={cargandoEdts ? 'Cargando EDTs...' : 'Seleccionar EDT...'} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Seleccionar EDT...</SelectItem>
-                  {edtsProyecto.map(edt => (
-                    <SelectItem key={edt.id} value={edt.id}>
-                      {edt.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {nuevaTarea.proyectoId && edtsProyecto.length === 0 && !cargandoEdts && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Este proyecto no tiene EDTs configurados.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="nombre">Nombre de la tarea *</Label>
+              <Label className="text-xs text-gray-500">Nombre de la tarea *</Label>
               <Input
-                id="nombre"
-                placeholder="Ej: Revisar documentación del cliente"
+                placeholder="Ej: Revisar documentación"
                 value={nuevaTarea.nombre}
                 onChange={(e) => setNuevaTarea({ ...nuevaTarea, nombre: e.target.value })}
+                className="h-9"
               />
             </div>
 
+            {/* Descripción */}
             <div>
-              <Label htmlFor="descripcion">Descripción</Label>
+              <Label className="text-xs text-gray-500">Descripción</Label>
               <TextareaComponent
-                id="descripcion"
-                placeholder="Descripción detallada de la tarea..."
+                placeholder="Descripción de la tarea..."
                 value={nuevaTarea.descripcion}
                 onChange={(e) => setNuevaTarea({ ...nuevaTarea, descripcion: e.target.value })}
-                rows={3}
+                rows={2}
+                className="resize-none"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Fechas */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="fechaInicio">Fecha Inicio *</Label>
+                <Label className="text-xs text-gray-500">Fecha Inicio *</Label>
                 <Input
-                  id="fechaInicio"
                   type="date"
                   value={nuevaTarea.fechaInicio}
                   onChange={(e) => setNuevaTarea({ ...nuevaTarea, fechaInicio: e.target.value })}
+                  className="h-9"
                 />
               </div>
               <div>
-                <Label htmlFor="fechaFin">Fecha Fin *</Label>
+                <Label className="text-xs text-gray-500">Fecha Fin *</Label>
                 <Input
-                  id="fechaFin"
                   type="date"
                   value={nuevaTarea.fechaFin}
                   onChange={(e) => setNuevaTarea({ ...nuevaTarea, fechaFin: e.target.value })}
+                  className="h-9"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Responsable, Prioridad y Horas */}
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label htmlFor="responsable">Responsable</Label>
+                <Label className="text-xs text-gray-500">Responsable</Label>
                 <Select
                   value={nuevaTarea.responsableId || '__none__'}
                   onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, responsableId: v === '__none__' ? '' : v })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9">
                     <SelectValue placeholder="Sin asignar" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1054,12 +1055,12 @@ export default function SupervisionTareasPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="prioridad">Prioridad</Label>
+                <Label className="text-xs text-gray-500">Prioridad</Label>
                 <Select
                   value={nuevaTarea.prioridad}
                   onValueChange={(v) => setNuevaTarea({ ...nuevaTarea, prioridad: v })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1070,38 +1071,30 @@ export default function SupervisionTareasPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div>
-              <Label htmlFor="horasEstimadas">Horas Estimadas</Label>
-              <Input
-                id="horasEstimadas"
-                type="number"
-                placeholder="Ej: 8"
-                value={nuevaTarea.horasEstimadas}
-                onChange={(e) => setNuevaTarea({ ...nuevaTarea, horasEstimadas: e.target.value })}
-              />
-            </div>
-
-            <div className="p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
-              <p className="flex items-center gap-2">
-                <Zap className="h-4 w-4" />
-                <span>Las tareas extra son tareas no planificadas originalmente en el cronograma.</span>
-              </p>
+              <div>
+                <Label className="text-xs text-gray-500">Horas Est.</Label>
+                <Input
+                  type="number"
+                  placeholder="8"
+                  value={nuevaTarea.horasEstimadas}
+                  onChange={(e) => setNuevaTarea({ ...nuevaTarea, horasEstimadas: e.target.value })}
+                  className="h-9"
+                />
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCrearModal(false)} disabled={creandoTarea}>
+          <DialogFooter className="pt-3 gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowCrearModal(false)} disabled={creandoTarea}>
               Cancelar
             </Button>
-            <Button onClick={crearTarea} disabled={creandoTarea || !nuevaTarea.proyectoEdtId}>
+            <Button size="sm" onClick={crearTarea} disabled={creandoTarea || !nuevaTarea.proyectoEdtId} className="bg-purple-600 hover:bg-purple-700">
               {creandoTarea ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
               ) : (
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-1" />
               )}
-              Crear Tarea
+              Crear
             </Button>
           </DialogFooter>
         </DialogContent>
