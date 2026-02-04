@@ -36,13 +36,18 @@ export async function GET(request: NextRequest) {
     const estado = searchParams.get('estado')
     const soloSinAsignar = searchParams.get('sinAsignar') === 'true'
 
-    // Obtener ProyectoTareas (tareas del cronograma)
-    const whereProyectoTarea: any = {}
+    // Obtener ProyectoTareas (tareas del cronograma de EJECUCIÓN únicamente)
+    // Los cronogramas comercial y planificación son solo para comparación/línea base
+    const whereProyectoTarea: any = {
+      proyectoEdt: {
+        proyectoCronograma: {
+          tipo: 'ejecucion'
+        }
+      }
+    }
 
     if (proyectoId) {
-      whereProyectoTarea.proyectoEdt = {
-        proyectoId: proyectoId
-      }
+      whereProyectoTarea.proyectoEdt.proyectoId = proyectoId
     }
 
     if (responsableId) {
