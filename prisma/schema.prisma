@@ -1126,7 +1126,8 @@ model User {
   proyectoActividad         ProyectoActividad[]
   proyectoEdt               ProyectoEdt[]
   proyectoSubtarea          ProyectoSubtarea[]
-  proyectoTarea             ProyectoTarea[]
+  tareasAsignadas           ProyectoTarea[]             @relation("TareaResponsable")
+  tareasCreadas             ProyectoTarea[]             @relation("TareaCreadaPor")
   registrosProgreso         RegistroProgreso[]
   subtareas                 Subtarea[]
   tareas                    Tarea[]
@@ -2223,6 +2224,7 @@ model ProyectoTarea {
   porcentajeCompletado        Int                         @default(0)
   dependenciaId               String?
   responsableId               String?
+  creadoPorId                 String?
   proyectoActividadId         String?
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime
@@ -2235,8 +2237,10 @@ model ProyectoTarea {
   proyectoActividad           ProyectoActividad?          @relation(fields: [proyectoActividadId], references: [id])
   proyectoCronograma          ProyectoCronograma          @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
   proyectoEdt                 ProyectoEdt                 @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
-  user                        User?                       @relation(fields: [responsableId], references: [id])
+  user                        User?                       @relation("TareaResponsable", fields: [responsableId], references: [id])
+  creadoPor                   User?                       @relation("TareaCreadaPor", fields: [creadoPorId], references: [id])
 
+  @@index([creadoPorId])
   @@index([dependenciaId])
   @@index([proyectoActividadId])
   @@index([proyectoActividadId, orden])
