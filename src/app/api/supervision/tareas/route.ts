@@ -449,7 +449,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que el ProyectoEdt existe y pertenece al proyecto
-    const proyectoEdt = await prisma.proyectoEdt.findFirst({
+    const proyectoEdtOriginal = await prisma.proyectoEdt.findFirst({
       where: {
         id: proyectoEdtId,
         proyectoId: proyectoId
@@ -459,21 +459,51 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    if (!proyectoEdt) {
+    if (!proyectoEdtOriginal) {
       return NextResponse.json(
         { error: 'El EDT no existe o no pertenece al proyecto' },
         { status: 400 }
       )
     }
 
+    // Buscar el cronograma de EJECUCIÓN del proyecto
+    const cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
+      where: {
+        proyectoId: proyectoId,
+        tipo: 'ejecucion'
+      }
+    })
+
+    if (!cronogramaEjecucion) {
+      return NextResponse.json(
+        { error: 'El proyecto no tiene un cronograma de ejecución configurado' },
+        { status: 400 }
+      )
+    }
+
+    // Buscar un EDT en el cronograma de ejecución con el mismo nombre
+    let proyectoEdt = await prisma.proyectoEdt.findFirst({
+      where: {
+        proyectoId: proyectoId,
+        proyectoCronogramaId: cronogramaEjecucion.id,
+        nombre: proyectoEdtOriginal.nombre
+      }
+    })
+
+    // Si no existe un EDT con ese nombre en ejecución, usar el EDT original pero vincular al cronograma de ejecución
+    if (!proyectoEdt) {
+      proyectoEdt = proyectoEdtOriginal
+    }
+
     // Crear la tarea con marcador [EXTRA] en la descripcion
+    // IMPORTANTE: Siempre vincular al cronograma de EJECUCIÓN para que aparezca en la lista
     const descripcionConMarcador = `[EXTRA]${descripcion?.trim() || ''}`
 
     const nuevaTarea = await prisma.proyectoTarea.create({
       data: {
         id: randomUUID(),
         proyectoEdtId: proyectoEdt.id,
-        proyectoCronogramaId: proyectoEdt.proyectoCronogramaId,
+        proyectoCronogramaId: cronogramaEjecucion.id,
         nombre: nombre.trim(),
         descripcion: descripcionConMarcador,
         fechaInicio: new Date(fechaInicio),
