@@ -189,6 +189,7 @@ export default function Sidebar() {
       links: [
         { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
         { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
+        { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
       ]

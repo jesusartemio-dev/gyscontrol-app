@@ -29,11 +29,13 @@ import {
   Target,
   Calendar,
   User,
+  UserPlus,
   BarChart3,
   GripVertical
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ProyectoEdtForm } from './ProyectoEdtForm'
+import { AsignarResponsable } from './AsignarResponsable'
 import { SortableList } from '@/components/ui/sortable-list'
 import { useSortableList } from '@/hooks/useSortableList'
 import type { ProyectoEdt } from '@/types/modelos'
@@ -63,6 +65,8 @@ export function ProyectoEdtList({
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingEdt, setEditingEdt] = useState<ProyectoEdt | null>(null)
+  const [showAsignarResponsable, setShowAsignarResponsable] = useState(false)
+  const [edtParaAsignar, setEdtParaAsignar] = useState<ProyectoEdt | null>(null)
 
   // Hook para manejar reordenamiento
   const { reorderItems, isReordering } = useSortableList({
@@ -141,6 +145,17 @@ export function ProyectoEdtList({
   const handleEditEdt = (edt: ProyectoEdt) => {
     setEditingEdt(edt)
     setShowEditModal(true)
+  }
+
+  const handleAsignarResponsable = (edt: ProyectoEdt) => {
+    setEdtParaAsignar(edt)
+    setShowAsignarResponsable(true)
+  }
+
+  const handleAsignacionExitosa = () => {
+    loadEdts()
+    setShowAsignarResponsable(false)
+    setEdtParaAsignar(null)
   }
 
   const handleEdtSuccess = (edt: ProyectoEdt) => {
@@ -395,9 +410,22 @@ export function ProyectoEdtList({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
+                        handleAsignarResponsable(edt)
+                      }}
+                      className="text-purple-600 hover:text-purple-800 hover:bg-purple-50"
+                      title="Asignar responsable"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
                         handleEditEdt(edt)
                       }}
                       className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                      title="Editar EDT"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -409,6 +437,7 @@ export function ProyectoEdtList({
                         handleDeleteEdt(edt.id)
                       }}
                       className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                      title="Eliminar EDT"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -446,6 +475,24 @@ export function ProyectoEdtList({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal Asignar Responsable */}
+      {edtParaAsignar && (
+        <AsignarResponsable
+          open={showAsignarResponsable}
+          onOpenChange={setShowAsignarResponsable}
+          tipo="edt"
+          elementoId={edtParaAsignar.id}
+          elementoNombre={edtParaAsignar.nombre}
+          responsableActual={edtParaAsignar.responsable ? {
+            id: edtParaAsignar.responsable.id,
+            name: edtParaAsignar.responsable.name || '',
+            email: edtParaAsignar.responsable.email || '',
+            role: edtParaAsignar.responsable.role || ''
+          } : null}
+          onAsignacionExitosa={handleAsignacionExitosa}
+        />
+      )}
     </div>
   )
 }
