@@ -629,34 +629,26 @@ export function RegistroCampoWizard({
           <Progress value={(paso / 4) * 100} className="h-2" />
         </div>
 
-        {/* Resumen mínimo */}
+        {/* Resumen mínimo - estilo breadcrumb */}
         {(proyectoSeleccionado || tareas.length > 0) && (
-          <div className="flex flex-wrap items-center gap-1.5 text-xs mb-2">
+          <div className="flex items-center text-sm text-gray-600 mb-3 pb-2 border-b">
             {proyectoSeleccionado && (
-              <Badge variant="outline" className="h-6 px-2 bg-gray-50">
-                <Building className="h-3 w-3 mr-1" />
-                {proyectoSeleccionado.codigo}
-              </Badge>
-            )}
-            {edtSeleccionado && (
-              <Badge variant="outline" className="h-6 px-2 bg-gray-50">
-                <FolderOpen className="h-3 w-3 mr-1" />
-                {edtSeleccionado.nombre}
-              </Badge>
+              <>
+                <span className="font-semibold text-gray-900">{proyectoSeleccionado.codigo}</span>
+                {edtSeleccionado && (
+                  <>
+                    <ChevronRight className="h-4 w-4 mx-1 text-gray-400" />
+                    <span className="text-gray-700">{edtSeleccionado.nombre}</span>
+                  </>
+                )}
+              </>
             )}
             {tareas.length > 0 && (
-              <>
-                <span className="text-gray-300">|</span>
-                <Badge variant="outline" className="h-6 px-2 bg-purple-50 text-purple-700">
-                  {totalTareas} tarea(s)
-                </Badge>
-                <Badge variant="outline" className="h-6 px-2 bg-blue-50 text-blue-700">
-                  {miembrosUnicos.size} pers.
-                </Badge>
-                <Badge variant="outline" className="h-6 px-2 bg-green-50 text-green-700">
-                  {totalHoras}h
-                </Badge>
-              </>
+              <div className="ml-auto flex items-center gap-3 text-xs">
+                <span className="text-purple-600 font-medium">{totalTareas} tarea(s)</span>
+                <span className="text-blue-600 font-medium">{miembrosUnicos.size} pers.</span>
+                <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-semibold">{totalHoras}h</span>
+              </div>
             )}
           </div>
         )}
