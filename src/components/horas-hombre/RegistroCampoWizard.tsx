@@ -197,10 +197,18 @@ export function RegistroCampoWizard({
       const response = await fetch(`/api/edts-proyecto-simple?proyectoId=${proyectoId}`)
       if (response.ok) {
         const data = await response.json()
-        setEdts(data.edts || [])
+        // Asegurar que edts sea siempre un array
+        const edtsData = Array.isArray(data.edts) ? data.edts : []
+        // Asegurar que cada EDT tenga tareas como array
+        const edtsConTareas = edtsData.map((edt: any) => ({
+          ...edt,
+          tareas: Array.isArray(edt.tareas) ? edt.tareas : []
+        }))
+        setEdts(edtsConTareas)
       }
     } catch (error) {
       console.error('Error cargando EDTs:', error)
+      setEdts([])
     } finally {
       setLoading(false)
     }
@@ -253,8 +261,8 @@ export function RegistroCampoWizard({
     }
   }
 
-  const edtSeleccionado = edts.find(e => e.id === proyectoEdtId)
-  const tareasDisponibles = edtSeleccionado?.tareas || []
+  const edtSeleccionado = Array.isArray(edts) ? edts.find(e => e.id === proyectoEdtId) : undefined
+  const tareasDisponibles = Array.isArray(edtSeleccionado?.tareas) ? edtSeleccionado.tareas : []
 
   const handleToggleMiembro = (userId: string) => {
     setTareaForm(prev => {
@@ -374,6 +382,7 @@ export function RegistroCampoWizard({
   }
 
   const getNombreUsuario = (userId: string): string => {
+    if (!Array.isArray(personal)) return 'Usuario'
     const p = personal.find(p => p.userId === userId)
     return p?.user.name || p?.user.email || 'Usuario'
   }
@@ -450,12 +459,13 @@ export function RegistroCampoWizard({
     }
   }
 
-  const proyectoSeleccionado = proyectos.find(p => p.id === proyectoId)
+  const proyectoSeleccionado = Array.isArray(proyectos) ? proyectos.find(p => p.id === proyectoId) : undefined
 
-  // Calcular totales
-  const totalTareas = tareas.length
-  const miembrosUnicos = new Set(tareas.flatMap(t => t.miembros.map(m => m.usuarioId)))
-  const totalHoras = tareas.reduce((sum, t) => sum + t.miembros.reduce((s, m) => s + m.horas, 0), 0)
+  // Calcular totales (con verificación de arrays)
+  const tareasArray = Array.isArray(tareas) ? tareas : []
+  const totalTareas = tareasArray.length
+  const miembrosUnicos = new Set(tareasArray.flatMap(t => Array.isArray(t.miembros) ? t.miembros.map(m => m.usuarioId) : []))
+  const totalHoras = tareasArray.reduce((sum, t) => sum + (Array.isArray(t.miembros) ? t.miembros.reduce((s, m) => s + m.horas, 0) : 0), 0)
 
   const pasos = [
     { num: 1, titulo: 'Proyecto', icon: Building },
