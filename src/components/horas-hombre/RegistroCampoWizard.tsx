@@ -774,10 +774,10 @@ export function RegistroCampoWizard({
                           <SelectTrigger className="h-9">
                             <SelectValue placeholder="Seleccionar actividad..." />
                           </SelectTrigger>
-                          <SelectContent position="popper" className="max-h-[200px] max-w-[calc(100vw-4rem)]">
-                            <SelectItem value="__none__">-- Seleccione --</SelectItem>
+                          <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
+                            <SelectItem value="__none__" className="text-xs py-2.5">-- Seleccione --</SelectItem>
                             {actividadesUnicas.map(a => (
-                              <SelectItem key={a.id} value={a.id}>
+                              <SelectItem key={a.id} value={a.id} className="text-xs py-2.5">
                                 <span className="truncate">{a.nombre} ({a.cantidadTareas})</span>
                               </SelectItem>
                             ))}
@@ -799,10 +799,10 @@ export function RegistroCampoWizard({
                             <SelectTrigger className="h-9">
                               <SelectValue placeholder="Seleccionar tarea..." />
                             </SelectTrigger>
-                            <SelectContent position="popper" className="max-h-[200px] max-w-[calc(100vw-4rem)]">
-                              <SelectItem value="__none__">-- Seleccione --</SelectItem>
+                            <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
+                              <SelectItem value="__none__" className="text-xs py-2.5">-- Seleccione --</SelectItem>
                               {tareasFiltradas.filter(t => t.id).map(t => (
-                                <SelectItem key={t.id} value={t.id}>
+                                <SelectItem key={t.id} value={t.id} className="text-xs py-2.5">
                                   <span className="truncate">{t.nombre}</span>
                                 </SelectItem>
                               ))}
@@ -842,10 +842,10 @@ export function RegistroCampoWizard({
                           <SelectTrigger className="h-9">
                             <SelectValue placeholder="Seleccionar tarea..." />
                           </SelectTrigger>
-                          <SelectContent position="popper" className="max-h-[200px] max-w-[calc(100vw-4rem)]">
-                            <SelectItem value="__none__">-- Seleccione --</SelectItem>
+                          <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
+                            <SelectItem value="__none__" className="text-xs py-2.5">-- Seleccione --</SelectItem>
                             {tareasDirectas.filter(t => t.id).map(t => (
-                              <SelectItem key={t.id} value={t.id}>
+                              <SelectItem key={t.id} value={t.id} className="text-xs py-2.5">
                                 <span className="truncate">{t.nombre}</span>
                               </SelectItem>
                             ))}
