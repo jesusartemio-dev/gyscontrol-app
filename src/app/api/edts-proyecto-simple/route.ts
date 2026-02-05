@@ -70,6 +70,21 @@ export async function GET(request: NextRequest) {
           },
           user: {
             select: { id: true, name: true }
+          },
+          // Incluir tareas del EDT a través de actividades
+          proyectoActividad: {
+            select: {
+              id: true,
+              nombre: true,
+              proyectoTarea: {
+                select: {
+                  id: true,
+                  nombre: true
+                },
+                orderBy: { orden: 'asc' }
+              }
+            },
+            orderBy: { orden: 'asc' }
           }
         },
         orderBy: { orden: 'asc' }
@@ -185,6 +200,22 @@ export async function GET(request: NextRequest) {
 
       console.log(`✅ EDT ${index + 1} resultado: nombre="${nombreFinal}", categoria="${categoriaNombre}"`);
 
+      // Extraer tareas de las actividades del EDT
+      const tareas: { id: string; nombre: string; proyectoActividad?: { nombre: string } | null }[] = []
+      if (edt.proyectoActividad && Array.isArray(edt.proyectoActividad)) {
+        for (const actividad of edt.proyectoActividad) {
+          if (actividad.proyectoTarea && Array.isArray(actividad.proyectoTarea)) {
+            for (const tarea of actividad.proyectoTarea) {
+              tareas.push({
+                id: tarea.id,
+                nombre: tarea.nombre,
+                proyectoActividad: { nombre: actividad.nombre }
+              })
+            }
+          }
+        }
+      }
+
       return {
         id: edt.id,
         nombre: nombreFinal,
@@ -193,7 +224,8 @@ export async function GET(request: NextRequest) {
         horasPlan: Number(edt.horasPlan || 0),
         horasReales: Number(edt.horasReales || 0),
         estado: edt.estado,
-        progreso: edt.porcentajeAvance
+        progreso: edt.porcentajeAvance,
+        tareas: tareas
       }
     });
 
