@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     if (estado) {
       where.estado = estado
     } else if (estadosActivos) {
-      // Estados activos para trabajo en campo (excluir cerrado, cancelado, pausado)
+      // Estados activos para trabajo (excluir solo cerrado y cancelado)
       where.estado = {
-        in: ['en_planificacion', 'listas_pendientes', 'listas_aprobadas', 'pedidos_creados', 'en_ejecucion', 'en_cierre']
+        notIn: ['cerrado', 'cancelado']
       }
     }
 
