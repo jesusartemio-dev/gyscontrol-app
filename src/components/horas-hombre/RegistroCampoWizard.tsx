@@ -668,126 +668,82 @@ export function RegistroCampoWizard({
         )}
 
         {/* Contenido del paso */}
-        <div className="min-h-[350px]">
-          {/* Paso 1: Proyecto y EDT */}
+        <div className="min-h-[280px]">
+          {/* Paso 1: Proyecto y EDT - COMPACTO */}
           {paso === 1 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Building className="h-5 w-5 text-blue-600" />
-                Paso 1: Seleccionar Proyecto y EDT
-              </h3>
-              <p className="text-sm text-gray-600">
-                Seleccione el proyecto y EDT donde se realizó el trabajo de campo.
-              </p>
+            <div className="space-y-3">
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Proyecto *</Label>
+                    <Label className="text-xs text-gray-500 mb-1">Proyecto *</Label>
                     <Select value={proyectoId} onValueChange={setProyectoId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar proyecto..." />
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Seleccionar..." />
                       </SelectTrigger>
                       <SelectContent>
                         {proyectosArray.map(p => (
                           <SelectItem key={p.id} value={p.id}>
-                            {p.codigo}
+                            <span className="font-mono font-semibold">{p.codigo}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {proyectoId && (
-                    <div>
-                      <Label>EDT *</Label>
-                      <Select value={proyectoEdtId} onValueChange={setProyectoEdtId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar EDT..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {edtsArray.map(e => (
-                            <SelectItem key={e.id} value={e.id}>
-                              {e.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1">EDT *</Label>
+                    <Select
+                      value={proyectoEdtId}
+                      onValueChange={setProyectoEdtId}
+                      disabled={!proyectoId}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder={proyectoId ? "Seleccionar..." : "Primero elija proyecto"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {edtsArray.map(e => (
+                          <SelectItem key={e.id} value={e.id}>
+                            {e.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Paso 2: Agregar Tareas */}
+          {/* Paso 2: Agregar Tareas - COMPACTO */}
           {paso === 2 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <ListTodo className="h-5 w-5 text-purple-600" />
-                Paso 2: Agregar Tareas con Personal
-              </h3>
-              <p className="text-sm text-gray-600">
-                Agregue las tareas realizadas. Puede agregar varias tareas, cada una con su propio personal.
-              </p>
-
-              {/* Lista de tareas agregadas */}
+            <div className="space-y-3">
+              {/* Lista de tareas agregadas - compacta */}
               {tareas.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Tareas agregadas ({tareas.length})</Label>
+                <div className="space-y-1">
                   {tareasArray.map(tarea => (
-                    <Card key={tarea.id} className="bg-green-50 border-green-200">
-                      <CardContent className="p-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium">{getNombreTarea(tarea)}</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {tarea.miembros.map(m => (
-                                <Badge key={m.usuarioId} variant="secondary" className="text-xs">
-                                  {getNombreUsuario(m.usuarioId)}: {m.horas}h
-                                </Badge>
-                              ))}
-                            </div>
-                            <p className="text-xs text-green-700 mt-1">
-                              Total: {tarea.miembros.reduce((s, m) => s + m.horas, 0)}h
-                            </p>
-                          </div>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => editarTarea(tarea)}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-600 hover:text-red-700"
-                              onClick={() => eliminarTarea(tarea.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div key={tarea.id} className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{getNombreTarea(tarea)}</p>
+                        <p className="text-xs text-green-700">
+                          {tarea.miembros.length} personas • {tarea.miembros.reduce((s, m) => s + m.horas, 0)}h
+                        </p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => editarTarea(tarea)}>
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => eliminarTarea(tarea.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   ))}
                 </div>
               )}
 
-              {/* Formulario para agregar/editar tarea */}
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm">
-                    {editandoTareaId ? 'Editar Tarea' : 'Agregar Nueva Tarea'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
+              {/* Formulario compacto */}
+              <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
                   {/* Tipo de tarea: Cronograma o Extra */}
                   <div className="flex gap-2">
                     <Button
@@ -1107,12 +1063,11 @@ export function RegistroCampoWizard({
                   </Button>
 
                   {editandoTareaId && (
-                    <Button variant="outline" onClick={resetTareaForm} className="w-full">
-                      Cancelar Edición
+                    <Button variant="outline" onClick={resetTareaForm} className="w-full" size="sm">
+                      Cancelar
                     </Button>
                   )}
-                </CardContent>
-              </Card>
+                </div>
             </div>
           )}
 
