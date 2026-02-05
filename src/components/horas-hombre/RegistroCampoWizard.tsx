@@ -229,60 +229,22 @@ export function RegistroCampoWizard({
 
   const cargarPersonal = async () => {
     try {
-      const response = await fetch(`/api/proyecto/${proyectoId}/personal`)
+      // Cargar TODOS los usuarios del sistema para registro de campo
+      const response = await fetch('/api/admin/usuarios')
       if (response.ok) {
-        const data = await response.json()
-        const personalDinamico = data.data?.personalDinamico || []
-        const rolesFijos = data.data?.rolesFijos || {}
+        const usuarios = await response.json()
 
-        const todosPersonal: PersonalProyecto[] = []
-        const userIdsAgregados = new Set<string>()
-
-        // Agregar TODOS los roles fijos (comercial, gestor, supervisor, lider)
-        if (rolesFijos.comercial) {
-          todosPersonal.push({
-            userId: rolesFijos.comercial.id,
-            rol: 'Comercial',
-            user: rolesFijos.comercial
-          })
-          userIdsAgregados.add(rolesFijos.comercial.id)
-        }
-        if (rolesFijos.gestor) {
-          todosPersonal.push({
-            userId: rolesFijos.gestor.id,
-            rol: 'Gestor',
-            user: rolesFijos.gestor
-          })
-          userIdsAgregados.add(rolesFijos.gestor.id)
-        }
-        if (rolesFijos.supervisor) {
-          todosPersonal.push({
-            userId: rolesFijos.supervisor.id,
-            rol: 'Supervisor',
-            user: rolesFijos.supervisor
-          })
-          userIdsAgregados.add(rolesFijos.supervisor.id)
-        }
-        if (rolesFijos.lider) {
-          todosPersonal.push({
-            userId: rolesFijos.lider.id,
-            rol: 'Líder',
-            user: rolesFijos.lider
-          })
-          userIdsAgregados.add(rolesFijos.lider.id)
-        }
-
-        // Agregar personal dinámico (Proyectos, Seguridad, etc.) - evitar duplicados
-        personalDinamico.forEach((p: any) => {
-          if (!userIdsAgregados.has(p.userId)) {
-            todosPersonal.push({
-              userId: p.userId,
-              rol: p.rol || 'Personal',
-              user: p.user
-            })
-            userIdsAgregados.add(p.userId)
+        // Convertir al formato PersonalProyecto
+        const todosPersonal: PersonalProyecto[] = usuarios.map((u: any) => ({
+          userId: u.id,
+          rol: formatearRol(u.role),
+          user: {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role
           }
-        })
+        }))
 
         console.log('👥 Personal cargado:', todosPersonal.length, 'usuarios')
         setPersonal(todosPersonal)
@@ -290,6 +252,20 @@ export function RegistroCampoWizard({
     } catch (error) {
       console.error('Error cargando personal:', error)
     }
+  }
+
+  // Formatear el rol para mostrar en la UI
+  const formatearRol = (role: string): string => {
+    const roles: Record<string, string> = {
+      'admin': 'Admin',
+      'proyectos': 'Proyectos',
+      'seguridad': 'Seguridad',
+      'comercial': 'Comercial',
+      'gestor': 'Gestor',
+      'coordinador': 'Coordinador',
+      'presupuestos': 'Presupuestos'
+    }
+    return roles[role] || role
   }
 
   const edtSeleccionado = Array.isArray(edts) ? edts.find(e => e.id === proyectoEdtId) : undefined
