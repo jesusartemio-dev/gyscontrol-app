@@ -217,7 +217,7 @@ export function AsignarResponsable({
               <div className="text-sm text-amber-800">
                 <p className="font-medium mb-1">Información:</p>
                 <ul className="text-xs space-y-1">
-                  <li>• Solo usuarios con permisos de gestión pueden ser asignados</li>
+                  <li>• Cualquier personal del proyecto puede ser asignado como responsable</li>
                   <li>• Se notificará automáticamente al nuevo responsable</li>
                   <li>• Puede cambiar la asignación en cualquier momento</li>
                 </ul>

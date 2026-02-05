@@ -230,15 +230,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener usuarios con acceso al proyecto
-    // TODO: Filtrar por roles apropiados (gestores, coordinadores, etc.)
+    // Obtener todos los usuarios activos del sistema
+    // Cualquier personal puede ser asignado como responsable de EDT o Tarea
     const usuariosProyecto = await prisma.user.findMany({
-      where: {
-        // Usuarios con roles apropiados para ser responsables
-        role: {
-          in: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
-        }
-      },
       select: {
         id: true,
         name: true,
