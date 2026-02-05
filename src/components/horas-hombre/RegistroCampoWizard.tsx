@@ -124,7 +124,7 @@ export function RegistroCampoWizard({
 
   // Estado para búsqueda y filtro de personal
   const [busquedaPersonal, setBusquedaPersonal] = useState('')
-  const [filtroRol, setFiltroRol] = useState<string>('todos')
+  const [filtroRol, setFiltroRol] = useState<string>('Proyectos')
   const [tareaForm, setTareaForm] = useState<{
     proyectoTareaId: string | null
     nombreTareaExtra: string
@@ -972,41 +972,6 @@ export function RegistroCampoWizard({
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-
-                    {/* Botones de selección rápida */}
-                    <div className="flex flex-wrap gap-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={seleccionarTodos}
-                        className="h-7 text-xs"
-                      >
-                        <UserCheck className="h-3 w-3 mr-1" />
-                        Todos visibles
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={deseleccionarTodos}
-                        className="h-7 text-xs"
-                      >
-                        Ninguno
-                      </Button>
-                      {rolesUnicos.slice(0, 3).map(rol => (
-                        <Button
-                          key={rol}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => seleccionarPorRol(rol)}
-                          className="h-7 text-xs"
-                        >
-                          + {rol}
-                        </Button>
-                      ))}
                     </div>
 
                     {/* Lista de personal */}
