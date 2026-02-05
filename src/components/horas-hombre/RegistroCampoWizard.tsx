@@ -45,7 +45,10 @@ import {
   Plus,
   Trash2,
   Users,
-  Edit2
+  Edit2,
+  Search,
+  UserCheck,
+  X
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import type { TareaWizard, MiembroCuadrilla } from '@/types/registroCampo'
@@ -118,6 +121,10 @@ export function RegistroCampoWizard({
   const [tipoTarea, setTipoTarea] = useState<'cronograma' | 'extra'>('cronograma')
   const [tareasDirectas, setTareasDirectas] = useState<TareaDelCronograma[]>([])
   const [loadingTareasDirectas, setLoadingTareasDirectas] = useState(false)
+
+  // Estado para búsqueda y filtro de personal
+  const [busquedaPersonal, setBusquedaPersonal] = useState('')
+  const [filtroRol, setFiltroRol] = useState<string>('todos')
   const [tareaForm, setTareaForm] = useState<{
     proyectoTareaId: string | null
     nombreTareaExtra: string
@@ -528,6 +535,54 @@ export function RegistroCampoWizard({
   const tareasArray = Array.isArray(tareas) ? tareas : []
   const miembrosSeleccionadosArray = Array.isArray(tareaForm.miembrosSeleccionados) ? tareaForm.miembrosSeleccionados : []
 
+  // Obtener roles únicos para el filtro
+  const rolesUnicos = React.useMemo(() => {
+    const roles = new Set(personalArray.map(p => p.rol))
+    return Array.from(roles).sort()
+  }, [personalArray])
+
+  // Filtrar personal por búsqueda y rol
+  const personalFiltrado = React.useMemo(() => {
+    return personalArray.filter(p => {
+      const nombreMatch = (p.user.name || p.user.email || '').toLowerCase().includes(busquedaPersonal.toLowerCase())
+      const rolMatch = filtroRol === 'todos' || p.rol === filtroRol
+      return nombreMatch && rolMatch
+    })
+  }, [personalArray, busquedaPersonal, filtroRol])
+
+  // Funciones de selección rápida
+  const seleccionarTodos = () => {
+    const idsVisibles = personalFiltrado.map(p => p.userId)
+    setTareaForm(prev => {
+      const nuevosSeleccionados = [...new Set([...prev.miembrosSeleccionados, ...idsVisibles])]
+      const nuevasHoras = { ...prev.horasPorMiembro }
+      idsVisibles.forEach(id => {
+        if (!nuevasHoras[id]) nuevasHoras[id] = prev.horasBase
+      })
+      return { ...prev, miembrosSeleccionados: nuevosSeleccionados, horasPorMiembro: nuevasHoras }
+    })
+  }
+
+  const deseleccionarTodos = () => {
+    const idsVisibles = new Set(personalFiltrado.map(p => p.userId))
+    setTareaForm(prev => ({
+      ...prev,
+      miembrosSeleccionados: prev.miembrosSeleccionados.filter(id => !idsVisibles.has(id))
+    }))
+  }
+
+  const seleccionarPorRol = (rol: string) => {
+    const idsPorRol = personalArray.filter(p => p.rol === rol).map(p => p.userId)
+    setTareaForm(prev => {
+      const nuevosSeleccionados = [...new Set([...prev.miembrosSeleccionados, ...idsPorRol])]
+      const nuevasHoras = { ...prev.horasPorMiembro }
+      idsPorRol.forEach(id => {
+        if (!nuevasHoras[id]) nuevasHoras[id] = prev.horasBase
+      })
+      return { ...prev, miembrosSeleccionados: nuevosSeleccionados, horasPorMiembro: nuevasHoras }
+    })
+  }
+
   const proyectoSeleccionado = proyectosArray.find(p => p.id === proyectoId)
 
   // Calcular totales
@@ -873,39 +928,140 @@ export function RegistroCampoWizard({
                     </div>
                   )}
 
-                  {/* Seleccionar personal */}
-                  <div>
-                    <Label>Personal para esta tarea</Label>
-                    <div className="grid grid-cols-2 gap-2 mt-2 max-h-[150px] overflow-y-auto p-2 border rounded-md">
-                      {personalArray.map(p => (
-                        <div
-                          key={p.userId}
-                          className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
-                            tareaForm.miembrosSeleccionados.includes(p.userId)
-                              ? 'bg-blue-50 border border-blue-200'
-                              : 'hover:bg-gray-50'
-                          }`}
-                          onClick={() => handleToggleMiembro(p.userId)}
+                  {/* Seleccionar personal - MEJORADO */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Personal para esta tarea
+                        {tareaForm.miembrosSeleccionados.length > 0 && (
+                          <Badge variant="secondary" className="ml-1">
+                            {tareaForm.miembrosSeleccionados.length} seleccionado(s)
+                          </Badge>
+                        )}
+                      </Label>
+                    </div>
+
+                    {/* Buscador y filtros */}
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Buscar por nombre..."
+                          value={busquedaPersonal}
+                          onChange={(e) => setBusquedaPersonal(e.target.value)}
+                          className="pl-8 h-9"
+                        />
+                        {busquedaPersonal && (
+                          <button
+                            onClick={() => setBusquedaPersonal('')}
+                            className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      <Select value={filtroRol} onValueChange={setFiltroRol}>
+                        <SelectTrigger className="w-[130px] h-9">
+                          <SelectValue placeholder="Filtrar rol" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos los roles</SelectItem>
+                          {rolesUnicos.map(rol => (
+                            <SelectItem key={rol} value={rol}>{rol}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Botones de selección rápida */}
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={seleccionarTodos}
+                        className="h-7 text-xs"
+                      >
+                        <UserCheck className="h-3 w-3 mr-1" />
+                        Todos visibles
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={deseleccionarTodos}
+                        className="h-7 text-xs"
+                      >
+                        Ninguno
+                      </Button>
+                      {rolesUnicos.slice(0, 3).map(rol => (
+                        <Button
+                          key={rol}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => seleccionarPorRol(rol)}
+                          className="h-7 text-xs"
                         >
-                          <Checkbox
-                            checked={tareaForm.miembrosSeleccionados.includes(p.userId)}
-                            onCheckedChange={() => handleToggleMiembro(p.userId)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{p.user.name || p.user.email}</p>
-                            <p className="text-xs text-gray-500">{p.rol}</p>
-                          </div>
-                        </div>
+                          + {rol}
+                        </Button>
                       ))}
+                    </div>
+
+                    {/* Lista de personal */}
+                    <div className="border rounded-md max-h-[200px] overflow-y-auto">
+                      {personalFiltrado.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500 text-sm">
+                          No se encontraron usuarios
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-1 p-2">
+                          {personalFiltrado.map(p => {
+                            const isSelected = tareaForm.miembrosSeleccionados.includes(p.userId)
+                            return (
+                              <div
+                                key={p.userId}
+                                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'bg-green-100 border-2 border-green-400 shadow-sm'
+                                    : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                                }`}
+                                onClick={() => handleToggleMiembro(p.userId)}
+                              >
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  isSelected ? 'bg-green-500 text-white' : 'bg-gray-200'
+                                }`}>
+                                  {isSelected ? (
+                                    <CheckCircle className="h-3 w-3" />
+                                  ) : (
+                                    <User className="h-3 w-3 text-gray-400" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${isSelected ? 'text-green-800' : ''}`}>
+                                    {p.user.name || p.user.email}
+                                  </p>
+                                  <p className="text-xs text-gray-500">{p.rol}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Horas por miembro */}
+                  {/* Horas por miembro - MEJORADO */}
                   {tareaForm.miembrosSeleccionados.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <Label>Horas por persona</Label>
+                    <div className="bg-blue-50 rounded-lg p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2 text-blue-800">
+                          <Clock className="h-4 w-4" />
+                          Horas por persona ({miembrosSeleccionadosArray.length})
+                        </Label>
                         <div className="flex items-center gap-2">
+                          <span className="text-xs text-blue-600">Horas base:</span>
                           <Input
                             type="number"
                             min={0.5}
@@ -916,30 +1072,62 @@ export function RegistroCampoWizard({
                               ...prev,
                               horasBase: parseFloat(e.target.value) || 8
                             }))}
-                            className="w-20"
+                            className="w-16 h-8 text-center"
                           />
-                          <Button variant="outline" size="sm" onClick={aplicarHorasATodos}>
-                            Aplicar a todos
+                          <Button variant="secondary" size="sm" onClick={aplicarHorasATodos} className="h-8">
+                            Aplicar
                           </Button>
                         </div>
                       </div>
-                      <div className="space-y-1 max-h-[120px] overflow-y-auto">
-                        {miembrosSeleccionadosArray.map(userId => (
-                          <div key={userId} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                            <User className="h-4 w-4 text-gray-400" />
-                            <span className="flex-1 text-sm">{getNombreUsuario(userId)}</span>
-                            <Input
-                              type="number"
-                              min={0.5}
-                              max={24}
-                              step={0.5}
-                              value={tareaForm.horasPorMiembro[userId] || tareaForm.horasBase}
-                              onChange={(e) => handleHorasChange(userId, parseFloat(e.target.value) || 0)}
-                              className="w-20"
-                            />
-                            <span className="text-sm text-gray-500">h</span>
+                      <div className="bg-white rounded-md border max-h-[150px] overflow-y-auto">
+                        {miembrosSeleccionadosArray.map((userId, index) => (
+                          <div
+                            key={userId}
+                            className={`flex items-center gap-3 p-2 ${index !== 0 ? 'border-t' : ''}`}
+                          >
+                            <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                              <User className="h-3 w-3 text-green-600" />
+                            </div>
+                            <span className="flex-1 text-sm font-medium">{getNombreUsuario(userId)}</span>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => handleHorasChange(userId, Math.max(0.5, (tareaForm.horasPorMiembro[userId] || tareaForm.horasBase) - 0.5))}
+                              >
+                                -
+                              </Button>
+                              <Input
+                                type="number"
+                                min={0.5}
+                                max={24}
+                                step={0.5}
+                                value={tareaForm.horasPorMiembro[userId] || tareaForm.horasBase}
+                                onChange={(e) => handleHorasChange(userId, parseFloat(e.target.value) || 0)}
+                                className="w-14 h-7 text-center"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => handleHorasChange(userId, Math.min(24, (tareaForm.horasPorMiembro[userId] || tareaForm.horasBase) + 0.5))}
+                              >
+                                +
+                              </Button>
+                              <span className="text-xs text-gray-500 w-4">h</span>
+                            </div>
                           </div>
                         ))}
+                      </div>
+                      <div className="flex justify-end">
+                        <Badge variant="outline" className="bg-white">
+                          Total: {miembrosSeleccionadosArray.reduce((sum, id) =>
+                            sum + (tareaForm.horasPorMiembro[id] || tareaForm.horasBase), 0
+                          )}h
+                        </Badge>
                       </div>
                     </div>
                   )}
