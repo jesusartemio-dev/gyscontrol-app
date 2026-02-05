@@ -114,6 +114,8 @@ export function RegistroCampoWizard({
 
   // Estado para agregar/editar tarea
   const [editandoTareaId, setEditandoTareaId] = useState<string | null>(null)
+  const [actividadSeleccionadaId, setActividadSeleccionadaId] = useState<string | null>(null)
+  const [tipoTarea, setTipoTarea] = useState<'cronograma' | 'extra'>('cronograma')
   const [tareaForm, setTareaForm] = useState<{
     proyectoTareaId: string | null
     nombreTareaExtra: string
@@ -166,6 +168,8 @@ export function RegistroCampoWizard({
 
   const resetTareaForm = () => {
     setEditandoTareaId(null)
+    setActividadSeleccionadaId(null)
+    setTipoTarea('cronograma')
     setTareaForm({
       proyectoTareaId: null,
       nombreTareaExtra: '',
@@ -269,6 +273,27 @@ export function RegistroCampoWizard({
 
   const edtSeleccionado = Array.isArray(edts) ? edts.find(e => e.id === proyectoEdtId) : undefined
   const tareasDisponibles = Array.isArray(edtSeleccionado?.tareas) ? edtSeleccionado.tareas : []
+
+  // Extraer actividades únicas de las tareas
+  const actividadesUnicas = React.useMemo(() => {
+    const actividadesMap = new Map<string, { id: string; nombre: string; cantidadTareas: number }>()
+    tareasDisponibles.forEach(t => {
+      if (t.proyectoActividad?.nombre) {
+        const nombre = t.proyectoActividad.nombre
+        if (!actividadesMap.has(nombre)) {
+          actividadesMap.set(nombre, { id: nombre, nombre, cantidadTareas: 0 })
+        }
+        actividadesMap.get(nombre)!.cantidadTareas++
+      }
+    })
+    return Array.from(actividadesMap.values())
+  }, [tareasDisponibles])
+
+  // Filtrar tareas por actividad seleccionada
+  const tareasFiltradas = React.useMemo(() => {
+    if (!actividadSeleccionadaId) return []
+    return tareasDisponibles.filter(t => t.proyectoActividad?.nombre === actividadSeleccionadaId)
+  }, [tareasDisponibles, actividadSeleccionadaId])
 
   const handleToggleMiembro = (userId: string) => {
     setTareaForm(prev => {
@@ -677,45 +702,113 @@ export function RegistroCampoWizard({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* Seleccionar tarea o nombre extra */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label>Tarea del Cronograma</Label>
-                      <Select
-                        value={tareaForm.proyectoTareaId || '__none__'}
-                        onValueChange={(v) => setTareaForm(prev => ({
-                          ...prev,
-                          proyectoTareaId: v === '__none__' ? null : v,
-                          nombreTareaExtra: v && v !== '__none__' ? '' : prev.nombreTareaExtra
-                        }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">-- Ninguna --</SelectItem>
-                          {tareasDisponibles.filter(t => t.id).map(t => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.proyectoActividad ? `${t.proyectoActividad.nombre} > ` : ''}{t.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {/* Tipo de tarea: Cronograma o Extra */}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={tipoTarea === 'cronograma' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setTipoTarea('cronograma')
+                        setTareaForm(prev => ({ ...prev, nombreTareaExtra: '' }))
+                      }}
+                      className="flex-1"
+                    >
+                      📋 Del Cronograma
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={tipoTarea === 'extra' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setTipoTarea('extra')
+                        setActividadSeleccionadaId(null)
+                        setTareaForm(prev => ({ ...prev, proyectoTareaId: null }))
+                      }}
+                      className="flex-1"
+                    >
+                      ✏️ Tarea Extra
+                    </Button>
+                  </div>
+
+                  {tipoTarea === 'cronograma' ? (
+                    <div className="space-y-3">
+                      {/* Paso 1: Seleccionar Actividad */}
+                      <div>
+                        <Label className="text-blue-600 font-medium">
+                          📌 Paso 1: Seleccionar Actividad
+                        </Label>
+                        <Select
+                          value={actividadSeleccionadaId || '__none__'}
+                          onValueChange={(v) => {
+                            setActividadSeleccionadaId(v === '__none__' ? null : v)
+                            setTareaForm(prev => ({ ...prev, proyectoTareaId: null }))
+                          }}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Seleccionar actividad..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">-- Seleccione --</SelectItem>
+                            {actividadesUnicas.map(a => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.nombre} ({a.cantidadTareas} tareas)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Paso 2: Seleccionar Tarea (solo si hay actividad) */}
+                      {actividadSeleccionadaId && (
+                        <div>
+                          <Label className="text-green-600 font-medium">
+                            ✓ Paso 2: Seleccionar Tarea
+                          </Label>
+                          <Select
+                            value={tareaForm.proyectoTareaId || '__none__'}
+                            onValueChange={(v) => setTareaForm(prev => ({
+                              ...prev,
+                              proyectoTareaId: v === '__none__' ? null : v
+                            }))}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Seleccionar tarea..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">-- Seleccione --</SelectItem>
+                              {tareasFiltradas.filter(t => t.id).map(t => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  {t.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {!actividadSeleccionadaId && actividadesUnicas.length === 0 && (
+                        <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                          Este EDT no tiene actividades con tareas configuradas.
+                          Use "Tarea Extra" para agregar una tarea manual.
+                        </p>
+                      )}
                     </div>
+                  ) : (
+                    /* Tarea Extra */
                     <div>
-                      <Label>O Tarea Extra</Label>
+                      <Label>Nombre de la Tarea Extra</Label>
                       <Input
-                        placeholder="Nombre de tarea extra..."
+                        placeholder="Ej: Revisión de documentación, Coordinación..."
                         value={tareaForm.nombreTareaExtra}
                         onChange={(e) => setTareaForm(prev => ({
                           ...prev,
-                          nombreTareaExtra: e.target.value,
-                          proyectoTareaId: e.target.value ? null : prev.proyectoTareaId
+                          nombreTareaExtra: e.target.value
                         }))}
-                        disabled={!!tareaForm.proyectoTareaId}
+                        className="mt-1"
                       />
                     </div>
-                  </div>
+                  )}
 
                   {/* Seleccionar personal */}
                   <div>
