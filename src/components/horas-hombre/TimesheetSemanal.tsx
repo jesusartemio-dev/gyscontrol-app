@@ -190,21 +190,41 @@ export function TimesheetSemanal({
     )
   }
 
+  // Función helper para construir texto jerárquico
+  const getTextoJerarquico = (registro: RegistroHoras) => {
+    const codigoProyecto = registro.proyectoNombre.split(' - ')[0] || registro.proyectoNombre
+    let texto = codigoProyecto
+
+    if (registro.edtNombre && registro.edtNombre !== 'Sin EDT') {
+      texto += `-"${registro.edtNombre}"`
+    }
+
+    if (registro.actividadNombre) {
+      texto += `-"${registro.actividadNombre}"`
+    }
+
+    if (registro.tareaNombre) {
+      texto += `:${registro.tareaNombre}`
+    }
+
+    return texto
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header con navegación */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+          <h3 className="text-lg md:text-xl font-semibold text-gray-900 flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             Calendario Semanal
           </h3>
-          <p className="text-gray-600">
+          <p className="text-sm text-gray-600">
             Semana {format(semanaActual, 'w', { locale: es })} de {format(semanaActual, 'yyyy', { locale: es })}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <Button variant="outline" size="sm" onClick={() => navegarSemana('anterior')}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -217,83 +237,62 @@ export function TimesheetSemanal({
         </div>
       </div>
 
-      {/* Calendario semanal */}
-      <div className="grid grid-cols-7 gap-4">
+      {/* ===== VISTA DESKTOP: Grid de 7 columnas ===== */}
+      <div className="hidden md:block">
         {/* Headers de días */}
-        {Array.from({ length: 7 }, (_, i) => {
-          const dia = addDays(startOfWeek(semanaActual, { weekStartsOn: 1 }), i)
-          return (
-            <div key={i} className="text-center p-2">
-              <div className="font-medium text-gray-900">
-                {getDiaSemana(dia)}
+        <div className="grid grid-cols-7 gap-2 lg:gap-4">
+          {Array.from({ length: 7 }, (_, i) => {
+            const dia = addDays(startOfWeek(semanaActual, { weekStartsOn: 1 }), i)
+            return (
+              <div key={i} className="text-center p-2">
+                <div className="font-medium text-gray-900">
+                  {getDiaSemana(dia)}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {format(dia, 'd', { locale: es })}
+                </div>
               </div>
-              <div className="text-sm text-gray-600">
-                {format(dia, 'd', { locale: es })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
 
-      <div className="grid grid-cols-7 gap-4 mt-2">
         {/* Celdas de días */}
-        {diasSemana.map((dia, index) => (
-          <div
-            key={index}
-            className={`min-h-[120px] border rounded-lg p-3 cursor-pointer transition-colors hover:shadow-md ${getColorPorHoras(dia.totalHoras)}`}
-            onClick={() => abrirRegistroDia(dia.fechaString, dia.fecha)}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-lg font-bold">{dia.totalHoras}h</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  abrirRegistroDia(dia.fechaString, dia.fecha)
-                }}
-                className="h-6 w-6 p-0"
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
+        <div className="grid grid-cols-7 gap-2 lg:gap-4 mt-2">
+          {diasSemana.map((dia, index) => (
+            <div
+              key={index}
+              className={`min-h-[120px] border rounded-lg p-3 cursor-pointer transition-colors hover:shadow-md ${getColorPorHoras(dia.totalHoras)}`}
+              onClick={() => abrirRegistroDia(dia.fechaString, dia.fecha)}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-lg font-bold">{dia.totalHoras}h</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    abrirRegistroDia(dia.fechaString, dia.fecha)
+                  }}
+                  className="h-6 w-6 p-0"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
 
-            <div className="space-y-1">
-              {dia.registros.slice(0, 3).map((registro) => {
-                // Construir texto jerárquico: "PROJ001-"EDT"-"Actividad":Tarea"
-                const getTextoJerarquico = () => {
-                  // Extraer solo el código del proyecto
-                  const codigoProyecto = registro.proyectoNombre.split(' - ')[0] || registro.proyectoNombre
-                  let texto = codigoProyecto
-                  
-                  if (registro.edtNombre && registro.edtNombre !== 'Sin EDT') {
-                    texto += `-"${registro.edtNombre}"`
-                  }
-                  
-                  if (registro.actividadNombre) {
-                    texto += `-"${registro.actividadNombre}"`
-                  }
-                  
-                  if (registro.tareaNombre) {
-                    texto += `:${registro.tareaNombre}`
-                  }
-                  
-                  return texto
-                }
-
-                return (
+              <div className="space-y-1">
+                {dia.registros.slice(0, 3).map((registro) => (
                   <div
                     key={registro.id}
                     className="text-xs bg-white/80 rounded px-2 py-1 truncate"
-                    title={`${getTextoJerarquico()}: ${registro.descripcion}`}
+                    title={`${getTextoJerarquico(registro)}: ${registro.descripcion}`}
                     onClick={(e) => {
                       e.stopPropagation()
                       editarRegistro(registro)
                     }}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="truncate flex-1" title={getTextoJerarquico()}>
-                        {getTextoJerarquico()}
+                      <span className="truncate flex-1" title={getTextoJerarquico(registro)}>
+                        {getTextoJerarquico(registro)}
                       </span>
                       <div className="flex items-center gap-1 ml-1">
                         <span className="font-medium">{registro.horas}h</span>
@@ -305,17 +304,105 @@ export function TimesheetSemanal({
                       </div>
                     </div>
                   </div>
-                )
-              })}
+                ))}
 
-              {dia.registros.length > 3 && (
-                <div className="text-xs text-gray-500 text-center">
-                  +{dia.registros.length - 3} más...
+                {dia.registros.length > 3 && (
+                  <div className="text-xs text-gray-500 text-center">
+                    +{dia.registros.length - 3} más...
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== VISTA MÓVIL: Lista vertical ===== */}
+      <div className="md:hidden space-y-2">
+        {diasSemana.map((dia, index) => {
+          const fechaDia = dia.fecha ? new Date(dia.fecha) : addDays(startOfWeek(semanaActual, { weekStartsOn: 1 }), index)
+          const esHoy = format(fechaDia, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+
+          return (
+            <div
+              key={index}
+              className={`border rounded-lg overflow-hidden ${esHoy ? 'ring-2 ring-blue-500' : ''}`}
+            >
+              {/* Header del día */}
+              <div
+                className={`flex items-center justify-between px-4 py-3 cursor-pointer ${getColorPorHoras(dia.totalHoras)}`}
+                onClick={() => abrirRegistroDia(dia.fechaString, dia.fecha)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="text-center min-w-[45px]">
+                    <div className="text-xs font-medium text-gray-600 uppercase">
+                      {getDiaSemana(fechaDia)}
+                    </div>
+                    <div className={`text-xl font-bold ${esHoy ? 'text-blue-600' : 'text-gray-900'}`}>
+                      {format(fechaDia, 'd')}
+                    </div>
+                  </div>
+                  <div className="h-10 w-px bg-gray-300" />
+                  <div>
+                    <span className="text-2xl font-bold text-gray-900">{dia.totalHoras}h</span>
+                    {dia.registros.length > 0 && (
+                      <span className="text-xs text-gray-500 ml-2">
+                        ({dia.registros.length} registro{dia.registros.length > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    abrirRegistroDia(dia.fechaString, dia.fecha)
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Registros del día */}
+              {dia.registros.length > 0 && (
+                <div className="bg-white divide-y divide-gray-100">
+                  {dia.registros.map((registro) => (
+                    <div
+                      key={registro.id}
+                      className="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                      onClick={() => editarRegistro(registro)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {registro.proyectoNombre.split(' - ')[0]}
+                          {registro.edtNombre && registro.edtNombre !== 'Sin EDT' && (
+                            <span className="text-gray-500"> · {registro.edtNombre}</span>
+                          )}
+                        </div>
+                        {(registro.actividadNombre || registro.tareaNombre) && (
+                          <div className="text-xs text-gray-500 truncate">
+                            {registro.actividadNombre}
+                            {registro.tareaNombre && ` → ${registro.tareaNombre}`}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 ml-2">
+                        <span className="text-sm font-bold text-gray-900">{registro.horas}h</span>
+                        {registro.aprobado && (
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 bg-green-50 text-green-700 border-green-200">
+                            ✓
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Wizard de registro de horas */}
