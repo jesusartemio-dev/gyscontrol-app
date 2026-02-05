@@ -102,7 +102,8 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            email: true
+            email: true,
+            role: true
           }
         },
         horasPlan: true,
@@ -226,10 +227,12 @@ export async function GET(request: NextRequest) {
           fechaInicio: edt.proyecto.fechaInicio,
           fechaFin: edt.proyecto.fechaFin
         },
-        responsable: {
-          id: edt.user?.id,
-          nombre: edt.user?.name || 'Sin responsable'
-        },
+        responsable: edt.user ? {
+          id: edt.user.id,
+          name: edt.user.name,
+          email: edt.user.email,
+          role: edt.user.role
+        } : null,
         horas: {
           planificadas: Math.round(horasPlanificadas * 10) / 10,
           reales: Math.round(horasRealesTotales * 10) / 10,
