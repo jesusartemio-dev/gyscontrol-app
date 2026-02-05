@@ -1002,7 +1002,7 @@ export function RegistroCampoWizard({
                                 step={0.5}
                                 value={tareaForm.horasPorMiembro[userId] || tareaForm.horasBase}
                                 onChange={(e) => handleHorasChange(userId, parseFloat(e.target.value) || 0)}
-                                className="w-14 h-7 text-center"
+                                className="w-16 h-7 text-center"
                               />
                               <Button
                                 type="button"
