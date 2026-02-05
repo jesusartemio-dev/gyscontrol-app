@@ -682,19 +682,19 @@ export function RegistroCampoWizard({
                     <div>
                       <Label>Tarea del Cronograma</Label>
                       <Select
-                        value={tareaForm.proyectoTareaId || ''}
+                        value={tareaForm.proyectoTareaId || '__none__'}
                         onValueChange={(v) => setTareaForm(prev => ({
                           ...prev,
-                          proyectoTareaId: v || null,
-                          nombreTareaExtra: v ? '' : prev.nombreTareaExtra
+                          proyectoTareaId: v === '__none__' ? null : v,
+                          nombreTareaExtra: v && v !== '__none__' ? '' : prev.nombreTareaExtra
                         }))}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">-- Ninguna --</SelectItem>
-                          {tareasDisponibles.map(t => (
+                          <SelectItem value="__none__">-- Ninguna --</SelectItem>
+                          {tareasDisponibles.filter(t => t.id).map(t => (
                             <SelectItem key={t.id} value={t.id}>
                               {t.proyectoActividad ? `${t.proyectoActividad.nombre} > ` : ''}{t.nombre}
                             </SelectItem>
