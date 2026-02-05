@@ -710,19 +710,21 @@ export function RegistroCampoWizard({
               {tareas.length > 0 && (
                 <div className="space-y-1">
                   {tareasArray.map(tarea => (
-                    <div key={tarea.id} className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{getNombreTarea(tarea)}</p>
-                        <p className="text-xs text-green-700">
-                          {tarea.miembros.length} personas • {tarea.miembros.reduce((s, m) => s + m.horas, 0)}h
+                    <div key={tarea.id} className="flex items-start gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="text-xs font-medium leading-tight line-clamp-2">{getNombreTarea(tarea)}</p>
+                        <p className="text-xs text-green-700 mt-0.5">
+                          {tarea.miembros.length} pers. • {tarea.miembros.reduce((s, m) => s + m.horas, 0)}h
                         </p>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => editarTarea(tarea)}>
-                        <Edit2 className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => eliminarTarea(tarea.id)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => editarTarea(tarea)}>
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600" onClick={() => eliminarTarea(tarea.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
