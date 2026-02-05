@@ -32,13 +32,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
         proyectoEdt: { select: { id: true, nombre: true } },
-        proyectoTarea: { select: { id: true, nombre: true } },
         supervisor: { select: { id: true, name: true, email: true, role: true } },
         aprobadoPor: { select: { id: true, name: true, email: true } },
-        miembros: {
+        tareas: {
           include: {
-            usuario: { select: { id: true, name: true, email: true, role: true } },
-            registroHoras: { select: { id: true } }
+            proyectoTarea: {
+              select: {
+                id: true,
+                nombre: true,
+                proyectoActividad: { select: { id: true, nombre: true } }
+              }
+            },
+            miembros: {
+              include: {
+                usuario: { select: { id: true, name: true, email: true, role: true } },
+                registroHoras: { select: { id: true } }
+              },
+              orderBy: { createdAt: 'asc' }
+            }
           },
           orderBy: { createdAt: 'asc' }
         }
@@ -52,15 +63,42 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Calcular total de horas
-    const totalHoras = registro.miembros.reduce((sum, m) => sum + m.horas, 0)
+    // Calcular totales
+    const cantidadTareas = registro.tareas.length
+    const todosLosMiembros = registro.tareas.flatMap(t => t.miembros)
+    const miembrosUnicos = new Set(todosLosMiembros.map(m => m.usuarioId))
+    const totalHoras = todosLosMiembros.reduce((sum, m) => sum + m.horas, 0)
+
+    // Formatear tareas con sus totales
+    const tareasFormateadas = registro.tareas.map(t => ({
+      id: t.id,
+      proyectoTareaId: t.proyectoTareaId,
+      nombreTareaExtra: t.nombreTareaExtra,
+      descripcion: t.descripcion,
+      proyectoTarea: t.proyectoTarea,
+      miembros: t.miembros,
+      totalHoras: t.miembros.reduce((sum, m) => sum + m.horas, 0)
+    }))
 
     return NextResponse.json({
       success: true,
       data: {
-        ...registro,
-        totalHoras,
-        cantidadMiembros: registro.miembros.length
+        id: registro.id,
+        fechaTrabajo: registro.fechaTrabajo,
+        descripcion: registro.descripcion,
+        ubicacion: registro.ubicacion,
+        estado: registro.estado,
+        fechaAprobacion: registro.fechaAprobacion,
+        motivoRechazo: registro.motivoRechazo,
+        createdAt: registro.createdAt,
+        proyecto: registro.proyecto,
+        proyectoEdt: registro.proyectoEdt,
+        supervisor: registro.supervisor,
+        aprobadoPor: registro.aprobadoPor,
+        tareas: tareasFormateadas,
+        cantidadTareas,
+        cantidadMiembros: miembrosUnicos.size,
+        totalHoras
       }
     })
 
@@ -122,7 +160,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Eliminar registro (cascade eliminará los miembros)
+    // Eliminar registro (cascade eliminará las tareas y miembros)
     await prisma.registroHorasCampo.delete({
       where: { id }
     })

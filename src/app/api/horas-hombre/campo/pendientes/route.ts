@@ -71,18 +71,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Obtener registros
+    // Obtener registros con la nueva estructura
     const registros = await prisma.registroHorasCampo.findMany({
       where,
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
         proyectoEdt: { select: { id: true, nombre: true } },
-        proyectoTarea: { select: { id: true, nombre: true } },
         supervisor: { select: { id: true, name: true, email: true } },
         aprobadoPor: { select: { id: true, name: true, email: true } },
-        miembros: {
+        tareas: {
           include: {
-            usuario: { select: { id: true, name: true, email: true, role: true } }
+            proyectoTarea: {
+              select: {
+                id: true,
+                nombre: true,
+                proyectoActividad: { select: { id: true, nombre: true } }
+              }
+            },
+            miembros: {
+              include: {
+                usuario: { select: { id: true, name: true, email: true, role: true } }
+              }
+            }
           }
         }
       },
@@ -90,31 +100,47 @@ export async function GET(request: NextRequest) {
     })
 
     // Formatear respuesta con totales
-    const registrosConTotales = registros.map(r => ({
-      id: r.id,
-      fechaTrabajo: r.fechaTrabajo,
-      horasBase: r.horasBase,
-      descripcion: r.descripcion,
-      ubicacion: r.ubicacion,
-      estado: r.estado,
-      fechaAprobacion: r.fechaAprobacion,
-      motivoRechazo: r.motivoRechazo,
-      createdAt: r.createdAt,
-      proyecto: r.proyecto,
-      proyectoEdt: r.proyectoEdt,
-      proyectoTarea: r.proyectoTarea,
-      supervisor: r.supervisor,
-      aprobadoPor: r.aprobadoPor,
-      cantidadMiembros: r.miembros.length,
-      totalHoras: r.miembros.reduce((sum, m) => sum + m.horas, 0),
-      miembros: r.miembros
-    }))
+    const registrosConTotales = registros.map(r => {
+      // Calcular totales desde las tareas
+      const cantidadTareas = r.tareas.length
+      const todosLosMiembros = r.tareas.flatMap(t => t.miembros)
+      const miembrosUnicos = new Set(todosLosMiembros.map(m => m.usuarioId))
+      const totalHoras = todosLosMiembros.reduce((sum, m) => sum + m.horas, 0)
+
+      return {
+        id: r.id,
+        fechaTrabajo: r.fechaTrabajo,
+        descripcion: r.descripcion,
+        ubicacion: r.ubicacion,
+        estado: r.estado,
+        fechaAprobacion: r.fechaAprobacion,
+        motivoRechazo: r.motivoRechazo,
+        createdAt: r.createdAt,
+        proyecto: r.proyecto,
+        proyectoEdt: r.proyectoEdt,
+        supervisor: r.supervisor,
+        aprobadoPor: r.aprobadoPor,
+        cantidadTareas,
+        cantidadMiembros: miembrosUnicos.size,
+        totalHoras,
+        tareas: r.tareas.map(t => ({
+          id: t.id,
+          proyectoTareaId: t.proyectoTareaId,
+          nombreTareaExtra: t.nombreTareaExtra,
+          descripcion: t.descripcion,
+          proyectoTarea: t.proyectoTarea,
+          miembros: t.miembros,
+          totalHoras: t.miembros.reduce((sum, m) => sum + m.horas, 0)
+        }))
+      }
+    })
 
     // Estadísticas
+    const todosLosMiembros = registros.flatMap(r => r.tareas.flatMap(t => t.miembros))
     const stats = {
       total: registrosConTotales.length,
       totalHorasGlobal: registrosConTotales.reduce((sum, r) => sum + r.totalHoras, 0),
-      totalPersonasUnicas: new Set(registros.flatMap(r => r.miembros.map(m => m.usuarioId))).size
+      totalPersonasUnicas: new Set(todosLosMiembros.map(m => m.usuarioId)).size
     }
 
     return NextResponse.json({

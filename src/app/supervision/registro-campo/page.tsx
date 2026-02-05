@@ -31,7 +31,6 @@ import { RegistroCampoWizard } from '@/components/horas-hombre/RegistroCampoWiza
 interface MiRegistro {
   id: string
   fechaTrabajo: string
-  horasBase: number
   descripcion: string | null
   ubicacion: string | null
   estado: 'pendiente' | 'aprobado' | 'rechazado'
@@ -40,6 +39,7 @@ interface MiRegistro {
   proyecto: { id: string; codigo: string; nombre: string }
   proyectoEdt: { id: string; nombre: string } | null
   aprobadoPor: { id: string; name: string | null } | null
+  cantidadTareas: number
   cantidadMiembros: number
   totalHoras: number
 }
@@ -236,14 +236,17 @@ export default function RegistroCampoPage() {
                               {getEstadoBadge(registro.estado)}
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-gray-600">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm text-gray-600">
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-4 w-4" />
                                 {format(new Date(registro.fechaTrabajo), 'dd/MM/yyyy', { locale: es })}
                               </div>
+                              <div className="flex items-center gap-1 text-purple-600">
+                                {registro.cantidadTareas} tarea(s)
+                              </div>
                               <div className="flex items-center gap-1">
                                 <Users className="h-4 w-4" />
-                                {registro.cantidadMiembros} personas
+                                {registro.cantidadMiembros} persona(s)
                               </div>
                               <div className="flex items-center gap-1 text-green-600 font-medium">
                                 <Clock className="h-4 w-4" />

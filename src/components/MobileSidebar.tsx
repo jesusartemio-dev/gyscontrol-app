@@ -256,10 +256,10 @@ export default function MobileSidebar() {
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
       <SheetContent
         side="left"
-        className="w-[280px] p-0 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 border-r border-gray-700/50"
+        className="w-[280px] p-0 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 border-r border-gray-700/50 flex flex-col h-full"
       >
         {/* Header */}
-        <SheetHeader className="p-4 border-b border-gray-700/60 bg-gray-800/50">
+        <SheetHeader className="p-4 border-b border-gray-700/60 bg-gray-800/50 flex-shrink-0">
           <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
           <div className="flex items-center gap-3">
             <Link href="/" onClick={handleLinkClick} className="relative w-[120px] h-8">
@@ -280,7 +280,7 @@ export default function MobileSidebar() {
 
         {/* User Section */}
         {session?.user && (
-          <div className="px-4 py-3 bg-gray-800/30 border-b border-gray-700/40">
+          <div className="px-4 py-3 bg-gray-800/30 border-b border-gray-700/40 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                 <User size={16} className="text-white" />
@@ -297,7 +297,7 @@ export default function MobileSidebar() {
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-2 py-4 custom-scrollbar">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-4 custom-scrollbar overscroll-contain touch-pan-y">
           <div className="space-y-2">
             {visibleSections.map((section) => {
               const SectionIcon = section.icon
@@ -380,10 +380,10 @@ export default function MobileSidebar() {
           </div>
         </nav>
 
-        <Separator className="bg-gray-700/60" />
+        <Separator className="bg-gray-700/60 flex-shrink-0" />
 
         {/* Footer */}
-        <div className="p-4 bg-gray-800/30">
+        <div className="p-4 bg-gray-800/30 flex-shrink-0">
           {session?.user && (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs text-gray-400">

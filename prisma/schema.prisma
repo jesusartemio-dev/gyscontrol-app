@@ -1056,14 +1056,14 @@ model RegistroHoras {
 // =============================================
 // Registro de Horas en Campo (Cuadrilla)
 // =============================================
+// Estructura: 1 Registro = 1 Proyecto + 1 EDT + N Tareas
+// Cada Tarea tiene su propio personal con horas independientes
 model RegistroHorasCampo {
   id              String              @id @default(cuid())
   proyectoId      String
   proyectoEdtId   String?
-  proyectoTareaId String?
   supervisorId    String
   fechaTrabajo    DateTime
-  horasBase       Float
   descripcion     String?
   ubicacion       String?
   estado          EstadoRegistroCampo @default(pendiente)
@@ -1073,12 +1073,11 @@ model RegistroHorasCampo {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
-  proyecto      Proyecto                    @relation(fields: [proyectoId], references: [id])
-  proyectoEdt   ProyectoEdt?                @relation(fields: [proyectoEdtId], references: [id])
-  proyectoTarea ProyectoTarea?              @relation(fields: [proyectoTareaId], references: [id])
-  supervisor    User                        @relation("RegistrosCampoSupervisor", fields: [supervisorId], references: [id])
-  aprobadoPor   User?                       @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
-  miembros      RegistroHorasCampoMiembro[]
+  proyecto    Proyecto                  @relation(fields: [proyectoId], references: [id])
+  proyectoEdt ProyectoEdt?              @relation(fields: [proyectoEdtId], references: [id])
+  supervisor  User                      @relation("RegistrosCampoSupervisor", fields: [supervisorId], references: [id])
+  aprobadoPor User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
+  tareas      RegistroHorasCampoTarea[]
 
   @@index([proyectoId, estado, fechaTrabajo])
   @@index([supervisorId, estado])
@@ -1086,20 +1085,40 @@ model RegistroHorasCampo {
   @@map("registro_horas_campo")
 }
 
-model RegistroHorasCampoMiembro {
-  id              String   @id @default(cuid())
-  registroCampoId String
-  usuarioId       String
-  horas           Float
-  observaciones   String?
-  registroHorasId String?  @unique
-  createdAt       DateTime @default(now())
+// Tarea dentro de un registro de campo
+// Puede ser una tarea del cronograma o una tarea extra (nombreTareaExtra)
+model RegistroHorasCampoTarea {
+  id               String   @id @default(cuid())
+  registroCampoId  String
+  proyectoTareaId  String?
+  nombreTareaExtra String?
+  descripcion      String?
+  createdAt        DateTime @default(now())
 
-  registroCampo RegistroHorasCampo @relation(fields: [registroCampoId], references: [id], onDelete: Cascade)
-  usuario       User               @relation(fields: [usuarioId], references: [id])
-  registroHoras RegistroHoras?     @relation(fields: [registroHorasId], references: [id])
+  registroCampo RegistroHorasCampo          @relation(fields: [registroCampoId], references: [id], onDelete: Cascade)
+  proyectoTarea ProyectoTarea?              @relation(fields: [proyectoTareaId], references: [id])
+  miembros      RegistroHorasCampoMiembro[]
 
   @@index([registroCampoId])
+  @@index([proyectoTareaId])
+  @@map("registro_horas_campo_tarea")
+}
+
+// Miembro asignado a una tarea específica dentro del registro de campo
+model RegistroHorasCampoMiembro {
+  id                   String   @id @default(cuid())
+  registroCampoTareaId String
+  usuarioId            String
+  horas                Float
+  observaciones        String?
+  registroHorasId      String?  @unique
+  createdAt            DateTime @default(now())
+
+  registroCampoTarea RegistroHorasCampoTarea @relation(fields: [registroCampoTareaId], references: [id], onDelete: Cascade)
+  usuario            User                    @relation(fields: [usuarioId], references: [id])
+  registroHoras      RegistroHoras?          @relation(fields: [registroHorasId], references: [id])
+
+  @@index([registroCampoTareaId])
   @@index([usuarioId])
   @@map("registro_horas_campo_miembro")
 }
@@ -2297,7 +2316,7 @@ model ProyectoTarea {
   proyectoEdt                 ProyectoEdt                 @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
   user                        User?                       @relation("TareaResponsable", fields: [responsableId], references: [id])
   creadoPor                   User?                       @relation("TareaCreadaPor", fields: [creadoPorId], references: [id])
-  registrosCampo              RegistroHorasCampo[]
+  registrosCampoTarea         RegistroHorasCampoTarea[]
 
   @@index([creadoPorId])
   @@index([dependenciaId])

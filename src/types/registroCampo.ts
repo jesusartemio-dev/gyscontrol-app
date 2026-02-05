@@ -1,5 +1,8 @@
 /**
  * Tipos para el sistema de Registro de Horas en Campo (Cuadrilla)
+ *
+ * Estructura: 1 Registro = 1 Proyecto + 1 EDT + N Tareas
+ * Cada Tarea tiene su propio personal con horas independientes
  */
 
 import type { EstadoRegistroCampo } from '@prisma/client'
@@ -25,6 +28,32 @@ export interface MiembroCuadrillaConInfo extends MiembroCuadrilla {
   }
 }
 
+// Tarea con sus miembros para crear un registro
+export interface TareaCuadrilla {
+  proyectoTareaId?: string | null
+  nombreTareaExtra?: string | null
+  descripcion?: string
+  miembros: MiembroCuadrilla[]
+}
+
+// Tarea con información completa (para mostrar)
+export interface TareaCuadrillaConInfo {
+  id: string
+  proyectoTareaId: string | null
+  nombreTareaExtra: string | null
+  descripcion: string | null
+  proyectoTarea: {
+    id: string
+    nombre: string
+    proyectoActividad?: {
+      id: string
+      nombre: string
+    } | null
+  } | null
+  miembros: MiembroCuadrillaConInfo[]
+  totalHoras: number
+}
+
 // =============================================
 // Payloads para APIs
 // =============================================
@@ -32,12 +61,10 @@ export interface MiembroCuadrillaConInfo extends MiembroCuadrilla {
 export interface CrearRegistroCampoPayload {
   proyectoId: string
   proyectoEdtId?: string
-  proyectoTareaId?: string
   fechaTrabajo: string // YYYY-MM-DD
-  horasBase: number
   descripcion?: string
   ubicacion?: string
-  miembros: MiembroCuadrilla[]
+  tareas: TareaCuadrilla[]
 }
 
 export interface RechazarRegistroCampoPayload {
@@ -51,7 +78,6 @@ export interface RechazarRegistroCampoPayload {
 export interface RegistroCampoResumen {
   id: string
   fechaTrabajo: Date
-  horasBase: number
   descripcion: string | null
   ubicacion: string | null
   estado: EstadoRegistroCampo
@@ -67,10 +93,6 @@ export interface RegistroCampoResumen {
     id: string
     nombre: string
   } | null
-  proyectoTarea: {
-    id: string
-    nombre: string
-  } | null
   supervisor: {
     id: string
     name: string | null
@@ -81,30 +103,36 @@ export interface RegistroCampoResumen {
     name: string | null
     email: string
   } | null
-  _count: {
-    miembros: number
-  }
+  cantidadTareas: number
+  cantidadMiembros: number
   totalHoras: number
 }
 
-export interface RegistroCampoDetalle extends Omit<RegistroCampoResumen, '_count' | 'totalHoras'> {
-  miembros: MiembroCuadrillaConInfo[]
+export interface RegistroCampoDetalle extends Omit<RegistroCampoResumen, 'cantidadTareas' | 'cantidadMiembros' | 'totalHoras'> {
+  tareas: TareaCuadrillaConInfo[]
 }
 
 // =============================================
 // Estado del componente Wizard
 // =============================================
 
+// Tarea en el wizard (editable)
+export interface TareaWizard {
+  id: string // ID temporal para UI
+  proyectoTareaId: string | null
+  nombreTareaExtra: string | null
+  descripcion: string
+  miembros: MiembroCuadrilla[]
+}
+
 export interface RegistroCampoWizardState {
   paso: number
   proyectoId: string | null
   proyectoEdtId: string | null
-  proyectoTareaId: string | null
   fechaTrabajo: string
-  horasBase: number
   descripcion: string
   ubicacion: string
-  miembrosSeleccionados: MiembroCuadrilla[]
+  tareas: TareaWizard[]
 }
 
 // =============================================

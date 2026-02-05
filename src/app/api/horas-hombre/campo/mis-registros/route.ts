@@ -41,17 +41,20 @@ export async function GET(request: NextRequest) {
       where.estado = estado
     }
 
-    // Obtener registros
+    // Obtener registros con la nueva estructura
     const registros = await prisma.registroHorasCampo.findMany({
       where,
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
         proyectoEdt: { select: { id: true, nombre: true } },
-        proyectoTarea: { select: { id: true, nombre: true } },
         aprobadoPor: { select: { id: true, name: true, email: true } },
-        _count: { select: { miembros: true } },
-        miembros: {
-          select: { horas: true }
+        tareas: {
+          include: {
+            proyectoTarea: { select: { id: true, nombre: true } },
+            miembros: {
+              select: { usuarioId: true, horas: true }
+            }
+          }
         }
       },
       orderBy: { createdAt: 'desc' },
@@ -59,23 +62,34 @@ export async function GET(request: NextRequest) {
     })
 
     // Formatear respuesta
-    const registrosFormateados = registros.map(r => ({
-      id: r.id,
-      fechaTrabajo: r.fechaTrabajo,
-      horasBase: r.horasBase,
-      descripcion: r.descripcion,
-      ubicacion: r.ubicacion,
-      estado: r.estado,
-      fechaAprobacion: r.fechaAprobacion,
-      motivoRechazo: r.motivoRechazo,
-      createdAt: r.createdAt,
-      proyecto: r.proyecto,
-      proyectoEdt: r.proyectoEdt,
-      proyectoTarea: r.proyectoTarea,
-      aprobadoPor: r.aprobadoPor,
-      cantidadMiembros: r._count.miembros,
-      totalHoras: r.miembros.reduce((sum, m) => sum + m.horas, 0)
-    }))
+    const registrosFormateados = registros.map(r => {
+      // Calcular totales desde las tareas
+      const cantidadTareas = r.tareas.length
+      const miembrosUnicos = new Set(
+        r.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
+      )
+      const totalHoras = r.tareas.reduce(
+        (sum, t) => sum + t.miembros.reduce((s, m) => s + m.horas, 0),
+        0
+      )
+
+      return {
+        id: r.id,
+        fechaTrabajo: r.fechaTrabajo,
+        descripcion: r.descripcion,
+        ubicacion: r.ubicacion,
+        estado: r.estado,
+        fechaAprobacion: r.fechaAprobacion,
+        motivoRechazo: r.motivoRechazo,
+        createdAt: r.createdAt,
+        proyecto: r.proyecto,
+        proyectoEdt: r.proyectoEdt,
+        aprobadoPor: r.aprobadoPor,
+        cantidadTareas,
+        cantidadMiembros: miembrosUnicos.size,
+        totalHoras
+      }
+    })
 
     // Estadísticas por estado
     const stats = {

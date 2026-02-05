@@ -4,8 +4,8 @@
  *
  * Al aprobar:
  * 1. Cambia estado a 'aprobado'
- * 2. Crea RegistroHoras individuales para cada miembro
- * 3. Actualiza horasReales de la tarea si aplica
+ * 2. Crea RegistroHoras individuales para cada miembro de cada tarea
+ * 3. Actualiza horasReales de cada tarea del cronograma si aplica
  * 4. Envía notificaciones a los miembros
  */
 
@@ -43,7 +43,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const aprobadorId = session.user.id
 
-    // Obtener registro con miembros
+    // Obtener registro con tareas y miembros
     const registro = await prisma.registroHorasCampo.findUnique({
       where: { id },
       include: {
@@ -56,11 +56,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
             edt: { select: { nombre: true } }
           }
         },
-        proyectoTarea: { select: { id: true, nombre: true } },
         supervisor: { select: { id: true, name: true, email: true } },
-        miembros: {
+        tareas: {
           include: {
-            usuario: { select: { id: true, name: true, email: true } }
+            proyectoTarea: {
+              select: {
+                id: true,
+                nombre: true,
+                proyectoActividad: { select: { id: true, nombre: true } }
+              }
+            },
+            miembros: {
+              include: {
+                usuario: { select: { id: true, name: true, email: true } }
+              }
+            }
           }
         }
       }
@@ -110,8 +120,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Determinar categoría
-    const categoriaFinal = registro.proyectoEdt?.nombre ||
+    // Determinar categoría base
+    const categoriaBase = registro.proyectoEdt?.nombre ||
                           registro.proyectoEdt?.edt?.nombre ||
                           proyectoServicio.edt?.nombre ||
                           'campo'
@@ -120,51 +130,67 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const resultado = await prisma.$transaction(async (tx) => {
       const registrosHorasCreados: string[] = []
       let totalHorasRegistradas = 0
+      const tareasActualizadas: Map<string, number> = new Map()
 
-      // Crear RegistroHoras para cada miembro
-      for (const miembro of registro.miembros) {
-        const nuevoRegistroId = randomUUID()
+      // Iterar por cada tarea
+      for (const tarea of registro.tareas) {
+        // Determinar nombre del servicio/tarea
+        const nombreServicio = tarea.proyectoTarea?.nombre ||
+                               tarea.nombreTareaExtra ||
+                               proyectoServicio.nombre ||
+                               'Trabajo de Campo'
 
-        await tx.registroHoras.create({
-          data: {
-            id: nuevoRegistroId,
-            proyectoId: registro.proyectoId,
-            proyectoServicioId: proyectoServicio.id,
-            categoria: categoriaFinal,
-            nombreServicio: proyectoServicio.nombre || registro.proyectoEdt?.nombre || 'Trabajo de Campo',
-            recursoId: recurso.id,
-            recursoNombre: recurso.nombre,
-            usuarioId: miembro.usuarioId,
-            fechaTrabajo: registro.fechaTrabajo,
-            horasTrabajadas: miembro.horas,
-            descripcion: registro.descripcion,
-            observaciones: miembro.observaciones,
-            aprobado: true,
-            proyectoEdtId: registro.proyectoEdtId,
-            edtId: registro.proyectoEdt?.edtId,
-            proyectoTareaId: registro.proyectoTareaId,
-            origen: 'campo',
-            ubicacion: registro.ubicacion,
-            updatedAt: new Date()
+        // Crear RegistroHoras para cada miembro de esta tarea
+        for (const miembro of tarea.miembros) {
+          const nuevoRegistroId = randomUUID()
+
+          await tx.registroHoras.create({
+            data: {
+              id: nuevoRegistroId,
+              proyectoId: registro.proyectoId,
+              proyectoServicioId: proyectoServicio.id,
+              categoria: categoriaBase,
+              nombreServicio: nombreServicio,
+              recursoId: recurso.id,
+              recursoNombre: recurso.nombre,
+              usuarioId: miembro.usuarioId,
+              fechaTrabajo: registro.fechaTrabajo,
+              horasTrabajadas: miembro.horas,
+              descripcion: tarea.descripcion || registro.descripcion,
+              observaciones: miembro.observaciones,
+              aprobado: true,
+              proyectoEdtId: registro.proyectoEdtId,
+              edtId: registro.proyectoEdt?.edtId,
+              proyectoTareaId: tarea.proyectoTareaId,
+              origen: 'campo',
+              ubicacion: registro.ubicacion,
+              updatedAt: new Date()
+            }
+          })
+
+          // Vincular RegistroHoras al miembro
+          await tx.registroHorasCampoMiembro.update({
+            where: { id: miembro.id },
+            data: { registroHorasId: nuevoRegistroId }
+          })
+
+          registrosHorasCreados.push(nuevoRegistroId)
+          totalHorasRegistradas += miembro.horas
+
+          // Acumular horas por tarea del cronograma
+          if (tarea.proyectoTareaId) {
+            const horasActuales = tareasActualizadas.get(tarea.proyectoTareaId) || 0
+            tareasActualizadas.set(tarea.proyectoTareaId, horasActuales + miembro.horas)
           }
-        })
-
-        // Vincular RegistroHoras al miembro
-        await tx.registroHorasCampoMiembro.update({
-          where: { id: miembro.id },
-          data: { registroHorasId: nuevoRegistroId }
-        })
-
-        registrosHorasCreados.push(nuevoRegistroId)
-        totalHorasRegistradas += miembro.horas
+        }
       }
 
-      // Actualizar horasReales de la tarea si existe
-      if (registro.proyectoTareaId) {
+      // Actualizar horasReales de cada tarea del cronograma afectada
+      for (const [tareaId, horas] of tareasActualizadas.entries()) {
         await tx.proyectoTarea.update({
-          where: { id: registro.proyectoTareaId },
+          where: { id: tareaId },
           data: {
-            horasReales: { increment: totalHorasRegistradas },
+            horasReales: { increment: horas },
             updatedAt: new Date()
           }
         })
@@ -183,26 +209,23 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return {
         registro: registroActualizado,
         registrosHorasCreados,
-        totalHorasRegistradas
+        totalHorasRegistradas,
+        tareasActualizadas: tareasActualizadas.size
       }
     })
 
     // TODO: Enviar notificaciones a los miembros
-    // for (const miembro of registro.miembros) {
-    //   await crearNotificacion({
-    //     titulo: 'Horas registradas por supervisor',
-    //     mensaje: `Se registraron ${miembro.horas}h en "${registro.proyecto.nombre}"`,
-    //     tipo: 'success',
-    //     prioridad: 'media',
-    //     usuarioId: miembro.usuarioId,
-    //     entidadTipo: 'registro_horas_campo',
-    //     entidadId: id,
-    //     accionUrl: '/mi-trabajo/timesheet',
-    //     accionTexto: 'Ver Timesheet'
-    //   })
+    // const usuariosNotificados = new Set<string>()
+    // for (const tarea of registro.tareas) {
+    //   for (const miembro of tarea.miembros) {
+    //     if (!usuariosNotificados.has(miembro.usuarioId)) {
+    //       usuariosNotificados.add(miembro.usuarioId)
+    //       await crearNotificacion({...})
+    //     }
+    //   }
     // }
 
-    console.log(`✅ APROBAR CAMPO: Aprobado registro ${id}, creados ${resultado.registrosHorasCreados.length} registros de horas`)
+    console.log(`✅ APROBAR CAMPO: Aprobado registro ${id}, creados ${resultado.registrosHorasCreados.length} registros de horas, ${resultado.tareasActualizadas} tareas actualizadas`)
 
     return NextResponse.json({
       success: true,
@@ -211,7 +234,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         registroId: id,
         estado: 'aprobado',
         registrosHorasCreados: resultado.registrosHorasCreados.length,
-        totalHorasRegistradas: resultado.totalHorasRegistradas
+        totalHorasRegistradas: resultado.totalHorasRegistradas,
+        tareasActualizadas: resultado.tareasActualizadas
       }
     })
 

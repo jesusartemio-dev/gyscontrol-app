@@ -2,6 +2,9 @@
 
 /**
  * AprobacionCampoList - Lista de registros de campo para aprobar/rechazar
+ *
+ * Nueva estructura: 1 Registro = 1 Proyecto + 1 EDT + N Tareas
+ * Cada Tarea tiene su propio personal con horas independientes
  */
 
 import React, { useState, useEffect } from 'react'
@@ -39,7 +42,8 @@ import {
   User,
   RefreshCw,
   Filter,
-  AlertCircle
+  AlertCircle,
+  ListTodo
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
@@ -59,10 +63,23 @@ interface Miembro {
   }
 }
 
+interface Tarea {
+  id: string
+  proyectoTareaId: string | null
+  nombreTareaExtra: string | null
+  descripcion: string | null
+  proyectoTarea: {
+    id: string
+    nombre: string
+    proyectoActividad?: { id: string; nombre: string } | null
+  } | null
+  miembros: Miembro[]
+  totalHoras: number
+}
+
 interface RegistroCampo {
   id: string
   fechaTrabajo: string
-  horasBase: number
   descripcion: string | null
   ubicacion: string | null
   estado: 'pendiente' | 'aprobado' | 'rechazado'
@@ -70,12 +87,12 @@ interface RegistroCampo {
   createdAt: string
   proyecto: { id: string; codigo: string; nombre: string }
   proyectoEdt: { id: string; nombre: string } | null
-  proyectoTarea: { id: string; nombre: string } | null
   supervisor: { id: string; name: string | null; email: string }
   aprobadoPor: { id: string; name: string | null; email: string } | null
+  cantidadTareas: number
   cantidadMiembros: number
   totalHoras: number
-  miembros: Miembro[]
+  tareas: Tarea[]
 }
 
 interface AprobacionCampoListProps {
@@ -233,6 +250,13 @@ export function AprobacionCampoList({
     }
   }
 
+  const getNombreTarea = (tarea: Tarea): string => {
+    if (tarea.proyectoTarea) {
+      return tarea.proyectoTarea.nombre
+    }
+    return tarea.nombreTareaExtra || 'Tarea Extra'
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -311,14 +335,18 @@ export function AprobacionCampoList({
                     </div>
 
                     {/* Info */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                       <div className="flex items-center gap-1 text-gray-600">
                         <Calendar className="h-4 w-4" />
                         {format(new Date(registro.fechaTrabajo), 'dd/MM/yyyy', { locale: es })}
                       </div>
+                      <div className="flex items-center gap-1 text-purple-600">
+                        <ListTodo className="h-4 w-4" />
+                        {registro.cantidadTareas} tarea(s)
+                      </div>
                       <div className="flex items-center gap-1 text-gray-600">
                         <Users className="h-4 w-4" />
-                        {registro.cantidadMiembros} personas
+                        {registro.cantidadMiembros} persona(s)
                       </div>
                       <div className="flex items-center gap-1 text-green-600 font-medium">
                         <Clock className="h-4 w-4" />
@@ -329,6 +357,22 @@ export function AprobacionCampoList({
                         {registro.supervisor.name || registro.supervisor.email}
                       </div>
                     </div>
+
+                    {/* Tareas resumen */}
+                    {registro.tareas && registro.tareas.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {registro.tareas.slice(0, 3).map(tarea => (
+                          <Badge key={tarea.id} variant="secondary" className="text-xs">
+                            {getNombreTarea(tarea)}
+                          </Badge>
+                        ))}
+                        {registro.tareas.length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{registro.tareas.length - 3} más
+                          </Badge>
+                        )}
+                      </div>
+                    )}
 
                     {/* Ubicación */}
                     {registro.ubicacion && (
@@ -401,20 +445,21 @@ export function AprobacionCampoList({
 
       {/* Modal de Detalle */}
       <Dialog open={showDetalle} onOpenChange={setShowDetalle}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-green-600" />
-              Detalle del Registro
+              Detalle del Registro de Campo
             </DialogTitle>
           </DialogHeader>
 
           {registroDetalle && (
             <div className="space-y-4">
+              {/* Info general */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-gray-500">Proyecto:</span>
-                  <p className="font-medium">{registroDetalle.proyecto.codigo}</p>
+                  <p className="font-medium">{registroDetalle.proyecto.codigo} - {registroDetalle.proyecto.nombre}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Fecha:</span>
@@ -428,20 +473,20 @@ export function AprobacionCampoList({
                     <p className="font-medium">{registroDetalle.proyectoEdt.nombre}</p>
                   </div>
                 )}
-                {registroDetalle.proyectoTarea && (
-                  <div>
-                    <span className="text-gray-500">Tarea:</span>
-                    <p className="font-medium">{registroDetalle.proyectoTarea.nombre}</p>
-                  </div>
-                )}
                 <div>
                   <span className="text-gray-500">Supervisor:</span>
-                  <p className="font-medium">{registroDetalle.supervisor.name}</p>
+                  <p className="font-medium">{registroDetalle.supervisor.name || registroDetalle.supervisor.email}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Estado:</span>
                   <p>{getEstadoBadge(registroDetalle.estado)}</p>
                 </div>
+                {registroDetalle.ubicacion && (
+                  <div>
+                    <span className="text-gray-500">Ubicación:</span>
+                    <p className="font-medium">{registroDetalle.ubicacion}</p>
+                  </div>
+                )}
               </div>
 
               {registroDetalle.descripcion && (
@@ -451,26 +496,55 @@ export function AprobacionCampoList({
                 </div>
               )}
 
+              {/* Tareas con miembros */}
               <div>
                 <span className="text-sm text-gray-500 block mb-2">
-                  Miembros ({registroDetalle.miembros.length}):
+                  Tareas ({registroDetalle.tareas?.length || 0}):
                 </span>
-                <div className="border rounded-lg divide-y max-h-[200px] overflow-y-auto">
-                  {registroDetalle.miembros.map(m => (
-                    <div key={m.id} className="p-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{m.usuario.name || m.usuario.email}</p>
-                        {m.observaciones && (
-                          <p className="text-xs text-gray-500">{m.observaciones}</p>
+                <div className="space-y-3">
+                  {registroDetalle.tareas?.map(tarea => (
+                    <Card key={tarea.id} className="bg-gray-50">
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <ListTodo className="h-4 w-4 text-purple-600" />
+                            <span className="font-medium">{getNombreTarea(tarea)}</span>
+                          </div>
+                          <Badge variant="outline" className="bg-green-50 text-green-700">
+                            {tarea.totalHoras}h
+                          </Badge>
+                        </div>
+                        {tarea.proyectoTarea?.proyectoActividad && (
+                          <p className="text-xs text-gray-500 mb-2">
+                            Actividad: {tarea.proyectoTarea.proyectoActividad.nombre}
+                          </p>
                         )}
-                      </div>
-                      <Badge variant="secondary">{m.horas}h</Badge>
-                    </div>
+                        <div className="space-y-1">
+                          {tarea.miembros.map(m => (
+                            <div key={m.id} className="flex items-center justify-between p-2 bg-white rounded text-sm">
+                              <div className="flex items-center gap-2">
+                                <User className="h-3 w-3 text-gray-400" />
+                                <span>{m.usuario.name || m.usuario.email}</span>
+                              </div>
+                              <Badge variant="secondary">{m.horas}h</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-                <div className="text-right mt-2 font-medium">
-                  Total: {registroDetalle.totalHoras}h
+              </div>
+
+              {/* Totales */}
+              <div className="border-t pt-3 flex justify-between items-center">
+                <div>
+                  <span className="text-gray-600">Total:</span>
+                  <p className="text-sm">
+                    {registroDetalle.cantidadTareas} tarea(s) - {registroDetalle.cantidadMiembros} persona(s)
+                  </p>
                 </div>
+                <span className="text-2xl font-bold text-green-700">{registroDetalle.totalHoras}h</span>
               </div>
             </div>
           )}
