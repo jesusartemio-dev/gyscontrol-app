@@ -773,7 +773,7 @@ export function RegistroCampoWizard({
                             setTareaForm(prev => ({ ...prev, proyectoTareaId: null }))
                           }}
                         >
-                          <SelectTrigger className="h-auto min-h-9 py-1.5 [&>span]:line-clamp-2 [&>span]:text-left">
+                          <SelectTrigger className="h-auto min-h-9 py-1.5 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-xs">
                             <SelectValue placeholder="Seleccionar actividad..." />
                           </SelectTrigger>
                           <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
@@ -798,7 +798,7 @@ export function RegistroCampoWizard({
                               proyectoTareaId: v === '__none__' ? null : v
                             }))}
                           >
-                            <SelectTrigger className="h-auto min-h-9 py-1.5 [&>span]:line-clamp-2 [&>span]:text-left">
+                            <SelectTrigger className="h-auto min-h-9 py-1.5 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-xs">
                               <SelectValue placeholder="Seleccionar tarea..." />
                             </SelectTrigger>
                             <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
@@ -841,7 +841,7 @@ export function RegistroCampoWizard({
                             }))
                           }}
                         >
-                          <SelectTrigger className="h-auto min-h-9 py-1.5 [&>span]:line-clamp-2 [&>span]:text-left">
+                          <SelectTrigger className="h-auto min-h-9 py-1.5 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-xs">
                             <SelectValue placeholder="Seleccionar tarea..." />
                           </SelectTrigger>
                           <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
