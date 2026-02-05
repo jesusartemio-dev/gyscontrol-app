@@ -116,6 +116,8 @@ export function RegistroCampoWizard({
   const [editandoTareaId, setEditandoTareaId] = useState<string | null>(null)
   const [actividadSeleccionadaId, setActividadSeleccionadaId] = useState<string | null>(null)
   const [tipoTarea, setTipoTarea] = useState<'cronograma' | 'extra'>('cronograma')
+  const [tareasDirectas, setTareasDirectas] = useState<TareaDelCronograma[]>([])
+  const [loadingTareasDirectas, setLoadingTareasDirectas] = useState(false)
   const [tareaForm, setTareaForm] = useState<{
     proyectoTareaId: string | null
     nombreTareaExtra: string
@@ -163,6 +165,7 @@ export function RegistroCampoWizard({
   // Resetear tareas cuando cambia el EDT
   useEffect(() => {
     setTareas([])
+    setTareasDirectas([])
     resetTareaForm()
   }, [proyectoEdtId])
 
@@ -233,37 +236,55 @@ export function RegistroCampoWizard({
         const rolesFijos = data.data?.rolesFijos || {}
 
         const todosPersonal: PersonalProyecto[] = []
+        const userIdsAgregados = new Set<string>()
 
-        // Agregar roles fijos
+        // Agregar TODOS los roles fijos (comercial, gestor, supervisor, lider)
+        if (rolesFijos.comercial) {
+          todosPersonal.push({
+            userId: rolesFijos.comercial.id,
+            rol: 'Comercial',
+            user: rolesFijos.comercial
+          })
+          userIdsAgregados.add(rolesFijos.comercial.id)
+        }
         if (rolesFijos.gestor) {
           todosPersonal.push({
             userId: rolesFijos.gestor.id,
-            rol: 'gestor',
+            rol: 'Gestor',
             user: rolesFijos.gestor
           })
+          userIdsAgregados.add(rolesFijos.gestor.id)
         }
         if (rolesFijos.supervisor) {
           todosPersonal.push({
             userId: rolesFijos.supervisor.id,
-            rol: 'supervisor',
+            rol: 'Supervisor',
             user: rolesFijos.supervisor
           })
+          userIdsAgregados.add(rolesFijos.supervisor.id)
         }
         if (rolesFijos.lider) {
           todosPersonal.push({
             userId: rolesFijos.lider.id,
-            rol: 'lider',
+            rol: 'Líder',
             user: rolesFijos.lider
           })
+          userIdsAgregados.add(rolesFijos.lider.id)
         }
 
-        // Agregar personal dinámico
-        personalDinamico.forEach((p: PersonalProyecto) => {
-          if (!todosPersonal.some(t => t.userId === p.userId)) {
-            todosPersonal.push(p)
+        // Agregar personal dinámico (Proyectos, Seguridad, etc.) - evitar duplicados
+        personalDinamico.forEach((p: any) => {
+          if (!userIdsAgregados.has(p.userId)) {
+            todosPersonal.push({
+              userId: p.userId,
+              rol: p.rol || 'Personal',
+              user: p.user
+            })
+            userIdsAgregados.add(p.userId)
           }
         })
 
+        console.log('👥 Personal cargado:', todosPersonal.length, 'usuarios')
         setPersonal(todosPersonal)
       }
     } catch (error) {
@@ -273,6 +294,33 @@ export function RegistroCampoWizard({
 
   const edtSeleccionado = Array.isArray(edts) ? edts.find(e => e.id === proyectoEdtId) : undefined
   const tareasDisponibles = Array.isArray(edtSeleccionado?.tareas) ? edtSeleccionado.tareas : []
+
+  // Cargar tareas directas (sin actividad) cuando se selecciona modo "extra"
+  const cargarTareasDirectas = async () => {
+    if (!proyectoEdtId) return
+    try {
+      setLoadingTareasDirectas(true)
+      const response = await fetch(`/api/horas-hombre/tareas-directas-edt/${proyectoEdtId}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.tareas) {
+          setTareasDirectas(data.tareas)
+          console.log('📋 Tareas directas cargadas:', data.tareas.length)
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando tareas directas:', error)
+    } finally {
+      setLoadingTareasDirectas(false)
+    }
+  }
+
+  // Cargar tareas directas cuando se cambia a modo "extra"
+  useEffect(() => {
+    if (tipoTarea === 'extra' && proyectoEdtId) {
+      cargarTareasDirectas()
+    }
+  }, [tipoTarea, proyectoEdtId])
 
   // Extraer actividades únicas de las tareas
   const actividadesUnicas = React.useMemo(() => {
@@ -333,11 +381,13 @@ export function RegistroCampoWizard({
   }
 
   const guardarTarea = () => {
-    // Validar
-    if (!tareaForm.proyectoTareaId && !tareaForm.nombreTareaExtra.trim()) {
+    // Validar - ahora siempre se requiere seleccionar una tarea (del cronograma o directa)
+    if (!tareaForm.proyectoTareaId) {
       toast({
         title: 'Error',
-        description: 'Seleccione una tarea del cronograma o ingrese un nombre de tarea extra',
+        description: tipoTarea === 'cronograma'
+          ? 'Seleccione una tarea del cronograma'
+          : 'Seleccione una tarea directa',
         variant: 'destructive'
       })
       return
@@ -406,10 +456,15 @@ export function RegistroCampoWizard({
 
   const getNombreTarea = (tarea: TareaWizard): string => {
     if (tarea.proyectoTareaId) {
+      // Buscar en tareas del cronograma (con actividad)
       const tareaDelCronograma = tareasDisponibles.find(t => t.id === tarea.proyectoTareaId)
-      return tareaDelCronograma?.nombre || 'Tarea'
+      if (tareaDelCronograma) return tareaDelCronograma.nombre
+      // Buscar en tareas directas (sin actividad)
+      const tareaDirecta = tareasDirectas.find(t => t.id === tarea.proyectoTareaId)
+      if (tareaDirecta) return tareaDirecta.nombre
+      return 'Tarea'
     }
-    return tarea.nombreTareaExtra || 'Tarea Extra'
+    return tarea.nombreTareaExtra || 'Tarea Directa'
   }
 
   const getNombreUsuario = (userId: string): string => {
@@ -723,11 +778,11 @@ export function RegistroCampoWizard({
                       onClick={() => {
                         setTipoTarea('extra')
                         setActividadSeleccionadaId(null)
-                        setTareaForm(prev => ({ ...prev, proyectoTareaId: null }))
+                        setTareaForm(prev => ({ ...prev, proyectoTareaId: null, nombreTareaExtra: '' }))
                       }}
                       className="flex-1"
                     >
-                      ✏️ Tarea Extra
+                      🎯 Tarea Directa
                     </Button>
                   </div>
 
@@ -790,23 +845,55 @@ export function RegistroCampoWizard({
                       {!actividadSeleccionadaId && actividadesUnicas.length === 0 && (
                         <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">
                           Este EDT no tiene actividades con tareas configuradas.
-                          Use "Tarea Extra" para agregar una tarea manual.
+                          Use "Tarea Directa" para seleccionar tareas sin actividad.
                         </p>
                       )}
                     </div>
                   ) : (
-                    /* Tarea Extra */
-                    <div>
-                      <Label>Nombre de la Tarea Extra</Label>
-                      <Input
-                        placeholder="Ej: Revisión de documentación, Coordinación..."
-                        value={tareaForm.nombreTareaExtra}
-                        onChange={(e) => setTareaForm(prev => ({
-                          ...prev,
-                          nombreTareaExtra: e.target.value
-                        }))}
-                        className="mt-1"
-                      />
+                    /* Tarea Directa (sin actividad) */
+                    <div className="space-y-3">
+                      <Label className="text-orange-600 font-medium">
+                        📌 Seleccionar Tarea Directa
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        Tareas que no pertenecen a ninguna actividad específica
+                      </p>
+                      {loadingTareasDirectas ? (
+                        <div className="flex items-center gap-2 p-3 bg-orange-50 rounded">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Cargando tareas directas...</span>
+                        </div>
+                      ) : tareasDirectas.length > 0 ? (
+                        <Select
+                          value={tareaForm.proyectoTareaId || '__none__'}
+                          onValueChange={(v) => {
+                            const tareaId = v === '__none__' ? null : v
+                            const tareaSeleccionada = tareasDirectas.find(t => t.id === tareaId)
+                            setTareaForm(prev => ({
+                              ...prev,
+                              proyectoTareaId: tareaId,
+                              nombreTareaExtra: tareaSeleccionada?.nombre || ''
+                            }))
+                          }}
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Seleccionar tarea directa..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">-- Seleccione --</SelectItem>
+                            {tareasDirectas.filter(t => t.id).map(t => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded">
+                          Este EDT no tiene tareas directas (tareas sin actividad).
+                          Puede agregar tareas directas desde el cronograma del proyecto.
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -884,7 +971,7 @@ export function RegistroCampoWizard({
                   <Button
                     onClick={guardarTarea}
                     className="w-full"
-                    disabled={!tareaForm.proyectoTareaId && !tareaForm.nombreTareaExtra.trim()}
+                    disabled={!tareaForm.proyectoTareaId || tareaForm.miembrosSeleccionados.length === 0}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     {editandoTareaId ? 'Actualizar Tarea' : 'Agregar Tarea'}
