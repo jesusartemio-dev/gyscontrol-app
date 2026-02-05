@@ -629,42 +629,36 @@ export function RegistroCampoWizard({
           <Progress value={(paso / 4) * 100} className="h-2" />
         </div>
 
-        {/* Resumen */}
+        {/* Resumen mínimo */}
         {(proyectoSeleccionado || tareas.length > 0) && (
-          <Card className="mb-4 bg-gray-50">
-            <CardContent className="p-3">
-              <div className="flex flex-wrap gap-2 text-sm">
-                {proyectoSeleccionado && (
-                  <Badge variant="outline" className="bg-white">
-                    <Building className="h-3 w-3 mr-1" />
-                    {proyectoSeleccionado.codigo}
-                  </Badge>
-                )}
-                {edtSeleccionado && (
-                  <Badge variant="outline" className="bg-white">
-                    <FolderOpen className="h-3 w-3 mr-1" />
-                    {edtSeleccionado.nombre}
-                  </Badge>
-                )}
-                {tareas.length > 0 && (
-                  <>
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700">
-                      <ListTodo className="h-3 w-3 mr-1" />
-                      {totalTareas} tarea(s)
-                    </Badge>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                      <Users className="h-3 w-3 mr-1" />
-                      {miembrosUnicos.size} persona(s)
-                    </Badge>
-                    <Badge variant="outline" className="bg-green-50 text-green-700">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {totalHoras}h total
-                    </Badge>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs mb-2">
+            {proyectoSeleccionado && (
+              <Badge variant="outline" className="h-6 px-2 bg-gray-50">
+                <Building className="h-3 w-3 mr-1" />
+                {proyectoSeleccionado.codigo}
+              </Badge>
+            )}
+            {edtSeleccionado && (
+              <Badge variant="outline" className="h-6 px-2 bg-gray-50">
+                <FolderOpen className="h-3 w-3 mr-1" />
+                {edtSeleccionado.nombre}
+              </Badge>
+            )}
+            {tareas.length > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <Badge variant="outline" className="h-6 px-2 bg-purple-50 text-purple-700">
+                  {totalTareas} tarea(s)
+                </Badge>
+                <Badge variant="outline" className="h-6 px-2 bg-blue-50 text-blue-700">
+                  {miembrosUnicos.size} pers.
+                </Badge>
+                <Badge variant="outline" className="h-6 px-2 bg-green-50 text-green-700">
+                  {totalHoras}h
+                </Badge>
+              </>
+            )}
+          </div>
         )}
 
         {/* Contenido del paso */}
@@ -774,12 +768,10 @@ export function RegistroCampoWizard({
                   </div>
 
                   {tipoTarea === 'cronograma' ? (
-                    <div className="space-y-3">
-                      {/* Paso 1: Seleccionar Actividad */}
+                    <div className="space-y-2">
+                      {/* Seleccionar Actividad */}
                       <div>
-                        <Label className="text-blue-600 font-medium">
-                          📌 Paso 1: Seleccionar Actividad
-                        </Label>
+                        <Label className="text-xs text-blue-600 font-medium">Actividad</Label>
                         <Select
                           value={actividadSeleccionadaId || '__none__'}
                           onValueChange={(v) => {
@@ -787,26 +779,24 @@ export function RegistroCampoWizard({
                             setTareaForm(prev => ({ ...prev, proyectoTareaId: null }))
                           }}
                         >
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="h-9">
                             <SelectValue placeholder="Seleccionar actividad..." />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent position="popper" className="max-h-[200px] max-w-[calc(100vw-4rem)]">
                             <SelectItem value="__none__">-- Seleccione --</SelectItem>
                             {actividadesUnicas.map(a => (
                               <SelectItem key={a.id} value={a.id}>
-                                {a.nombre} ({a.cantidadTareas} tareas)
+                                <span className="truncate">{a.nombre} ({a.cantidadTareas})</span>
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
 
-                      {/* Paso 2: Seleccionar Tarea (solo si hay actividad) */}
+                      {/* Seleccionar Tarea (solo si hay actividad) */}
                       {actividadSeleccionadaId && (
                         <div>
-                          <Label className="text-green-600 font-medium">
-                            ✓ Paso 2: Seleccionar Tarea
-                          </Label>
+                          <Label className="text-xs text-green-600 font-medium">Tarea</Label>
                           <Select
                             value={tareaForm.proyectoTareaId || '__none__'}
                             onValueChange={(v) => setTareaForm(prev => ({
@@ -814,14 +804,14 @@ export function RegistroCampoWizard({
                               proyectoTareaId: v === '__none__' ? null : v
                             }))}
                           >
-                            <SelectTrigger className="mt-1">
+                            <SelectTrigger className="h-9">
                               <SelectValue placeholder="Seleccionar tarea..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent position="popper" className="max-h-[200px] max-w-[calc(100vw-4rem)]">
                               <SelectItem value="__none__">-- Seleccione --</SelectItem>
                               {tareasFiltradas.filter(t => t.id).map(t => (
                                 <SelectItem key={t.id} value={t.id}>
-                                  {t.nombre}
+                                  <span className="truncate">{t.nombre}</span>
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -830,25 +820,19 @@ export function RegistroCampoWizard({
                       )}
 
                       {!actividadSeleccionadaId && actividadesUnicas.length === 0 && (
-                        <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">
-                          Este EDT no tiene actividades con tareas configuradas.
-                          Use "Tarea Directa" para seleccionar tareas sin actividad.
+                        <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                          Sin actividades. Use "Tarea Directa".
                         </p>
                       )}
                     </div>
                   ) : (
                     /* Tarea Directa (sin actividad) */
-                    <div className="space-y-3">
-                      <Label className="text-orange-600 font-medium">
-                        📌 Seleccionar Tarea Directa
-                      </Label>
-                      <p className="text-xs text-gray-500">
-                        Tareas que no pertenecen a ninguna actividad específica
-                      </p>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-orange-600 font-medium">Tarea Directa</Label>
                       {loadingTareasDirectas ? (
-                        <div className="flex items-center gap-2 p-3 bg-orange-50 rounded">
+                        <div className="flex items-center gap-2 p-2 bg-orange-50 rounded">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">Cargando tareas directas...</span>
+                          <span className="text-xs">Cargando...</span>
                         </div>
                       ) : tareasDirectas.length > 0 ? (
                         <Select
@@ -863,22 +847,21 @@ export function RegistroCampoWizard({
                             }))
                           }}
                         >
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Seleccionar tarea directa..." />
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Seleccionar tarea..." />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent position="popper" className="max-h-[200px] max-w-[calc(100vw-4rem)]">
                             <SelectItem value="__none__">-- Seleccione --</SelectItem>
                             {tareasDirectas.filter(t => t.id).map(t => (
                               <SelectItem key={t.id} value={t.id}>
-                                {t.nombre}
+                                <span className="truncate">{t.nombre}</span>
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded">
-                          Este EDT no tiene tareas directas (tareas sin actividad).
-                          Puede agregar tareas directas desde el cronograma del proyecto.
+                        <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                          Sin tareas directas en este EDT.
                         </p>
                       )}
                     </div>
