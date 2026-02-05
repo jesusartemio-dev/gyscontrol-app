@@ -187,7 +187,7 @@ export default function MobileSidebar() {
       title: 'Configuración',
       icon: Settings,
       color: 'text-blue-400',
-      roles: ['admin', 'gerente', 'comercial', 'logistico', 'proyectos'],
+      roles: ['admin', 'gerente'],
       links: [
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
         { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },

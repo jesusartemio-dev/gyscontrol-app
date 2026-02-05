@@ -145,6 +145,15 @@ const protectedRoutes = withAuth(
       return NextResponse.redirect(new URL('/denied', req.url));
     }
 
+    // Configuración y Catálogos - Solo admin y gerente
+    if (path.startsWith('/configuracion') && !['admin', 'gerente'].includes(role || '')) {
+      return NextResponse.redirect(new URL('/denied', req.url));
+    }
+
+    if (path.startsWith('/catalogo') && !['admin', 'gerente'].includes(role || '')) {
+      return NextResponse.redirect(new URL('/denied', req.url));
+    }
+
     return NextResponse.next();
   },
   {

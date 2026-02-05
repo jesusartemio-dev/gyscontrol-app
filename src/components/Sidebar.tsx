@@ -236,13 +236,13 @@ export default function Sidebar() {
         { href: '/gestion/reportes/financiero', label: 'Financiero', icon: DollarSign },
       ],
     },
-    // 6. Configuración - Administración del sistema y catálogos
+    // 6. Configuración - Administración del sistema y catálogos (solo admin y gerente)
     {
       key: 'configuracion',
       title: 'Configuración',
       icon: Settings,
       color: 'text-blue-400',
-      roles: ['admin', 'gerente', 'comercial', 'logistico', 'proyectos'],
+      roles: ['admin', 'gerente'],
       links: [
         { href: '/configuracion/general', label: 'General', icon: Settings },
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
