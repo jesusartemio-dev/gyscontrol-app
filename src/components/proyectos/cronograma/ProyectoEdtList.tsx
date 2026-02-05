@@ -488,7 +488,7 @@ export function ProyectoEdtList({
             id: edtParaAsignar.responsable.id,
             name: edtParaAsignar.responsable.name || '',
             email: edtParaAsignar.responsable.email || '',
-            role: edtParaAsignar.responsable.role || ''
+            role: (edtParaAsignar.responsable as any).role || ''
           } : null}
           onAsignacionExitosa={handleAsignacionExitosa}
         />

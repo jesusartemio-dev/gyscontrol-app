@@ -44,7 +44,9 @@ import {
   Shield,
   UserCheck,
   History,
-  Briefcase
+  Briefcase,
+  MapPin,
+  ClipboardCheck
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -190,6 +192,8 @@ export default function Sidebar() {
         { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
         { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
         { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
+        { href: '/supervision/registro-campo', label: 'Registro Campo', icon: MapPin },
+        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: ClipboardCheck },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
       ]
