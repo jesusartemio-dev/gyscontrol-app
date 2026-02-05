@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 
 const asignarResponsableSchema = z.object({
@@ -19,7 +20,7 @@ const asignarResponsableSchema = z.object({
 export async function PUT(request: NextRequest) {
   try {
     // Verificar sesión
-    const session = await getServerSession()
+    const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'No autorizado' },
