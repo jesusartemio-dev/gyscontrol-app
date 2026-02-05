@@ -179,8 +179,8 @@ export function RegistroCampoWizard({
   const cargarProyectos = async () => {
     try {
       setLoading(true)
-      // Incluir proyectos en ejecución y otros estados activos
-      const response = await fetch('/api/proyectos?estadosActivos=true')
+      // Obtener todos los proyectos (sin filtro)
+      const response = await fetch('/api/proyectos')
       if (response.ok) {
         const data = await response.json()
         // Manejar diferentes estructuras de respuesta
