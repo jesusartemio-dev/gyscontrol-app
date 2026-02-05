@@ -583,7 +583,7 @@ export function RegistroCampoWizard({
                       <SelectContent>
                         {proyectosArray.map(p => (
                           <SelectItem key={p.id} value={p.id}>
-                            <span className="font-medium">{p.codigo}</span> - {p.nombre}
+                            {p.codigo}
                           </SelectItem>
                         ))}
                       </SelectContent>
