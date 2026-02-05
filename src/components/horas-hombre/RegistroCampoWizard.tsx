@@ -179,10 +179,16 @@ export function RegistroCampoWizard({
   const cargarProyectos = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/proyectos?estado=en_ejecucion')
+      // Incluir proyectos en ejecución y otros estados activos
+      const response = await fetch('/api/proyectos?estadosActivos=true')
       if (response.ok) {
         const data = await response.json()
-        setProyectos(data.proyectos || data || [])
+        // Manejar diferentes estructuras de respuesta
+        const proyectosData = data.proyectos || data.data || data || []
+        setProyectos(Array.isArray(proyectosData) ? proyectosData : [])
+        console.log('Proyectos cargados:', proyectosData.length)
+      } else {
+        console.error('Error response:', response.status)
       }
     } catch (error) {
       console.error('Error cargando proyectos:', error)
