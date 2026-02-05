@@ -68,11 +68,13 @@ export default function RegistroCampoPage() {
       if (!response.ok) throw new Error('Error cargando registros')
 
       const data = await response.json()
-      setRegistros(data.data || [])
+      // Asegurar que siempre sea un array
+      setRegistros(Array.isArray(data.data) ? data.data : [])
       setStats(data.stats || { pendientes: 0, aprobados: 0, rechazados: 0, total: 0 })
 
     } catch (error) {
       console.error('Error:', error)
+      setRegistros([]) // Reset a array vacío en caso de error
       toast({
         title: 'Error',
         description: 'No se pudieron cargar los registros',
@@ -100,9 +102,11 @@ export default function RegistroCampoPage() {
     }
   }
 
-  const filtrarPorEstado = (estado: string) => {
-    if (estado === 'todos') return registros
-    return registros.filter(r => r.estado === estado)
+  const filtrarPorEstado = (estado: string): MiRegistro[] => {
+    // Asegurar que registros sea siempre un array
+    const registrosArray = Array.isArray(registros) ? registros : []
+    if (estado === 'todos') return registrosArray
+    return registrosArray.filter(r => r.estado === estado)
   }
 
   return (

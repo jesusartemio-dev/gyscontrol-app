@@ -459,10 +459,16 @@ export function RegistroCampoWizard({
     }
   }
 
-  const proyectoSeleccionado = Array.isArray(proyectos) ? proyectos.find(p => p.id === proyectoId) : undefined
-
-  // Calcular totales (con verificación de arrays)
+  // Variables seguras para evitar errores de .map() en non-arrays
+  const proyectosArray = Array.isArray(proyectos) ? proyectos : []
+  const edtsArray = Array.isArray(edts) ? edts : []
+  const personalArray = Array.isArray(personal) ? personal : []
   const tareasArray = Array.isArray(tareas) ? tareas : []
+  const miembrosSeleccionadosArray = Array.isArray(tareaForm.miembrosSeleccionados) ? tareaForm.miembrosSeleccionados : []
+
+  const proyectoSeleccionado = proyectosArray.find(p => p.id === proyectoId)
+
+  // Calcular totales
   const totalTareas = tareasArray.length
   const miembrosUnicos = new Set(tareasArray.flatMap(t => Array.isArray(t.miembros) ? t.miembros.map(m => m.usuarioId) : []))
   const totalHoras = tareasArray.reduce((sum, t) => sum + (Array.isArray(t.miembros) ? t.miembros.reduce((s, m) => s + m.horas, 0) : 0), 0)
@@ -569,7 +575,7 @@ export function RegistroCampoWizard({
                         <SelectValue placeholder="Seleccionar proyecto..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {proyectos.map(p => (
+                        {proyectosArray.map(p => (
                           <SelectItem key={p.id} value={p.id}>
                             <span className="font-medium">{p.codigo}</span> - {p.nombre}
                           </SelectItem>
@@ -586,7 +592,7 @@ export function RegistroCampoWizard({
                           <SelectValue placeholder="Seleccionar EDT..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {edts.map(e => (
+                          {edtsArray.map(e => (
                             <SelectItem key={e.id} value={e.id}>
                               {e.nombre}
                             </SelectItem>
@@ -615,7 +621,7 @@ export function RegistroCampoWizard({
               {tareas.length > 0 && (
                 <div className="space-y-2">
                   <Label>Tareas agregadas ({tareas.length})</Label>
-                  {tareas.map(tarea => (
+                  {tareasArray.map(tarea => (
                     <Card key={tarea.id} className="bg-green-50 border-green-200">
                       <CardContent className="p-3">
                         <div className="flex items-start justify-between">
@@ -709,7 +715,7 @@ export function RegistroCampoWizard({
                   <div>
                     <Label>Personal para esta tarea</Label>
                     <div className="grid grid-cols-2 gap-2 mt-2 max-h-[150px] overflow-y-auto p-2 border rounded-md">
-                      {personal.map(p => (
+                      {personalArray.map(p => (
                         <div
                           key={p.userId}
                           className={`flex items-center gap-2 p-2 rounded cursor-pointer ${
@@ -756,7 +762,7 @@ export function RegistroCampoWizard({
                         </div>
                       </div>
                       <div className="space-y-1 max-h-[120px] overflow-y-auto">
-                        {tareaForm.miembrosSeleccionados.map(userId => (
+                        {miembrosSeleccionadosArray.map(userId => (
                           <div key={userId} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                             <User className="h-4 w-4 text-gray-400" />
                             <span className="flex-1 text-sm">{getNombreUsuario(userId)}</span>
@@ -838,7 +844,7 @@ export function RegistroCampoWizard({
                   <CardTitle className="text-sm">Resumen de Tareas</CardTitle>
                 </CardHeader>
                 <CardContent className="p-3">
-                  {tareas.map(tarea => (
+                  {tareasArray.map(tarea => (
                     <div key={tarea.id} className="flex justify-between py-1 border-b last:border-0">
                       <span className="text-sm">{getNombreTarea(tarea)}</span>
                       <span className="text-sm text-gray-500">
@@ -888,7 +894,7 @@ export function RegistroCampoWizard({
 
                   <div className="border-t pt-4">
                     <p className="text-gray-600 mb-2">Tareas registradas:</p>
-                    {tareas.map(tarea => (
+                    {tareasArray.map(tarea => (
                       <div key={tarea.id} className="mb-3 p-2 bg-white rounded">
                         <p className="font-medium text-sm">{getNombreTarea(tarea)}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
