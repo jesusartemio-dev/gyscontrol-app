@@ -286,11 +286,16 @@ export default function Sidebar() {
   ]
 
   const role = session?.user.role as RolUsuario | undefined
+  const sectionAccess = session?.user?.sectionAccess as string[] | undefined
 
   const visibleSections = useMemo(() => allSections
-    .filter((section) =>
-      role ? section.roles.includes(role) : false
-    )
+    .filter((section) => {
+      if (sectionAccess && sectionAccess.length > 0) {
+        return sectionAccess.includes(section.key)
+      }
+      // Fallback: usar roles hardcodeados si no hay sectionAccess
+      return role ? section.roles.includes(role) : false
+    })
     .map(section => ({
       ...section,
       links: section.links.filter(link => {
@@ -302,7 +307,7 @@ export default function Sidebar() {
       })
     }))
     .filter(section => section.links.length > 0), // Remover secciones sin links
-    [role]
+    [role, sectionAccess]
   )
 
   // ✅ Efecto para detectar la sección activa al cargar la página

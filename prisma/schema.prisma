@@ -2668,3 +2668,17 @@ enum TipoRecurso {
   individual
   cuadrilla
 }
+
+model RoleSectionAccess {
+  id         String   @id @default(cuid())
+  role       Role
+  sectionKey String
+  hasAccess  Boolean  @default(true)
+  updatedBy  String?
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@unique([role, sectionKey])
+  @@index([role])
+  @@map("role_section_access")
+}

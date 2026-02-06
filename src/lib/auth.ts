@@ -3,6 +3,7 @@ import { AuthOptions, getServerSession } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from './prisma'
 import * as bcrypt from 'bcryptjs'
+import { getSectionAccessForRole } from './services/section-access'
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -53,10 +54,16 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id
         token.role = (user as any).role
+        const sectionAccess = await getSectionAccessForRole((user as any).role)
+        token.sectionAccess = sectionAccess
+      }
+      if (trigger === 'update') {
+        const sectionAccess = await getSectionAccessForRole(token.role as string)
+        token.sectionAccess = sectionAccess
       }
       return token
     },
@@ -64,6 +71,7 @@ export const authOptions: AuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id as string
         (session.user as any).role = token.role as string
+        (session.user as any).sectionAccess = token.sectionAccess || []
       }
       return session
     },
