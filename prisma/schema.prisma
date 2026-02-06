@@ -1066,10 +1066,19 @@ model RegistroHorasCampo {
   fechaTrabajo    DateTime
   descripcion     String?
   ubicacion       String?
-  estado          EstadoRegistroCampo @default(pendiente)
+  estado          EstadoRegistroCampo @default(iniciado)
   fechaAprobacion DateTime?
   aprobadoPorId   String?
   motivoRechazo   String?
+
+  // Campos para Jornada de Campo
+  objetivosDia        String?   // Objetivos planificados al inicio del día
+  personalPlanificado Json?     // [{userId, nombre}] - Personal planificado
+  avanceDia           String?   // Resumen de avance al cierre
+  bloqueos            Json?     // [{descripcion, impacto?, accion?}]
+  planSiguiente       String?   // Plan para el día siguiente
+  fechaCierre         DateTime? // Cuando se cerró la jornada
+
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
@@ -2575,7 +2584,8 @@ enum OrigenTrabajo {
 }
 
 enum EstadoRegistroCampo {
-  pendiente
+  iniciado   // Jornada comenzada pero no cerrada
+  pendiente  // Jornada cerrada, esperando aprobación
   aprobado
   rechazado
 }
