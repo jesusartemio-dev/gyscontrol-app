@@ -1,16 +1,5 @@
 'use client'
 
-/**
- * IniciarJornadaModal - Modal para iniciar una nueva jornada de campo
- *
- * Permite al supervisor definir:
- * - Proyecto y EDT
- * - Fecha de trabajo
- * - Objetivos del día
- * - Personal planificado
- * - Ubicación (opcional)
- */
-
 import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -35,7 +24,9 @@ import {
   MapPin,
   Loader2,
   Search,
-  Play
+  Play,
+  Shield,
+  HardHat
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -60,6 +51,7 @@ interface Usuario {
 interface PersonalPlanificado {
   userId: string
   nombre: string
+  rolJornada?: 'trabajador' | 'supervisor' | 'seguridad'
 }
 
 interface IniciarJornadaModalProps {
@@ -68,6 +60,16 @@ interface IniciarJornadaModalProps {
   onSuccess: (jornadaId: string) => void
 }
 
+const ROLE_TABS = [
+  { key: 'proyectos', label: 'Proyectos' },
+  { key: 'seguridad', label: 'Seguridad' },
+  { key: 'comercial', label: 'Comercial' },
+  { key: 'presupuestos', label: 'Presupuestos' },
+  { key: 'todos', label: 'Todos' },
+] as const
+
+const ROLES_PERMITIDOS = ['colaborador', 'coordinador', 'logistico', 'gestor', 'proyectos', 'comercial', 'seguridad', 'presupuestos']
+
 export function IniciarJornadaModal({
   open,
   onOpenChange,
@@ -75,16 +77,13 @@ export function IniciarJornadaModal({
 }: IniciarJornadaModalProps) {
   const { toast } = useToast()
 
-  // Estado de carga
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  // Datos de selección
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [edts, setEdts] = useState<EdtProyecto[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
 
-  // Formulario
   const [proyectoId, setProyectoId] = useState('')
   const [proyectoEdtId, setProyectoEdtId] = useState('')
   const [fechaTrabajo, setFechaTrabajo] = useState(new Date().toISOString().split('T')[0])
@@ -92,10 +91,14 @@ export function IniciarJornadaModal({
   const [ubicacion, setUbicacion] = useState('')
   const [personalSeleccionado, setPersonalSeleccionado] = useState<string[]>([])
 
-  // Búsqueda de personal
+  // Responsables
+  const [supervisorId, setSupervisorId] = useState('')
+  const [seguridadId, setSeguridadId] = useState('')
+
+  // Filtro por rol
+  const [filtroRol, setFiltroRol] = useState<string>('proyectos')
   const [busquedaPersonal, setBusquedaPersonal] = useState('')
 
-  // Reset al abrir
   useEffect(() => {
     if (open) {
       setProyectoId('')
@@ -104,13 +107,15 @@ export function IniciarJornadaModal({
       setObjetivosDia('')
       setUbicacion('')
       setPersonalSeleccionado([])
+      setSupervisorId('')
+      setSeguridadId('')
+      setFiltroRol('proyectos')
       setBusquedaPersonal('')
       cargarProyectos()
       cargarUsuarios()
     }
   }, [open])
 
-  // Cargar EDTs cuando cambia el proyecto
   useEffect(() => {
     if (proyectoId) {
       cargarEdts()
@@ -142,17 +147,12 @@ export function IniciarJornadaModal({
       if (response.ok) {
         const data = await response.json()
         const allEdts = Array.isArray(data) ? data : []
-
-        // Eliminar duplicados por nombre de EDT (mantener solo el primero de cada nombre)
         const nombresVistos = new Set<string>()
         const edtsUnicos = allEdts.filter((edt: { nombre: string }) => {
-          if (nombresVistos.has(edt.nombre)) {
-            return false
-          }
+          if (nombresVistos.has(edt.nombre)) return false
           nombresVistos.add(edt.nombre)
           return true
         })
-
         setEdts(edtsUnicos)
       }
     } catch (error) {
@@ -165,10 +165,8 @@ export function IniciarJornadaModal({
       const response = await fetch('/api/admin/usuarios')
       if (response.ok) {
         const data = await response.json()
-        // Filtrar solo roles que trabajan en campo
-        const rolesPermitidos = ['colaborador', 'coordinador', 'logistico', 'gestor', 'proyectos', 'comercial', 'seguridad']
         const usuariosFiltrados = data.filter((u: Usuario) =>
-          rolesPermitidos.includes(u.role)
+          ROLES_PERMITIDOS.includes(u.role)
         )
         setUsuarios(usuariosFiltrados)
       }
@@ -185,12 +183,12 @@ export function IniciarJornadaModal({
     )
   }
 
-  const seleccionarTodos = () => {
-    const usuariosFiltrados = usuarios.filter(u =>
-      u.name?.toLowerCase().includes(busquedaPersonal.toLowerCase()) ||
-      u.email.toLowerCase().includes(busquedaPersonal.toLowerCase())
-    )
-    setPersonalSeleccionado(usuariosFiltrados.map(u => u.id))
+  const seleccionarTodosFiltrados = () => {
+    const ids = usuariosMostrados.map(u => u.id)
+    setPersonalSeleccionado(prev => {
+      const set = new Set([...prev, ...ids])
+      return Array.from(set)
+    })
   }
 
   const deseleccionarTodos = () => {
@@ -198,7 +196,6 @@ export function IniciarJornadaModal({
   }
 
   const handleSubmit = async () => {
-    // Validaciones
     if (!proyectoId) {
       toast({ variant: 'destructive', title: 'Error', description: 'Selecciona un proyecto' })
       return
@@ -211,13 +208,20 @@ export function IniciarJornadaModal({
       toast({ variant: 'destructive', title: 'Error', description: 'Selecciona al menos una persona' })
       return
     }
+    if (!supervisorId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Asigna un supervisor de campo' })
+      return
+    }
 
-    // Construir lista de personal planificado
     const personalPlanificado: PersonalPlanificado[] = personalSeleccionado.map(userId => {
       const usuario = usuarios.find(u => u.id === userId)
+      let rolJornada: 'trabajador' | 'supervisor' | 'seguridad' = 'trabajador'
+      if (userId === supervisorId) rolJornada = 'supervisor'
+      if (userId === seguridadId) rolJornada = 'seguridad'
       return {
         userId,
-        nombre: usuario?.name || usuario?.email || 'Sin nombre'
+        nombre: usuario?.name || usuario?.email || 'Sin nombre',
+        rolJornada
       }
     })
 
@@ -262,13 +266,21 @@ export function IniciarJornadaModal({
     }
   }
 
-  const proyectoSeleccionado = proyectos.find(p => p.id === proyectoId)
-  const usuariosFiltrados = usuarios.filter(u =>
+  // Filtrar usuarios por rol y búsqueda
+  const usuariosPorRol = filtroRol === 'todos'
+    ? usuarios
+    : usuarios.filter(u => u.role === filtroRol)
+
+  const usuariosMostrados = usuariosPorRol.filter(u =>
     u.name?.toLowerCase().includes(busquedaPersonal.toLowerCase()) ||
     u.email.toLowerCase().includes(busquedaPersonal.toLowerCase())
   )
 
-  // Función para formatear el rol
+  // Usuarios seleccionados para los selects de responsable
+  const usuariosSeleccionados = usuarios.filter(u => personalSeleccionado.includes(u.id))
+
+  const proyectoSeleccionado = proyectos.find(p => p.id === proyectoId)
+
   const formatRol = (role: string) => {
     const roles: Record<string, string> = {
       colaborador: 'Colaborador',
@@ -277,7 +289,8 @@ export function IniciarJornadaModal({
       logistico: 'Logístico',
       gestor: 'Gestor',
       proyectos: 'Proyectos',
-      seguridad: 'Seguridad'
+      seguridad: 'Seguridad',
+      presupuestos: 'Presupuestos'
     }
     return roles[role] || role
   }
@@ -292,7 +305,7 @@ export function IniciarJornadaModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Proyecto y EDT */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -384,26 +397,39 @@ export function IniciarJornadaModal({
             <div className="flex items-center justify-between">
               <Label className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Personal planificado * ({personalSeleccionado.length} seleccionados)
+                Personal * ({personalSeleccionado.length} seleccionados)
               </Label>
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={seleccionarTodos}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={seleccionarTodosFiltrados}>
                   Todos
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={deseleccionarTodos}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={deseleccionarTodos}>
                   Ninguno
                 </Button>
               </div>
+            </div>
+
+            {/* Filtro por rol - tabs */}
+            <div className="flex flex-wrap gap-1">
+              {ROLE_TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setFiltroRol(tab.key)}
+                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                    filtroRol === tab.key
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {tab.label}
+                  {tab.key !== 'todos' && (
+                    <span className="ml-1 opacity-70">
+                      ({usuarios.filter(u => u.role === tab.key).length})
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
 
             {/* Búsqueda */}
@@ -423,16 +449,16 @@ export function IniciarJornadaModal({
                 <div className="p-4 text-center text-gray-500 text-sm">
                   Cargando usuarios...
                 </div>
-              ) : usuariosFiltrados.length === 0 ? (
+              ) : usuariosMostrados.length === 0 ? (
                 <div className="p-4 text-center text-gray-500 text-sm">
-                  No se encontró personal con ese nombre
+                  No se encontró personal con ese filtro
                 </div>
               ) : (
                 <div className="divide-y">
-                  {usuariosFiltrados.map(u => (
+                  {usuariosMostrados.map(u => (
                     <label
                       key={u.id}
-                      className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
+                      className="flex items-center gap-3 p-2.5 hover:bg-gray-50 cursor-pointer"
                     >
                       <Checkbox
                         checked={personalSeleccionado.includes(u.id)}
@@ -444,31 +470,92 @@ export function IniciarJornadaModal({
                         </div>
                         <div className="text-xs text-gray-500">{formatRol(u.role)}</div>
                       </div>
+                      {personalSeleccionado.includes(u.id) && (
+                        <div className="flex gap-1">
+                          {u.id === supervisorId && (
+                            <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">SUP</Badge>
+                          )}
+                          {u.id === seguridadId && (
+                            <Badge className="bg-red-100 text-red-700 text-[10px] px-1.5">SEG</Badge>
+                          )}
+                        </div>
+                      )}
                     </label>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Personas seleccionadas */}
+            {/* Badges de seleccionados */}
             {personalSeleccionado.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {personalSeleccionado.slice(0, 5).map(userId => {
+                {personalSeleccionado.slice(0, 8).map(userId => {
                   const usuario = usuarios.find(u => u.id === userId)
+                  const esSupervisor = userId === supervisorId
+                  const esSeguridad = userId === seguridadId
                   return (
-                    <Badge key={userId} variant="secondary" className="text-xs">
+                    <Badge
+                      key={userId}
+                      variant="secondary"
+                      className={`text-xs ${esSupervisor ? 'bg-orange-100 text-orange-800' : esSeguridad ? 'bg-red-100 text-red-800' : ''}`}
+                    >
                       {usuario?.name?.split(' ')[0] || 'Usuario'}
+                      {esSupervisor && ' (Sup)'}
+                      {esSeguridad && ' (Seg)'}
                     </Badge>
                   )
                 })}
-                {personalSeleccionado.length > 5 && (
+                {personalSeleccionado.length > 8 && (
                   <Badge variant="outline" className="text-xs">
-                    +{personalSeleccionado.length - 5} más
+                    +{personalSeleccionado.length - 8} más
                   </Badge>
                 )}
               </div>
             )}
           </div>
+
+          {/* Responsables - Supervisor y Seguridad */}
+          {personalSeleccionado.length > 0 && (
+            <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg border">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm">
+                  <HardHat className="h-4 w-4 text-orange-600" />
+                  Supervisor de campo *
+                </Label>
+                <Select value={supervisorId} onValueChange={setSupervisorId}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Seleccionar supervisor" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[200px]">
+                    {usuariosSeleccionados.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm">
+                  <Shield className="h-4 w-4 text-red-600" />
+                  Resp. Seguridad
+                </Label>
+                <Select value={seguridadId} onValueChange={setSeguridadId}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Seleccionar (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[200px]">
+                    {usuariosSeleccionados.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
 
           {/* Resumen */}
           {proyectoSeleccionado && personalSeleccionado.length > 0 && objetivosDia && (
@@ -482,6 +569,20 @@ export function IniciarJornadaModal({
                 </span>
                 {' '}con{' '}
                 <span className="font-semibold">{personalSeleccionado.length} persona(s)</span>
+                {supervisorId && (
+                  <>
+                    {' '}- Supervisor: <span className="font-semibold">
+                      {usuarios.find(u => u.id === supervisorId)?.name?.split(' ')[0]}
+                    </span>
+                  </>
+                )}
+                {seguridadId && (
+                  <>
+                    {' '}- Seguridad: <span className="font-semibold">
+                      {usuarios.find(u => u.id === seguridadId)?.name?.split(' ')[0]}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -498,7 +599,7 @@ export function IniciarJornadaModal({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !proyectoId || !objetivosDia || personalSeleccionado.length === 0}
+              disabled={submitting || !proyectoId || !objetivosDia || personalSeleccionado.length === 0 || !supervisorId}
               className="bg-green-600 hover:bg-green-700"
             >
               {submitting ? (

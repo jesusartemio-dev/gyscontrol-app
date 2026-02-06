@@ -49,6 +49,7 @@ interface Actividad {
 interface PersonalPlanificado {
   userId: string
   nombre: string
+  rolJornada?: 'trabajador' | 'supervisor' | 'seguridad'
 }
 
 interface MiembroSeleccionado {

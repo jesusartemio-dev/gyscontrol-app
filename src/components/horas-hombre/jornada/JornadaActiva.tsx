@@ -1,20 +1,13 @@
 'use client'
 
 /**
- * JornadaActiva - Panel compacto y colapsable para jornadas en curso
+ * JornadaActiva - Panel para jornadas en curso
  */
 
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import {
-  Building,
-  Calendar,
   MapPin,
   Target,
   Users,
@@ -24,11 +17,16 @@ import {
   Send,
   Trash2,
   AlertCircle,
-  ChevronDown,
-  ChevronRight,
   Pencil,
-  Settings
+  Settings,
+  MoreVertical
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
 import { AgregarTareaModal } from './AgregarTareaModal'
 import { EditarTareaModal } from './EditarTareaModal'
@@ -74,6 +72,7 @@ interface TareaJornada {
   proyectoTarea?: {
     id: string
     nombre: string
+    porcentajeCompletado?: number
     proyectoActividad?: { nombre: string } | null
   } | null
   nombreTareaExtra?: string | null
@@ -84,6 +83,7 @@ interface TareaJornada {
 interface PersonalPlanificado {
   userId: string
   nombre: string
+  rolJornada?: 'trabajador' | 'supervisor' | 'seguridad'
 }
 
 interface JornadaActivaData {
@@ -111,7 +111,6 @@ export function JornadaActiva({
   const { toast } = useToast()
 
   // Estados
-  const [isOpen, setIsOpen] = useState(true)
   const [agregarTareaOpen, setAgregarTareaOpen] = useState(false)
   const [editarTareaOpen, setEditarTareaOpen] = useState(false)
   const [editarJornadaOpen, setEditarJornadaOpen] = useState(false)
@@ -120,7 +119,7 @@ export function JornadaActiva({
   const [eliminarJornadaOpen, setEliminarJornadaOpen] = useState(false)
   const [eliminando, setEliminando] = useState(false)
 
-  // Calcular estadísticas
+  // Calcular estadisticas
   const cantidadTareas = jornada.tareas.length
   const miembrosUnicos = new Set(
     jornada.tareas.flatMap(t => t.miembros.map(m => m.usuario.id))
@@ -132,6 +131,7 @@ export function JornadaActiva({
 
   const formatFechaCorta = (fecha: string) => {
     return new Date(fecha).toLocaleDateString('es-CL', {
+      weekday: 'short',
       day: 'numeric',
       month: 'short'
     })
@@ -142,6 +142,13 @@ export function JornadaActiva({
       return tarea.proyectoTarea.nombre
     }
     return tarea.nombreTareaExtra || 'Tarea sin nombre'
+  }
+
+  const getProgresoColor = (pct: number) => {
+    if (pct >= 100) return 'bg-green-500'
+    if (pct >= 50) return 'bg-blue-500'
+    if (pct > 0) return 'bg-amber-500'
+    return 'bg-gray-300'
   }
 
   const handleEditarTarea = (tarea: TareaJornada) => {
@@ -184,53 +191,66 @@ export function JornadaActiva({
     id: t.id,
     nombre: getNombreTarea(t),
     miembros: t.miembros.length,
-    horas: t.miembros.reduce((sum, m) => sum + m.horas, 0)
+    horas: t.miembros.reduce((sum, m) => sum + m.horas, 0),
+    proyectoTareaId: t.proyectoTarea?.id || null,
+    porcentajeActual: t.proyectoTarea?.porcentajeCompletado ?? 0
   }))
 
   return (
     <>
-      <Collapsible
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        className="border border-green-200 rounded-lg bg-gradient-to-r from-green-50 to-white overflow-hidden"
-      >
-        {/* Header - Mobile optimized */}
-        <div className="p-3 space-y-2">
-          {/* Primera fila: Expand + Proyecto + Acciones */}
-          <div className="flex items-center gap-2">
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="p-1 h-8 w-8 flex-shrink-0">
-                {isOpen ? (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-500" />
-                )}
-              </Button>
-            </CollapsibleTrigger>
-
-            {/* Info principal */}
+      <div className="rounded-xl border-l-4 border-l-green-500 border border-gray-200 bg-white shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="px-4 py-3 sm:py-4">
+          {/* Fila principal: Proyecto + Fecha + Acciones */}
+          <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <Badge className="bg-green-600 text-xs px-1.5 py-0.5 flex-shrink-0">
-                  <Clock className="h-3 w-3 sm:mr-1" />
-                  <span className="hidden sm:inline">Activa</span>
-                </Badge>
-                <span className="font-bold text-sm sm:text-base truncate">{jornada.proyecto.codigo}</span>
-                <span className="hidden sm:inline text-xs text-gray-500">
+              <div className="flex items-center gap-2.5 mb-1">
+                <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                </span>
+                <h3 className="font-bold text-base sm:text-lg truncate">{jornada.proyecto.codigo}</h3>
+                <span className="text-xs text-gray-400 hidden sm:inline truncate">{jornada.proyecto.nombre}</span>
+              </div>
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 ml-5">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
                   {formatFechaCorta(jornada.fechaTrabajo)}
+                </span>
+                {jornada.proyectoEdt && (
+                  <span className="flex items-center gap-1">
+                    <Target className="h-3.5 w-3.5" />
+                    {jornada.proyectoEdt.nombre}
+                  </span>
+                )}
+                {jornada.ubicacion && (
+                  <span className="hidden sm:flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {jornada.ubicacion}
+                  </span>
+                )}
+                <span className="text-gray-200">|</span>
+                <span className="flex items-center gap-1 text-blue-600 font-medium">
+                  <ListTodo className="h-3.5 w-3.5" />
+                  {cantidadTareas}
+                </span>
+                <span className="flex items-center gap-1 text-green-600 font-medium">
+                  <Users className="h-3.5 w-3.5" />
+                  {miembrosUnicos}
+                </span>
+                <span className="flex items-center gap-1 text-orange-600 font-medium">
+                  <Clock className="h-3.5 w-3.5" />
+                  {totalHoras}h
                 </span>
               </div>
             </div>
 
-            {/* Acciones rápidas - Touch friendly */}
-            <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Acciones */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <Button
                 size="sm"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setAgregarTareaOpen(true)
-                }}
-                className="h-9 sm:h-8 px-2 sm:px-3 text-xs"
+                onClick={() => setAgregarTareaOpen(true)}
+                className="h-9 sm:h-8 px-3 text-xs bg-green-600 hover:bg-green-700"
               >
                 <Plus className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Tarea</span>
@@ -238,133 +258,121 @@ export function JornadaActiva({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setCerrarJornadaOpen(true)
-                }}
+                onClick={() => setCerrarJornadaOpen(true)}
                 disabled={cantidadTareas === 0}
-                className="h-9 sm:h-8 px-2 sm:px-3 text-xs border-orange-300 text-orange-600 hover:bg-orange-50"
+                className="h-9 sm:h-8 px-3 text-xs border-orange-300 text-orange-600 hover:bg-orange-50"
               >
                 <Send className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Cerrar</span>
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setEliminarJornadaOpen(true)
-                }}
-                className="h-9 w-9 sm:h-8 sm:w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-9 w-9 sm:h-8 sm:w-8 p-0 text-gray-400">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEditarJornadaOpen(true)}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Editar jornada
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setEliminarJornadaOpen(true)}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar jornada
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-          </div>
-
-          {/* Segunda fila: Stats (visible en mobile) */}
-          <div className="flex items-center gap-3 text-xs pl-10">
-            <span className="flex items-center gap-1 text-blue-600 font-medium">
-              <ListTodo className="h-3.5 w-3.5" />
-              {cantidadTareas} {cantidadTareas === 1 ? 'tarea' : 'tareas'}
-            </span>
-            <span className="flex items-center gap-1 text-green-600 font-medium">
-              <Users className="h-3.5 w-3.5" />
-              {miembrosUnicos}
-            </span>
-            <span className="flex items-center gap-1 text-orange-600 font-medium">
-              <Clock className="h-3.5 w-3.5" />
-              {totalHoras}h
-            </span>
-            {jornada.proyectoEdt && (
-              <span className="hidden sm:flex items-center gap-1 text-gray-500">
-                <Target className="h-3.5 w-3.5" />
-                {jornada.proyectoEdt.nombre}
-              </span>
-            )}
           </div>
         </div>
 
-        {/* Contenido expandible */}
-        <CollapsibleContent>
-          <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-1 space-y-3 border-t border-green-100">
-            {/* Objetivos y ubicación */}
-            <div className="bg-white rounded-lg p-3 border">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs text-gray-500 block mb-0.5">Objetivos:</span>
-                  <span className="text-sm">{jornada.objetivosDia || 'Sin objetivos definidos'}</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditarJornadaOpen(true)}
-                  className="h-8 w-8 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50 flex-shrink-0"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </div>
-              {jornada.ubicacion && (
-                <div className="flex items-center gap-1 text-gray-500 text-xs mt-2 pt-2 border-t">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {jornada.ubicacion}
-                </div>
-              )}
-            </div>
+        {/* Objetivos */}
+        {jornada.objetivosDia && (
+          <div className="mx-4 mb-3 bg-gray-50 rounded-lg px-3 py-2 flex items-start gap-2">
+            <Target className="h-3.5 w-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-gray-600 leading-relaxed">{jornada.objetivosDia}</p>
+          </div>
+        )}
 
-            {/* Lista de tareas */}
-            {cantidadTareas > 0 ? (
-              <div className="space-y-2">
-                <div className="text-xs font-medium text-gray-500">
-                  Tareas ({cantidadTareas})
-                </div>
-                <div className="grid gap-2">
-                  {jornada.tareas.map(tarea => {
-                    const horasTarea = tarea.miembros.reduce((s, m) => s + m.horas, 0)
-                    return (
-                      <div
-                        key={tarea.id}
-                        className="flex items-start justify-between bg-white rounded-lg p-3 border text-sm"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <span className="font-medium text-sm leading-tight block">
+        {/* Ubicacion mobile */}
+        {jornada.ubicacion && (
+          <div className="mx-4 mb-3 sm:hidden flex items-center gap-1.5 text-xs text-gray-500">
+            <MapPin className="h-3.5 w-3.5" />
+            {jornada.ubicacion}
+          </div>
+        )}
+
+        {/* Lista de tareas */}
+        <div className="border-t border-gray-100">
+          {cantidadTareas > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {jornada.tareas.map(tarea => {
+                const horasTarea = tarea.miembros.reduce((s, m) => s + m.horas, 0)
+                const pct = tarea.proyectoTarea?.porcentajeCompletado
+                const hasPct = tarea.proyectoTarea && pct !== undefined && pct !== null
+                return (
+                  <div
+                    key={tarea.id}
+                    className="px-4 py-2.5 hover:bg-gray-50/50 transition-colors group"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate">
                             {getNombreTarea(tarea)}
                           </span>
-                          <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1.5">
-                            {tarea.miembros.map(m => (
-                              <span key={m.id} className="text-xs text-gray-500 whitespace-nowrap">
-                                {m.usuario.name?.split(' ')[0] || m.usuario.email.split('@')[0]} ({m.horas}h)
-                              </span>
-                            ))}
-                          </div>
+                          {hasPct && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0 rounded-full text-white ${getProgresoColor(pct!)}`}>
+                              {pct}%
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditarTarea(tarea)}
-                            className="h-8 w-8 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Badge variant="secondary" className="text-xs font-medium">
-                            {horasTarea}h
-                          </Badge>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
+                          {tarea.miembros.map(m => (
+                            <span key={m.id} className="text-[11px] text-gray-400">
+                              {m.usuario.name?.split(' ')[0] || m.usuario.email.split('@')[0]} ({m.horas}h)
+                            </span>
+                          ))}
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-amber-600 bg-amber-50 rounded-lg p-3 text-sm">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                <span>Agrega tareas antes de cerrar la jornada</span>
-              </div>
-            )}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditarTarea(tarea)}
+                          className="h-7 w-7 p-0 text-gray-300 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Badge variant="secondary" className="text-[11px] font-semibold px-2 py-0 rounded-full">
+                          {horasTarea}h
+                        </Badge>
+                      </div>
+                    </div>
+                    {/* Barra de progreso */}
+                    {hasPct && (
+                      <div className="mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${getProgresoColor(pct!)}`}
+                          style={{ width: `${Math.min(pct!, 100)}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="px-4 py-4 flex items-center gap-2 text-amber-600 text-sm">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Agrega tareas antes de cerrar la jornada</span>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Modales */}
       <AgregarTareaModal
@@ -419,9 +427,9 @@ export function JornadaActiva({
       <AlertDialog open={eliminarJornadaOpen} onOpenChange={setEliminarJornadaOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar jornada?</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar jornada?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará la jornada de {jornada.proyecto.codigo} y todas sus tareas.
+              Se eliminara la jornada de {jornada.proyecto.codigo} y todas sus tareas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -14,6 +14,7 @@ import { authOptions } from '@/lib/auth'
 interface PersonalPlanificado {
   userId: string
   nombre: string
+  rolJornada?: 'trabajador' | 'supervisor' | 'seguridad'
 }
 
 interface IniciarJornadaPayload {

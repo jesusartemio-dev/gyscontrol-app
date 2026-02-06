@@ -46,7 +46,7 @@ import {
   History,
   Briefcase,
   MapPin,
-  ClipboardCheck
+  HardHat
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -174,11 +174,12 @@ export default function Sidebar() {
       title: 'Mi Trabajo',
       icon: Clock,
       color: 'text-emerald-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
       links: [
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
         { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
+        { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
       ]
     },
     // 2.2. Supervisión - Vista de equipo y análisis (solo supervisores)
@@ -193,7 +194,6 @@ export default function Sidebar() {
         { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
         { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
-        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: ClipboardCheck },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
       ]

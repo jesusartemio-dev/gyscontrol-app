@@ -1,12 +1,14 @@
 /**
- * API para listar las jornadas del supervisor actual
- * GET /api/horas-hombre/jornada/mis-jornadas
+ * API para listar TODAS las jornadas (vista supervisión)
+ * GET /api/horas-hombre/jornada/todas
  *
+ * Restringido a roles de supervisión.
  * Query params:
  * - estado: iniciado | pendiente | aprobado | rechazado (opcional, múltiples separados por coma)
  * - fechaDesde: YYYY-MM-DD (opcional)
  * - fechaHasta: YYYY-MM-DD (opcional)
  * - proyectoId: string (opcional)
+ * - supervisorId: string (opcional, filtrar por creador)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -15,9 +17,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import type { EstadoRegistroCampo } from '@prisma/client'
 
+const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
+
 export async function GET(request: NextRequest) {
   try {
-    // Verificar autenticación
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -26,23 +29,34 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supervisorId = session.user.id
+    // Verificar rol
+    const userRole = (session.user as { role?: string }).role || ''
+    if (!ROLES_PERMITIDOS.includes(userRole)) {
+      return NextResponse.json(
+        { error: 'No tiene permisos para ver todas las jornadas' },
+        { status: 403 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
 
-    // Parsear parámetros
     const estadoParam = searchParams.get('estado')
     const fechaDesde = searchParams.get('fechaDesde')
     const fechaHasta = searchParams.get('fechaHasta')
     const proyectoId = searchParams.get('proyectoId')
+    const supervisorIdParam = searchParams.get('supervisorId')
 
-    // Construir filtros
+    // Construir filtros (sin supervisorId fijo)
     const where: {
-      supervisorId: string
       estado?: { in: EstadoRegistroCampo[] }
       fechaTrabajo?: { gte?: Date; lte?: Date }
       proyectoId?: string
-    } = {
-      supervisorId
+      supervisorId?: string
+    } = {}
+
+    // Filtrar por creador específico (opcional)
+    if (supervisorIdParam) {
+      where.supervisorId = supervisorIdParam
     }
 
     // Filtrar por estados
@@ -73,12 +87,13 @@ export async function GET(request: NextRequest) {
       where.proyectoId = proyectoId
     }
 
-    // Obtener jornadas con todas las relaciones necesarias
     const jornadas = await prisma.registroHorasCampo.findMany({
       where,
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
         proyectoEdt: { select: { id: true, nombre: true } },
+        supervisor: { select: { id: true, name: true, email: true } },
+        aprobadoPor: { select: { id: true, name: true, email: true } },
         tareas: {
           include: {
             proyectoTarea: {
@@ -98,12 +113,11 @@ export async function GET(request: NextRequest) {
         }
       },
       orderBy: [
-        { estado: 'asc' }, // 'iniciado' primero
+        { estado: 'asc' },
         { fechaTrabajo: 'desc' }
       ]
     })
 
-    // Transformar datos con estadísticas calculadas
     const jornadasConEstadisticas = jornadas.map(j => {
       const cantidadTareas = j.tareas.length
       const cantidadMiembros = new Set(
@@ -118,6 +132,8 @@ export async function GET(request: NextRequest) {
         id: j.id,
         proyecto: j.proyecto,
         proyectoEdt: j.proyectoEdt,
+        supervisor: j.supervisor,
+        aprobadoPor: j.aprobadoPor,
         fechaTrabajo: j.fechaTrabajo,
         estado: j.estado,
         objetivosDia: j.objetivosDia,
@@ -154,7 +170,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ JORNADA CAMPO Error al listar:', error)
+    console.error('❌ JORNADA CAMPO Error al listar todas:', error)
     return NextResponse.json(
       {
         error: 'Error obteniendo jornadas',

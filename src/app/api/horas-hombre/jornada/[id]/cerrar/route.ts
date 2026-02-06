@@ -17,10 +17,16 @@ interface Bloqueo {
   accion?: string
 }
 
+interface ProgresoTarea {
+  proyectoTareaId: string
+  porcentaje: number
+}
+
 interface CerrarJornadaPayload {
   avanceDia: string
   bloqueos?: Bloqueo[]
   planSiguiente?: string
+  progresoTareas?: ProgresoTarea[]
 }
 
 interface RouteContext {
@@ -41,7 +47,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const { id: jornadaId } = await context.params
     const body: CerrarJornadaPayload = await request.json()
 
-    const { avanceDia, bloqueos, planSiguiente } = body
+    const { avanceDia, bloqueos, planSiguiente, progresoTareas } = body
 
     // Verificar que la jornada existe
     const jornada = await prisma.registroHorasCampo.findUnique({
@@ -140,6 +146,48 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         fechaCierre: new Date()
       }
     })
+
+    // Calcular horas por tarea del cronograma
+    const horasPorTarea: Record<string, number> = {}
+    for (const tarea of jornada.tareas) {
+      if (tarea.proyectoTareaId) {
+        const horasTarea = tarea.miembros.reduce((sum, m) => sum + m.horas, 0)
+        horasPorTarea[tarea.proyectoTareaId] = (horasPorTarea[tarea.proyectoTareaId] || 0) + horasTarea
+      }
+    }
+
+    // Actualizar progreso y horas de tareas del cronograma
+    const tareasActualizadas = new Set<string>()
+
+    // Primero: actualizar progreso (si se envió)
+    if (progresoTareas && progresoTareas.length > 0) {
+      for (const { proyectoTareaId, porcentaje } of progresoTareas) {
+        if (proyectoTareaId && porcentaje >= 0 && porcentaje <= 100) {
+          const horasIncremento = horasPorTarea[proyectoTareaId] || 0
+          await prisma.proyectoTarea.update({
+            where: { id: proyectoTareaId },
+            data: {
+              porcentajeCompletado: Math.round(porcentaje),
+              ...(horasIncremento > 0 ? { horasReales: { increment: horasIncremento } } : {}),
+              ...(porcentaje >= 100 ? { estado: 'completada', fechaFinReal: new Date() } : {})
+            }
+          })
+          tareasActualizadas.add(proyectoTareaId)
+        }
+      }
+    }
+
+    // Segundo: incrementar horas para tareas que no tenían progreso enviado
+    for (const [proyectoTareaId, horas] of Object.entries(horasPorTarea)) {
+      if (!tareasActualizadas.has(proyectoTareaId) && horas > 0) {
+        await prisma.proyectoTarea.update({
+          where: { id: proyectoTareaId },
+          data: {
+            horasReales: { increment: horas }
+          }
+        })
+      }
+    }
 
     // Obtener la jornada actualizada con relaciones
     const jornadaCerrada = await prisma.registroHorasCampo.findUnique({

@@ -4,8 +4,9 @@
  * CerrarJornadaModal - Modal para cerrar una jornada de campo
  *
  * Permite registrar:
+ * - Progreso de tareas (slider %)
  * - Avance del día (requerido)
- * - Bloqueos encontrados (opcional, múltiples)
+ * - Bloqueos encontrados (opcional, compactos)
  * - Plan para el día siguiente (opcional)
  */
 
@@ -16,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { Slider } from '@/components/ui/slider'
 import {
   Clock,
   Users,
@@ -25,9 +26,10 @@ import {
   Calendar,
   Loader2,
   Plus,
-  Trash2,
+  X,
   CheckCircle,
-  Send
+  Send,
+  TrendingUp
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -42,6 +44,8 @@ interface TareaResumen {
   nombre: string
   miembros: number
   horas: number
+  proyectoTareaId?: string | null
+  porcentajeActual?: number
 }
 
 interface CerrarJornadaModalProps {
@@ -76,6 +80,10 @@ export function CerrarJornadaModal({
   const [avanceDia, setAvanceDia] = useState('')
   const [bloqueos, setBloqueos] = useState<Bloqueo[]>([])
   const [planSiguiente, setPlanSiguiente] = useState('')
+  const [progresoTareas, setProgresoTareas] = useState<Record<string, number>>({})
+
+  // Tareas vinculadas a cronograma (solo esas tienen progreso)
+  const tareasConProgreso = tareasResumen.filter(t => t.proyectoTareaId)
 
   // Reset al abrir
   React.useEffect(() => {
@@ -83,6 +91,13 @@ export function CerrarJornadaModal({
       setAvanceDia('')
       setBloqueos([])
       setPlanSiguiente('')
+      const inicial: Record<string, number> = {}
+      tareasResumen.forEach(t => {
+        if (t.proyectoTareaId) {
+          inicial[t.proyectoTareaId] = t.porcentajeActual ?? 0
+        }
+      })
+      setProgresoTareas(inicial)
     }
   }, [open])
 
@@ -99,20 +114,12 @@ export function CerrarJornadaModal({
   }
 
   const handleSubmit = async () => {
-    // Validaciones
     if (!avanceDia.trim()) {
       toast({ variant: 'destructive', title: 'Error', description: 'El avance del día es requerido' })
       return
     }
 
-    // Filtrar bloqueos vacíos y validar los que tienen contenido
     const bloqueosValidos = bloqueos.filter(b => b.descripcion.trim())
-    for (const bloqueo of bloqueosValidos) {
-      if (!bloqueo.descripcion.trim()) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Cada bloqueo debe tener una descripción' })
-        return
-      }
-    }
 
     try {
       setSubmitting(true)
@@ -126,7 +133,11 @@ export function CerrarJornadaModal({
             impacto: b.impacto.trim() || undefined,
             accion: b.accion.trim() || undefined
           })) : undefined,
-          planSiguiente: planSiguiente.trim() || undefined
+          planSiguiente: planSiguiente.trim() || undefined,
+          progresoTareas: Object.entries(progresoTareas).map(([proyectoTareaId, porcentaje]) => ({
+            proyectoTareaId,
+            porcentaje
+          }))
         })
       })
 
@@ -158,176 +169,193 @@ export function CerrarJornadaModal({
 
   const formatFecha = (fecha: string) => {
     return new Date(fecha).toLocaleDateString('es-CL', {
-      weekday: 'long',
+      weekday: 'short',
       day: 'numeric',
-      month: 'long'
+      month: 'short'
     })
+  }
+
+  const getProgresoColor = (pct: number) => {
+    if (pct >= 100) return 'text-green-700 bg-green-100'
+    if (pct >= 50) return 'text-blue-700 bg-blue-100'
+    if (pct > 0) return 'text-amber-700 bg-amber-100'
+    return 'text-gray-500 bg-gray-100'
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Send className="h-5 w-5 text-orange-600" />
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="pb-0">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Send className="h-4 w-4 text-orange-600" />
             Cerrar Jornada
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
-          {/* Resumen de la jornada */}
-          <Card className="bg-gray-50">
-            <CardContent className="pt-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{proyecto.codigo}</span>
-                  <Badge variant="outline">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {formatFecha(fechaTrabajo)}
-                  </Badge>
-                </div>
+        <div className="space-y-4">
+          {/* Resumen compacto */}
+          <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold text-sm">{proyecto.codigo}</span>
+              <span className="text-xs text-gray-500 hidden sm:inline">·</span>
+              <span className="text-xs text-gray-500 hidden sm:inline">{formatFecha(fechaTrabajo)}</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Badge variant="secondary" className="text-xs gap-1 px-1.5">
+                <ListTodo className="h-3 w-3" />{tareasResumen.length}
+              </Badge>
+              <Badge variant="secondary" className="text-xs gap-1 px-1.5">
+                <Users className="h-3 w-3" />{totalMiembros}
+              </Badge>
+              <Badge variant="secondary" className="text-xs gap-1 px-1.5 font-semibold">
+                <Clock className="h-3 w-3" />{totalHoras}h
+              </Badge>
+            </div>
+          </div>
 
-                <div className="text-sm text-gray-600">
-                  <strong>Objetivos:</strong> {objetivosDia}
-                </div>
-
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1">
-                    <ListTodo className="h-4 w-4 text-blue-600" />
-                    <span>{tareasResumen.length} tareas</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="h-4 w-4 text-green-600" />
-                    <span>{totalMiembros} personas</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4 text-orange-600" />
-                    <span>{totalHoras}h total</span>
-                  </div>
-                </div>
-
-                {/* Lista de tareas */}
-                {tareasResumen.length > 0 && (
-                  <div className="border-t pt-3 mt-3">
-                    <div className="text-xs font-medium text-gray-500 mb-2">Tareas registradas:</div>
-                    <div className="space-y-1">
-                      {tareasResumen.map(tarea => (
-                        <div key={tarea.id} className="flex items-center justify-between text-xs">
-                          <span className="truncate flex-1">{tarea.nombre}</span>
-                          <span className="text-gray-500 ml-2">
-                            {tarea.miembros}p · {tarea.horas}h
-                          </span>
+          {/* Progreso de tareas - integrado */}
+          {tareasConProgreso.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm">
+                <TrendingUp className="h-4 w-4 text-purple-600" />
+                Progreso de tareas
+              </Label>
+              <div className="space-y-2">
+                {tareasConProgreso.map(tarea => {
+                  const progreso = progresoTareas[tarea.proyectoTareaId!] ?? 0
+                  const changed = tarea.porcentajeActual !== undefined && tarea.porcentajeActual !== progreso
+                  return (
+                    <div key={tarea.id} className="rounded-lg border px-3 py-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm truncate flex-1">{tarea.nombre}</span>
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getProgresoColor(progreso)}`}>
+                          {progreso}%
+                        </span>
+                      </div>
+                      <Slider
+                        value={[progreso]}
+                        onValueChange={([val]) => {
+                          setProgresoTareas(prev => ({
+                            ...prev,
+                            [tarea.proyectoTareaId!]: val
+                          }))
+                        }}
+                        max={100}
+                        step={5}
+                      />
+                      {changed && (
+                        <div className="text-[11px] text-gray-400">
+                          {tarea.porcentajeActual}% → {progreso}%
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </div>
-                )}
+                  )
+                })}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          )}
 
           {/* Avance del día */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-sm">
               <CheckCircle className="h-4 w-4 text-green-600" />
-              Avance del día *
+              Avance del día <span className="text-red-500">*</span>
             </Label>
             <Textarea
-              placeholder="Describe el avance logrado hoy, qué se completó, el estado actual de las tareas..."
+              placeholder="Describe el avance logrado hoy..."
               value={avanceDia}
               onChange={e => setAvanceDia(e.target.value)}
-              rows={4}
+              rows={3}
+              className="resize-none"
             />
           </div>
 
-          {/* Bloqueos */}
-          <div className="space-y-3">
+          {/* Bloqueos - compactos */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Bloqueos (opcional)
+              <Label className="flex items-center gap-2 text-sm">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Bloqueos
               </Label>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={agregarBloqueo}
+                className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2"
               >
-                <Plus className="h-4 w-4 mr-1" />
+                <Plus className="h-3.5 w-3.5 mr-1" />
                 Agregar
               </Button>
             </div>
 
-            {bloqueos.length === 0 ? (
-              <div className="text-sm text-gray-500 italic">
-                No hay bloqueos registrados. Haz clic en "Agregar" si encontraste algún impedimento.
-              </div>
-            ) : (
-              <div className="space-y-3">
+            {bloqueos.length > 0 && (
+              <div className="space-y-2">
                 {bloqueos.map((bloqueo, index) => (
-                  <Card key={index} className="border-amber-200 bg-amber-50/50">
-                    <CardContent className="pt-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <Label className="text-sm">Bloqueo {index + 1}</Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => eliminarBloqueo(index)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        <Input
-                          placeholder="Descripción del bloqueo *"
-                          value={bloqueo.descripcion}
-                          onChange={e => actualizarBloqueo(index, 'descripcion', e.target.value)}
-                        />
-                        <Input
-                          placeholder="Impacto (opcional)"
-                          value={bloqueo.impacto}
-                          onChange={e => actualizarBloqueo(index, 'impacto', e.target.value)}
-                        />
-                        <Input
-                          placeholder="Acción tomada (opcional)"
-                          value={bloqueo.accion}
-                          onChange={e => actualizarBloqueo(index, 'accion', e.target.value)}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div key={index} className="rounded-lg border border-amber-200 bg-amber-50/50 p-2.5 space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        placeholder="Descripcion del bloqueo"
+                        value={bloqueo.descripcion}
+                        onChange={e => actualizarBloqueo(index, 'descripcion', e.target.value)}
+                        className="h-8 text-sm bg-white"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => eliminarBloqueo(index)}
+                        className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 flex-shrink-0"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Input
+                        placeholder="Impacto"
+                        value={bloqueo.impacto}
+                        onChange={e => actualizarBloqueo(index, 'impacto', e.target.value)}
+                        className="h-7 text-xs bg-white"
+                      />
+                      <Input
+                        placeholder="Accion tomada"
+                        value={bloqueo.accion}
+                        onChange={e => actualizarBloqueo(index, 'accion', e.target.value)}
+                        className="h-7 text-xs bg-white"
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
           </div>
 
           {/* Plan siguiente */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 text-blue-600" />
-              Plan para mañana (opcional)
+              Plan para mañana
             </Label>
             <Textarea
-              placeholder="Describe brevemente qué se planea hacer el próximo día de trabajo..."
+              placeholder="Que se planea hacer el proximo dia..."
               value={planSiguiente}
               onChange={e => setPlanSiguiente(e.target.value)}
               rows={2}
+              className="resize-none"
             />
           </div>
 
-          {/* Aviso */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-            <strong>Nota:</strong> Al cerrar la jornada, será enviada para aprobación.
-            Las horas no aparecerán en los timesheets individuales hasta que un gestor o gerente apruebe la jornada.
-          </div>
+          {/* Nota sutil */}
+          <p className="text-[11px] text-gray-400 leading-tight">
+            Al cerrar, la jornada sera enviada para aprobacion. Las horas apareceran en los timesheets una vez aprobada.
+          </p>
 
           {/* Botones */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex justify-end gap-2 pt-2 border-t">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
+              size="sm"
               onClick={() => onOpenChange(false)}
               disabled={submitting}
             >
@@ -336,17 +364,18 @@ export function CerrarJornadaModal({
             <Button
               onClick={handleSubmit}
               disabled={submitting || !avanceDia.trim() || tareasResumen.length === 0}
+              size="sm"
               className="bg-orange-600 hover:bg-orange-700"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
                   Cerrando...
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Cerrar y Enviar a Aprobación
+                  <Send className="h-4 w-4 mr-1.5" />
+                  Cerrar y Enviar
                 </>
               )}
             </Button>

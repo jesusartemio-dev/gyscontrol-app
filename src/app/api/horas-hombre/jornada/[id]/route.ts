@@ -40,6 +40,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
               select: {
                 id: true,
                 nombre: true,
+                porcentajeCompletado: true,
                 proyectoActividad: { select: { id: true, nombre: true } }
               }
             },

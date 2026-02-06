@@ -1,9 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -11,7 +10,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  Sun,
+  Plus,
+  HardHat,
   Loader2,
   Calendar,
   Clock,
@@ -21,12 +21,15 @@ import {
   MapPin,
   CheckCircle,
   XCircle,
-  AlertCircle,
-  UserCircle
+  AlertCircle
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
-import { ListaJornadas } from '@/components/horas-hombre/jornada'
+import {
+  IniciarJornadaModal,
+  JornadaActiva,
+  ListaJornadas
+} from '@/components/horas-hombre/jornada'
 
 type EstadoJornada = 'iniciado' | 'pendiente' | 'aprobado' | 'rechazado'
 
@@ -83,8 +86,6 @@ interface JornadaCompleta {
   id: string
   proyecto: Proyecto
   proyectoEdt?: Edt | null
-  supervisor?: Usuario | null
-  aprobadoPor?: Usuario | null
   fechaTrabajo: string
   estado: EstadoJornada
   objetivosDia?: string | null
@@ -102,30 +103,31 @@ interface JornadaCompleta {
   totalHoras: number
 }
 
-export default function JornadaCampoSupervisionPage() {
+export default function MiJornadaPage() {
   const { toast } = useToast()
 
   const [loading, setLoading] = useState(true)
   const [jornadas, setJornadas] = useState<JornadaCompleta[]>([])
+  const [jornadasActivas, setJornadasActivas] = useState<JornadaCompleta[]>([])
+  const [iniciarModalOpen, setIniciarModalOpen] = useState(false)
   const [detalleModalOpen, setDetalleModalOpen] = useState(false)
   const [jornadaDetalle, setJornadaDetalle] = useState<JornadaCompleta | null>(null)
-  const [aprobando, setAprobando] = useState<string | null>(null)
-  const [rechazarModalOpen, setRechazarModalOpen] = useState(false)
-  const [jornadaRechazar, setJornadaRechazar] = useState<string | null>(null)
-  const [motivoRechazo, setMotivoRechazo] = useState('')
-  const [procesandoRechazo, setProcesandoRechazo] = useState(false)
 
   const cargarJornadas = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/horas-hombre/jornada/todas')
+      const response = await fetch('/api/horas-hombre/jornada/mis-jornadas')
 
       if (!response.ok) {
         throw new Error('Error cargando jornadas')
       }
 
       const data = await response.json()
-      setJornadas(data.data || [])
+      const jornadasData = data.data || []
+
+      setJornadas(jornadasData)
+      const activas = jornadasData.filter((j: JornadaCompleta) => j.estado === 'iniciado')
+      setJornadasActivas(activas)
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -137,66 +139,12 @@ export default function JornadaCampoSupervisionPage() {
     cargarJornadas()
   }, [])
 
-  const handleAprobar = async (jornadaId: string) => {
-    try {
-      setAprobando(jornadaId)
-      const response = await fetch(`/api/horas-hombre/campo/${jornadaId}/aprobar`, {
-        method: 'PUT'
-      })
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Error al aprobar')
-      }
-      toast({
-        title: 'Jornada aprobada',
-        description: 'La jornada fue aprobada exitosamente'
-      })
-      cargarJornadas()
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo aprobar la jornada'
-      })
-    } finally {
-      setAprobando(null)
-    }
+  const handleJornadaIniciada = () => {
+    cargarJornadas()
   }
 
-  const handleRechazar = (jornadaId: string) => {
-    setJornadaRechazar(jornadaId)
-    setMotivoRechazo('')
-    setRechazarModalOpen(true)
-  }
-
-  const confirmarRechazo = async () => {
-    if (!jornadaRechazar || motivoRechazo.length < 10) return
-    try {
-      setProcesandoRechazo(true)
-      const response = await fetch(`/api/horas-hombre/campo/${jornadaRechazar}/rechazar`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ motivoRechazo })
-      })
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Error al rechazar')
-      }
-      toast({
-        title: 'Jornada rechazada',
-        description: 'La jornada fue rechazada'
-      })
-      setRechazarModalOpen(false)
-      cargarJornadas()
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo rechazar la jornada'
-      })
-    } finally {
-      setProcesandoRechazo(false)
-    }
+  const handleJornadaCerrada = () => {
+    cargarJornadas()
   }
 
   const handleVerDetalle = async (jornadaId: string) => {
@@ -240,16 +188,33 @@ export default function JornadaCampoSupervisionPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-          <Sun className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500" />
-          <span className="truncate">Jornadas de Campo</span>
-        </h1>
-        <p className="text-gray-600 text-sm">
-          Vista general de todas las jornadas registradas
-        </p>
+    <div className="container mx-auto py-4 space-y-4">
+      {/* Header - Estilo MI TRABAJO */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b">
+        <div className="flex items-center gap-3">
+          <HardHat className="h-6 w-6 text-amber-600" />
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Mi Jornada</h1>
+            <p className="text-xs text-gray-500">Registra tus actividades y horas de trabajo en campo</p>
+          </div>
+        </div>
+        {/* Desktop button */}
+        <Button
+          onClick={() => setIniciarModalOpen(true)}
+          className="hidden sm:flex bg-green-600 hover:bg-green-700"
+          size="sm"
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Nueva Jornada
+        </Button>
+        {/* Mobile button */}
+        <Button
+          onClick={() => setIniciarModalOpen(true)}
+          className="sm:hidden w-full bg-green-600 hover:bg-green-700 h-12 text-base"
+        >
+          <Plus className="h-5 w-5 mr-2" />
+          Nueva Jornada
+        </Button>
       </div>
 
       {loading ? (
@@ -260,74 +225,47 @@ export default function JornadaCampoSupervisionPage() {
           </CardContent>
         </Card>
       ) : (
-        <ListaJornadas
-          jornadas={jornadas}
-          onVerDetalle={handleVerDetalle}
-          onAprobar={handleAprobar}
-          onRechazar={handleRechazar}
-          aprobando={aprobando}
-          loading={loading}
-          showSupervisor={true}
-          title="Todas las Jornadas"
-        />
-      )}
-
-      {/* Modal Rechazar Jornada */}
-      <Dialog open={rechazarModalOpen} onOpenChange={setRechazarModalOpen}>
-        <DialogContent className="max-w-md p-4 sm:p-6">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="flex items-center gap-2 text-base text-red-700">
-              <XCircle className="h-5 w-5" />
-              Rechazar Jornada
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600">
-              Indica el motivo del rechazo para que el supervisor pueda corregir la jornada.
-            </p>
-            <Textarea
-              placeholder="Escribe el motivo del rechazo (min. 10 caracteres)..."
-              value={motivoRechazo}
-              onChange={e => setMotivoRechazo(e.target.value)}
-              rows={3}
-              className="resize-none"
-            />
-            <div className="flex items-center justify-between">
-              <span className={`text-xs ${motivoRechazo.length >= 10 ? 'text-green-600' : 'text-gray-400'}`}>
-                {motivoRechazo.length}/10 caracteres min.
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setRechazarModalOpen(false)}
-                  disabled={procesandoRechazo}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-red-600 hover:bg-red-700"
-                  onClick={confirmarRechazo}
-                  disabled={motivoRechazo.length < 10 || procesandoRechazo}
-                >
-                  {procesandoRechazo ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                      Rechazando...
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="h-4 w-4 mr-1" />
-                      Rechazar
-                    </>
-                  )}
-                </Button>
+        <div className="space-y-4">
+          {/* Jornadas Activas */}
+          {jornadasActivas.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                {jornadasActivas.length === 1
+                  ? 'Jornada en curso'
+                  : `${jornadasActivas.length} jornadas en curso`}
+              </div>
+              <div className="space-y-2">
+                {jornadasActivas.map(jornada => (
+                  <JornadaActiva
+                    key={jornada.id}
+                    jornada={{
+                      ...jornada,
+                      personalPlanificado: (jornada.personalPlanificado || []) as PersonalPlanificado[]
+                    }}
+                    onRefresh={cargarJornadas}
+                    onClosed={handleJornadaCerrada}
+                  />
+                ))}
               </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          )}
+
+          {/* Lista de mis jornadas */}
+          <ListaJornadas
+            jornadas={jornadas}
+            onVerDetalle={handleVerDetalle}
+            loading={loading}
+          />
+        </div>
+      )}
+
+      {/* Modal Iniciar Jornada */}
+      <IniciarJornadaModal
+        open={iniciarModalOpen}
+        onOpenChange={setIniciarModalOpen}
+        onSuccess={handleJornadaIniciada}
+      />
 
       {/* Modal Detalle Jornada */}
       <Dialog open={detalleModalOpen} onOpenChange={setDetalleModalOpen}>
@@ -351,14 +289,6 @@ export default function JornadaCampoSupervisionPage() {
                 </div>
                 {getEstadoBadge(jornadaDetalle.estado)}
               </div>
-
-              {/* Creado por */}
-              {jornadaDetalle.supervisor && (
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
-                  <UserCircle className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  <span>Creado por: <span className="font-medium">{jornadaDetalle.supervisor.name || jornadaDetalle.supervisor.email}</span></span>
-                </div>
-              )}
 
               <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-4 text-xs sm:text-sm">
                 <div className="flex items-center gap-1 justify-center sm:justify-start bg-blue-50 sm:bg-transparent rounded-lg py-2 sm:py-0">
