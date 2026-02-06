@@ -50,15 +50,11 @@ interface EdtProyecto {
   nombre: string
 }
 
-interface PersonalProyecto {
-  userId: string
-  rol: string
-  user: {
-    id: string
-    name: string | null
-    email: string
-    role: string
-  }
+interface Usuario {
+  id: string
+  name: string | null
+  email: string
+  role: string
 }
 
 interface PersonalPlanificado {
@@ -86,7 +82,7 @@ export function IniciarJornadaModal({
   // Datos de selección
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [edts, setEdts] = useState<EdtProyecto[]>([])
-  const [personal, setPersonal] = useState<PersonalProyecto[]>([])
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
 
   // Formulario
   const [proyectoId, setProyectoId] = useState('')
@@ -110,19 +106,17 @@ export function IniciarJornadaModal({
       setPersonalSeleccionado([])
       setBusquedaPersonal('')
       cargarProyectos()
+      cargarUsuarios()
     }
   }, [open])
 
-  // Cargar EDTs y personal cuando cambia el proyecto
+  // Cargar EDTs cuando cambia el proyecto
   useEffect(() => {
     if (proyectoId) {
       cargarEdts()
-      cargarPersonal()
     } else {
       setEdts([])
-      setPersonal([])
       setProyectoEdtId('')
-      setPersonalSeleccionado([])
     }
   }, [proyectoId])
 
@@ -166,56 +160,20 @@ export function IniciarJornadaModal({
     }
   }
 
-  const cargarPersonal = async () => {
+  const cargarUsuarios = async () => {
     try {
-      const response = await fetch(`/api/proyecto/${proyectoId}/personal`)
+      const response = await fetch('/api/admin/usuarios')
       if (response.ok) {
         const data = await response.json()
-        // Combinar roles fijos y dinámicos
-        const personalDinamico = data.data?.personalDinamico || []
-        const rolesFijos = data.data?.rolesFijos || {}
-
-        const todoElPersonal: PersonalProyecto[] = []
-        const idsAgregados = new Set<string>()
-
-        // Helper para agregar sin duplicados
-        const agregarSiNoExiste = (userId: string, rol: string, user: PersonalProyecto['user']) => {
-          if (!idsAgregados.has(userId)) {
-            idsAgregados.add(userId)
-            todoElPersonal.push({ userId, rol, user })
-          }
-        }
-
-        // Agregar roles fijos (evitando duplicados)
-        if (rolesFijos.comercial) {
-          agregarSiNoExiste(rolesFijos.comercial.id, 'Comercial', rolesFijos.comercial)
-        }
-        if (rolesFijos.gestor) {
-          agregarSiNoExiste(rolesFijos.gestor.id, 'Gestor', rolesFijos.gestor)
-        }
-        if (rolesFijos.supervisor) {
-          agregarSiNoExiste(rolesFijos.supervisor.id, 'Supervisor', rolesFijos.supervisor)
-        }
-        if (rolesFijos.lider) {
-          agregarSiNoExiste(rolesFijos.lider.id, 'Líder', rolesFijos.lider)
-        }
-
-        // Agregar personal dinámico (evitando duplicados)
-        for (const p of personalDinamico) {
-          if (!idsAgregados.has(p.user.id)) {
-            idsAgregados.add(p.user.id)
-            todoElPersonal.push({
-              userId: p.user.id,
-              rol: p.rol,
-              user: p.user
-            })
-          }
-        }
-
-        setPersonal(todoElPersonal)
+        // Filtrar solo roles que trabajan en campo
+        const rolesPermitidos = ['colaborador', 'coordinador', 'logistico', 'gestor', 'proyectos', 'comercial', 'seguridad']
+        const usuariosFiltrados = data.filter((u: Usuario) =>
+          rolesPermitidos.includes(u.role)
+        )
+        setUsuarios(usuariosFiltrados)
       }
     } catch (error) {
-      console.error('Error cargando personal:', error)
+      console.error('Error cargando usuarios:', error)
     }
   }
 
@@ -228,11 +186,11 @@ export function IniciarJornadaModal({
   }
 
   const seleccionarTodos = () => {
-    const personalFiltrado = personal.filter(p =>
-      p.user.name?.toLowerCase().includes(busquedaPersonal.toLowerCase()) ||
-      p.user.email.toLowerCase().includes(busquedaPersonal.toLowerCase())
+    const usuariosFiltrados = usuarios.filter(u =>
+      u.name?.toLowerCase().includes(busquedaPersonal.toLowerCase()) ||
+      u.email.toLowerCase().includes(busquedaPersonal.toLowerCase())
     )
-    setPersonalSeleccionado(personalFiltrado.map(p => p.userId))
+    setPersonalSeleccionado(usuariosFiltrados.map(u => u.id))
   }
 
   const deseleccionarTodos = () => {
@@ -256,10 +214,10 @@ export function IniciarJornadaModal({
 
     // Construir lista de personal planificado
     const personalPlanificado: PersonalPlanificado[] = personalSeleccionado.map(userId => {
-      const persona = personal.find(p => p.userId === userId)
+      const usuario = usuarios.find(u => u.id === userId)
       return {
         userId,
-        nombre: persona?.user.name || persona?.user.email || 'Sin nombre'
+        nombre: usuario?.name || usuario?.email || 'Sin nombre'
       }
     })
 
@@ -305,10 +263,24 @@ export function IniciarJornadaModal({
   }
 
   const proyectoSeleccionado = proyectos.find(p => p.id === proyectoId)
-  const personalFiltrado = personal.filter(p =>
-    p.user.name?.toLowerCase().includes(busquedaPersonal.toLowerCase()) ||
-    p.user.email.toLowerCase().includes(busquedaPersonal.toLowerCase())
+  const usuariosFiltrados = usuarios.filter(u =>
+    u.name?.toLowerCase().includes(busquedaPersonal.toLowerCase()) ||
+    u.email.toLowerCase().includes(busquedaPersonal.toLowerCase())
   )
+
+  // Función para formatear el rol
+  const formatRol = (role: string) => {
+    const roles: Record<string, string> = {
+      colaborador: 'Colaborador',
+      comercial: 'Comercial',
+      coordinador: 'Coordinador',
+      logistico: 'Logístico',
+      gestor: 'Gestor',
+      proyectos: 'Proyectos',
+      seguridad: 'Seguridad'
+    }
+    return roles[role] || role
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -335,7 +307,7 @@ export function IniciarJornadaModal({
                 <SelectContent position="popper" className="max-h-[250px]">
                   {proyectos.map(p => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.codigo} - {p.nombre}
+                      {p.codigo}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -408,97 +380,95 @@ export function IniciarJornadaModal({
           </div>
 
           {/* Personal planificado */}
-          {proyectoId && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Personal planificado * ({personalSeleccionado.length} seleccionados)
-                </Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={seleccionarTodos}
-                  >
-                    Todos
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={deseleccionarTodos}
-                  >
-                    Ninguno
-                  </Button>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Personal planificado * ({personalSeleccionado.length} seleccionados)
+              </Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={seleccionarTodos}
+                >
+                  Todos
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={deseleccionarTodos}
+                >
+                  Ninguno
+                </Button>
+              </div>
+            </div>
+
+            {/* Búsqueda */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Buscar personal..."
+                value={busquedaPersonal}
+                onChange={e => setBusquedaPersonal(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Lista de personal */}
+            <div className="border rounded-lg max-h-48 overflow-y-auto">
+              {usuarios.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  Cargando usuarios...
                 </div>
-              </div>
-
-              {/* Búsqueda */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar personal..."
-                  value={busquedaPersonal}
-                  onChange={e => setBusquedaPersonal(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-
-              {/* Lista de personal */}
-              <div className="border rounded-lg max-h-48 overflow-y-auto">
-                {personal.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500 text-sm">
-                    No hay personal asignado a este proyecto
-                  </div>
-                ) : personalFiltrado.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500 text-sm">
-                    No se encontró personal con ese nombre
-                  </div>
-                ) : (
-                  <div className="divide-y">
-                    {personalFiltrado.map(p => (
-                      <label
-                        key={p.userId}
-                        className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={personalSeleccionado.includes(p.userId)}
-                          onCheckedChange={() => togglePersonal(p.userId)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {p.user.name || p.user.email}
-                          </div>
-                          <div className="text-xs text-gray-500">{p.rol}</div>
+              ) : usuariosFiltrados.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  No se encontró personal con ese nombre
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {usuariosFiltrados.map(u => (
+                    <label
+                      key={u.id}
+                      className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={personalSeleccionado.includes(u.id)}
+                        onCheckedChange={() => togglePersonal(u.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">
+                          {u.name || u.email}
                         </div>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Personas seleccionadas */}
-              {personalSeleccionado.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {personalSeleccionado.slice(0, 5).map(userId => {
-                    const persona = personal.find(p => p.userId === userId)
-                    return (
-                      <Badge key={userId} variant="secondary" className="text-xs">
-                        {persona?.user.name?.split(' ')[0] || 'Usuario'}
-                      </Badge>
-                    )
-                  })}
-                  {personalSeleccionado.length > 5 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{personalSeleccionado.length - 5} más
-                    </Badge>
-                  )}
+                        <div className="text-xs text-gray-500">{formatRol(u.role)}</div>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               )}
             </div>
-          )}
+
+            {/* Personas seleccionadas */}
+            {personalSeleccionado.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {personalSeleccionado.slice(0, 5).map(userId => {
+                  const usuario = usuarios.find(u => u.id === userId)
+                  return (
+                    <Badge key={userId} variant="secondary" className="text-xs">
+                      {usuario?.name?.split(' ')[0] || 'Usuario'}
+                    </Badge>
+                  )
+                })}
+                {personalSeleccionado.length > 5 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{personalSeleccionado.length - 5} más
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Resumen */}
           {proyectoSeleccionado && personalSeleccionado.length > 0 && objetivosDia && (
