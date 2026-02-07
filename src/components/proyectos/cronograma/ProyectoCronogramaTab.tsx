@@ -34,7 +34,8 @@ import {
   FileText,
   Target,
   Play,
-  Star
+  Star,
+  Upload
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -49,6 +50,7 @@ import { ProyectoGanttView } from './ProyectoGanttView'
 import { CronogramaGanttViewPro } from '@/components/comercial/cronograma/CronogramaGanttViewPro'
 import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { convertToMSProjectXML, downloadMSProjectXML } from '@/lib/utils/msProjectXmlExport'
+import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import type { ProyectoCronograma } from '@/types/modelos'
 
 interface CronogramaStats {
@@ -78,6 +80,7 @@ export function ProyectoCronogramaTab({
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [showDeleteCronogramaModal, setShowDeleteCronogramaModal] = useState(false)
   const [showGenerarCronogramaModal, setShowGenerarCronogramaModal] = useState(false)
+  const [showImportExcelModal, setShowImportExcelModal] = useState(false)
 
   // Estado de datos
   const [selectedCronograma, setSelectedCronograma] = useState<ProyectoCronograma | undefined>(cronograma)
@@ -720,6 +723,13 @@ export function ProyectoCronogramaTab({
                     <Wand2 className="h-4 w-4 mr-2" />
                     Generar Cronograma
                   </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => {
+                    setDropdownOpen(false)
+                    setTimeout(() => setShowImportExcelModal(true), 100)
+                  }}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar desde Excel (MS Project)
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
               )}
@@ -872,6 +882,14 @@ export function ProyectoCronogramaTab({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de importar Excel */}
+      <ImportExcelCronogramaModal
+        open={showImportExcelModal}
+        onOpenChange={setShowImportExcelModal}
+        proyectoId={proyectoId}
+        onImportSuccess={handleRefresh}
+      />
 
       {/* Tabs de Vistas */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
