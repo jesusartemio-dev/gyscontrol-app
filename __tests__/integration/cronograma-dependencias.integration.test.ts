@@ -9,7 +9,7 @@ import {
 // Mock de Prisma para tests de integración
 jest.mock('@/lib/prisma', () => ({
   prisma: {
-    cotizacionDependenciaTarea: {
+    cotizacionDependenciasTarea: {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -191,7 +191,7 @@ describe('Cronograma Dependencias - Tests de Integración', () => {
 
   describe('Escenarios de error y recuperación', () => {
     it('debe manejar errores de base de datos gracefully', async () => {
-      const mockFindMany = prisma.cotizacionDependenciaTarea.findMany as jest.MockedFunction<any>
+      const mockFindMany = prisma.cotizacionDependenciasTarea.findMany as jest.MockedFunction<any>
       mockFindMany.mockRejectedValue(new Error('Database connection failed'))
 
       // TODO: Update when implementation is complete

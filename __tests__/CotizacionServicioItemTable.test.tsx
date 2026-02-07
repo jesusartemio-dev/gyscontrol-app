@@ -25,6 +25,7 @@ const mockRecursos: Recurso[] = [
   {
     id: 'recurso-1',
     nombre: 'Programador Senior',
+    tipo: 'individual',
     costoHora: 30.50,
     createdAt: '2025-01-23T10:00:00Z',
     updatedAt: '2025-01-23T10:00:00Z'
@@ -32,6 +33,7 @@ const mockRecursos: Recurso[] = [
   {
     id: 'recurso-2',
     nombre: 'Técnico Junior',
+    tipo: 'individual',
     costoHora: 20.00,
     createdAt: '2025-01-23T10:00:00Z',
     updatedAt: '2025-01-23T10:00:00Z'
@@ -54,9 +56,9 @@ const mockItems: CotizacionServicioItem[] = [
     catalogoServicioId: 'catalogo-1',
     unidadServicioId: 'unidad-1',
     recursoId: 'recurso-1',
+    edtId: 'edt-1',
     nombre: 'Programación PLC',
     descripcion: 'Programación de lógica de control',
-    categoria: 'PLC',
     formula: 'Escalonada',
     horaBase: 5,
     horaRepetido: 0,
@@ -82,9 +84,9 @@ const mockItems: CotizacionServicioItem[] = [
     catalogoServicioId: 'catalogo-2',
     unidadServicioId: 'unidad-1',
     recursoId: 'recurso-2',
+    edtId: 'edt-2',
     nombre: 'Configuración HMI',
     descripcion: 'Configuración de interfaz',
-    categoria: 'HMI',
     formula: 'Fijo',
     horaBase: 0,
     horaRepetido: 0,

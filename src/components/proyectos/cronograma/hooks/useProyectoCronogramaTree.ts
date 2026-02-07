@@ -327,6 +327,7 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
             fechaInicio: data.fechaInicio,
             fechaFin: data.fechaFin,
             horasEstimadas: data.horasEstimadas || 0,
+            personasEstimadas: data.personasEstimadas || 1,
             descripcion: data.descripcion,
             prioridad: data.prioridad || 'media',
             posicionamiento: data.posicionamiento || 'despues_ultima'

@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle, Users } from 'lucide-react'
 // import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { TreeNode, NodeType, PositioningMode, PositioningConfig } from './types'
 import { obtenerCalendarioLaboral } from '@/lib/utils/calendarioLaboral'
@@ -78,6 +78,7 @@ export function TreeNodeForm({
     fechaInicioComercial: '',
     fechaFinComercial: '',
     horasEstimadas: '',
+    personasEstimadas: '1',
     orden: '',
     prioridad: 'media' as const,
     estado: getDefaultStatus(nodeType),
@@ -369,6 +370,7 @@ export function TreeNodeForm({
           fechaInicioComercial: fechaInicio,
           fechaFinComercial: fechaFin,
           horasEstimadas: node.data.horasEstimadas?.toString() || '',
+          personasEstimadas: node.data.personasEstimadas?.toString() || '1',
           orden: node.data.orden?.toString() || '',
           prioridad: node.data.prioridad || 'media',
           estado: node.metadata.status === 'pending' ? 'pendiente' :
@@ -390,6 +392,7 @@ export function TreeNodeForm({
     let submitData: any = {
       ...formData,
       horasEstimadas: formData.horasEstimadas ? parseFloat(formData.horasEstimadas) : undefined,
+      personasEstimadas: formData.personasEstimadas ? parseInt(formData.personasEstimadas) : undefined,
       orden: formData.orden ? parseInt(formData.orden) : undefined,
       // Incluir configuración de posicionamiento para creación
       ...(mode === 'create' && {
@@ -490,8 +493,8 @@ export function TreeNodeForm({
             </div>
           </div>
 
-          {/* Horas estimadas y orden */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Horas estimadas, personas y orden */}
+          <div className={`grid gap-4 ${(nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')) ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div className="space-y-2">
               <Label htmlFor="horasEstimadas">Horas Estimadas</Label>
               <Input
@@ -504,6 +507,23 @@ export function TreeNodeForm({
                 placeholder="0"
               />
             </div>
+            {(nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')) && (
+              <div className="space-y-2">
+                <Label htmlFor="personasEstimadas">
+                  <Users className="h-3.5 w-3.5 inline mr-1" />
+                  Personas
+                </Label>
+                <Input
+                  id="personasEstimadas"
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={formData.personasEstimadas}
+                  onChange={(e) => setFormData(prev => ({ ...prev, personasEstimadas: e.target.value }))}
+                  placeholder="1"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="orden">Orden</Label>
               <Input

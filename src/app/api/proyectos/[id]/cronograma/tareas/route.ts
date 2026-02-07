@@ -253,6 +253,7 @@ const createTareaSchema = z.object({
   fechaInicio: z.string().optional(), // Opcional si se usa posicionamiento automático
   fechaFin: z.string().optional(), // Opcional si se usa posicionamiento automático
   horasEstimadas: z.number().optional(),
+  personasEstimadas: z.number().int().min(1).optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).default('media'),
   dependenciaId: z.string().optional(),
   responsableId: z.string().optional(),
@@ -268,6 +269,7 @@ const updateTareaSchema = z.object({
   fechaInicioReal: z.string().optional(),
   fechaFinReal: z.string().optional(),
   horasEstimadas: z.number().optional(),
+  personasEstimadas: z.number().int().min(1).optional(),
   estado: z.enum(['pendiente', 'en_progreso', 'completada', 'cancelada', 'pausada']).optional(),
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional(),
   porcentajeCompletado: z.number().int().min(0).max(100).optional(),
@@ -506,6 +508,7 @@ export async function POST(
       fechaInicio: fechaInicio,
       fechaFin: fechaFin,
       horasEstimadas: validatedData.horasEstimadas,
+      personasEstimadas: validatedData.personasEstimadas || 1,
       prioridad: validatedData.prioridad,
       dependenciaId: validatedData.dependenciaId,
       responsableId: validatedData.responsableId,

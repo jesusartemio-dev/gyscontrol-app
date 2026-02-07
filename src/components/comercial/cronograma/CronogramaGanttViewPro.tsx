@@ -921,6 +921,19 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
 
           {/* Timeline column */}
           <div className="flex-1 relative" style={{ height: level === 0 ? '56px' : '44px' }}>
+            {/* Today line */}
+            {(() => {
+              const now = new Date()
+              const timeRange = timeline.endDate.getTime() - timeline.startDate.getTime()
+              if (timeRange <= 0 || now < timeline.startDate || now > timeline.endDate) return null
+              const todayPercent = ((now.getTime() - timeline.startDate.getTime()) / timeRange) * 100
+              return (
+                <div
+                  className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none"
+                  style={{ left: `${todayPercent}%` }}
+                />
+              )
+            })()}
             {task.fechaInicio instanceof Date && !isNaN(task.fechaInicio.getTime()) &&
              task.fechaFin instanceof Date && !isNaN(task.fechaFin.getTime()) && (
               <TooltipProvider>
@@ -1143,7 +1156,22 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
             </div>
 
             {/* Timeline */}
-            <div className="flex-1 overflow-x-auto" ref={timelineRef}>
+            <div className="flex-1 overflow-x-auto relative" ref={timelineRef}>
+              {/* Today marker in header */}
+              {(() => {
+                const now = new Date()
+                const timeRange = timeline.endDate.getTime() - timeline.startDate.getTime()
+                if (timeRange <= 0 || now < timeline.startDate || now > timeline.endDate) return null
+                const todayPercent = ((now.getTime() - timeline.startDate.getTime()) / timeRange) * 100
+                return (
+                  <div
+                    className="absolute top-0 bottom-0 w-px bg-red-500 z-20 pointer-events-none"
+                    style={{ left: `${todayPercent}%` }}
+                  >
+                    <div className="absolute -top-0.5 -left-2 text-[8px] font-bold text-red-500 bg-red-50 px-0.5 rounded">Hoy</div>
+                  </div>
+                )
+              })()}
               <div className="flex" style={{ width: `${timeline.totalWidth}px`, minWidth: '100%' }}>
                 {/* Generate timeline units */}
                 {Array.from({ length: Math.ceil((timeline.endDate.getTime() - timeline.startDate.getTime()) / (1000 * 60 * 60 * 24 * (timeline.unit === 'days' ? 1 : timeline.unit === 'weeks' ? 7 : 30))) }, (_, i) => {
@@ -1178,7 +1206,7 @@ export function CronogramaGanttViewPro({ cotizacionId, cronogramaId, refreshKey 
         </div>
 
         {/* Tasks */}
-        <div className="max-h-[500px] overflow-y-auto" ref={tasksContainerRef}>
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)', minHeight: 200 }} ref={tasksContainerRef}>
           {filteredTasks.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />

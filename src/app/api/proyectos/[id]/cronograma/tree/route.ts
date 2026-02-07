@@ -268,6 +268,7 @@ export async function GET(
                       progreso: tarea.porcentajeCompletado,
                       horasEstimadas: tarea.horasEstimadas,
                       horasReales: tarea.horasReales,
+                      personasEstimadas: tarea.personasEstimadas || 1,
                       prioridad: tarea.prioridad,
                       orden: tarea.orden,
                       responsable: tarea.user

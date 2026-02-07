@@ -296,7 +296,7 @@ export default function CalendarioLaboralPage() {
                   <div className="space-y-1.5 text-sm text-muted-foreground mb-3">
                     <div className="flex items-center gap-2">
                       <Clock className="h-3.5 w-3.5" />
-                      <span>{calendario.horasPorDia}h/día · {calendario.diasLaborables.length} días hábiles</span>
+                      <span>{calendario.horasPorDia}h/día · {calendario.diasLaborables.length} días · <strong>{calendario.horasPorDia * calendario.diasLaborables.length}h/sem</strong></span>
                     </div>
                     <div className="text-xs">
                       {calendario.horaInicioManana}-{calendario.horaFinManana} / {calendario.horaInicioTarde}-{calendario.horaFinTarde}
@@ -415,10 +415,14 @@ export default function CalendarioLaboralPage() {
                     type="number"
                     min="1"
                     max="24"
+                    step="0.5"
                     value={formData.horasPorDia}
                     onChange={(e) => setFormData(prev => ({ ...prev, horasPorDia: parseFloat(e.target.value) || 8 }))}
                     className="h-9"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    = <strong>{formData.horasPorDia * formData.diasLaborables.length}h/semana</strong> · {(formData.horasPorDia * formData.diasLaborables.length * 4).toFixed(0)}h/mes
+                  </p>
                 </div>
               </div>
 

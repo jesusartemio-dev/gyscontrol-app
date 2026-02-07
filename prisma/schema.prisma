@@ -2305,6 +2305,7 @@ model ProyectoTarea {
   fechaFinReal                DateTime?
   horasEstimadas              Decimal?                    @db.Decimal(10, 2)
   horasReales                 Decimal                     @default(0) @db.Decimal(10, 2)
+  personasEstimadas           Int                         @default(1)
   estado                      EstadoTarea                 @default(pendiente)
   prioridad                   PrioridadTarea              @default(media)
   porcentajeCompletado        Int                         @default(0)

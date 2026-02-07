@@ -48,7 +48,7 @@ describe('Jerarquía de Registro de Horas', () => {
 
   test('debe manejar IDs vacíos o nulos correctamente', () => {
     expect(determinarNivelRegistro('', 'actividad-456')).toEqual({ nivel: 'actividad', id: 'actividad-456' })
-    expect(determinarNivelRegistro(null, 'actividad-456')).toEqual({ nivel: 'actividad', id: 'actividad-456' })
+    expect(determinarNivelRegistro(undefined, 'actividad-456')).toEqual({ nivel: 'actividad', id: 'actividad-456' })
     expect(determinarNivelRegistro('   ', 'actividad-456')).toEqual({ nivel: 'actividad', id: 'actividad-456' })
   })
 })
@@ -57,7 +57,7 @@ describe('Jerarquía de Registro de Horas', () => {
  * Función de prueba para determinar nivel de registro
  * Simula la lógica de negocio implementada en el sistema
  */
-function determinarNivelRegistro(
+export function determinarNivelRegistro(
   tareaId?: string,
   actividadId?: string,
   faseId?: string,

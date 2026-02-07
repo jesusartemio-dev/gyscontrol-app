@@ -7,12 +7,13 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { parseDuration } from '@/lib/utils/msProjectExcelParser'
+import { parseDuration, parseWork } from '@/lib/utils/msProjectExcelParser'
 
 interface RowData {
   id: number
   name: string
   duration: string
+  work: string
   start: string | null
   finish: string | null
   predecessors: number[]
@@ -29,6 +30,7 @@ interface ImportRequest {
   project: string
   fases: FaseData[]
   stats: { fases: number; edts: number; actividades: number; tareas: number }
+  edtMappings?: Record<string, string> // Excel EDT name → catalog edtId
 }
 
 export async function POST(
@@ -48,6 +50,25 @@ export async function POST(
     const proyecto = await prisma.proyecto.findUnique({ where: { id: proyectoId } })
     if (!proyecto) {
       return NextResponse.json({ message: 'Proyecto no encontrado' }, { status: 404 })
+    }
+
+    // Obtener horasPorDia del calendario laboral asignado al proyecto (o default activo)
+    let horasPorDia = 8
+    const configCalendario = await prisma.configuracionCalendario.findFirst({
+      where: { entidadTipo: 'proyecto', entidadId: proyectoId },
+      include: { calendarioLaboral: true },
+    })
+    if (configCalendario?.calendarioLaboral) {
+      horasPorDia = configCalendario.calendarioLaboral.horasPorDia
+    } else {
+      // Fallback: buscar calendario activo por defecto
+      const defaultCalendario = await prisma.calendarioLaboral.findFirst({
+        where: { activo: true },
+        orderBy: { createdAt: 'asc' },
+      })
+      if (defaultCalendario) {
+        horasPorDia = defaultCalendario.horasPorDia
+      }
     }
 
     // Buscar o crear cronograma de planificación
@@ -120,20 +141,26 @@ export async function POST(
       for (let edtIdx = 0; edtIdx < faseData.edts.length; edtIdx++) {
         const edtData = faseData.edts[edtIdx]
 
-        // Buscar o crear EDT maestro en catálogo
-        let edtMaestro = await prisma.edt.findFirst({
-          where: { nombre: edtData.row.name },
-        })
-        if (!edtMaestro) {
-          edtMaestro = await prisma.edt.create({
-            data: {
-              nombre: edtData.row.name,
-              descripcion: edtData.row.notes || null,
-            },
+        // Resolve EDT catalog entry: use mapping if provided, otherwise find/create
+        let edtMaestroId: string
+        if (body.edtMappings?.[edtData.row.name]) {
+          edtMaestroId = body.edtMappings[edtData.row.name]
+        } else {
+          let edtMaestro = await prisma.edt.findFirst({
+            where: { nombre: edtData.row.name },
           })
+          if (!edtMaestro) {
+            edtMaestro = await prisma.edt.create({
+              data: {
+                nombre: edtData.row.name,
+                descripcion: edtData.row.notes || null,
+              },
+            })
+          }
+          edtMaestroId = edtMaestro.id
         }
 
-        const dur = parseDuration(edtData.row.duration)
+        const dur = parseDuration(edtData.row.duration, horasPorDia)
         const proyectoEdtId = crypto.randomUUID()
 
         await (prisma as any).proyectoEdt.create({
@@ -142,7 +169,7 @@ export async function POST(
             proyectoId,
             proyectoCronogramaId: cronograma.id,
             proyectoFaseId: faseId,
-            edtId: edtMaestro.id,
+            edtId: edtMaestroId,
             nombre: edtData.row.name,
             descripcion: edtData.row.notes || null,
             orden: edtIdx,
@@ -164,7 +191,7 @@ export async function POST(
         // Crear Actividades dentro del EDT
         for (let actIdx = 0; actIdx < edtData.actividades.length; actIdx++) {
           const actData = edtData.actividades[actIdx]
-          const actDur = parseDuration(actData.row.duration)
+          const actDur = parseDuration(actData.row.duration, horasPorDia)
           const actividadId = crypto.randomUUID()
 
           // Actividad requiere fechas, usar defaults si no hay
@@ -201,8 +228,20 @@ export async function POST(
           // Crear Tareas dentro de la Actividad
           for (let tareaIdx = 0; tareaIdx < actData.tareas.length; tareaIdx++) {
             const tareaData = actData.tareas[tareaIdx]
-            const tareaDur = parseDuration(tareaData.row.duration)
+            const tareaDur = parseDuration(tareaData.row.duration, horasPorDia)
+            const tareaWork = parseWork(tareaData.row.work, horasPorDia)
             const tareaId = crypto.randomUUID()
+
+            // Si Work is available, use it as horasEstimadas (total person-hours)
+            // Otherwise fallback to Duration × horasPorDia (single-person hours)
+            const horasEstimadas = tareaWork > 0 ? tareaWork : tareaDur.hours
+
+            // Calculate personasEstimadas: Work / (Duration × horasPorDia)
+            // If Work = Duration × horasPorDia → 1 person; if Work > → multiple people
+            let personasEstimadas = 1
+            if (tareaWork > 0 && tareaDur.hours > 0) {
+              personasEstimadas = Math.max(1, Math.round(tareaWork / tareaDur.hours))
+            }
 
             const tareaStart = tareaData.row.start
               ? new Date(tareaData.row.start)
@@ -222,7 +261,8 @@ export async function POST(
                 orden: tareaIdx,
                 fechaInicio: tareaStart,
                 fechaFin: tareaFinish,
-                horasEstimadas: tareaDur.hours,
+                horasEstimadas,
+                personasEstimadas,
                 estado: 'pendiente',
                 prioridad: 'media',
                 porcentajeCompletado: 0,
@@ -300,6 +340,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       cronogramaId: cronograma.id,
+      horasPorDia,
       stats: {
         fases: fasesCreadas,
         edts: edtsCreados,

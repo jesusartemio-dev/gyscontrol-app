@@ -10,6 +10,7 @@ export interface MSProjectRow {
   id: number
   name: string
   duration: string
+  work: string
   start: Date | null
   finish: Date | null
   predecessors: number[]
@@ -46,6 +47,7 @@ export interface MSProjectTree {
     actividades: number
     tareas: number
     ignored: number
+    hasWork: boolean
   }
   dateRange: {
     start: Date | null
@@ -60,11 +62,23 @@ export interface ParsedDuration {
   isMilestone: boolean
 }
 
+// Parsear Work de MS Project: "475 hrs", "40 hours", "0 hrs" → horas totales (persona-horas)
+// Work usa el mismo formato que Duration pero representa esfuerzo total, no tiempo calendario
+export function parseWork(work: string, horasPorDia: number = 8): number {
+  if (!work) return 0
+  const parsed = parseDuration(work, horasPorDia)
+  return parsed.hours
+}
+
 // Parsear duración de MS Project: "107 days", "2 hours", "4.63 days", "0 days"
-export function parseDuration(duration: string): ParsedDuration {
+// horasPorDia: horas laborables por día (default 8, configurable desde calendario laboral)
+export function parseDuration(duration: string, horasPorDia: number = 8): ParsedDuration {
   if (!duration) return { days: 0, hours: 0, isMilestone: false }
 
   const str = String(duration).trim().toLowerCase()
+  const hpd = horasPorDia || 8
+  const diasPorSemana = 5
+  const diasPorMes = 20
 
   // Milestone
   if (str === '0 days' || str === '0 day' || str === '0 hrs' || str === '0 hours') {
@@ -75,35 +89,35 @@ export function parseDuration(duration: string): ParsedDuration {
   const dayMatch = str.match(/^([\d.]+)\s*days?$/i)
   if (dayMatch) {
     const days = parseFloat(dayMatch[1])
-    return { days, hours: days * 8, isMilestone: false }
+    return { days, hours: days * hpd, isMilestone: false }
   }
 
   // "X hours" or "X hrs"
   const hourMatch = str.match(/^([\d.]+)\s*(hours?|hrs?)$/i)
   if (hourMatch) {
     const hours = parseFloat(hourMatch[1])
-    return { days: hours / 8, hours, isMilestone: false }
+    return { days: hours / hpd, hours, isMilestone: false }
   }
 
   // "X mins" or "X minutes"
   const minMatch = str.match(/^([\d.]+)\s*(mins?|minutes?)$/i)
   if (minMatch) {
     const mins = parseFloat(minMatch[1])
-    return { days: mins / 480, hours: mins / 60, isMilestone: false }
+    return { days: mins / (hpd * 60), hours: mins / 60, isMilestone: false }
   }
 
   // "X wks" or "X weeks"
   const weekMatch = str.match(/^([\d.]+)\s*(wks?|weeks?)$/i)
   if (weekMatch) {
     const weeks = parseFloat(weekMatch[1])
-    return { days: weeks * 5, hours: weeks * 40, isMilestone: false }
+    return { days: weeks * diasPorSemana, hours: weeks * diasPorSemana * hpd, isMilestone: false }
   }
 
   // "X mons" or "X months"
   const monthMatch = str.match(/^([\d.]+)\s*(mons?|months?)$/i)
   if (monthMatch) {
     const months = parseFloat(monthMatch[1])
-    return { days: months * 20, hours: months * 160, isMilestone: false }
+    return { days: months * diasPorMes, hours: months * diasPorMes * hpd, isMilestone: false }
   }
 
   return { days: 0, hours: 0, isMilestone: false }
@@ -210,12 +224,14 @@ export function parseMSProjectExcel(file: File): Promise<MSProjectRow[]> {
         const colPredecessors = findCol(['Predecessors', 'Predecesoras']) || headers[7]
         const colOutlineLevel = findCol(['Outline Level', 'Nivel de esquema', 'Outline']) || headers[8]
         const colNotes = findCol(['Notes', 'Notas']) || headers[9]
+        const colWork = findCol(['Work', 'Trabajo'])
 
         const rows: MSProjectRow[] = rawRows
           .map((raw) => ({
             id: parseInt(String(raw[colId])) || 0,
             name: String(raw[colName] || '').trim(),
             duration: String(raw[colDuration] || '').trim(),
+            work: colWork ? String(raw[colWork] || '').trim() : '',
             start: parseMSProjectDate(raw[colStart] as string | number),
             finish: parseMSProjectDate(raw[colFinish] as string | number),
             predecessors: parsePredecessors(raw[colPredecessors] as string),
@@ -336,6 +352,7 @@ export function buildHierarchy(rows: MSProjectRow[]): MSProjectTree {
   let edtCount = 0
   let actividadCount = 0
   let tareaCount = 0
+  let hasWork = false
   let minDate: Date | null = null
   let maxDate: Date | null = null
 
@@ -348,6 +365,7 @@ export function buildHierarchy(rows: MSProjectRow[]): MSProjectTree {
 
         // Calcular rango de fechas desde tareas (nivel hoja)
         for (const tarea of act.tareas) {
+          if (tarea.row.work) hasWork = true
           if (tarea.row.start && (!minDate || tarea.row.start < minDate)) {
             minDate = tarea.row.start
           }
@@ -376,6 +394,7 @@ export function buildHierarchy(rows: MSProjectRow[]): MSProjectTree {
       actividades: actividadCount,
       tareas: tareaCount,
       ignored,
+      hasWork,
     },
     dateRange: {
       start: minDate,
@@ -390,6 +409,7 @@ export function serializeTree(tree: MSProjectTree): unknown {
     ...row,
     start: row.start?.toISOString() || null,
     finish: row.finish?.toISOString() || null,
+    work: row.work || '',
   })
 
   return {

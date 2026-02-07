@@ -31,16 +31,14 @@ describe('Flujo Completo: Registro de Horas', () => {
   })
 
   test('debe permitir registro de horas completo desde wizard', async () => {
-    const mockRegistrarHoras = vi.mocked(import('@/lib/api').registrarHoras)
-    mockRegistrarHoras.mockResolvedValue({
+    const mockRegistrarHoras = vi.fn().mockResolvedValue({
       ok: true,
       data: { id: 'registro-123', mensaje: 'Horas registradas correctamente' }
     })
 
     const { rerender } = render(
-      <RegistroHorasWizard 
+      <RegistroHorasWizard
         onSuccess={vi.fn()}
-        elementoInicial={{ tipo: 'proyecto', id: 'proyecto-123' }}
       />
     )
 
@@ -84,8 +82,7 @@ describe('Flujo Completo: Registro de Horas', () => {
   })
 
   test('debe mostrar error cuando falla el registro', async () => {
-    const mockRegistrarHoras = vi.mocked(import('@/lib/api').registrarHoras)
-    mockRegistrarHoras.mockRejectedValue(new Error('Error del servidor'))
+    const mockRegistrarHoras = vi.fn().mockRejectedValue(new Error('Error del servidor'))
 
     const { rerender } = render(
       <RegistroHorasWizard 
@@ -211,7 +208,7 @@ describe('Flujo Completo: Dashboard de Productividad', () => {
       ]
     }
 
-    render(<DashboardProductividad />)
+    render(<DashboardProductividad periodo="semanal" />)
 
     // Verificar que se muestran las alertas
     await waitFor(() => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom/jest-globals'
 import { DependencyManager } from '@/components/cronograma/DependencyManager'
 import { useToast } from '@/hooks/use-toast'
 
@@ -67,12 +67,6 @@ jest.mock('lucide-react', () => ({
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>
 global.fetch = mockFetch
 
-// Extender Jest matchers para testing-library
-declare module '@jest/globals' {
-  interface Matchers<R> {
-    toBeInTheDocument(): R
-  }
-}
 
 describe('DependencyManager Component', () => {
   const mockToast = jest.fn()
@@ -81,6 +75,9 @@ describe('DependencyManager Component', () => {
     {
       id: 'tarea-1',
       nombre: 'Tarea A',
+      descripcion: 'Descripción tarea A',
+      horasEstimadas: 8,
+      personasEstimadas: 1,
       fechaInicio: '2024-01-01T08:00:00Z',
       fechaFin: '2024-01-02T17:00:00Z',
       esHito: false
@@ -88,6 +85,9 @@ describe('DependencyManager Component', () => {
     {
       id: 'tarea-2',
       nombre: 'Tarea B',
+      descripcion: 'Descripción tarea B',
+      horasEstimadas: 16,
+      personasEstimadas: 2,
       fechaInicio: '2024-01-03T08:00:00Z',
       fechaFin: '2024-01-04T17:00:00Z',
       esHito: true

@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, MoreHorizontal, Download } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, MoreHorizontal, Download, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -150,17 +150,17 @@ export function TreeNode({
 
   return (
     <div
-      className={`tree-node group ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'} border-l-2 border-transparent pl-4 py-2 cursor-pointer transition-colors`}
-      style={{ paddingLeft: `${node.level * 20 + 16}px` }}
+      className={`tree-node group ${isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'} border-l-2 border-transparent pl-2 py-0.5 cursor-pointer transition-colors`}
+      style={{ paddingLeft: `${node.level * 16 + 8}px` }}
       onClick={onSelect}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-1">
+        <div className="flex items-center gap-1 flex-1 min-w-0">
           {/* Toggle button */}
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0"
+            className="h-5 w-5 p-0 shrink-0"
             onClick={(e) => {
               e.stopPropagation()
               onToggle()
@@ -168,28 +168,21 @@ export function TreeNode({
             disabled={!hasChildren && !isLoading}
           >
             {isLoading ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
             ) : hasChildren ? (
-              isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+              isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />
             ) : (
-              <div className="h-4 w-4" />
+              <div className="h-3 w-3" />
             )}
           </Button>
 
           {/* Node icon and name */}
-          <span className="text-lg">{config.icon}</span>
-          <span className="font-medium text-gray-900">{node.nombre}</span>
-
-          {/* Orden indicator */}
-          {node.data.orden !== undefined && node.data.orden !== null && (
-            <Badge variant="outline" className="text-xs ml-2 bg-gray-50 text-gray-600 border-gray-300">
-              #{node.data.orden}
-            </Badge>
-          )}
+          <span className="text-xs shrink-0">{config.icon}</span>
+          <span className="text-xs font-medium text-gray-900 truncate">{node.nombre}</span>
 
           {/* Indicador de hito */}
           {node.data?.esHito && (
-            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+            <Badge variant="outline" className="text-[10px] leading-none px-1 py-0 h-4 bg-green-50 text-green-700 border-green-200 shrink-0">
               Hito
             </Badge>
           )}
@@ -198,28 +191,62 @@ export function TreeNode({
           <TreeNodeProgress
             percentage={node.metadata.progressPercentage}
             status={mapStatusForProgress(node.metadata.status)}
-            size="sm"
+            size="xs"
           />
 
-          {/* Status badge */}
-          <Badge variant="outline" className={config.color}>
+          {/* Type badge */}
+          <Badge variant="outline" className={`text-[10px] leading-none px-1 py-0 h-4 shrink-0 ${config.color}`}>
             {config.label}
           </Badge>
 
           {/* Children count */}
           {hasChildren && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-[10px] leading-none px-1 py-0 h-4 shrink-0">
               {node.metadata.totalChildren}
             </Badge>
+          )}
+
+          {/* Dates and hours inline */}
+          <span className="text-[11px] text-gray-400 shrink-0 ml-1">
+            {(() => {
+              let fechaInicio: string | null = null
+              let fechaFin: string | null = null
+              if (node.type === 'tarea') {
+                fechaInicio = node.data.fechaInicio
+                fechaFin = node.data.fechaFin
+              } else {
+                fechaInicio = node.data.fechaInicioComercial || node.data.fechaInicioPlan
+                fechaFin = node.data.fechaFinComercial || node.data.fechaFinPlan
+              }
+              const fmt = (d: string | Date) => {
+                try {
+                  const date = typeof d === 'string' ? new Date(d) : d
+                  if (isNaN(date.getTime())) return ''
+                  return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+                } catch { return '' }
+              }
+              const parts: string[] = []
+              if (fechaInicio && fechaFin) parts.push(`${fmt(fechaInicio)}–${fmt(fechaFin)}`)
+              if (totalHours > 0) parts.push(`${totalHours}h`)
+              return parts.join(' · ')
+            })()}
+          </span>
+
+          {/* Personas estimadas badge (solo tareas con > 1 persona) */}
+          {node.type === 'tarea' && (node.data.personasEstimadas || 1) > 1 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0 shrink-0">
+              <Users className="h-2.5 w-2.5" />
+              {node.data.personasEstimadas}
+            </span>
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
           {/* More actions menu */}
           <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
                 <MoreHorizontal className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
@@ -283,50 +310,6 @@ export function TreeNode({
         </div>
       </div>
 
-      {/* Additional info */}
-      <div className="ml-8 mt-1 text-sm text-gray-600">
-        {(() => {
-          // Extraer fechas según el tipo de nodo
-          let fechaInicio: string | null = null
-          let fechaFin: string | null = null
-
-          if (node.type === 'fase') {
-            fechaInicio = node.data.fechaInicioComercial || node.data.fechaInicioPlan
-            fechaFin = node.data.fechaFinComercial || node.data.fechaFinPlan
-          } else if (node.type === 'edt') {
-            fechaInicio = node.data.fechaInicioComercial || node.data.fechaInicioPlan
-            fechaFin = node.data.fechaFinComercial || node.data.fechaFinPlan
-          } else if (node.type === 'actividad') {
-            fechaInicio = node.data.fechaInicioComercial || node.data.fechaInicioPlan
-            fechaFin = node.data.fechaFinComercial || node.data.fechaFinPlan
-          } else if (node.type === 'tarea') {
-            // Para tareas, las fechas están directamente en data.fechaInicio y data.fechaFin
-            fechaInicio = node.data.fechaInicio
-            fechaFin = node.data.fechaFin
-          }
-
-          // Función para formatear fecha local correctamente
-          const formatDate = (dateString: string | Date) => {
-            if (!dateString) return ''
-            try {
-              // Si es un string ISO, convertir a Date
-              const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-              if (isNaN(date.getTime())) return 'Fecha inválida'
-              return date.toLocaleDateString('es-ES')
-            } catch (error) {
-              console.error('Error formateando fecha:', dateString, error)
-              return 'Fecha inválida'
-            }
-          }
-
-          return fechaInicio && fechaFin ? (
-            <span>
-              {formatDate(fechaInicio)} - {formatDate(fechaFin)}
-            </span>
-          ) : null
-        })()}
-        <span className="ml-2">({totalHours}h)</span>
-      </div>
 
       {/* Delete confirmation dialog */}
       <DeleteAlertDialog

@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 interface TreeNodeProgressProps {
   percentage: number
   status: 'pending' | 'in_progress' | 'completed' | 'paused' | 'cancelled'
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   showLabel?: boolean
 }
 
@@ -53,6 +53,10 @@ export function TreeNodeProgress({
   const clampedPercentage = Math.max(0, Math.min(100, percentage))
 
   const sizeClasses = {
+    xs: {
+      container: 'h-1 w-8',
+      text: 'text-[10px]'
+    },
     sm: {
       container: 'h-2 w-12',
       text: 'text-xs'
@@ -70,7 +74,7 @@ export function TreeNodeProgress({
   const classes = sizeClasses[size]
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center ${size === 'xs' ? 'gap-1' : 'gap-2'}`}>
       {/* Barra de progreso */}
       <div
         className={`relative ${classes.container} bg-gray-200 rounded-full overflow-hidden`}
@@ -83,7 +87,7 @@ export function TreeNodeProgress({
       </div>
 
       {/* Porcentaje */}
-      <span className={`${classes.text} font-medium text-gray-600 min-w-[2.5rem]`}>
+      <span className={`${classes.text} font-medium text-gray-600 ${size === 'xs' ? 'min-w-[1.8rem]' : 'min-w-[2.5rem]'}`}>
         {clampedPercentage}%
       </span>
 

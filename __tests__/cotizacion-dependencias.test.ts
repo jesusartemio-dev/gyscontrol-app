@@ -11,7 +11,7 @@ import {
 // Mock de Prisma
 jest.mock('@/lib/prisma', () => ({
   prisma: {
-    cotizacionDependenciaTarea: {
+    cotizacionDependenciasTarea: {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -38,7 +38,7 @@ describe('CotizacionDependencias Service', () => {
 
     it('debe manejar errores de base de datos', async () => {
       // Simular error de BD
-      const mockFindMany = prisma.cotizacionDependenciaTarea.findMany as jest.MockedFunction<any>
+      const mockFindMany = prisma.cotizacionDependenciasTarea.findMany as jest.MockedFunction<any>
       mockFindMany.mockRejectedValue(new Error('Database error'))
 
       // TODO: Update when implementation is complete

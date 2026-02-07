@@ -97,7 +97,7 @@ describe('Validación de Progreso', () => {
 /**
  * Funciones de prueba para simular la lógica de negocio
  */
-function calcularProgresoReal(horasPlanificadas: number, horasReales: number): number {
+export function calcularProgresoReal(horasPlanificadas: number, horasReales: number): number {
   if (horasPlanificadas <= 0 || horasReales < 0) {
     return 0
   }
@@ -106,7 +106,7 @@ function calcularProgresoReal(horasPlanificadas: number, horasReales: number): n
   return Math.min(100, Math.max(0, Math.round(progreso)))
 }
 
-function calcularProgresoActividad(jerarquia: any): number {
+export function calcularProgresoActividad(jerarquia: any): number {
   const { horasPlanificadas, horasReales, tareas } = jerarquia.actividad
   
   if (tareas.length === 0) return 0

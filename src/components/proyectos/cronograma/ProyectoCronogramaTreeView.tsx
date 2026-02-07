@@ -567,7 +567,7 @@ export function ProyectoCronogramaTreeView({
               )}
             </div>
           ) : (
-            <div className="p-4">
+            <div className="p-2">
               {renderTree(state.rootNodes)}
             </div>
           )}

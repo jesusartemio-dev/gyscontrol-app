@@ -70,6 +70,7 @@ interface Tarea {
   fechaFin: Date
   horasPlan: number
   horasReales: number
+  personasEstimadas: number
   progreso: number
   estado: string
   prioridad: string
@@ -132,11 +133,13 @@ export default function SupervisionTareasPage() {
   const [filtroBusqueda, setFiltroBusqueda] = useState<string>('')
   const [filtroSinAsignar, setFiltroSinAsignar] = useState<boolean>(false)
   const [filtroTipo, setFiltroTipo] = useState<string>('')
+  const [filtroEdt, setFiltroEdt] = useState<string>('')
 
   // Modal de asignacion
   const [showAsignarModal, setShowAsignarModal] = useState(false)
   const [tareaSeleccionada, setTareaSeleccionada] = useState<Tarea | null>(null)
   const [nuevoResponsable, setNuevoResponsable] = useState<string>('')
+  const [nuevaPersonasEstimadas, setNuevaPersonasEstimadas] = useState<number>(1)
 
   // Modal de crear tarea
   const [showCrearModal, setShowCrearModal] = useState(false)
@@ -251,17 +254,22 @@ export default function SupervisionTareasPage() {
       }
     }
 
+    if (filtroEdt) {
+      resultado = resultado.filter(t => t.edtNombre === filtroEdt)
+    }
+
     if (filtroBusqueda) {
       const busqueda = filtroBusqueda.toLowerCase()
       resultado = resultado.filter(t =>
         t.nombre.toLowerCase().includes(busqueda) ||
         t.proyectoNombre.toLowerCase().includes(busqueda) ||
-        t.proyectoCodigo.toLowerCase().includes(busqueda)
+        t.proyectoCodigo.toLowerCase().includes(busqueda) ||
+        t.edtNombre.toLowerCase().includes(busqueda)
       )
     }
 
     setTareasFiltradas(resultado)
-  }, [tareas, filtroProyecto, filtroResponsable, filtroEstado, filtroSinAsignar, filtroTipo, filtroBusqueda])
+  }, [tareas, filtroProyecto, filtroResponsable, filtroEstado, filtroSinAsignar, filtroTipo, filtroEdt, filtroBusqueda])
 
   // Cargar EDTs del cronograma de EJECUCIÓN cuando cambia el proyecto seleccionado en el modal
   const cargarEdtsProyecto = async (proyectoId: string) => {
@@ -335,6 +343,7 @@ export default function SupervisionTareasPage() {
   const abrirAsignarModal = (tarea: Tarea) => {
     setTareaSeleccionada(tarea)
     setNuevoResponsable(tarea.responsableId || '')
+    setNuevaPersonasEstimadas(tarea.personasEstimadas || 1)
     setShowAsignarModal(true)
   }
 
@@ -349,7 +358,8 @@ export default function SupervisionTareasPage() {
         body: JSON.stringify({
           tareaId: tareaSeleccionada.id,
           tipo: tareaSeleccionada.tipo,
-          responsableId: nuevoResponsable || null
+          responsableId: nuevoResponsable || null,
+          ...(tareaSeleccionada.tipo === 'proyecto_tarea' && { personasEstimadas: nuevaPersonasEstimadas }),
         })
       })
 
@@ -495,6 +505,7 @@ export default function SupervisionTareasPage() {
     setFiltroBusqueda('')
     setFiltroSinAsignar(false)
     setFiltroTipo('')
+    setFiltroEdt('')
   }
 
   // Abrir modal para crear
@@ -713,6 +724,24 @@ export default function SupervisionTareasPage() {
           </SelectContent>
         </Select>
 
+        <Select value={filtroEdt || 'all'} onValueChange={(v) => setFiltroEdt(v === 'all' ? '' : v)}>
+          <SelectTrigger className="h-9 w-[140px]">
+            <SelectValue placeholder="EDT" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">EDT</SelectItem>
+            {Array.from(new Set(
+              (filtroProyecto ? tareas.filter(t => t.proyectoId === filtroProyecto) : tareas)
+                .map(t => t.edtNombre)
+                .filter(Boolean)
+            )).sort().map(edt => (
+              <SelectItem key={edt} value={edt}>
+                {edt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Select value={filtroResponsable || 'all'} onValueChange={(v) => setFiltroResponsable(v === 'all' ? '' : v)}>
           <SelectTrigger className="h-9 w-[150px]">
             <SelectValue placeholder="Responsables" />
@@ -882,6 +911,12 @@ export default function SupervisionTareasPage() {
                               {tarea.horasReales}h
                             </span>
                             <span className="text-gray-400">/{tarea.horasPlan}h</span>
+                            {tarea.personasEstimadas > 1 && (
+                              <span className="inline-flex items-center gap-0.5 ml-1 text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0">
+                                <Users className="h-2.5 w-2.5" />
+                                {tarea.personasEstimadas}
+                              </span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -969,6 +1004,26 @@ export default function SupervisionTareasPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {tareaSeleccionada.tipo === 'proyecto_tarea' && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    <Users className="h-3.5 w-3.5 inline mr-1" />
+                    Personas Estimadas
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={nuevaPersonasEstimadas}
+                    onChange={(e) => setNuevaPersonasEstimadas(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-24"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Cantidad de personas que trabajan simultáneamente en esta tarea
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -978,7 +1033,7 @@ export default function SupervisionTareasPage() {
             </Button>
             <Button onClick={asignarTarea}>
               <UserPlus className="h-4 w-4 mr-2" />
-              Asignar
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -170,7 +170,7 @@ describe('Validación de Flujos Complejos', () => {
  * Funciones auxiliares para tests
  */
 
-function validarDatosRegistro(datos: any) {
+export function validarDatosRegistro(datos: any) {
   const errores: string[] = []
   
   if (!datos.proyectoId || datos.proyectoId.trim() === '') {
@@ -199,7 +199,7 @@ function validarDatosRegistro(datos: any) {
   }
 }
 
-function calcularCostoTotal(registro: any) {
+export function calcularCostoTotal(registro: any) {
   return registro.horas * registro.costoHora * (registro.factorSeguridad || 1)
 }
 
@@ -223,7 +223,7 @@ function calcularProgresoJerarquia(jerarquia: any) {
   }
 }
 
-function calcularResumenSemana(registros: any[]) {
+export function calcularResumenSemana(registros: any[]) {
   const totalHoras = registros.reduce((sum, r) => sum + r.horas, 0)
   const diasTrabajados = registros.filter(r => r.horas > 0).length
   const proyectos = [...new Set(registros.filter(r => r.proyecto).map(r => r.proyecto))]
@@ -251,7 +251,7 @@ function detectarAlertasHoras(registros: any[]) {
   return alertas
 }
 
-function calcularProductividad(datos: any) {
+export function calcularProductividad(datos: any) {
   const eficiencia = datos.horasPlanificadas > 0 ? (datos.horasReales / datos.horasPlanificadas) * 100 : 0
   const utilizacionDias = datos.diasLaborables > 0 ? (datos.diasTrabajados / datos.diasLaborables) * 100 : 0
   const horasPromedioDia = datos.diasTrabajados > 0 ? datos.horasReales / datos.diasTrabajados : 0

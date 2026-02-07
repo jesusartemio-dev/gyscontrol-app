@@ -24,7 +24,7 @@
 }
 
 .tree-children {
-  @apply ml-4 border-l border-gray-200 pl-4 space-y-1;
+  @apply ml-2 border-l border-gray-200 pl-2 space-y-0;
 }
 
 /* Animaciones de expansión */

@@ -204,6 +204,7 @@ export async function GET(request: NextRequest) {
         fechaFin: t.fechaFin,
         horasPlan: t.horasEstimadas ? Number(t.horasEstimadas) : 0,
         horasReales: t.horasReales ? Number(t.horasReales) : 0,
+        personasEstimadas: (t as any).personasEstimadas || 1,
         progreso: t.porcentajeCompletado || 0,
         estado: t.estado,
         prioridad: t.prioridad || 'media'
@@ -320,7 +321,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { tareaId, tipo, responsableId, estado, prioridad, porcentajeCompletado } = body
+    const { tareaId, tipo, responsableId, estado, prioridad, porcentajeCompletado, personasEstimadas } = body
 
     if (!tareaId || !tipo) {
       return NextResponse.json(
@@ -345,6 +346,9 @@ export async function PATCH(request: NextRequest) {
       // Permitir actualizar porcentaje manualmente (solo si no se está completando)
       if (porcentajeCompletado !== undefined && estado !== 'completada') {
         updateData.porcentajeCompletado = Math.min(100, Math.max(0, porcentajeCompletado))
+      }
+      if (personasEstimadas !== undefined) {
+        updateData.personasEstimadas = Math.max(1, parseInt(personasEstimadas) || 1)
       }
 
       tareaActualizada = await prisma.proyectoTarea.update({

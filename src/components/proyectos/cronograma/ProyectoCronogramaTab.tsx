@@ -90,6 +90,11 @@ export function ProyectoCronogramaTab({
   const [fechaFin, setFechaFin] = useState('')
   const [stats, setStats] = useState<CronogramaStats>({ fases: 0, edts: 0, actividades: 0, tareas: 0 })
 
+  // Estado del calendario laboral
+  const [calendarioAsignado, setCalendarioAsignado] = useState<{ id: string; nombre: string; horasPorDia: number } | null>(null)
+  const [calendariosDisponibles, setCalendariosDisponibles] = useState<{ id: string; nombre: string; horasPorDia: number; diasLaborables: string[] }[]>([])
+  const [savingCalendario, setSavingCalendario] = useState(false)
+
   const { toast } = useToast()
 
   // Cargar cronogramas disponibles
@@ -111,6 +116,43 @@ export function ProyectoCronogramaTab({
     }
     loadCronogramas()
   }, [proyectoId])
+
+  // Cargar calendario laboral asignado al proyecto
+  useEffect(() => {
+    const loadCalendario = async () => {
+      try {
+        const res = await fetch(`/api/proyectos/${proyectoId}/calendario`)
+        if (res.ok) {
+          const data = await res.json()
+          setCalendarioAsignado(data.calendarioAsignado)
+          setCalendariosDisponibles(data.calendarios || [])
+        }
+      } catch (error) {
+        console.error('Error loading calendario:', error)
+      }
+    }
+    loadCalendario()
+  }, [proyectoId])
+
+  const handleCalendarioChange = async (calendarioId: string) => {
+    setSavingCalendario(true)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/calendario`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendarioId: calendarioId || null }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCalendarioAsignado(data.calendarioAsignado)
+        toast({ title: 'Calendario actualizado' })
+      }
+    } catch {
+      toast({ title: 'Error al asignar calendario', variant: 'destructive' })
+    } finally {
+      setSavingCalendario(false)
+    }
+  }
 
   // Cargar datos del proyecto
   const loadProyectoDataFn = async () => {
@@ -190,9 +232,6 @@ export function ProyectoCronogramaTab({
   const handleSaveConfiguracion = async () => {
     try {
       setIsLoading(true)
-
-      // Nota: Proyecto no tiene calendarioLaboralId (solo Cotizacion lo tiene)
-      // Por eso no guardamos el calendario aquí
 
       // Detectar cambio de fecha
       const fechaOriginal = proyectoData?.fechaInicio
@@ -668,6 +707,14 @@ export function ProyectoCronogramaTab({
           )}
         </div>
 
+        {/* Calendario badge */}
+        {calendarioAsignado && (
+          <Badge variant="outline" className="hidden sm:flex text-xs font-normal text-indigo-600 border-indigo-200">
+            <Calendar className="h-3 w-3 mr-1" />
+            {calendarioAsignado.horasPorDia}h/día
+          </Badge>
+        )}
+
         {/* Fechas */}
         {fechaInicio && (
           <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground ml-auto mr-2">
@@ -807,7 +854,25 @@ export function ProyectoCronogramaTab({
                     className="h-8 text-sm bg-muted/50"
                   />
                 </div>
-                {/* Nota: Proyecto no tiene calendarioLaboralId - solo Cotizacion lo soporta */}
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs text-muted-foreground">Calendario Laboral</Label>
+                  <Select
+                    value={calendarioAsignado?.id || ''}
+                    onValueChange={handleCalendarioChange}
+                    disabled={savingCalendario}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Sin calendario asignado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {calendariosDisponibles.map(cal => (
+                        <SelectItem key={cal.id} value={cal.id}>
+                          {cal.nombre} ({cal.horasPorDia}h/día)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button
                   onClick={handleSaveConfiguracion}
                   disabled={isLoading || !fechaInicio}

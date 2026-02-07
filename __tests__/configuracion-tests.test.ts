@@ -268,4 +268,4 @@ export const mockAPI = {
 
 // Configurar vi globalmente
 import { vi } from 'vitest'
-global.vi = vi
+;(globalThis as any).vi = vi
