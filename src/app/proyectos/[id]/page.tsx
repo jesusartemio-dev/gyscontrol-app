@@ -17,9 +17,8 @@ import {
   CheckSquare
 } from 'lucide-react'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 
 import { useProyectoContext } from './ProyectoContext'
 
@@ -236,45 +235,44 @@ export default function ProyectoHubPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Navigation Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {navigationCards.map((card, index) => (
           <motion.div
             key={card.id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-            className="h-full"
+            transition={{ duration: 0.2, delay: index * 0.05 }}
           >
             <Card
-              className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${card.hoverBg} group border-l-4 ${card.borderColor} h-full flex flex-col`}
+              className={`cursor-pointer transition-all duration-200 hover:shadow-md ${card.hoverBg} group border-l-4 ${card.borderColor}`}
               onClick={() => router.push(card.href)}
             >
-              <CardHeader className="pb-2 flex-1">
-                <div className="flex items-center justify-between min-h-[40px]">
-                  <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                    <card.icon className={`h-6 w-6 ${card.color}`} />
+              <CardContent className="p-3 space-y-2">
+                {/* Row 1: Icon + Title + Amount/Badge + Chevron */}
+                <div className="flex items-center gap-2">
+                  <div className={`p-1.5 rounded-md ${card.bgColor}`}>
+                    <card.icon className={`h-4 w-4 ${card.color}`} />
                   </div>
+                  <span className="font-semibold text-sm group-hover:text-primary flex-1">
+                    {card.title}
+                  </span>
                   {card.badge && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
                       {card.badge}
                     </Badge>
                   )}
                   {card.total !== undefined && card.total > 0 && (
-                    <span className="text-sm font-semibold text-gray-700">
+                    <span className="text-xs font-semibold text-gray-600">
                       {formatCurrency(card.total)}
                     </span>
                   )}
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
                 </div>
-                <CardTitle className="text-lg group-hover:text-primary flex items-center justify-between mt-2">
-                  {card.title}
-                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                </CardTitle>
-                <CardDescription>{card.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0 space-y-2">
-                <div className="flex items-center gap-4 text-sm min-h-[24px]">
+
+                {/* Row 2: Stats */}
+                <div className="flex items-center gap-3 text-xs">
                   {card.stats && card.stats.length > 0 ? (
                     card.stats.map((stat, i) => (
                       <div key={i} className="flex items-center gap-1">
@@ -283,14 +281,14 @@ export default function ProyectoHubPage() {
                       </div>
                     ))
                   ) : (
-                    <span className="text-muted-foreground text-xs">Ver detalles</span>
+                    <span className="text-muted-foreground">Ver detalles</span>
                   )}
                 </div>
 
                 {/* Progress bar for cost tracking */}
                 {card.progreso && card.plan && card.plan > 0 && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center justify-between text-[11px]">
                       <span className="text-muted-foreground flex items-center gap-1">
                         {card.progreso.estado === 'danger' ? (
                           <TrendingUp className="h-3 w-3 text-red-500" />
@@ -309,7 +307,7 @@ export default function ProyectoHubPage() {
                         {card.progreso.porcentaje.toFixed(0)}%
                       </span>
                     </div>
-                    <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="relative h-1 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className={`absolute inset-y-0 left-0 rounded-full transition-all ${getProgressColor(card.progreso.estado)}`}
                         style={{ width: `${Math.min(card.progreso.porcentaje, 100)}%` }}
@@ -324,13 +322,13 @@ export default function ProyectoHubPage() {
                   </div>
                 )}
 
-                {/* Coverage progress bar for equipos */}
+                {/* Coverage progress bar */}
                 {card.cobertura && card.cobertura.porcentaje >= 0 && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center justify-between text-[11px]">
                       <span className="text-muted-foreground flex items-center gap-1">
                         <ClipboardList className="h-3 w-3 text-blue-500" />
-                        Cobertura en listas
+                        Cobertura
                       </span>
                       <span className={`font-medium ${
                         card.cobertura.porcentaje >= 100 ? 'text-emerald-600' :
@@ -340,7 +338,7 @@ export default function ProyectoHubPage() {
                         {card.cobertura.porcentaje.toFixed(0)}%
                       </span>
                     </div>
-                    <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="relative h-1 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className={`absolute inset-y-0 left-0 rounded-full transition-all ${
                           card.cobertura.porcentaje >= 100 ? 'bg-emerald-500' :
@@ -361,22 +359,22 @@ export default function ProyectoHubPage() {
       {/* Status Alert for new projects */}
       {proyecto.estado === 'creado' && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.6 }}
+          transition={{ duration: 0.2, delay: 0.4 }}
         >
           <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+            <CardContent className="px-4 py-3">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-amber-900 mb-1">Proyecto recién creado</h3>
-                  <p className="text-amber-700 text-sm">
-                    Comienza creando listas técnicas para organizar los equipos del proyecto.
-                  </p>
+                  <span className="font-medium text-amber-900 text-sm">Proyecto recién creado</span>
+                  <span className="text-amber-700 text-xs ml-2">
+                    Comienza creando listas técnicas para organizar los equipos.
+                  </span>
                 </div>
                 <ChevronRight
-                  className="h-5 w-5 text-amber-600 cursor-pointer hover:text-amber-800"
+                  className="h-4 w-4 text-amber-600 cursor-pointer hover:text-amber-800"
                   onClick={() => router.push(`${baseUrl}/equipos/listas`)}
                 />
               </div>
