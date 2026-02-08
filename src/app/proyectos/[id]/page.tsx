@@ -13,7 +13,8 @@ import {
   Users,
   AlertTriangle,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  CheckSquare
 } from 'lucide-react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -86,7 +87,17 @@ export default function ProyectoHubPage() {
 
   const baseUrl = `/proyectos/${proyecto.id}`
 
+  // Tareas progress
+  const progresoTareas = cronogramaStats.tareas > 0
+    ? { porcentaje: (cronogramaStats.tareasCompletadas / cronogramaStats.tareas) * 100, estado: 'ok' as const }
+    : null
+
+  // Grid order: row by row (3 cols)
+  // Row 1: Equipos | Servicios | Gastos
+  // Row 2: Listas  | Cronograma | Personal
+  // Row 3: Pedidos | Tareas    |
   const navigationCards = [
+    // Row 1 — Cotizados
     {
       id: 'equipos',
       title: 'Equipos',
@@ -143,22 +154,7 @@ export default function ProyectoHubPage() {
       real: totalGastosReal,
       plan: totalGastosCliente
     },
-    {
-      id: 'cronograma',
-      title: 'Cronograma',
-      description: 'Fases, EDTs, actividades y tareas',
-      icon: Calendar,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-50',
-      hoverBg: 'hover:bg-purple-50',
-      borderColor: 'border-purple-200',
-      href: `${baseUrl}/cronograma`,
-      stats: [
-        { label: 'EDTs', value: cronogramaStats.edts },
-        { label: 'Tareas', value: cronogramaStats.tareas },
-      ],
-      badge: cronogramaStats.activeCronograma?.nombre || 'Cronograma'
-    },
+    // Row 2
     {
       id: 'listas',
       title: 'Listas',
@@ -174,18 +170,20 @@ export default function ProyectoHubPage() {
       ],
     },
     {
-      id: 'pedidos',
-      title: 'Pedidos',
-      description: 'Gestionar pedidos de compra',
-      icon: Truck,
-      color: 'text-cyan-500',
-      bgColor: 'bg-cyan-50',
-      hoverBg: 'hover:bg-cyan-50',
-      borderColor: 'border-cyan-200',
-      href: `${baseUrl}/equipos/pedidos`,
+      id: 'cronograma',
+      title: 'Cronograma',
+      description: 'Fases, EDTs y actividades',
+      icon: Calendar,
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-50',
+      hoverBg: 'hover:bg-purple-50',
+      borderColor: 'border-purple-200',
+      href: `${baseUrl}/cronograma`,
       stats: [
-        { label: 'Pedidos', value: totalPedidos },
+        { label: 'EDTs', value: cronogramaStats.edts },
+        { label: 'Fases', value: cronogramaStats.fases },
       ],
+      badge: cronogramaStats.activeCronograma?.nombre || 'Cronograma'
     },
     {
       id: 'personal',
@@ -202,6 +200,38 @@ export default function ProyectoHubPage() {
         { label: 'Supervisor', value: proyecto.supervisor?.name ? 1 : 0 },
       ],
       badge: proyecto.gestor?.name || 'Sin asignar'
+    },
+    // Row 3
+    {
+      id: 'pedidos',
+      title: 'Pedidos',
+      description: 'Gestionar pedidos de compra',
+      icon: Truck,
+      color: 'text-cyan-500',
+      bgColor: 'bg-cyan-50',
+      hoverBg: 'hover:bg-cyan-50',
+      borderColor: 'border-cyan-200',
+      href: `${baseUrl}/equipos/pedidos`,
+      stats: [
+        { label: 'Pedidos', value: totalPedidos },
+      ],
+    },
+    {
+      id: 'tareas',
+      title: 'Tareas',
+      description: 'Seguimiento de tareas del proyecto',
+      icon: CheckSquare,
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-50',
+      hoverBg: 'hover:bg-amber-50',
+      borderColor: 'border-amber-200',
+      href: `${baseUrl}/cronograma`,
+      stats: [
+        { label: 'Total', value: cronogramaStats.tareas },
+        { label: 'En progreso', value: cronogramaStats.tareasEnProgreso },
+        { label: 'Completadas', value: cronogramaStats.tareasCompletadas },
+      ],
+      cobertura: progresoTareas,
     },
   ]
 

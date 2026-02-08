@@ -59,6 +59,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     fases: 0,
     edts: 0,
     tareas: 0,
+    tareasCompletadas: 0,
+    tareasEnProgreso: 0,
     activeCronograma: null
   })
 
@@ -137,6 +139,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       let fasesCount = 0
       let edtsCount = 0
       let tareasCount = 0
+      let tareasCompletadas = 0
+      let tareasEnProgreso = 0
 
       if (fasesResponse.ok) {
         const fasesData = await fasesResponse.json()
@@ -150,7 +154,12 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
 
       if (tareasResponse.ok) {
         const tareasData = await tareasResponse.json()
-        if (tareasData.success) tareasCount = tareasData.data.length
+        if (tareasData.success) {
+          const tareasList = tareasData.data as Array<{ estado: string }>
+          tareasCount = tareasList.length
+          tareasCompletadas = tareasList.filter(t => t.estado === 'completada').length
+          tareasEnProgreso = tareasList.filter(t => t.estado === 'en_progreso').length
+        }
       }
 
       if (cronogramasList.length === 0) {
@@ -186,6 +195,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         fases: fasesCount,
         edts: edtsCount,
         tareas: tareasCount,
+        tareasCompletadas,
+        tareasEnProgreso,
         activeCronograma
       })
     } catch (error) {

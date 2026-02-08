@@ -8,6 +8,8 @@ export interface CronogramaStats {
   fases: number
   edts: number
   tareas: number
+  tareasCompletadas: number
+  tareasEnProgreso: number
   activeCronograma: ProyectoCronograma | null
 }
 
