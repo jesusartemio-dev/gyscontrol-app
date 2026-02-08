@@ -61,6 +61,7 @@ interface QuotedItemOption {
   id: string
   codigo: string
   descripcion: string
+  categoria: string
   grupoNombre: string
   grupoId: string
 }
@@ -186,6 +187,7 @@ export default function ModalImportarExcelLista({
           id: item.id,
           codigo: item.codigo,
           descripcion: item.descripcion,
+          categoria: (item as any).categoria || '',
           grupoNombre: grupo.nombre,
           grupoId: grupo.id,
         }))
@@ -464,7 +466,7 @@ export default function ModalImportarExcelLista({
       const a = document.createElement('a')
       a.href = url
       const fileName = listaCodigo && listaNombre
-        ? `${listaCodigo}_${listaNombre.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s-]/g, '').replace(/\s+/g, '_')}.xlsx`
+        ? `${listaCodigo}_${listaNombre.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s-]/g, '').replace(/\s+/g, '_')}_-_Plantilla.xlsx`
         : 'plantilla_importacion_equipos.xlsx'
       a.download = fileName
       a.click()
@@ -679,7 +681,7 @@ export default function ModalImportarExcelLista({
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono shrink-0">
                       {item.codigo}
                     </Badge>
-                    <span className="text-xs text-gray-700 truncate flex-1">{item.descripcion}</span>
+                    <span className="text-xs text-gray-700 line-clamp-2 flex-1" title={item.descripcion}>{item.descripcion}</span>
                     {isNew && !isMapped && (
                       <Badge className="text-[10px] px-1 py-0 bg-orange-100 text-orange-700 shrink-0">
                         nuevo
@@ -710,35 +712,74 @@ export default function ModalImportarExcelLista({
                       }
                     >
                       <SelectTrigger className={cn(
-                        'h-7 text-xs flex-1',
+                        'h-7 text-xs flex-1 overflow-hidden',
                         isMapped ? 'border-green-300 text-green-800' : 'text-gray-500'
                       )}>
                         <SelectValue>
                           {isMapped && matchedQuoted
-                            ? `${matchedQuoted.codigo} - ${matchedQuoted.descripcion}`
+                            ? <span className="truncate block max-w-full"><span className="font-mono">{matchedQuoted.codigo}</span> {matchedQuoted.descripcion.length > 45 ? matchedQuoted.descripcion.slice(0, 45) + '...' : matchedQuoted.descripcion}</span>
                             : 'Sin vincular'
                           }
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-w-[500px]">
                         <SelectItem value={MAPPING_NONE} className="text-xs">
                           <span className="flex items-center gap-1.5">
                             <Unlink className="h-3 w-3" />
                             Sin vincular
                           </span>
                         </SelectItem>
-                        {proyectoEquipos.map(grupo => (
-                          <SelectGroup key={grupo.id}>
-                            <SelectLabel className="text-[10px] font-semibold text-gray-500 uppercase">
-                              {grupo.nombre}
-                            </SelectLabel>
-                            {(grupo.items || []).map(qi => (
-                              <SelectItem key={qi.id} value={qi.id} className="text-xs">
-                                {qi.codigo} - {qi.descripcion}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        ))}
+                        {(() => {
+                          const excelCategoria = (item.categoria || '').toLowerCase()
+                          const allItems = proyectoEquipos.flatMap(grupo =>
+                            (grupo.items || []).map(qi => ({ ...qi, grupoNombre: grupo.nombre }))
+                          )
+                          const sameCategory = excelCategoria
+                            ? allItems.filter(qi => ((qi as any).categoria || '').toLowerCase() === excelCategoria)
+                            : []
+                          const otherItems = excelCategoria
+                            ? allItems.filter(qi => ((qi as any).categoria || '').toLowerCase() !== excelCategoria)
+                            : allItems
+
+                          return (
+                            <>
+                              {sameCategory.length > 0 && (
+                                <SelectGroup>
+                                  <SelectLabel className="text-[10px] font-semibold text-green-600 uppercase">
+                                    Misma categoría ({item.categoria})
+                                  </SelectLabel>
+                                  {sameCategory.map(qi => (
+                                    <SelectItem key={qi.id} value={qi.id} className="text-xs max-w-[480px]">
+                                      <span className="flex flex-col gap-0.5">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
+                                          <span className="truncate text-gray-700">{qi.descripcion}</span>
+                                        </span>
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              )}
+                              {otherItems.length > 0 && (
+                                <SelectGroup>
+                                  <SelectLabel className="text-[10px] font-semibold text-gray-500 uppercase">
+                                    {sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}
+                                  </SelectLabel>
+                                  {otherItems.map(qi => (
+                                    <SelectItem key={qi.id} value={qi.id} className="text-xs max-w-[480px]">
+                                      <span className="flex flex-col gap-0.5">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
+                                          <span className="truncate text-gray-700">{qi.descripcion}</span>
+                                        </span>
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              )}
+                            </>
+                          )
+                        })()}
                       </SelectContent>
                     </Select>
                   </div>
