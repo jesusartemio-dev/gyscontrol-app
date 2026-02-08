@@ -57,10 +57,13 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   const [cronogramaStats, setCronogramaStats] = useState<CronogramaStats>({
     cronogramas: 0,
     fases: 0,
+    fasesEnProgreso: 0,
     edts: 0,
     tareas: 0,
     tareasCompletadas: 0,
     tareasEnProgreso: 0,
+    horasPlan: 0,
+    horasReales: 0,
     activeCronograma: null
   })
 
@@ -137,19 +140,31 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       ])
 
       let fasesCount = 0
+      let fasesEnProgreso = 0
       let edtsCount = 0
       let tareasCount = 0
       let tareasCompletadas = 0
       let tareasEnProgreso = 0
+      let horasPlan = 0
+      let horasReales = 0
 
       if (fasesResponse.ok) {
         const fasesData = await fasesResponse.json()
-        if (fasesData.success) fasesCount = fasesData.data.length
+        if (fasesData.success) {
+          const fasesList = fasesData.data as Array<{ estado: string }>
+          fasesCount = fasesList.length
+          fasesEnProgreso = fasesList.filter(f => f.estado === 'en_progreso').length
+        }
       }
 
       if (edtsResponse.ok) {
         const edtsData = await edtsResponse.json()
-        if (edtsData.success) edtsCount = edtsData.data.length
+        if (edtsData.success) {
+          const edtsList = edtsData.data as Array<{ horasPlan?: number; horasReales?: number }>
+          edtsCount = edtsList.length
+          horasPlan = edtsList.reduce((sum, e) => sum + (Number(e.horasPlan) || 0), 0)
+          horasReales = edtsList.reduce((sum, e) => sum + (Number(e.horasReales) || 0), 0)
+        }
       }
 
       if (tareasResponse.ok) {
@@ -193,10 +208,13 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       setCronogramaStats({
         cronogramas: cronogramasList.length,
         fases: fasesCount,
+        fasesEnProgreso,
         edts: edtsCount,
         tareas: tareasCount,
         tareasCompletadas,
         tareasEnProgreso,
+        horasPlan,
+        horasReales,
         activeCronograma
       })
     } catch (error) {

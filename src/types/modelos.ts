@@ -1401,7 +1401,11 @@ export interface PedidoEquipo {
   fechaEntregaReal?: string            // Fecha real de entrega
   observacion?: string
 
-  // ✅ Coherencia financiera
+  // ✅ Financiero y prioridad
+  esUrgente?: boolean
+  prioridad?: string
+  costoRealTotal?: number
+  presupuestoTotal?: number
   coherencia?: number                  // Porcentaje de coherencia (0-100)
 
   // 🚛 Campos logísticos para gestión de entregas

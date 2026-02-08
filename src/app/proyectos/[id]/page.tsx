@@ -78,7 +78,24 @@ export default function ProyectoHubPage() {
   const totalGastosCliente = proyecto.gastos?.reduce((acc, g) => acc + (g.subtotalCliente || 0), 0) || 0
   const totalGastosReal = proyecto.gastos?.reduce((acc, g) => acc + (g.subtotalReal || 0), 0) || 0
   const totalListas = proyecto.listaEquipos?.length || 0
+  const totalListasItems = proyecto.listaEquipos?.reduce((acc, l) => acc + (l.listaEquipoItem?.length || 0), 0) || 0
+  const totalListasPresupuesto = proyecto.listaEquipos?.reduce((acc, l) =>
+    acc + (l.listaEquipoItem?.reduce((s, i) => s + (i.presupuesto || 0), 0) || 0), 0) || 0
+  const listasAprobadas = proyecto.listaEquipos?.filter(l =>
+    l.estado === 'aprobada' || l.estado === 'completada').length || 0
+  const progresoListas = totalListas > 0
+    ? { porcentaje: (listasAprobadas / totalListas) * 100, estado: 'ok' as const }
+    : null
+
   const totalPedidos = proyecto.pedidos?.length || 0
+  const pedidosEntregados = proyecto.pedidos?.filter(p => p.estado === 'entregado').length || 0
+  const pedidosUrgentes = proyecto.pedidos?.filter(p => p.esUrgente).length || 0
+  const pedidosCostoReal = proyecto.pedidos?.reduce((acc, p) => acc + (p.costoRealTotal || 0), 0) || 0
+  const pedidosPresupuesto = proyecto.pedidos?.reduce((acc, p) => acc + (p.presupuestoTotal || 0), 0) || 0
+  const progresoPedidosEntrega = totalPedidos > 0
+    ? { porcentaje: (pedidosEntregados / totalPedidos) * 100, estado: 'ok' as const }
+    : null
+  const progresoPedidosCosto = calcularProgreso(pedidosCostoReal, pedidosPresupuesto)
 
   // Calculate progress for each category
   const progresoServicios = calcularProgreso(totalServiciosReal, totalServiciosCliente)
@@ -90,6 +107,9 @@ export default function ProyectoHubPage() {
   const progresoTareas = cronogramaStats.tareas > 0
     ? { porcentaje: (cronogramaStats.tareasCompletadas / cronogramaStats.tareas) * 100, estado: 'ok' as const }
     : null
+
+  // Cronograma hours progress
+  const progresoHoras = calcularProgreso(cronogramaStats.horasReales, cronogramaStats.horasPlan)
 
   // Grid order: row by row (3 cols)
   // Row 1: Equipos | Servicios | Gastos
@@ -166,7 +186,12 @@ export default function ProyectoHubPage() {
       href: `${baseUrl}/equipos/listas`,
       stats: [
         { label: 'Listas', value: totalListas },
+        { label: 'Items', value: totalListasItems },
+        { label: 'Aprobadas', value: listasAprobadas },
       ],
+      total: totalListasPresupuesto,
+      cobertura: progresoListas,
+      coberturaLabel: 'Aprobación',
     },
     {
       id: 'cronograma',
@@ -179,9 +204,14 @@ export default function ProyectoHubPage() {
       borderColor: 'border-purple-200',
       href: `${baseUrl}/cronograma`,
       stats: [
-        { label: 'EDTs', value: cronogramaStats.edts },
         { label: 'Fases', value: cronogramaStats.fases },
+        { label: 'Activas', value: cronogramaStats.fasesEnProgreso },
+        { label: 'EDTs', value: cronogramaStats.edts },
       ],
+      progreso: progresoHoras,
+      real: cronogramaStats.horasReales,
+      plan: cronogramaStats.horasPlan,
+      realLabel: `${Math.round(cronogramaStats.horasReales)}h / ${Math.round(cronogramaStats.horasPlan)}h`,
       badge: cronogramaStats.activeCronograma?.nombre || 'Cronograma'
     },
     {
@@ -213,7 +243,14 @@ export default function ProyectoHubPage() {
       href: `${baseUrl}/equipos/pedidos`,
       stats: [
         { label: 'Pedidos', value: totalPedidos },
+        { label: 'Entregados', value: pedidosEntregados },
+        ...(pedidosUrgentes > 0 ? [{ label: 'Urgentes', value: pedidosUrgentes }] : []),
       ],
+      cobertura: progresoPedidosEntrega,
+      coberturaLabel: 'Entrega',
+      progreso: progresoPedidosCosto,
+      real: pedidosCostoReal,
+      plan: pedidosPresupuesto
     },
     {
       id: 'tareas',
@@ -297,7 +334,7 @@ export default function ProyectoHubPage() {
                         ) : (
                           <TrendingDown className="h-3 w-3 text-emerald-500" />
                         )}
-                        Real: {formatCurrency(card.real || 0)}
+                        {card.realLabel || `Real: ${formatCurrency(card.real || 0)}`}
                       </span>
                       <span className={`font-medium ${
                         card.progreso.estado === 'danger' ? 'text-red-600' :
@@ -328,7 +365,7 @@ export default function ProyectoHubPage() {
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-muted-foreground flex items-center gap-1">
                         <ClipboardList className="h-3 w-3 text-blue-500" />
-                        Cobertura
+                        {card.coberturaLabel || 'Cobertura'}
                       </span>
                       <span className={`font-medium ${
                         card.cobertura.porcentaje >= 100 ? 'text-emerald-600' :

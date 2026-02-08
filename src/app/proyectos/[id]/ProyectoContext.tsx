@@ -6,10 +6,13 @@ import type { Proyecto, ProyectoCronograma } from '@/types'
 export interface CronogramaStats {
   cronogramas: number
   fases: number
+  fasesEnProgreso: number
   edts: number
   tareas: number
   tareasCompletadas: number
   tareasEnProgreso: number
+  horasPlan: number
+  horasReales: number
   activeCronograma: ProyectoCronograma | null
 }
 
