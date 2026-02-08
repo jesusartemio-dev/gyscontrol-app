@@ -16,13 +16,21 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
+import {
   Package,
   CheckCircle2,
   Loader2,
   Search,
   X,
   Calendar,
-  FileText
+  FileText,
+  Filter
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@prisma/client'
@@ -57,6 +65,7 @@ export default function CrearListaMultipleModal({
   const [busqueda, setBusqueda] = useState('')
   const [codigoLista, setCodigoLista] = useState('')
   const [fechaRequerida, setFechaRequerida] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('__todas__')
   const router = useRouter()
 
   const cargarItemsDisponibles = async () => {
@@ -108,6 +117,7 @@ export default function CrearListaMultipleModal({
       setItemsSeleccionados([])
       setNombreLista(proyectoEquipo.nombre || 'Nueva Lista Técnica')
       setBusqueda('')
+      setCategoriaFiltro('__todas__')
       setFechaRequerida('')
     }
   }, [isOpen, proyectoEquipo.id, proyectoId])
@@ -127,7 +137,15 @@ export default function CrearListaMultipleModal({
     setItemsSeleccionados([])
   }
 
+  const categoriasUnicas = [...new Set(itemsDisponibles.map(i => i.categoria || 'SIN-CATEGORIA'))].sort()
+
   const itemsFiltrados = itemsDisponibles.filter(item => {
+    // Filtro por categoría
+    if (categoriaFiltro !== '__todas__') {
+      const cat = item.categoria || 'SIN-CATEGORIA'
+      if (cat !== categoriaFiltro) return false
+    }
+    // Filtro por búsqueda de texto
     if (!busqueda) return true
     const term = busqueda.toLowerCase()
     return (
@@ -242,7 +260,7 @@ export default function CrearListaMultipleModal({
 
           {/* Search and Actions */}
           <div className="flex items-center gap-2">
-            <div className="relative flex-1 max-w-xs">
+            <div className="relative flex-1 max-w-[200px]">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
               <Input
                 value={busqueda}
@@ -251,6 +269,23 @@ export default function CrearListaMultipleModal({
                 className="h-7 text-xs pl-7"
               />
             </div>
+            <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+              <SelectTrigger className="h-7 text-xs w-[200px]">
+                <Filter className="h-3 w-3 mr-1 text-gray-400" />
+                <SelectValue placeholder="Categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__todas__">Todas las categorías ({itemsDisponibles.length})</SelectItem>
+                {categoriasUnicas.map(cat => {
+                  const count = itemsDisponibles.filter(i => (i.categoria || 'SIN-CATEGORIA') === cat).length
+                  return (
+                    <SelectItem key={cat} value={cat}>
+                      {cat} ({count})
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
             <div className="flex items-center gap-1 ml-auto">
               <Button
                 variant="ghost"
@@ -295,7 +330,7 @@ export default function CrearListaMultipleModal({
                   {itemsFiltrados.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                        {busqueda ? 'No se encontraron items' : 'No hay items disponibles'}
+                        {busqueda || categoriaFiltro !== '__todas__' ? 'No se encontraron items con los filtros aplicados' : 'No hay items disponibles'}
                       </td>
                     </tr>
                   ) : (
