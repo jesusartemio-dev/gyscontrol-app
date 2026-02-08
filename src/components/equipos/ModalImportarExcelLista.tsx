@@ -73,6 +73,7 @@ export default function ModalImportarExcelLista({
   const [importProgress, setImportProgress] = useState(0)
   const [proyectoEquipos, setProyectoEquipos] = useState<ProyectoEquipoCotizado[]>([])
   const [selectedProyectoEquipoId, setSelectedProyectoEquipoId] = useState('')
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
   const resetModal = useCallback(() => {
     setStep('upload')
@@ -245,15 +246,110 @@ export default function ModalImportarExcelLista({
     }
   }
 
-  const downloadTemplate = () => {
-    const templateData = [
-      { 'Código': 'EQ001', 'Descripción': 'Ejemplo de Equipo', 'Categoría': 'Eléctricos', 'Unidad': 'UND', 'Marca': 'Siemens', 'Cantidad': 1 },
-      { 'Código': 'EQ002', 'Descripción': 'Otro Equipo', 'Categoría': 'Mecánicos', 'Unidad': 'KG', 'Marca': 'ABB', 'Cantidad': 2 }
-    ]
-    const ws = XLSX.utils.json_to_sheet(templateData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla')
-    XLSX.writeFile(wb, 'plantilla_importacion.xlsx')
+  const downloadTemplate = async () => {
+    try {
+      setDownloadingTemplate(true)
+      const ExcelJS = (await import('exceljs')).default
+
+      const [catRes, uniRes] = await Promise.all([
+        fetch('/api/categoria-equipo'),
+        fetch('/api/unidad')
+      ])
+
+      const categorias: Array<{ id: string; nombre: string; descripcion?: string }> = catRes.ok ? await catRes.json() : []
+      const unidades: Array<{ id: string; nombre: string }> = uniRes.ok ? await uniRes.json() : []
+
+      const wb = new ExcelJS.Workbook()
+
+      // --- Sheet 1: Plantilla ---
+      const wsPlantilla = wb.addWorksheet('Plantilla')
+      wsPlantilla.columns = [
+        { header: 'Código', key: 'codigo', width: 12 },
+        { header: 'Descripción', key: 'descripcion', width: 30 },
+        { header: 'Categoría', key: 'categoria', width: 22 },
+        { header: 'Unidad', key: 'unidad', width: 10 },
+        { header: 'Marca', key: 'marca', width: 15 },
+        { header: 'Cantidad', key: 'cantidad', width: 10 },
+      ]
+      // Header style
+      wsPlantilla.getRow(1).font = { bold: true }
+      wsPlantilla.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }
+
+      // Example rows
+      wsPlantilla.addRow({
+        codigo: 'EQ001', descripcion: 'Ejemplo de Equipo',
+        categoria: categorias[0]?.nombre || 'Eléctricos',
+        unidad: unidades[0]?.nombre || 'UND',
+        marca: 'Siemens', cantidad: 1
+      })
+      wsPlantilla.addRow({
+        codigo: 'EQ002', descripcion: 'Otro Equipo',
+        categoria: categorias[1]?.nombre || 'Mecánicos',
+        unidad: unidades[1]?.nombre || 'KG',
+        marca: 'ABB', cantidad: 2
+      })
+
+      // --- Sheet 2: Categorias (VISIBLE - reference with description) ---
+      const wsCategorias = wb.addWorksheet('Categorias')
+      wsCategorias.columns = [
+        { header: 'Categoría', key: 'nombre', width: 25 },
+        { header: 'Descripción', key: 'descripcion', width: 70 },
+      ]
+      wsCategorias.getRow(1).font = { bold: true }
+      wsCategorias.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
+      for (const cat of categorias) {
+        wsCategorias.addRow({ nombre: cat.nombre, descripcion: cat.descripcion || '' })
+      }
+
+      // --- Sheet 3: Unidades (HIDDEN) ---
+      const wsUnidades = wb.addWorksheet('Unidades')
+      wsUnidades.columns = [{ header: 'Unidad', key: 'nombre', width: 15 }]
+      for (const uni of unidades) {
+        wsUnidades.addRow({ nombre: uni.nombre })
+      }
+      wsUnidades.state = 'hidden'
+
+      // --- Data validation dropdowns on Plantilla ---
+      if (categorias.length > 0) {
+        for (let row = 2; row <= 500; row++) {
+          wsPlantilla.getCell(`C${row}`).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: [`Categorias!$A$2:$A$${categorias.length + 1}`],
+            showErrorMessage: true,
+            errorTitle: 'Categoría inválida',
+            error: 'Selecciona una categoría de la lista o consulta la hoja "Categorias"',
+          }
+        }
+      }
+      if (unidades.length > 0) {
+        for (let row = 2; row <= 500; row++) {
+          wsPlantilla.getCell(`D${row}`).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: [`Unidades!$A$2:$A$${unidades.length + 1}`],
+            showErrorMessage: true,
+            errorTitle: 'Unidad inválida',
+            error: 'Selecciona una unidad de la lista',
+          }
+        }
+      }
+
+      // Generate and download
+      const buffer = await wb.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'plantilla_importacion_equipos.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error descargando plantilla:', error)
+      toast.error('Error al descargar la plantilla')
+    } finally {
+      setDownloadingTemplate(false)
+    }
   }
 
   // Step indicator
@@ -318,9 +414,13 @@ export default function ModalImportarExcelLista({
       </label>
 
       <div className="flex justify-center">
-        <Button variant="ghost" size="sm" onClick={downloadTemplate} className="h-7 text-xs text-gray-500">
-          <Download className="w-3 h-3 mr-1" />
-          Descargar plantilla
+        <Button variant="ghost" size="sm" onClick={downloadTemplate} disabled={downloadingTemplate} className="h-7 text-xs text-gray-500">
+          {downloadingTemplate ? (
+            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+          ) : (
+            <Download className="w-3 h-3 mr-1" />
+          )}
+          {downloadingTemplate ? 'Descargando...' : 'Descargar plantilla'}
         </Button>
       </div>
 

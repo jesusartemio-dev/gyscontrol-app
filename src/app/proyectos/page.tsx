@@ -447,7 +447,7 @@ export default function ProyectosPage() {
                         <td className="p-2 font-mono text-[10px] text-gray-500">{proyecto.codigo}</td>
                         <td className="p-2">
                           <button
-                            className="text-blue-600 hover:underline font-medium text-left truncate max-w-[180px] block"
+                            className="text-blue-600 hover:underline font-medium text-left line-clamp-2 leading-tight"
                             onClick={() => router.push(`/proyectos/${proyecto.id}`)}
                             title={proyecto.nombre}
                           >

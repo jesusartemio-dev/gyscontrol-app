@@ -456,19 +456,21 @@ export default function EquipmentListsPage({ params }: PageProps) {
               <Trash2 className="h-5 w-5 text-red-600" />
               Eliminar Lista de Equipos
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>¿Estás seguro de que deseas eliminar esta lista?</p>
-              {listaToDelete && (
-                <div className="bg-muted/50 rounded-md p-3 mt-2">
-                  <p className="font-medium text-foreground">{listaToDelete.nombre}</p>
-                  {listaToDelete.codigo && (
-                    <p className="text-xs text-muted-foreground font-mono">{listaToDelete.codigo}</p>
-                  )}
-                </div>
-              )}
-              <p className="text-red-600 text-sm font-medium mt-2">
-                Esta acción no se puede deshacer.
-              </p>
+            <AlertDialogDescription asChild>
+              <div className="text-muted-foreground text-sm space-y-2">
+                <span>¿Estás seguro de que deseas eliminar esta lista?</span>
+                {listaToDelete && (
+                  <div className="bg-muted/50 rounded-md p-3 mt-2">
+                    <span className="font-medium text-foreground block">{listaToDelete.nombre}</span>
+                    {listaToDelete.codigo && (
+                      <span className="text-xs text-muted-foreground font-mono block">{listaToDelete.codigo}</span>
+                    )}
+                  </div>
+                )}
+                <span className="text-red-600 text-sm font-medium mt-2 block">
+                  Esta acción no se puede deshacer.
+                </span>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

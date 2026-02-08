@@ -108,6 +108,24 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   }
 }
 
+// ✅ Actualizar parcialmente proyecto (estado, etc.)
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await context.params
+    const data = await req.json()
+
+    const actualizado = await prisma.proyecto.update({
+      where: { id },
+      data,
+    })
+
+    return NextResponse.json(actualizado)
+  } catch (error) {
+    console.error('❌ Error al actualizar proyecto (PATCH):', error)
+    return NextResponse.json({ error: 'Error interno al actualizar proyecto' }, { status: 500 })
+  }
+}
+
 // ✅ Eliminar proyecto (Soft Delete)
 // En lugar de eliminar físicamente, marca el proyecto con deletedAt
 // La extension de Prisma filtra automáticamente los proyectos eliminados
