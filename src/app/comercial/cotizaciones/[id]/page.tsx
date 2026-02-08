@@ -17,7 +17,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
-import { useCotizacionContext } from './layout'
+import { useCotizacionContext } from './cotizacion-context'
 
 // Utility function
 const formatCurrency = (amount: number): string => {

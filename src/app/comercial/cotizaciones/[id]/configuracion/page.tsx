@@ -9,7 +9,7 @@ import { CabeceraTab } from '@/components/cotizaciones/tabs/CabeceraTab'
 import { ExclusionesTab } from '@/components/cotizaciones/tabs/ExclusionesTab'
 import { CondicionesTab } from '@/components/cotizaciones/tabs/CondicionesTab'
 
-import { useCotizacionContext } from '../layout'
+import { useCotizacionContext } from '../cotizacion-context'
 
 export default function CotizacionConfiguracionPage() {
   const { cotizacion, setCotizacion } = useCotizacionContext()

@@ -13,7 +13,7 @@ import CotizacionGastoAccordion from '@/components/cotizaciones/CotizacionGastoA
 import CotizacionGastoModal from '@/components/cotizaciones/CotizacionGastoModal'
 import ImportarPlantillaModal from '@/components/cotizaciones/ImportarPlantillaModal'
 
-import { useCotizacionContext } from '../layout'
+import { useCotizacionContext } from '../cotizacion-context'
 import type { CotizacionGastoItem } from '@/types'
 
 export default function CotizacionGastosPage() {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, createContext, useContext } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -29,25 +29,7 @@ import EstadoCotizacionStepper from '@/components/cotizaciones/EstadoCotizacionS
 import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
 
 import type { Cotizacion, EstadoCotizacion } from '@/types'
-
-// Context para compartir datos de cotizacion con sub-páginas
-interface CotizacionContextType {
-  cotizacion: Cotizacion | null
-  setCotizacion: (cotizacion: Cotizacion) => void
-  refreshCotizacion: () => Promise<void>
-  loading: boolean
-  isLocked: boolean // true cuando la cotización está aprobada (no se puede editar)
-}
-
-const CotizacionContext = createContext<CotizacionContextType | null>(null)
-
-export function useCotizacionContext() {
-  const context = useContext(CotizacionContext)
-  if (!context) {
-    throw new Error('useCotizacionContext must be used within CotizacionLayout')
-  }
-  return context
-}
+import { CotizacionContext } from './cotizacion-context'
 
 // Utility functions
 const formatCurrency = (amount: number): string => {

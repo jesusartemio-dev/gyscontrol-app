@@ -1,7 +1,7 @@
 'use client'
 
 import { CronogramaComercialTab } from '@/components/comercial/cronograma/CronogramaComercialTab'
-import { useCotizacionContext } from '../layout'
+import { useCotizacionContext } from '../cotizacion-context'
 
 export default function CotizacionCronogramaPage() {
   const { cotizacion } = useCotizacionContext()

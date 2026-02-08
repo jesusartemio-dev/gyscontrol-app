@@ -14,7 +14,7 @@ import CotizacionEquipoAccordion from '@/components/cotizaciones/CotizacionEquip
 import CotizacionEquipoModal from '@/components/cotizaciones/CotizacionEquipoModal'
 import ImportarPlantillaModal from '@/components/cotizaciones/ImportarPlantillaModal'
 
-import { useCotizacionContext } from '../layout'
+import { useCotizacionContext } from '../cotizacion-context'
 import type { CotizacionEquipoItem } from '@/types'
 
 export default function CotizacionEquiposPage() {

@@ -14,7 +14,7 @@ import CotizacionServicioAccordion from '@/components/cotizaciones/CotizacionSer
 import CotizacionServicioCreateModal from '@/components/cotizaciones/CotizacionServicioCreateModal'
 import ImportarPlantillaModal from '@/components/cotizaciones/ImportarPlantillaModal'
 
-import { useCotizacionContext } from '../layout'
+import { useCotizacionContext } from '../cotizacion-context'
 import type { CotizacionServicioItem } from '@/types'
 
 export default function CotizacionServiciosPage() {

@@ -136,11 +136,12 @@ export async function POST(req: Request) {
         const proyectoItem = proyectoEquipoItems.find(item => item.id === itemId)
         if (!proyectoItem) continue
 
-        await tx.listaEquipoItem.create({
+        const nuevoItem = await tx.listaEquipoItem.create({
           data: {
             id: crypto.randomUUID(),
             listaId: lista.id,
             proyectoEquipoItemId: proyectoItem.id,
+            proyectoEquipoId: proyectoEquipoId,
             codigo: proyectoItem.codigo,
             descripcion: proyectoItem.descripcion,
             marca: proyectoItem.marca || '',
@@ -156,18 +157,20 @@ export async function POST(req: Request) {
             updatedAt: new Date()
           }
         })
-      }
 
-      // 3. Asociar los ProyectoEquipoItem a la lista (mantener estado 'pendiente')
-      // Solo cambiar a 'en_lista' cuando se convierta en pedido
-      await tx.proyectoEquipoCotizadoItem.updateMany({
-        where: {
-          id: { in: itemsIds }
-        },
-        data: {
-          listaId: lista.id
-        }
-      })
+        // 3. Actualizar ProyectoEquipoItem: vincular a lista y marcar como 'en_lista'
+        await tx.proyectoEquipoCotizadoItem.update({
+          where: { id: proyectoItem.id },
+          data: {
+            listaId: lista.id,
+            listaEquipoSeleccionadoId: nuevoItem.id,
+            estado: 'en_lista',
+            cantidadReal: proyectoItem.cantidad,
+            precioReal: proyectoItem.precioInterno,
+            costoReal: proyectoItem.cantidad * proyectoItem.precioInterno,
+          }
+        })
+      }
 
       return lista
     })

@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         categoria: item.categoria || '', // ✅ Copiar categoria
         unidad: item.unidad || '',
         cantidad: item.cantidad,
-        presupuesto: item.precioInterno,
+        presupuesto: item.precioCliente || 0,
         origen: 'cotizado',
         estado: 'borrador',
         updatedAt: new Date(),

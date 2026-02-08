@@ -26,6 +26,7 @@ export interface ItemExcelImportado {
   estado: 'en_cotizacion' | 'solo_catalogo' | 'nuevo'
   catalogoId?: string
   proyectoEquipoItemId?: string
+  categoriaCatalogo?: string // Categoría del catálogo para detectar discrepancias
 }
 
 export interface ResumenImportacionExcel {
@@ -112,16 +113,20 @@ export async function verificarExistenciaEquipos(
       let catalogoId: string | undefined
       let proyectoEquipoItemId: string | undefined
 
+      let categoriaCatalogo: string | undefined
+
       if (existeEnCatalogo && existeEnCotizacion) {
         // Existe en ambos
         estado = 'en_cotizacion'
         catalogoId = catalogoPorCodigo.get(codigoStr)?.id
         proyectoEquipoItemId = cotizacionPorCodigo.get(codigoStr)?.id
+        categoriaCatalogo = catalogoPorCodigo.get(codigoStr)?.categoriaEquipo?.nombre
         enCotizacion++
       } else if (existeEnCatalogo) {
         // Solo en catálogo
         estado = 'solo_catalogo'
         catalogoId = catalogoPorCodigo.get(codigoStr)?.id
+        categoriaCatalogo = catalogoPorCodigo.get(codigoStr)?.categoriaEquipo?.nombre
         soloCatalogo++
       } else {
         // Nuevo
@@ -188,7 +193,8 @@ export async function verificarExistenciaEquipos(
         cantidad,
         estado,
         catalogoId,
-        proyectoEquipoItemId
+        proyectoEquipoItemId,
+        categoriaCatalogo
       })
     }
 
@@ -344,5 +350,60 @@ export async function importarDesdeCatalogo(
   } catch (error) {
     console.error('Error importando desde catálogo:', error)
     throw new Error('Error al importar items desde catálogo')
+  }
+}
+
+// ✅ Importar items directo a la lista SIN crear en catálogo (actualiza si ya existe el código)
+export async function importarDirectoALista(
+  listaId: string,
+  proyectoEquipoId: string,
+  items: Array<{
+    codigo: string
+    descripcion: string
+    categoria: string
+    unidad: string
+    marca: string
+    cantidad: number
+  }>,
+  responsableId: string
+): Promise<void> {
+  try {
+    const itemsExistentes = await getListaEquipoItemsByLista(listaId)
+    const itemsPorCodigo = new Map<string, ListaEquipoItem>(
+      itemsExistentes.map(item => [item.codigo, item])
+    )
+
+    for (const item of items) {
+      const existente = itemsPorCodigo.get(item.codigo)
+
+      if (existente) {
+        await updateListaEquipoItem(existente.id, {
+          cantidad: item.cantidad,
+          descripcion: item.descripcion || existente.descripcion,
+          marca: item.marca || existente.marca || 'SIN-MARCA',
+          categoria: item.categoria || existente.categoria || 'SIN-CATEGORIA',
+        })
+        console.log(`🔄 Item ${item.codigo} actualizado en lista (sin catálogo)`)
+      } else {
+        await createListaEquipoItem({
+          listaId,
+          proyectoEquipoId,
+          responsableId,
+          codigo: item.codigo,
+          descripcion: item.descripcion,
+          marca: item.marca || 'SIN-MARCA',
+          categoria: item.categoria || 'SIN-CATEGORIA',
+          unidad: item.unidad || 'UND',
+          cantidad: item.cantidad,
+          presupuesto: 0,
+          origen: 'nuevo',
+          estado: 'borrador'
+        })
+        console.log(`✅ Item ${item.codigo} creado en lista (sin catálogo)`)
+      }
+    }
+  } catch (error) {
+    console.error('Error importando directo a lista:', error)
+    throw new Error('Error al importar items directamente a la lista')
   }
 }
