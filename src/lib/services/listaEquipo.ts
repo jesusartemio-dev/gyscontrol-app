@@ -243,18 +243,24 @@ export async function enviarListaARevision(listaId: string): Promise<boolean> {
 
 // ✅ Cambiar estado de la lista técnica (solo estado, no todo el objeto)
 // 🔄 Las fechas se actualizan automáticamente en el backend según el cambio de estado
-export async function updateListaEstado(id: string, nuevoEstado: string): Promise<ListaEquipo | null> {
+export async function updateListaEstado(id: string, nuevoEstado: string, motivoRechazo?: string): Promise<ListaEquipo | null> {
   try {
+    const payload: Record<string, string> = { estado: nuevoEstado }
+    if (motivoRechazo) payload.motivoRechazo = motivoRechazo
+
     const res = await fetch(`${BASE_URL}/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: nuevoEstado }),
+      body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error('Error al cambiar estado de la lista')
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || 'Error al cambiar estado de la lista')
+    }
     return await res.json()
   } catch (error) {
     console.error('updateListaEstado:', error)
-    return null
+    throw error
   }
 }
 

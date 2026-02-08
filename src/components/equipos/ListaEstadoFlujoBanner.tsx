@@ -10,7 +10,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
-import type { EstadoListaEquipo } from '@/types/modelos'
+import { flujoEstados, estadosList, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
 
 import {
   AlertDialog,
@@ -29,42 +29,13 @@ import { cn } from '@/lib/utils'
 
 import { useState } from 'react'
 
-// ✅ Minimalist estado configuration - text only
-const estados: { key: EstadoListaEquipo; label: string }[] = [
-  { key: 'borrador', label: 'Borrador' },
-  { key: 'por_revisar', label: 'Por revisar' },
-  { key: 'por_cotizar', label: 'Por cotizar' },
-  { key: 'por_validar', label: 'Por validar' },
-  { key: 'por_aprobar', label: 'Por aprobar' },
-  { key: 'aprobada', label: 'Aprobada' },
-  { key: 'rechazada', label: 'Rechazada' },
-  { key: 'enviada', label: 'Enviada' },
-  { key: 'completada', label: 'Completada' },
-]
-
-const flujoEstados: Record<
-  EstadoListaEquipo,
-  {
-    siguiente?: EstadoListaEquipo
-    rechazar?: EstadoListaEquipo
-    reset?: EstadoListaEquipo
-    roles: string[]
-  }
-> = {
-  borrador: { siguiente: 'por_revisar', roles: ['proyectos', 'admin'] },
-  enviada: { siguiente: 'por_revisar', roles: ['coordinador', 'admin'] },
-  por_revisar: { siguiente: 'por_cotizar', rechazar: 'rechazada', roles: ['coordinador', 'admin'] },
-  por_cotizar: { siguiente: 'por_validar', rechazar: 'rechazada', roles: ['logistico', 'admin'] },
-  por_validar: { siguiente: 'por_aprobar', rechazar: 'rechazada', roles: ['gestor', 'admin'] },
-  por_aprobar: { siguiente: 'aprobada', rechazar: 'rechazada', roles: ['gerente', 'admin'] },
-  aprobada: { siguiente: 'completada', rechazar: 'rechazada', roles: ['gerente', 'admin'] },
-  rechazada: { reset: 'borrador', roles: ['proyectos', 'admin'] },
-  completada: { roles: ['gerente', 'admin'] },
-}
+const estados = estadosList
 
 interface Props {
   estado: EstadoListaEquipo
   listaId?: string
+  totalItems?: number
+  itemsVerificados?: number
   onUpdated?: (nuevoEstado: EstadoListaEquipo) => void
   className?: string
 }
@@ -83,7 +54,7 @@ interface Props {
  * - ✅ Professional styling
  * - ✅ Responsive design
  */
-export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, className }: Props) {
+export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0, itemsVerificados = 0, onUpdated, className }: Props) {
   const { data: session } = useSession()
   const rol = session?.user?.role || ''
   const flujo = flujoEstados[estado] || {}
@@ -95,26 +66,28 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
   const [justificacion, setJustificacion] = useState('')
   const [openRechazo, setOpenRechazo] = useState(false)
   const [openReset, setOpenReset] = useState(false)
+  const [openConfirmAvanzar, setOpenConfirmAvanzar] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  const faltanVerificar = totalItems > 0 && itemsVerificados < totalItems
 
   // ✅ Get current estado info
   const siguienteEstado = estados.find(e => e.key === flujo.siguiente)
   const currentIndex = estados.findIndex(e => e.key === estado)
 
-  // ✅ Enhanced state change with loading states and audit logging
-  const cambiarEstado = async (nuevoEstado: EstadoListaEquipo, mensaje: string) => {
+  const cambiarEstado = async (nuevoEstado: EstadoListaEquipo, mensaje: string, motivo?: string) => {
     if (!listaId || !session?.user?.id) return
 
     setLoading(true)
     try {
-      const updated = await updateListaEstado(listaId, nuevoEstado)
+      const updated = await updateListaEstado(listaId, nuevoEstado, motivo)
       if (updated) {
         toast.success(mensaje)
         onUpdated?.(nuevoEstado)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating estado:', error)
-      toast.error('❌ Error al cambiar el estado')
+      toast.error(error?.message || 'Error al cambiar el estado')
     } finally {
       setLoading(false)
     }
@@ -166,17 +139,60 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
       <div className="flex items-center gap-2 flex-shrink-0">
         {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
 
+        {/* Verification progress */}
+        {totalItems > 0 && (
+          <span className={cn(
+            'text-[10px] font-medium',
+            itemsVerificados === totalItems ? 'text-green-600' : 'text-muted-foreground'
+          )}>
+            {itemsVerificados}/{totalItems} verificados
+          </span>
+        )}
+
         {/* Advance Button */}
         {puedeAvanzar && flujo.siguiente && siguienteEstado && (
-          <Button
-            onClick={() => cambiarEstado(flujo.siguiente!, `Estado actualizado a "${siguienteEstado.label}"`)}
-            size="sm"
-            disabled={loading}
-            className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <ArrowRight className="w-3 h-3 mr-1" />
-            Avanzar
-          </Button>
+          <>
+            <Button
+              onClick={() => {
+                if (faltanVerificar) {
+                  setOpenConfirmAvanzar(true)
+                } else {
+                  cambiarEstado(flujo.siguiente!, `Estado actualizado a "${siguienteEstado.label}"`)
+                }
+              }}
+              size="sm"
+              disabled={loading}
+              className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <ArrowRight className="w-3 h-3 mr-1" />
+              Avanzar
+            </Button>
+
+            <AlertDialog open={openConfirmAvanzar} onOpenChange={setOpenConfirmAvanzar}>
+              <AlertDialogContent className="sm:max-w-md">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Items sin verificar</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Hay {totalItems - itemsVerificados} de {totalItems} items sin verificar.
+                    ¿Desea avanzar de todas formas?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      cambiarEstado(flujo.siguiente!, `Estado actualizado a "${siguienteEstado.label}"`)
+                      setOpenConfirmAvanzar(false)
+                    }}
+                    disabled={loading}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Avanzar de todas formas
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
         )}
 
         {/* Reject Button */}
@@ -222,7 +238,7 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, onUpdated, cla
                       toast.error('La justificación debe tener al menos 10 caracteres')
                       return
                     }
-                    cambiarEstado(flujo.rechazar!, 'Lista rechazada')
+                    cambiarEstado(flujo.rechazar!, 'Lista rechazada', justificacion.trim())
                     setJustificacion('')
                     setOpenRechazo(false)
                   }}

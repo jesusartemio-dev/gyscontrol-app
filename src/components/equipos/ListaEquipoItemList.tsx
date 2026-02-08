@@ -81,7 +81,7 @@ interface Props {
 
 const labelOrigen: Record<string, string> = {
   cotizado: 'cotizado',
-  nuevo: 'nuevo',
+  nuevo: 'no cotizado',
   reemplazo: 'reemplazo',
 }
 
@@ -129,7 +129,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     unidad: false, // ✅ Oculta cuando está activa la unificada
     cantidad: false, // ✅ Oculta cuando está activa la unificada
     cantidadUnidad: true, // ✅ Nueva columna unificada (activada por defecto)
-    pedidos: true, // ✅ Nueva columna: estado de pedidos
+    pedidos: false, // ✅ Oculta por defecto (integrado en Cant./Und)
     cotizacion: true,
     costo: true,
     entrega: false,
@@ -162,8 +162,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     ).length
     // ✅ Use itemsWithResumen instead of items to avoid duplicate dependency
     const costoTotal = calcularCostoTotal(itemsWithResumen)
-    
-    return { total, verificados, sinPedidos, enPedido, conCotizacion, costoTotal }
+    const noCotizados = itemsWithResumen.filter(i => i.origen === 'nuevo').length
+    const conMayorCantidad = itemsWithResumen.filter(i =>
+      i.origen === 'cotizado' &&
+      i.proyectoEquipoItem?.cantidad != null &&
+      i.cantidad > i.proyectoEquipoItem.cantidad
+    ).length
+
+    return { total, verificados, sinPedidos, enPedido, conCotizacion, costoTotal, noCotizados, conMayorCantidad }
   }, [itemsWithResumen])
 
   // 🔍 Filter and search items using memoized summaries
@@ -339,8 +345,20 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
         )}
 
         {/* Stats */}
-        <div className="text-[10px] text-muted-foreground">
-          {filteredItems.length} de {items.length}
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span>{filteredItems.length} de {items.length}</span>
+          <span className={`font-medium ${stats.verificados === stats.total ? 'text-green-600' : 'text-muted-foreground'}`}>
+            {stats.verificados}/{stats.total} verificados
+          </span>
+          {stats.noCotizados > 0 && (
+            <span className="text-amber-600 font-medium">{stats.noCotizados} no cotizado{stats.noCotizados > 1 ? 's' : ''}</span>
+          )}
+          {stats.conMayorCantidad > 0 && (
+            <span className="text-amber-600 font-medium flex items-center gap-0.5">
+              <AlertTriangle className="h-3 w-3" />
+              {stats.conMayorCantidad} con mayor cant.
+            </span>
+          )}
         </div>
 
         <div className="flex-1" />
@@ -445,6 +463,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                   entrega: 'Entrega',
                   origen: 'Origen',
                   estado: 'Estado',
+                  pedidosLinks: 'Links Pedidos',
                   verificadoComentario: 'Verif./Comentario'
                 }).map(([key, label]) => {
                   if (visibleColumns.cantidadUnidad && (key === 'unidad' || key === 'cantidad')) {
@@ -517,7 +536,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
 
     // ✅ Define optimized column widths for compact layout
     const columnWidths = {
-      codigoDescripcion: 'w-48',
+      codigoDescripcion: 'min-w-[180px]',
       marca: 'w-28',
       unidad: 'w-16',
       cantidad: 'w-20',
@@ -537,7 +556,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     return (
       <div className="border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className={`w-full ${textSize} table-fixed`}>
+          <table className={`w-full ${textSize}`}>
             <thead>
               <tr className="bg-gray-50 border-b">
                 {visibleColumns.codigoDescripcion && (
@@ -595,8 +614,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                     Estado
                   </th>
                 )}
-                {visibleColumns.pedidos && (
-                  <th className={`${cellPadding} ${columnWidths.pedidos} text-center font-semibold text-gray-700`}>
+                {visibleColumns.pedidosLinks && (
+                  <th className={`${cellPadding} ${columnWidths.pedidosLinks} text-center font-semibold text-gray-700`}>
                     Pedidos
                   </th>
                 )}
@@ -633,19 +652,17 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
               return (
                 <tr
                    key={item.id}
-                   className={`border-b hover:bg-orange-50/50 transition-colors ${
-                     item.estado === 'rechazado' ? 'bg-red-50/50' :
-                     item.estado === 'aprobado' ? 'bg-green-50/30' :
+                   className={`border-b hover:bg-gray-50 transition-colors ${
                      rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                    }`}
                  >
                    {visibleColumns.codigoDescripcion && (
                      <td className={`${cellPadding} ${columnWidths.codigoDescripcion} text-gray-700`}>
-                       <div className="space-y-1">
-                         <div className="font-semibold text-gray-900 text-sm truncate" title={item.codigo}>
+                       <div className="space-y-0.5">
+                         <div className="font-medium text-gray-900 text-xs truncate" title={item.codigo}>
                            {item.codigo}
                          </div>
-                         <div className="text-xs text-gray-600 truncate" title={item.descripcion}>
+                         <div className="text-[11px] text-gray-500 truncate" title={item.descripcion}>
                            {item.descripcion}
                          </div>
                        </div>
@@ -681,12 +698,20 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                           </Button>
                         </div>
                       ) : (
-                        <div
-                          className="flex items-center justify-center gap-1 font-medium cursor-pointer hover:text-blue-600 transition-colors"
-                          onClick={() => editable && setEditCantidadItemId(item.id)}
-                        >
-                          {item.cantidad}
-                          {editable && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                        <div>
+                          <div
+                            className="flex items-center justify-center gap-1 font-medium cursor-pointer hover:text-blue-600 transition-colors"
+                            onClick={() => editable && setEditCantidadItemId(item.id)}
+                          >
+                            {item.cantidad}
+                            {editable && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                          </div>
+                          {item.origen === 'cotizado' && item.proyectoEquipoItem?.cantidad != null && item.cantidad > item.proyectoEquipoItem.cantidad && (
+                            <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                              <span className="text-[10px] text-amber-600">Cotizado: {item.proyectoEquipoItem.cantidad}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                      </td>
@@ -710,13 +735,31 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                           </Button>
                         </div>
                       ) : (
-                        <div
-                          className="flex items-center justify-center gap-1 font-medium cursor-pointer hover:text-blue-600 transition-colors"
-                          onClick={() => editable && setEditCantidadItemId(item.id)}
-                        >
-                          <span>{item.cantidad}</span>
-                          <span className="text-xs text-gray-500">{item.unidad}</span>
-                          {editable && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                        <div>
+                          <div
+                            className="flex items-center justify-center gap-1 font-medium cursor-pointer hover:text-blue-600 transition-colors"
+                            onClick={() => editable && setEditCantidadItemId(item.id)}
+                          >
+                            <span>{item.cantidad}</span>
+                            <span className="text-xs text-gray-500">{item.unidad}</span>
+                            {editable && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                          </div>
+                          {item.origen === 'cotizado' && item.proyectoEquipoItem?.cantidad != null && item.cantidad > item.proyectoEquipoItem.cantidad && (
+                            <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                              <span className="text-[10px] text-amber-600">Cotizado: {item.proyectoEquipoItem.cantidad}</span>
+                            </div>
+                          )}
+                          {/* Pedido status integrated */}
+                          {(() => {
+                            const cantidadPedida = item.cantidadPedida || 0
+                            const cantidadTotal = item.cantidad || 0
+                            if (cantidadPedida === 0) return null
+                            if (cantidadPedida >= cantidadTotal) {
+                              return <div className="text-center mt-0.5"><span className="text-[9px] text-green-600">Completo</span></div>
+                            }
+                            return <div className="text-center mt-0.5"><span className="text-[9px] text-muted-foreground">{cantidadPedida}/{cantidadTotal} ped.</span></div>
+                          })()}
                         </div>
                       )}
                      </td>
@@ -749,7 +792,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                      </td>
                    )}
                    {visibleColumns.costo && (
-                     <td className={`${cellPadding} ${columnWidths.costo} text-right font-bold text-emerald-600`}>
+                     <td className={`${cellPadding} ${columnWidths.costo} text-right font-medium text-gray-900`}>
                       {costoTotal > 0 ? formatCurrency(costoTotal) : '—'}
                     </td>
                    )}
@@ -766,62 +809,55 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                      </td>
                    )}
                    {visibleColumns.origen && (
-                     <td className={`${cellPadding} ${columnWidths.origen}`}>
-                      <div className="flex justify-center">
-                        <Badge variant={getOrigenVariant(item.origen)} className="text-xs">
-                          {labelOrigen[item.origen] || item.origen}
-                        </Badge>
-                      </div>
+                     <td className={`${cellPadding} ${columnWidths.origen} text-center`}>
+                      <span className={`text-[11px] ${item.origen === 'nuevo' ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                        {labelOrigen[item.origen] || item.origen}
+                      </span>
                      </td>
                    )}
                    {visibleColumns.estado && (
-                     <td className={`${cellPadding} ${columnWidths.estado}`}>
-                      <div className="flex justify-center">
-                        <Badge variant={getStatusVariant(item.estado) as "default" | "secondary" | "outline"} className="text-xs">
-                          {item.estado || 'Sin estado'}
-                        </Badge>
-                      </div>
+                     <td className={`${cellPadding} ${columnWidths.estado} text-center`}>
+                      <span className={`text-[11px] ${
+                        item.estado === 'aprobado' ? 'text-green-600' :
+                        item.estado === 'rechazado' ? 'text-red-500' :
+                        'text-muted-foreground'
+                      }`}>
+                        {item.estado || 'sin estado'}
+                      </span>
                      </td>
                    )}
-                   {visibleColumns.pedidos && (
-                     <td className={`${cellPadding} ${columnWidths.pedidos}`}>
+                   {visibleColumns.pedidosLinks && (
+                     <td className={`${cellPadding} ${columnWidths.pedidosLinks}`}>
                       <div className="flex flex-col gap-1 min-w-0">
                         {(() => {
                           const pedidos = obtenerTodosLosPedidos(item)
                           
                           if (pedidos.length === 0) {
                             return (
-                               <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
-                                 Disponible
-                               </Badge>
+                               <span className="text-[10px] text-muted-foreground">—</span>
                              )
                           }
-                          
+
                           // Mostrar todos los pedidos directamente
                           return (
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-0.5">
                               {pedidos.map((codigo, index) => (
                                 <Tooltip key={index}>
                                   <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-auto p-1 text-xs hover:bg-blue-50 justify-start min-w-0"
+                                    <button
+                                      className="text-[10px] font-mono text-blue-600/80 hover:text-blue-700 hover:underline text-left truncate"
                                       onClick={() => {
-                                        // Navegar al pedido específico
                                         const pedidoItem = item.pedidos?.find(p => p.pedido?.codigo === codigo)
                                         if (pedidoItem?.pedido?.id) {
                                           router.push(`/proyectos/${proyectoId}/pedidos-equipo/${pedidoItem.pedido.id}`)
                                         }
                                       }}
                                     >
-                                      <Badge variant="default" className="text-[10px] truncate px-1.5 py-0.5">
-                                         {codigo}
-                                       </Badge>
-                                    </Button>
+                                      {codigo}
+                                    </button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>Click para ver pedido {codigo}</p>
+                                    <p>Ver pedido {codigo}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               ))}
@@ -933,10 +969,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                           <TooltipTrigger asChild>
                             <Button
                               size="sm"
-                              variant="destructive"
+                              variant="ghost"
                               disabled={!editable}
                               onClick={() => setDeleteTarget(item.id)}
-                              className="h-7 w-7 p-0"
+                              className="h-7 w-7 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>

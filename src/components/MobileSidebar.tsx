@@ -48,6 +48,7 @@ import {
   UserCheck,
   MapPin,
   ClipboardCheck,
+  ClipboardList,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -143,6 +144,7 @@ export default function MobileSidebar() {
         { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
         { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: ClipboardCheck },
+        { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
       ]

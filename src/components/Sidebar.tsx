@@ -46,7 +46,8 @@ import {
   History,
   Briefcase,
   MapPin,
-  HardHat
+  HardHat,
+  ClipboardList
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -194,6 +195,7 @@ export default function Sidebar() {
         { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
         { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
+        { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
       ]

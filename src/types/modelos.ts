@@ -1317,6 +1317,8 @@ export interface ListaEquipoItem {
   // 🧠 Relaciones de origen y reemplazo
   proyectoEquipoItem?: {
     id: string
+    cantidad: number
+    precioCliente: number
     proyectoEquipo?: {
       nombre: string
     }

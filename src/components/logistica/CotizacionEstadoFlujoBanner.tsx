@@ -1,27 +1,25 @@
 'use client'
 
-import React, { useState } from 'react'
-import { EstadoCotizacionProveedor } from '@/types'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
 import {
-  Clock,
-  Send,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
+  ArrowRight,
+  X,
   Loader2,
   ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 interface CotizacionEstadoFlujoBannerProps {
   estado: string
@@ -31,88 +29,54 @@ interface CotizacionEstadoFlujoBannerProps {
   onUpdated?: (nuevoEstado: string) => void
 }
 
-const ESTADOS: EstadoCotizacionProveedor[] = [
-  'pendiente',
-  'solicitado',
-  'cotizado',
-  'rechazado',
-  'seleccionado',
+const ESTADOS = [
+  { key: 'pendiente', label: 'Pendiente' },
+  { key: 'solicitado', label: 'Solicitado' },
+  { key: 'cotizado', label: 'Cotizado' },
+  { key: 'seleccionado', label: 'Seleccionado' },
 ]
 
-const getEstadoInfo = (estado: string) => {
-  switch (estado) {
-    case 'pendiente':
-      return {
-        label: 'Pendiente',
-        icon: Clock,
-        color: 'text-orange-600',
-        bgColor: 'bg-orange-100',
-      }
-    case 'solicitado':
-      return {
-        label: 'Solicitado',
-        icon: Send,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-100',
-      }
-    case 'cotizado':
-      return {
-        label: 'Cotizado',
-        icon: CheckCircle,
-        color: 'text-green-600',
-        bgColor: 'bg-green-100',
-      }
-    case 'rechazado':
-      return {
-        label: 'Rechazado',
-        icon: XCircle,
-        color: 'text-red-600',
-        bgColor: 'bg-red-100',
-      }
-    case 'seleccionado':
-      return {
-        label: 'Seleccionado',
-        icon: CheckCircle,
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-100',
-      }
-    default:
-      return {
-        label: 'Desconocido',
-        icon: AlertCircle,
-        color: 'text-gray-600',
-        bgColor: 'bg-gray-100',
-      }
-  }
+const FLUJO: Record<string, { siguiente?: string; rechazar?: string }> = {
+  pendiente: { siguiente: 'solicitado', rechazar: 'rechazado' },
+  solicitado: { siguiente: 'cotizado', rechazar: 'rechazado' },
+  cotizado: { siguiente: 'seleccionado', rechazar: 'rechazado' },
+  rechazado: {},
+  seleccionado: {},
 }
 
-const esEstadoAccesible = (estadoActual: string, estadoDestino: string): boolean => {
-  const flujoPermitido: Record<string, string[]> = {
-    pendiente: ['solicitado', 'rechazado'],
-    solicitado: ['cotizado', 'rechazado'],
-    cotizado: ['seleccionado', 'rechazado'],
-    rechazado: [],
-    seleccionado: [],
-  }
-  return flujoPermitido[estadoActual]?.includes(estadoDestino) || false
-}
-
-const CotizacionEstadoFlujoBanner: React.FC<CotizacionEstadoFlujoBannerProps> = ({
+export default function CotizacionEstadoFlujoBanner({
   estado,
   cotizacionId,
   cotizacionNombre,
   usuarioId,
   onUpdated,
-}) => {
+}: CotizacionEstadoFlujoBannerProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [pendingEstado, setPendingEstado] = useState<string>('')
+  const [pendingEstado, setPendingEstado] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
 
+  const flujo = FLUJO[estado] || {}
+  const currentIndex = ESTADOS.findIndex(e => e.key === estado)
+  const siguienteEstado = ESTADOS.find(e => e.key === flujo.siguiente)
+
   const confirmarCambioEstado = async () => {
+    if (!pendingEstado) return
     try {
       setIsUpdating(true)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
 
+      // Persist estado to database
+      const res = await fetch(`/api/cotizacion-proveedor/${cotizacionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: pendingEstado }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al actualizar')
+      }
+
+      // Log audit
       if (usuarioId) {
         try {
           await fetch('/api/audit/log-status-change', {
@@ -124,7 +88,7 @@ const CotizacionEstadoFlujoBanner: React.FC<CotizacionEstadoFlujoBannerProps> = 
               userId: usuarioId,
               oldStatus: estado,
               newStatus: pendingEstado,
-              description: cotizacionNombre || `Cotización ${cotizacionId}`,
+              description: cotizacionNombre || `Cotizacion ${cotizacionId}`,
             }),
           })
         } catch (auditError) {
@@ -132,10 +96,11 @@ const CotizacionEstadoFlujoBanner: React.FC<CotizacionEstadoFlujoBannerProps> = 
         }
       }
 
-      toast.success(`Estado actualizado a: ${getEstadoInfo(pendingEstado).label}`)
+      const label = ESTADOS.find(e => e.key === pendingEstado)?.label || pendingEstado
+      toast.success(`Estado actualizado a "${label}"`)
       onUpdated?.(pendingEstado)
-    } catch {
-      toast.error('Error al actualizar el estado')
+    } catch (error: any) {
+      toast.error(error?.message || 'Error al actualizar el estado')
     } finally {
       setIsUpdating(false)
       setShowConfirmDialog(false)
@@ -143,124 +108,130 @@ const CotizacionEstadoFlujoBanner: React.FC<CotizacionEstadoFlujoBannerProps> = 
     }
   }
 
-  const estadoActual = getEstadoInfo(estado)
-  const estadosAccesibles = ESTADOS.filter(
-    (e) => e !== estado && esEstadoAccesible(estado, e)
-  )
+  const handleAvanzar = () => {
+    if (!flujo.siguiente) return
+    setPendingEstado(flujo.siguiente)
+    setShowConfirmDialog(true)
+  }
+
+  const handleRechazar = () => {
+    if (!flujo.rechazar) return
+    setPendingEstado(flujo.rechazar)
+    setShowConfirmDialog(true)
+  }
 
   return (
-    <>
-      <div className="bg-white rounded-lg border px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          {/* Estado actual */}
-          <div className="flex items-center gap-2">
-            <div className={`p-1.5 rounded-md ${estadoActual.bgColor}`}>
-              <estadoActual.icon className={`h-4 w-4 ${estadoActual.color}`} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{estadoActual.label}</span>
-                <Badge variant="outline" className="text-[10px] h-5">
-                  Actual
-                </Badge>
-              </div>
-            </div>
-          </div>
+    <div className="flex items-center justify-between gap-4 py-2 px-3 bg-gray-50/80 border border-gray-200 rounded-lg">
+      {/* Progress Flow */}
+      <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
+        {ESTADOS.map((etapa, i) => {
+          const isActive = estado === etapa.key
+          const isPast = currentIndex > i
 
-          {/* Acciones */}
-          {estadosAccesibles.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">Cambiar a:</span>
-              {estadosAccesibles.map((estadoOption) => {
-                const info = getEstadoInfo(estadoOption)
-                return (
-                  <Button
-                    key={estadoOption}
-                    variant="outline"
-                    size="sm"
-                    disabled={isUpdating}
-                    onClick={() => {
-                      setPendingEstado(estadoOption)
-                      setShowConfirmDialog(true)
-                    }}
-                    className="h-7 text-xs gap-1"
-                  >
-                    <info.icon className={`h-3 w-3 ${info.color}`} />
-                    {info.label}
-                  </Button>
-                )
-              })}
+          return (
+            <div key={etapa.key} className="flex items-center flex-shrink-0">
+              <span
+                className={cn(
+                  'text-xs px-2 py-1 rounded-md transition-all whitespace-nowrap',
+                  isActive
+                    ? 'bg-white font-semibold text-gray-900 shadow-sm border border-gray-300'
+                    : isPast
+                      ? 'text-gray-500'
+                      : 'text-gray-400'
+                )}
+              >
+                {isPast && <span className="text-green-500 mr-1">&#10003;</span>}
+                {etapa.label}
+              </span>
+
+              {i < ESTADOS.length - 1 && (
+                <ChevronRight className={cn(
+                  'w-3 h-3 mx-0.5 flex-shrink-0',
+                  isPast ? 'text-gray-400' : 'text-gray-300'
+                )} />
+              )}
             </div>
-          ) : (
-            <span className="text-[10px] text-muted-foreground">Estado final</span>
-          )}
-        </div>
+          )
+        })}
+
+        {/* Show rechazado tag when active */}
+        {estado === 'rechazado' && (
+          <>
+            <span className="text-gray-300 mx-1">|</span>
+            <span className="text-xs px-2 py-1 rounded-md bg-red-50 font-semibold text-red-600 border border-red-200">
+              Rechazado
+            </span>
+          </>
+        )}
       </div>
 
-      {/* Dialog de Confirmación */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-sm">Confirmar Cambio</DialogTitle>
-            <DialogDescription className="text-xs">
-              ¿Cambiar estado de <strong>{cotizacionNombre || 'cotización'}</strong>?
-            </DialogDescription>
-          </DialogHeader>
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {isUpdating && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
 
-          <div className="flex items-center justify-center gap-3 py-3">
-            <div className="flex items-center gap-1.5">
-              <div className={`p-1.5 rounded-md ${getEstadoInfo(estado).bgColor}`}>
-                {React.createElement(getEstadoInfo(estado).icon, {
-                  className: `h-3.5 w-3.5 ${getEstadoInfo(estado).color}`,
-                })}
-              </div>
-              <span className="text-xs font-medium">{getEstadoInfo(estado).label}</span>
-            </div>
+        {flujo.siguiente && siguienteEstado && (
+          <Button
+            onClick={handleAvanzar}
+            size="sm"
+            disabled={isUpdating}
+            className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <ArrowRight className="w-3 h-3 mr-1" />
+            Avanzar
+          </Button>
+        )}
 
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        {flujo.rechazar && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRechazar}
+            disabled={isUpdating}
+            className="h-7 px-3 text-xs border-gray-300 text-gray-600 hover:bg-gray-100"
+          >
+            <X className="w-3 h-3 mr-1" />
+            Rechazar
+          </Button>
+        )}
 
-            <div className="flex items-center gap-1.5">
-              <div className={`p-1.5 rounded-md ${getEstadoInfo(pendingEstado).bgColor}`}>
-                {React.createElement(getEstadoInfo(pendingEstado).icon, {
-                  className: `h-3.5 w-3.5 ${getEstadoInfo(pendingEstado).color}`,
-                })}
-              </div>
-              <span className="text-xs font-medium">
-                {getEstadoInfo(pendingEstado).label}
-              </span>
-            </div>
-          </div>
+        {!flujo.siguiente && !flujo.rechazar && (
+          <span className="text-[10px] text-muted-foreground">Estado final</span>
+        )}
+      </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowConfirmDialog(false)}
-              disabled={isUpdating}
-              className="h-7 text-xs"
-            >
+      {/* Confirmation Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm">
+              {pendingEstado === 'rechazado' ? 'Rechazar cotizacion' : 'Confirmar cambio de estado'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
+              {pendingEstado === 'rechazado'
+                ? `Se rechazara la cotizacion "${cotizacionNombre || cotizacionId}".`
+                : `Se cambiara el estado de "${cotizacionNombre || cotizacionId}" a "${ESTADOS.find(e => e.key === pendingEstado)?.label || pendingEstado}".`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating} className="h-7 text-xs">
               Cancelar
-            </Button>
-            <Button
-              size="sm"
+            </AlertDialogCancel>
+            <AlertDialogAction
               onClick={confirmarCambioEstado}
               disabled={isUpdating}
-              className="h-7 text-xs"
-            >
-              {isUpdating ? (
-                <>
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Actualizando...
-                </>
-              ) : (
-                'Confirmar'
+              className={cn(
+                'h-7 text-xs',
+                pendingEstado === 'rechazado'
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-blue-600 hover:bg-blue-700'
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+            >
+              {isUpdating ? 'Actualizando...' : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
-
-export default CotizacionEstadoFlujoBanner

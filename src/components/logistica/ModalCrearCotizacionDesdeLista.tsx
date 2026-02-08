@@ -186,7 +186,7 @@ export default function ModalCrearCotizacionDesdeLista({
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="max-w-2xl w-full max-h-[85vh] flex flex-col p-0 gap-0">
         {/* Header */}
-        <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
+        <DialogHeader className="px-4 pr-10 py-3 border-b flex-shrink-0">
           <div className="flex items-center gap-2">
             <Truck className="h-4 w-4 text-purple-600" />
             <DialogTitle className="text-sm font-semibold">

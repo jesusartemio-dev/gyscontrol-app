@@ -332,6 +332,7 @@ const ListasTable = memo(function ListasTable({
 });
 
 export default function EquipmentListsPage({ params }: PageProps) {
+  const router = useRouter();
   const [proyectoId, setProyectoId] = useState<string>('');
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [listas, setListas] = useState<any[]>([]);
@@ -431,9 +432,9 @@ export default function EquipmentListsPage({ params }: PageProps) {
         {/* Acción principal */}
         <ModalCrearListaEquipo
           proyectoId={proyectoId}
-          onCreated={() => {
-            fetchData();
+          onCreated={(lista: any) => {
             toast.success('Lista creada');
+            router.push(`/proyectos/${proyectoId}/equipos/listas/${lista.id}`);
           }}
           triggerClassName="h-8"
         />

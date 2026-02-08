@@ -338,12 +338,12 @@ export function CotizacionCodigoSimple({
 
   // 🔍 Si no hay cotizaciones
   if (!cotizaciones || cotizaciones.length === 0) {
-    return <Badge variant="outline">-</Badge>
+    return <span className="text-[10px] text-muted-foreground">—</span>
   }
 
   // ✅ Mostrar todas las cotizaciones en lista vertical
   return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-0.5">
         {cotizaciones.map((cotizacion) => {
           const codigo = cotizacion.cotizacionProveedor?.codigo || "Sin código"
           const isSelected = cotizacion.id === cotizacionSeleccionadaId
@@ -353,20 +353,19 @@ export function CotizacionCodigoSimple({
           return (
             <Tooltip key={cotizacion.id}>
               <TooltipTrigger asChild>
-                <Badge
-                  variant={isSelected ? "default" : "outline"}
+                <span
                   className={cn(
-                    "text-[10px] px-2 py-1 flex items-center gap-1 cursor-help",
+                    "text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 cursor-help",
                     isSelected
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      ? "bg-gray-100 text-gray-800 font-medium"
+                      : "text-gray-400"
                   )}
                 >
                   {isSelected && (
-                    <Check className="w-3 h-3" />
+                    <Check className="w-2.5 h-2.5 text-green-600" />
                   )}
                   {codigo}
-                </Badge>
+                </span>
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-xs">
                 <div className="space-y-1">

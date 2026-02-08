@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -9,25 +10,43 @@ import {
   FileText,
   Plus,
   Package,
-  CheckCircle,
+  ArrowRight,
+  X,
   ChevronRight,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from 'lucide-react'
 import { getLogisticaListaById } from '@/lib/services/logisticaLista'
 import { updateListaEstado } from '@/lib/services/listaEquipo'
+import { flujoEstados, estadoLabels, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
 import LogisticaListaDetalleItemTableProfessional from '@/components/logistica/LogisticaListaDetalleItemTableProfessional'
 import ModalCrearCotizacionDesdeLista from '@/components/logistica/ModalCrearCotizacionDesdeLista'
 import type { ListaEquipo } from '@/types'
 
 export default function LogisticaListaDetallePage() {
   const { id } = useParams<{ id: string }>()
+  const { data: session } = useSession()
   const [lista, setLista] = useState<ListaEquipo | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCrearCotizacion, setShowCrearCotizacion] = useState(false)
   const [updatingEstado, setUpdatingEstado] = useState(false)
+  const [openRechazo, setOpenRechazo] = useState(false)
+  const [openConfirmAvanzar, setOpenConfirmAvanzar] = useState(false)
+  const [justificacion, setJustificacion] = useState('')
 
   const handleRefetch = async () => {
     try {
@@ -48,19 +67,36 @@ export default function LogisticaListaDetallePage() {
     fetchData()
   }, [id])
 
+  const rol = session?.user?.role || ''
+  const flujo = lista ? flujoEstados[lista.estado as EstadoListaEquipo] : null
+  const puedeAvanzar = !!flujo?.siguiente && flujo.roles.includes(rol)
+  const puedeRechazar = !!flujo?.rechazar && flujo.roles.includes(rol)
+
   const handleAvanzarEstado = async () => {
-    if (!lista) return
+    if (!lista || !flujo?.siguiente) return
     try {
       setUpdatingEstado(true)
-      const updated = await updateListaEstado(lista.id, 'por_validar')
-      if (updated) {
-        toast.success('Estado actualizado')
-        handleRefetch()
-      } else {
-        toast.error('Error al actualizar')
-      }
-    } catch {
-      toast.error('Error al avanzar estado')
+      await updateListaEstado(lista.id, flujo.siguiente)
+      toast.success(`Estado actualizado a "${estadoLabels[flujo.siguiente]}"`)
+      handleRefetch()
+    } catch (error: any) {
+      toast.error(error?.message || 'Error al avanzar estado')
+    } finally {
+      setUpdatingEstado(false)
+    }
+  }
+
+  const handleRechazar = async () => {
+    if (!lista || !flujo?.rechazar || justificacion.trim().length < 10) return
+    try {
+      setUpdatingEstado(true)
+      await updateListaEstado(lista.id, flujo.rechazar, justificacion.trim())
+      toast.success('Lista rechazada')
+      setJustificacion('')
+      setOpenRechazo(false)
+      handleRefetch()
+    } catch (error: any) {
+      toast.error(error?.message || 'Error al rechazar')
     } finally {
       setUpdatingEstado(false)
     }
@@ -112,6 +148,15 @@ export default function LogisticaListaDetallePage() {
   // Use lista.items (transformed with cotizaciones) or fallback to listaEquipoItem
   const items = (lista as any).items || lista.listaEquipoItem || []
 
+  // Pricing stats
+  const totalItems = items.length
+  const itemsSinPrecio = items.filter((i: any) => !i.precioElegido && !i.cotizacionSeleccionadaId).length
+  const itemsSinCotizacion = items.filter((i: any) => {
+    const cots = i.cotizaciones || i.cotizacionProveedorItems || []
+    return cots.length === 0
+  }).length
+  const faltanPrecios = totalItems > 0 && itemsSinPrecio > 0
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
@@ -162,19 +207,37 @@ export default function LogisticaListaDetallePage() {
                 <Plus className="h-3 w-3 mr-1" />
                 Cotización
               </Button>
-              {lista.estado === 'por_cotizar' && (
+              {puedeAvanzar && (
                 <Button
                   size="sm"
-                  onClick={handleAvanzarEstado}
+                  onClick={() => {
+                    if (faltanPrecios) {
+                      setOpenConfirmAvanzar(true)
+                    } else {
+                      handleAvanzarEstado()
+                    }
+                  }}
                   disabled={updatingEstado}
-                  className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                  className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
                 >
                   {updatingEstado ? (
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                   ) : (
-                    <CheckCircle className="h-3 w-3 mr-1" />
+                    <ArrowRight className="h-3 w-3 mr-1" />
                   )}
                   Avanzar
+                </Button>
+              )}
+              {puedeRechazar && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOpenRechazo(true)}
+                  disabled={updatingEstado}
+                  className="h-7 text-xs border-gray-300 text-gray-600 hover:bg-gray-100"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Rechazar
                 </Button>
               )}
             </div>
@@ -183,6 +246,20 @@ export default function LogisticaListaDetallePage() {
       </div>
 
       <div className="p-4 space-y-4">
+        {/* Warning: items sin precios */}
+        {faltanPrecios && puedeAvanzar && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <span>
+              <strong>{itemsSinPrecio} de {totalItems}</strong> items no tienen precio asignado
+              {itemsSinCotizacion > 0 && (
+                <> ({itemsSinCotizacion} sin cotizaciones)</>
+              )}
+              . Asigna cotizaciones y selecciona precios antes de avanzar.
+            </span>
+          </div>
+        )}
+
         {/* Items table */}
         {items.length > 0 ? (
           <LogisticaListaDetalleItemTableProfessional
@@ -199,7 +276,7 @@ export default function LogisticaListaDetallePage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal Cotización */}
       {lista.proyecto && (
         <ModalCrearCotizacionDesdeLista
           open={showCrearCotizacion}
@@ -212,6 +289,78 @@ export default function LogisticaListaDetallePage() {
           }}
         />
       )}
+
+      {/* Dialog Confirmar Avanzar sin precios */}
+      <AlertDialog open={openConfirmAvanzar} onOpenChange={setOpenConfirmAvanzar}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Items sin precio asignado
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Hay <strong>{itemsSinPrecio} de {totalItems}</strong> items que no tienen precio asignado.
+                </p>
+                {itemsSinCotizacion > 0 && (
+                  <p>{itemsSinCotizacion} items no tienen ninguna cotización creada.</p>
+                )}
+                <p className="text-amber-600">
+                  Se recomienda asignar precios y tiempos de entrega a todos los items antes de avanzar.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={updatingEstado}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                handleAvanzarEstado()
+                setOpenConfirmAvanzar(false)
+              }}
+              disabled={updatingEstado}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Avanzar de todas formas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog Rechazo */}
+      <AlertDialog open={openRechazo} onOpenChange={setOpenRechazo}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Rechazar esta lista?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Indica la razón del rechazo para que el equipo pueda hacer correcciones.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Justificación *
+            </label>
+            <Textarea
+              placeholder="Describe las razones del rechazo..."
+              value={justificacion}
+              onChange={(e) => setJustificacion(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={updatingEstado}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRechazar}
+              disabled={updatingEstado || justificacion.trim().length < 10}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {updatingEstado ? 'Rechazando...' : 'Rechazar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

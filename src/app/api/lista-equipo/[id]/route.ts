@@ -11,10 +11,10 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { ListaEquipoUpdatePayload } from '@/types/payloads'
-import type { EstadoListaEquipo } from '@prisma/client'
 import { logStatusChange } from '@/lib/services/auditLogger'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { validarTransicion, getFechasPorTransicion, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
 
 // ✅ Obtener ListaEquipo por ID (GET)
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -97,32 +97,26 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       )
     }
 
-    // ✅ Preparar datos de actualización con fechas automáticas según cambio de estado
-    const updateData: any = { ...body }
-    const now = new Date()
+    // ✅ Validar transición de estado + rol si hay cambio de estado
+    if (body.estado && body.estado !== existe.estado) {
+      const userRole = session.user.role || ''
+      const resultado = validarTransicion(existe.estado, body.estado, userRole)
+      if (!resultado.valido) {
+        return NextResponse.json(
+          { error: resultado.error },
+          { status: 403 }
+        )
+      }
+    }
+
+    // ✅ Preparar datos de actualización
+    const { motivoRechazo, ...restBody } = body as any
+    const updateData: any = { ...restBody }
 
     // 🔄 Si hay cambio de estado, actualizar fechas automáticamente
     if (body.estado && body.estado !== existe.estado) {
-      switch (body.estado) {
-        case 'por_revisar':
-          updateData.fechaEnvioRevision = now
-          break
-        case 'por_validar':
-          updateData.fechaValidacion = now
-          break
-        case 'por_aprobar':
-          updateData.fechaValidacion = now
-          break
-        case 'aprobada':
-          updateData.fechaAprobacionRevision = now
-          break
-        case 'por_cotizar':
-          updateData.fechaEnvioLogistica = now
-          break
-        case 'rechazada':
-          // No se actualiza ninguna fecha específica para rechazado
-          break
-      }
+      const fechas = getFechasPorTransicion(body.estado as EstadoListaEquipo)
+      Object.assign(updateData, fechas)
     }
 
     // 🔄 Convertir fechaNecesaria a Date si viene como string
@@ -138,17 +132,19 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     // ✅ Registrar el cambio de estado en auditoría si hubo cambio de estado
     if (body.estado && body.estado !== existe.estado) {
       try {
+        const description = motivoRechazo
+          ? `Lista ${data.nombre || data.codigo || 'sin nombre'} - Motivo: ${motivoRechazo}`
+          : `Lista ${data.nombre || data.codigo || 'sin nombre'}`
         await logStatusChange({
           userId: session.user.id,
           entityType: 'LISTA_EQUIPO',
           entityId: id,
           oldStatus: existe.estado,
           newStatus: body.estado,
-          description: `Lista ${data.nombre || data.codigo || 'sin nombre'}`
+          description
         })
       } catch (auditError) {
         console.error('Error logging status change:', auditError)
-        // No fallar la operación principal por error de auditoría
       }
     }
 

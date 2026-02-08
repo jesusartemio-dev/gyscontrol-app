@@ -34,7 +34,6 @@ import {
   ChevronRight,
   History
 } from 'lucide-react';
-import Link from 'next/link';
 import ListaEquipoItemList from '@/components/equipos/ListaEquipoItemList';
 import ListaEquipoEditModal from '@/components/equipos/ListaEquipoEditModal';
 import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
@@ -144,10 +143,11 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
   const stats = useMemo(() => {
     const totalItems = items.length;
     const completedItems = items.filter(item => item.estado === 'aprobado').length;
+    const verificados = items.filter(item => item.verificado).length;
     const totalCost = items.reduce((sum, item) => sum + (item.costoElegido || 0), 0);
     const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
-    return { totalItems, completedItems, totalCost, progress };
+    return { totalItems, completedItems, verificados, totalCost, progress };
   }, [items]);
 
   if (loading) return <LoadingSkeleton />;
@@ -160,9 +160,9 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
         <p className="text-xs text-muted-foreground mb-3">
           {error || 'No se pudo cargar la lista'}
         </p>
-        <Button variant="outline" size="sm" onClick={() => router.push(`/proyectos/${proyectoId}/equipos/listas`)} className="h-7 text-xs">
+        <Button variant="outline" size="sm" onClick={() => router.back()} className="h-7 text-xs">
           <ArrowLeft className="w-3 h-3 mr-1" />
-          Volver a Listas
+          Volver
         </Button>
       </div>
     );
@@ -177,13 +177,13 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
       <div className="flex items-start justify-between gap-4 pb-3 border-b">
         <div className="space-y-1">
           {/* Navegación mínima */}
-          <Link
-            href={`/proyectos/${proyectoId}/equipos/listas`}
+          <button
+            onClick={() => router.back()}
             className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-3 w-3 mr-1" />
-            Listas
-          </Link>
+            Volver
+          </button>
 
           {/* Título con icono */}
           <div className="flex items-center gap-2">
@@ -204,6 +204,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
             </Badge>
             <span className="text-gray-300">|</span>
             <span>{stats.totalItems} items</span>
+            <span className="text-gray-300">|</span>
+            <span className={stats.verificados === stats.totalItems ? 'text-green-600' : ''}>{stats.verificados}/{stats.totalItems} verificados</span>
             <span className="text-gray-300">|</span>
             <span className="text-green-600">{stats.completedItems} aprobados</span>
             <span className="text-gray-300">|</span>
@@ -270,6 +272,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
         <ListaEstadoFlujoBanner
           estado={lista.estado}
           listaId={lista.id}
+          totalItems={items.length}
+          itemsVerificados={items.filter(i => i.verificado).length}
           onUpdated={() => handleRefreshItems()}
         />
       )}

@@ -14,7 +14,6 @@ import {
   Building2,
   FileText,
   Package,
-  DollarSign,
   Mail,
   Plus,
   ChevronRight,
@@ -104,10 +103,10 @@ Equipo de Compras`
   const getEstadoBadge = (estado: string) => {
     const styles: Record<string, string> = {
       pendiente: 'bg-gray-100 text-gray-700',
-      enviada: 'bg-blue-100 text-blue-700',
-      cotizada: 'bg-purple-100 text-purple-700',
-      aprobada: 'bg-green-100 text-green-700',
-      rechazada: 'bg-red-100 text-red-700',
+      solicitado: 'bg-blue-100 text-blue-700',
+      cotizado: 'bg-purple-100 text-purple-700',
+      seleccionado: 'bg-green-100 text-green-700',
+      rechazado: 'bg-red-100 text-red-700',
     }
     return styles[estado] || 'bg-gray-100 text-gray-700'
   }
@@ -132,7 +131,11 @@ Equipo de Compras`
     totalItems: cotizacion.items?.length || 0,
     totalCost: cotizacion.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0,
     selectedItems: cotizacion.items?.filter(item => item.esSeleccionada).length || 0,
+    itemsSinPrecio: cotizacion.items?.filter(item => !item.precioUnitario).length || 0,
   }
+
+  const estado = cotizacion.estado || 'pendiente'
+  const esEstadoFinal = estado === 'rechazado' || estado === 'seleccionado'
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -163,14 +166,14 @@ Equipo de Compras`
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-base font-semibold">{cotizacion.codigo}</h1>
-                    <Badge className={`text-[10px] h-5 ${getEstadoBadge(cotizacion.estado || 'pendiente')}`}>
-                      {cotizacion.estado}
+                    <Badge className={`text-[10px] h-5 ${getEstadoBadge(estado)}`}>
+                      {estado}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                     <Building2 className="h-3 w-3" />
                     <span>{cotizacion.proveedor?.nombre || 'Sin proveedor'}</span>
-                    <span>•</span>
+                    <span>·</span>
                     <span>{cotizacion.proyecto?.nombre}</span>
                   </div>
                 </div>
@@ -178,52 +181,63 @@ Equipo de Compras`
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAgregarItems(true)}
-                className="h-7 text-xs"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Items
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSolicitarCotizacion}
-                className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
-              >
-                <Mail className="h-3 w-3 mr-1" />
-                Solicitar
-              </Button>
+              {!esEstadoFinal && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAgregarItems(true)}
+                  className="h-7 text-xs"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Items
+                </Button>
+              )}
+              {(estado === 'pendiente' || estado === 'solicitado') && cotizacion.proveedor?.correo && (
+                <Button
+                  size="sm"
+                  onClick={handleSolicitarCotizacion}
+                  className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
+                >
+                  <Mail className="h-3 w-3 mr-1" />
+                  Solicitar
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
         {/* Stats inline */}
-        <div className="px-4 py-2 border-t bg-gray-50/50 flex items-center gap-6 text-xs">
+        <div className="px-4 py-1.5 border-t bg-gray-50/50 flex items-center gap-6 text-xs">
           <div className="flex items-center gap-1.5">
             <Package className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Items:</span>
             <span className="font-semibold">{stats.totalItems}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
             <span className="text-muted-foreground">Total:</span>
-            <span className="font-semibold text-emerald-600">
+            <span className="font-semibold">
               ${stats.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Seleccionados:</span>
-            <span className="font-semibold text-blue-600">{stats.selectedItems}</span>
-          </div>
+          {stats.selectedItems > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Seleccionados:</span>
+              <span className="font-semibold text-green-600">{stats.selectedItems}</span>
+            </div>
+          )}
+          {stats.itemsSinPrecio > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Sin precio:</span>
+              <span className="font-semibold text-amber-600">{stats.itemsSinPrecio}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-3">
         {/* Estado flujo */}
         <CotizacionEstadoFlujoBanner
-          estado={cotizacion.estado || 'pendiente'}
+          estado={estado}
           cotizacionId={cotizacionId}
           cotizacionNombre={cotizacion.codigo}
           usuarioId={session?.user?.id}
@@ -233,17 +247,7 @@ Equipo de Compras`
         />
 
         {/* Items table */}
-        <div className="bg-white rounded-lg border">
-          <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-purple-600" />
-              <span className="text-sm font-medium">Items de la Cotización</span>
-            </div>
-            <Badge variant="secondary" className="text-[10px] h-5">
-              {stats.totalItems} items
-            </Badge>
-          </div>
-
+        <div className="bg-white rounded-lg border overflow-hidden">
           {cotizacion.items && cotizacion.items.length > 0 ? (
             <CotizacionProveedorTabla
               items={cotizacion.items}
@@ -277,13 +281,13 @@ Equipo de Compras`
         <div className="bg-white rounded-lg border">
           <button
             onClick={() => setShowHistorial(!showHistorial)}
-            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <History className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Historial de Cambios</span>
+              <History className="h-3.5 w-3.5 text-gray-400" />
+              <span className="text-xs font-medium text-gray-600">Historial</span>
             </div>
-            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showHistorial ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${showHistorial ? 'rotate-180' : ''}`} />
           </button>
           {showHistorial && (
             <div className="px-4 pb-4 border-t">

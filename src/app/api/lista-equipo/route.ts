@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import type { EstadoListaEquipo } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { getServerSession } from 'next-auth'
@@ -24,10 +25,12 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const proyectoId = searchParams.get('proyectoId')
+    const estado = searchParams.get('estado')
 
     const data = await prisma.listaEquipo.findMany({
       where: {
         ...(proyectoId ? { proyectoId } : {}),
+        ...(estado ? { estado: estado as EstadoListaEquipo } : {}),
       },
       include: {
         proyecto: true,
