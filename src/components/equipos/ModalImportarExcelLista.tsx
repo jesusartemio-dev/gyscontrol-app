@@ -725,6 +725,12 @@ export default function ModalImportarExcelLista({
               const isDupe = duplicateCodes.has(item.codigo.toLowerCase())
               const showCatalogOption = isNew && !isMapped
               const isReplacement = isMapped && replacementFlags[item.codigo]
+              // IDs de items cotizados ya asignados por OTROS items del Excel
+              const usedByOthers = new Set(
+                Object.entries(itemMappings)
+                  .filter(([code, val]) => code !== item.codigo && val && val !== MAPPING_NONE)
+                  .map(([, val]) => val)
+              )
               // Detectar discrepancia de categoría entre Excel y catálogo
               const hasCategoriaMismatch = item.categoriaCatalogo && item.categoria &&
                 item.categoriaCatalogo.toLowerCase() !== item.categoria.toLowerCase()
@@ -822,16 +828,18 @@ export default function ModalImportarExcelLista({
                                   <SelectLabel className="text-[10px] font-semibold text-green-600 uppercase">
                                     Misma categoría ({item.categoria})
                                   </SelectLabel>
-                                  {sameCategory.map(qi => (
-                                    <SelectItem key={qi.id} value={qi.id} className="text-xs max-w-[480px]">
-                                      <span className="flex flex-col gap-0.5">
+                                  {sameCategory.map(qi => {
+                                    const isUsed = usedByOthers.has(qi.id)
+                                    return (
+                                      <SelectItem key={qi.id} value={qi.id} disabled={isUsed} className={cn('text-xs max-w-[480px]', isUsed && 'opacity-50')}>
                                         <span className="flex items-center gap-1.5">
                                           <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
                                           <span className="truncate text-gray-700">{qi.descripcion}</span>
+                                          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
                                         </span>
-                                      </span>
-                                    </SelectItem>
-                                  ))}
+                                      </SelectItem>
+                                    )
+                                  })}
                                 </SelectGroup>
                               )}
                               {otherItems.length > 0 && (
@@ -839,16 +847,18 @@ export default function ModalImportarExcelLista({
                                   <SelectLabel className="text-[10px] font-semibold text-gray-500 uppercase">
                                     {sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}
                                   </SelectLabel>
-                                  {otherItems.map(qi => (
-                                    <SelectItem key={qi.id} value={qi.id} className="text-xs max-w-[480px]">
-                                      <span className="flex flex-col gap-0.5">
+                                  {otherItems.map(qi => {
+                                    const isUsed = usedByOthers.has(qi.id)
+                                    return (
+                                      <SelectItem key={qi.id} value={qi.id} disabled={isUsed} className={cn('text-xs max-w-[480px]', isUsed && 'opacity-50')}>
                                         <span className="flex items-center gap-1.5">
                                           <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
                                           <span className="truncate text-gray-700">{qi.descripcion}</span>
+                                          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
                                         </span>
-                                      </span>
-                                    </SelectItem>
-                                  ))}
+                                      </SelectItem>
+                                    )
+                                  })}
                                 </SelectGroup>
                               )}
                             </>
