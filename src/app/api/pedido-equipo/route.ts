@@ -183,7 +183,7 @@ export async function GET(request: Request) {
   }
 }
 
-// ✅ Crear nuevo pedido
+// ✅ Crear nuevo pedido (unificado: soporta creación directa y desde lista)
 export async function POST(request: Request) {
   try {
     // Verificar autenticación
@@ -239,124 +239,141 @@ export async function POST(request: Request) {
     const nuevoNumero = ultimoPedido ? ultimoPedido.numeroSecuencia + 1 : 1
     const codigoGenerado = `${proyecto.codigo}-PED-${String(nuevoNumero).padStart(3, '0')}`
 
-    // 📝 Crear pedido
-    const pedidoId = randomUUID()
-    const pedido = await prisma.pedidoEquipo.create({
-      data: {
-        id: pedidoId,
-        proyectoId: body.proyectoId,
-        responsableId: body.responsableId,
-        listaId: body.listaId ?? null,
-        codigo: codigoGenerado,
-        numeroSecuencia: nuevoNumero,
-        estado: body.estado ?? 'borrador',
-        observacion: body.observacion ?? '',
-        fechaPedido: body.fechaPedido ? new Date(body.fechaPedido) : new Date(),
-        fechaNecesaria: new Date(body.fechaNecesaria),
-        fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : null,
-        fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : null,
-        updatedAt: new Date(),
-      },
-    })
-
-    // 📦 Crear items del pedido si se envían itemsSeleccionados
+    // 📦 Pre-cargar items de lista si hay seleccionados (para pricing fallback)
+    let listaItemsMap = new Map<string, any>()
     if (body.itemsSeleccionados && body.itemsSeleccionados.length > 0) {
-      // Obtener datos de los items de la lista
       const listaItemIds = body.itemsSeleccionados.map(item => item.listaEquipoItemId)
       const listaItems = await prisma.listaEquipoItem.findMany({
         where: { id: { in: listaItemIds } },
-        select: {
-          id: true,
-          codigo: true,
-          descripcion: true,
-          unidad: true,
-          precioElegido: true,
-          tiempoEntrega: true,
-          tiempoEntregaDias: true,
-          listaId: true,
-          responsableId: true,
-          cantidad: true,
-          cantidadPedida: true,
+        include: {
+          cotizacionSeleccionada: {
+            select: { precioUnitario: true },
+          },
+        },
+      })
+      listaItemsMap = new Map(listaItems.map(item => [item.id, item]))
+
+      // Validar que todos los items existen
+      for (const itemSel of body.itemsSeleccionados) {
+        if (!listaItemsMap.has(itemSel.listaEquipoItemId)) {
+          return NextResponse.json(
+            { error: `Item de lista no encontrado: ${itemSel.listaEquipoItemId}` },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
+    // 🔄 Transacción atómica: crear pedido + items + actualizar cantidades
+    const now = new Date()
+    const pedidoId = randomUUID()
+
+    const resultado = await prisma.$transaction(async (tx) => {
+      // 1️⃣ Crear el pedido
+      const pedido = await tx.pedidoEquipo.create({
+        data: {
+          id: pedidoId,
+          proyectoId: body.proyectoId,
+          responsableId: body.responsableId,
+          listaId: body.listaId ?? null,
+          codigo: codigoGenerado,
+          numeroSecuencia: nuevoNumero,
+          estado: 'borrador',
+          observacion: body.observacion ?? '',
+          prioridad: body.prioridad || 'media',
+          esUrgente: body.esUrgente || false,
+          fechaPedido: body.fechaPedido ? new Date(body.fechaPedido) : now,
+          fechaNecesaria: new Date(body.fechaNecesaria),
+          fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : null,
+          fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : null,
+          updatedAt: now,
         },
       })
 
-      // Crear map para acceso rápido
-      const listaItemsMap = new Map(listaItems.map(item => [item.id, item]))
+      // 2️⃣ Crear items del pedido si hay seleccionados
+      let itemsCreados = 0
+      let presupuestoTotal = 0
 
-      // Crear los PedidoEquipoItem
-      const pedidoItems = body.itemsSeleccionados.map(itemSel => {
-        const listaItem = listaItemsMap.get(itemSel.listaEquipoItemId)
-        if (!listaItem) {
-          throw new Error(`Item de lista no encontrado: ${itemSel.listaEquipoItemId}`)
-        }
+      if (body.itemsSeleccionados && body.itemsSeleccionados.length > 0) {
+        for (const itemSel of body.itemsSeleccionados) {
+          const listaItem = listaItemsMap.get(itemSel.listaEquipoItemId)!
+          const cantidad = listaItem.cantidad || 1
 
-        const precioUnitario = listaItem.precioElegido || 0
-        const costoTotal = precioUnitario * itemSel.cantidadPedida
+          // Pricing fallback: precioElegido > cotizacionSeleccionada > presupuesto > 0
+          // precioElegido ya es precio unitario; presupuesto es total, se divide por cantidad
+          let precioUnitario = 0
+          if (listaItem.precioElegido !== null && listaItem.precioElegido !== undefined) {
+            precioUnitario = listaItem.precioElegido
+          } else if (listaItem.cotizacionSeleccionada?.precioUnitario) {
+            precioUnitario = listaItem.cotizacionSeleccionada.precioUnitario
+          } else if (listaItem.presupuesto !== null && listaItem.presupuesto !== undefined) {
+            precioUnitario = listaItem.presupuesto / cantidad
+          }
 
-        return {
-          id: randomUUID(),
-          pedidoId: pedidoId,
-          listaEquipoItemId: listaItem.id,
-          listaId: listaItem.listaId,
-          codigo: listaItem.codigo,
-          descripcion: listaItem.descripcion,
-          unidad: listaItem.unidad,
-          cantidadPedida: itemSel.cantidadPedida,
-          precioUnitario,
-          costoTotal,
-          tiempoEntrega: listaItem.tiempoEntrega,
-          tiempoEntregaDias: listaItem.tiempoEntregaDias,
-          responsableId: body.responsableId,
-          estado: 'pendiente' as const,
-          estadoEntrega: 'pendiente' as const,
-          updatedAt: new Date(),
-        }
-      })
+          const costoTotal = precioUnitario * itemSel.cantidadPedida
+          presupuestoTotal += costoTotal
 
-      // Insertar items del pedido
-      await prisma.pedidoEquipoItem.createMany({
-        data: pedidoItems,
-      })
-
-      // Actualizar cantidadPedida en ListaEquipoItem
-      for (const itemSel of body.itemsSeleccionados) {
-        const listaItem = listaItemsMap.get(itemSel.listaEquipoItemId)
-        if (listaItem) {
-          const nuevaCantidadPedida = (listaItem.cantidadPedida || 0) + itemSel.cantidadPedida
-          await prisma.listaEquipoItem.update({
-            where: { id: itemSel.listaEquipoItemId },
+          await tx.pedidoEquipoItem.create({
             data: {
-              cantidadPedida: nuevaCantidadPedida,
-              updatedAt: new Date(),
+              id: randomUUID(),
+              pedidoId: pedido.id,
+              listaEquipoItemId: listaItem.id,
+              listaId: listaItem.listaId,
+              codigo: listaItem.codigo,
+              descripcion: listaItem.descripcion,
+              unidad: listaItem.unidad,
+              cantidadPedida: itemSel.cantidadPedida,
+              precioUnitario,
+              costoTotal,
+              tiempoEntrega: listaItem.tiempoEntrega,
+              tiempoEntregaDias: listaItem.tiempoEntregaDias,
+              responsableId: body.responsableId,
+              estado: 'pendiente',
+              estadoEntrega: 'pendiente',
+              updatedAt: now,
             },
           })
+
+          // Actualizar cantidadPedida en ListaEquipoItem
+          await tx.listaEquipoItem.update({
+            where: { id: itemSel.listaEquipoItemId },
+            data: { cantidadPedida: { increment: itemSel.cantidadPedida } },
+          })
+
+          itemsCreados++
         }
+
+        // Actualizar presupuestoTotal en el pedido
+        await tx.pedidoEquipo.update({
+          where: { id: pedido.id },
+          data: { presupuestoTotal, updatedAt: now },
+        })
       }
 
-      console.log(`✅ ${pedidoItems.length} items creados para pedido ${pedido.codigo}`)
-    }
+      return { pedido, itemsCreados }
+    })
 
-    // ✅ Registrar en auditoría
+    // ✅ Registrar en auditoría (fuera de la transacción)
     try {
       await registrarCreacion(
         'PEDIDO_EQUIPO',
-        pedido.id,
+        resultado.pedido.id,
         session.user.id,
-        `Pedido ${pedido.codigo}`,
+        `Pedido ${resultado.pedido.codigo}`,
         {
           proyecto: proyecto.nombre,
-          codigo: pedido.codigo,
+          codigo: resultado.pedido.codigo,
           fechaNecesaria: body.fechaNecesaria,
-          estado: pedido.estado
+          estado: resultado.pedido.estado,
+          itemsCreados: resultado.itemsCreados,
         }
       )
     } catch (auditError) {
       console.error('Error al registrar auditoría:', auditError)
-      // No fallar la creación por error de auditoría
     }
 
-    console.log('✅ Pedido creado:', pedido)
-    return NextResponse.json(pedido)
+    console.log(`✅ Pedido ${resultado.pedido.codigo} creado con ${resultado.itemsCreados} items`)
+    return NextResponse.json(resultado.pedido)
   } catch (error) {
     console.error('❌ Error al crear pedido:', error)
     return NextResponse.json(

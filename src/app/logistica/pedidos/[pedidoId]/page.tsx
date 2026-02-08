@@ -174,6 +174,13 @@ export default function PedidoLogisticaDetailPage() {
     })
   }
 
+  // Clamp cantidadAtendida to valid range
+  const setCantidadAtendida = (value: number) => {
+    if (!editingItem.item) return
+    const clamped = Math.max(0, Math.min(value, editingItem.item.cantidadPedida))
+    setEditingItem(prev => ({ ...prev, cantidadAtendida: clamped }))
+  }
+
   // 📦 Guardar cambios del item
   const saveItemEdit = async () => {
     if (!editingItem.item) return
@@ -576,112 +583,154 @@ export default function PedidoLogisticaDetailPage() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-sm font-medium">Registrar Entrega</DialogTitle>
+            <DialogTitle className="text-sm font-medium flex items-center gap-2">
+              <Package className="h-4 w-4 text-blue-600" />
+              Registrar Entrega
+            </DialogTitle>
           </DialogHeader>
-          {editingItem.item && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-lg p-3 text-xs">
-                <p className="font-mono font-medium">{editingItem.item.codigo}</p>
-                <p className="text-muted-foreground truncate">{editingItem.item.descripcion}</p>
-              </div>
+          {editingItem.item && (() => {
+            const cantPedida = editingItem.item.cantidadPedida
+            const cantAtendida = editingItem.cantidadAtendida
+            const porcentaje = cantPedida > 0 ? Math.round((cantAtendida / cantPedida) * 100) : 0
+            const esCompleta = cantAtendida >= cantPedida
+            const esParcial = cantAtendida > 0 && cantAtendida < cantPedida
+            const proveedor = (editingItem.item as any).listaEquipoItem?.proveedor?.nombre
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Cant. Pedida</label>
-                  <Input
-                    value={editingItem.item.cantidadPedida}
-                    disabled
-                    className="h-8 text-xs bg-gray-50"
-                  />
+            return (
+              <div className="space-y-4">
+                {/* Item info card */}
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-medium text-xs">{editingItem.item.codigo}</span>
+                    <span className="text-[10px] text-muted-foreground bg-white px-1.5 py-0.5 rounded border">
+                      {editingItem.item.unidad}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{editingItem.item.descripcion}</p>
+                  {proveedor && (
+                    <div className="flex items-center gap-1 text-[10px] text-blue-600">
+                      <Building2 className="h-3 w-3" />
+                      {proveedor}
+                    </div>
+                  )}
                 </div>
+
+                {/* Cantidad section */}
                 <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Cant. Atendida</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={editingItem.item.cantidadPedida}
-                    value={editingItem.cantidadAtendida}
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium">Cantidad a entregar</label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] px-2"
+                      onClick={() => setCantidadAtendida(cantPedida)}
+                      disabled={esCompleta}
+                    >
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Entrega completa
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={cantPedida}
+                        value={cantAtendida}
+                        onChange={(e) => setCantidadAtendida(Number(e.target.value))}
+                        className="h-9 text-sm font-medium"
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      / {cantPedida} {editingItem.item.unidad}
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="mt-2">
+                    <Progress
+                      value={porcentaje}
+                      className={cn('h-2', esCompleta && '[&>div]:bg-green-500', esParcial && '[&>div]:bg-amber-500')}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1 text-right">{porcentaje}%</p>
+                  </div>
+                </div>
+
+                {/* Fecha de entrega - solo mostrar si hay cantidad atendida */}
+                {cantAtendida > 0 && (
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Fecha de Entrega</label>
+                    <Input
+                      type="date"
+                      value={editingItem.fechaEntregaReal}
+                      onChange={(e) => setEditingItem(prev => ({
+                        ...prev,
+                        fechaEntregaReal: e.target.value
+                      }))}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                )}
+
+                {/* Observaciones */}
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Observaciones</label>
+                  <textarea
+                    value={editingItem.observacionesEntrega}
                     onChange={(e) => setEditingItem(prev => ({
                       ...prev,
-                      cantidadAtendida: Number(e.target.value)
+                      observacionesEntrega: e.target.value
                     }))}
-                    className="h-8 text-xs"
+                    placeholder="Ej: Entrega parcial, pendiente 2 unidades para la siguiente semana..."
+                    rows={2}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                   />
                 </div>
-              </div>
 
-              {/* Fecha de entrega - solo mostrar si hay cantidad atendida */}
-              {editingItem.cantidadAtendida > 0 && (
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Fecha de Entrega</label>
-                  <Input
-                    type="date"
-                    value={editingItem.fechaEntregaReal}
-                    onChange={(e) => setEditingItem(prev => ({
-                      ...prev,
-                      fechaEntregaReal: e.target.value
-                    }))}
-                    className="h-8 text-xs"
-                  />
+                {/* Estado resultante - banner prominente */}
+                <div className={cn(
+                  'rounded-lg px-3 py-2 flex items-center gap-2 text-xs font-medium border',
+                  cantAtendida === 0 && 'bg-gray-50 text-gray-600 border-gray-200',
+                  esParcial && 'bg-amber-50 text-amber-700 border-amber-200',
+                  esCompleta && 'bg-green-50 text-green-700 border-green-200',
+                )}>
+                  <span className={cn(
+                    'w-2 h-2 rounded-full',
+                    cantAtendida === 0 && 'bg-gray-400',
+                    esParcial && 'bg-amber-500',
+                    esCompleta && 'bg-green-500',
+                  )} />
+                  Estado resultante: {cantAtendida === 0 ? 'Pendiente' : esCompleta ? 'Entregado' : 'Parcial'}
                 </div>
-              )}
 
-              {/* Observaciones */}
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Observaciones (opcional)</label>
-                <Input
-                  value={editingItem.observacionesEntrega}
-                  onChange={(e) => setEditingItem(prev => ({
-                    ...prev,
-                    observacionesEntrega: e.target.value
-                  }))}
-                  placeholder="Ej: Entrega parcial, falta 2 unidades..."
-                  className="h-8 text-xs"
-                />
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '' })}
+                    className="h-8 text-xs"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={saveItemEdit}
+                    disabled={updating}
+                    className={cn(
+                      'h-8 text-xs',
+                      esCompleta && 'bg-green-600 hover:bg-green-700',
+                    )}
+                  >
+                    <Save className="h-3 w-3 mr-1" />
+                    {updating ? 'Guardando...' : esCompleta ? 'Confirmar Entrega' : 'Guardar'}
+                  </Button>
+                </div>
               </div>
-
-              <div className="text-xs text-muted-foreground">
-                {editingItem.cantidadAtendida === 0 && (
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-gray-400" />
-                    Estado resultante: <span className="font-medium">Pendiente</span>
-                  </span>
-                )}
-                {editingItem.cantidadAtendida > 0 && editingItem.cantidadAtendida < editingItem.item.cantidadPedida && (
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    Estado resultante: <span className="font-medium">Parcial</span>
-                  </span>
-                )}
-                {editingItem.cantidadAtendida >= editingItem.item.cantidadPedida && (
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500" />
-                    Estado resultante: <span className="font-medium">Entregado</span>
-                  </span>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditingItem({ item: null, cantidadAtendida: 0, estado: 'pendiente', fechaEntregaReal: '', observacionesEntrega: '' })}
-                  className="h-7 text-xs"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={saveItemEdit}
-                  disabled={updating}
-                  className="h-7 text-xs"
-                >
-                  <Save className="h-3 w-3 mr-1" />
-                  {updating ? 'Guardando...' : 'Guardar'}
-                </Button>
-              </div>
-            </div>
-          )}
+            )
+          })()}
         </DialogContent>
       </Dialog>
     </div>

@@ -206,16 +206,21 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     })
 
     // ✅ Restar cantidades acumuladas en ListaEquipoItem
+    // Agrupar por listaEquipoItemId para recalcular después
+    const listaItemIds = new Set<string>()
     for (const item of items) {
-      if (item.listaEquipoItemId && item.cantidadPedida > 0) {
-        await prisma.listaEquipoItem.update({
-          where: { id: item.listaEquipoItemId },
-          data: {
-            cantidadPedida: {
-              decrement: item.cantidadPedida,
+      if (item.listaEquipoItemId) {
+        listaItemIds.add(item.listaEquipoItemId)
+        if (item.cantidadPedida > 0) {
+          await prisma.listaEquipoItem.update({
+            where: { id: item.listaEquipoItemId },
+            data: {
+              cantidadPedida: {
+                decrement: item.cantidadPedida,
+              },
             },
-          },
-        })
+          })
+        }
       }
     }
 
@@ -223,6 +228,22 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     await prisma.pedidoEquipo.delete({
       where: { id },
     })
+
+    // 🔄 Recalcular cantidadEntregada en ListaEquipoItems afectados
+    for (const listaItemId of listaItemIds) {
+      try {
+        const resultado = await prisma.pedidoEquipoItem.aggregate({
+          where: { listaEquipoItemId: listaItemId },
+          _sum: { cantidadAtendida: true },
+        })
+        await prisma.listaEquipoItem.update({
+          where: { id: listaItemId },
+          data: { cantidadEntregada: resultado._sum.cantidadAtendida || 0 },
+        })
+      } catch (syncError) {
+        console.warn('⚠️ Error al sincronizar cantidadEntregada tras eliminar pedido:', syncError)
+      }
+    }
 
     return NextResponse.json({ status: 'OK' })
   } catch (error) {

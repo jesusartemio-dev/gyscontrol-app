@@ -96,13 +96,14 @@ export async function POST(request: NextRequest) {
       const itemLista = itemsEncontrados.find(item => item.id === itemSeleccionado.listaEquipoItemId)!
       
       // 🔍 Obtener precio unitario con prioridad: precioElegido > cotizacionSeleccionada.precioUnitario > presupuesto > 0
+      // precioElegido ya es precio unitario; presupuesto es total, se divide por cantidad
       let precioUnitario = 0
       if (itemLista.precioElegido !== null && itemLista.precioElegido !== undefined) {
-        precioUnitario = itemLista.precioElegido / (itemLista.cantidad || 1) // Dividir por cantidad para obtener precio unitario
+        precioUnitario = itemLista.precioElegido
       } else if (itemLista.cotizacionSeleccionada?.precioUnitario) {
         precioUnitario = itemLista.cotizacionSeleccionada.precioUnitario
       } else if (itemLista.presupuesto !== null && itemLista.presupuesto !== undefined) {
-        precioUnitario = itemLista.presupuesto / (itemLista.cantidad || 1) // Dividir por cantidad para obtener precio unitario
+        precioUnitario = itemLista.presupuesto / (itemLista.cantidad || 1)
       }
       
       const costoTotalItem = precioUnitario * itemSeleccionado.cantidadPedida
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
           listaId: payload.listaId,
           codigo: codigoGenerado,
           numeroSecuencia: nuevoNumero,
+          estado: 'borrador',
           observacion: payload.observacion || '',
           fechaNecesaria: payload.fechaNecesaria ? new Date(payload.fechaNecesaria) : new Date(),
           prioridad: payload.prioridad || 'media',
@@ -164,7 +166,7 @@ export async function POST(request: NextRequest) {
         itemsParaPedido.map(async item => {
           const itemOriginal = itemsEncontrados.find(i => i.id === item.listaEquipoItemId)
           
-          // Crear el item del pedido
+          // Crear el item del pedido (usar precioUnitario ya calculado con fallback chain)
           const pedidoItem = await tx.pedidoEquipoItem.create({
             data: {
               id: randomUUID(),
@@ -176,10 +178,12 @@ export async function POST(request: NextRequest) {
               descripcion: itemOriginal?.descripcion || 'Sin descripción',
               unidad: itemOriginal?.unidad || 'UND',
               cantidadPedida: item.cantidad,
-              precioUnitario: itemOriginal?.precioElegido || 0,
-              costoTotal: (itemOriginal?.precioElegido || 0) * item.cantidad,
+              precioUnitario: item.costoUnitario,
+              costoTotal: item.costoTotal,
               tiempoEntrega: itemOriginal?.tiempoEntrega,
               tiempoEntregaDias: itemOriginal?.tiempoEntregaDias,
+              estado: 'pendiente',
+              estadoEntrega: 'pendiente',
               updatedAt: now
             }
           })

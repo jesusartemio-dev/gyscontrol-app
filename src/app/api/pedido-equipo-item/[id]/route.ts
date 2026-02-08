@@ -131,6 +131,59 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       await recalcularCantidadPedida(itemAnterior.listaEquipoItemId)
     }
 
+    // 🔄 Sync cantidadEntregada en ListaEquipoItem cuando cambia cantidadAtendida
+    if (body.cantidadAtendida !== undefined && itemAnterior.listaEquipoItemId) {
+      try {
+        // Recalcular sumando todas las cantidadAtendida de PedidoEquipoItems vinculados
+        const resultado = await prisma.pedidoEquipoItem.aggregate({
+          where: { listaEquipoItemId: itemAnterior.listaEquipoItemId },
+          _sum: { cantidadAtendida: true },
+        })
+        await prisma.listaEquipoItem.update({
+          where: { id: itemAnterior.listaEquipoItemId },
+          data: { cantidadEntregada: resultado._sum.cantidadAtendida || 0 },
+        })
+      } catch (syncError) {
+        console.warn('⚠️ Error al sincronizar cantidadEntregada:', syncError)
+      }
+    }
+
+    // 🔄 Auto-derivar estado del pedido padre basado en estados de todos sus items
+    if (body.estado && itemAnterior.pedidoEquipo) {
+      try {
+        const allItems = await prisma.pedidoEquipoItem.findMany({
+          where: { pedidoId: itemAnterior.pedidoEquipo.id },
+          select: { estado: true },
+        })
+
+        const estados = allItems.map(i => i.estado)
+        let nuevoEstadoPedido: 'parcial' | 'entregado' | null = null
+
+        if (estados.length > 0) {
+          if (estados.every(e => e === 'entregado')) {
+            nuevoEstadoPedido = 'entregado'
+          } else if (estados.some(e => e !== 'pendiente')) {
+            nuevoEstadoPedido = 'parcial'
+          }
+        }
+
+        // Solo actualizar si hay un nuevo estado derivado y es diferente al actual
+        const estadoActualPedido = itemAnterior.pedidoEquipo.estado
+        if (
+          nuevoEstadoPedido &&
+          nuevoEstadoPedido !== estadoActualPedido &&
+          estadoActualPedido !== 'cancelado'
+        ) {
+          await prisma.pedidoEquipo.update({
+            where: { id: itemAnterior.pedidoEquipo.id },
+            data: { estado: nuevoEstadoPedido, updatedAt: new Date() },
+          })
+        }
+      } catch (derivarError) {
+        console.warn('⚠️ Error al derivar estado del pedido:', derivarError)
+      }
+    }
+
     return NextResponse.json(itemActualizado)
   } catch (error) {
     return NextResponse.json(
@@ -180,6 +233,20 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     // 🔄 Recalcular cantidadPedida después de eliminar para asegurar consistencia
     if (item.listaEquipoItemId) {
       await recalcularCantidadPedida(item.listaEquipoItemId)
+
+      // 🔄 Recalcular cantidadEntregada sumando items restantes
+      try {
+        const resultado = await prisma.pedidoEquipoItem.aggregate({
+          where: { listaEquipoItemId: item.listaEquipoItemId },
+          _sum: { cantidadAtendida: true },
+        })
+        await prisma.listaEquipoItem.update({
+          where: { id: item.listaEquipoItemId },
+          data: { cantidadEntregada: resultado._sum.cantidadAtendida || 0 },
+        })
+      } catch (syncError) {
+        console.warn('⚠️ Error al sincronizar cantidadEntregada tras eliminar:', syncError)
+      }
     }
 
     // ✅ Confirmar éxito
