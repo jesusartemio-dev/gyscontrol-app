@@ -55,6 +55,11 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
             cliente: true,
             comercial: true
           }
+        },
+        // ✅ Proyecto vinculado
+        proyecto: {
+          select: { id: true, codigo: true, nombre: true, estado: true },
+          take: 1
         }
       }
     })
@@ -82,7 +87,9 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       exclusiones: cotizacion.cotizacionExclusion || [],
       condiciones: cotizacion.cotizacionCondicion || [],
       // ✅ Mapeamos crmOportunidad a oportunidadCrm para compatibilidad con frontend
-      oportunidadCrm: cotizacion.crmOportunidad || null
+      oportunidadCrm: cotizacion.crmOportunidad || null,
+      // ✅ Proyecto vinculado (primer match)
+      proyectoVinculado: cotizacion.proyecto?.[0] || null
     }
 
     return NextResponse.json(cotizacionFormatted)

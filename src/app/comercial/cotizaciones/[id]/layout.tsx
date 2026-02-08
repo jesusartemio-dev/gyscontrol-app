@@ -11,7 +11,8 @@ import {
   AlertCircle,
   ArrowLeft,
   PanelRightClose,
-  PanelRightOpen
+  PanelRightOpen,
+  FolderOpen
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCotizacionById } from '@/lib/services/cotizacion'
@@ -264,13 +265,26 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                     <span className="hidden sm:inline">+ CRM</span>
                   </Button>
                 )}
-                {cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada' || cotizacion.oportunidadCrm.estado === 'seguimiento_proyecto') && (
-                  <CrearProyectoDesdeCotizacionModal
-                    cotizacion={cotizacion}
-                    buttonVariant="outline"
-                    buttonSize="sm"
-                    buttonClassName="h-8 text-purple-700 border-purple-300 hover:bg-purple-50"
-                  />
+                {(cotizacion as any).proyectoVinculado ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/proyectos/${(cotizacion as any).proyectoVinculado.id}`)}
+                    className="h-8 text-purple-700 border-purple-300 hover:bg-purple-50"
+                  >
+                    <FolderOpen className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">{(cotizacion as any).proyectoVinculado.codigo}</span>
+                    <span className="sm:hidden">Proyecto</span>
+                  </Button>
+                ) : (
+                  cotizacion.estado === 'aprobada' && (!cotizacion.oportunidadCrm || cotizacion.oportunidadCrm.estado === 'cerrada_ganada' || cotizacion.oportunidadCrm.estado === 'seguimiento_proyecto') && (
+                    <CrearProyectoDesdeCotizacionModal
+                      cotizacion={cotizacion}
+                      buttonVariant="outline"
+                      buttonSize="sm"
+                      buttonClassName="h-8 text-purple-700 border-purple-300 hover:bg-purple-50"
+                    />
+                  )
                 )}
               </div>
             </div>
