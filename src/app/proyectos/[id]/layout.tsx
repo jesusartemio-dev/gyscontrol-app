@@ -294,7 +294,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                       >
                         <span className="font-mono">{proyecto.codigo}</span>
                         <span className="mx-1">:</span>
-                        <span className="truncate max-w-[150px]">{proyecto.nombre}</span>
+                        <span className="truncate max-w-[300px]" title={proyecto.nombre}>{proyecto.nombre}</span>
                       </Button>
                       <span className="text-muted-foreground">/</span>
                       <span className="font-medium text-foreground">{currentSubPage}</span>
@@ -304,7 +304,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                       <span className="font-mono bg-muted px-2 py-0.5 rounded border">
                         {proyecto.codigo}
                       </span>
-                      <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate max-w-[300px]">
+                      <h1 className="text-lg sm:text-xl font-semibold text-gray-900" title={proyecto.nombre}>
                         {proyecto.nombre}
                       </h1>
                     </div>
