@@ -11,6 +11,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
+import {
   ArrowLeft,
   Package,
   Search,
@@ -21,7 +28,8 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Filter
 } from 'lucide-react'
 import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@prisma/client'
 import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal'
@@ -78,18 +86,32 @@ function LoadingSkeleton() {
 
 function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
   const [search, setSearch] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('__todas__')
   const [sortField, setSortField] = useState<string>('codigo')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
+  const categoriasUnicas = useMemo(() =>
+    [...new Set(items.map(i => i.categoria || 'SIN-CATEGORIA'))].sort()
+  , [items])
+
   const filteredItems = useMemo(() => {
-    if (!search) return items
-    const term = search.toLowerCase()
-    return items.filter(item =>
-      item.codigo.toLowerCase().includes(term) ||
-      item.descripcion.toLowerCase().includes(term) ||
-      item.marca?.toLowerCase().includes(term)
-    )
-  }, [items, search])
+    return items.filter(item => {
+      // Filtro por categoría
+      if (categoriaFiltro !== '__todas__') {
+        const cat = item.categoria || 'SIN-CATEGORIA'
+        if (cat !== categoriaFiltro) return false
+      }
+      // Filtro por búsqueda de texto
+      if (!search) return true
+      const term = search.toLowerCase()
+      return (
+        item.codigo.toLowerCase().includes(term) ||
+        item.descripcion.toLowerCase().includes(term) ||
+        item.marca?.toLowerCase().includes(term) ||
+        item.categoria?.toLowerCase().includes(term)
+      )
+    })
+  }, [items, search, categoriaFiltro])
 
   const sortedItems = useMemo(() => {
     return [...filteredItems].sort((a, b) => {
@@ -151,10 +173,10 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
 
   return (
     <div className="space-y-2">
-      {/* Search - only show if more than 3 items */}
+      {/* Filters - only show if more than 3 items */}
       {items.length > 3 && (
-        <div className="flex items-center gap-3">
-          <div className="relative max-w-xs">
+        <div className="flex items-center gap-2">
+          <div className="relative max-w-[200px]">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
             <Input
               placeholder="Buscar..."
@@ -163,7 +185,26 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
               className="pl-7 h-7 text-xs"
             />
           </div>
-          <span className="text-[10px] text-muted-foreground">
+          {categoriasUnicas.length > 1 && (
+            <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+              <SelectTrigger className="h-7 text-xs w-[200px]">
+                <Filter className="h-3 w-3 mr-1 text-gray-400" />
+                <SelectValue placeholder="Categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__todas__">Todas las categorías ({items.length})</SelectItem>
+                {categoriasUnicas.map(cat => {
+                  const count = items.filter(i => (i.categoria || 'SIN-CATEGORIA') === cat).length
+                  return (
+                    <SelectItem key={cat} value={cat}>
+                      {cat} ({count})
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          )}
+          <span className="text-[10px] text-muted-foreground ml-auto">
             {sortedItems.length} de {items.length}
           </span>
         </div>
@@ -209,7 +250,7 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
               {sortedItems.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-8 text-muted-foreground">
-                    {search ? 'No se encontraron items' : 'Sin items'}
+                    {search || categoriaFiltro !== '__todas__' ? 'No se encontraron items con los filtros aplicados' : 'Sin items'}
                   </td>
                 </tr>
               ) : (
