@@ -35,14 +35,6 @@ import {
 import { toast } from 'sonner'
 import type { ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@prisma/client'
 
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('es-PE', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(amount)
-}
-
 interface Props {
   isOpen: boolean
   onClose: () => void
@@ -155,11 +147,6 @@ export default function CrearListaMultipleModal({
       item.categoria?.toLowerCase().includes(term)
     )
   })
-
-  const totalSeleccionado = itemsSeleccionados.reduce((sum, id) => {
-    const item = itemsDisponibles.find(i => i.id === id)
-    return sum + (item ? item.cantidad * (item.precioCliente || 0) : 0)
-  }, 0)
 
   const crearLista = async () => {
     if (!nombreLista.trim()) {
@@ -320,23 +307,21 @@ export default function CrearListaMultipleModal({
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-8"></th>
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-24">Código</th>
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700">Descripción</th>
-                    <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-24">Marca</th>
-                    <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Cant.</th>
+                    <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-20">Marca</th>
+                    <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-12">Cant.</th>
                     <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-12">Und.</th>
-                    <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {itemsFiltrados.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={6} className="text-center py-8 text-muted-foreground">
                         {busqueda || categoriaFiltro !== '__todas__' ? 'No se encontraron items con los filtros aplicados' : 'No hay items disponibles'}
                       </td>
                     </tr>
                   ) : (
                     itemsFiltrados.map((item, idx) => {
                       const isSelected = itemsSeleccionados.includes(item.id)
-                      const subtotal = item.cantidad * (item.precioCliente || 0)
 
                       return (
                         <tr
@@ -351,31 +336,26 @@ export default function CrearListaMultipleModal({
                                 : 'bg-gray-50/30 hover:bg-gray-50'
                           )}
                         >
-                          <td className="px-2 py-1.5 text-center">
+                          <td className="px-2 py-2 text-center align-top">
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleItemSeleccion(item.id)}
-                              className="pointer-events-none"
+                              className="pointer-events-none mt-0.5"
                             />
                           </td>
-                          <td className="px-2 py-1.5">
-                            <span className="font-mono text-gray-600">{item.codigo}</span>
+                          <td className="px-2 py-2 align-top">
+                            <span className="font-mono text-gray-600 text-[11px]">{item.codigo}</span>
                           </td>
-                          <td className="px-2 py-1.5">
-                            <span className="line-clamp-1" title={item.descripcion}>
+                          <td className="px-2 py-2">
+                            <span className="line-clamp-3 leading-relaxed text-gray-800">
                               {item.descripcion}
                             </span>
                           </td>
-                          <td className="px-2 py-1.5">
-                            <span className="line-clamp-1 text-gray-600" title={item.marca || ''}>
-                              {item.marca || '-'}
-                            </span>
+                          <td className="px-2 py-2 align-top">
+                            <span className="line-clamp-1 text-gray-500">{item.marca || '-'}</span>
                           </td>
-                          <td className="px-2 py-1.5 text-center font-medium">{item.cantidad}</td>
-                          <td className="px-2 py-1.5 text-center text-gray-500">{item.unidad}</td>
-                          <td className="px-2 py-1.5 text-right font-mono text-gray-700">
-                            {formatCurrency(subtotal)}
-                          </td>
+                          <td className="px-2 py-2 text-center font-medium align-top">{item.cantidad}</td>
+                          <td className="px-2 py-2 text-center text-gray-500 align-top">{item.unidad}</td>
                         </tr>
                       )
                     })
@@ -387,16 +367,16 @@ export default function CrearListaMultipleModal({
 
           {/* Summary */}
           {itemsSeleccionados.length > 0 && (
-            <div className="flex items-center justify-between text-xs bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-orange-600" />
-                <span className="font-medium text-orange-900">
-                  {itemsSeleccionados.length} items seleccionados
-                </span>
-              </div>
-              <span className="font-mono font-semibold text-orange-700">
-                Total: {formatCurrency(totalSeleccionado)}
+            <div className="flex items-center gap-2 text-xs bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+              <CheckCircle2 className="h-4 w-4 text-orange-600" />
+              <span className="font-medium text-orange-900">
+                {itemsSeleccionados.length} items seleccionados
               </span>
+              {categoriaFiltro !== '__todas__' && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
+                  {categoriaFiltro}
+                </Badge>
+              )}
             </div>
           )}
         </div>

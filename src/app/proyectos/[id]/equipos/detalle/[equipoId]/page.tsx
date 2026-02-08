@@ -266,7 +266,7 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
                       <span className="font-mono text-gray-600">{item.codigo}</span>
                     </td>
                     <td className="px-2 py-1.5">
-                      <span className="line-clamp-1" title={item.descripcion}>{item.descripcion}</span>
+                      <span className="line-clamp-2 text-[11px] leading-snug text-gray-700" title={item.descripcion}>{item.descripcion}</span>
                     </td>
                     <td className="px-2 py-1.5">
                       <span className="line-clamp-1 text-gray-600" title={item.marca || ''}>
