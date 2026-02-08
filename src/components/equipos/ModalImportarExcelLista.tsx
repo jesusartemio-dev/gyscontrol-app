@@ -31,7 +31,8 @@ import {
   Link2,
   Unlink,
   Database,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react'
 import { importarEquiposDesdeExcel } from '@/lib/utils/equiposExcel'
 import {
@@ -40,6 +41,7 @@ import {
   importarDesdeCotizacion,
   importarDesdeCatalogo,
   importarDirectoALista,
+  importarComoReemplazo,
   type ResumenImportacionExcel
 } from '@/lib/services/listaEquipoImportExcel'
 import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
@@ -100,6 +102,10 @@ export default function ModalImportarExcelLista({
   const [saveToCatalog, setSaveToCatalog] = useState<Set<string>>(new Set())
   // Códigos duplicados en el Excel (no se pueden guardar en catálogo)
   const [duplicateCodes, setDuplicateCodes] = useState<Set<string>>(new Set())
+  // Replacement flags: Excel item code → true if mapped as replacement
+  const [replacementFlags, setReplacementFlags] = useState<Record<string, boolean>>({})
+  // Replacement motivos: Excel item code → motivo text
+  const [replacementMotivos, setReplacementMotivos] = useState<Record<string, string>>({})
 
   const resetModal = useCallback(() => {
     setStep('upload')
@@ -113,6 +119,8 @@ export default function ModalImportarExcelLista({
     setAllQuotedItems([])
     setSaveToCatalog(new Set())
     setDuplicateCodes(new Set())
+    setReplacementFlags({})
+    setReplacementMotivos({})
   }, [])
 
   useEffect(() => {
@@ -256,16 +264,26 @@ export default function ModalImportarExcelLista({
       const responsableId = session?.user?.id
       if (!responsableId) throw new Error('Usuario no identificado')
 
-      // Split items into 3 groups based on user mappings
+      // Split items into 4 groups based on user mappings
       const mappedItems: Array<{ excelItem: typeof resumen.items[0]; quotedItemId: string }> = []
+      const replacementItems: Array<{ excelItem: typeof resumen.items[0]; quotedItemId: string; motivo: string }> = []
       const unmappedWithCatalog: typeof resumen.items = [] // ya existen en catálogo o user eligió guardar
       const unmappedDirect: typeof resumen.items = []      // sin catálogo (directo a lista)
 
       for (const excelItem of resumen.items) {
         const mappedTo = itemMappings[excelItem.codigo]
         if (mappedTo && mappedTo !== MAPPING_NONE) {
-          // Path 1: Vinculado a item cotizado
-          mappedItems.push({ excelItem, quotedItemId: mappedTo })
+          if (replacementFlags[excelItem.codigo]) {
+            // Path 1b: Reemplazo de item cotizado
+            replacementItems.push({
+              excelItem,
+              quotedItemId: mappedTo,
+              motivo: replacementMotivos[excelItem.codigo] || 'Reemplazo desde importación Excel'
+            })
+          } else {
+            // Path 1: Vinculado a item cotizado
+            mappedItems.push({ excelItem, quotedItemId: mappedTo })
+          }
         } else if (excelItem.estado === 'solo_catalogo' || excelItem.catalogoId) {
           // Path 2: Ya existe en catálogo → importar desde catálogo
           unmappedWithCatalog.push(excelItem)
@@ -287,7 +305,39 @@ export default function ModalImportarExcelLista({
         }))
         await importarDesdeCotizacion(listaId, quotedItemIds, excelData)
       }
-      setImportProgress(33)
+      setImportProgress(20)
+
+      // === Path 1b: Import replacement items ===
+      if (replacementItems.length > 0) {
+        // Determine equipment group: use selected or find from the quoted item
+        const equipoIdForReplacements = selectedProyectoEquipoId ||
+          (() => {
+            const firstQuotedId = replacementItems[0].quotedItemId
+            const matched = allQuotedItems.find(q => q.id === firstQuotedId)
+            return matched?.grupoId || ''
+          })()
+
+        if (equipoIdForReplacements) {
+          await importarComoReemplazo(
+            listaId,
+            equipoIdForReplacements,
+            replacementItems.map(r => ({
+              excelItem: {
+                codigo: r.excelItem.codigo,
+                descripcion: r.excelItem.descripcion,
+                categoria: r.excelItem.categoria,
+                unidad: r.excelItem.unidad,
+                marca: r.excelItem.marca,
+                cantidad: r.excelItem.cantidad,
+              },
+              proyectoEquipoItemId: r.quotedItemId,
+              motivo: r.motivo,
+            })),
+            responsableId
+          )
+        }
+      }
+      setImportProgress(40)
 
       // === Path 2: Items that need catalog (existing or user-chosen) ===
       if (unmappedWithCatalog.length > 0) {
@@ -337,7 +387,7 @@ export default function ModalImportarExcelLista({
           )
         }
       }
-      setImportProgress(66)
+      setImportProgress(70)
 
       // === Path 3: Direct to list without catalog ===
       if (unmappedDirect.length > 0) {
@@ -624,10 +674,13 @@ export default function ModalImportarExcelLista({
   const renderMappingStep = () => {
     if (!resumen) return null
 
-    const mappedCount = resumen.items.filter(item => {
+    const mappedItems = resumen.items.filter(item => {
       const m = itemMappings[item.codigo]
       return m && m !== MAPPING_NONE
-    }).length
+    })
+    const linkedCount = mappedItems.filter(item => !replacementFlags[item.codigo]).length
+    const replacedCount = mappedItems.filter(item => replacementFlags[item.codigo]).length
+    const mappedCount = mappedItems.length
     const unmappedCount = resumen.items.length - mappedCount
     const needsGroup = unmappedCount > 0
     const canImport = resumen.items.length > 0 && (!needsGroup || selectedProyectoEquipoId)
@@ -642,10 +695,17 @@ export default function ModalImportarExcelLista({
               Vincular items a equipos cotizados
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-green-50 text-green-700 border-green-200">
-              {mappedCount} vinculados
-            </Badge>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {linkedCount > 0 && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-green-50 text-green-700 border-green-200">
+                {linkedCount} vinculados
+              </Badge>
+            )}
+            {replacedCount > 0 && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700 border-blue-200">
+                {replacedCount} reemplazos
+              </Badge>
+            )}
             {unmappedCount > 0 && (
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-gray-50 text-gray-500">
                 {unmappedCount} sin vincular
@@ -664,6 +724,7 @@ export default function ModalImportarExcelLista({
               const isNew = item.estado === 'nuevo'
               const isDupe = duplicateCodes.has(item.codigo.toLowerCase())
               const showCatalogOption = isNew && !isMapped
+              const isReplacement = isMapped && replacementFlags[item.codigo]
               // Detectar discrepancia de categoría entre Excel y catálogo
               const hasCategoriaMismatch = item.categoriaCatalogo && item.categoria &&
                 item.categoriaCatalogo.toLowerCase() !== item.categoria.toLowerCase()
@@ -673,7 +734,11 @@ export default function ModalImportarExcelLista({
                   key={item.codigo}
                   className={cn(
                     'p-2 rounded-lg border transition-colors',
-                    isMapped ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-gray-50/30'
+                    isMapped
+                      ? isReplacement
+                        ? 'border-blue-200 bg-blue-50/50'
+                        : 'border-green-200 bg-green-50/50'
+                      : 'border-gray-200 bg-gray-50/30'
                   )}
                 >
                   {/* Excel item info */}
@@ -707,13 +772,22 @@ export default function ModalImportarExcelLista({
                     <ArrowRight className="h-3 w-3 text-gray-400 shrink-0" />
                     <Select
                       value={currentMapping}
-                      onValueChange={(val) =>
+                      onValueChange={(val) => {
                         setItemMappings(prev => ({ ...prev, [item.codigo]: val }))
-                      }
+                        // Clear replacement flag when mapping changes
+                        if (val === MAPPING_NONE) {
+                          setReplacementFlags(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
+                          setReplacementMotivos(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
+                        }
+                      }}
                     >
                       <SelectTrigger className={cn(
                         'h-7 text-xs flex-1 overflow-hidden',
-                        isMapped ? 'border-green-300 text-green-800' : 'text-gray-500'
+                        isMapped
+                          ? isReplacement
+                            ? 'border-blue-300 text-blue-800'
+                            : 'border-green-300 text-green-800'
+                          : 'text-gray-500'
                       )}>
                         <SelectValue>
                           {isMapped && matchedQuoted
@@ -783,6 +857,52 @@ export default function ModalImportarExcelLista({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Vincular vs Reemplazar toggle — only when mapped */}
+                  {isMapped && (
+                    <div className="mt-1.5 pl-5 space-y-1.5">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReplacementFlags(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
+                            setReplacementMotivos(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
+                          }}
+                          className={cn(
+                            'flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+                            !isReplacement
+                              ? 'bg-green-100 border-green-300 text-green-800 font-medium'
+                              : 'bg-white border-gray-200 text-gray-500 hover:border-green-300'
+                          )}
+                        >
+                          <Link2 className="h-2.5 w-2.5" />
+                          Vincular
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReplacementFlags(prev => ({ ...prev, [item.codigo]: true }))}
+                          className={cn(
+                            'flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+                            isReplacement
+                              ? 'bg-blue-100 border-blue-300 text-blue-800 font-medium'
+                              : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300'
+                          )}
+                        >
+                          <RefreshCw className="h-2.5 w-2.5" />
+                          Reemplazar
+                        </button>
+                      </div>
+                      {isReplacement && (
+                        <input
+                          type="text"
+                          placeholder="Motivo del reemplazo (opcional)"
+                          value={replacementMotivos[item.codigo] || ''}
+                          onChange={(e) => setReplacementMotivos(prev => ({ ...prev, [item.codigo]: e.target.value }))}
+                          className="w-full h-6 text-[10px] px-2 border border-blue-200 rounded bg-white placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        />
+                      )}
+                    </div>
+                  )}
 
                   {/* Catalog save option for new unmapped items */}
                   {showCatalogOption && (

@@ -11,6 +11,7 @@ import { getProyectoEquipos } from './proyectoEquipo'
 import { createCatalogoEquipo } from './catalogoEquipo'
 import { createListaEquipoItem, updateListaEquipoItem, getListaEquipoItemsByLista } from './listaEquipoItem'
 import { createListaEquipoItemFromProyecto } from './listaEquipoItem'
+import { updateProyectoEquipoItem } from './proyectoEquipoItem'
 import { getCategoriasEquipo, createCategoriaEquipo } from './categoriaEquipo'
 import { getUnidades, createUnidad } from './unidad'
 import { buildApiUrl } from '@/lib/utils'
@@ -405,5 +406,62 @@ export async function importarDirectoALista(
   } catch (error) {
     console.error('Error importando directo a lista:', error)
     throw new Error('Error al importar items directamente a la lista')
+  }
+}
+
+// ✅ Importar items como reemplazo de items cotizados
+export async function importarComoReemplazo(
+  listaId: string,
+  proyectoEquipoId: string,
+  replacements: Array<{
+    excelItem: {
+      codigo: string
+      descripcion: string
+      categoria: string
+      unidad: string
+      marca: string
+      cantidad: number
+    }
+    proyectoEquipoItemId: string
+    motivo: string
+  }>,
+  responsableId: string
+): Promise<void> {
+  try {
+    for (const { excelItem, proyectoEquipoItemId, motivo } of replacements) {
+      // 1. Crear nuevo ListaEquipoItem con origen 'reemplazo'
+      const nuevoItem = await createListaEquipoItem({
+        listaId,
+        proyectoEquipoId,
+        responsableId,
+        proyectoEquipoItemId,
+        reemplazaProyectoEquipoCotizadoItemId: proyectoEquipoItemId,
+        codigo: excelItem.codigo,
+        descripcion: excelItem.descripcion,
+        marca: excelItem.marca || 'SIN-MARCA',
+        categoria: excelItem.categoria || 'SIN-CATEGORIA',
+        unidad: excelItem.unidad || 'UND',
+        cantidad: excelItem.cantidad,
+        presupuesto: 0,
+        origen: 'reemplazo',
+        estado: 'borrador',
+        comentarioRevision: motivo,
+      })
+
+      // 2. Actualizar ProyectoEquipoItem → reemplazado
+      if (nuevoItem) {
+        await updateProyectoEquipoItem(proyectoEquipoItemId, {
+          listaEquipoSeleccionadoId: nuevoItem.id,
+          listaId,
+          estado: 'reemplazado',
+          motivoCambio: motivo,
+        })
+      }
+
+      console.log(`🔄 Item ${excelItem.codigo} importado como reemplazo de ProyectoEquipoItem ${proyectoEquipoItemId}`)
+    }
+  } catch (error) {
+    console.error('Error importando como reemplazo:', error)
+    throw new Error('Error al importar items como reemplazo')
   }
 }
