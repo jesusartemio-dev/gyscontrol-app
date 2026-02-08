@@ -63,7 +63,12 @@ export default function ProyectoHubPage() {
   const totalEquipos = proyecto.equipos?.length || 0
   const totalEquiposItems = proyecto.equipos?.reduce((acc, e) => acc + (e.items?.length || 0), 0) || 0
   const totalEquiposCliente = proyecto.equipos?.reduce((acc, e) => acc + (e.subtotalCliente || 0), 0) || 0
-  const totalEquiposReal = proyecto.equipos?.reduce((acc, e) => acc + (e.subtotalReal || 0), 0) || 0
+  // Cobertura: ítems cotizados ya vinculados a listas (en_lista, reemplazado, descartado)
+  const equiposItemsEnLista = proyecto.equipos?.reduce((acc, e) =>
+    acc + (e.items?.filter((i: any) => i.estado && i.estado !== 'pendiente').length || 0), 0) || 0
+  const progresoCobertura = totalEquiposItems > 0
+    ? { porcentaje: (equiposItemsEnLista / totalEquiposItems) * 100, estado: 'ok' as const }
+    : null
   const totalServicios = proyecto.servicios?.length || 0
   const totalServiciosItems = proyecto.servicios?.reduce((acc, s) => acc + (s.items?.length || 0), 0) || 0
   const totalServiciosCliente = proyecto.servicios?.reduce((acc, s) => acc + (s.subtotalCliente || 0), 0) || 0
@@ -72,11 +77,10 @@ export default function ProyectoHubPage() {
   const totalGastosItems = proyecto.gastos?.reduce((acc, g) => acc + (g.items?.length || 0), 0) || 0
   const totalGastosCliente = proyecto.gastos?.reduce((acc, g) => acc + (g.subtotalCliente || 0), 0) || 0
   const totalGastosReal = proyecto.gastos?.reduce((acc, g) => acc + (g.subtotalReal || 0), 0) || 0
-  const totalListas = proyecto.ListaEquipo?.length || 0
-  const totalPedidos = (proyecto as any).pedidos?.length || 0
+  const totalListas = proyecto.listaEquipos?.length || 0
+  const totalPedidos = proyecto.pedidos?.length || 0
 
   // Calculate progress for each category
-  const progresoEquipos = calcularProgreso(totalEquiposReal, totalEquiposCliente)
   const progresoServicios = calcularProgreso(totalServiciosReal, totalServiciosCliente)
   const progresoGastos = calcularProgreso(totalGastosReal, totalGastosCliente)
 
@@ -96,11 +100,10 @@ export default function ProyectoHubPage() {
       stats: [
         { label: 'Grupos', value: totalEquipos },
         { label: 'Items', value: totalEquiposItems },
+        { label: 'En listas', value: equiposItemsEnLista },
       ],
       total: totalEquiposCliente,
-      progreso: progresoEquipos,
-      real: totalEquiposReal,
-      plan: totalEquiposCliente
+      cobertura: progresoCobertura,
     },
     {
       id: 'servicios',
@@ -287,6 +290,35 @@ export default function ProyectoHubPage() {
                           style={{ left: '100%', width: `${Math.min(card.progreso.porcentaje - 100, 50)}%` }}
                         />
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Coverage progress bar for equipos */}
+                {card.cobertura && card.cobertura.porcentaje >= 0 && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <ClipboardList className="h-3 w-3 text-blue-500" />
+                        Cobertura en listas
+                      </span>
+                      <span className={`font-medium ${
+                        card.cobertura.porcentaje >= 100 ? 'text-emerald-600' :
+                        card.cobertura.porcentaje >= 50 ? 'text-blue-600' :
+                        'text-gray-500'
+                      }`}>
+                        {card.cobertura.porcentaje.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`absolute inset-y-0 left-0 rounded-full transition-all ${
+                          card.cobertura.porcentaje >= 100 ? 'bg-emerald-500' :
+                          card.cobertura.porcentaje >= 50 ? 'bg-blue-500' :
+                          'bg-blue-300'
+                        }`}
+                        style={{ width: `${Math.min(card.cobertura.porcentaje, 100)}%` }}
+                      />
                     </div>
                   </div>
                 )}

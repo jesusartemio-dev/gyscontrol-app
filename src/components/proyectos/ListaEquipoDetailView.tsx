@@ -257,7 +257,7 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
               }}
               onRefresh={refreshItems}
               trigger={
-                <Button size="sm" className="h-7 text-xs bg-orange-600 hover:bg-orange-700">
+                <Button size="sm" className="h-7 text-xs bg-orange-600 hover:bg-orange-700" disabled={items.length === 0}>
                   <ShoppingCart className="h-3 w-3 mr-1" />
                   Crear Pedido
                 </Button>
