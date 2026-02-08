@@ -6,7 +6,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronUp, ChevronDown, Eye, Package, Trash2, Building2 } from 'lucide-react'
+import { ChevronUp, ChevronDown, Eye, Package, Trash2, Building2, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -28,6 +28,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { toast } from 'sonner'
 import type { CotizacionProveedor } from '@/types'
 
 type SortField = 'codigo' | 'proveedor' | 'proyecto' | 'estado' | 'createdAt' | 'itemsCount'
@@ -51,14 +53,23 @@ const ESTADOS_CONFIG: Record<EstadoCotizacion, { label: string; variant: 'defaul
   seleccionado: { label: 'Seleccionado', variant: 'default' },
 }
 
+const FLUJO_COTIZACION: Record<string, { siguiente?: string; label?: string }> = {
+  pendiente: { siguiente: 'solicitado', label: 'Solicitado' },
+  solicitado: { siguiente: 'cotizado', label: 'Cotizado' },
+}
+
 const ITEMS_PER_PAGE = 15
 
-export default function LogisticaCotizacionesTable({ cotizaciones, loading = false, onDelete, className }: LogisticaCotizacionesTableProps) {
+export default function LogisticaCotizacionesTable({ cotizaciones, loading = false, onRefresh, onDelete, className }: LogisticaCotizacionesTableProps) {
   const router = useRouter()
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [advancingId, setAdvancingId] = useState<string | null>(null)
+  const [confirmAdvance, setConfirmAdvance] = useState<{
+    cotId: string; estado: string; codigo: string; proveedor: string; siguiente: string; label: string
+  } | null>(null)
 
   // Sorting logic
   const sortedCotizaciones = useMemo(() => {
@@ -140,6 +151,45 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
     }
   }
 
+  const handleRequestAdvance = (e: React.MouseEvent, cot: CotizacionProveedor) => {
+    e.stopPropagation()
+    const flujo = FLUJO_COTIZACION[cot.estado as string]
+    if (!flujo?.siguiente) return
+    setConfirmAdvance({
+      cotId: cot.id,
+      estado: cot.estado,
+      codigo: cot.codigo || cot.id,
+      proveedor: cot.proveedor?.nombre || 'Sin proveedor',
+      siguiente: flujo.siguiente,
+      label: flujo.label || flujo.siguiente,
+    })
+  }
+
+  const handleConfirmAdvance = async () => {
+    if (!confirmAdvance) return
+    const { cotId, siguiente, label } = confirmAdvance
+
+    setAdvancingId(cotId)
+    setConfirmAdvance(null)
+    try {
+      const res = await fetch(`/api/logistica/cotizaciones-proveedor/${cotId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: siguiente }),
+      })
+      if (res.ok) {
+        toast.success(`Cotización avanzada a "${label}"`)
+        onRefresh?.()
+      } else {
+        toast.error('Error al cambiar estado')
+      }
+    } catch {
+      toast.error('Error inesperado')
+    } finally {
+      setAdvancingId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-4 space-y-2">
@@ -188,6 +238,12 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
             >
               <span className="flex items-center justify-center gap-1">Items <SortIcon field="itemsCount" /></span>
             </TableHead>
+            <TableHead className="text-xs w-[70px] text-center">
+              <span className="flex items-center justify-center gap-1">Precios</span>
+            </TableHead>
+            <TableHead className="text-xs w-[70px] text-center">
+              <span className="flex items-center justify-center gap-1">Selección</span>
+            </TableHead>
             <TableHead
               className="text-xs cursor-pointer hover:bg-gray-50 w-[90px]"
               onClick={() => handleSort('estado')}
@@ -206,7 +262,16 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
         <TableBody>
           {currentCotizaciones.map((cot) => {
             const estadoConfig = ESTADOS_CONFIG[cot.estado as EstadoCotizacion] || { label: cot.estado, variant: 'secondary' as const }
-            const itemsCount = cot.items?.length || 0
+            const cotItems = cot.items || (cot as any).cotizacionProveedorItem || []
+            const itemsCount = cotItems.length
+            const conPrecio = cotItems.filter((i: any) => i.precioUnitario && i.precioUnitario > 0).length
+            const preciosCompletos = itemsCount > 0 && conPrecio === itemsCount
+            const flujo = FLUJO_COTIZACION[cot.estado as string]
+            // pendiente → solicitado: cuando tiene items (se envió al proveedor)
+            // solicitado → cotizado: cuando todos los precios están completos
+            const listoParaAvanzar = !!flujo?.siguiente && (
+              cot.estado === 'pendiente' ? itemsCount > 0 : preciosCompletos
+            )
 
             return (
               <TableRow
@@ -235,16 +300,104 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
                     {itemsCount}
                   </span>
                 </TableCell>
+                <TableCell className="py-2 text-center">
+                  {itemsCount === 0 ? (
+                    <span className="text-[10px] text-muted-foreground">—</span>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className={`text-[10px] font-medium cursor-help ${
+                          preciosCompletos ? 'text-green-600' : conPrecio > 0 ? 'text-amber-600' : 'text-red-500'
+                        }`}>
+                          {conPrecio}/{itemsCount}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        {preciosCompletos
+                          ? 'Todos los precios completos'
+                          : `${itemsCount - conPrecio} item${itemsCount - conPrecio > 1 ? 's' : ''} sin precio asignado`
+                        }
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </TableCell>
+                <TableCell className="py-2 text-center">
+                  {(() => {
+                    const seleccionados = cotItems.filter((i: any) => i.esSeleccionada).length
+                    if (itemsCount === 0) return <span className="text-[10px] text-muted-foreground">—</span>
+                    if (seleccionados === 0) return <span className="text-[10px] text-muted-foreground">0/{itemsCount}</span>
+                    const completo = seleccionados === itemsCount
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] h-5 px-1.5 cursor-help ${
+                              completo
+                                ? 'border-green-300 bg-green-50 text-green-700'
+                                : 'border-amber-300 bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            {seleccionados}/{itemsCount}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          {completo
+                            ? 'Selección completa — todos los items asignados'
+                            : `${seleccionados} de ${itemsCount} items seleccionados`
+                          }
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })()}
+                </TableCell>
                 <TableCell className="py-2">
-                  <Badge variant={estadoConfig.variant} className="text-[10px] h-5 px-1.5">
-                    {estadoConfig.label}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <Badge variant={estadoConfig.variant} className="text-[10px] h-5 px-1.5">
+                      {estadoConfig.label}
+                    </Badge>
+                    {listoParaAvanzar && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          {cot.estado === 'pendiente'
+                            ? `${itemsCount} items listos — marcar como solicitado`
+                            : 'Precios completos — marcar como cotizado'
+                          }
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="py-2 text-xs text-muted-foreground">
                   {formatDate(cot.createdAt)}
                 </TableCell>
                 <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-0.5">
+                    {listoParaAvanzar && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleRequestAdvance(e, cot)}
+                            disabled={advancingId === cot.id}
+                            className="h-7 w-7 p-0"
+                          >
+                            {advancingId === cot.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-green-600" />
+                            ) : (
+                              <ArrowRight className="h-3.5 w-3.5 text-green-600" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="text-xs">
+                          Avanzar a &quot;{FLUJO_COTIZACION[cot.estado as string]?.label}&quot;
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -302,6 +455,32 @@ export default function LogisticaCotizacionesTable({ cotizaciones, loading = fal
           </div>
         </div>
       )}
+
+      {/* Advance confirmation dialog */}
+      <AlertDialog open={!!confirmAdvance} onOpenChange={(open) => !open && setConfirmAdvance(null)}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base">Confirmar cambio de estado</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-sm space-y-2">
+                <p>
+                  Se avanzará la cotización <span className="font-medium">{confirmAdvance?.codigo}</span> de{' '}
+                  <span className="font-medium">{confirmAdvance?.proveedor}</span> al estado{' '}
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 align-middle">
+                    {confirmAdvance?.label}
+                  </Badge>
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-8 text-xs">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmAdvance} className="h-8 text-xs bg-blue-600 hover:bg-blue-700">
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

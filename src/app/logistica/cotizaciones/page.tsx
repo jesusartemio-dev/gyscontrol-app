@@ -8,7 +8,6 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { useSession } from 'next-auth/react'
 import {
   Plus,
   Package,
@@ -27,7 +26,6 @@ import {
 import { CotizacionProveedor, Proyecto, Proveedor } from '@/types'
 import {
   getCotizacionesProveedor,
-  updateCotizacionProveedor,
   deleteCotizacionProveedor,
 } from '@/lib/services/cotizacionProveedor'
 import { getProyectos } from '@/lib/services/proyecto'
@@ -57,7 +55,6 @@ const ESTADOS_COTIZACION = [
 ]
 
 export default function CotizacionesPage() {
-  const { data: session } = useSession()
   const [cotizaciones, setCotizaciones] = useState<CotizacionProveedor[]>([])
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
@@ -131,44 +128,6 @@ export default function CotizacionesPage() {
       fetchData()
     } else {
       toast.error('Error al eliminar cotización')
-    }
-  }
-
-  const handleEstadoUpdated = async (cotizacionId: string, nuevoEstado: CotizacionProveedor['estado']) => {
-    try {
-      const cotizacion = cotizaciones.find(c => c.id === cotizacionId)
-      const estadoAnterior = cotizacion?.estado
-
-      setCotizaciones(prev =>
-        prev.map(cot =>
-          cot.id === cotizacionId ? { ...cot, estado: nuevoEstado } : cot
-        )
-      )
-
-      await updateCotizacionProveedor(cotizacionId, { estado: nuevoEstado })
-
-      if (estadoAnterior && estadoAnterior !== nuevoEstado) {
-        try {
-          await fetch('/api/audit/log-status-change', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: (session?.user as { id?: string })?.id || '',
-              entityType: 'COTIZACION',
-              entityId: cotizacionId,
-              oldStatus: estadoAnterior,
-              newStatus: nuevoEstado,
-              description: cotizacion?.codigo || `Cotización ${cotizacionId}`
-            })
-          })
-        } catch (auditError) {
-          console.warn('Error al registrar auditoría:', auditError)
-        }
-      }
-    } catch (error) {
-      console.error('Error al actualizar estado:', error)
-      fetchData()
-      throw error
     }
   }
 

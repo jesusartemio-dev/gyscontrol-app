@@ -18,13 +18,15 @@ import {
   Plus,
   ChevronRight,
   ChevronDown,
-  History
+  History,
+  CheckCircle2,
 } from 'lucide-react'
 import type { CotizacionProveedor } from '@/types'
 import CotizacionProveedorHistorial from '@/components/logistica/CotizacionProveedorHistorial'
 import CotizacionEstadoFlujoBanner from '@/components/logistica/CotizacionEstadoFlujoBanner'
 import CotizacionProveedorTabla from '@/components/logistica/CotizacionProveedorTabla'
 import ModalAgregarItemCotizacionProveedor from '@/components/logistica/ModalAgregarItemCotizacionProveedor'
+import ModalSeleccionarCotizacionCompleta from '@/components/logistica/ModalSeleccionarCotizacionCompleta'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -36,6 +38,7 @@ export default function CotizacionProveedorDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true)
   const [cotizacionId, setCotizacionId] = useState('')
   const [showAgregarItems, setShowAgregarItems] = useState(false)
+  const [showSeleccionarCompleta, setShowSeleccionarCompleta] = useState(false)
   const [showHistorial, setShowHistorial] = useState(false)
 
   useEffect(() => {
@@ -135,7 +138,7 @@ Equipo de Compras`
   }
 
   const estado = cotizacion.estado || 'pendiente'
-  const esEstadoFinal = estado === 'rechazado' || estado === 'seleccionado'
+  const esEstadoFinal = estado === 'rechazado'
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -169,6 +172,22 @@ Equipo de Compras`
                     <Badge className={`text-[10px] h-5 ${getEstadoBadge(estado)}`}>
                       {estado}
                     </Badge>
+                    {stats.totalItems > 0 && stats.selectedItems > 0 && (
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] h-5 px-1.5 ${
+                          stats.selectedItems === stats.totalItems
+                            ? 'border-green-300 bg-green-50 text-green-700'
+                            : 'border-amber-300 bg-amber-50 text-amber-700'
+                        }`}
+                      >
+                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                        {stats.selectedItems === stats.totalItems
+                          ? 'Selección completa'
+                          : `${stats.selectedItems}/${stats.totalItems} seleccionados`
+                        }
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                     <Building2 className="h-3 w-3" />
@@ -190,6 +209,16 @@ Equipo de Compras`
                 >
                   <Plus className="h-3 w-3 mr-1" />
                   Items
+                </Button>
+              )}
+              {(estado === 'cotizado' || estado === 'seleccionado') && stats.totalItems > 0 && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowSeleccionarCompleta(true)}
+                  className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Seleccionar
                 </Button>
               )}
               {(estado === 'pendiente' || estado === 'solicitado') && cotizacion.proveedor?.correo && (
@@ -219,12 +248,18 @@ Equipo de Compras`
               ${stats.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
           </div>
-          {stats.selectedItems > 0 && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Seleccionados:</span>
-              <span className="font-semibold text-green-600">{stats.selectedItems}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">Selección:</span>
+            <span className={`font-semibold ${
+              stats.selectedItems === stats.totalItems && stats.totalItems > 0
+                ? 'text-green-600'
+                : stats.selectedItems > 0
+                ? 'text-amber-600'
+                : 'text-muted-foreground'
+            }`}>
+              {stats.selectedItems}/{stats.totalItems}
+            </span>
+          </div>
           {stats.itemsSinPrecio > 0 && (
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Sin precio:</span>
@@ -300,7 +335,7 @@ Equipo de Compras`
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal agregar items */}
       <ModalAgregarItemCotizacionProveedor
         open={showAgregarItems}
         onClose={() => setShowAgregarItems(false)}
@@ -308,6 +343,18 @@ Equipo de Compras`
         proyectoId={cotizacion.proyectoId || ''}
         onAdded={handleRefresh}
       />
+
+      {/* Modal seleccionar cotización completa */}
+      {cotizacion.items && (
+        <ModalSeleccionarCotizacionCompleta
+          open={showSeleccionarCompleta}
+          onClose={() => setShowSeleccionarCompleta(false)}
+          items={cotizacion.items}
+          cotizacionCodigo={cotizacion.codigo || ''}
+          proveedorNombre={cotizacion.proveedor?.nombre || ''}
+          onCompleted={handleRefresh}
+        />
+      )}
     </div>
   )
 }

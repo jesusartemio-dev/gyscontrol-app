@@ -150,12 +150,21 @@ export default function LogisticaListaDetallePage() {
 
   // Pricing stats
   const totalItems = items.length
-  const itemsSinPrecio = items.filter((i: any) => !i.precioElegido && !i.cotizacionSeleccionadaId).length
+  const itemsSinPrecio = items.filter((i: any) => !i.precioElegido).length
   const itemsSinCotizacion = items.filter((i: any) => {
     const cots = i.cotizaciones || i.cotizacionProveedorItems || []
     return cots.length === 0
   }).length
   const faltanPrecios = totalItems > 0 && itemsSinPrecio > 0
+
+  // Coverage stats (ideal: 3 cotizaciones per item)
+  const MIN_COT = 3
+  const itemsConCobertura = items.filter((i: any) => {
+    const cots = i.cotizaciones || i.cotizacionProveedorItems || []
+    return cots.length >= MIN_COT
+  }).length
+  const itemsBajaCobertura = totalItems - itemsConCobertura
+  const faltaCobertura = totalItems > 0 && itemsBajaCobertura > 0
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -211,7 +220,7 @@ export default function LogisticaListaDetallePage() {
                 <Button
                   size="sm"
                   onClick={() => {
-                    if (faltanPrecios) {
+                    if (faltanPrecios || faltaCobertura) {
                       setOpenConfirmAvanzar(true)
                     } else {
                       handleAvanzarEstado()
@@ -246,17 +255,30 @@ export default function LogisticaListaDetallePage() {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Warning: items sin precios */}
-        {faltanPrecios && puedeAvanzar && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            <span>
-              <strong>{itemsSinPrecio} de {totalItems}</strong> items no tienen precio asignado
-              {itemsSinCotizacion > 0 && (
-                <> ({itemsSinCotizacion} sin cotizaciones)</>
+        {/* Warning: items sin precios / baja cobertura */}
+        {(faltanPrecios || faltaCobertura) && puedeAvanzar && (
+          <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              {faltanPrecios && (
+                <p>
+                  <strong>{itemsSinPrecio} de {totalItems}</strong> items no tienen precio asignado
+                  {itemsSinCotizacion > 0 && (
+                    <> ({itemsSinCotizacion} sin cotizaciones)</>
+                  )}
+                  .
+                </p>
               )}
-              . Asigna cotizaciones y selecciona precios antes de avanzar.
-            </span>
+              {faltaCobertura && (
+                <p>
+                  <strong>{itemsBajaCobertura} de {totalItems}</strong> items tienen menos de {MIN_COT} cotizaciones
+                  {' '}(<strong>{itemsConCobertura}/{totalItems}</strong> con cobertura completa).
+                </p>
+              )}
+              <p className="text-amber-600/80">
+                Se recomienda al menos {MIN_COT} cotizaciones por item para comparar precios.
+              </p>
+            </div>
           </div>
         )}
 
@@ -300,14 +322,21 @@ export default function LogisticaListaDetallePage() {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
-                <p>
-                  Hay <strong>{itemsSinPrecio} de {totalItems}</strong> items que no tienen precio asignado.
-                </p>
+                {faltanPrecios && (
+                  <p>
+                    Hay <strong>{itemsSinPrecio} de {totalItems}</strong> items que no tienen precio asignado.
+                  </p>
+                )}
                 {itemsSinCotizacion > 0 && (
                   <p>{itemsSinCotizacion} items no tienen ninguna cotización creada.</p>
                 )}
+                {faltaCobertura && (
+                  <p>
+                    <strong>{itemsBajaCobertura}</strong> items tienen menos de {MIN_COT} cotizaciones para comparar precios.
+                  </p>
+                )}
                 <p className="text-amber-600">
-                  Se recomienda asignar precios y tiempos de entrega a todos los items antes de avanzar.
+                  Se recomienda al menos {MIN_COT} cotizaciones por item y asignar precios antes de avanzar.
                 </p>
               </div>
             </AlertDialogDescription>

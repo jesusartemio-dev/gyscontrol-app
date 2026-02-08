@@ -173,11 +173,15 @@ export default function ModalCrearCotizacionDesdeLista({
   }
 
   const getItemStatus = (item: ListaEquipoItem) => {
-    const hasCotizacion = (item.cotizaciones?.length || 0) > 0
-    if (hasCotizacion) {
-      return { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', label: 'Cotizado' }
+    const count = item.cotizaciones?.length || 0
+    const MIN_COT = 3
+    if (count >= MIN_COT) {
+      return { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', label: `${count}/${MIN_COT}` }
     }
-    return { icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', label: 'Pendiente' }
+    if (count > 0) {
+      return { icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50', label: `${count}/${MIN_COT}` }
+    }
+    return { icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-50', label: `0/${MIN_COT}` }
   }
 
   if (!open) return null
@@ -292,7 +296,7 @@ export default function ModalCrearCotizacionDesdeLista({
                       Cant.
                     </th>
                     <th className="py-2 px-2 text-center font-medium text-muted-foreground w-20">
-                      Estado
+                      Cot.
                     </th>
                   </tr>
                 </thead>
@@ -342,11 +346,17 @@ export default function ModalCrearCotizacionDesdeLista({
         {/* Footer */}
         <div className="px-4 py-3 border-t bg-gray-50/50 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground space-y-0.5">
               {seleccionados.size > 0 && (
-                <span className="text-blue-600 font-medium">
+                <div className="text-blue-600 font-medium">
                   {seleccionados.size} items seleccionados
-                </span>
+                </div>
+              )}
+              {items.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500" />
+                  <span>{items.filter(i => (i.cotizaciones?.length || 0) >= 3).length}/{items.length} con 3+ cot.</span>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2">

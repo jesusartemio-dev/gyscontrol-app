@@ -14,8 +14,11 @@ import {
   Clock,
   Search,
   Package,
-  X
+  X,
+  Zap,
+  Loader2
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Props {
   items: ListaEquipoItem[]
@@ -24,6 +27,7 @@ interface Props {
 
 export default function LogisticaListaDetalleItemTableProfessional({ items, onUpdated }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [isAutoSelecting, setIsAutoSelecting] = useState(false)
   const [selectorModal, setSelectorModal] = useState<{ open: boolean; item: ListaEquipoItem | null }>({
     open: false,
     item: null
@@ -37,13 +41,69 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
     setSelectorModal({ open: false, item: null })
   }
 
+  // Auto-seleccionar mejor precio para items pendientes
+  const handleAutoSelectBestPrices = async () => {
+    const pendientes = items.filter(item => {
+      const cots = item.cotizaciones || []
+      const disponibles = cots.filter((c: any) => {
+        const estado = c.cotizacion?.estado || c.estado
+        return estado !== 'rechazado' && c.precioUnitario && c.precioUnitario > 0
+      })
+      return !item.cotizacionSeleccionadaId && disponibles.length > 0
+    })
+
+    if (pendientes.length === 0) {
+      toast.info('No hay items pendientes con cotizaciones disponibles')
+      return
+    }
+
+    setIsAutoSelecting(true)
+    let seleccionados = 0
+    let errores = 0
+
+    for (const item of pendientes) {
+      const cots = (item.cotizaciones || []).filter((c: any) => {
+        const estado = c.cotizacion?.estado || c.estado
+        return estado !== 'rechazado' && c.precioUnitario && c.precioUnitario > 0
+      })
+      // Find cheapest
+      const mejor = cots.reduce((best: any, current: any) =>
+        !best || (current.precioUnitario < best.precioUnitario) ? current : best
+      , null)
+
+      if (!mejor) continue
+
+      try {
+        const res = await fetch(`/api/lista-equipo-item/${item.id}/seleccionar-cotizacion`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cotizacionProveedorItemId: mejor.id }),
+        })
+        if (res.ok) seleccionados++
+        else errores++
+      } catch {
+        errores++
+      }
+    }
+
+    setIsAutoSelecting(false)
+
+    if (seleccionados > 0) {
+      toast.success(`Mejor precio seleccionado en ${seleccionados} items`)
+      onUpdated?.()
+    }
+    if (errores > 0) {
+      toast.error(`${errores} items no se pudieron actualizar`)
+    }
+  }
+
   // Calcular estadísticas del ítem
   const getItemStats = (item: ListaEquipoItem) => {
     const cotizaciones = item.cotizaciones || []
     const cotizacionesCount = cotizaciones.length
     const cotizacionesDisponibles = cotizaciones.filter((c: any) => {
       const estado = c.cotizacion?.estado || c.estado
-      return estado === 'cotizado'
+      return estado !== 'rechazado' && c.precioUnitario && c.precioUnitario > 0
     }).length
     const hasSelection = !!item.cotizacionSeleccionadaId
     const selectedCot = cotizaciones.find((c: any) => c.id === item.cotizacionSeleccionadaId)
@@ -51,7 +111,7 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
     const preciosDisponibles = cotizaciones
       .filter((c: any) => {
         const estado = c.cotizacion?.estado || c.estado
-        return estado === 'cotizado' && c.precioUnitario
+        return estado !== 'rechazado' && c.precioUnitario && c.precioUnitario > 0
       })
       .map((c: any) => c.precioUnitario!)
     const mejorPrecio = preciosDisponibles.length > 0 ? Math.min(...preciosDisponibles) : null
@@ -114,6 +174,22 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
             <Badge className="text-[10px] h-5 bg-emerald-600">
               {formatCurrency(stats.costoTotal)}
             </Badge>
+            {stats.pendientes > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAutoSelectBestPrices}
+                disabled={isAutoSelecting}
+                className="h-6 text-[10px] px-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                {isAutoSelecting ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Zap className="h-3 w-3 mr-1" />
+                )}
+                Auto-seleccionar ({stats.pendientes})
+              </Button>
+            )}
           </div>
         </div>
 

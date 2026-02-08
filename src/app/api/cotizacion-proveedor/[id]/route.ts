@@ -55,7 +55,7 @@ export async function PUT(
 
     const data = await prisma.cotizacionProveedor.update({
       where: { id },
-      data: body,
+      data: { ...body, updatedAt: new Date() },
     })
 
     return NextResponse.json(data)
@@ -76,12 +76,36 @@ export async function DELETE(
   try {
     const { id } = await context.params
 
-    await prisma.cotizacionProveedorItem.deleteMany({
-      where: { cotizacionId: id },
-    })
+    await prisma.$transaction(async (tx) => {
+      // Buscar items que se van a eliminar
+      const items = await tx.cotizacionProveedorItem.findMany({
+        where: { cotizacionId: id },
+        select: { id: true },
+      })
+      const itemIds = items.map(i => i.id)
 
-    await prisma.cotizacionProveedor.delete({
-      where: { id },
+      // Limpiar referencias en ListaEquipoItem antes de borrar
+      if (itemIds.length > 0) {
+        await tx.listaEquipoItem.updateMany({
+          where: { cotizacionSeleccionadaId: { in: itemIds } },
+          data: {
+            cotizacionSeleccionadaId: null,
+            precioElegido: null,
+            costoElegido: null,
+            tiempoEntrega: null,
+            tiempoEntregaDias: null,
+            updatedAt: new Date(),
+          },
+        })
+      }
+
+      await tx.cotizacionProveedorItem.deleteMany({
+        where: { cotizacionId: id },
+      })
+
+      await tx.cotizacionProveedor.delete({
+        where: { id },
+      })
     })
 
     return NextResponse.json({ status: 'OK' })

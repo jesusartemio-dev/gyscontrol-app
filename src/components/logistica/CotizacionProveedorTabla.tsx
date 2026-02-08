@@ -10,7 +10,8 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
-import { Save, X, Pencil, Trash2, Check } from 'lucide-react'
+import { Save, X, Pencil, Trash2, Check, UserCheck } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { CotizacionProveedorItem } from '@/types'
 import {
   updateCotizacionProveedorItem,
@@ -173,6 +174,30 @@ export default function CotizacionProveedorTabla({ items, onUpdated, onItemUpdat
                               Seleccionada
                             </span>
                           </>
+                        )}
+                        {!item.esSeleccionada && item.listaEquipoItem?.cotizacionSeleccionadaId && (
+                          (() => {
+                            const selProv = (item.listaEquipoItem as any)?.cotizacionSeleccionada?.cotizacionProveedor?.proveedor?.nombre
+                            return (
+                              <>
+                                <span>·</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-orange-600 flex items-center gap-0.5 cursor-help">
+                                      <UserCheck className="h-2.5 w-2.5" />
+                                      Asignado
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    {selProv
+                                      ? `Seleccionado para: ${selProv}`
+                                      : 'Asignado a otro proveedor'
+                                    }
+                                  </TooltipContent>
+                                </Tooltip>
+                              </>
+                            )
+                          })()
                         )}
                         {!item.listaEquipoItemId && (
                           <>

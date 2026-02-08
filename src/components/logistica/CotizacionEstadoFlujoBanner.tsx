@@ -17,9 +17,11 @@ import {
   X,
   Loader2,
   ChevronRight,
+  Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { updateCotizacionProveedor } from '@/lib/services/cotizacionProveedor'
 
 interface CotizacionEstadoFlujoBannerProps {
   estado: string
@@ -33,15 +35,13 @@ const ESTADOS = [
   { key: 'pendiente', label: 'Pendiente' },
   { key: 'solicitado', label: 'Solicitado' },
   { key: 'cotizado', label: 'Cotizado' },
-  { key: 'seleccionado', label: 'Seleccionado' },
 ]
 
 const FLUJO: Record<string, { siguiente?: string; rechazar?: string }> = {
   pendiente: { siguiente: 'solicitado', rechazar: 'rechazado' },
   solicitado: { siguiente: 'cotizado', rechazar: 'rechazado' },
-  cotizado: { siguiente: 'seleccionado', rechazar: 'rechazado' },
+  cotizado: { rechazar: 'rechazado' },
   rechazado: {},
-  seleccionado: {},
 }
 
 export default function CotizacionEstadoFlujoBanner({
@@ -55,8 +55,9 @@ export default function CotizacionEstadoFlujoBanner({
   const [pendingEstado, setPendingEstado] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
 
+  const isLegacySeleccionado = estado === 'seleccionado'
   const flujo = FLUJO[estado] || {}
-  const currentIndex = ESTADOS.findIndex(e => e.key === estado)
+  const currentIndex = isLegacySeleccionado ? ESTADOS.length : ESTADOS.findIndex(e => e.key === estado)
   const siguienteEstado = ESTADOS.find(e => e.key === flujo.siguiente)
 
   const confirmarCambioEstado = async () => {
@@ -64,16 +65,10 @@ export default function CotizacionEstadoFlujoBanner({
     try {
       setIsUpdating(true)
 
-      // Persist estado to database
-      const res = await fetch(`/api/cotizacion-proveedor/${cotizacionId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: pendingEstado }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error al actualizar')
+      // Persist estado to database via service layer
+      const updated = await updateCotizacionProveedor(cotizacionId, { estado: pendingEstado as any })
+      if (!updated) {
+        throw new Error('Error al actualizar el estado')
       }
 
       // Log audit
@@ -163,6 +158,16 @@ export default function CotizacionEstadoFlujoBanner({
             </span>
           </>
         )}
+
+        {/* Show legacy seleccionado tag */}
+        {isLegacySeleccionado && (
+          <>
+            <span className="text-gray-300 mx-1">|</span>
+            <span className="text-xs px-2 py-1 rounded-md bg-green-50 font-semibold text-green-600 border border-green-200">
+              Seleccionado
+            </span>
+          </>
+        )}
       </div>
 
       {/* Action Buttons */}
@@ -192,6 +197,13 @@ export default function CotizacionEstadoFlujoBanner({
             <X className="w-3 h-3 mr-1" />
             Rechazar
           </Button>
+        )}
+
+        {!flujo.siguiente && (estado === 'cotizado' || isLegacySeleccionado) && (
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <Info className="h-3 w-3" />
+            Selección desde la lista
+          </span>
         )}
 
         {!flujo.siguiente && !flujo.rechazar && (

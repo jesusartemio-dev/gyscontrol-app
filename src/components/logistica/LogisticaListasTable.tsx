@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import type { ListaEquipo, EstadoListaEquipo, Proyecto } from '@/types'
 import {
   calcularStatsCotizacionLista,
@@ -184,6 +185,7 @@ export default function LogisticaListasTable({ listas, loading = false, classNam
               <span className="flex items-center justify-center gap-1">Items <SortIcon field="itemsCount" /></span>
             </TableHead>
             <TableHead className="text-xs w-[80px] text-center">Cotización</TableHead>
+            <TableHead className="text-xs w-[70px] text-center">Selección</TableHead>
             <TableHead
               className="text-xs cursor-pointer hover:bg-gray-50 w-[80px]"
               onClick={() => handleSort('createdAt')}
@@ -232,6 +234,40 @@ export default function LogisticaListasTable({ listas, loading = false, classNam
                   <Badge variant={getEstadoCotizacionVariant(cotizacionStats)} className="text-[10px] h-5 px-1.5">
                     {getEstadoCotizacionText(cotizacionStats)}
                   </Badge>
+                </TableCell>
+                <TableCell className="py-2 text-center">
+                  {(() => {
+                    const items = lista.listaEquipoItem || []
+                    const total = items.length
+                    if (total === 0) return <span className="text-[10px] text-muted-foreground">—</span>
+                    const conSeleccion = items.filter(i => !!i.cotizacionSeleccionadaId).length
+                    const completo = conSeleccion === total
+                    const costoTotal = items.reduce((sum: number, i: any) => sum + (i.costoElegido ?? 0), 0)
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={`text-[10px] font-medium cursor-help ${
+                            completo ? 'text-green-600' : conSeleccion > 0 ? 'text-amber-600' : 'text-muted-foreground'
+                          }`}>
+                            {conSeleccion}/{total}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          <div>
+                            {completo
+                              ? 'Seleccion completa'
+                              : `${total - conSeleccion} item${total - conSeleccion > 1 ? 's' : ''} sin cotizacion seleccionada`
+                            }
+                          </div>
+                          {costoTotal > 0 && (
+                            <div className="font-medium mt-0.5">
+                              Costo: ${costoTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </div>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })()}
                 </TableCell>
                 <TableCell className="py-2 text-xs text-muted-foreground">
                   {formatDate(lista.createdAt)}

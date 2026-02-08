@@ -23,11 +23,14 @@ export async function POST(request: Request) {
       )
     }
 
-    // 🔁 Verificar que el ítem de cotización existe y pertenece al ítem de lista
+    // Verificar que el ítem de cotización existe y pertenece al ítem de lista
     const cotizacionItem = await prisma.cotizacionProveedorItem.findFirst({
       where: {
         id: cotizacionProveedorItemId,
         listaEquipoItemId: listaEquipoItemId,
+      },
+      include: {
+        cotizacionProveedor: true,
       },
     })
 
@@ -38,9 +41,9 @@ export async function POST(request: Request) {
       )
     }
 
-    // 📡 Transacción para actualizar la selección
+    // Transacción para actualizar la selección y copiar precios
     await prisma.$transaction(async (tx) => {
-      // 🔁 Desmarcar todas las cotizaciones del ítem como no seleccionadas
+      // Desmarcar todas las cotizaciones del ítem como no seleccionadas
       await tx.cotizacionProveedorItem.updateMany({
         where: {
           listaEquipoItemId: listaEquipoItemId,
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
         },
       })
 
-      // ✅ Marcar la cotización específica como seleccionada
+      // Marcar la cotización específica como seleccionada
       await tx.cotizacionProveedorItem.update({
         where: {
           id: cotizacionProveedorItemId,
@@ -60,13 +63,19 @@ export async function POST(request: Request) {
         },
       })
 
-      // 🔁 Actualizar la referencia en ListaEquipoItem
+      // Actualizar ListaEquipoItem: referencia + copiar precio, costo, tiempo y proveedor
       await tx.listaEquipoItem.update({
         where: {
           id: listaEquipoItemId,
         },
         data: {
           cotizacionSeleccionadaId: cotizacionProveedorItemId,
+          precioElegido: cotizacionItem.precioUnitario,
+          costoElegido: cotizacionItem.costoTotal,
+          tiempoEntrega: cotizacionItem.tiempoEntrega,
+          tiempoEntregaDias: cotizacionItem.tiempoEntregaDias,
+          proveedorId: cotizacionItem.cotizacionProveedor?.proveedorId || undefined,
+          updatedAt: new Date(),
         },
       })
     })

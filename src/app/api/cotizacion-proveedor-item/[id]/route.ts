@@ -42,29 +42,48 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const { id } = await context.params
     const body: CotizacionProveedorItemUpdatePayload = await request.json()
 
-    const updated = await prisma.cotizacionProveedorItem.update({
-      where: { id },
-      data: {
-        precioUnitario: body.precioUnitario ?? null,
-        cantidad: body.cantidad ?? null,
-        costoTotal: body.costoTotal ?? null,
-        tiempoEntrega: body.tiempoEntrega ?? null,
-        tiempoEntregaDias: body.tiempoEntregaDias ?? null,
-        estado: body.estado,
-        esSeleccionada: body.esSeleccionada ?? false,
-      },
-      include: {
-        cotizacionProveedor: {
-          include: {
-            proveedor: true,
-            proyecto: true,
-          },
+    const updated = await prisma.$transaction(async (tx) => {
+      const item = await tx.cotizacionProveedorItem.update({
+        where: { id },
+        data: {
+          precioUnitario: body.precioUnitario ?? null,
+          cantidad: body.cantidad ?? null,
+          costoTotal: body.costoTotal ?? null,
+          tiempoEntrega: body.tiempoEntrega ?? null,
+          tiempoEntregaDias: body.tiempoEntregaDias ?? null,
+          estado: body.estado,
+          esSeleccionada: body.esSeleccionada ?? false,
+          updatedAt: new Date(),
         },
-        listaEquipoItem: true,
-        listaEquipo: true,
-      },
+        include: {
+          cotizacionProveedor: {
+            include: {
+              proveedor: true,
+              proyecto: true,
+            },
+          },
+          listaEquipoItem: true,
+          listaEquipo: true,
+        },
+      })
+
+      // Si el item es seleccionado, propagar precio/costo/tiempo al ListaEquipoItem
+      if (item.esSeleccionada && item.listaEquipoItemId) {
+        await tx.listaEquipoItem.update({
+          where: { id: item.listaEquipoItemId },
+          data: {
+            precioElegido: item.precioUnitario,
+            costoElegido: item.costoTotal,
+            tiempoEntrega: item.tiempoEntrega,
+            tiempoEntregaDias: item.tiempoEntregaDias,
+            updatedAt: new Date(),
+          },
+        })
+      }
+
+      return item
     })
-    
+
     return NextResponse.json(updated)
   } catch (error) {
     console.error('❌ Error en PUT:', error)
@@ -84,6 +103,19 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     if (!existente) {
       return NextResponse.json({ error: 'Ítem no encontrado' }, { status: 404 })
     }
+
+    // Limpiar referencia en ListaEquipoItem si este item era el seleccionado
+    await prisma.listaEquipoItem.updateMany({
+      where: { cotizacionSeleccionadaId: id },
+      data: {
+        cotizacionSeleccionadaId: null,
+        precioElegido: null,
+        costoElegido: null,
+        tiempoEntrega: null,
+        tiempoEntregaDias: null,
+        updatedAt: new Date(),
+      },
+    })
 
     await prisma.cotizacionProveedorItem.delete({ where: { id } })
 

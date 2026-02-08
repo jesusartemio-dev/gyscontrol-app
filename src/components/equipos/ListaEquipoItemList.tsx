@@ -154,10 +154,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
     const total = itemsWithResumen.length
     const verificados = itemsWithResumen.filter(i => i.verificado).length
     const sinPedidos = itemsWithResumen.filter(i => i.resumen.estado === 'sin_pedidos').length
-    const enPedido = itemsWithResumen.filter(i => 
+    const enPedido = itemsWithResumen.filter(i =>
       i.resumen.estado === 'pendiente' || i.resumen.estado === 'parcial'
     ).length
-    const conCotizacion = itemsWithResumen.filter(i => 
+    const conCotizacion = itemsWithResumen.filter(i =>
       i.cotizacionSeleccionada && i.cotizacionSeleccionada.precioUnitario && i.cotizacionSeleccionada.precioUnitario > 0
     ).length
     // ✅ Use itemsWithResumen instead of items to avoid duplicate dependency
@@ -169,7 +169,16 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
       i.cantidad > i.proyectoEquipoItem.cantidad
     ).length
 
-    return { total, verificados, sinPedidos, enPedido, conCotizacion, costoTotal, noCotizados, conMayorCantidad }
+    // Cobertura de cotizaciones (ideal: 3 por item)
+    const MIN_COT = 3
+    const coberturaBuena = itemsWithResumen.filter(i => (i.cotizaciones?.length || 0) >= MIN_COT).length
+    const coberturaParcial = itemsWithResumen.filter(i => {
+      const n = i.cotizaciones?.length || 0
+      return n > 0 && n < MIN_COT
+    }).length
+    const sinCotizaciones = itemsWithResumen.filter(i => (i.cotizaciones?.length || 0) === 0).length
+
+    return { total, verificados, sinPedidos, enPedido, conCotizacion, costoTotal, noCotizados, conMayorCantidad, coberturaBuena, coberturaParcial, sinCotizaciones }
   }, [itemsWithResumen])
 
   // 🔍 Filter and search items using memoized summaries
@@ -357,6 +366,18 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
             <span className="text-amber-600 font-medium flex items-center gap-0.5">
               <AlertTriangle className="h-3 w-3" />
               {stats.conMayorCantidad} con mayor cant.
+            </span>
+          )}
+          {stats.total > 0 && (
+            <span className={`font-medium flex items-center gap-0.5 ${
+              stats.coberturaBuena === stats.total ? 'text-green-600' :
+              stats.sinCotizaciones > 0 ? 'text-red-500' : 'text-amber-600'
+            }`}>
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+                stats.coberturaBuena === stats.total ? 'bg-green-500' :
+                stats.sinCotizaciones > 0 ? 'bg-red-500' : 'bg-amber-500'
+              }`} />
+              {stats.coberturaBuena}/{stats.total} con 3+ cot.
             </span>
           )}
         </div>
@@ -782,12 +803,25 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
                    )}
                    {visibleColumns.cotizacion && (
                      <td className={`${cellPadding} ${columnWidths.cotizacion}`}>
-                      <div className="flex justify-center">
+                      <div className="flex items-start justify-center gap-1">
+                        {(() => {
+                          const n = item.cotizaciones?.length || 0
+                          const color = n === 0 ? 'bg-red-500' : n < 3 ? 'bg-amber-500' : 'bg-green-500'
+                          const label = `${n}/3 cotizaciones`
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`inline-block w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${color}`} />
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="text-xs">{label}</TooltipContent>
+                            </Tooltip>
+                          )
+                        })()}
                         <CotizacionCodigoSimple
                           cotizaciones={item.cotizaciones || []}
                           cotizacionSeleccionadaId={item.cotizacionSeleccionadaId || undefined}
                           interactive={false}
-                          />
+                        />
                       </div>
                      </td>
                    )}
@@ -1085,7 +1119,14 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
 
                       {/* Cotización */}
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Cotización:</span>
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          {(() => {
+                            const n = item.cotizaciones?.length || 0
+                            const color = n === 0 ? 'bg-red-500' : n < 3 ? 'bg-amber-500' : 'bg-green-500'
+                            return <span className={`inline-block w-1.5 h-1.5 rounded-full ${color}`} />
+                          })()}
+                          Cot. ({item.cotizaciones?.length || 0}/3):
+                        </span>
                         <CotizacionCodigoSimple
                           cotizaciones={item.cotizaciones || []}
                           cotizacionSeleccionadaId={item.cotizacionSeleccionadaId || undefined}

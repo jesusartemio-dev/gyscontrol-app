@@ -12,7 +12,6 @@ import {
   CotizacionProveedor,
   CotizacionProveedorPayload,
   CotizacionProveedorUpdatePayload,
-  CotizacionProveedorItemPayload,
 } from '@/types'
 import { buildApiUrl } from '@/lib/utils'
 
@@ -64,24 +63,6 @@ export async function createCotizacionProveedor(
   } catch (error) {
     console.error('❌ createCotizacionProveedor:', error)
     return null
-  }
-}
-
-// ✅ Crear ítem para cotización proveedor (nuevo)
-export async function createCotizacionProveedorItem(
-  payload: CotizacionProveedorItemPayload
-): Promise<boolean> {
-  try {
-    const url = buildApiUrl(`${BASE_URL}/item`)
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    return res.ok
-  } catch (error) {
-    console.error('❌ createCotizacionProveedorItem:', error)
-    return false
   }
 }
 

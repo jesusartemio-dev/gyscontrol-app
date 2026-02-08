@@ -17,20 +17,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Verifica que cada ítem tenga todos los campos necesarios
+    const now = new Date()
     const mappedItems = body.items.map((item: any) => ({
       cotizacionId: item.cotizacionId,
       listaEquipoItemId: item.listaEquipoItemId,
       codigo: item.codigo,
-      descripcion: item.descripcion, // ✅ aseguramos que se incluya
-      unidad: item.unidad,           // ✅ aseguramos que se incluya
-      cantidadOriginal: item.cantidadOriginal || 0, // por si es obligatorio
+      descripcion: item.descripcion,
+      unidad: item.unidad,
+      cantidadOriginal: item.cantidadOriginal || 0,
       precioUnitario: item.precioUnitario,
       cantidad: item.cantidad,
       costoTotal: item.costoTotal,
       tiempoEntrega: item.tiempoEntrega,
+      tiempoEntregaDias: item.tiempoEntregaDias,
       estado: item.estado,
       esSeleccionada: item.esSeleccionada,
+      updatedAt: now,
     }))
 
     const created = await prisma.cotizacionProveedorItem.createMany({
