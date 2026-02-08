@@ -436,24 +436,28 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                           </TooltipTrigger>
                           <TooltipContent>Ver</TooltipContent>
                         </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => setEditingCotizacion(cotizacion)}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Editar</TooltipContent>
-                        </Tooltip>
-                        <DeleteAlertDialog
-                          onConfirm={() => handleDelete(cotizacion.id)}
-                          title="¿Eliminar cotización?"
-                          description={`¿Estás seguro de eliminar la cotización "${cotizacion.nombre}"? Esta acción no se puede deshacer.`}
-                        />
+                        {cotizacion.estado !== 'aprobada' && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => setEditingCotizacion(cotizacion)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar</TooltipContent>
+                            </Tooltip>
+                            <DeleteAlertDialog
+                              onConfirm={() => handleDelete(cotizacion.id)}
+                              title="¿Eliminar cotización?"
+                              description={`¿Estás seguro de eliminar la cotización "${cotizacion.nombre}"? Esta acción no se puede deshacer.`}
+                            />
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -490,10 +494,11 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                     <div className="flex items-start justify-between">
                       <div className="space-y-1 flex-1">
                         <CardTitle
-                          className="text-lg font-semibold text-foreground cursor-text hover:text-blue-600 transition-colors"
-                          contentEditable
+                          className={`text-lg font-semibold text-foreground transition-colors ${cotizacion.estado !== 'aprobada' ? 'cursor-text hover:text-blue-600' : ''}`}
+                          contentEditable={cotizacion.estado !== 'aprobada'}
                           suppressContentEditableWarning
                           onBlur={(e) => {
+                            if (cotizacion.estado === 'aprobada') return
                             const value = e.currentTarget.textContent?.trim() || ''
                             if (value && value !== cotizacion.nombre) {
                               handleEdit(cotizacion.id, 'nombre', value)
@@ -603,11 +608,13 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                         </Link>
                       </Button>
 
-                      <DeleteAlertDialog
-                        onConfirm={() => handleDelete(cotizacion.id)}
-                        title="¿Eliminar cotización?"
-                        description={`¿Estás seguro de eliminar la cotización "${cotizacion.nombre}"? Esta acción no se puede deshacer.`}
-                      />
+                      {cotizacion.estado !== 'aprobada' && (
+                        <DeleteAlertDialog
+                          onConfirm={() => handleDelete(cotizacion.id)}
+                          title="¿Eliminar cotización?"
+                          description={`¿Estás seguro de eliminar la cotización "${cotizacion.nombre}"? Esta acción no se puede deshacer.`}
+                        />
+                      )}
                     </div>
                   </CardContent>
                 </Card>

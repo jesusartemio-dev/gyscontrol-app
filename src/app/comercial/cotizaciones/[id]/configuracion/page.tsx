@@ -12,7 +12,7 @@ import { CondicionesTab } from '@/components/cotizaciones/tabs/CondicionesTab'
 import { useCotizacionContext } from '../cotizacion-context'
 
 export default function CotizacionConfiguracionPage() {
-  const { cotizacion, setCotizacion } = useCotizacionContext()
+  const { cotizacion, setCotizacion, isLocked } = useCotizacionContext()
   const [activeTab, setActiveTab] = useState('cabecera')
 
   if (!cotizacion) return null
@@ -60,6 +60,7 @@ export default function CotizacionConfiguracionPage() {
             <CabeceraTab
               cotizacion={cotizacion}
               onUpdated={setCotizacion}
+              isLocked={isLocked}
             />
           </TabsContent>
 
@@ -67,6 +68,7 @@ export default function CotizacionConfiguracionPage() {
             <CondicionesTab
               cotizacion={cotizacion}
               onUpdated={setCotizacion}
+              isLocked={isLocked}
             />
           </TabsContent>
 
@@ -74,6 +76,7 @@ export default function CotizacionConfiguracionPage() {
             <ExclusionesTab
               cotizacion={cotizacion}
               onUpdated={setCotizacion}
+              isLocked={isLocked}
             />
           </TabsContent>
         </div>

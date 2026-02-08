@@ -9,7 +9,8 @@ import {
   DollarSign,
   Save,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,9 +24,10 @@ import type { Cotizacion } from '@/types'
 interface CabeceraTabProps {
   cotizacion: Cotizacion
   onUpdated: (updatedCotizacion: Cotizacion) => void
+  isLocked?: boolean
 }
 
-export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
+export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: CabeceraTabProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -101,6 +103,13 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {isLocked && (
+            <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-700">
+              <Lock className="h-4 w-4 flex-shrink-0" />
+              Esta cotización está aprobada. Los campos no pueden ser editados.
+            </div>
+          )}
+
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -130,6 +139,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                   value={formData.referencia}
                   onChange={(e) => handleInputChange('referencia', e.target.value)}
                   placeholder="Ej: GYS-4251-25 R04"
+                  disabled={isLocked}
                 />
               </div>
 
@@ -144,6 +154,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                   value={formData.revision}
                   onChange={(e) => handleInputChange('revision', e.target.value)}
                   placeholder="Ej: R01, R02, etc."
+                  disabled={isLocked}
                 />
               </div>
 
@@ -156,6 +167,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                 <Select
                   value={formData.formaPago}
                   onValueChange={(value) => handleInputChange('formaPago', value)}
+                  disabled={isLocked}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar forma de pago" />
@@ -184,6 +196,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                 <Select
                   value={formData.moneda}
                   onValueChange={(value) => handleInputChange('moneda', value)}
+                  disabled={isLocked}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -210,6 +223,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                   max="365"
                   value={formData.validezOferta}
                   onChange={(e) => handleInputChange('validezOferta', parseInt(e.target.value) || 15)}
+                  disabled={isLocked}
                 />
               </div>
 
@@ -224,6 +238,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                   type="date"
                   value={formData.fechaValidezHasta}
                   onChange={(e) => handleInputChange('fechaValidezHasta', e.target.value)}
+                  disabled={isLocked}
                 />
               </div>
             </div>
@@ -236,6 +251,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                 checked={formData.incluyeIGV}
                 onChange={(e) => handleInputChange('incluyeIGV', e.target.checked)}
                 className="rounded border-gray-300"
+                disabled={isLocked}
               />
               <Label htmlFor="incluyeIGV" className="text-sm">
                 Los precios incluyen IGV (18%)
@@ -243,6 +259,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
             </div>
 
             {/* Botón de guardar */}
+            {!isLocked && (
             <div className="flex justify-end pt-4">
               <Button
                 type="submit"
@@ -257,6 +274,7 @@ export function CabeceraTab({ cotizacion, onUpdated }: CabeceraTabProps) {
                 {loading ? 'Guardando...' : 'Guardar Cambios'}
               </Button>
             </div>
+            )}
           </form>
         </CardContent>
       </Card>

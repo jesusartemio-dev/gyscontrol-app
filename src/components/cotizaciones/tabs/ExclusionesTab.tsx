@@ -44,9 +44,10 @@ import type { Cotizacion, CotizacionExclusion } from '@/types'
 interface ExclusionesTabProps {
   cotizacion: Cotizacion
   onUpdated: (updatedCotizacion: Cotizacion) => void
+  isLocked?: boolean
 }
 
-export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
+export function ExclusionesTab({ cotizacion, onUpdated, isLocked = false }: ExclusionesTabProps) {
   const [exclusiones, setExclusiones] = useState<CotizacionExclusion[]>(cotizacion.exclusiones || [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -314,6 +315,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
                 ({exclusiones.length})
               </span>
             </CardTitle>
+            {!isLocked && (
             <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
               <DialogTrigger asChild>
                 <Button
@@ -488,6 +490,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
                 </div>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -508,6 +511,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
           )}
 
           {/* Agregar nueva exclusion */}
+          {!isLocked && (
           <div className="space-y-4">
             <Label className="text-sm font-medium">Agregar Nueva Exclusion</Label>
             <div className="flex gap-2">
@@ -532,6 +536,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
               </Button>
             </div>
           </div>
+          )}
 
           {/* Lista de exclusiones */}
           <div className="space-y-4">
@@ -592,7 +597,7 @@ export function ExclusionesTab({ cotizacion, onUpdated }: ExclusionesTabProps) {
                       )}
                     </div>
 
-                    {editingId !== exclusion.id && (
+                    {editingId !== exclusion.id && !isLocked && (
                       <div className="flex gap-1">
                         <Button
                           size="sm"

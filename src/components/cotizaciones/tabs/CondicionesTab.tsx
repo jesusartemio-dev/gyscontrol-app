@@ -38,9 +38,10 @@ import type { Cotizacion, CotizacionCondicion } from '@/types'
 interface CondicionesTabProps {
   cotizacion: Cotizacion
   onUpdated: (updatedCotizacion: Cotizacion) => void
+  isLocked?: boolean
 }
 
-export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
+export function CondicionesTab({ cotizacion, onUpdated, isLocked = false }: CondicionesTabProps) {
   const [condiciones, setCondiciones] = useState<CotizacionCondicion[]>(cotizacion.condiciones || [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -314,6 +315,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
                 ({condiciones.length})
               </span>
             </CardTitle>
+            {!isLocked && (
             <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
               <DialogTrigger asChild>
                 <Button
@@ -498,6 +500,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
                 </div>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -518,6 +521,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
           )}
 
           {/* Agregar nueva condicion */}
+          {!isLocked && (
           <div className="space-y-4">
             <Label className="text-sm font-medium">Agregar Nueva Condicion</Label>
             <div className="space-y-3">
@@ -558,6 +562,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
               </Button>
             </div>
           </div>
+          )}
 
           {/* Lista de condiciones */}
           <div className="space-y-4">
@@ -646,7 +651,7 @@ export function CondicionesTab({ cotizacion, onUpdated }: CondicionesTabProps) {
                       )}
                     </div>
 
-                    {editingId !== condicion.id && (
+                    {editingId !== condicion.id && !isLocked && (
                       <div className="flex gap-1">
                         <Button
                           size="sm"

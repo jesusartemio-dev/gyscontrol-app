@@ -107,6 +107,15 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
     }
 
+    // Bloquear edición si la cotización está aprobada (excepto cambios de estado)
+    const soloEstado = Object.keys(data).length === 1 && 'estado' in data
+    if (existente.estado === 'aprobada' && !soloEstado) {
+      return NextResponse.json(
+        { error: 'No se puede editar una cotización aprobada' },
+        { status: 403 }
+      )
+    }
+
     const actualizada = await prisma.cotizacion.update({
       where: { id },
       data
@@ -127,6 +136,14 @@ export async function DELETE(_: NextRequest, context: { params: Promise<{ id: st
      if (typeof id !== 'string') {
        return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
      }
+
+    const existente = await prisma.cotizacion.findUnique({ where: { id } })
+    if (existente?.estado === 'aprobada') {
+      return NextResponse.json(
+        { error: 'No se puede eliminar una cotización aprobada' },
+        { status: 403 }
+      )
+    }
 
     await prisma.cotizacion.delete({ where: { id } })
 

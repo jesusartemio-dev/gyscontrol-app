@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Pencil, Loader2 } from 'lucide-react'
+import { Pencil, Loader2, Lock } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,7 @@ interface Props {
 }
 
 export default function CotizacionEditModal({ cotizacion, open, onOpenChange, onUpdated }: Props) {
+  const isLocked = cotizacion.estado === 'aprobada'
   const [nombre, setNombre] = useState(cotizacion.nombre)
   const [clienteId, setClienteId] = useState('')
   const [comercialId, setComercialId] = useState('')
@@ -140,6 +141,13 @@ export default function CotizacionEditModal({ cotizacion, open, onOpenChange, on
           </DialogTitle>
         </DialogHeader>
 
+        {isLocked && (
+          <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+            <Lock className="h-3.5 w-3.5 flex-shrink-0" />
+            Esta cotización está aprobada y no puede ser editada.
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="nombre" className="text-xs">Nombre *</Label>
@@ -150,7 +158,7 @@ export default function CotizacionEditModal({ cotizacion, open, onOpenChange, on
               placeholder="Nombre de la cotización"
               rows={4}
               className="resize-none"
-              disabled={loading}
+              disabled={loading || isLocked}
             />
           </div>
 
@@ -166,7 +174,7 @@ export default function CotizacionEditModal({ cotizacion, open, onOpenChange, on
             <Select
               value={clienteId}
               onValueChange={setClienteId}
-              disabled={loading || loadingData}
+              disabled={loading || loadingData || isLocked}
             >
               <SelectTrigger className="h-9">
                 <SelectValue placeholder={loadingData ? 'Cargando...' : 'Seleccionar cliente'}>
@@ -197,7 +205,7 @@ export default function CotizacionEditModal({ cotizacion, open, onOpenChange, on
             <Select
               value={comercialId}
               onValueChange={setComercialId}
-              disabled={loading || loadingData}
+              disabled={loading || loadingData || isLocked}
             >
               <SelectTrigger className="h-9">
                 <SelectValue placeholder={loadingData ? 'Cargando...' : 'Seleccionar comercial'}>
@@ -225,7 +233,7 @@ export default function CotizacionEditModal({ cotizacion, open, onOpenChange, on
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || isLocked}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
