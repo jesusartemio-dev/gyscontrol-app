@@ -49,6 +49,8 @@ interface Props {
   isOpen: boolean
   proyectoId: string
   listaId: string
+  listaCodigo?: string
+  listaNombre?: string
   onClose: () => void
   onSuccess: () => void
 }
@@ -75,6 +77,8 @@ export default function ModalImportarExcelLista({
   isOpen,
   proyectoId,
   listaId,
+  listaCodigo,
+  listaNombre,
   onClose,
   onSuccess
 }: Props) {
@@ -459,7 +463,10 @@ export default function ModalImportarExcelLista({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'plantilla_importacion_equipos.xlsx'
+      const fileName = listaCodigo && listaNombre
+        ? `${listaCodigo}_${listaNombre.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s-]/g, '').replace(/\s+/g, '_')}.xlsx`
+        : 'plantilla_importacion_equipos.xlsx'
+      a.download = fileName
       a.click()
       URL.revokeObjectURL(url)
     } catch (error) {

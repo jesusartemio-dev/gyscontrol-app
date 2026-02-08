@@ -70,6 +70,8 @@ import {
 interface Props {
   listaId: string
   proyectoId: string
+  listaCodigo?: string
+  listaNombre?: string
   items: ListaEquipoItem[]
   editable?: boolean
   onCreated?: () => void | Promise<void>
@@ -106,7 +108,7 @@ const getOrigenVariant = (origen: string): "default" | "secondary" | "outline" =
 }
 
 
-export default function ListaEquipoItemList({ listaId, proyectoId, items, editable = true, onCreated, onItemUpdated, onItemsUpdated, onDeleted, onRefresh }: Props) {
+export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, listaNombre, items, editable = true, onCreated, onItemUpdated, onItemsUpdated, onDeleted, onRefresh }: Props) {
   const router = useRouter()
   const [editCantidadItemId, setEditCantidadItemId] = useState<string | null>(null)
   const [editCantidadValues, setEditCantidadValues] = useState<Record<string, string>>({})
@@ -1290,6 +1292,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, items, editab
         onClose={() => setShowModalImportarExcel(false)}
         listaId={listaId}
         proyectoId={proyectoId}
+        listaCodigo={listaCodigo}
+        listaNombre={listaNombre}
         onSuccess={() => {
           setShowModalImportarExcel(false)
           onCreated?.()

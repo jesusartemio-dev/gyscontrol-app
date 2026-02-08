@@ -395,9 +395,11 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
               </div>
 
               {/* Equipment List */}
-               <ListaEquipoItemList 
+               <ListaEquipoItemList
                  listaId={lista.id}
                  proyectoId={lista.proyecto?.id || ''}
+                 listaCodigo={lista.codigo || ''}
+                 listaNombre={lista.nombre || ''}
                  items={equiposData.items}
                  editable={true}
                  onCreated={async () => {
