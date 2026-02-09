@@ -31,11 +31,16 @@ import {
   RefreshCw,
   Filter
 } from 'lucide-react'
-import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem } from '@prisma/client'
+import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem, ListaEquipo, ListaEquipoItem } from '@prisma/client'
 import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal'
 
+type ItemWithLista = ProyectoEquipoCotizadoItem & {
+  listaEquipo?: Pick<ListaEquipo, 'id' | 'codigo' | 'nombre'> | null
+  listaEquipoSeleccionado?: Pick<ListaEquipoItem, 'id' | 'cantidad'> | null
+}
+
 type ProyectoEquipoCotizadoWithItems = Omit<ProyectoEquipoCotizado, 'proyecto' | 'responsable'> & {
-  items: ProyectoEquipoCotizadoItem[]
+  items: ItemWithLista[]
 }
 
 interface PageProps {
@@ -84,7 +89,7 @@ function LoadingSkeleton() {
   )
 }
 
-function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
+function ItemsTable({ items, proyectoId }: { items: ItemWithLista[], proyectoId: string }) {
   const [search, setSearch] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('__todas__')
   const [sortField, setSortField] = useState<string>('codigo')
@@ -115,8 +120,8 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
 
   const sortedItems = useMemo(() => {
     return [...filteredItems].sort((a, b) => {
-      const aVal = a[sortField as keyof ProyectoEquipoCotizadoItem]
-      const bVal = b[sortField as keyof ProyectoEquipoCotizadoItem]
+      const aVal = a[sortField as keyof ItemWithLista]
+      const bVal = b[sortField as keyof ItemWithLista]
       if (aVal == null || bVal == null) return 0
       if (aVal < bVal) return sortDir === 'asc' ? -1 : 1
       if (aVal > bVal) return sortDir === 'asc' ? 1 : -1
@@ -140,7 +145,7 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
       : <ArrowDown className="h-2.5 w-2.5 ml-0.5" />
   }
 
-  const getStatusBadge = (item: ProyectoEquipoCotizadoItem) => {
+  const getStatusBadge = (item: ItemWithLista) => {
     if (item.listaId || item.estado === 'en_lista') {
       return (
         <span className="inline-flex items-center gap-0.5 text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded">
@@ -244,12 +249,13 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
                 </th>
                 <th className="px-2 py-1.5 text-right font-semibold text-gray-700 w-24">Subtotal</th>
                 <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-20">Estado</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-36">En Lista</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {sortedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <td colSpan={9} className="text-center py-8 text-muted-foreground">
                     {search || categoriaFiltro !== '__todas__' ? 'No se encontraron items con los filtros aplicados' : 'Sin items'}
                   </td>
                 </tr>
@@ -291,6 +297,31 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
                     <td className="px-2 py-1.5 text-center">
                       {getStatusBadge(item)}
                     </td>
+                    <td className="px-2 py-1.5">
+                      {item.listaEquipo ? (
+                        <div className="flex items-center gap-1">
+                          <Link
+                            href={`/proyectos/${proyectoId}/equipos/listas/${item.listaEquipo.id}`}
+                            className="text-[10px] font-mono text-blue-600 hover:underline truncate max-w-[80px]"
+                            title={item.listaEquipo.nombre}
+                          >
+                            {item.listaEquipo.codigo}
+                          </Link>
+                          {item.listaEquipoSeleccionado && (
+                            <span className={cn(
+                              'text-[10px] px-1 py-0.5 rounded font-medium',
+                              item.listaEquipoSeleccionado.cantidad >= item.cantidad
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-amber-100 text-amber-700'
+                            )}>
+                              {item.listaEquipoSeleccionado.cantidad}/{item.cantidad}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -303,7 +334,7 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
                 <td className="px-2 py-1.5 text-right font-mono font-bold text-green-700">
                   {formatCurrency(totalFiltered)}
                 </td>
-                <td></td>
+                <td colSpan={2}></td>
               </tr>
             </tfoot>
           </table>
@@ -406,7 +437,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
       )}
 
       {/* Items Table */}
-      <ItemsTable items={equipo.items || []} />
+      <ItemsTable items={equipo.items || []} proyectoId={proyectoId} />
 
       {/* Modal */}
       <CrearListaMultipleModal
