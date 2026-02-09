@@ -9,6 +9,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -265,14 +266,15 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         }))
         // ✅ Then set edit mode
         setEditComentarioItemId(item.id)
-        // ✅ Focus input after render
+        // ✅ Focus textarea inside Popover after render
         setTimeout(() => {
-          const input = document.querySelector<HTMLInputElement>(`#comentario-${item.id}`)
-          if (input) {
-            input.focus()
-            input.select() // ✅ Select text for easy editing
+          const textarea = document.querySelector<HTMLTextAreaElement>(`#comentario-${item.id}`) ||
+                           document.querySelector<HTMLTextAreaElement>(`#comentario-card-${item.id}`)
+          if (textarea) {
+            textarea.focus()
+            textarea.select()
           }
-        }, 100) // ✅ Increased timeout for better reliability
+        }, 150)
       } else {
         setEditComentarioItemId(null)
         // ✅ Clear comment values when unchecked
@@ -950,42 +952,61 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
                           />
                         </div>
-                        {/* Comment */}
+                        {/* Comment with Popover */}
                         <div className="flex-1 min-w-0">
-                          {isEditingComentario && editable ? (
-                            <div className="flex gap-1 items-center">
-                              <Input
-                                id={`comentario-${item.id}`}
-                                value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
-                                onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSaveComentario(item.id)}
-                                className="text-xs h-7"
-                                placeholder="Comentario..."
-                              />
-                              <Button size="sm" onClick={() => handleSaveComentario(item.id)} className="h-7 w-7 p-0">
-                                <CheckCircle2 className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)} className="h-7 w-7 p-0">
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div
-                              onClick={() => editable && setEditComentarioItemId(item.id)}
-                              className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors line-clamp-2 leading-tight ${
-                                editable ? 'hover:text-blue-600' : ''
-                              } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
-                              title={item.comentarioRevision || 'Click para agregar comentario'}
-                            >
-                              {item.comentarioRevision ? (
-                                <span>{item.comentarioRevision}</span>
-                              ) : (
-                                <span className="text-muted-foreground italic text-xs">
-                                  {editable ? '+' : '—'}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          <Popover
+                            open={isEditingComentario}
+                            onOpenChange={(open) => {
+                              if (!open) setEditComentarioItemId(null)
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <div
+                                onClick={() => editable && setEditComentarioItemId(item.id)}
+                                className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors line-clamp-2 leading-tight ${
+                                  editable ? 'hover:text-blue-600' : ''
+                                } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
+                                title={item.comentarioRevision || 'Click para agregar comentario'}
+                              >
+                                {item.comentarioRevision ? (
+                                  <span>{item.comentarioRevision}</span>
+                                ) : (
+                                  <span className="text-muted-foreground italic text-xs">
+                                    {editable ? '+' : '—'}
+                                  </span>
+                                )}
+                              </div>
+                            </PopoverTrigger>
+                            {editable && (
+                              <PopoverContent className="w-72 p-3" align="start" side="bottom">
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium text-muted-foreground">Comentario de revisión</p>
+                                  <Textarea
+                                    id={`comentario-${item.id}`}
+                                    value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
+                                    onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        handleSaveComentario(item.id)
+                                      }
+                                    }}
+                                    placeholder="Escribe un comentario..."
+                                    className="text-xs min-h-[72px] resize-none"
+                                    rows={3}
+                                  />
+                                  <div className="flex justify-end gap-1">
+                                    <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)} className="h-7 text-xs">
+                                      Cancelar
+                                    </Button>
+                                    <Button size="sm" onClick={() => handleSaveComentario(item.id)} className="h-7 text-xs">
+                                      Guardar
+                                    </Button>
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            )}
+                          </Popover>
                         </div>
                       </div>
                      </td>
@@ -1188,35 +1209,52 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
 
                       {/* Comments */}
                       <div className="text-xs">
-                        {isEditingComentario && editable ? (
-                          <div className="space-y-1">
-                            <Input
-                              id={`comentario-${item.id}`}
-                              value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
-                              onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSaveComentario(item.id)}
-                              placeholder="Comentario..."
-                              className="h-7 text-xs"
-                            />
-                            <div className="flex gap-1">
-                              <Button size="sm" onClick={() => handleSaveComentario(item.id)} className="h-6 text-xs">
-                                Guardar
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)} className="h-6 text-xs">
-                                Cancelar
-                              </Button>
+                        <Popover
+                          open={isEditingComentario}
+                          onOpenChange={(open) => {
+                            if (!open) setEditComentarioItemId(null)
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <div
+                              onClick={() => editable && setEditComentarioItemId(item.id)}
+                              className={`text-muted-foreground p-1.5 rounded border-dashed border ${
+                                editable ? 'cursor-pointer hover:bg-muted/50' : ''
+                              }`}
+                            >
+                              {item.comentarioRevision || (editable ? '+ Comentario' : '—')}
                             </div>
-                          </div>
-                        ) : (
-                          <div
-                            onClick={() => editable && setEditComentarioItemId(item.id)}
-                            className={`text-muted-foreground p-1.5 rounded border-dashed border ${
-                              editable ? 'cursor-pointer hover:bg-muted/50' : ''
-                            }`}
-                          >
-                            {item.comentarioRevision || (editable ? '+ Comentario' : '—')}
-                          </div>
-                        )}
+                          </PopoverTrigger>
+                          {editable && (
+                            <PopoverContent className="w-72 p-3" align="start" side="bottom">
+                              <div className="space-y-2">
+                                <p className="text-xs font-medium text-muted-foreground">Comentario de revisión</p>
+                                <Textarea
+                                  id={`comentario-card-${item.id}`}
+                                  value={editComentarioValues[item.id] ?? item.comentarioRevision ?? ''}
+                                  onChange={(e) => setEditComentarioValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault()
+                                      handleSaveComentario(item.id)
+                                    }
+                                  }}
+                                  placeholder="Escribe un comentario..."
+                                  className="text-xs min-h-[72px] resize-none"
+                                  rows={3}
+                                />
+                                <div className="flex justify-end gap-1">
+                                  <Button size="sm" variant="ghost" onClick={() => setEditComentarioItemId(null)} className="h-7 text-xs">
+                                    Cancelar
+                                  </Button>
+                                  <Button size="sm" onClick={() => handleSaveComentario(item.id)} className="h-7 text-xs">
+                                    Guardar
+                                  </Button>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          )}
+                        </Popover>
                       </div>
 
                       {/* Actions */}
