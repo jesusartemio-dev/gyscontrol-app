@@ -82,12 +82,12 @@ export const schema = z.object({
   password: z.string().min(4, { message: 'La contraseña debe tener al menos 4 caracteres' }).optional(),
   role: z.enum(roles as [RolUsuario, ...RolUsuario[]], { required_error: 'Elige un rol' }),
 }).refine(data => {
-  if (!data.id && !data.password) return false
+  // Password opcional: usuarios OAuth no necesitan contraseña
   if (data.id && data.password && data.password.length < 4) return false
   return true
 }, {
   path: ['password'],
-  message: 'La contraseña es obligatoria (mín. 4 caracteres)',
+  message: 'La contraseña debe tener al menos 4 caracteres',
 })
 
 // Role display mapping con descripciones
@@ -349,12 +349,12 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
             <Label htmlFor="password" className="flex items-center gap-2 text-sm font-medium">
               <Key className="h-4 w-4 text-muted-foreground" />
               Contraseña
-              {isEditing && <span className="text-xs text-muted-foreground font-normal">(opcional)</span>}
+              <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
             </Label>
             <Input
               id="password"
               type="password"
-              placeholder={isEditing ? '••••••••' : 'Mínimo 4 caracteres'}
+              placeholder={isEditing ? '••••••••' : 'Dejar vacío si usará Google'}
               value={form.password}
               onChange={(e) => handleChange('password', e.target.value)}
               className={formErrors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}
@@ -363,11 +363,9 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
             {formErrors.password && (
               <p className="text-xs text-red-500">{formErrors.password}</p>
             )}
-            {isEditing && (
-              <p className="text-xs text-muted-foreground">
-                Deja vacío para mantener la contraseña actual
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {isEditing ? 'Deja vacío para mantener la contraseña actual' : 'Sin contraseña, el usuario solo podrá ingresar con Google'}
+            </p>
           </div>
 
           {/* Role Field */}

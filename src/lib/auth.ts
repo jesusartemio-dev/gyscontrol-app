@@ -1,12 +1,19 @@
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { AuthOptions, getServerSession } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from './prisma'
 import * as bcrypt from 'bcryptjs'
 import { getSectionAccessForRole } from './services/section-access'
 
 export const authOptions: AuthOptions = {
+  adapter: PrismaAdapter(prisma as any),
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
+    }),
     CredentialsProvider({
       name: 'credentials',
       credentials: {
@@ -54,11 +61,27 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      // Para Google OAuth, permitir siempre (auto-crea usuario con rol default)
+      if (account?.provider === 'google') {
+        return true
+      }
+      return true
+    },
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id
-        token.role = (user as any).role
-        const sectionAccess = await getSectionAccessForRole((user as any).role)
+        let role = (user as any).role
+        // OAuth users no traen role del provider — buscar en DB
+        if (!role) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true }
+          })
+          role = dbUser?.role || 'colaborador'
+        }
+        token.role = role
+        const sectionAccess = await getSectionAccessForRole(role)
         token.sectionAccess = sectionAccess
       }
       if (trigger === 'update') {

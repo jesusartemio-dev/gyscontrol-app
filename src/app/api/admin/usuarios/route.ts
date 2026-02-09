@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const { email, name, password, role } = body
 
     // Validaciones básicas
-    if (!email || !password || !name || !role) {
+    if (!email || !name || !role) {
       return NextResponse.json({ message: 'Faltan campos' }, { status: 400 })
     }
 
@@ -19,8 +19,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'El correo ya existe' }, { status: 409 })
     }
 
-    // Encriptar contraseña
-    const hashedPassword = await hash(password, 10)
+    // Encriptar contraseña (opcional: usuarios OAuth no necesitan password)
+    const hashedPassword = password ? await hash(password, 10) : null
 
     // Crear usuario
     const newUser = await prisma.user.create({
