@@ -59,13 +59,13 @@ export async function PUT(
     const payload: ListaEquipoItemUpdatePayload = await request.json()
 
     const dataToUpdate: any = {
-      // Nota: categoria field will be added after Prisma client regeneration
       codigo: payload.codigo,
       descripcion: payload.descripcion,
+      categoria: payload.categoria,
       unidad: payload.unidad,
       cantidad: payload.cantidad,
       verificado: payload.verificado,
-      comentarioRevision: payload.categoria ? `CATEGORIA:${payload.categoria}` : payload.comentarioRevision,
+      comentarioRevision: payload.comentarioRevision,
       presupuesto: payload.presupuesto,
       precioElegido: payload.precioElegido,
       costoElegido: payload.costoElegido,

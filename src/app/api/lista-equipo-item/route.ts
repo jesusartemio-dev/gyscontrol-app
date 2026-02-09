@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         marca: body.marca || 'SIN-MARCA',
         cantidad: body.cantidad ?? 0,
         verificado: body.verificado ?? false,
-        comentarioRevision: body.categoria ? `CATEGORIA:${body.categoria}` : body.comentarioRevision || null,
+        comentarioRevision: body.comentarioRevision || null,
         presupuesto: body.presupuesto ?? null,
         precioElegido: body.precioElegido ?? null,
         costoElegido: body.costoElegido ?? null,

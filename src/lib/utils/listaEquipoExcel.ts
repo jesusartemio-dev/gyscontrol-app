@@ -18,25 +18,12 @@ export function exportarListaEquipoAExcel(
   try {
     // Preparar datos para Excel (solo campos que se pueden importar)
     const datosExcel = items.map(item => {
-      // ✅ Prioridad para obtener categoría:
-      // 1. Campo directo item.categoria (copiado de ProyectoEquipoItem)
-      // 2. Del catálogo de equipos
-      // 3. Del comentarioRevision (legacy)
-      // 4. Por defecto: 'SIN-CATEGORIA'
-      let categoria = ''
-      if (item.categoria && item.categoria !== 'SIN-CATEGORIA') {
-        categoria = item.categoria
-        console.log(`📊 Exportando item ${item.codigo}: categoria directa: "${categoria}"`)
-      } else if (item.catalogoEquipo?.categoriaEquipo?.nombre) {
-        categoria = item.catalogoEquipo.categoriaEquipo.nombre
-        console.log(`📊 Exportando item ${item.codigo}: categoria de catalogoEquipo: "${categoria}"`)
-      } else if (item.comentarioRevision && item.comentarioRevision.startsWith('CATEGORIA:')) {
-        categoria = item.comentarioRevision.replace('CATEGORIA:', '').trim()
-        console.log(`📊 Exportando item ${item.codigo}: categoria de comentarioRevision (legacy): "${categoria}"`)
-      } else {
-        categoria = 'SIN-CATEGORIA'
-        console.log(`📊 Exportando item ${item.codigo}: sin categoria, usando SIN-CATEGORIA`)
-      }
+      // Prioridad para obtener categoría:
+      // 1. Campo directo item.categoria
+      // 2. Del catálogo de equipos (fallback)
+      const categoria = (item.categoria && item.categoria !== 'SIN-CATEGORIA')
+        ? item.categoria
+        : item.catalogoEquipo?.categoriaEquipo?.nombre || 'SIN-CATEGORIA'
 
       // Obtener marca: primero del item directo, luego del catálogo como fallback
       const marca = (item as any).marca || item.catalogoEquipo?.marca || ''

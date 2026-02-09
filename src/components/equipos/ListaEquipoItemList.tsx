@@ -15,7 +15,8 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
 import { updateListaEquipoItem, deleteListaEquipoItem } from '@/lib/services/listaEquipoItem'
@@ -118,6 +119,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const [itemReemplazoReemplazo, setItemReemplazoReemplazo] = useState<ListaEquipoItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
   const [isLoading, setIsLoading] = useState(false)
 
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('list') // ✅ Default to list view
@@ -183,22 +185,32 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
     return { total, verificados, sinPedidos, enPedido, conCotizacion, costoTotal, noCotizados, conMayorCantidad, coberturaBuena, coberturaParcial, sinCotizaciones }
   }, [itemsWithResumen])
 
+  const categoriasUnicas = useMemo(() =>
+    [...new Set(items.map(i => i.categoria || 'SIN-CATEGORIA'))].sort()
+  , [items])
+
   // 🔍 Filter and search items using memoized summaries
   const filteredItems = useMemo(() => {
     let filtered = [...itemsWithResumen]
-    
+
+    // Category filter
+    if (categoriaFiltro !== '__ALL__') {
+      filtered = filtered.filter(item => (item.categoria || 'SIN-CATEGORIA') === categoriaFiltro)
+    }
+
     // Search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(item =>
         item.codigo.toLowerCase().includes(term) ||
         item.descripcion.toLowerCase().includes(term) ||
-        item.marca?.toLowerCase().includes(term)
+        item.marca?.toLowerCase().includes(term) ||
+        item.categoria?.toLowerCase().includes(term)
       )
     }
-    
+
     return filtered.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-  }, [itemsWithResumen, searchTerm])
+  }, [itemsWithResumen, searchTerm, categoriaFiltro])
 
   const handleSaveCantidad = async (itemId: string) => {
     try {
@@ -353,6 +365,24 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
               className="pl-7 h-7 text-xs w-48"
             />
           </div>
+        )}
+
+        {/* Category filter */}
+        {categoriasUnicas.length > 1 && (
+          <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+            <SelectTrigger className="w-[150px] h-7 text-xs">
+              <Tag className="h-3 w-3 mr-1 text-muted-foreground" />
+              <SelectValue>
+                {categoriaFiltro === '__ALL__' ? 'Categoría' : categoriaFiltro}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todas las categorías</SelectItem>
+              {categoriasUnicas.map(cat => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
 
         {/* Stats */}
@@ -688,6 +718,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                          <div className="text-[11px] text-gray-500 truncate" title={item.descripcion}>
                            {item.descripcion}
                          </div>
+                         {item.categoria && item.categoria !== 'SIN-CATEGORIA' && (
+                           <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0 rounded bg-violet-50 text-violet-600 border border-violet-200">
+                             <Tag className="h-2 w-2" />{item.categoria}
+                           </span>
+                         )}
                        </div>
                      </td>
                    )}
@@ -1062,6 +1097,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           <p className="text-xs text-muted-foreground line-clamp-2">
                             {item.descripcion}
                           </p>
+                          {item.categoria && item.categoria !== 'SIN-CATEGORIA' && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0 rounded bg-violet-50 text-violet-600 border border-violet-200">
+                              <Tag className="h-2 w-2" />{item.categoria}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <Checkbox
