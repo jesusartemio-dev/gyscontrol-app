@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import {
@@ -74,8 +74,8 @@ interface QuotedItemOption {
 
 const MAPPING_NONE = '__none__'
 
-// Combobox component for vinculación with search — rendered inline (no Portal)
-// to avoid z-index/pointer-event conflicts with the parent Dialog
+// Simple searchable dropdown for vinculación — plain HTML, no cmdk/Popover
+// to avoid pointer-event conflicts with the parent Dialog
 function VinculacionCombobox({
   item,
   currentMapping,
@@ -96,7 +96,9 @@ function VinculacionCombobox({
   onSelect: (val: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Close on click outside
   useEffect(() => {
@@ -104,10 +106,16 @@ function VinculacionCombobox({
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)
+        setSearch('')
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 50)
   }, [open])
 
   const excelCategoria = (item.categoria || '').toLowerCase()
@@ -120,6 +128,45 @@ function VinculacionCombobox({
   const otherItems = excelCategoria
     ? allItems.filter((qi: any) => ((qi as any).categoria || '').toLowerCase() !== excelCategoria)
     : allItems
+
+  // Filter by search term
+  const term = search.toLowerCase()
+  const filterItem = (qi: any) => {
+    if (!term) return true
+    return `${qi.codigo} ${qi.descripcion} ${qi.categoria || ''}`.toLowerCase().includes(term)
+  }
+  const filteredSame = sameCategory.filter(filterItem)
+  const filteredOther = otherItems.filter(filterItem)
+  const hasResults = filteredSame.length > 0 || filteredOther.length > 0 || (!term || 'sin vincular'.includes(term))
+
+  const handleSelect = (val: string) => {
+    onSelect(val)
+    setOpen(false)
+    setSearch('')
+  }
+
+  const renderItem = (qi: any) => {
+    const isUsed = usedByOthers.has(qi.id)
+    const isSelected = currentMapping === qi.id
+    return (
+      <div
+        key={qi.id}
+        onClick={() => { if (!isUsed) handleSelect(qi.id) }}
+        className={cn(
+          'flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-sm cursor-pointer',
+          isSelected ? 'bg-accent' : 'hover:bg-accent',
+          isUsed && 'opacity-50 cursor-not-allowed'
+        )}
+      >
+        <span className="flex items-center gap-1.5 flex-1 min-w-0">
+          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
+          <span className="truncate">{qi.descripcion}</span>
+          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
+        </span>
+        {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
+      </div>
+    )
+  }
 
   return (
     <div ref={containerRef} className="relative flex-1">
@@ -146,92 +193,58 @@ function VinculacionCombobox({
       </Button>
       {open && (
         <div className="absolute top-full left-0 mt-1 w-[460px] z-[200] rounded-md border bg-popover text-popover-foreground shadow-lg">
-          <Command filter={(value, search) => {
-            if (!search) return 1
-            const term = search.toLowerCase()
-            if (value === MAPPING_NONE) return 'sin vincular'.includes(term) ? 1 : 0
-            const found = allItems.find((qi: any) => qi.id === value)
-            if (!found) return 0
-            const text = `${(found as any).codigo} ${(found as any).descripcion} ${(found as any).categoria || ''}`.toLowerCase()
-            return text.includes(term) ? 1 : 0
-          }}>
-            <CommandInput placeholder="Buscar por código o descripción..." className="h-8 text-xs" />
-            <CommandList className="max-h-[250px]">
-              <CommandEmpty className="py-3 text-xs text-center">No se encontraron items</CommandEmpty>
-              <CommandGroup>
-                <CommandItem
-                  value={MAPPING_NONE}
-                  onSelect={() => {
-                    onSelect(MAPPING_NONE)
-                    setOpen(false)
-                  }}
-                  className="text-xs cursor-pointer"
-                >
-                  <Unlink className="h-3 w-3 mr-1.5 shrink-0" />
-                  Sin vincular
-                  {currentMapping === MAPPING_NONE && <Check className="ml-auto h-3 w-3 text-green-600" />}
-                </CommandItem>
-              </CommandGroup>
-              {sameCategory.length > 0 && (
-                <CommandGroup heading={`Misma categoría (${item.categoria})`}>
-                  {sameCategory.map((qi: any) => {
-                    const isUsed = usedByOthers.has(qi.id)
-                    const isSelected = currentMapping === qi.id
-                    return (
-                      <CommandItem
-                        key={qi.id}
-                        value={qi.id}
-                        disabled={isUsed}
-                        onSelect={() => {
-                          if (!isUsed) {
-                            onSelect(qi.id)
-                            setOpen(false)
-                          }
-                        }}
-                        className={cn('text-xs cursor-pointer', isUsed && 'opacity-50 cursor-not-allowed')}
-                      >
-                        <span className="flex items-center gap-1.5 flex-1 min-w-0">
-                          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
-                          <span className="truncate">{qi.descripcion}</span>
-                          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
-                        </span>
-                        {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
-                      </CommandItem>
-                    )
-                  })}
-                </CommandGroup>
-              )}
-              {otherItems.length > 0 && (
-                <CommandGroup heading={sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}>
-                  {otherItems.map((qi: any) => {
-                    const isUsed = usedByOthers.has(qi.id)
-                    const isSelected = currentMapping === qi.id
-                    return (
-                      <CommandItem
-                        key={qi.id}
-                        value={qi.id}
-                        disabled={isUsed}
-                        onSelect={() => {
-                          if (!isUsed) {
-                            onSelect(qi.id)
-                            setOpen(false)
-                          }
-                        }}
-                        className={cn('text-xs cursor-pointer', isUsed && 'opacity-50 cursor-not-allowed')}
-                      >
-                        <span className="flex items-center gap-1.5 flex-1 min-w-0">
-                          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
-                          <span className="truncate">{qi.descripcion}</span>
-                          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
-                        </span>
-                        {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
-                      </CommandItem>
-                    )
-                  })}
-                </CommandGroup>
-              )}
-            </CommandList>
-          </Command>
+          {/* Search input */}
+          <div className="flex items-center border-b px-2">
+            <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por código o descripción..."
+              className="flex h-8 w-full bg-transparent py-2 text-xs outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          {/* Items list */}
+          <div className="max-h-[250px] overflow-y-auto p-1">
+            {/* Sin vincular option */}
+            {(!term || 'sin vincular'.includes(term)) && (
+              <div
+                onClick={() => handleSelect(MAPPING_NONE)}
+                className={cn(
+                  'flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-sm cursor-pointer',
+                  currentMapping === MAPPING_NONE ? 'bg-accent' : 'hover:bg-accent'
+                )}
+              >
+                <Unlink className="h-3 w-3 shrink-0" />
+                <span>Sin vincular</span>
+                {currentMapping === MAPPING_NONE && <Check className="ml-auto h-3 w-3 text-green-600" />}
+              </div>
+            )}
+            {/* Same category group */}
+            {filteredSame.length > 0 && (
+              <div className="mt-1">
+                <div className="px-2 py-1 text-[10px] font-semibold text-green-600 uppercase">
+                  Misma categoría ({item.categoria})
+                </div>
+                {filteredSame.map(renderItem)}
+              </div>
+            )}
+            {/* Other categories group */}
+            {filteredOther.length > 0 && (
+              <div className="mt-1">
+                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase">
+                  {filteredSame.length > 0 || sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}
+                </div>
+                {filteredOther.map(renderItem)}
+              </div>
+            )}
+            {/* No results */}
+            {!hasResults && (
+              <div className="py-4 text-center text-xs text-muted-foreground">
+                No se encontraron items
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
