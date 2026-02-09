@@ -242,11 +242,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
       })
       toast.success('Comentario guardado')
       setEditComentarioItemId(null)
-      setEditComentarioValues((prev) => {
-        const updated = { ...prev }
-        delete updated[itemId]
-        return updated
-      })
+      // No borrar editComentarioValues: se mantiene como optimistic cache
+      // hasta que el parent refresque los items con el valor actualizado
       onItemUpdated?.(itemId)
       onItemsUpdated?.()
     } catch {
@@ -961,21 +958,26 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             }}
                           >
                             <PopoverTrigger asChild>
-                              <div
-                                onClick={() => editable && setEditComentarioItemId(item.id)}
-                                className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors line-clamp-2 leading-tight ${
-                                  editable ? 'hover:text-blue-600' : ''
-                                } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
-                                title={item.comentarioRevision || 'Click para agregar comentario'}
-                              >
-                                {item.comentarioRevision ? (
-                                  <span>{item.comentarioRevision}</span>
-                                ) : (
-                                  <span className="text-muted-foreground italic text-xs">
-                                    {editable ? '+' : '—'}
-                                  </span>
-                                )}
-                              </div>
+                              {(() => {
+                                const displayComment = editComentarioValues[item.id] ?? item.comentarioRevision
+                                return (
+                                  <div
+                                    onClick={() => editable && setEditComentarioItemId(item.id)}
+                                    className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors line-clamp-2 leading-tight ${
+                                      editable ? 'hover:text-blue-600' : ''
+                                    } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
+                                    title={displayComment || 'Click para agregar comentario'}
+                                  >
+                                    {displayComment ? (
+                                      <span>{displayComment}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground italic text-xs">
+                                        {editable ? '+' : '—'}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              })()}
                             </PopoverTrigger>
                             {editable && (
                               <PopoverContent className="w-72 p-3" align="start" side="bottom">
@@ -1222,7 +1224,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                                 editable ? 'cursor-pointer hover:bg-muted/50' : ''
                               }`}
                             >
-                              {item.comentarioRevision || (editable ? '+ Comentario' : '—')}
+                              {(editComentarioValues[item.id] ?? item.comentarioRevision) || (editable ? '+ Comentario' : '—')}
                             </div>
                           </PopoverTrigger>
                           {editable && (
