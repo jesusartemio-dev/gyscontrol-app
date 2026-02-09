@@ -510,6 +510,8 @@ model ListaEquipoItem {
   marca                                 String                       @default("SIN-MARCA")
   cantidad                              Float
   verificado                            Boolean                      @default(false)
+  verificadoPorId                       String?
+  verificadoAt                          DateTime?
   comentarioRevision                    String?
   presupuesto                           Float?
   precioElegido                         Float?
@@ -535,6 +537,7 @@ model ListaEquipoItem {
   proyectoEquipoItem                    ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemProyectoEquipoItem", fields: [proyectoEquipoItemId], references: [id])
   reemplazaProyectoEquipoCotizadoItem   ProyectoEquipoCotizadoItem?  @relation("listaEquipoItemReemplazaProyectoEquipoItem", fields: [reemplazaProyectoEquipoCotizadoItemId], references: [id])
   user                                  User                         @relation(fields: [responsableId], references: [id])
+  verificadoPor                         User?                        @relation("ListaEquipoItemVerificador", fields: [verificadoPorId], references: [id])
   pedidoEquipoItem                      PedidoEquipoItem[]
   listaEquipoItemSeleccionados          ProyectoEquipoCotizadoItem[] @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado")
   catalogoEquipo                        CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
@@ -586,6 +589,8 @@ model PedidoEquipoItem {
   estado                      EstadoPedidoItem  @default(pendiente)
   cantidadAtendida            Float?
   comentarioLogistica         String?
+  comentarioLogisticaPorId    String?
+  comentarioLogisticaAt       DateTime?
   createdAt                   DateTime          @default(now())
   updatedAt                   DateTime
   listaId                     String?
@@ -605,6 +610,7 @@ model PedidoEquipoItem {
   listaEquipo                 ListaEquipo?      @relation(fields: [listaId], references: [id])
   pedidoEquipo                PedidoEquipo      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   user                        User              @relation(fields: [responsableId], references: [id])
+  comentarioLogisticaPor      User?             @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
 
   @@map("pedido_equipo_item")
 }
@@ -1220,6 +1226,9 @@ model User {
   registrosCampoSupervisor  RegistroHorasCampo[]        @relation("RegistrosCampoSupervisor")
   registrosCampoAprobador   RegistroHorasCampo[]        @relation("RegistrosCampoAprobador")
   miembrosCuadrilla         RegistroHorasCampoMiembro[]
+  // Trazabilidad
+  listaEquipoItemsVerificados           ListaEquipoItem[]            @relation("ListaEquipoItemVerificador")
+  pedidoEquipoItemsComentados           PedidoEquipoItem[]           @relation("PedidoEquipoItemComentarioLogistica")
 
   @@map("user")
 }

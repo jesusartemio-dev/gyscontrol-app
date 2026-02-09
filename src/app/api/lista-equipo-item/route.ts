@@ -47,6 +47,9 @@ export async function GET(request: Request) {
           }
         },
         proyectoEquipoCotizado: true,
+        verificadoPor: {
+          select: { id: true, name: true, email: true }
+        },
         cotizacionProveedorItems: {
           include: {
             cotizacionProveedor: {

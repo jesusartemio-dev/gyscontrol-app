@@ -1299,6 +1299,9 @@ export interface ListaEquipoItem {
   marca: string // ✅ Campo agregado para exportación Excel
   cantidad: number
   verificado: boolean
+  verificadoPorId?: string
+  verificadoAt?: string
+  verificadoPor?: { id: string; name?: string; email: string }
   comentarioRevision?: string
   presupuesto?: number
   precioElegido?: number
@@ -1449,6 +1452,9 @@ export interface PedidoEquipoItem {
   costoTotal?: number
   estado: EstadoPedidoItem
   comentarioLogistica?: string
+  comentarioLogisticaPorId?: string
+  comentarioLogisticaAt?: string
+  comentarioLogisticaPor?: { id: string; name?: string; email: string }
   // Copiados desde ListaEquipoItem
   codigo: string
   descripcion: string

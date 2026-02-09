@@ -8,6 +8,8 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import type { PedidoEquipoItemUpdatePayload } from '@/types'
 import { sincronizarCantidadPedida, recalcularCantidadPedida } from '@/lib/utils/cantidadPedidaValidator'
 
@@ -42,6 +44,9 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
             },
           },
         },
+        comentarioLogisticaPor: {
+          select: { id: true, name: true, email: true }
+        },
       },
     })
 
@@ -57,6 +62,11 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 // ✅ Actualizar un ítem de pedido por ID
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await context.params
     const body: PedidoEquipoItemUpdatePayload = await request.json()
 
@@ -118,6 +128,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
          fechaOrdenCompraRecomendada: fechaOC, 
          estado: body.estado, 
          comentarioLogistica: body.comentarioLogistica,
+         // 🔍 Trazabilidad: registrar quién escribió el comentario logístico
+         ...(body.comentarioLogistica !== undefined ? {
+           comentarioLogisticaPorId: session.user.id,
+           comentarioLogisticaAt: new Date(),
+         } : {}),
          // 🚚 Campos de trazabilidad de entregas
          fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : undefined,
          fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : undefined,

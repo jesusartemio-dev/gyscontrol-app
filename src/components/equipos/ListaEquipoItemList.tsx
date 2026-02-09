@@ -1009,6 +1009,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                               </PopoverContent>
                             )}
                           </Popover>
+                          {item.verificado && item.verificadoPor && (
+                            <span className="text-[9px] text-muted-foreground leading-none mt-0.5 block">
+                              {item.verificadoPor.name?.split(' ')[0]} · {item.verificadoAt ? new Date(item.verificadoAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : ''}
+                            </span>
+                          )}
                         </div>
                       </div>
                      </td>
@@ -1137,6 +1142,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           )}
                         </div>
                       </div>
+                      {item.verificado && item.verificadoPor && (
+                        <p className="text-[9px] text-muted-foreground text-right">
+                          {item.verificadoPor.name?.split(' ')[0]} · {item.verificadoAt ? new Date(item.verificadoAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : ''}
+                        </p>
+                      )}
 
                       <div className="flex flex-wrap gap-1 mt-2">
                         <Badge variant={getStatusVariant(item.estado) as "default" | "secondary" | "outline"} className="text-[10px] px-1.5 py-0">

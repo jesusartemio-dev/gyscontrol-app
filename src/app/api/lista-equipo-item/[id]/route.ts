@@ -6,6 +6,8 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import type { ListaEquipoItemUpdatePayload } from '@/types/payloads'
 
 // ✅ Obtener ítem por ID
@@ -37,6 +39,9 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
             proyectoEquipoCotizado: true,
           },
         },
+        verificadoPor: {
+          select: { id: true, name: true, email: true }
+        },
       },
     })
 
@@ -55,6 +60,11 @@ export async function PUT(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await context.params
     const payload: ListaEquipoItemUpdatePayload = await request.json()
 
@@ -95,6 +105,16 @@ export async function PUT(
         dataToUpdate.tiempoEntrega = cotizacion.tiempoEntrega
         dataToUpdate.tiempoEntregaDias = cotizacion.tiempoEntregaDias
       }
+    }
+
+    // 🔍 Trazabilidad: registrar quién verificó y cuándo
+    if (payload.verificado === true) {
+      dataToUpdate.verificadoPorId = session.user.id
+      dataToUpdate.verificadoAt = new Date()
+    }
+    if (payload.verificado === false) {
+      dataToUpdate.verificadoPorId = null
+      dataToUpdate.verificadoAt = null
     }
 
     const actualizado = await prisma.listaEquipoItem.update({
