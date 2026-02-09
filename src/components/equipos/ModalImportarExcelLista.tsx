@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import {
@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
@@ -75,7 +74,8 @@ interface QuotedItemOption {
 
 const MAPPING_NONE = '__none__'
 
-// Combobox component for vinculación with search
+// Combobox component for vinculación with search — rendered inline (no Portal)
+// to avoid z-index/pointer-event conflicts with the parent Dialog
 function VinculacionCombobox({
   item,
   currentMapping,
@@ -96,6 +96,19 @@ function VinculacionCombobox({
   onSelect: (val: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Close on click outside
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
 
   const excelCategoria = (item.categoria || '').toLowerCase()
   const allItems = proyectoEquipos.flatMap(grupo =>
@@ -109,121 +122,119 @@ function VinculacionCombobox({
     : allItems
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            'h-7 text-xs flex-1 justify-between overflow-hidden font-normal',
-            isMapped
-              ? isReplacement
-                ? 'border-blue-300 text-blue-800'
-                : 'border-green-300 text-green-800'
-              : 'text-gray-500'
-          )}
-        >
-          <span className="truncate">
-            {isMapped && matchedQuoted
-              ? <><span className="font-mono">{matchedQuoted.codigo}</span> {matchedQuoted.descripcion.length > 40 ? matchedQuoted.descripcion.slice(0, 40) + '...' : matchedQuoted.descripcion}</>
-              : 'Sin vincular'
-            }
-          </span>
-          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[460px] p-0" align="start">
-        <Command filter={(value, search) => {
-          // Custom filter: search across the display text (codigo + descripcion)
-          if (!search) return 1
-          const term = search.toLowerCase()
-          // value is the item id, we need to find the item to search its text
-          if (value === MAPPING_NONE) return 'sin vincular'.includes(term) ? 1 : 0
-          const found = allItems.find((qi: any) => qi.id === value)
-          if (!found) return 0
-          const text = `${(found as any).codigo} ${(found as any).descripcion} ${(found as any).categoria || ''}`.toLowerCase()
-          return text.includes(term) ? 1 : 0
-        }}>
-          <CommandInput placeholder="Buscar por código o descripción..." className="h-8 text-xs" />
-          <CommandList className="max-h-[250px]">
-            <CommandEmpty className="py-3 text-xs text-center">No se encontraron items</CommandEmpty>
-            <CommandGroup>
-              <CommandItem
-                value={MAPPING_NONE}
-                onSelect={() => {
-                  onSelect(MAPPING_NONE)
-                  setOpen(false)
-                }}
-                className="text-xs"
-              >
-                <Unlink className="h-3 w-3 mr-1.5 shrink-0" />
-                Sin vincular
-                {currentMapping === MAPPING_NONE && <Check className="ml-auto h-3 w-3 text-green-600" />}
-              </CommandItem>
-            </CommandGroup>
-            {sameCategory.length > 0 && (
-              <CommandGroup heading={`Misma categoría (${item.categoria})`}>
-                {sameCategory.map((qi: any) => {
-                  const isUsed = usedByOthers.has(qi.id)
-                  const isSelected = currentMapping === qi.id
-                  return (
-                    <CommandItem
-                      key={qi.id}
-                      value={qi.id}
-                      disabled={isUsed}
-                      onSelect={() => {
-                        if (!isUsed) {
-                          onSelect(qi.id)
-                          setOpen(false)
-                        }
-                      }}
-                      className={cn('text-xs', isUsed && 'opacity-50')}
-                    >
-                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
-                        <span className="truncate text-gray-700">{qi.descripcion}</span>
-                        {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
-                      </span>
-                      {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
-                    </CommandItem>
-                  )
-                })}
+    <div ref={containerRef} className="relative flex-1">
+      <Button
+        variant="outline"
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          'h-7 text-xs w-full justify-between overflow-hidden font-normal',
+          isMapped
+            ? isReplacement
+              ? 'border-blue-300 text-blue-800'
+              : 'border-green-300 text-green-800'
+            : 'text-gray-500'
+        )}
+      >
+        <span className="truncate">
+          {isMapped && matchedQuoted
+            ? <><span className="font-mono">{matchedQuoted.codigo}</span> {matchedQuoted.descripcion.length > 40 ? matchedQuoted.descripcion.slice(0, 40) + '...' : matchedQuoted.descripcion}</>
+            : 'Sin vincular'
+          }
+        </span>
+        <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+      </Button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-[460px] z-[200] rounded-md border bg-popover text-popover-foreground shadow-lg">
+          <Command filter={(value, search) => {
+            if (!search) return 1
+            const term = search.toLowerCase()
+            if (value === MAPPING_NONE) return 'sin vincular'.includes(term) ? 1 : 0
+            const found = allItems.find((qi: any) => qi.id === value)
+            if (!found) return 0
+            const text = `${(found as any).codigo} ${(found as any).descripcion} ${(found as any).categoria || ''}`.toLowerCase()
+            return text.includes(term) ? 1 : 0
+          }}>
+            <CommandInput placeholder="Buscar por código o descripción..." className="h-8 text-xs" />
+            <CommandList className="max-h-[250px]">
+              <CommandEmpty className="py-3 text-xs text-center">No se encontraron items</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  value={MAPPING_NONE}
+                  onSelect={() => {
+                    onSelect(MAPPING_NONE)
+                    setOpen(false)
+                  }}
+                  className="text-xs cursor-pointer"
+                >
+                  <Unlink className="h-3 w-3 mr-1.5 shrink-0" />
+                  Sin vincular
+                  {currentMapping === MAPPING_NONE && <Check className="ml-auto h-3 w-3 text-green-600" />}
+                </CommandItem>
               </CommandGroup>
-            )}
-            {otherItems.length > 0 && (
-              <CommandGroup heading={sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}>
-                {otherItems.map((qi: any) => {
-                  const isUsed = usedByOthers.has(qi.id)
-                  const isSelected = currentMapping === qi.id
-                  return (
-                    <CommandItem
-                      key={qi.id}
-                      value={qi.id}
-                      disabled={isUsed}
-                      onSelect={() => {
-                        if (!isUsed) {
-                          onSelect(qi.id)
-                          setOpen(false)
-                        }
-                      }}
-                      className={cn('text-xs', isUsed && 'opacity-50')}
-                    >
-                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
-                        <span className="truncate text-gray-700">{qi.descripcion}</span>
-                        {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
-                      </span>
-                      {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
-                    </CommandItem>
-                  )
-                })}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+              {sameCategory.length > 0 && (
+                <CommandGroup heading={`Misma categoría (${item.categoria})`}>
+                  {sameCategory.map((qi: any) => {
+                    const isUsed = usedByOthers.has(qi.id)
+                    const isSelected = currentMapping === qi.id
+                    return (
+                      <CommandItem
+                        key={qi.id}
+                        value={qi.id}
+                        disabled={isUsed}
+                        onSelect={() => {
+                          if (!isUsed) {
+                            onSelect(qi.id)
+                            setOpen(false)
+                          }
+                        }}
+                        className={cn('text-xs cursor-pointer', isUsed && 'opacity-50 cursor-not-allowed')}
+                      >
+                        <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
+                          <span className="truncate">{qi.descripcion}</span>
+                          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
+                        </span>
+                        {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
+                      </CommandItem>
+                    )
+                  })}
+                </CommandGroup>
+              )}
+              {otherItems.length > 0 && (
+                <CommandGroup heading={sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}>
+                  {otherItems.map((qi: any) => {
+                    const isUsed = usedByOthers.has(qi.id)
+                    const isSelected = currentMapping === qi.id
+                    return (
+                      <CommandItem
+                        key={qi.id}
+                        value={qi.id}
+                        disabled={isUsed}
+                        onSelect={() => {
+                          if (!isUsed) {
+                            onSelect(qi.id)
+                            setOpen(false)
+                          }
+                        }}
+                        className={cn('text-xs cursor-pointer', isUsed && 'opacity-50 cursor-not-allowed')}
+                      >
+                        <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
+                          <span className="truncate">{qi.descripcion}</span>
+                          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
+                        </span>
+                        {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
+                      </CommandItem>
+                    )
+                  })}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </div>
+      )}
+    </div>
   )
 }
 
