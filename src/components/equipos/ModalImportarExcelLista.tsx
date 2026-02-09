@@ -911,7 +911,7 @@ export default function ModalImportarExcelLista({
 
         {/* Mapping table */}
         <div className="space-y-2">
-          <div className="space-y-1.5">
+          <div className="space-y-2.5">
             {resumen.items.map((item, itemIdx) => {
               const currentMapping = itemMappings[item.codigo] || MAPPING_NONE
               const isMapped = currentMapping !== MAPPING_NONE
@@ -934,12 +934,12 @@ export default function ModalImportarExcelLista({
                 <div
                   key={item.codigo}
                   className={cn(
-                    'p-2 rounded-lg border-l-[3px] border transition-colors',
+                    'p-2 rounded-lg border-l-[3px] border transition-colors shadow-sm',
                     isMapped
                       ? isReplacement
-                        ? 'border-l-blue-500 border-blue-200 bg-blue-50/40'
-                        : 'border-l-green-500 border-green-200 bg-green-50/40'
-                      : 'border-l-gray-300 border-gray-200 bg-white'
+                        ? 'border-l-blue-500 border-blue-300 bg-blue-50/40'
+                        : 'border-l-green-500 border-green-300 bg-green-50/40'
+                      : 'border-l-gray-400 border-gray-300 bg-white'
                   )}
                 >
                   {/* Excel item info */}
@@ -1162,11 +1162,11 @@ export default function ModalImportarExcelLista({
         step === 'mapping' ? 'max-w-lg' : 'max-w-md'
       )}>
         <DialogHeader className="px-4 pt-4 pb-3 border-b shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-base">
+          <DialogTitle className="flex items-center gap-2 text-base pr-6">
             <FileSpreadsheet className="h-4 w-4 text-orange-600" />
             Importar desde Excel
             {step !== 'upload' && (
-              <span className="text-[10px] font-normal text-muted-foreground ml-auto">
+              <span className="text-[10px] font-normal text-muted-foreground ml-auto mr-2">
                 Cerrar sin perder progreso
               </span>
             )}
