@@ -733,22 +733,68 @@ export default function CatalogoEquipoPage() {
         {/* Delete confirmation */}
         <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
           <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar equipo?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Se eliminará el equipo "{deleteTarget?.codigo}". Esta acción no se puede deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                disabled={eliminando}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {eliminando ? 'Eliminando...' : 'Eliminar'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
+            {(() => {
+              const c = deleteTarget?._count?.cotizacionEquipoItem || 0
+              const p = deleteTarget?._count?.proyectoEquipoCotizadoItem || 0
+              const l = deleteTarget?._count?.listaEquipoItem || 0
+              const tieneUso = c + p + l > 0
+              return (
+                <>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {tieneUso ? 'No se puede eliminar' : '¿Eliminar equipo?'}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div>
+                        {tieneUso ? (
+                          <div className="space-y-3">
+                            <p>
+                              El equipo <span className="font-mono font-medium text-foreground">{deleteTarget?.codigo}</span> está siendo usado en:
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {c > 0 && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm bg-blue-50 text-blue-700 border border-blue-200">
+                                  {c} cotizaci{c === 1 ? 'ón' : 'ones'}
+                                </span>
+                              )}
+                              {p > 0 && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm bg-amber-50 text-amber-700 border border-amber-200">
+                                  {p} proyecto{p === 1 ? '' : 's'}
+                                </span>
+                              )}
+                              {l > 0 && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {l} lista{l === 1 ? '' : 's'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm">
+                              Debes desvincular el equipo de estos registros antes de poder eliminarlo.
+                            </p>
+                          </div>
+                        ) : (
+                          <p>Se eliminará el equipo &quot;{deleteTarget?.codigo}&quot;. Esta acción no se puede deshacer.</p>
+                        )}
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={eliminando}>
+                      {tieneUso ? 'Cerrar' : 'Cancelar'}
+                    </AlertDialogCancel>
+                    {!tieneUso && (
+                      <AlertDialogAction
+                        onClick={confirmDelete}
+                        disabled={eliminando}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {eliminando ? 'Eliminando...' : 'Eliminar'}
+                      </AlertDialogAction>
+                    )}
+                  </AlertDialogFooter>
+                </>
+              )
+            })()}
           </AlertDialogContent>
         </AlertDialog>
 
