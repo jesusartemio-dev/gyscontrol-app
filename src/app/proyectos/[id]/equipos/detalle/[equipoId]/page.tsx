@@ -263,7 +263,14 @@ function ItemsTable({ items }: { items: ProyectoEquipoCotizadoItem[] }) {
                     )}
                   >
                     <td className="px-2 py-1.5">
-                      <span className="font-mono text-gray-600">{item.codigo}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-gray-600">{item.codigo}</span>
+                        {!item.catalogoEquipoId && (
+                          <span className="px-1 py-0.5 text-[8px] font-medium bg-amber-100 text-amber-700 rounded" title="No vinculado al catálogo de equipos">
+                            Temp
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-2 py-1.5">
                       <span className="line-clamp-2 text-[11px] leading-snug text-gray-700" title={item.descripcion}>{item.descripcion}</span>
