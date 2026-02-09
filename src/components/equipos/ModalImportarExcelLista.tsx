@@ -151,6 +151,7 @@ function VinculacionCombobox({
     return (
       <div
         key={qi.id}
+        title={`${qi.codigo} — ${qi.descripcion}`}
         onClick={() => { if (!isUsed) handleSelect(qi.id) }}
         className={cn(
           'flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-sm cursor-pointer',
@@ -174,6 +175,7 @@ function VinculacionCombobox({
         variant="outline"
         type="button"
         onClick={() => setOpen(!open)}
+        title={isMapped && matchedQuoted ? `${matchedQuoted.codigo} — ${matchedQuoted.descripcion}` : undefined}
         className={cn(
           'h-7 text-xs w-full justify-between overflow-hidden font-normal',
           isMapped
@@ -909,8 +911,8 @@ export default function ModalImportarExcelLista({
 
         {/* Mapping table */}
         <div className="space-y-2">
-          <div className="space-y-2">
-            {resumen.items.map((item) => {
+          <div className="space-y-1.5">
+            {resumen.items.map((item, itemIdx) => {
               const currentMapping = itemMappings[item.codigo] || MAPPING_NONE
               const isMapped = currentMapping !== MAPPING_NONE
               const matchedQuoted = isMapped ? allQuotedItems.find(q => q.id === currentMapping) : null
@@ -932,20 +934,33 @@ export default function ModalImportarExcelLista({
                 <div
                   key={item.codigo}
                   className={cn(
-                    'p-2 rounded-lg border transition-colors',
+                    'p-2 rounded-lg border-l-[3px] border transition-colors',
                     isMapped
                       ? isReplacement
-                        ? 'border-blue-200 bg-blue-50/50'
-                        : 'border-green-200 bg-green-50/50'
-                      : 'border-gray-200 bg-gray-50/30'
+                        ? 'border-l-blue-500 border-blue-200 bg-blue-50/40'
+                        : 'border-l-green-500 border-green-200 bg-green-50/40'
+                      : 'border-l-gray-300 border-gray-200 bg-white'
                   )}
                 >
                   {/* Excel item info */}
                   <div className="flex items-center gap-2 mb-1.5">
+                    <span className={cn(
+                      'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                      isMapped
+                        ? isReplacement
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-500'
+                    )}>
+                      {isMapped
+                        ? isReplacement ? <RefreshCw className="h-2.5 w-2.5" /> : <CheckCircle className="h-3 w-3" />
+                        : itemIdx + 1
+                      }
+                    </span>
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono shrink-0">
                       {item.codigo}
                     </Badge>
-                    <span className="text-xs text-gray-700 line-clamp-2 flex-1" title={item.descripcion}>{item.descripcion}</span>
+                    <span className="text-xs text-gray-700 line-clamp-1 flex-1" title={item.descripcion}>{item.descripcion}</span>
                     {isNew && !isMapped && (
                       <Badge className="text-[10px] px-1 py-0 bg-orange-100 text-orange-700 shrink-0">
                         nuevo
