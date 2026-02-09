@@ -34,9 +34,13 @@ import {
 import type { Proyecto, ProyectoEquipoCotizado, ProyectoEquipoCotizadoItem, ListaEquipo, ListaEquipoItem } from '@prisma/client'
 import CrearListaMultipleModal from '@/components/proyectos/equipos/CrearListaMultipleModal'
 
+type ListaInfo = Pick<ListaEquipo, 'id' | 'codigo' | 'nombre'>
+
 type ItemWithLista = ProyectoEquipoCotizadoItem & {
-  listaEquipo?: Pick<ListaEquipo, 'id' | 'codigo' | 'nombre'> | null
-  listaEquipoSeleccionado?: Pick<ListaEquipoItem, 'id' | 'cantidad'> | null
+  listaEquipo?: ListaInfo | null
+  listaEquipoSeleccionado?: (Pick<ListaEquipoItem, 'id' | 'cantidad'> & {
+    listaEquipo?: ListaInfo | null
+  }) | null
 }
 
 type ProyectoEquipoCotizadoWithItems = Omit<ProyectoEquipoCotizado, 'proyecto' | 'responsable'> & {
@@ -298,29 +302,31 @@ function ItemsTable({ items, proyectoId }: { items: ItemWithLista[], proyectoId:
                       {getStatusBadge(item)}
                     </td>
                     <td className="px-2 py-1.5">
-                      {item.listaEquipo ? (
-                        <div className="flex items-center gap-1">
-                          <Link
-                            href={`/proyectos/${proyectoId}/equipos/listas/${item.listaEquipo.id}`}
-                            className="text-[10px] font-mono text-blue-600 hover:underline truncate max-w-[80px]"
-                            title={item.listaEquipo.nombre}
-                          >
-                            {item.listaEquipo.codigo}
-                          </Link>
-                          {item.listaEquipoSeleccionado && (
-                            <span className={cn(
-                              'text-[10px] px-1 py-0.5 rounded font-medium',
-                              item.listaEquipoSeleccionado.cantidad >= item.cantidad
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-amber-100 text-amber-700'
-                            )}>
-                              {item.listaEquipoSeleccionado.cantidad}/{item.cantidad}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground">—</span>
-                      )}
+                      {(() => {
+                        const lista = item.listaEquipo ?? item.listaEquipoSeleccionado?.listaEquipo
+                        if (!lista) return <span className="text-[10px] text-muted-foreground">—</span>
+                        return (
+                          <div className="flex items-center gap-1">
+                            <Link
+                              href={`/proyectos/${proyectoId}/equipos/listas/${lista.id}`}
+                              className="text-[10px] font-mono text-blue-600 hover:underline truncate max-w-[80px]"
+                              title={lista.nombre}
+                            >
+                              {lista.codigo}
+                            </Link>
+                            {item.listaEquipoSeleccionado && (
+                              <span className={cn(
+                                'text-[10px] px-1 py-0.5 rounded font-medium',
+                                item.listaEquipoSeleccionado.cantidad >= item.cantidad
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-amber-100 text-amber-700'
+                              )}>
+                                {item.listaEquipoSeleccionado.cantidad}/{item.cantidad}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </td>
                   </tr>
                 ))

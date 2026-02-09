@@ -24,7 +24,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
           include: {
             catalogoEquipo: true,
             listaEquipo: true,
-            listaEquipoSeleccionado: true
+            listaEquipoSeleccionado: {
+              include: {
+                listaEquipo: { select: { id: true, codigo: true, nombre: true } }
+              }
+            }
           }
         }
       }

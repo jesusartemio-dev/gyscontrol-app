@@ -71,6 +71,7 @@ export async function POST(req: Request) {
     await prisma.proyectoEquipoCotizadoItem.update({
       where: { id: proyectoEquipoItemId },
       data: {
+        listaId,
         listaEquipoSeleccionadoId: nuevo.id,
         estado: 'en_lista',
         cantidadReal: item.cantidad,
