@@ -10,7 +10,6 @@ import { getCatalogoEquipos } from './catalogoEquipo'
 import { getProyectoEquipos } from './proyectoEquipo'
 import { createCatalogoEquipo } from './catalogoEquipo'
 import { createListaEquipoItem, updateListaEquipoItem, getListaEquipoItemsByLista } from './listaEquipoItem'
-import { createListaEquipoItemFromProyecto } from './listaEquipoItem'
 import { updateProyectoEquipoItem } from './proyectoEquipoItem'
 import { getCategoriasEquipo, createCategoriaEquipo } from './categoriaEquipo'
 import { getUnidades, createUnidad } from './unidad'
@@ -134,55 +133,59 @@ export async function verificarExistenciaEquipos(
         estado = 'nuevo'
         nuevos++
 
-        // Obtener o crear categoria
-        let categoriaId: string
+        // Skip catalog preparation for TEMP-coded items (no real catalog code)
+        const esCodigoTemporal = codigoStr.startsWith('TEMP-')
+        if (!esCodigoTemporal) {
+          // Obtener o crear categoria
+          let categoriaId: string
 
-        if (!categoria || categoria.trim().length === 0) {
-          // Usar categoría por defecto si está vacía
-          console.log(`⚠️ Item ${codigo}: Categoría vacía, usando categoría por defecto`)
-          categoriaId = categoriaDefaultId!
-        } else {
-          // Buscar categoría existente
-          categoriaId = categoriaPorNombre.get(categoria.toLowerCase())?.id as string
-          
-          if (!categoriaId) {
-            // Crear nueva categoría
-            console.log(`🔹 Creando nueva categoría: ${categoria}`)
-            const nuevaCategoria = await createCategoriaEquipo({ 
-              nombre: categoria.trim() 
-            })
-            categoriaId = nuevaCategoria.id
-            categoriaPorNombre.set(categoria.toLowerCase(), nuevaCategoria)
-            console.log(`✅ Categoría creada: ${nuevaCategoria.nombre}`)
+          if (!categoria || categoria.trim().length === 0) {
+            // Usar categoría por defecto si está vacía
+            console.log(`⚠️ Item ${codigo}: Categoría vacía, usando categoría por defecto`)
+            categoriaId = categoriaDefaultId!
+          } else {
+            // Buscar categoría existente
+            categoriaId = categoriaPorNombre.get(categoria.toLowerCase())?.id as string
+
+            if (!categoriaId) {
+              // Crear nueva categoría
+              console.log(`🔹 Creando nueva categoría: ${categoria}`)
+              const nuevaCategoria = await createCategoriaEquipo({
+                nombre: categoria.trim()
+              })
+              categoriaId = nuevaCategoria.id
+              categoriaPorNombre.set(categoria.toLowerCase(), nuevaCategoria)
+              console.log(`✅ Categoría creada: ${nuevaCategoria.nombre}`)
+            }
           }
-        }
 
-        // Obtener o crear unidad
-        let unidadId = unidadPorNombre.get(unidad.toLowerCase())?.id
-        if (!unidadId) {
-          // Crear nueva unidad
-          const nuevaUnidad = await createUnidad({ nombre: unidad })
-          unidadId = nuevaUnidad.id
-          unidadPorNombre.set(unidad.toLowerCase(), nuevaUnidad)
-        }
+          // Obtener o crear unidad
+          let unidadId = unidadPorNombre.get(unidad.toLowerCase())?.id
+          if (!unidadId) {
+            // Crear nueva unidad
+            const nuevaUnidad = await createUnidad({ nombre: unidad })
+            unidadId = nuevaUnidad.id
+            unidadPorNombre.set(unidad.toLowerCase(), nuevaUnidad)
+          }
 
-        // Verificar que tenemos los IDs
-        if (!categoriaId || !unidadId) {
-          throw new Error(`No se pudieron obtener IDs para categoria "${categoria}" o unidad "${unidad}"`)
-        }
+          // Verificar que tenemos los IDs
+          if (!categoriaId || !unidadId) {
+            throw new Error(`No se pudieron obtener IDs para categoria "${categoria}" o unidad "${unidad}"`)
+          }
 
-        // Agregar para crear en catálogo
-        equiposParaCatalogo.push({
-          codigo: codigoStr,
-          descripcion,
-          marca,
-          categoriaId,
-          unidadId,
-          precioInterno: 0,
-          margen: 0.15,
-          precioVenta: 0,
-          estado: 'pendiente'
-        })
+          // Agregar para crear en catálogo (only real codes, not TEMP)
+          equiposParaCatalogo.push({
+            codigo: codigoStr,
+            descripcion,
+            marca,
+            categoriaId,
+            unidadId,
+            precioInterno: 0,
+            margen: 0.15,
+            precioVenta: 0,
+            estado: 'pendiente'
+          })
+        }
       }
 
       itemsClasificados.push({
@@ -239,11 +242,19 @@ export async function crearEquiposEnCatalogo(
   }
 }
 
-// ✅ Importar items desde cotización (actualiza si ya existe el código)
+// ✅ Importar items desde cotización usando datos del Excel + vínculo al cotizado
 export async function importarDesdeCotizacion(
   listaId: string,
   proyectoEquipoItemIds: string[],
-  itemsExcel?: Array<{ codigo: string; cantidad: number }>
+  itemsExcel?: Array<{
+    codigo: string
+    descripcion: string
+    categoria: string
+    unidad: string
+    marca: string
+    cantidad: number
+    quotedItemId: string
+  }>
 ): Promise<void> {
   try {
     // Obtener items existentes en la lista para detectar duplicados
@@ -252,36 +263,60 @@ export async function importarDesdeCotizacion(
       itemsExistentes.map(item => [item.codigo, item])
     )
 
-    // Crear mapa de cantidades del Excel
-    const cantidadesExcel = new Map<string, number>()
+    // Build lookup: quotedItemId → Excel data
+    const excelByQuotedId = new Map<string, { codigo: string; descripcion: string; categoria: string; unidad: string; marca: string; cantidad: number; quotedItemId: string }>()
     if (itemsExcel) {
       for (const item of itemsExcel) {
-        cantidadesExcel.set(item.codigo, item.cantidad)
+        excelByQuotedId.set(item.quotedItemId, item)
       }
     }
 
     for (const itemId of proyectoEquipoItemIds) {
-      // Obtener datos del ProyectoEquipoItem para verificar código
+      // Obtener datos del ProyectoEquipoItem para el vínculo
       const res = await fetch(buildApiUrl(`/api/proyecto-equipo-item/${itemId}`))
       if (!res.ok) continue
 
       const proyectoItem = await res.json()
-      const existente = itemsPorCodigo.get(proyectoItem.codigo)
+      const excelData = excelByQuotedId.get(itemId)
+
+      // Use Excel code/data if available, fall back to quoted item data
+      const codigo = excelData?.codigo || proyectoItem.codigo
+      const descripcion = excelData?.descripcion || proyectoItem.descripcion
+      const categoria = excelData?.categoria || proyectoItem.categoria
+      const unidad = excelData?.unidad || proyectoItem.unidad || 'UND'
+      const marca = excelData?.marca || proyectoItem.marca || ''
+      const cantidad = excelData?.cantidad || proyectoItem.cantidad || 1
+
+      const existente = itemsPorCodigo.get(codigo)
 
       if (existente) {
-        // ✅ Actualizar item existente con nueva cantidad del Excel
-        const nuevaCantidad = cantidadesExcel.get(proyectoItem.codigo) || proyectoItem.cantidad
+        // ✅ Actualizar item existente
         await updateListaEquipoItem(existente.id, {
-          cantidad: nuevaCantidad,
-          descripcion: proyectoItem.descripcion || existente.descripcion,
-          marca: proyectoItem.marca || existente.marca,
-          categoria: proyectoItem.categoria || existente.categoria,
+          cantidad,
+          descripcion,
+          marca,
+          categoria,
+          proyectoEquipoItemId: itemId,
         })
-        console.log(`🔄 Item ${proyectoItem.codigo} actualizado en lista`)
+        console.log(`🔄 Item ${codigo} actualizado en lista (vinculado a ${proyectoItem.codigo})`)
       } else {
-        // ✅ Crear nuevo item
-        await createListaEquipoItemFromProyecto(listaId, itemId)
-        console.log(`✅ Item ${proyectoItem.codigo} creado en lista`)
+        // ✅ Crear nuevo item con datos del Excel + vínculo al cotizado
+        await createListaEquipoItem({
+          listaId,
+          proyectoEquipoItemId: itemId,
+          proyectoEquipoId: proyectoItem.proyectoEquipoId,
+          catalogoEquipoId: proyectoItem.catalogoEquipoId,
+          codigo,
+          descripcion,
+          categoria,
+          unidad,
+          marca,
+          cantidad,
+          presupuesto: proyectoItem.precioCliente || 0,
+          origen: 'cotizado',
+          estado: 'borrador',
+        })
+        console.log(`✅ Item ${codigo} creado en lista (vinculado a ${proyectoItem.codigo})`)
       }
     }
   } catch (error) {

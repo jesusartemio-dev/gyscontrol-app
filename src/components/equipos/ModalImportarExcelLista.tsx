@@ -344,14 +344,28 @@ export default function ModalImportarExcelLista({
 
       const data = await importarEquiposDesdeExcel(file)
 
-      const itemsExcel = data.map((row: any) => ({
-        codigo: row['Código'] || '',
-        descripcion: row['Descripción'] || '',
-        categoria: row['Categoría'] || '',
-        unidad: row['Unidad'] || '',
-        marca: row['Marca'] || '',
-        cantidad: parseFloat(row['Cantidad']) || 1
-      }))
+      // Generate TEMP codes for items without a code (same pattern as cotización)
+      let tempCounter = 1
+      const generarCodigoTemp = () => {
+        const now = new Date()
+        const yy = String(now.getFullYear()).slice(-2)
+        const mm = String(now.getMonth() + 1).padStart(2, '0')
+        const dd = String(now.getDate()).padStart(2, '0')
+        const xx = String(tempCounter++).padStart(2, '0')
+        return `TEMP-${yy}${mm}${dd}-${xx}`
+      }
+
+      const itemsExcel = data.map((row: any) => {
+        const codigo = String(row['Código'] || '').trim()
+        return {
+          codigo: codigo || generarCodigoTemp(),
+          descripcion: row['Descripción'] || '',
+          categoria: row['Categoría'] || '',
+          unidad: row['Unidad'] || '',
+          marca: row['Marca'] || '',
+          cantidad: parseFloat(row['Cantidad']) || 1
+        }
+      })
 
       const resumenData = await verificarExistenciaEquipos(itemsExcel, proyectoId)
       setResumen(resumenData)
@@ -437,10 +451,10 @@ export default function ModalImportarExcelLista({
       })
       setDuplicateCodes(dupes)
 
-      // 4. Pre-check "save to catalog" for new items with valid, non-duplicate codes
+      // 4. Pre-check "save to catalog" for new items with valid, non-duplicate, non-TEMP codes
       const preChecked = new Set<string>()
       for (const item of resumen.items) {
-        if (item.estado === 'nuevo' && item.codigo.trim() && !dupes.has(item.codigo.toLowerCase())) {
+        if (item.estado === 'nuevo' && item.codigo.trim() && !dupes.has(item.codigo.toLowerCase()) && !item.codigo.startsWith('TEMP-')) {
           preChecked.add(item.codigo)
         }
       }
@@ -508,7 +522,12 @@ export default function ModalImportarExcelLista({
         const quotedItemIds = mappedItems.map(m => m.quotedItemId)
         const excelData = mappedItems.map(m => ({
           codigo: m.excelItem.codigo,
-          cantidad: m.excelItem.cantidad
+          descripcion: m.excelItem.descripcion,
+          categoria: m.excelItem.categoria,
+          unidad: m.excelItem.unidad,
+          marca: m.excelItem.marca,
+          cantidad: m.excelItem.cantidad,
+          quotedItemId: m.quotedItemId,
         }))
         await importarDesdeCotizacion(listaId, quotedItemIds, excelData)
       }
@@ -846,14 +865,24 @@ export default function ModalImportarExcelLista({
           </div>
         </div>
 
-        {resumen.nuevos > 0 && (
-          <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
-            <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-amber-700">
-              <strong>{resumen.nuevos}</strong> items no existen en el catálogo. Podrás elegir si guardarlos en el siguiente paso.
-            </p>
-          </div>
-        )}
+        {resumen.nuevos > 0 && (() => {
+          const tempCount = resumen.items.filter(i => i.estado === 'nuevo' && i.codigo.startsWith('TEMP-')).length
+          const realNewCount = resumen.nuevos - tempCount
+          return (
+            <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-amber-700">
+                <p><strong>{resumen.nuevos}</strong> items no existen en el catálogo.</p>
+                {tempCount > 0 && (
+                  <p className="mt-0.5">{tempCount} sin código (temporales) — no se guardarán en catálogo.</p>
+                )}
+                {realNewCount > 0 && (
+                  <p className="mt-0.5">{realNewCount} con código — podrás elegir si guardarlos en el siguiente paso.</p>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         <div className="flex gap-2 pt-2">
           <Button variant="outline" size="sm" onClick={() => setStep('upload')} disabled={loading} className="h-8">
@@ -930,7 +959,8 @@ export default function ModalImportarExcelLista({
               const matchedQuoted = isMapped ? allQuotedItems.find(q => q.id === currentMapping) : null
               const isNew = item.estado === 'nuevo'
               const isDupe = duplicateCodes.has(item.codigo.toLowerCase())
-              const showCatalogOption = isNew && !isMapped
+              const isTemp = item.codigo.startsWith('TEMP-')
+              const showCatalogOption = isNew && !isDupe && !isTemp
               const isReplacement = isMapped && replacementFlags[item.codigo]
               // IDs de items cotizados ya asignados por OTROS items del Excel
               const usedByOthers = new Set(
@@ -974,7 +1004,12 @@ export default function ModalImportarExcelLista({
                     </Badge>
                     <span className="text-xs text-gray-700 line-clamp-2 flex-1" title={item.descripcion}>{item.descripcion}</span>
                     <div className="flex items-center gap-1 shrink-0 mt-0.5">
-                      {isNew && !isMapped && (
+                      {isTemp && (
+                        <Badge className="text-[10px] px-1 py-0 bg-amber-100 text-amber-700">
+                          Temp
+                        </Badge>
+                      )}
+                      {isNew && !isMapped && !isTemp && (
                         <Badge className="text-[10px] px-1 py-0 bg-orange-100 text-orange-700">
                           nuevo
                         </Badge>
@@ -1062,34 +1097,46 @@ export default function ModalImportarExcelLista({
                     </div>
                   )}
 
-                  {/* Catalog save option for new unmapped items */}
+                  {/* Catalog save option for new items (visible even when mapped) */}
                   {showCatalogOption && (
                     <div className="flex items-center gap-2 mt-1.5 pl-5">
-                      {isDupe ? (
-                        <span className="text-[10px] text-gray-400 italic">
-                          Código duplicado en Excel - no se puede guardar en catálogo
-                        </span>
-                      ) : (
-                        <>
-                          <Checkbox
-                            id={`catalog-${item.codigo}`}
-                            checked={saveToCatalog.has(item.codigo)}
-                            onCheckedChange={(checked) => {
-                              setSaveToCatalog(prev => {
-                                const next = new Set(prev)
-                                if (checked) next.add(item.codigo)
-                                else next.delete(item.codigo)
-                                return next
-                              })
-                            }}
-                            className="h-3.5 w-3.5"
-                          />
-                          <label htmlFor={`catalog-${item.codigo}`} className="text-[10px] text-gray-600 flex items-center gap-1 cursor-pointer">
-                            <Database className="h-3 w-3" />
-                            Guardar en catálogo
-                          </label>
-                        </>
-                      )}
+                      <Checkbox
+                        id={`catalog-${item.codigo}`}
+                        checked={saveToCatalog.has(item.codigo)}
+                        onCheckedChange={(checked) => {
+                          setSaveToCatalog(prev => {
+                            const next = new Set(prev)
+                            if (checked) next.add(item.codigo)
+                            else next.delete(item.codigo)
+                            return next
+                          })
+                        }}
+                        className="h-3.5 w-3.5"
+                      />
+                      <label htmlFor={`catalog-${item.codigo}`} className="text-[10px] text-gray-600 flex items-center gap-1 cursor-pointer">
+                        <Database className="h-3 w-3" />
+                        Guardar en catálogo
+                      </label>
+                    </div>
+                  )}
+
+                  {/* TEMP code indicator - cannot save to catalog */}
+                  {isNew && isTemp && (
+                    <div className="flex items-center gap-1.5 mt-1.5 pl-5">
+                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                      <span className="text-[10px] text-amber-600 italic">
+                        Código temporal — no se guardará en catálogo
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Duplicate code indicator */}
+                  {isNew && isDupe && !isTemp && (
+                    <div className="flex items-center gap-1.5 mt-1.5 pl-5">
+                      <AlertTriangle className="h-3 w-3 text-gray-400 shrink-0" />
+                      <span className="text-[10px] text-gray-400 italic">
+                        Código duplicado en Excel — no se puede guardar en catálogo
+                      </span>
                     </div>
                   )}
                 </div>
