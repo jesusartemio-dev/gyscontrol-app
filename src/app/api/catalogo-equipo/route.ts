@@ -11,6 +11,13 @@ export async function GET() {
       include: {
         categoriaEquipo: true,
         unidad: true,
+        _count: {
+          select: {
+            cotizacionEquipoItem: true,
+            proyectoEquipoCotizadoItem: true,
+            listaEquipoItem: true,
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     })

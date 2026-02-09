@@ -540,6 +540,13 @@ export interface CatalogoEquipo {
 
   // 🔗 Relaciones
   listaEquipoItems?: ListaEquipoItem[]
+
+  // 📊 Contadores de uso
+  _count?: {
+    cotizacionEquipoItem: number
+    proyectoEquipoCotizadoItem: number
+    listaEquipoItem: number
+  }
 }
 
 // ========================

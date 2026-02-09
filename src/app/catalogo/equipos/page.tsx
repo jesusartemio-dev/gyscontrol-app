@@ -92,6 +92,7 @@ export default function CatalogoEquipoPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
   const [estadoFiltro, setEstadoFiltro] = useState('__ALL__')
+  const [usoFiltro, setUsoFiltro] = useState('__ALL__')
 
   // Edit state
   const [editandoId, setEditandoId] = useState<string | null>(null)
@@ -125,13 +126,17 @@ export default function CatalogoEquipoPage() {
   )
 
   const equiposFiltrados = useMemo(() => {
-    return equipos.filter(eq =>
-      (categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro) &&
-      (estadoFiltro === '__ALL__' || eq.estado === estadoFiltro) &&
-      (searchTerm === '' ||
-        `${eq.codigo} ${eq.descripcion} ${eq.marca}`.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
-  }, [equipos, categoriaFiltro, estadoFiltro, searchTerm])
+    return equipos.filter(eq => {
+      const tieneUso = (eq._count?.cotizacionEquipoItem || 0) + (eq._count?.proyectoEquipoCotizadoItem || 0) + (eq._count?.listaEquipoItem || 0) > 0
+      return (
+        (categoriaFiltro === '__ALL__' || eq.categoriaEquipo?.nombre === categoriaFiltro) &&
+        (estadoFiltro === '__ALL__' || eq.estado === estadoFiltro) &&
+        (usoFiltro === '__ALL__' || (usoFiltro === 'con_uso' ? tieneUso : !tieneUso)) &&
+        (searchTerm === '' ||
+          `${eq.codigo} ${eq.descripcion} ${eq.marca}`.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    })
+  }, [equipos, categoriaFiltro, estadoFiltro, usoFiltro, searchTerm])
 
   const handleCreated = () => {
     cargarEquipos()
@@ -431,7 +436,20 @@ export default function CatalogoEquipoPage() {
             </SelectContent>
           </Select>
 
-          {(searchTerm || categoriaFiltro !== '__ALL__' || estadoFiltro !== '__ALL__') && (
+          <Select value={usoFiltro} onValueChange={setUsoFiltro}>
+            <SelectTrigger className="w-[140px] h-9">
+              <SelectValue>
+                {usoFiltro === '__ALL__' ? 'Uso: Todos' : usoFiltro === 'con_uso' ? 'Con uso' : 'Sin uso'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__ALL__">Todos</SelectItem>
+              <SelectItem value="con_uso">Con uso</SelectItem>
+              <SelectItem value="sin_uso">Sin uso</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(searchTerm || categoriaFiltro !== '__ALL__' || estadoFiltro !== '__ALL__' || usoFiltro !== '__ALL__') && (
             <span className="text-sm text-muted-foreground">
               {equiposFiltrados.length} de {equipos.length}
             </span>
@@ -498,6 +516,9 @@ export default function CatalogoEquipoPage() {
                       <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Marca
                       </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Uso
+                      </th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         P. Interno
                       </th>
@@ -531,6 +552,48 @@ export default function CatalogoEquipoPage() {
                         </td>
                         <td className="py-2 px-3 text-sm text-muted-foreground">
                           {eq.marca || '—'}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {(() => {
+                            const c = eq._count?.cotizacionEquipoItem || 0
+                            const p = eq._count?.proyectoEquipoCotizadoItem || 0
+                            const l = eq._count?.listaEquipoItem || 0
+                            if (c + p + l === 0) return <span className="text-muted-foreground text-xs">—</span>
+                            return (
+                              <div className="flex items-center justify-center gap-1">
+                                {c > 0 && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
+                                        {c}C
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{c} cotizaci{c === 1 ? 'ón' : 'ones'}</TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {p > 0 && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                                        {p}P
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{p} proyecto{p === 1 ? '' : 's'}</TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {l > 0 && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700">
+                                        {l}L
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{l} lista{l === 1 ? '' : 's'}</TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="py-2 px-3 text-right font-mono text-sm">
                           {editandoId === eq.id ? (
