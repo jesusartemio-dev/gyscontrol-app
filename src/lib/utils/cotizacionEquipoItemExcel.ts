@@ -8,62 +8,123 @@
 
 import * as XLSX from 'xlsx'
 import type { CotizacionEquipoItem, CatalogoEquipo } from '@/types'
+import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
+import { getUnidades } from '@/lib/services/unidad'
 
 // ============================================
-// EXPORTAR A EXCEL
+// EXPORTAR A EXCEL (con hojas de Categorías/Unidades y dropdowns)
 // ============================================
-export function exportarCotizacionEquipoItemsAExcel(
+export async function exportarCotizacionEquipoItemsAExcel(
   items: CotizacionEquipoItem[],
   nombreArchivo: string = 'EquiposCotizacion'
 ) {
-  const data = items.map((item, idx) => {
+  const ExcelJS = (await import('exceljs')).default
+  const wb = new ExcelJS.Workbook()
+
+  // Fetch categories and units for dropdown sheets
+  let categorias: Array<{ nombre: string; descripcion?: string }> = []
+  let unidades: Array<{ nombre: string }> = []
+  try {
+    const [cats, unis] = await Promise.all([getCategoriasEquipo(), getUnidades()])
+    categorias = cats
+    unidades = unis
+  } catch { /* continue without dropdowns */ }
+
+  // --- Sheet 1: Equipos (main data) ---
+  const wsEquipos = wb.addWorksheet('Equipos')
+  wsEquipos.columns = [
+    { header: '#', key: 'num', width: 5 },
+    { header: 'Código', key: 'codigo', width: 15 },
+    { header: 'Descripción', key: 'descripcion', width: 40 },
+    { header: 'Categoría', key: 'categoria', width: 18 },
+    { header: 'Unidad', key: 'unidad', width: 10 },
+    { header: 'Marca', key: 'marca', width: 15 },
+    { header: 'Cantidad', key: 'cantidad', width: 10 },
+    { header: 'P.Lista', key: 'precioLista', width: 12 },
+    { header: 'P.Interno', key: 'precioInterno', width: 12 },
+    { header: 'Diferencia', key: 'diferencia', width: 12 },
+    { header: 'Margen', key: 'margen', width: 10 },
+    { header: 'P.Cliente', key: 'precioCliente', width: 12 },
+    { header: 'Total Interno', key: 'totalInterno', width: 14 },
+    { header: 'Total Cliente', key: 'totalCliente', width: 14 },
+  ]
+  wsEquipos.getRow(1).font = { bold: true }
+  wsEquipos.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }
+
+  items.forEach((item, idx) => {
     const diferencia = item.precioLista && item.precioInterno
       ? +((item.precioInterno - item.precioLista) * item.cantidad).toFixed(2)
       : null
-    return {
-      '#': idx + 1,
-      'Código': item.codigo,
-      'Descripción': item.descripcion,
-      'Categoría': item.categoria || '',
-      'Unidad': item.unidad || '',
-      'Marca': item.marca || '',
-      'Cantidad': item.cantidad || 1,
-      'P.Lista': item.precioLista || '',
-      'P.Interno': item.precioInterno || 0,
-      'Diferencia': diferencia ?? '',
-      'Margen': +((1 + (item.margen || 0)).toFixed(2)),
-      'P.Cliente': item.precioCliente || 0,
-      'Total Interno': item.costoInterno || 0,
-      'Total Cliente': item.costoCliente || 0
-    }
+    wsEquipos.addRow({
+      num: idx + 1,
+      codigo: item.codigo,
+      descripcion: item.descripcion,
+      categoria: item.categoria || '',
+      unidad: item.unidad || '',
+      marca: item.marca || '',
+      cantidad: item.cantidad || 1,
+      precioLista: item.precioLista || '',
+      precioInterno: item.precioInterno || 0,
+      diferencia: diferencia ?? '',
+      margen: +((1 + (item.margen || 0)).toFixed(2)),
+      precioCliente: item.precioCliente || 0,
+      totalInterno: item.costoInterno || 0,
+      totalCliente: item.costoCliente || 0,
+    })
   })
 
-  const worksheet = XLSX.utils.json_to_sheet(data)
-
-  // Ajustar anchos de columna
-  worksheet['!cols'] = [
-    { wch: 4 },   // #
-    { wch: 15 },  // Código
-    { wch: 40 },  // Descripción
-    { wch: 18 },  // Categoría
-    { wch: 10 },  // Unidad
-    { wch: 15 },  // Marca
-    { wch: 10 },  // Cantidad
-    { wch: 12 },  // P.Lista
-    { wch: 12 },  // P.Interno
-    { wch: 12 },  // Diferencia
-    { wch: 10 },  // Margen %
-    { wch: 12 },  // P.Cliente
-    { wch: 14 },  // Total Interno
-    { wch: 14 },  // Total Cliente
+  // --- Sheet 2: Categorias (visible reference) ---
+  const wsCategorias = wb.addWorksheet('Categorias')
+  wsCategorias.columns = [
+    { header: 'Categoría', key: 'nombre', width: 25 },
+    { header: 'Descripción', key: 'descripcion', width: 70 },
   ]
+  wsCategorias.getRow(1).font = { bold: true }
+  wsCategorias.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
+  for (const cat of categorias) {
+    wsCategorias.addRow({ nombre: cat.nombre, descripcion: (cat as any).descripcion || '' })
+  }
 
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Equipos')
+  // --- Sheet 3: Unidades (hidden) ---
+  const wsUnidades = wb.addWorksheet('Unidades')
+  wsUnidades.columns = [{ header: 'Unidad', key: 'nombre', width: 15 }]
+  for (const uni of unidades) {
+    wsUnidades.addRow({ nombre: uni.nombre })
+  }
+  wsUnidades.state = 'hidden'
 
-  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
-  const blob = new Blob([excelBuffer], { type: 'application/octet-stream' })
+  // --- Data validation dropdowns on Equipos sheet ---
+  const lastDataRow = items.length + 1 // header + data rows
+  const maxRow = Math.max(lastDataRow + 50, 100) // extra rows for future additions
 
+  if (categorias.length > 0) {
+    for (let row = 2; row <= maxRow; row++) {
+      wsEquipos.getCell(`D${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`Categorias!$A$2:$A$${categorias.length + 1}`],
+        showErrorMessage: true,
+        errorTitle: 'Categoría inválida',
+        error: 'Selecciona una categoría de la lista o consulta la hoja "Categorias"',
+      }
+    }
+  }
+  if (unidades.length > 0) {
+    for (let row = 2; row <= maxRow; row++) {
+      wsEquipos.getCell(`E${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`Unidades!$A$2:$A$${unidades.length + 1}`],
+        showErrorMessage: true,
+        errorTitle: 'Unidad inválida',
+        error: 'Selecciona una unidad de la lista',
+      }
+    }
+  }
+
+  // Generate and download
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -76,55 +137,105 @@ export function exportarCotizacionEquipoItemsAExcel(
 
 // ============================================
 // GENERAR PLANTILLA EXCEL PARA IMPORTACIÓN
+// (con hojas de Categorías/Unidades y dropdowns)
 // ============================================
-export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'PlantillaEquipos') {
-  // Columnas: Código, Descripción, Marca, Categoría, Unidad, Cantidad, P.Lista, P.Real, Margen
-  // P.Cliente se calcula: P.Real × Margen (donde Margen = 1.15 significa 15% de ganancia)
-  const ejemplos = [
-    {
-      'Código': 'EQ-001',
-      'Descripción': 'Sensor de temperatura PT100',
-      'Marca': 'Siemens',
-      'Categoría': 'Sensores',
-      'Unidad': 'Unidad',
-      'Cantidad': 2,
-      'P.Lista': 120.00,
-      'P.Real': 130.00,
-      'Margen': 1.15
-    },
-    {
-      'Código': 'EQ-002',
-      'Descripción': 'PLC Compacto S7-1200',
-      'Marca': 'Siemens',
-      'Categoría': 'Controladores',
-      'Unidad': 'Unidad',
-      'Cantidad': 1,
-      'P.Lista': 700.00,
-      'P.Real': 739.13,
-      'Margen': 1.15
+export async function generarPlantillaEquiposImportacion(
+  nombreArchivo: string = 'PlantillaEquipos',
+  categorias: Array<{ nombre: string; descripcion?: string }> = [],
+  unidades: Array<{ nombre: string }> = []
+) {
+  const ExcelJS = (await import('exceljs')).default
+  const wb = new ExcelJS.Workbook()
+
+  // --- Sheet 1: Equipos (main data entry) ---
+  const wsEquipos = wb.addWorksheet('Equipos')
+  wsEquipos.columns = [
+    { header: 'Código', key: 'codigo', width: 15 },
+    { header: 'Descripción', key: 'descripcion', width: 40 },
+    { header: 'Marca', key: 'marca', width: 15 },
+    { header: 'Categoría', key: 'categoria', width: 18 },
+    { header: 'Unidad', key: 'unidad', width: 10 },
+    { header: 'Cantidad', key: 'cantidad', width: 10 },
+    { header: 'P.Lista', key: 'precioLista', width: 12 },
+    { header: 'P.Real', key: 'precioReal', width: 12 },
+    { header: 'Margen', key: 'margen', width: 10 },
+  ]
+  wsEquipos.getRow(1).font = { bold: true }
+  wsEquipos.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }
+
+  // Example rows using real categories/units when available
+  wsEquipos.addRow({
+    codigo: 'EQ-001',
+    descripcion: 'Sensor de temperatura PT100',
+    marca: 'Siemens',
+    categoria: categorias[0]?.nombre || 'Sensores',
+    unidad: unidades[0]?.nombre || 'Unidad',
+    cantidad: 2,
+    precioLista: 120.00,
+    precioReal: 130.00,
+    margen: 1.15,
+  })
+  wsEquipos.addRow({
+    codigo: 'EQ-002',
+    descripcion: 'PLC Compacto S7-1200',
+    marca: 'Siemens',
+    categoria: categorias[1]?.nombre || 'Controladores',
+    unidad: unidades[1]?.nombre || 'Unidad',
+    cantidad: 1,
+    precioLista: 700.00,
+    precioReal: 739.13,
+    margen: 1.15,
+  })
+
+  // --- Sheet 2: Categorias (visible reference with descriptions) ---
+  const wsCategorias = wb.addWorksheet('Categorias')
+  wsCategorias.columns = [
+    { header: 'Categoría', key: 'nombre', width: 25 },
+    { header: 'Descripción', key: 'descripcion', width: 70 },
+  ]
+  wsCategorias.getRow(1).font = { bold: true }
+  wsCategorias.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
+  for (const cat of categorias) {
+    wsCategorias.addRow({ nombre: cat.nombre, descripcion: (cat as any).descripcion || '' })
+  }
+
+  // --- Sheet 3: Unidades (hidden, used for dropdown validation) ---
+  const wsUnidades = wb.addWorksheet('Unidades')
+  wsUnidades.columns = [{ header: 'Unidad', key: 'nombre', width: 15 }]
+  for (const uni of unidades) {
+    wsUnidades.addRow({ nombre: uni.nombre })
+  }
+  wsUnidades.state = 'hidden'
+
+  // --- Data validation dropdowns on Equipos sheet ---
+  if (categorias.length > 0) {
+    for (let row = 2; row <= 500; row++) {
+      wsEquipos.getCell(`D${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`Categorias!$A$2:$A$${categorias.length + 1}`],
+        showErrorMessage: true,
+        errorTitle: 'Categoría inválida',
+        error: 'Selecciona una categoría de la lista o consulta la hoja "Categorias"',
+      }
     }
-  ]
+  }
+  if (unidades.length > 0) {
+    for (let row = 2; row <= 500; row++) {
+      wsEquipos.getCell(`E${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`Unidades!$A$2:$A$${unidades.length + 1}`],
+        showErrorMessage: true,
+        errorTitle: 'Unidad inválida',
+        error: 'Selecciona una unidad de la lista',
+      }
+    }
+  }
 
-  const worksheet = XLSX.utils.json_to_sheet(ejemplos)
-
-  worksheet['!cols'] = [
-    { wch: 15 },  // Código
-    { wch: 40 },  // Descripción
-    { wch: 15 },  // Marca
-    { wch: 18 },  // Categoría
-    { wch: 10 },  // Unidad
-    { wch: 10 },  // Cantidad
-    { wch: 12 },  // P.Lista
-    { wch: 12 },  // P.Real
-    { wch: 10 },  // Margen
-  ]
-
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Equipos')
-
-  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
-  const blob = new Blob([excelBuffer], { type: 'application/octet-stream' })
-
+  // Generate and download
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url

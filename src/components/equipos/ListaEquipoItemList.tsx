@@ -340,7 +340,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         }
       }
 
-      exportarListaEquipoAExcel(items, listaNombre, listaCodigo)
+      await exportarListaEquipoAExcel(items, listaNombre, listaCodigo)
       toast.success('Lista exportada a Excel correctamente')
     } catch (error) {
       console.error('Error exportando a Excel:', error)

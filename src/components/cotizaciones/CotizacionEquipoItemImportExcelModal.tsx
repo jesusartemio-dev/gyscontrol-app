@@ -53,6 +53,7 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   equipo: CotizacionEquipo
+  cotizacionId?: string
   onItemsCreated: (items: CotizacionEquipoItem[]) => void
 }
 
@@ -81,6 +82,7 @@ export default function CotizacionEquipoItemImportExcelModal({
   isOpen,
   onClose,
   equipo,
+  cotizacionId,
   onItemsCreated
 }: Props) {
   const [catalogoEquipos, setCatalogoEquipos] = useState<CatalogoEquipo[]>([])
@@ -206,9 +208,16 @@ export default function CotizacionEquipoItemImportExcelModal({
     }
   }
 
-  const handleDownloadTemplate = () => {
-    generarPlantillaEquiposImportacion('PlantillaEquiposCotizacion')
-    toast.success('Plantilla descargada')
+  const handleDownloadTemplate = async () => {
+    try {
+      const prefix = cotizacionId ? `${cotizacionId}_` : ''
+      const nombreArchivo = `${prefix}${equipo.nombre} - Plantilla`
+      await generarPlantillaEquiposImportacion(nombreArchivo, categoriasEquipo, unidades)
+      toast.success('Plantilla descargada')
+    } catch (error) {
+      console.error('Error downloading template:', error)
+      toast.error('Error al descargar la plantilla')
+    }
   }
 
   const toggleNuevo = (index: number) => {

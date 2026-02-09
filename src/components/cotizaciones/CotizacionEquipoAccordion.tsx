@@ -35,6 +35,7 @@ const formatCurrency = (amount: number): string => {
 
 interface Props {
   equipo: CotizacionEquipo
+  cotizacionId?: string
   onCreated: (item: CotizacionEquipoItem) => void
   onMultipleCreated?: (items: CotizacionEquipoItem[]) => void
   onDeleted: (itemId: string) => void
@@ -47,6 +48,7 @@ interface Props {
 
 export default function CotizacionEquipoAccordion({
   equipo,
+  cotizacionId,
   onCreated,
   onMultipleCreated,
   onDeleted,
@@ -115,13 +117,19 @@ export default function CotizacionEquipoAccordion({
     }
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (equipo.items.length === 0) {
       toast.error('No hay items para exportar')
       return
     }
-    exportarCotizacionEquipoItemsAExcel(equipo.items, `Equipos_${equipo.nombre}`)
-    toast.success('Excel exportado')
+    try {
+      const prefix = cotizacionId ? `${cotizacionId}_` : ''
+      await exportarCotizacionEquipoItemsAExcel(equipo.items, `${prefix}Equipos_${equipo.nombre}`)
+      toast.success('Excel exportado')
+    } catch (error) {
+      console.error('Error exporting:', error)
+      toast.error('Error al exportar')
+    }
   }
 
   const handleOpenCreateModal = () => {
@@ -386,6 +394,7 @@ export default function CotizacionEquipoAccordion({
         isOpen={showExcelModal}
         onClose={() => setShowExcelModal(false)}
         equipo={equipo}
+        cotizacionId={cotizacionId}
         onItemsCreated={handleExcelItemsCreated}
       />
 
