@@ -943,9 +943,9 @@ export default function ModalImportarExcelLista({
                   )}
                 >
                   {/* Excel item info */}
-                  <div className="flex items-center gap-2 mb-1.5">
+                  <div className="flex items-start gap-2 mb-1.5">
                     <span className={cn(
-                      'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0',
+                      'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5',
                       isMapped
                         ? isReplacement
                           ? 'bg-blue-100 text-blue-700'
@@ -957,18 +957,20 @@ export default function ModalImportarExcelLista({
                         : itemIdx + 1
                       }
                     </span>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono shrink-0">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono shrink-0 mt-0.5">
                       {item.codigo}
                     </Badge>
-                    <span className="text-xs text-gray-700 line-clamp-1 flex-1" title={item.descripcion}>{item.descripcion}</span>
-                    {isNew && !isMapped && (
-                      <Badge className="text-[10px] px-1 py-0 bg-orange-100 text-orange-700 shrink-0">
-                        nuevo
+                    <span className="text-xs text-gray-700 line-clamp-2 flex-1" title={item.descripcion}>{item.descripcion}</span>
+                    <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                      {isNew && !isMapped && (
+                        <Badge className="text-[10px] px-1 py-0 bg-orange-100 text-orange-700">
+                          nuevo
+                        </Badge>
+                      )}
+                      <Badge className="text-[10px] px-1.5 py-0 bg-gray-100 text-gray-600">
+                        x{item.cantidad}
                       </Badge>
-                    )}
-                    <Badge className="text-[10px] px-1.5 py-0 bg-gray-100 text-gray-600 shrink-0">
-                      x{item.cantidad}
-                    </Badge>
+                    </div>
                   </div>
 
                   {/* Aviso de discrepancia de categoría */}
