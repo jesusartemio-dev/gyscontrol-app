@@ -12,7 +12,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import {
@@ -32,7 +34,10 @@ import {
   Unlink,
   Database,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Search,
+  ChevronsUpDown,
+  Check
 } from 'lucide-react'
 import { importarEquiposDesdeExcel } from '@/lib/utils/equiposExcel'
 import {
@@ -69,6 +74,158 @@ interface QuotedItemOption {
 }
 
 const MAPPING_NONE = '__none__'
+
+// Combobox component for vinculación with search
+function VinculacionCombobox({
+  item,
+  currentMapping,
+  isMapped,
+  isReplacement,
+  matchedQuoted,
+  proyectoEquipos,
+  usedByOthers,
+  onSelect,
+}: {
+  item: { codigo: string; categoria: string; descripcion: string }
+  currentMapping: string
+  isMapped: boolean
+  isReplacement: boolean
+  matchedQuoted: QuotedItemOption | null | undefined
+  proyectoEquipos: ProyectoEquipoCotizado[]
+  usedByOthers: Set<string>
+  onSelect: (val: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  const excelCategoria = (item.categoria || '').toLowerCase()
+  const allItems = proyectoEquipos.flatMap(grupo =>
+    (grupo.items || []).map((qi: any) => ({ ...qi, grupoNombre: grupo.nombre }))
+  )
+  const sameCategory = excelCategoria
+    ? allItems.filter((qi: any) => ((qi as any).categoria || '').toLowerCase() === excelCategoria)
+    : []
+  const otherItems = excelCategoria
+    ? allItems.filter((qi: any) => ((qi as any).categoria || '').toLowerCase() !== excelCategoria)
+    : allItems
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn(
+            'h-7 text-xs flex-1 justify-between overflow-hidden font-normal',
+            isMapped
+              ? isReplacement
+                ? 'border-blue-300 text-blue-800'
+                : 'border-green-300 text-green-800'
+              : 'text-gray-500'
+          )}
+        >
+          <span className="truncate">
+            {isMapped && matchedQuoted
+              ? <><span className="font-mono">{matchedQuoted.codigo}</span> {matchedQuoted.descripcion.length > 40 ? matchedQuoted.descripcion.slice(0, 40) + '...' : matchedQuoted.descripcion}</>
+              : 'Sin vincular'
+            }
+          </span>
+          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[460px] p-0" align="start">
+        <Command filter={(value, search) => {
+          // Custom filter: search across the display text (codigo + descripcion)
+          if (!search) return 1
+          const term = search.toLowerCase()
+          // value is the item id, we need to find the item to search its text
+          if (value === MAPPING_NONE) return 'sin vincular'.includes(term) ? 1 : 0
+          const found = allItems.find((qi: any) => qi.id === value)
+          if (!found) return 0
+          const text = `${(found as any).codigo} ${(found as any).descripcion} ${(found as any).categoria || ''}`.toLowerCase()
+          return text.includes(term) ? 1 : 0
+        }}>
+          <CommandInput placeholder="Buscar por código o descripción..." className="h-8 text-xs" />
+          <CommandList className="max-h-[250px]">
+            <CommandEmpty className="py-3 text-xs text-center">No se encontraron items</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value={MAPPING_NONE}
+                onSelect={() => {
+                  onSelect(MAPPING_NONE)
+                  setOpen(false)
+                }}
+                className="text-xs"
+              >
+                <Unlink className="h-3 w-3 mr-1.5 shrink-0" />
+                Sin vincular
+                {currentMapping === MAPPING_NONE && <Check className="ml-auto h-3 w-3 text-green-600" />}
+              </CommandItem>
+            </CommandGroup>
+            {sameCategory.length > 0 && (
+              <CommandGroup heading={`Misma categoría (${item.categoria})`}>
+                {sameCategory.map((qi: any) => {
+                  const isUsed = usedByOthers.has(qi.id)
+                  const isSelected = currentMapping === qi.id
+                  return (
+                    <CommandItem
+                      key={qi.id}
+                      value={qi.id}
+                      disabled={isUsed}
+                      onSelect={() => {
+                        if (!isUsed) {
+                          onSelect(qi.id)
+                          setOpen(false)
+                        }
+                      }}
+                      className={cn('text-xs', isUsed && 'opacity-50')}
+                    >
+                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
+                        <span className="truncate text-gray-700">{qi.descripcion}</span>
+                        {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
+                      </span>
+                      {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            )}
+            {otherItems.length > 0 && (
+              <CommandGroup heading={sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}>
+                {otherItems.map((qi: any) => {
+                  const isUsed = usedByOthers.has(qi.id)
+                  const isSelected = currentMapping === qi.id
+                  return (
+                    <CommandItem
+                      key={qi.id}
+                      value={qi.id}
+                      disabled={isUsed}
+                      onSelect={() => {
+                        if (!isUsed) {
+                          onSelect(qi.id)
+                          setOpen(false)
+                        }
+                      }}
+                      className={cn('text-xs', isUsed && 'opacity-50')}
+                    >
+                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
+                        <span className="truncate text-gray-700">{qi.descripcion}</span>
+                        {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
+                      </span>
+                      {isSelected && <Check className="ml-auto h-3 w-3 text-green-600 shrink-0" />}
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 const steps: { key: Step; label: string }[] = [
   { key: 'upload', label: 'Subir' },
@@ -137,7 +294,19 @@ export default function ModalImportarExcelLista({
     fetchProyectoEquipos()
   }, [isOpen, proyectoId])
 
-  const handleClose = useCallback(() => {
+  // Dismiss: close without resetting (accidental close / click outside / Escape)
+  const handleDismiss = useCallback(() => {
+    onClose()
+  }, [onClose])
+
+  // Cancel: explicit reset + close (user clicks "Cancelar")
+  const handleCancel = useCallback(() => {
+    resetModal()
+    onClose()
+  }, [resetModal, onClose])
+
+  // After successful import: reset + close
+  const handleImportSuccess = useCallback(() => {
     resetModal()
     onClose()
   }, [resetModal, onClose])
@@ -410,7 +579,7 @@ export default function ModalImportarExcelLista({
       setImportProgress(100)
       toast.success('Importación completada')
       onSuccess()
-      handleClose()
+      handleImportSuccess()
     } catch (error) {
       console.error('Error importando:', error)
       toast.error('Error durante la importación')
@@ -773,99 +942,25 @@ export default function ModalImportarExcelLista({
                     </div>
                   )}
 
-                  {/* Mapping dropdown */}
+                  {/* Mapping combobox with search */}
                   <div className="flex items-center gap-1.5">
                     <ArrowRight className="h-3 w-3 text-gray-400 shrink-0" />
-                    <Select
-                      value={currentMapping}
-                      onValueChange={(val) => {
+                    <VinculacionCombobox
+                      item={item}
+                      currentMapping={currentMapping}
+                      isMapped={isMapped}
+                      isReplacement={isReplacement}
+                      matchedQuoted={matchedQuoted}
+                      proyectoEquipos={proyectoEquipos}
+                      usedByOthers={usedByOthers}
+                      onSelect={(val) => {
                         setItemMappings(prev => ({ ...prev, [item.codigo]: val }))
-                        // Clear replacement flag when mapping changes
                         if (val === MAPPING_NONE) {
                           setReplacementFlags(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
                           setReplacementMotivos(prev => { const next = { ...prev }; delete next[item.codigo]; return next })
                         }
                       }}
-                    >
-                      <SelectTrigger className={cn(
-                        'h-7 text-xs flex-1 overflow-hidden',
-                        isMapped
-                          ? isReplacement
-                            ? 'border-blue-300 text-blue-800'
-                            : 'border-green-300 text-green-800'
-                          : 'text-gray-500'
-                      )}>
-                        <SelectValue>
-                          {isMapped && matchedQuoted
-                            ? <span className="truncate block max-w-full"><span className="font-mono">{matchedQuoted.codigo}</span> {matchedQuoted.descripcion.length > 45 ? matchedQuoted.descripcion.slice(0, 45) + '...' : matchedQuoted.descripcion}</span>
-                            : 'Sin vincular'
-                          }
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="max-w-[500px]">
-                        <SelectItem value={MAPPING_NONE} className="text-xs">
-                          <span className="flex items-center gap-1.5">
-                            <Unlink className="h-3 w-3" />
-                            Sin vincular
-                          </span>
-                        </SelectItem>
-                        {(() => {
-                          const excelCategoria = (item.categoria || '').toLowerCase()
-                          const allItems = proyectoEquipos.flatMap(grupo =>
-                            (grupo.items || []).map(qi => ({ ...qi, grupoNombre: grupo.nombre }))
-                          )
-                          const sameCategory = excelCategoria
-                            ? allItems.filter(qi => ((qi as any).categoria || '').toLowerCase() === excelCategoria)
-                            : []
-                          const otherItems = excelCategoria
-                            ? allItems.filter(qi => ((qi as any).categoria || '').toLowerCase() !== excelCategoria)
-                            : allItems
-
-                          return (
-                            <>
-                              {sameCategory.length > 0 && (
-                                <SelectGroup>
-                                  <SelectLabel className="text-[10px] font-semibold text-green-600 uppercase">
-                                    Misma categoría ({item.categoria})
-                                  </SelectLabel>
-                                  {sameCategory.map(qi => {
-                                    const isUsed = usedByOthers.has(qi.id)
-                                    return (
-                                      <SelectItem key={qi.id} value={qi.id} disabled={isUsed} className={cn('text-xs max-w-[480px]', isUsed && 'opacity-50')}>
-                                        <span className="flex items-center gap-1.5">
-                                          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
-                                          <span className="truncate text-gray-700">{qi.descripcion}</span>
-                                          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
-                                        </span>
-                                      </SelectItem>
-                                    )
-                                  })}
-                                </SelectGroup>
-                              )}
-                              {otherItems.length > 0 && (
-                                <SelectGroup>
-                                  <SelectLabel className="text-[10px] font-semibold text-gray-500 uppercase">
-                                    {sameCategory.length > 0 ? 'Otras categorías' : 'Equipos cotizados'}
-                                  </SelectLabel>
-                                  {otherItems.map(qi => {
-                                    const isUsed = usedByOthers.has(qi.id)
-                                    return (
-                                      <SelectItem key={qi.id} value={qi.id} disabled={isUsed} className={cn('text-xs max-w-[480px]', isUsed && 'opacity-50')}>
-                                        <span className="flex items-center gap-1.5">
-                                          <span className="font-mono text-[10px] shrink-0">{qi.codigo}</span>
-                                          <span className="truncate text-gray-700">{qi.descripcion}</span>
-                                          {isUsed && <span className="text-[9px] text-orange-500 shrink-0">(ya asignado)</span>}
-                                        </span>
-                                      </SelectItem>
-                                    )
-                                  })}
-                                </SelectGroup>
-                              )}
-                            </>
-                          )
-                        })()}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
 
                   {/* Vincular vs Reemplazar toggle — only when mapped */}
@@ -1022,7 +1117,7 @@ export default function ModalImportarExcelLista({
   if (!isOpen) return null
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleDismiss() }}>
       <DialogContent className={cn(
         'p-0 gap-0 overflow-hidden transition-all flex flex-col max-h-[85vh]',
         step === 'mapping' ? 'max-w-lg' : 'max-w-md'
@@ -1031,6 +1126,11 @@ export default function ModalImportarExcelLista({
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileSpreadsheet className="h-4 w-4 text-orange-600" />
             Importar desde Excel
+            {step !== 'upload' && (
+              <span className="text-[10px] font-normal text-muted-foreground ml-auto">
+                Cerrar sin perder progreso
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -1049,7 +1149,7 @@ export default function ModalImportarExcelLista({
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleClose}
+              onClick={handleCancel}
               className="w-full h-7 text-xs text-gray-500"
             >
               <X className="w-3 h-3 mr-1" />
