@@ -47,12 +47,23 @@ export async function GET() {
         id: true,
         email: true,
         name: true,
-        role: true
+        role: true,
+        password: true,
+        Account: {
+          select: { provider: true },
+        },
       },
       orderBy: { name: 'asc' }
     })
 
-    return NextResponse.json(users)
+    // Map to include auth method info without exposing password
+    const mapped = users.map(({ password, Account, ...user }) => ({
+      ...user,
+      hasPassword: !!password,
+      authProviders: Account.map(a => a.provider),
+    }))
+
+    return NextResponse.json(mapped)
   } catch (error) {
     return NextResponse.json({ message: 'Error del servidor' }, { status: 500 })
   }
