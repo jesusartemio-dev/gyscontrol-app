@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
         costoCliente: true,
         createdAt: true,
         updatedAt: true,
-        cotizacionEquipoId: true
+        cotizacionEquipoId: true,
+        catalogoEquipoId: true
       }
     })
 

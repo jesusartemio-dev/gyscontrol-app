@@ -124,6 +124,7 @@ export default function CotizacionEquiposPage() {
                 key={`${e.id}-${e.items?.length || 0}`}
                 equipo={e}
                 cotizacionId={cotizacion.id}
+                cotizacionCodigo={cotizacion.codigo}
                 onCreated={i => actualizarEquipo(e.id, items => [...items, i])}
                 onMultipleCreated={newItems => actualizarEquipo(e.id, items => [...items, ...newItems])}
                 onUpdated={async (item) => {

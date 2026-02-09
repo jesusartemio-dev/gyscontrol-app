@@ -36,6 +36,7 @@ const formatCurrency = (amount: number): string => {
 interface Props {
   equipo: CotizacionEquipo
   cotizacionId?: string
+  cotizacionCodigo?: string
   onCreated: (item: CotizacionEquipoItem) => void
   onMultipleCreated?: (items: CotizacionEquipoItem[]) => void
   onDeleted: (itemId: string) => void
@@ -49,6 +50,7 @@ interface Props {
 export default function CotizacionEquipoAccordion({
   equipo,
   cotizacionId,
+  cotizacionCodigo,
   onCreated,
   onMultipleCreated,
   onDeleted,
@@ -123,7 +125,7 @@ export default function CotizacionEquipoAccordion({
       return
     }
     try {
-      const prefix = cotizacionId ? `${cotizacionId}_` : ''
+      const prefix = (cotizacionCodigo || cotizacionId) ? `${cotizacionCodigo || cotizacionId}_` : ''
       await exportarCotizacionEquipoItemsAExcel(equipo.items, `${prefix}Equipos_${equipo.nombre}`)
       toast.success('Excel exportado')
     } catch (error) {
@@ -395,6 +397,7 @@ export default function CotizacionEquipoAccordion({
         onClose={() => setShowExcelModal(false)}
         equipo={equipo}
         cotizacionId={cotizacionId}
+        cotizacionCodigo={cotizacionCodigo}
         onItemsCreated={handleExcelItemsCreated}
       />
 

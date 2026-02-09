@@ -54,6 +54,7 @@ interface Props {
   onClose: () => void
   equipo: CotizacionEquipo
   cotizacionId?: string
+  cotizacionCodigo?: string
   onItemsCreated: (items: CotizacionEquipoItem[]) => void
 }
 
@@ -83,6 +84,7 @@ export default function CotizacionEquipoItemImportExcelModal({
   onClose,
   equipo,
   cotizacionId,
+  cotizacionCodigo,
   onItemsCreated
 }: Props) {
   const [catalogoEquipos, setCatalogoEquipos] = useState<CatalogoEquipo[]>([])
@@ -210,7 +212,7 @@ export default function CotizacionEquipoItemImportExcelModal({
 
   const handleDownloadTemplate = async () => {
     try {
-      const prefix = cotizacionId ? `${cotizacionId}_` : ''
+      const prefix = (cotizacionCodigo || cotizacionId) ? `${cotizacionCodigo || cotizacionId}_` : ''
       const nombreArchivo = `${prefix}${equipo.nombre} - Plantilla`
       await generarPlantillaEquiposImportacion(nombreArchivo, categoriasEquipo, unidades)
       toast.success('Plantilla descargada')
