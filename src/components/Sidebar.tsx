@@ -47,7 +47,8 @@ import {
   Briefcase,
   MapPin,
   HardHat,
-  ClipboardList
+  ClipboardList,
+  HardDrive
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -68,6 +69,7 @@ export default function Sidebar() {
     comercial: false,
     crm: false,
     proyectos: false,
+    documentos: false,
     'mi-trabajo': false,
     supervision: false,
     logistica: false,
@@ -167,6 +169,17 @@ export default function Sidebar() {
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart, badge: 'pedidos-pendientes' as NotificationBadgeType },
+      ],
+    },
+    // 2.5. Documentos - Google Drive
+    {
+      key: 'documentos',
+      title: 'Documentos',
+      icon: HardDrive,
+      color: 'text-indigo-400',
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'comercial'],
+      links: [
+        { href: '/documentos', label: 'GYS.PROYECTOS', icon: FolderOpen },
       ],
     },
     // 2.1. Mi Trabajo - Registro personal de horas y tareas (para todos)
