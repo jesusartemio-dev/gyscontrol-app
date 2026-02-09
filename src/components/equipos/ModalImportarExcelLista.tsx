@@ -397,15 +397,17 @@ export default function ModalImportarExcelLista({
       )
       setAllQuotedItems(quotedItems)
 
-      // 2. Auto-match: exact code match + fuzzy description match
+      // 2. Auto-match: exact code → fuzzy description → code-in-description
       const mappings: Record<string, string> = {}
       for (const excelItem of resumen.items) {
         const codigoLower = excelItem.codigo.toLowerCase()
+        // Strategy 1: exact code match
         const exactMatch = quotedItems.find(qi => qi.codigo.toLowerCase() === codigoLower)
         if (exactMatch) {
           mappings[excelItem.codigo] = exactMatch.id
           continue
         }
+        // Strategy 2: fuzzy description match (one contains the other)
         const descLower = excelItem.descripcion.toLowerCase()
         const fuzzyMatches = quotedItems.filter(qi => {
           const qDesc = qi.descripcion.toLowerCase()
@@ -413,6 +415,16 @@ export default function ModalImportarExcelLista({
         })
         if (fuzzyMatches.length === 1) {
           mappings[excelItem.codigo] = fuzzyMatches[0].id
+          continue
+        }
+        // Strategy 3: Excel code found inside quoted item's description
+        if (codigoLower.length >= 4) {
+          const codeInDescMatches = quotedItems.filter(qi =>
+            qi.descripcion.toLowerCase().includes(codigoLower)
+          )
+          if (codeInDescMatches.length === 1) {
+            mappings[excelItem.codigo] = codeInDescMatches[0].id
+          }
         }
       }
       setItemMappings(mappings)
