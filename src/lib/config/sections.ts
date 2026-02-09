@@ -7,6 +7,7 @@ export const SECTION_KEYS = [
   'comercial',
   'crm',
   'proyectos',
+  'documentos',
   'mi-trabajo',
   'supervision',
   'logistica',
@@ -21,6 +22,7 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   comercial: 'Comercial',
   crm: 'CRM',
   proyectos: 'Proyectos',
+  documentos: 'Documentos',
   'mi-trabajo': 'Mi Trabajo',
   supervision: 'Supervisión',
   logistica: 'Logística',
@@ -46,15 +48,15 @@ export type RoleKey = (typeof ALL_ROLES)[number]
 
 // Mapeo por defecto (fallback) basado en la config hardcodeada actual del Sidebar
 export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
-  admin: ['comercial', 'crm', 'proyectos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gestion', 'configuracion'],
-  gerente: ['comercial', 'crm', 'proyectos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gestion', 'configuracion'],
-  gestor: ['proyectos', 'mi-trabajo', 'supervision', 'aprovisionamiento', 'gestion'],
-  coordinador: ['proyectos', 'mi-trabajo', 'supervision'],
-  proyectos: ['proyectos', 'mi-trabajo', 'supervision'],
+  admin: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gestion', 'configuracion'],
+  gerente: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gestion', 'configuracion'],
+  gestor: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'aprovisionamiento', 'gestion'],
+  coordinador: ['proyectos', 'documentos', 'mi-trabajo', 'supervision'],
+  proyectos: ['proyectos', 'documentos', 'mi-trabajo', 'supervision'],
   seguridad: ['mi-trabajo'],
-  comercial: ['comercial', 'crm', 'mi-trabajo'],
+  comercial: ['comercial', 'crm', 'documentos', 'mi-trabajo'],
   presupuestos: ['comercial', 'mi-trabajo'],
-  logistico: ['logistica', 'mi-trabajo'],
+  logistico: ['logistica', 'documentos', 'mi-trabajo'],
   colaborador: ['mi-trabajo'],
 }
 
@@ -63,6 +65,7 @@ export const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   '/comercial': 'comercial',
   '/crm': 'crm',
   '/proyectos': 'proyectos',
+  '/documentos': 'documentos',
   '/mi-trabajo': 'mi-trabajo',
   '/supervision': 'supervision',
   '/logistica': 'logistica',

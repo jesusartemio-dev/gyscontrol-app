@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getSectionAccessForAllRoles, updateSectionAccess } from '@/lib/services/section-access'
+import { getSectionAccessForAllRoles, updateSectionAccess, seedSectionAccess } from '@/lib/services/section-access'
 import { SECTION_KEYS, ALL_ROLES } from '@/lib/config/sections'
 import type { RolUsuario } from '@/types/modelos'
 
@@ -24,6 +24,23 @@ export async function GET() {
     return NextResponse.json(accessMap)
   } catch (error) {
     console.error('[ERROR section-access GET]', error)
+    return NextResponse.json({ message: 'Error del servidor' }, { status: 500 })
+  }
+}
+
+// POST /api/admin/section-access - Re-seed secciones faltantes
+export async function POST() {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
+    }
+
+    await seedSectionAccess()
+    return NextResponse.json({ message: 'Secciones sincronizadas correctamente' })
+  } catch (error) {
+    console.error('[ERROR section-access POST]', error)
     return NextResponse.json({ message: 'Error del servidor' }, { status: 500 })
   }
 }
