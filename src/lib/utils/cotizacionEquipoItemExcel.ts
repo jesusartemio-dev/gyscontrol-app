@@ -31,43 +31,42 @@ export async function exportarCotizacionEquipoItemsAExcel(
   } catch { /* continue without dropdowns */ }
 
   // --- Sheet 1: Equipos (main data) ---
+  // Columnas base alineadas con la plantilla de importación + columnas calculadas al final
   const wsEquipos = wb.addWorksheet('Equipos')
   wsEquipos.columns = [
-    { header: '#', key: 'num', width: 5 },
     { header: 'Código', key: 'codigo', width: 15 },
     { header: 'Descripción', key: 'descripcion', width: 40 },
+    { header: 'Marca', key: 'marca', width: 15 },
     { header: 'Categoría', key: 'categoria', width: 18 },
     { header: 'Unidad', key: 'unidad', width: 10 },
-    { header: 'Marca', key: 'marca', width: 15 },
     { header: 'Cantidad', key: 'cantidad', width: 10 },
     { header: 'P.Lista', key: 'precioLista', width: 12 },
-    { header: 'P.Interno', key: 'precioInterno', width: 12 },
-    { header: 'Diferencia', key: 'diferencia', width: 12 },
+    { header: 'P.Real', key: 'precioReal', width: 12 },
     { header: 'Margen', key: 'margen', width: 10 },
     { header: 'P.Cliente', key: 'precioCliente', width: 12 },
+    { header: 'Diferencia', key: 'diferencia', width: 12 },
     { header: 'Total Interno', key: 'totalInterno', width: 14 },
     { header: 'Total Cliente', key: 'totalCliente', width: 14 },
   ]
   wsEquipos.getRow(1).font = { bold: true }
   wsEquipos.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }
 
-  items.forEach((item, idx) => {
+  items.forEach((item) => {
     const diferencia = item.precioLista && item.precioInterno
       ? +((item.precioInterno - item.precioLista) * item.cantidad).toFixed(2)
       : null
     wsEquipos.addRow({
-      num: idx + 1,
       codigo: item.codigo,
       descripcion: item.descripcion,
+      marca: item.marca || '',
       categoria: item.categoria || '',
       unidad: item.unidad || '',
-      marca: item.marca || '',
       cantidad: item.cantidad || 1,
       precioLista: item.precioLista || '',
-      precioInterno: item.precioInterno || 0,
-      diferencia: diferencia ?? '',
+      precioReal: item.precioInterno || 0,
       margen: +((1 + (item.margen || 0)).toFixed(2)),
       precioCliente: item.precioCliente || 0,
+      diferencia: diferencia ?? '',
       totalInterno: item.costoInterno || 0,
       totalCliente: item.costoCliente || 0,
     })
