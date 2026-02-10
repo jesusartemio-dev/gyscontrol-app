@@ -49,6 +49,8 @@ import {
   MapPin,
   ClipboardCheck,
   ClipboardList,
+  HardDrive,
+  HardHat,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -66,6 +68,7 @@ export default function MobileSidebar() {
     comercial: true,
     crm: false,
     proyectos: false,
+    documentos: false,
     'mi-trabajo': false,
     supervision: false,
     logistica: false,
@@ -121,15 +124,26 @@ export default function MobileSidebar() {
       ],
     },
     {
+      key: 'documentos',
+      title: 'Documentos',
+      icon: HardDrive,
+      color: 'text-indigo-400',
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'comercial'],
+      links: [
+        { href: '/documentos', label: 'GYS.PROYECTOS', icon: FolderOpen },
+      ],
+    },
+    {
       key: 'mi-trabajo',
       title: 'Mi Trabajo',
       icon: Clock,
       color: 'text-emerald-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
       links: [
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
         { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
+        { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
       ]
     },
     {
@@ -223,11 +237,15 @@ export default function MobileSidebar() {
   ]
 
   const role = session?.user.role as RolUsuario | undefined
+  const sectionAccess = session?.user?.sectionAccess as string[] | undefined
 
   const visibleSections = React.useMemo(() => allSections
-    .filter((section) =>
-      role ? section.roles.includes(role) : false
-    )
+    .filter((section) => {
+      if (sectionAccess && sectionAccess.length > 0) {
+        return sectionAccess.includes(section.key)
+      }
+      return role ? section.roles.includes(role) : false
+    })
     .map(section => ({
       ...section,
       links: section.links.filter(link => {
@@ -238,7 +256,7 @@ export default function MobileSidebar() {
       })
     }))
     .filter(section => section.links.length > 0),
-    [role]
+    [role, sectionAccess]
   )
 
   // Auto-expand active section on mount
