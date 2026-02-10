@@ -265,7 +265,7 @@ export default function OportunidadDetailPage() {
           <span className="text-muted-foreground hidden sm:inline">|</span>
           <span className="flex items-center gap-1 text-muted-foreground">
             <MessageSquare className="h-3.5 w-3.5" />
-            <span className="font-medium text-foreground">{oportunidad._count?.actividades || 0}</span> act.
+            <span className="font-medium text-foreground">{oportunidad._count?.crmActividad || 0}</span> act.
           </span>
           {diasSinContacto !== null && diasSinContacto > 7 && (
             <>

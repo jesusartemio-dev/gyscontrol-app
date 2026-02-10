@@ -87,8 +87,9 @@ export async function GET(req: NextRequest) {
         }
       }),
 
-      // Actividades recientes (últimas 10)
+      // Actividades recientes (últimas 10) - filtrado por RBAC
       prisma.crmActividad.findMany({
+        where: esComercial ? { usuarioId: session.user.id } : {},
         take: 10,
         orderBy: { fecha: 'desc' },
         include: {

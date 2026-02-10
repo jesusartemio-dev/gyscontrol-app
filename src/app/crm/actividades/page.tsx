@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Loader2, Search, Phone, Mail, Calendar, MessageSquare, Clock, TrendingUp, TrendingDown, Users } from 'lucide-react'
+import { Loader2, Search, Phone, Mail, Calendar, MessageSquare, Clock, TrendingUp, TrendingDown, Users, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { getAllActividades, CrmActividad, TIPOS_ACTIVIDAD, RESULTADOS_ACTIVIDAD } from '@/lib/services/crm/actividades'
 
@@ -36,6 +37,8 @@ export default function CrmActividadesPage() {
   const [loading, setLoading] = useState(true)
   const [estadisticas, setEstadisticas] = useState<Estadisticas | null>(null)
 
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(0)
   const [tipoFilter, setTipoFilter] = useState('todos')
   const [resultadoFilter, setResultadoFilter] = useState('todos')
   const [searchTerm, setSearchTerm] = useState('')
@@ -49,9 +52,12 @@ export default function CrmActividadesPage() {
         if (resultadoFilter !== 'todos') filters.resultado = resultadoFilter
         if (searchTerm) filters.search = searchTerm
 
-        const response = await getAllActividades(filters, { limit: 50 })
+        const response = await getAllActividades(filters, { page, limit: 50 })
         setActividades(response.data as ActividadExtendida[])
         setEstadisticas(response.estadisticas as unknown as Estadisticas)
+        if (response.pagination) {
+          setTotalPages(response.pagination.pages)
+        }
       } catch (err) {
         console.error('Error loading actividades:', err)
       } finally {
@@ -60,7 +66,7 @@ export default function CrmActividadesPage() {
     }
 
     loadActividades()
-  }, [tipoFilter, resultadoFilter, searchTerm])
+  }, [tipoFilter, resultadoFilter, searchTerm, page])
 
   const getTipoIcon = (tipo: string) => {
     const icons: Record<string, typeof Phone> = {
@@ -262,11 +268,11 @@ export default function CrmActividadesPage() {
           <Input
             placeholder="Buscar..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
             className="pl-8 h-9"
           />
         </div>
-        <Select value={tipoFilter} onValueChange={setTipoFilter}>
+        <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1) }}>
           <SelectTrigger className="w-[130px] h-9">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
@@ -278,7 +284,7 @@ export default function CrmActividadesPage() {
             <SelectItem value={TIPOS_ACTIVIDAD.PROPUESTA}>Propuestas</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={resultadoFilter} onValueChange={setResultadoFilter}>
+        <Select value={resultadoFilter} onValueChange={(v) => { setResultadoFilter(v); setPage(1) }}>
           <SelectTrigger className="w-[130px] h-9">
             <SelectValue placeholder="Resultado" />
           </SelectTrigger>
@@ -295,7 +301,20 @@ export default function CrmActividadesPage() {
       {/* Lista de actividades */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Historial Reciente</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">Historial Reciente</CardTitle>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Pág. {page} de {totalPages}</span>
+                <Button variant="outline" size="icon" className="h-7 w-7" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {actividades.length === 0 ? (

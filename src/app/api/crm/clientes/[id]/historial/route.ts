@@ -24,6 +24,12 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesPermitidos = ['comercial', 'admin', 'gerente']
+    if (!rolesPermitidos.includes(userRole)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
     const { id } = await params
     const { searchParams } = new URL(req.url)
     const tipo = searchParams.get('tipo') // 'todos', 'proyectos', 'cotizaciones'

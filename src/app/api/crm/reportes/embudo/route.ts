@@ -27,8 +27,9 @@ export async function GET(req: NextRequest) {
     const comercialFilter = esComercial ? { comercialId: session.user.id } : {}
 
     const { searchParams } = new URL(req.url)
-    const fechaDesde = searchParams.get('fechaDesde') || '2024-01-01'
-    const fechaHasta = searchParams.get('fechaHasta') || '2024-12-31'
+    const currentYear = new Date().getFullYear()
+    const fechaDesde = searchParams.get('fechaDesde') || `${currentYear}-01-01`
+    const fechaHasta = searchParams.get('fechaHasta') || `${currentYear}-12-31`
 
     // Definir las etapas del embudo
     // Flujo: Inicio → Contacto → Propuesta (V.Técnica / V.Comercial) → Negociación → [Seg.Proyecto / Feedback]

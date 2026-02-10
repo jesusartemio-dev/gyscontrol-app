@@ -60,7 +60,7 @@ export interface CrmOportunidad {
 
   // Conteos (opcional, disponible cuando se incluye en queries)
   _count?: {
-    actividades: number
+    crmActividad: number
   }
 }
 
