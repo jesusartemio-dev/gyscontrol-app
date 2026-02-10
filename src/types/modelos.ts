@@ -1931,6 +1931,7 @@ export interface ProyectoCronograma {
   nombre: string
   copiadoDesdeCotizacionId?: string
   esBaseline: boolean
+  bloqueado: boolean
   version: number
   createdAt: string
   updatedAt: string

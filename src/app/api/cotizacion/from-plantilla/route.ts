@@ -74,6 +74,8 @@ export async function POST(req: Request) {
           }
         },
         plantillaGasto: { include: { plantillaGastoItem: true } },
+        plantillaCondicion: { orderBy: { orden: 'asc' } },
+        plantillaExclusion: { orderBy: { orden: 'asc' } },
       },
     })
 
@@ -203,6 +205,30 @@ export async function POST(req: Request) {
           },
         })),
       },
+      // ✅ Fix #1: Copiar condiciones y exclusiones desde plantilla
+      ...(plantilla.plantillaCondicion && plantilla.plantillaCondicion.length > 0 ? {
+        cotizacionCondicion: {
+          create: plantilla.plantillaCondicion.map((cond: any, idx: number) => ({
+            id: `cot-cond-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
+            catalogoCondicionId: cond.catalogoCondicionId,
+            tipo: cond.tipo,
+            descripcion: cond.descripcion,
+            orden: cond.orden ?? idx,
+            updatedAt: new Date(),
+          })),
+        },
+      } : {}),
+      ...(plantilla.plantillaExclusion && plantilla.plantillaExclusion.length > 0 ? {
+        cotizacionExclusion: {
+          create: plantilla.plantillaExclusion.map((exc: any, idx: number) => ({
+            id: `cot-exc-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
+            catalogoExclusionId: exc.catalogoExclusionId,
+            descripcion: exc.descripcion,
+            orden: exc.orden ?? idx,
+            updatedAt: new Date(),
+          })),
+        },
+      } : {}),
     }
 
     // Crear la cotización base

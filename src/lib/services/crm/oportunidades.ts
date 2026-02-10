@@ -27,6 +27,7 @@ export interface CrmOportunidad {
   notas?: string
   competencia?: string
   cotizacionId?: string // ✅ Agregado para validar si ya tiene cotización
+  proyectoId?: string   // ✅ Agregado: enlace directo a proyecto
   createdAt: string
   updatedAt: string
 

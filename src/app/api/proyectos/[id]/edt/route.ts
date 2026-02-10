@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { CreateProyectoEdtPayload, FiltrosCronogramaPayload } from '@/types/payloads';
 import { logger } from '@/lib/logger';
 import { validarFechasEdt, validarEstadoEdt } from '@/lib/validators/cronograma';
+import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck';
 
 // ✅ GET - Listar EDT de un proyecto
 export async function GET(
@@ -132,6 +133,11 @@ export async function POST(
       ...body,
       proyectoId: id
     };
+
+    // Check cronograma lock
+    if (data.proyectoCronogramaId && await isCronogramaBloqueado(data.proyectoCronogramaId)) {
+      return cronogramaBloqueadoResponse();
+    }
 
     // 🔍 Validaciones de negocio
     if (data.fechaInicio || data.fechaFin) {
@@ -281,6 +287,15 @@ export async function PUT(
       );
     }
 
+    // Check cronograma lock
+    const firstEdt = await prisma.proyectoEdt.findFirst({
+      where: { id: { in: edtIds }, proyectoId: id },
+      select: { proyectoCronogramaId: true }
+    });
+    if (firstEdt?.proyectoCronogramaId && await isCronogramaBloqueado(firstEdt.proyectoCronogramaId)) {
+      return cronogramaBloqueadoResponse();
+    }
+
     // ✅ Actualización masiva
     const resultado = await prisma.proyectoEdt.updateMany({
       where: {
@@ -338,6 +353,15 @@ export async function DELETE(
         { error: 'Se requiere al menos un ID de EDT' },
         { status: 400 }
       );
+    }
+
+    // Check cronograma lock
+    const firstEdtToDelete = await prisma.proyectoEdt.findFirst({
+      where: { id: { in: edtIds }, proyectoId: id },
+      select: { proyectoCronogramaId: true }
+    });
+    if (firstEdtToDelete?.proyectoCronogramaId && await isCronogramaBloqueado(firstEdtToDelete.proyectoCronogramaId)) {
+      return cronogramaBloqueadoResponse();
     }
 
     // ✅ Verificar que no tengan registros de horas

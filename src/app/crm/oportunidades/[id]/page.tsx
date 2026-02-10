@@ -30,7 +30,7 @@ import { getOportunidadById, CrmOportunidad, CRM_PRIORIDADES } from '@/lib/servi
 import { getClientes } from '@/lib/services/cliente'
 import { getUsuarios } from '@/lib/services/usuario'
 import { getCotizacionById } from '@/lib/services/cotizacion'
-import { getProyectos } from '@/lib/services/proyecto'
+import { getProyectoById } from '@/lib/services/proyecto'
 import CrearCotizacionDesdeOportunidadModal from '@/components/crm/CrearCotizacionDesdeOportunidadModal'
 import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
 import type { Proyecto, Cotizacion } from '@/types'
@@ -104,18 +104,24 @@ export default function OportunidadDetailPage() {
 
       if (data.cotizacionId) {
         try {
-          const [cotizacionData, proyectosData] = await Promise.all([
-            getCotizacionById(data.cotizacionId),
-            getProyectos()
-          ])
+          const cotizacionData = await getCotizacionById(data.cotizacionId)
           setCotizacionFull(cotizacionData)
-          const proyectoExistente = proyectosData.find(p => p.cotizacionId === data.cotizacionId)
-          setProyecto(proyectoExistente || null)
         } catch (relatedErr) {
-          console.error('Error al cargar datos relacionados:', relatedErr)
+          console.error('Error al cargar cotización:', relatedErr)
         }
       } else {
         setCotizacionFull(null)
+      }
+
+      if (data.proyectoId) {
+        try {
+          const proyectoData = await getProyectoById(data.proyectoId)
+          setProyecto(proyectoData || null)
+        } catch (relatedErr) {
+          console.error('Error al cargar proyecto:', relatedErr)
+          setProyecto(null)
+        }
+      } else {
         setProyecto(null)
       }
     } catch (err) {

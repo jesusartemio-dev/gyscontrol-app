@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
 
 // ✅ Schema de validación para crear dependencia
 const createDependenciaSchema = z.object({
@@ -96,6 +97,15 @@ export async function POST(
 
     // ✅ Validar datos de entrada
     const validatedData = createDependenciaSchema.parse(body)
+
+    // Check cronograma lock
+    const tareaOrigen = await prisma.proyectoTarea.findUnique({
+      where: { id: validatedData.tareaOrigenId },
+      select: { proyectoCronogramaId: true }
+    })
+    if (tareaOrigen?.proyectoCronogramaId && await isCronogramaBloqueado(tareaOrigen.proyectoCronogramaId)) {
+      return cronogramaBloqueadoResponse()
+    }
 
     // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({

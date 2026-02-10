@@ -21,6 +21,8 @@ interface GanttRowProps {
   hasChildren?: boolean
   onToggleExpand?: () => void
   showLeftColumn?: boolean
+  baselineStart?: Date | null
+  baselineEnd?: Date | null
 }
 
 export function GanttRow({
@@ -37,7 +39,9 @@ export function GanttRow({
   isExpanded = false,
   hasChildren = false,
   onToggleExpand,
-  showLeftColumn = true
+  showLeftColumn = true,
+  baselineStart,
+  baselineEnd
 }: GanttRowProps) {
   const getLevelStyles = () => {
     const styles: Record<number, { indent: number, bg: string, border: string }> = {
@@ -125,6 +129,8 @@ export function GanttRow({
           level={level}
           onResizeEnd={onResizeEnd}
           onClick={onClick}
+          baselineStart={baselineStart}
+          baselineEnd={baselineEnd}
         />
       </div>
     </div>

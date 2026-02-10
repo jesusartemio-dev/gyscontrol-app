@@ -74,6 +74,17 @@ export async function GET(request: NextRequest) {
     const soloVencidas = searchParams.get('soloVencidas')
     const soloActivas = searchParams.get('soloActivas')
 
+    // Quick lookup by proyectoId (for back-links)
+    const proyectoId = searchParams.get('proyectoId')
+    if (proyectoId) {
+      const oportunidades = await prisma.crmOportunidad.findMany({
+        where: { proyectoId },
+        select: { id: true, nombre: true, estado: true },
+        take: 1,
+      })
+      return NextResponse.json(oportunidades)
+    }
+
     // 🔧 Construir filtros
     const where: any = {}
 

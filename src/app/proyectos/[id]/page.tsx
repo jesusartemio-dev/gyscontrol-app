@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -8,13 +9,16 @@ import {
   Receipt,
   Calendar,
   ChevronRight,
+  ChevronDown,
   ClipboardList,
   Truck,
   Users,
   AlertTriangle,
   TrendingUp,
   TrendingDown,
-  CheckSquare
+  CheckSquare,
+  CheckCircle,
+  FileWarning
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -53,11 +57,29 @@ const getProgressColor = (estado: 'ok' | 'warning' | 'danger'): string => {
   }
 }
 
+type ProyectoCondExcl = {
+  condiciones: { id: string; descripcion: string; tipo?: string | null; orden?: number | null }[]
+  exclusiones: { id: string; descripcion: string; orden?: number | null }[]
+}
+
 export default function ProyectoHubPage() {
   const router = useRouter()
   const { proyecto, cronogramaStats } = useProyectoContext()
+  const [condExcl, setCondExcl] = useState<ProyectoCondExcl | null>(null)
+  const [showCondExcl, setShowCondExcl] = useState(false)
+
+  useEffect(() => {
+    if (!proyecto?.id) return
+    fetch(`/api/proyectos/${proyecto.id}/condiciones-exclusiones`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setCondExcl(data) })
+      .catch(() => {})
+  }, [proyecto?.id])
 
   if (!proyecto) return null
+
+  const totalCond = condExcl?.condiciones?.length || 0
+  const totalExcl = condExcl?.exclusiones?.length || 0
 
   // Calculate statistics
   const totalEquipos = proyecto.equipos?.length || 0
@@ -392,6 +414,69 @@ export default function ProyectoHubPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* Condiciones y Exclusiones del Proyecto */}
+      {(totalCond > 0 || totalExcl > 0) && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: 0.35 }}
+        >
+          <Card>
+            <CardContent className="p-0">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+                onClick={() => setShowCondExcl(!showCondExcl)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <span className="text-sm font-medium">Condiciones</span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{totalCond}</Badge>
+                  </div>
+                  <span className="text-muted-foreground">·</span>
+                  <div className="flex items-center gap-2">
+                    <FileWarning className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm font-medium">Exclusiones</span>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">{totalExcl}</Badge>
+                  </div>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showCondExcl ? 'rotate-180' : ''}`} />
+              </button>
+              {showCondExcl && (
+                <div className="border-t px-4 py-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {totalCond > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">Condiciones</h4>
+                      <ul className="space-y-1.5">
+                        {condExcl!.condiciones.map((c, i) => (
+                          <li key={c.id} className="flex items-start gap-2 text-sm">
+                            <span className="text-emerald-500 font-medium shrink-0">{i + 1}.</span>
+                            <span className="text-gray-700">{c.descripcion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {totalExcl > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Exclusiones</h4>
+                      <ul className="space-y-1.5">
+                        {condExcl!.exclusiones.map((e, i) => (
+                          <li key={e.id} className="flex items-start gap-2 text-sm">
+                            <span className="text-amber-500 font-medium shrink-0">{i + 1}.</span>
+                            <span className="text-gray-700">{e.descripcion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Status Alert for new projects */}
       {proyecto.estado === 'creado' && (

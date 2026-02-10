@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDuration, parseWork } from '@/lib/utils/msProjectExcelParser'
+import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
 
 interface RowData {
   id: number
@@ -75,6 +76,11 @@ export async function POST(
     let cronograma = await (prisma as any).proyectoCronograma.findFirst({
       where: { proyectoId, tipo: 'planificacion' },
     })
+
+    // Check cronograma lock
+    if (cronograma?.id && await isCronogramaBloqueado(cronograma.id)) {
+      return cronogramaBloqueadoResponse()
+    }
 
     if (cronograma) {
       // Verificar si ya tiene contenido

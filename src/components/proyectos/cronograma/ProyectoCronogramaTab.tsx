@@ -35,8 +35,12 @@ import {
   Target,
   Play,
   Star,
-  Upload
+  Upload,
+  GitCompare,
+  Lock,
+  Unlock
 } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import {
   DropdownMenu,
@@ -51,6 +55,7 @@ import { CronogramaGanttViewPro } from '@/components/comercial/cronograma/Cronog
 import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { convertToMSProjectXML, downloadMSProjectXML } from '@/lib/utils/msProjectXmlExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
+import { CronogramaVarianza } from './CronogramaVarianza'
 import type { ProyectoCronograma } from '@/types/modelos'
 
 interface CronogramaStats {
@@ -96,6 +101,41 @@ export function ProyectoCronogramaTab({
   const [savingCalendario, setSavingCalendario] = useState(false)
 
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.role === 'admin'
+
+  // Desbloquear/bloquear cronograma (toggle baseline)
+  const handleToggleBloqueo = async () => {
+    if (!selectedCronograma) return
+    try {
+      setIsLoading(true)
+      const response = await fetch(
+        `/api/proyectos/${proyectoId}/cronograma/${selectedCronograma.id}/baseline`,
+        { method: 'PUT' }
+      )
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Error al cambiar estado de bloqueo')
+      }
+      const result = await response.json()
+      // Actualizar cronograma seleccionado y lista
+      setSelectedCronograma(result.data)
+      setCronogramas(prev => prev.map(c => c.id === result.data.id ? result.data : c))
+      toast({
+        title: result.data.bloqueado ? 'Cronograma bloqueado' : 'Cronograma desbloqueado',
+        description: result.message
+      })
+      handleRefresh()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo cambiar el estado.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Cargar cronogramas disponibles
   useEffect(() => {
@@ -607,6 +647,7 @@ export function ProyectoCronogramaTab({
   const puedeCrearLineaBase = !tieneLineaBase
   const puedeIniciarEjecucion = tieneBaseline && !tieneEjecucion
   const esComercial = selectedCronograma?.tipo === 'comercial'
+  const esBloqueado = selectedCronograma?.bloqueado === true || selectedCronograma?.tipo === 'comercial'
 
   return (
     <div className="space-y-4">
@@ -636,6 +677,7 @@ export function ProyectoCronogramaTab({
                     <Icon className={`h-3 w-3 ${info.color}`} />
                     <span className={info.color}>{info.label}</span>
                     {selectedCronograma.esBaseline && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
+                    {(selectedCronograma.bloqueado || selectedCronograma.tipo === 'comercial') && <Lock className="h-3 w-3 text-amber-500" />}
                   </div>
                 )
               })()}
@@ -651,12 +693,21 @@ export function ProyectoCronogramaTab({
                     <Icon className={`h-3 w-3 ${info.color}`} />
                     <span className={info.color}>{info.label}</span>
                     {cron.esBaseline && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
+                    {(cron.bloqueado || cron.tipo === 'comercial') && <Lock className="h-3 w-3 text-amber-500" />}
                   </div>
                 </SelectItem>
               )
             })}
           </SelectContent>
         </Select>
+
+        {/* Indicador de bloqueo */}
+        {esBloqueado && (
+          <Badge variant="outline" className="text-xs font-normal text-amber-600 border-amber-300 bg-amber-50">
+            <Lock className="h-3 w-3 mr-1" />
+            Cronograma bloqueado
+          </Badge>
+        )}
 
         {/* Botones de acción para crear cronogramas */}
         {puedeCrearLineaBase && (
@@ -761,19 +812,33 @@ export function ProyectoCronogramaTab({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              {/* Desbloquear - solo admin cuando esta bloqueado */}
+              {selectedCronograma?.bloqueado && isAdmin && (
+                <>
+                  <DropdownMenuItem onSelect={() => {
+                    setDropdownOpen(false)
+                    setTimeout(() => handleToggleBloqueo(), 100)
+                  }} disabled={isLoading}>
+                    <Unlock className="h-4 w-4 mr-2" />
+                    Desbloquear Cronograma
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+
               {!esComercial && (
                 <>
                   <DropdownMenuItem onSelect={() => {
                     setDropdownOpen(false)
                     setTimeout(() => setShowGenerarCronogramaModal(true), 100)
-                  }}>
+                  }} disabled={esBloqueado}>
                     <Wand2 className="h-4 w-4 mr-2" />
                     Generar Cronograma
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => {
                     setDropdownOpen(false)
                     setTimeout(() => setShowImportExcelModal(true), 100)
-                  }}>
+                  }} disabled={esBloqueado}>
                     <Upload className="h-4 w-4 mr-2" />
                     Importar desde Excel (MS Project)
                   </DropdownMenuItem>
@@ -806,12 +871,12 @@ export function ProyectoCronogramaTab({
                       setTimeout(() => setShowDeleteCronogramaModal(true), 150)
                     }}
                     className="text-red-600 focus:text-red-600"
-                    disabled={!hasCronograma}
+                    disabled={!hasCronograma || esBloqueado}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Vaciar Contenido
                   </DropdownMenuItem>
-                  {!selectedCronograma?.esBaseline && cronogramas.length > 1 && (
+                  {!selectedCronograma?.esBaseline && cronogramas.length > 1 && !esBloqueado && (
                     <DropdownMenuItem
                       onSelect={() => {
                         setDropdownOpen(false)
@@ -971,6 +1036,12 @@ export function ProyectoCronogramaTab({
             <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
             Gantt Pro
           </TabsTrigger>
+          {tieneBaseline && tieneEjecucion && (
+            <TabsTrigger value="varianza" className="text-xs px-3">
+              <GitCompare className="h-3.5 w-3.5 mr-1.5" />
+              Varianza
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="jerarquia" className="mt-3">
@@ -1003,6 +1074,15 @@ export function ProyectoCronogramaTab({
             refreshKey={refreshKey}
           />
         </TabsContent>
+
+        {tieneBaseline && tieneEjecucion && (
+          <TabsContent value="varianza" className="mt-3">
+            <CronogramaVarianza
+              proyectoId={proyectoId}
+              proyectoNombre={proyectoNombre}
+            />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

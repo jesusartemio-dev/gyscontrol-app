@@ -276,8 +276,8 @@ export function ProyectoCronogramaTreeView({
       const isSelected = state.selectedNodeId === nodeId
       const childNodeIds = node.children?.map(child => child.id) || []
 
-      // Determinar permisos según el tipo de cronograma
-      const isReadOnly = selectedCronograma?.tipo === 'comercial'
+      // Determinar permisos según el tipo de cronograma o estado de bloqueo
+      const isReadOnly = selectedCronograma?.tipo === 'comercial' || selectedCronograma?.bloqueado === true
       const isExecutionLimited = selectedCronograma?.tipo === 'ejecucion'
 
       return (

@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
+import { ProgresoService } from '@/lib/services/progresoService'
 
 const registrarHorasSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -171,6 +172,15 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
       })
 
       console.log('✅ POST registrar: Registro creado exitosamente', { registroHoras })
+
+      // Auto-actualizar progreso si se asoció a una tarea del cronograma
+      if (tareaId) {
+        try {
+          await ProgresoService.actualizarProgresoTarea(tareaId)
+        } catch (err) {
+          console.error(`⚠️ Error actualizando progreso de tarea ${tareaId}:`, err)
+        }
+      }
 
       return NextResponse.json({
         success: true,

@@ -70,7 +70,9 @@ export async function PUT(
     const updatedCronograma = await prisma.proyectoCronograma.update({
       where: { id: cronogramaId },
       data: {
-        esBaseline: !cronograma.esBaseline
+        esBaseline: !cronograma.esBaseline,
+        bloqueado: !cronograma.esBaseline,
+        updatedAt: new Date()
       }
     })
 

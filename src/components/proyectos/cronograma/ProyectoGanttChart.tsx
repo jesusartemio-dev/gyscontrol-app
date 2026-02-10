@@ -34,6 +34,7 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
   const [showDependencies, setShowDependencies] = useState(true)
   const [draggedItem, setDraggedItem] = useState(null)
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  const [baselineMap, setBaselineMap] = useState<Map<string, { start: Date; end: Date }>>(new Map())
 
   // Sistema de historial
   const {
@@ -115,6 +116,60 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
       clearHistory() // Reset history when loading new data
 
       calculateTimelineBounds(safeFasesData, safeEdtsData, safeTareasData, safeSubtareasData)
+
+      // Load baseline overlay if this is an ejecucion cronograma
+      try {
+        const cronogramasRes = await fetch(`/api/proyectos/${proyectoId}/cronograma`)
+        if (cronogramasRes.ok) {
+          const cronogramasData = await cronogramasRes.json()
+          const cronogramasList = cronogramasData.data || []
+          const currentCron = cronogramasList.find((c: any) => c.id === cronogramaId)
+          if (currentCron?.tipo === 'ejecucion') {
+            const baselineCron = cronogramasList.find((c: any) => c.tipo === 'planificacion' && c.esBaseline)
+            if (baselineCron) {
+              const treeRes = await fetch(`/api/proyectos/${proyectoId}/cronograma/tree?cronogramaId=${baselineCron.id}`)
+              if (treeRes.ok) {
+                const treeData = await treeRes.json()
+                const tree = treeData?.data?.tree || []
+                const map = new Map<string, { start: Date; end: Date }>()
+                for (const fase of tree) {
+                  const fd = fase.data || {}
+                  if (fd.fechaInicioPlan && fd.fechaFinPlan) {
+                    map.set(fase.nombre, { start: new Date(fd.fechaInicioPlan), end: new Date(fd.fechaFinPlan) })
+                  }
+                  for (const edt of fase.children || []) {
+                    const ed = edt.data || {}
+                    if (ed.fechaInicioPlan && ed.fechaFinPlan) {
+                      map.set(edt.nombre, { start: new Date(ed.fechaInicioPlan), end: new Date(ed.fechaFinPlan) })
+                    }
+                    for (const child of edt.children || []) {
+                      const cd = child.data || {}
+                      const cStart = cd.fechaInicio || cd.fechaInicioPlan
+                      const cEnd = cd.fechaFin || cd.fechaFinPlan
+                      if (cStart && cEnd) {
+                        map.set(child.nombre, { start: new Date(cStart), end: new Date(cEnd) })
+                      }
+                      for (const sub of child.children || []) {
+                        const sd = sub.data || {}
+                        const sStart = sd.fechaInicio || sd.fechaInicioPlan
+                        const sEnd = sd.fechaFin || sd.fechaFinPlan
+                        if (sStart && sEnd) {
+                          map.set(sub.nombre, { start: new Date(sStart), end: new Date(sEnd) })
+                        }
+                      }
+                    }
+                  }
+                }
+                setBaselineMap(map)
+              }
+            }
+          } else {
+            setBaselineMap(new Map())
+          }
+        }
+      } catch {
+        // Baseline loading is optional, don't break the chart
+      }
     } catch (error) {
       console.error('Error loading cronograma data:', error)
       toast.error('Error al cargar el cronograma')
@@ -451,6 +506,8 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
     return expandedItems.has(itemId)
   }
 
+  const getBaseline = (nombre: string) => baselineMap.get(nombre) || null
+
   const renderRows = (): React.JSX.Element[] => {
     const rows: React.JSX.Element[] = []
     let currentY = 0
@@ -460,6 +517,7 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
       const faseExpanded = isExpanded(fase.id)
 
       // Render fase
+      const faseBaseline = getBaseline(fase.nombre)
       rows.push(
         <GanttRow
           key={`fase-${fase.id}`}
@@ -477,6 +535,8 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
           hasChildren={edts.some(edt => edt.proyectoFaseId === fase.id)}
           onToggleExpand={() => toggleExpanded(fase.id)}
           showLeftColumn={false}
+          baselineStart={faseBaseline?.start}
+          baselineEnd={faseBaseline?.end}
         />
       )
       currentY += 45
@@ -487,6 +547,7 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
         faseEdts.forEach(edt => {
           const edtExpanded = isExpanded(edt.id)
 
+          const edtBaseline = getBaseline(edt.nombre)
           rows.push(
             <GanttRow
               key={`edt-${edt.id}`}
@@ -504,6 +565,8 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
               hasChildren={tareas.some(tarea => tarea.proyectoEdtId === edt.id)}
               onToggleExpand={() => toggleExpanded(edt.id)}
               showLeftColumn={false}
+              baselineStart={edtBaseline?.start}
+              baselineEnd={edtBaseline?.end}
             />
           )
           currentY += 40
@@ -514,6 +577,7 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
             edtTareas.forEach(tarea => {
               const tareaExpanded = isExpanded(tarea.id)
 
+              const tareaBaseline = getBaseline(tarea.nombre)
               rows.push(
                 <GanttRow
                   key={`tarea-${tarea.id}`}
@@ -531,6 +595,8 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
                   hasChildren={subtareas.some(subtarea => subtarea.proyectoTareaId === tarea.id)}
                   onToggleExpand={() => toggleExpanded(tarea.id)}
                   showLeftColumn={false}
+                  baselineStart={tareaBaseline?.start}
+                  baselineEnd={tareaBaseline?.end}
                 />
               )
               currentY += 35
@@ -539,6 +605,7 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
               if (tareaExpanded) {
                 const tareaSubtareas = subtareas.filter(subtarea => subtarea.proyectoTareaId === tarea.id)
                 tareaSubtareas.forEach(subtarea => {
+                  const subBaseline = getBaseline(subtarea.nombre)
                   rows.push(
                     <GanttRow
                       key={`subtarea-${subtarea.id}`}
@@ -553,6 +620,8 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
                       onResizeEnd={handleResizeEnd}
                       showDependencies={showDependencies}
                       showLeftColumn={false}
+                      baselineStart={subBaseline?.start}
+                      baselineEnd={subBaseline?.end}
                     />
                   )
                   currentY += 30

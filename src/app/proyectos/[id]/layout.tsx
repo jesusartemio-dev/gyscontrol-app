@@ -11,7 +11,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   FileText,
-  ExternalLink
+  ExternalLink,
+  Megaphone
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getProyectoById } from '@/lib/services/proyecto'
@@ -66,6 +67,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     horasReales: 0,
     activeCronograma: null
   })
+
+  const [oportunidadId, setOportunidadId] = useState<string | null>(null)
 
   // Determinar si estamos en el hub o en una sub-página
   const isHubPage = pathname === `/proyectos/${id}`
@@ -222,6 +225,20 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     }
   }
 
+  // Lookup CrmOportunidad linked to this proyecto
+  useEffect(() => {
+    if (typeof id === 'string') {
+      fetch(`/api/crm/oportunidades?proyectoId=${id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && Array.isArray(data) && data.length > 0) {
+            setOportunidadId(data[0].id)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [id])
+
   useEffect(() => {
     if (typeof id === 'string') {
       setLoading(true)
@@ -342,6 +359,18 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
 
                 {/* Acciones Principales */}
                 <div className="flex items-center gap-2 flex-wrap">
+                  {oportunidadId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/crm/oportunidades/${oportunidadId}`)}
+                      className="h-8 text-orange-700 border-orange-300 hover:bg-orange-50"
+                    >
+                      <Megaphone className="h-4 w-4 mr-1" />
+                      <span className="hidden sm:inline">Oportunidad</span>
+                      <ExternalLink className="h-3 w-3 ml-1" />
+                    </Button>
+                  )}
                   {proyecto.cotizacionId && (
                     <Button
                       variant="outline"

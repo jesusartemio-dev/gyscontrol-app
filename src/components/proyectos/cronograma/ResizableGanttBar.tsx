@@ -13,6 +13,8 @@ interface ResizableGanttBarProps {
   onResizeEnd?: (item: any, newStartDate: Date, newEndDate: Date) => void
   onClick?: (item: any) => void
   isResizing?: boolean
+  baselineStart?: Date | null
+  baselineEnd?: Date | null
 }
 
 type ResizeHandle = 'start' | 'end' | null
@@ -26,7 +28,9 @@ export function ResizableGanttBar({
   level,
   onResizeEnd,
   onClick,
-  isResizing = false
+  isResizing = false,
+  baselineStart,
+  baselineEnd
 }: ResizableGanttBarProps) {
   const [resizeState, setResizeState] = useState({
     isResizing: false,
@@ -223,6 +227,26 @@ export function ResizableGanttBar({
         )}
       </div>
 
+      {/* Baseline overlay bar (thin gray bar below main bar) */}
+      {baselineStart && baselineEnd && (() => {
+        const blStartOffset = baselineStart.getTime() - timelineStart.getTime()
+        const blDuration = baselineEnd.getTime() - baselineStart.getTime()
+        const blX = (blStartOffset / totalDuration) * chartWidth - x
+        const blWidth = Math.max(6, (blDuration / totalDuration) * chartWidth)
+        return (
+          <div
+            className="absolute bg-gray-400 opacity-60 rounded-sm"
+            style={{
+              left: blX,
+              top: '26px',
+              width: blWidth,
+              height: '5px'
+            }}
+            title={`Baseline: ${baselineStart.toLocaleDateString('es-ES')} - ${baselineEnd.toLocaleDateString('es-ES')}`}
+          />
+        )
+      })()}
+
       {/* Tooltip */}
       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2
                       opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
@@ -230,8 +254,12 @@ export function ResizableGanttBar({
           <div className="font-medium">{item.nombre}</div>
           <div>Inicio: {startDate.toLocaleDateString('es-ES')}</div>
           <div>Fin: {endDate.toLocaleDateString('es-ES')}</div>
+          {baselineStart && baselineEnd && (
+            <>
+              <div className="text-gray-300">Baseline: {baselineStart.toLocaleDateString('es-ES')} - {baselineEnd.toLocaleDateString('es-ES')}</div>
+            </>
+          )}
           <div>Progreso: {progreso}%</div>
-          <div className="text-yellow-300 mt-1">💡 Arrastra para mover • Handles para redimensionar</div>
         </div>
       </div>
     </div>

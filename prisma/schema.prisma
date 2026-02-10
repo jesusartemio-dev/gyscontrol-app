@@ -637,6 +637,8 @@ model Plantilla {
   plantillaGasto            PlantillaGasto[]
   plantillaServicio         PlantillaServicio[]
   cotizacionPlantillaImport CotizacionPlantillaImport[]
+  plantillaCondicion        PlantillaCondicion[]
+  plantillaExclusion        PlantillaExclusion[]
 
   @@map("plantilla")
 }
@@ -828,6 +830,8 @@ model Proyecto {
   proyectoEdt              ProyectoEdt[]
   proyectoFase             ProyectoFase[]
   registrosCampo           RegistroHorasCampo[]
+  proyectoCondicion        ProyectoCondicion[]
+  proyectoExclusion        ProyectoExclusion[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1524,6 +1528,68 @@ model CotizacionExclusion {
   @@map("cotizacion_exclusion")
 }
 
+model PlantillaCondicion {
+  id                  String             @id @default(cuid())
+  plantillaId         String
+  catalogoCondicionId String?
+  tipo                String?
+  descripcion         String
+  orden               Int?               @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  plantilla           Plantilla          @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  catalogoCondicion   CatalogoCondicion? @relation(fields: [catalogoCondicionId], references: [id])
+
+  @@index([plantillaId, orden])
+  @@map("plantilla_condicion")
+}
+
+model PlantillaExclusion {
+  id                  String             @id @default(cuid())
+  plantillaId         String
+  catalogoExclusionId String?
+  descripcion         String
+  orden               Int?               @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  plantilla           Plantilla          @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  catalogoExclusion   CatalogoExclusion? @relation(fields: [catalogoExclusionId], references: [id])
+
+  @@index([plantillaId, orden])
+  @@map("plantilla_exclusion")
+}
+
+model ProyectoCondicion {
+  id                  String             @id @default(cuid())
+  proyectoId          String
+  catalogoCondicionId String?
+  tipo                String?
+  descripcion         String
+  orden               Int?               @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime
+  proyecto            Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  catalogoCondicion   CatalogoCondicion? @relation(fields: [catalogoCondicionId], references: [id])
+
+  @@index([proyectoId, orden])
+  @@map("proyecto_condicion")
+}
+
+model ProyectoExclusion {
+  id                  String             @id @default(cuid())
+  proyectoId          String
+  catalogoExclusionId String?
+  descripcion         String
+  orden               Int?               @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime
+  proyecto            Proyecto           @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  catalogoExclusion   CatalogoExclusion? @relation(fields: [catalogoExclusionId], references: [id])
+
+  @@index([proyectoId, orden])
+  @@map("proyecto_exclusion")
+}
+
 model CotizacionFase {
   id               String          @id
   cotizacionId     String
@@ -1937,6 +2003,8 @@ model CatalogoCondicion {
   categoria                           CategoriaCondicion?                   @relation(fields: [categoriaId], references: [id])
   cotizacionCondiciones               CotizacionCondicion[]
   plantillaCondicionItemIndependiente PlantillaCondicionItemIndependiente[]
+  plantillaCondicion                  PlantillaCondicion[]
+  proyectoCondicion                   ProyectoCondicion[]
 
   @@index([categoriaId, tipo, activo])
   @@map("catalogo_condicion")
@@ -2007,6 +2075,8 @@ model CatalogoExclusion {
   categoria                           CategoriaExclusion?                   @relation(fields: [categoriaId], references: [id])
   cotizacionExclusiones               CotizacionExclusion[]
   plantillaExclusionItemIndependiente PlantillaExclusionItemIndependiente[]
+  plantillaExclusion                  PlantillaExclusion[]
+  proyectoExclusion                   ProyectoExclusion[]
 
   @@index([categoriaId, activo])
   @@map("catalogo_exclusion")
@@ -2191,6 +2261,7 @@ model ProyectoCronograma {
   copiadoDesdeCotizacionId String?             @unique
   esBaseline               Boolean             @default(false)
   version                  Int                 @default(1)
+  bloqueado                Boolean             @default(false)
   createdAt                DateTime            @default(now())
   updatedAt                DateTime
   proyectoActividad        ProyectoActividad[]
@@ -2209,7 +2280,9 @@ model ProyectoDependenciasTarea {
   tipo               TipoDependencia @default(finish_to_start)
   tareaOrigenId      String
   tareaDependienteId String
+  lagMinutos         Int             @default(0)
   createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @default(now())
   tareaDependiente   ProyectoTarea   @relation("dependenciasTareaDependiente", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
   tareaOrigen        ProyectoTarea   @relation("dependenciasTareaOrigen", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
 

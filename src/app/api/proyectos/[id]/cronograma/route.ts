@@ -217,6 +217,7 @@ export async function POST(
       let edtsCopiados = 0
       let actividadesCopiadas = 0
       let tareasCopiadas = 0
+      const tareaIdMap = new Map<string, string>() // oldTareaId -> newTareaId
 
       try {
         for (const faseOrigen of cronogramaOrigen.proyectoFase) {
@@ -304,7 +305,8 @@ export async function POST(
               console.log('Actividad creada:', nuevaActividad.id)
 
               for (const tareaOrigen of actividadOrigen.proyectoTarea) {
-                console.log('Creando tarea:', tareaOrigen.nombre)
+                const newTareaId = crypto.randomUUID()
+                tareaIdMap.set(tareaOrigen.id, newTareaId)
 
                 await prisma.$queryRaw`
                   INSERT INTO "proyecto_tarea" (
@@ -324,7 +326,7 @@ export async function POST(
                     "createdAt",
                     "updatedAt"
                   ) VALUES (
-                    gen_random_uuid(),
+                    ${newTareaId}::uuid,
                     ${actividadId},
                     ${nuevoCronograma.id},
                     ${nuevoEdt.id},
@@ -346,6 +348,38 @@ export async function POST(
             }
           }
         }
+        // Copiar dependencias usando el mapping de IDs
+        let dependenciasCopiadas = 0
+        const sourceTareaIds = Array.from(tareaIdMap.keys())
+        if (sourceTareaIds.length > 0) {
+          const dependencias = await prisma.proyectoDependenciasTarea.findMany({
+            where: {
+              OR: [
+                { tareaOrigenId: { in: sourceTareaIds } },
+                { tareaDependienteId: { in: sourceTareaIds } }
+              ]
+            }
+          })
+
+          for (const dep of dependencias) {
+            const newOrigenId = tareaIdMap.get(dep.tareaOrigenId)
+            const newDependienteId = tareaIdMap.get(dep.tareaDependienteId)
+            if (newOrigenId && newDependienteId) {
+              await prisma.proyectoDependenciasTarea.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  tipo: dep.tipo,
+                  tareaOrigenId: newOrigenId,
+                  tareaDependienteId: newDependienteId,
+                  lagMinutos: dep.lagMinutos,
+                  updatedAt: new Date()
+                }
+              })
+              dependenciasCopiadas++
+            }
+          }
+        }
+
       } catch (copyError) {
         console.error('Error durante la copia:', copyError)
         throw new Error(`Error copiando estructura: ${copyError instanceof Error ? copyError.message : 'Error desconocido'}`)

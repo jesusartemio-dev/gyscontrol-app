@@ -158,6 +158,8 @@ export async function POST(request: NextRequest) {
         cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
         cotizacionServicio: { include: { cotizacionServicioItem: true } },
         cotizacionGasto: { include: { cotizacionGastoItem: true } },
+        cotizacionCondicion: { orderBy: { orden: 'asc' } },
+        cotizacionExclusion: { orderBy: { orden: 'asc' } },
         cotizacionFase: true,
         cotizacionEdt: {
           include: {
@@ -319,6 +321,58 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    // ✅ Fix #10: Transferir condiciones y exclusiones de cotización → proyecto
+    if (cotizacion.cotizacionCondicion && cotizacion.cotizacionCondicion.length > 0) {
+      await Promise.all(cotizacion.cotizacionCondicion.map((cond: any) =>
+        prisma.proyectoCondicion.create({
+          data: {
+            proyectoId: proyecto.id,
+            catalogoCondicionId: cond.catalogoCondicionId,
+            tipo: cond.tipo,
+            descripcion: cond.descripcion,
+            orden: cond.orden,
+            updatedAt: new Date()
+          }
+        })
+      ))
+      console.log(`✅ [CONDICIONES] ${cotizacion.cotizacionCondicion.length} condiciones transferidas al proyecto`)
+    }
+
+    if (cotizacion.cotizacionExclusion && cotizacion.cotizacionExclusion.length > 0) {
+      await Promise.all(cotizacion.cotizacionExclusion.map((exc: any) =>
+        prisma.proyectoExclusion.create({
+          data: {
+            proyectoId: proyecto.id,
+            catalogoExclusionId: exc.catalogoExclusionId,
+            descripcion: exc.descripcion,
+            orden: exc.orden,
+            updatedAt: new Date()
+          }
+        })
+      ))
+      console.log(`✅ [EXCLUSIONES] ${cotizacion.cotizacionExclusion.length} exclusiones transferidas al proyecto`)
+    }
+
+    // ✅ Fix #9: Actualizar CrmOportunidad con proyectoId y estado
+    try {
+      const oportunidad = await prisma.crmOportunidad.findFirst({
+        where: { cotizacionId }
+      })
+      if (oportunidad) {
+        await prisma.crmOportunidad.update({
+          where: { id: oportunidad.id },
+          data: {
+            proyectoId: proyecto.id,
+            estado: 'seguimiento_proyecto',
+            updatedAt: new Date()
+          }
+        })
+        console.log(`✅ [CRM] Oportunidad ${oportunidad.id} actualizada: proyectoId=${proyecto.id}, estado=seguimiento_proyecto`)
+      }
+    } catch (crmError) {
+      console.log('⚠️ [CRM] Error al actualizar oportunidad (no bloqueante):', crmError)
+    }
 
     // ✅ Convertir EDTs comerciales a jerarquía completa de 5 niveles (sin zonas)
     // ✅ Crear SOLO cronograma comercial (baseline histórica)

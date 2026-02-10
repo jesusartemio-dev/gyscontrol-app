@@ -335,7 +335,10 @@ export function ProyectoCronogramaSelector({
                       Base
                     </Badge>
                   )}
-                  {info.readOnly && cronograma && (
+                  {cronograma && (cronograma.bloqueado || cronograma.tipo === 'comercial') && (
+                    <Lock className="h-3 w-3 text-amber-500 ml-1" />
+                  )}
+                  {info.readOnly && cronograma && !cronograma.bloqueado && cronograma.tipo !== 'comercial' && (
                     <Eye className="h-3 w-3 text-gray-400 ml-1" />
                   )}
                   {info.isMain && cronograma && (

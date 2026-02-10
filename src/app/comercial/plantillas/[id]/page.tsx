@@ -7,7 +7,7 @@
 // 📅 Última actualización: 2025-01-17 - Mejoras UX/UI aplicadas
 // ===================================================
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, Variants } from 'framer-motion'
 import {
@@ -26,6 +26,7 @@ import PlantillaServicioAccordion from '@/components/plantillas/PlantillaServici
 import PlantillaGastoAccordion from '@/components/plantillas/PlantillaGastoAccordion'
 import ResumenTotalesPlantilla from '@/components/plantillas/ResumenTotalesPlantilla'
 import CrearCotizacionModal from '@/components/cotizaciones/CrearCotizacionModal'
+import { exportarPlantillaAExcel } from '@/lib/utils/plantillaExportExcel'
 
 // UI Components
 import { Button } from '@/components/ui/button'
@@ -49,7 +50,12 @@ import {
   Loader2,
   Wrench,
   Truck,
-  DollarSign
+  DollarSign,
+  CheckCircle,
+  AlertTriangle,
+  Trash2,
+  X,
+  Copy
 } from 'lucide-react'
 
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
@@ -164,13 +170,75 @@ export default function PlantillaDetallePage() {
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState({ servicio: false, gasto: false })
 
+  // Condiciones y Exclusiones
+  const [condiciones, setCondiciones] = useState<{ id: string; descripcion: string; tipo?: string | null }[]>([])
+  const [exclusiones, setExclusiones] = useState<{ id: string; descripcion: string }[]>([])
+  const [newCond, setNewCond] = useState('')
+  const [newExcl, setNewExcl] = useState('')
+
+  const loadCondExcl = useCallback(async (plantillaId: string) => {
+    try {
+      const [cRes, eRes] = await Promise.all([
+        fetch(`/api/plantilla/${plantillaId}/condiciones`),
+        fetch(`/api/plantilla/${plantillaId}/exclusiones`),
+      ])
+      if (cRes.ok) setCondiciones(await cRes.json())
+      if (eRes.ok) setExclusiones(await eRes.json())
+    } catch {}
+  }, [])
+
+  const addCondicion = async () => {
+    if (!newCond.trim() || !plantilla) return
+    const res = await fetch(`/api/plantilla/${plantilla.id}/condiciones`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ descripcion: newCond, orden: condiciones.length }),
+    })
+    if (res.ok) {
+      const item = await res.json()
+      setCondiciones(prev => [...prev, item])
+      setNewCond('')
+      toast.success('Condición agregada')
+    }
+  }
+
+  const addExclusion = async () => {
+    if (!newExcl.trim() || !plantilla) return
+    const res = await fetch(`/api/plantilla/${plantilla.id}/exclusiones`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ descripcion: newExcl, orden: exclusiones.length }),
+    })
+    if (res.ok) {
+      const item = await res.json()
+      setExclusiones(prev => [...prev, item])
+      setNewExcl('')
+      toast.success('Exclusión agregada')
+    }
+  }
+
+  const delCondicion = async (itemId: string) => {
+    if (!plantilla) return
+    const res = await fetch(`/api/plantilla/${plantilla.id}/condiciones?itemId=${itemId}`, { method: 'DELETE' })
+    if (res.ok) setCondiciones(prev => prev.filter(c => c.id !== itemId))
+  }
+
+  const delExclusion = async (itemId: string) => {
+    if (!plantilla) return
+    const res = await fetch(`/api/plantilla/${plantilla.id}/exclusiones?itemId=${itemId}`, { method: 'DELETE' })
+    if (res.ok) setExclusiones(prev => prev.filter(e => e.id !== itemId))
+  }
+
   useEffect(() => {
     if (typeof id === 'string') {
       getPlantillaById(id)
-        .then(setPlantilla)
+        .then((data) => {
+          setPlantilla(data)
+          loadCondExcl(id)
+        })
         .catch(() => setError('❌ Error al cargar la plantilla.'))
     }
-  }, [id])
+  }, [id, loadCondExcl])
 
   const actualizarTotalesParciales = (equipos: any[], servicios: any[], gastos: any[]) => {
     const subtotalesEquipos = calcularTotal({ equipos, servicios: [], gastos: [] })
@@ -366,17 +434,44 @@ export default function PlantillaDetallePage() {
             </div>
             
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Share2 className="h-4 w-4 mr-2" />
-                Compartir
-              </Button>
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!plantilla) return
+                  try {
+                    exportarPlantillaAExcel({
+                      ...plantilla,
+                      condiciones,
+                      exclusiones,
+                    })
+                    toast.success('Excel exportado')
+                  } catch {
+                    toast.error('Error al exportar')
+                  }
+                }}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
-              <Button size="sm">
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!plantilla) return
+                  try {
+                    const res = await fetch(`/api/plantilla/${plantilla.id}/duplicar`, { method: 'POST' })
+                    if (!res.ok) throw new Error()
+                    const data = await res.json()
+                    toast.success(`Plantilla duplicada: ${data.nombre}`)
+                    router.push(`/comercial/plantillas/${data.id}`)
+                  } catch {
+                    toast.error('Error al duplicar')
+                  }
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Duplicar
               </Button>
             </div>
           </div>
@@ -634,6 +729,101 @@ export default function PlantillaDetallePage() {
             </Card>
           </motion.div>
         )}
+        {/* Condiciones y Exclusiones */}
+        <motion.div variants={itemVariants}>
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-emerald-600" />
+                Condiciones y Exclusiones
+              </CardTitle>
+              <CardDescription>
+                Condiciones comerciales y exclusiones que se copiarán a las cotizaciones creadas desde esta plantilla
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Condiciones */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-emerald-700 uppercase tracking-wide flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Condiciones ({condiciones.length})
+                  </h4>
+                  {condiciones.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {condiciones.map((c, i) => (
+                        <li key={c.id} className="flex items-start justify-between gap-2 text-sm group">
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                            <span className="text-emerald-500 font-medium shrink-0">{i + 1}.</span>
+                            <span className="text-gray-700">{c.descripcion}</span>
+                          </div>
+                          <button
+                            onClick={() => delCondicion(c.id)}
+                            className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newCond}
+                      onChange={e => setNewCond(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addCondicion()}
+                      placeholder="Nueva condición..."
+                      className="flex-1 text-sm border rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <Button size="sm" variant="outline" onClick={addCondicion} disabled={!newCond.trim()}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Exclusiones */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-amber-700 uppercase tracking-wide flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Exclusiones ({exclusiones.length})
+                  </h4>
+                  {exclusiones.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {exclusiones.map((e, i) => (
+                        <li key={e.id} className="flex items-start justify-between gap-2 text-sm group">
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                            <span className="text-amber-500 font-medium shrink-0">{i + 1}.</span>
+                            <span className="text-gray-700">{e.descripcion}</span>
+                          </div>
+                          <button
+                            onClick={() => delExclusion(e.id)}
+                            className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newExcl}
+                      onChange={e => setNewExcl(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addExclusion()}
+                      placeholder="Nueva exclusión..."
+                      className="flex-1 text-sm border rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <Button size="sm" variant="outline" onClick={addExclusion} disabled={!newExcl.trim()}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
        </div>
      </motion.div>
    )

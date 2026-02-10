@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -11,7 +12,8 @@ import {
   ChevronRight,
   FileText,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  History
 } from 'lucide-react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +34,15 @@ const formatCurrency = (amount: number): string => {
 export default function CotizacionHubPage() {
   const router = useRouter()
   const { cotizacion } = useCotizacionContext()
+  const [versionesCount, setVersionesCount] = useState(0)
+
+  useEffect(() => {
+    if (!cotizacion?.id) return
+    fetch(`/api/cotizaciones/${cotizacion.id}/versions`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (Array.isArray(data)) setVersionesCount(data.length) })
+      .catch(() => {})
+  }, [cotizacion?.id])
 
   if (!cotizacion) return null
 
@@ -184,7 +195,7 @@ export default function CotizacionHubPage() {
       </div>
 
       {/* Quick Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Cabecera Quick Info */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -249,6 +260,30 @@ export default function CotizacionHubPage() {
                   <p className="text-sm font-medium text-gray-900">Exclusiones</p>
                   <p className="text-xs text-muted-foreground">
                     {totalExclusiones} {totalExclusiones === 1 ? 'exclusión' : 'exclusiones'} definidas
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Versiones Quick Info */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.8 }}
+        >
+          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(`${baseUrl}/configuracion`)}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-50 rounded-lg">
+                  <History className="h-5 w-5 text-purple-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">Versiones</p>
+                  <p className="text-xs text-muted-foreground">
+                    {versionesCount} {versionesCount === 1 ? 'versión' : 'versiones'} guardadas
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />

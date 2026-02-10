@@ -283,7 +283,7 @@ export default function VersionesCotizacion({
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            <span>{version.usuario.name}</span>
+                            <span>{version.user.name}</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />

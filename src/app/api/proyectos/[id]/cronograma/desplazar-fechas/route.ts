@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,11 @@ export async function POST(
 
     const body = await request.json()
     const { nuevaFechaInicio, cronogramaId } = desplazarSchema.parse(body)
+
+    // Check cronograma lock
+    if (cronogramaId && await isCronogramaBloqueado(cronogramaId)) {
+      return cronogramaBloqueadoResponse()
+    }
 
     // Parsear fecha como mediodía UTC para evitar problemas de timezone
     const [year, month, day] = nuevaFechaInicio.split('-').map(Number)

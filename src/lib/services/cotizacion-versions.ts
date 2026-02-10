@@ -24,8 +24,8 @@ export interface CotizacionVersion {
   createdAt: string
   updatedAt: string
 
-  // Relaciones
-  usuario: {
+  // Relaciones (Prisma returns 'user' from include)
+  user: {
     id: string
     name: string
     email: string
@@ -195,7 +195,7 @@ export function compareCotizacionVersions(version1: CotizacionVersion, version2:
 export async function createCotizacionSnapshot(cotizacionId: string): Promise<string> {
   try {
     // Obtener datos completos de la cotización
-    const response = await fetch(buildApiUrl(`/api/cotizaciones/${cotizacionId}`), {
+    const response = await fetch(buildApiUrl(`/api/cotizacion/${cotizacionId}`), {
       method: 'GET',
       credentials: 'include',
       headers: {

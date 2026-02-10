@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
 
 const createProyectoTareaSchema = z.object({
   nombre: z.string().min(1),
@@ -133,6 +134,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const body = await request.json()
 
     const validatedData = createProyectoTareaSchema.parse(body)
+
+    // Check cronograma lock
+    if (validatedData.proyectoCronogramaId && await isCronogramaBloqueado(validatedData.proyectoCronogramaId)) {
+      return cronogramaBloqueadoResponse()
+    }
 
     // Verificar que el EDT existe y pertenece al proyecto
     const edt = await prisma.proyectoEdt.findFirst({

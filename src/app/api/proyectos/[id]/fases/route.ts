@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
 
 // ✅ Schema de validación para crear fase
 const createFaseSchema = z.object({
@@ -108,6 +109,11 @@ export async function POST(
 
     // ✅ Validar datos de entrada
     const validatedData = createFaseSchema.parse(body)
+
+    // Check cronograma lock
+    if (validatedData.proyectoCronogramaId && await isCronogramaBloqueado(validatedData.proyectoCronogramaId)) {
+      return cronogramaBloqueadoResponse()
+    }
 
     // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({

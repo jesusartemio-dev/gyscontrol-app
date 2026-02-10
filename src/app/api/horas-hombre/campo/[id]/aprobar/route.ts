@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
+import { ProgresoService } from '@/lib/services/progresoService'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -214,16 +215,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     })
 
-    // TODO: Enviar notificaciones a los miembros
-    // const usuariosNotificados = new Set<string>()
-    // for (const tarea of registro.tareas) {
-    //   for (const miembro of tarea.miembros) {
-    //     if (!usuariosNotificados.has(miembro.usuarioId)) {
-    //       usuariosNotificados.add(miembro.usuarioId)
-    //       await crearNotificacion({...})
-    //     }
-    //   }
-    // }
+    // Auto-actualizar progreso de tareas afectadas (no-blocking)
+    for (const [tareaId] of Array.from(new Map(
+      registro.tareas
+        .filter(t => t.proyectoTareaId)
+        .map(t => [t.proyectoTareaId!, true] as [string, boolean])
+    ))) {
+      try {
+        await ProgresoService.actualizarProgresoTarea(tareaId)
+      } catch (err) {
+        console.error(`⚠️ Error actualizando progreso de tarea ${tareaId}:`, err)
+      }
+    }
 
     console.log(`✅ APROBAR CAMPO: Aprobado registro ${id}, creados ${resultado.registrosHorasCreados.length} registros de horas, ${resultado.tareasActualizadas} tareas actualizadas`)
 

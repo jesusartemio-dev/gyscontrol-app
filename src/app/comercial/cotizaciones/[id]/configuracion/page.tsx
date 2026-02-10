@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, FileText, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Settings, FileText, CheckCircle, AlertTriangle, History } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 
 import { CabeceraTab } from '@/components/cotizaciones/tabs/CabeceraTab'
 import { ExclusionesTab } from '@/components/cotizaciones/tabs/ExclusionesTab'
 import { CondicionesTab } from '@/components/cotizaciones/tabs/CondicionesTab'
+import VersionesCotizacion from '@/components/cotizaciones/VersionesCotizacion'
 
 import { useCotizacionContext } from '../cotizacion-context'
 
@@ -28,9 +29,9 @@ export default function CotizacionConfiguracionPage() {
         <h2 className="text-lg font-semibold">Configuración</h2>
       </div>
 
-      {/* Tabs para Cabecera, Condiciones, Exclusiones */}
+      {/* Tabs para Cabecera, Condiciones, Exclusiones, Versiones */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="cabecera" className="gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Cabecera</span>
@@ -52,6 +53,10 @@ export default function CotizacionConfiguracionPage() {
                 {totalExclusiones}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="versiones" className="gap-2">
+            <History className="h-4 w-4" />
+            <span className="hidden sm:inline">Versiones</span>
           </TabsTrigger>
         </TabsList>
 
@@ -77,6 +82,14 @@ export default function CotizacionConfiguracionPage() {
               cotizacion={cotizacion}
               onUpdated={setCotizacion}
               isLocked={isLocked}
+            />
+          </TabsContent>
+
+          <TabsContent value="versiones" className="m-0">
+            <VersionesCotizacion
+              cotizacionId={cotizacion.id}
+              cotizacionCodigo={cotizacion.codigo || cotizacion.id}
+              cotizacionNombre={cotizacion.nombre}
             />
           </TabsContent>
         </div>
