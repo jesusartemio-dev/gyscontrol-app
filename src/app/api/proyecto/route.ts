@@ -93,6 +93,7 @@ export async function POST(req: Request) {
         codigo: codigoProyecto,
         fechaInicio: new Date(data.fechaInicio),
         fechaFin: data.fechaFin ? new Date(data.fechaFin) : null,
+        updatedAt: new Date(),
       },
       include: {
         cliente: true,
