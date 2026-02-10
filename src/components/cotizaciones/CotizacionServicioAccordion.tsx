@@ -44,6 +44,7 @@ interface Props {
   onUpdatedNombre: (nuevoNombre: string) => void
   onRefresh?: () => Promise<void>
   isLocked?: boolean
+  moneda?: string
 }
 
 export default function CotizacionServicioAccordion({
@@ -55,7 +56,8 @@ export default function CotizacionServicioAccordion({
   onDeletedGrupo,
   onUpdatedNombre,
   onRefresh,
-  isLocked = false
+  isLocked = false,
+  moneda
 }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -339,6 +341,7 @@ export default function CotizacionServicioAccordion({
                     onDeleted={onDeleted}
                     onUpdated={onUpdated}
                     isLocked={isLocked}
+                    moneda={moneda}
                   />
                 )}
               </div>

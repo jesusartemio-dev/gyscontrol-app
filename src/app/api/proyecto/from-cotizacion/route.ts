@@ -238,6 +238,8 @@ export async function POST(request: NextRequest) {
         totalCliente: finalTotalCliente,
         descuento: finalDescuento,
         grandTotal: finalGrandTotal,
+        moneda: cotizacion.moneda || 'USD',
+        tipoCambio: cotizacion.tipoCambio || null,
         updatedAt: new Date(),
 
         proyectoEquipoCotizado: {

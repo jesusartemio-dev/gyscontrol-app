@@ -105,6 +105,8 @@ export async function POST(req: Request) {
         totalCliente: data.totalCliente || 0,
         descuento: data.descuento || 0,
         grandTotal: data.grandTotal || 0,
+        moneda: data.moneda || 'USD',
+        tipoCambio: data.tipoCambio || null,
         estado: data.estado === 'activo' ? 'en_ejecucion' : (data.estado || 'creado'),
         fechaInicio: new Date(data.fechaInicio),
         fechaFin: data.fechaFin ? new Date(data.fechaFin) : null,

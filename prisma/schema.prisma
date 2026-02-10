@@ -205,6 +205,7 @@ model Cotizacion {
   formaPago                 String?
   incluyeIGV                Boolean?                    @default(false)
   moneda                    String?                     @default("USD")
+  tipoCambio                Float?
   referencia                String?
   revision                  String?                     @default("R01")
   validezOferta             Int?                        @default(15)
@@ -815,6 +816,8 @@ model Proyecto {
   totalRealServicios       Float                      @default(0)
   totalRealGastos          Float                      @default(0)
   totalReal                Float                      @default(0)
+  moneda                   String?                    @default("USD")
+  tipoCambio               Float?
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime
   deletedAt                DateTime?

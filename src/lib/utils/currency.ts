@@ -31,15 +31,63 @@ export const formatCurrency = (amount: number, options?: {
 /**
  * Formatea un número como moneda compacta (K, M, B)
  * @param amount - El monto a formatear
- * @returns String formateado como moneda USD compacta
+ * @param currency - Código de moneda (default: 'USD')
+ * @returns String formateado como moneda compacta
  */
-export const formatCurrencyCompact = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
+export const formatCurrencyCompact = (amount: number, currency: string = 'USD'): string => {
+  return new Intl.NumberFormat(getMonedaLocale(currency), {
     style: 'currency',
-    currency: 'USD',
+    currency,
     notation: 'compact',
     maximumFractionDigits: 1
   }).format(amount)
+}
+
+/**
+ * Obtiene el símbolo de moneda
+ */
+export const getMonedaSymbol = (moneda?: string | null): string => {
+  switch (moneda) {
+    case 'PEN': return 'S/'
+    case 'EUR': return '€'
+    default: return '$'
+  }
+}
+
+/**
+ * Obtiene el locale apropiado para una moneda
+ */
+export const getMonedaLocale = (moneda?: string | null): string => {
+  switch (moneda) {
+    case 'PEN': return 'es-PE'
+    case 'EUR': return 'de-DE'
+    default: return 'en-US'
+  }
+}
+
+/**
+ * Formatea un monto con la moneda correcta (shorthand)
+ * @param amount - El monto a formatear
+ * @param moneda - Código de moneda: 'USD', 'PEN', 'EUR'
+ */
+export const formatMoneda = (amount: number, moneda?: string | null): string => {
+  const currency = moneda || 'USD'
+  return new Intl.NumberFormat(getMonedaLocale(currency), {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount)
+}
+
+/**
+ * Formatea un monto sin símbolo de moneda (solo números con separadores)
+ */
+export const formatMonedaCompact = (amount: number, moneda?: string | null): string => {
+  return amount.toLocaleString(getMonedaLocale(moneda), {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
 }
 
 /**

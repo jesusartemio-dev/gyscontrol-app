@@ -168,6 +168,8 @@ export async function POST(request: NextRequest) {
         fechaInicio: body.fechaInicio ? new Date(body.fechaInicio) : new Date(),
         fechaFin: body.fechaFin ? new Date(body.fechaFin) : null,
         totalCliente: body.totalCliente || 0,
+        moneda: body.moneda || 'USD',
+        tipoCambio: body.tipoCambio || null,
         estado: body.estado || 'activo',
         updatedAt: new Date()
       },

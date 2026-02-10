@@ -39,6 +39,7 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
     fechaValidezHasta: cotizacion.fechaValidezHasta ?
       new Date(cotizacion.fechaValidezHasta).toISOString().split('T')[0] : '',
     moneda: cotizacion.moneda || 'USD',
+    tipoCambio: cotizacion.tipoCambio || '',
     revision: cotizacion.revision || '',
     incluyeIGV: cotizacion.incluyeIGV ?? false
   })
@@ -51,16 +52,25 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
       fechaValidezHasta: cotizacion.fechaValidezHasta ?
         new Date(cotizacion.fechaValidezHasta).toISOString().split('T')[0] : '',
       moneda: cotizacion.moneda || 'USD',
+      tipoCambio: cotizacion.tipoCambio || '',
       revision: cotizacion.revision || '',
       incluyeIGV: cotizacion.incluyeIGV ?? false
     })
   }, [cotizacion])
 
   const handleInputChange = (field: string, value: string | number | boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      // When switching currency, handle tipoCambio
+      if (field === 'moneda') {
+        if (value === 'USD') {
+          updated.tipoCambio = ''
+        } else if (!prev.tipoCambio) {
+          updated.tipoCambio = 3.75 // Default TC
+        }
+      }
+      return updated
+    })
     setError(null)
     setSuccess(false)
   }
@@ -73,7 +83,8 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
     try {
       const dataToUpdate = {
         ...formData,
-        fechaValidezHasta: formData.fechaValidezHasta || null
+        fechaValidezHasta: formData.fechaValidezHasta || null,
+        tipoCambio: formData.tipoCambio ? parseFloat(String(formData.tipoCambio)) : null
       }
 
       const updatedCotizacion = await updateCotizacion(cotizacion.id, dataToUpdate)
@@ -209,6 +220,28 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
                 </Select>
               </div>
 
+              {/* Tipo de Cambio - solo cuando moneda no es USD */}
+              {formData.moneda !== 'USD' && (
+                <div className="space-y-2">
+                  <Label htmlFor="tipoCambio" className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Tipo de Cambio ({formData.moneda}/USD)
+                  </Label>
+                  <Input
+                    id="tipoCambio"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={formData.tipoCambio}
+                    onChange={(e) => handleInputChange('tipoCambio', parseFloat(e.target.value) || '')}
+                    placeholder="Ej: 3.75"
+                    disabled={isLocked}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Tipo de cambio referencial al momento de la cotización
+                  </p>
+                </div>
+              )}
 
               {/* Validez de Oferta */}
               <div className="space-y-2">

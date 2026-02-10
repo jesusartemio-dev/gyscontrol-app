@@ -782,6 +782,7 @@ export interface Cotizacion {
    validezOferta?: number | null
    fechaValidezHasta?: string | null
    moneda?: string | null
+   tipoCambio?: number | null
    revision?: string | null
    incluyeIGV?: boolean | null
 
@@ -1052,6 +1053,8 @@ export interface Proyecto {
   totalRealServicios: number
   totalRealGastos: number
   totalReal: number
+  moneda?: string | null
+  tipoCambio?: number | null
   codigo: string
   estado: string
   fechaInicio: string

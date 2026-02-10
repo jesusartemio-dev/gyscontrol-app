@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { generateEquiposKey, generateServiciosKey, generateGastosKey } from '@/lib/utils/uniqueKeyGenerator'
+import { getMonedaSymbol, formatMoneda, formatMonedaCompact } from '@/lib/utils/currency'
 import type { Cotizacion } from '@/types'
 
 // Configuración de categorías con iconos y colores
@@ -47,27 +48,14 @@ const categoriasConfig = {
 function calcularRenta(pCliente: number, pInterno: number): { valor: string; color: string } {
   if (pInterno === 0) return { valor: '∞', color: 'text-green-600' }
   const renta = ((pCliente - pInterno) / pInterno) * 100
-  
+
   let color = 'text-gray-500'
   if (renta >= 30) color = 'text-green-600'
   else if (renta >= 15) color = 'text-yellow-600'
   else if (renta >= 0) color = 'text-orange-600'
   else color = 'text-red-600'
-  
+
   return { valor: `${renta.toFixed(1)}%`, color }
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(amount)
-}
-
-// Formato compacto sin símbolo
-function formatCompact(amount: number): string {
-  return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 interface Props {
@@ -77,6 +65,10 @@ interface Props {
 export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
   // 🔧 Generate unique keys using singleton generator to avoid React 19 duplicate key issues
   const contextId = React.useMemo(() => cotizacion.id || 'default', [cotizacion.id]);
+  const moneda = cotizacion.moneda || 'USD'
+  const sym = getMonedaSymbol(moneda)
+  const fmtCompact = (amount: number) => formatMonedaCompact(amount, moneda)
+  const fmtCurrency = (amount: number) => formatMoneda(amount, moneda)
   
   const categorias = [
     {
@@ -154,12 +146,12 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
                     </div>
                     <div className="text-right">
                       <span className="font-mono text-[10px] text-gray-600">
-                        ${formatCompact(categoria.totalInterno)}
+                        {sym}{fmtCompact(categoria.totalInterno)}
                       </span>
                     </div>
                     <div className="text-right">
                       <span className={`font-mono text-[10px] font-medium ${categoria.config.color}`}>
-                        ${formatCompact(categoria.totalCliente)}
+                        {sym}{fmtCompact(categoria.totalCliente)}
                       </span>
                     </div>
                     <div className="text-center">
@@ -190,7 +182,7 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
                 <span className="text-gray-600">Total Interno</span>
               </div>
               <span className="font-mono font-semibold text-gray-700">
-                ${formatCompact(cotizacion.totalInterno)}
+                {sym}{fmtCompact(cotizacion.totalInterno)}
               </span>
             </div>
 
@@ -200,7 +192,7 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
                 <span className="text-blue-700">Total Cliente</span>
               </div>
               <span className="font-mono font-semibold text-blue-800">
-                ${formatCompact(cotizacion.totalCliente)}
+                {sym}{fmtCompact(cotizacion.totalCliente)}
               </span>
             </div>
 
@@ -212,7 +204,7 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
                   <span className="text-amber-700">Dcto. {cotizacion.descuentoPorcentaje}% (Pendiente)</span>
                 </div>
                 <span className="font-mono font-semibold text-amber-800">
-                  -${formatCompact(cotizacion.descuento)}
+                  -{sym}{fmtCompact(cotizacion.descuento)}
                 </span>
               </div>
             )}
@@ -223,7 +215,7 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
                   <span className="text-green-700">Dcto. {cotizacion.descuentoPorcentaje}%</span>
                 </div>
                 <span className="font-mono font-semibold text-green-800">
-                  -${formatCompact(cotizacion.descuento)}
+                  -{sym}{fmtCompact(cotizacion.descuento)}
                 </span>
               </div>
             )}
@@ -234,7 +226,7 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
                   <span className="text-red-400 line-through">Dcto. {cotizacion.descuentoPorcentaje}% (Rechazado)</span>
                 </div>
                 <span className="font-mono font-semibold text-red-400 line-through">
-                  -${formatCompact(cotizacion.descuento)}
+                  -{sym}{fmtCompact(cotizacion.descuento)}
                 </span>
               </div>
             )}
@@ -246,7 +238,7 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
                   <span className="text-yellow-700">Descuento</span>
                 </div>
                 <span className="font-mono font-semibold text-yellow-800">
-                  -${formatCompact(cotizacion.descuento)}
+                  -{sym}{fmtCompact(cotizacion.descuento)}
                 </span>
               </div>
             )}
@@ -264,7 +256,7 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
                   <span className="font-bold text-sm">Total Final</span>
                 </div>
                 <span className="font-bold text-base font-mono">
-                  {formatCurrency(cotizacion.grandTotal)}
+                  {fmtCurrency(cotizacion.grandTotal)}
                 </span>
               </div>
 

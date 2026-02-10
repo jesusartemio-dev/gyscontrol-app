@@ -8,22 +8,18 @@ import type { CotizacionGastoItem } from '@/types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('es-PE', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(amount)
-}
+import { formatMoneda } from '@/lib/utils/currency'
 
 interface Props {
   items: CotizacionGastoItem[]
   onUpdate?: (item: CotizacionGastoItem) => void
   onDelete?: (id: string) => void
   isLocked?: boolean
+  moneda?: string
 }
 
-export default function CotizacionGastoItemTable({ items, onUpdate, onDelete, isLocked = false }: Props) {
+export default function CotizacionGastoItemTable({ items, onUpdate, onDelete, isLocked = false, moneda }: Props) {
+  const formatCurrency = (amount: number) => formatMoneda(amount, moneda)
   const [editModeId, setEditModeId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, Partial<CotizacionGastoItem>>>({})
   const [filter, setFilter] = useState('')

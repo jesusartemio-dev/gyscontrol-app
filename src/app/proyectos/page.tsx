@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { getProyectos, deleteProyecto, createProyecto } from '@/lib/services/proyecto'
 import type { Proyecto, ProyectoPayload } from '@/types'
+import { getMonedaSymbol } from '@/lib/utils/currency'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -194,7 +195,12 @@ export default function ProyectosPage() {
     total: proyectos.length,
     activos: proyectos.filter(p => p.estado === 'activo').length,
     cerrados: proyectos.filter(p => p.estado === 'cerrado').length,
-    totalValor: proyectos.reduce((sum, p) => sum + p.totalCliente, 0)
+    // Consolidate all projects to USD for KPI totals
+    totalValor: proyectos.reduce((sum, p) => {
+      const monto = p.totalCliente || 0
+      if (p.moneda === 'PEN' && p.tipoCambio) return sum + monto / p.tipoCambio
+      return sum + monto
+    }, 0)
   }
 
   const formatCurrency = (amount: number): string => {
@@ -488,7 +494,7 @@ export default function ProyectosPage() {
 
                   <div className="flex items-center justify-between pt-3 border-t">
                     <span className="text-sm font-bold text-green-600">
-                      $ {proyecto.totalCliente.toLocaleString()}
+                      {getMonedaSymbol(proyecto.moneda)} {proyecto.totalCliente.toLocaleString()}
                     </span>
                     <div className="flex gap-1">
                       <Button
@@ -576,7 +582,7 @@ export default function ProyectosPage() {
                           </Badge>
                         </td>
                         <td className="p-2 text-right font-medium text-green-600 whitespace-nowrap">
-                          ${proyecto.totalCliente.toLocaleString()}
+                          {getMonedaSymbol(proyecto.moneda)} {proyecto.totalCliente.toLocaleString()}
                         </td>
                         <td className="p-2">
                           <div className="flex gap-0.5 justify-center">

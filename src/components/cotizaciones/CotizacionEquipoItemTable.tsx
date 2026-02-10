@@ -12,11 +12,7 @@ import {
 } from '@/components/ui/tooltip'
 import type { CotizacionEquipoItem } from '@/types'
 import { cn } from '@/lib/utils'
-
-// Formato compacto sin símbolo de moneda para ahorrar espacio
-const formatCompact = (amount: number): string => {
-  return amount.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+import { formatMonedaCompact } from '@/lib/utils/currency'
 
 interface Props {
   items: CotizacionEquipoItem[]
@@ -24,9 +20,11 @@ interface Props {
   onDeleted?: (id: string) => void
   onEdit?: (item: CotizacionEquipoItem) => void
   isLocked?: boolean
+  moneda?: string
 }
 
-export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, isLocked = false }: Props) {
+export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, isLocked = false, moneda }: Props) {
+  const formatCompact = (amount: number) => formatMonedaCompact(amount, moneda)
   const [filter, setFilter] = useState('')
   const [showReferencia, setShowReferencia] = useState(false)
 

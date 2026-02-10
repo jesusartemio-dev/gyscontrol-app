@@ -18,8 +18,10 @@ import CotizacionModal from '@/components/cotizaciones/CotizacionModal'
 import CotizacionList from '@/components/cotizaciones/CotizacionList'
 import { getCotizaciones } from '@/lib/services/cotizacion'
 import type { Cotizacion } from '@/types'
+import { getMonedaSymbol } from '@/lib/utils/currency'
+import { penToUSD } from '@/lib/costos'
 
-const formatCurrency = (amount: number): string => {
+const formatCurrencyKPI = (amount: number): string => {
   if (amount >= 1000000) {
     return `$${(amount / 1000000).toFixed(1)}M`
   }
@@ -60,7 +62,12 @@ export default function CotizacionesPage() {
   const aprobadas = cotizaciones.filter(c => c.estado?.toLowerCase() === 'aprobada').length
   const enviadas = cotizaciones.filter(c => c.estado?.toLowerCase() === 'enviada').length
   const borradores = cotizaciones.filter(c => c.estado?.toLowerCase() === 'borrador').length
-  const montoTotal = cotizaciones.reduce((sum, c) => sum + (c.totalCliente || 0), 0)
+  // KPI total: consolidate all cotizaciones to USD
+  const montoTotal = cotizaciones.reduce((sum, c) => {
+    const monto = c.totalCliente || 0
+    if (c.moneda === 'PEN' && c.tipoCambio) return sum + penToUSD(monto, c.tipoCambio)
+    return sum + monto
+  }, 0)
 
   if (loading) {
     return (
@@ -100,7 +107,7 @@ export default function CotizacionesPage() {
             <div className="w-px h-4 bg-gray-200" />
             <div className="flex items-center gap-1 text-emerald-600" title="Monto Total">
               <DollarSign className="h-3.5 w-3.5" />
-              <span className="font-semibold">{formatCurrency(montoTotal)}</span>
+              <span className="font-semibold">{formatCurrencyKPI(montoTotal)}</span>
             </div>
           </div>
 
@@ -135,7 +142,7 @@ export default function CotizacionesPage() {
           <div className="text-[10px] text-gray-700">Borradores</div>
         </div>
         <div className="bg-emerald-50 rounded-lg p-2 text-center">
-          <div className="text-lg font-bold text-emerald-600">{formatCurrency(montoTotal)}</div>
+          <div className="text-lg font-bold text-emerald-600">{formatCurrencyKPI(montoTotal)}</div>
           <div className="text-[10px] text-emerald-700">Total</div>
         </div>
       </div>
