@@ -664,8 +664,7 @@ export default function PersonalClient() {
                     <tr className="border-b bg-slate-100">
                       {/* Columnas fijas de información */}
                       <th className="sticky left-0 z-10 bg-slate-100 text-center py-2 px-2 font-semibold text-slate-700 border-r w-8">N°</th>
-                      <th className="sticky left-8 z-10 bg-slate-100 text-left py-2 px-2 font-semibold text-slate-700 border-r min-w-[180px]">Apellidos y Nombres</th>
-                      <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">DNI</th>
+                      <th className="sticky left-8 z-10 bg-slate-100 text-left py-2 px-2 font-semibold text-slate-700 border-r min-w-[200px]">Nombre / DNI</th>
                       <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">F. Ingreso</th>
                       <th className="text-left py-2 px-2 font-semibold text-slate-700 min-w-[180px] max-w-[220px]">Cargo</th>
                       <th className="text-left py-2 px-2 font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">Area</th>
@@ -705,7 +704,7 @@ export default function PersonalClient() {
                           <td className="sticky left-0 z-10 bg-white text-center py-1.5 px-2 font-mono text-slate-500 border-r">
                             {index + 1}
                           </td>
-                          {/* Nombre */}
+                          {/* Nombre + DNI */}
                           <td className="sticky left-8 z-10 bg-white py-1.5 px-2 border-r">
                             <div className="flex items-center gap-2">
                               <div className={cn(
@@ -714,20 +713,25 @@ export default function PersonalClient() {
                               )}>
                                 {getInitials(emp.user?.name)}
                               </div>
-                              <span className="font-medium truncate" title={emp.user?.name || 'Sin nombre'}>
-                                {emp.user?.name || 'Sin nombre'}
-                              </span>
+                              <div className="min-w-0">
+                                <span className="font-medium truncate block" title={emp.user?.name || 'Sin nombre'}>
+                                  {emp.user?.name || 'Sin nombre'}
+                                </span>
+                                {emp.documentoIdentidad && (
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    DNI: {emp.documentoIdentidad}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
-                          {/* DNI */}
-                          <td className="py-1.5 px-2 text-center font-mono">{emp.documentoIdentidad || '—'}</td>
                           {/* Fecha Ingreso */}
                           <td className="py-1.5 px-2 text-center font-mono text-slate-600">
                             {emp.fechaIngreso ? new Date(emp.fechaIngreso).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                           </td>
                           {/* Cargo */}
-                          <td className="py-1.5 px-2 text-sm leading-tight max-w-[220px]">
-                            <span className="line-clamp-2" title={emp.cargo?.nombre}>{emp.cargo?.nombre || '—'}</span>
+                          <td className="py-1.5 px-2">
+                            <span className="text-sm" title={emp.cargo?.nombre}>{emp.cargo?.nombre || '—'}</span>
                           </td>
                           {/* Area/Departamento */}
                           <td className="py-1.5 px-2 truncate" title={emp.departamento?.nombre}>{emp.departamento?.nombre || '—'}</td>
@@ -841,7 +845,7 @@ export default function PersonalClient() {
                   {/* Fila de totales */}
                   <tfoot>
                     <tr className="border-t-2 bg-slate-50 font-semibold">
-                      <td colSpan={6} className="sticky left-0 z-10 bg-slate-50 py-2 px-2 text-right border-r">
+                      <td colSpan={5} className="sticky left-0 z-10 bg-slate-50 py-2 px-2 text-right border-r">
                         TOTALES ({filteredEmpleados.length} empleados)
                       </td>
                       {(() => {
