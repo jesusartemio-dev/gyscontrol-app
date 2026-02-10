@@ -74,7 +74,8 @@ export async function recalcularTotalesCotizacion(id: string) {
 
   const totalInterno = totalEquiposInterno + totalServiciosInterno + totalGastosInterno
   const totalCliente = totalEquiposCliente + totalServiciosCliente + totalGastosCliente
-  const grandTotal = totalCliente - cotizacion.descuento
+  const descuentoEfectivo = cotizacion.descuentoEstado === 'aprobado' ? cotizacion.descuento : 0
+  const grandTotal = totalCliente - descuentoEfectivo
 
   await prisma.cotizacion.update({
     where: { id },

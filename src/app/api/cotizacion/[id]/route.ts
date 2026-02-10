@@ -56,6 +56,9 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
             comercial: true
           }
         },
+        // ✅ Descuento - relaciones
+        descuentoSolicitadoPor: { select: { id: true, name: true } },
+        descuentoAprobadoPor: { select: { id: true, name: true } },
         // ✅ Proyecto vinculado
         proyecto: {
           select: { id: true, codigo: true, nombre: true, estado: true },

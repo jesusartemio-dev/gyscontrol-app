@@ -221,10 +221,20 @@ model Cotizacion {
   fechaFin                  DateTime?
   fechaInicio               DateTime?
   estado                    EstadoCotizacion            @default(borrador)
+  // Descuento con aprobación
+  descuentoPorcentaje       Float?
+  descuentoMotivo           String?
+  descuentoEstado           String?
+  descuentoSolicitadoPorId  String?
+  descuentoAprobadoPorId    String?
+  descuentoFechaRespuesta   DateTime?
+  descuentoComentario       String?
   calendarioLaboral         CalendarioLaboral?          @relation(fields: [calendarioLaboralId], references: [id])
   cliente                   Cliente?                    @relation(fields: [clienteId], references: [id])
   user                      User?                       @relation(fields: [comercialId], references: [id])
   plantilla                 Plantilla?                  @relation(fields: [plantillaId], references: [id])
+  descuentoSolicitadoPor    User?                       @relation("CotizacionDescuentoSolicitante", fields: [descuentoSolicitadoPorId], references: [id])
+  descuentoAprobadoPor      User?                       @relation("CotizacionDescuentoAprobador", fields: [descuentoAprobadoPorId], references: [id])
   cotizacionEquipo          CotizacionEquipo[]
   cotizacionGasto           CotizacionGasto[]
   cotizacionServicio        CotizacionServicio[]
@@ -1235,6 +1245,9 @@ model User {
   // Trazabilidad
   listaEquipoItemsVerificados           ListaEquipoItem[]            @relation("ListaEquipoItemVerificador")
   pedidoEquipoItemsComentados           PedidoEquipoItem[]           @relation("PedidoEquipoItemComentarioLogistica")
+  // Descuentos cotización
+  cotizacionDescuentosSolicitados       Cotizacion[]                 @relation("CotizacionDescuentoSolicitante")
+  cotizacionDescuentosAprobados         Cotizacion[]                 @relation("CotizacionDescuentoAprobador")
 
   @@map("user")
 }

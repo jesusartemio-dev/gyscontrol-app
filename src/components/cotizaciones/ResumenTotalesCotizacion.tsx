@@ -204,8 +204,42 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
               </span>
             </div>
 
-            {/* Descuento */}
-            {cotizacion.descuento > 0 && (
+            {/* Descuento con estado */}
+            {cotizacion.descuentoEstado === 'propuesto' && (
+              <div className="flex items-center justify-between text-[10px] px-1 py-0.5 bg-amber-50 rounded border border-amber-200">
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="h-2.5 w-2.5 text-amber-600 rotate-180" />
+                  <span className="text-amber-700">Dcto. {cotizacion.descuentoPorcentaje}% (Pendiente)</span>
+                </div>
+                <span className="font-mono font-semibold text-amber-800">
+                  -${formatCompact(cotizacion.descuento)}
+                </span>
+              </div>
+            )}
+            {cotizacion.descuentoEstado === 'aprobado' && cotizacion.descuento > 0 && (
+              <div className="flex items-center justify-between text-[10px] px-1 py-0.5 bg-green-50 rounded border border-green-200">
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="h-2.5 w-2.5 text-green-600 rotate-180" />
+                  <span className="text-green-700">Dcto. {cotizacion.descuentoPorcentaje}%</span>
+                </div>
+                <span className="font-mono font-semibold text-green-800">
+                  -${formatCompact(cotizacion.descuento)}
+                </span>
+              </div>
+            )}
+            {cotizacion.descuentoEstado === 'rechazado' && (
+              <div className="flex items-center justify-between text-[10px] px-1 py-0.5 bg-red-50 rounded border border-red-200">
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="h-2.5 w-2.5 text-red-400 rotate-180" />
+                  <span className="text-red-400 line-through">Dcto. {cotizacion.descuentoPorcentaje}% (Rechazado)</span>
+                </div>
+                <span className="font-mono font-semibold text-red-400 line-through">
+                  -${formatCompact(cotizacion.descuento)}
+                </span>
+              </div>
+            )}
+            {/* Legacy: show descuento without estado (backward compat) */}
+            {!cotizacion.descuentoEstado && cotizacion.descuento > 0 && (
               <div className="flex items-center justify-between text-[10px] px-1 py-0.5 bg-yellow-50 rounded border border-yellow-200">
                 <div className="flex items-center gap-1">
                   <TrendingUp className="h-2.5 w-2.5 text-yellow-600 rotate-180" />

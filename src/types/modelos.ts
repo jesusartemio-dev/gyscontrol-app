@@ -814,6 +814,17 @@ export interface Cotizacion {
    // ✅ NUEVA RELACIÓN CON OPORTUNIDAD CRM
    oportunidadCrm?: CrmOportunidad
 
+   // ✅ Descuento con aprobación
+   descuentoPorcentaje?: number | null
+   descuentoMotivo?: string | null
+   descuentoEstado?: string | null
+   descuentoSolicitadoPorId?: string | null
+   descuentoAprobadoPorId?: string | null
+   descuentoFechaRespuesta?: string | null
+   descuentoComentario?: string | null
+   descuentoSolicitadoPor?: { id: string; name: string } | null
+   descuentoAprobadoPor?: { id: string; name: string } | null
+
    // ✅ CALENDARIO LABORAL ASOCIADO
    calendarioLaboralId?: string
    calendarioLaboral?: CalendarioLaboral

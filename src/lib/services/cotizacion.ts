@@ -138,6 +138,29 @@ export async function deleteCotizacion(id: string): Promise<void> {
   }
 }
 
+// Acciones de descuento (proponer, aprobar, rechazar, eliminar)
+export async function descuentoAction(
+  cotizacionId: string,
+  data: { action: string; porcentaje?: number; motivo?: string; comentario?: string }
+) {
+  try {
+    const res = await fetch(buildApiUrl(`/api/cotizacion/${cotizacionId}/descuento`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      const err = await res.json()
+      throw new Error(err.error || 'Error en acción de descuento')
+    }
+    return res.json()
+  } catch (error) {
+    console.error('descuentoAction:', error)
+    throw error
+  }
+}
+
 // Recalcular cotización
 export async function recalcularCotizacionDesdeAPI(id: string) {
   try {
