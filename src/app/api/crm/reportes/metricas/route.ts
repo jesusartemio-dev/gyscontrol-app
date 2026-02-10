@@ -6,6 +6,8 @@
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -14,6 +16,17 @@ export const dynamic = 'force-dynamic'
 // ✅ Obtener métricas detalladas del CRM
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
+    const comercialFilter = esComercial ? { comercialId: session.user.id } : {}
+    const usuarioFilter = esComercial ? { usuarioId: session.user.id } : {}
+
     const { searchParams } = new URL(req.url)
     const periodo = searchParams.get('periodo') || '2024-Q4' // Trimestre por defecto
 
@@ -51,6 +64,7 @@ export async function GET(req: NextRequest) {
       // Cotizaciones generadas
       prisma.cotizacion.count({
         where: {
+          ...comercialFilter,
           createdAt: { gte: fechaInicio, lte: fechaFin }
         }
       }),
@@ -58,6 +72,7 @@ export async function GET(req: NextRequest) {
       // Cotizaciones aprobadas
       prisma.cotizacion.count({
         where: {
+          ...comercialFilter,
           estado: 'aprobada',
           createdAt: { gte: fechaInicio, lte: fechaFin }
         }
@@ -66,6 +81,7 @@ export async function GET(req: NextRequest) {
       // Proyectos cerrados
       prisma.proyecto.count({
         where: {
+          ...comercialFilter,
           createdAt: { gte: fechaInicio, lte: fechaFin }
         }
       }),
@@ -73,21 +89,24 @@ export async function GET(req: NextRequest) {
       // Oportunidades creadas
       prisma.crmOportunidad.count({
         where: {
+          ...comercialFilter,
           createdAt: { gte: fechaInicio, lte: fechaFin }
         }
       }),
 
-      // Oportunidades ganadas (seguimiento_proyecto = ganada, cerrada_ganada = legacy)
+      // Oportunidades ganadas - filtrar por fechaCierre (cuando realmente se ganó)
       prisma.crmOportunidad.count({
         where: {
+          ...comercialFilter,
           estado: { in: ['cerrada_ganada', 'seguimiento_proyecto'] },
-          createdAt: { gte: fechaInicio, lte: fechaFin }
+          fechaCierre: { gte: fechaInicio, lte: fechaFin }
         }
       }),
 
       // Actividades realizadas
       prisma.crmActividad.count({
         where: {
+          ...usuarioFilter,
           fecha: { gte: fechaInicio, lte: fechaFin }
         }
       })
@@ -96,6 +115,7 @@ export async function GET(req: NextRequest) {
     // Valor total vendido
     const valorTotalResult = await prisma.proyecto.aggregate({
       where: {
+        ...comercialFilter,
         createdAt: { gte: fechaInicio, lte: fechaFin }
       },
       _sum: { grandTotal: true }
@@ -104,6 +124,7 @@ export async function GET(req: NextRequest) {
     // Margen total obtenido
     const margenResult = await prisma.proyecto.aggregate({
       where: {
+        ...comercialFilter,
         createdAt: { gte: fechaInicio, lte: fechaFin }
       },
       _sum: {
@@ -122,13 +143,13 @@ export async function GET(req: NextRequest) {
 
       const [cotizacionesMes, proyectosMes, valorMes] = await Promise.all([
         prisma.cotizacion.count({
-          where: { createdAt: { gte: mesInicio, lte: mesFin } }
+          where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mesFin } }
         }),
         prisma.proyecto.count({
-          where: { createdAt: { gte: mesInicio, lte: mesFin } }
+          where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mesFin } }
         }),
         prisma.proyecto.aggregate({
-          where: { createdAt: { gte: mesInicio, lte: mesFin } },
+          where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mesFin } },
           _sum: { grandTotal: true }
         })
       ])

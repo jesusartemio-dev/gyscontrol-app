@@ -52,6 +52,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
+
     const { searchParams } = new URL(req.url)
     const comercialId = searchParams.get('comercialId') || undefined
     const meses = parseInt(searchParams.get('meses') || '6', 10)
@@ -61,11 +65,14 @@ export async function GET(req: NextRequest) {
     const limiteSuper = new Date(now.getFullYear(), now.getMonth() + meses + 1, 0, 23, 59, 59)
 
     // Build where clause for active opportunities with valorEstimado > 0
+    // RBAC: comercial solo ve sus propias oportunidades
     const where: any = {
       estado: { in: ESTADOS_ACTIVOS as any },
       valorEstimado: { not: null, gt: 0 },
     }
-    if (comercialId) {
+    if (esComercial) {
+      where.comercialId = session.user.id
+    } else if (comercialId) {
       where.comercialId = comercialId
     }
 
@@ -154,15 +161,19 @@ export async function GET(req: NextRequest) {
 
     // Calculate historical precision: won opportunities in the last 3 months
     const tresMesesAtras = new Date(now.getFullYear(), now.getMonth() - 3, 1)
-    const ganadas = await prisma.crmOportunidad.findMany({
-      where: {
-        estado: { in: ESTADOS_GANADOS as any },
-        fechaCierre: {
-          gte: tresMesesAtras,
-          lte: now,
-        },
-        valorEstimado: { not: null, gt: 0 },
+    const ganadasWhere: any = {
+      estado: { in: ESTADOS_GANADOS as any },
+      fechaCierre: {
+        gte: tresMesesAtras,
+        lte: now,
       },
+      valorEstimado: { not: null, gt: 0 },
+    }
+    if (esComercial) {
+      ganadasWhere.comercialId = session.user.id
+    }
+    const ganadas = await prisma.crmOportunidad.findMany({
+      where: ganadasWhere,
       select: { valorEstimado: true },
     })
     const valorRealGanado = ganadas.reduce((sum, op) => sum + (op.valorEstimado || 0), 0)

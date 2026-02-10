@@ -6,6 +6,8 @@
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -13,8 +15,13 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const data = await req.json()
-    const { cotizacionId, comercialId, descripcion } = data
+    const { cotizacionId, descripcion } = data
 
     if (!cotizacionId) {
       return NextResponse.json(
@@ -69,10 +76,10 @@ export async function POST(req: NextRequest) {
         probabilidad: 50, // Probabilidad inicial por defecto
         estado: 'contacto_cliente',
         fuente: 'cotizacion_existente',
-        comercialId: comercialId || cotizacion.user?.id,
-        responsableId: comercialId || cotizacion.user?.id,
+        comercialId: session.user.id,
+        responsableId: session.user.id,
         cotizacionId: cotizacion.id,
-        fechaCierreEstimada: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días por defecto
+        fechaCierreEstimada: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días por defecto
         updatedAt: new Date()
       },
       include: {
@@ -92,9 +99,9 @@ export async function POST(req: NextRequest) {
         oportunidadId: oportunidad.id,
         tipo: 'seguimiento',
         descripcion: `Oportunidad creada desde cotización ${cotizacion.codigo}`,
-        fecha: new Date().toISOString(),
+        fecha: new Date(),
         resultado: 'neutro',
-        usuarioId: comercialId || cotizacion.user?.id || 'system',
+        usuarioId: session.user.id,
         updatedAt: new Date()
       }
     })

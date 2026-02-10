@@ -63,9 +63,13 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
 
     const { searchParams } = new URL(request.url)
     const periodo = searchParams.get('periodo') || new Date().toISOString().slice(0, 7)
@@ -75,10 +79,11 @@ export async function GET(request: NextRequest) {
     const yearStart = new Date(year, 0, 1)
     const yearEnd = new Date(year, 11, 31, 23, 59, 59)
 
-    // Obtener usuarios comerciales (cualquier rol con actividad CRM)
+    // RBAC: comercial solo ve sus propias métricas
     const usuarios = await prisma.user.findMany({
       where: {
-        role: { in: ['comercial', 'coordinador', 'gerente', 'admin'] }
+        role: { in: ['comercial', 'coordinador', 'gerente', 'admin'] },
+        ...(esComercial ? { id: session.user.id } : {}),
       },
       select: { id: true, name: true, email: true, role: true }
     })

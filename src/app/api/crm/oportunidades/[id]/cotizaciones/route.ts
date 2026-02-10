@@ -100,7 +100,7 @@ export async function POST(
       }
 
       const createData = {
-        id: `cot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         clienteId: oportunidad.clienteId,
         comercialId: oportunidad.comercialId,
         plantillaId: plantillaId,
@@ -127,7 +127,7 @@ export async function POST(
         // ✅ Copiar equipos con sus items
         cotizacionEquipo: {
           create: plantilla.plantillaEquipo.map(e => ({
-            id: `cot-eq-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: crypto.randomUUID(),
             nombre: e.nombre,
             descripcion: e.descripcion,
             subtotalInterno: e.subtotalInterno,
@@ -135,7 +135,7 @@ export async function POST(
             updatedAt: new Date(),
             cotizacionEquipoItem: {
               create: e.plantillaEquipoItem.map(item => ({
-                id: `cot-eq-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: crypto.randomUUID(),
                 catalogoEquipoId: item.catalogoEquipoId,
                 codigo: item.codigo,
                 descripcion: item.descripcion,
@@ -155,7 +155,7 @@ export async function POST(
         // ✅ Copiar servicios con sus items
         cotizacionServicio: {
           create: plantilla.plantillaServicio.map((s) => ({
-            id: `cot-srv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: crypto.randomUUID(),
             nombre: s.nombre,
             categoria: s.categoria,
             subtotalInterno: Number(s.subtotalInterno),
@@ -163,7 +163,7 @@ export async function POST(
             updatedAt: new Date(),
             cotizacionServicioItem: {
               create: s.plantillaServicioItem.map(item => ({
-                id: `cot-srv-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: crypto.randomUUID(),
                 catalogoServicioId: item.catalogoServicioId,
                 categoria: item.categoria,
                 unidadServicioId: item.unidadServicioId, // ✅ Campo obligatorio
@@ -192,14 +192,14 @@ export async function POST(
         // ✅ Copiar gastos con sus items
         cotizacionGasto: {
           create: plantilla.plantillaGasto.map(g => ({
-            id: `cot-gasto-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: crypto.randomUUID(),
             nombre: g.nombre,
             subtotalInterno: g.subtotalInterno,
             subtotalCliente: g.subtotalCliente,
             updatedAt: new Date(),
             cotizacionGastoItem: {
               create: g.plantillaGastoItem.map(item => ({
-                id: `cot-gasto-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: crypto.randomUUID(),
                 nombre: item.nombre,
                 descripcion: item.descripcion,
                 cantidad: item.cantidad,
@@ -221,7 +221,7 @@ export async function POST(
       // Crear cotización básica
       nuevaCotizacion = await prisma.cotizacion.create({
         data: {
-          id: `cot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: crypto.randomUUID(),
           clienteId: oportunidad.clienteId,
           comercialId: oportunidad.comercialId,
           codigo: codigo,

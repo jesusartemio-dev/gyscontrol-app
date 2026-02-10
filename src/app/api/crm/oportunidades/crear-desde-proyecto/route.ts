@@ -6,6 +6,8 @@
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -13,8 +15,13 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const data = await req.json()
-    const { proyectoId, comercialId, descripcion, tipo } = data
+    const { proyectoId, descripcion, tipo } = data
 
     if (!proyectoId) {
       return NextResponse.json(
@@ -90,7 +97,7 @@ export async function POST(req: NextRequest) {
     // Crear la oportunidad
     const oportunidad = await prisma.crmOportunidad.create({
       data: {
-        id: `crm-opp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         clienteId: proyecto.cliente.id,
         nombre: nombreOportunidad,
         descripcion: descripcion || `Oportunidad creada automáticamente desde el proyecto ${proyecto.nombre}`,
@@ -98,10 +105,10 @@ export async function POST(req: NextRequest) {
         probabilidad: tipo === 'seguimiento' ? 60 : 40, // Mayor probabilidad para seguimientos
         estado: estadoInicial,
         fuente: tipo || 'proyecto_existente',
-        comercialId: comercialId || proyecto.comercial?.id,
-        responsableId: comercialId || proyecto.comercial?.id,
+        comercialId: session.user.id,
+        responsableId: session.user.id,
         proyectoId: proyecto.id,
-        fechaCierreEstimada: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 días por defecto
+        fechaCierreEstimada: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 días por defecto
         updatedAt: new Date()
       },
       include: {
@@ -131,13 +138,13 @@ export async function POST(req: NextRequest) {
 
     await prisma.crmActividad.create({
       data: {
-        id: `crm-act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         oportunidadId: oportunidad.id,
         tipo: tipo === 'seguimiento' ? 'seguimiento' : 'llamada',
         descripcion: descripcionActividad,
-        fecha: new Date().toISOString(),
+        fecha: new Date(),
         resultado: 'neutro',
-        usuarioId: comercialId || proyecto.comercial?.id || 'system',
+        usuarioId: session.user.id,
         updatedAt: new Date()
       }
     })

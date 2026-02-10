@@ -6,6 +6,8 @@
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -17,7 +19,19 @@ export async function GET(
   { params }: { params: Promise<{ usuarioId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { usuarioId } = await params
+
+    // RBAC: comercial solo puede ver sus propias métricas
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    if (!rolesConAccesoTotal.includes(userRole) && usuarioId !== session.user.id) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
     const { searchParams } = new URL(req.url)
     const periodo = searchParams.get('periodo') || new Date().toISOString().slice(0, 7)
     const tipo = searchParams.get('tipo') || 'mensual'
