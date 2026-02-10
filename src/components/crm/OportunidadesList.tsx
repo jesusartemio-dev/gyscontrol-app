@@ -28,7 +28,9 @@ import {
   ClipboardCheck,
   FileCheck,
   Send,
-  MessageSquareWarning
+  MessageSquareWarning,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -447,10 +449,17 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
   const [searchTerm, setSearchTerm] = useState('')
   const [estadisticas, setEstadisticas] = useState<Record<string, { count: number; valorTotal: number }>>({})
   const [viewMode, setViewMode] = useState<'table' | 'card' | 'kanban'>('table')
+  const [totalPages, setTotalPages] = useState(0)
   const { toast } = useToast()
 
   // ✅ Cargar oportunidades y detectar proyectos existentes
   const loadOportunidades = async () => {
+    // Kanban manages its own data fetching
+    if (viewMode === 'kanban') {
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -458,6 +467,9 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
       const response = await getOportunidades(filters, pagination)
       setOportunidades(response.data)
       setEstadisticas(response.estadisticas)
+      if (response.pagination) {
+        setTotalPages(response.pagination.pages)
+      }
 
     } catch (err) {
       console.error('Error al cargar oportunidades:', err)
@@ -475,7 +487,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
   // ✅ Efecto para cargar datos
   useEffect(() => {
     loadOportunidades()
-  }, [filters, pagination])
+  }, [filters, pagination, viewMode])
 
   // ✅ Efecto para búsqueda con debounce
   useEffect(() => {
@@ -690,7 +702,9 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
         </AnimatePresence>
 
         {/* Loading state */}
-        {loading ? (
+        {viewMode === 'kanban' ? (
+          <KanbanBoard onView={onView} onEdit={onEdit} filters={filters} />
+        ) : loading ? (
           <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <OportunidadSkeleton key={i} />
@@ -698,8 +712,6 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
           </div>
         ) : oportunidades.length === 0 ? (
           <EmptyState onCreate={onCreate} />
-        ) : viewMode === 'kanban' ? (
-          <KanbanBoard onView={onView} onEdit={onEdit} />
         ) : viewMode === 'table' ? (
           <div className="bg-white border rounded-lg overflow-x-auto">
             <table className="w-full table-fixed min-w-[800px]">
@@ -1085,6 +1097,33 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
           </AnimatePresence>
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && viewMode !== 'kanban' && totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-sm text-muted-foreground">
+            Página {pagination.page ?? 1} de {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={(pagination.page ?? 1) <= 1}
+              onClick={() => setPagination(prev => ({ ...prev, page: (prev.page ?? 1) - 1 }))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={(pagination.page ?? 1) >= totalPages}
+              onClick={() => setPagination(prev => ({ ...prev, page: (prev.page ?? 1) + 1 }))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

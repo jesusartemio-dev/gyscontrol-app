@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { Building2, Users, Search, Filter, Eye, BarChart3, Loader2, List, Grid3X3 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +26,7 @@ interface ClienteCRM extends Cliente {
 
 export default function CrmClientesPage() {
   const router = useRouter()
+  const { status } = useSession()
   const [clientes, setClientes] = useState<ClienteCRM[]>([])
   const [filteredClientes, setFilteredClientes] = useState<ClienteCRM[]>([])
   const [loading, setLoading] = useState(true)
@@ -113,7 +115,7 @@ export default function CrmClientesPage() {
     ))
   }
 
-  if (loading) {
+  if (loading || status === 'loading') {
     return (
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -124,6 +126,11 @@ export default function CrmClientesPage() {
         </div>
       </div>
     )
+  }
+
+  if (status === 'unauthenticated') {
+    router.push('/login')
+    return null
   }
 
   if (error) {

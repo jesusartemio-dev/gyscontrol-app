@@ -23,7 +23,12 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
-    const userRole = searchParams.get('role') || 'comercial'
+    const userRole = (session.user as any).role || 'comercial'
+
+    // RBAC: comercial users can only see their own data
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
+    const comercialFilter = esComercial ? { comercialId: session.user.id } : {}
 
     // Obtener métricas generales del embudo
     const [
@@ -37,11 +42,12 @@ export async function GET(req: NextRequest) {
       oportunidadesPorEstado
     ] = await Promise.all([
       // Total de oportunidades
-      prisma.crmOportunidad.count(),
+      prisma.crmOportunidad.count({ where: comercialFilter }),
 
       // Oportunidades activas (no cerradas)
       prisma.crmOportunidad.count({
         where: {
+          ...comercialFilter,
           estado: {
             notIn: ['cerrada_ganada', 'cerrada_perdida', 'seguimiento_proyecto', 'feedback_mejora']
           }
@@ -51,6 +57,7 @@ export async function GET(req: NextRequest) {
       // Oportunidades ganadas (seguimiento_proyecto = ganada, cerrada_ganada = legacy)
       prisma.crmOportunidad.count({
         where: {
+          ...comercialFilter,
           estado: { in: ['cerrada_ganada', 'seguimiento_proyecto'] }
         }
       }),
@@ -58,19 +65,22 @@ export async function GET(req: NextRequest) {
       // Oportunidades perdidas (feedback_mejora = perdida, cerrada_perdida = legacy)
       prisma.crmOportunidad.count({
         where: {
+          ...comercialFilter,
           estado: { in: ['cerrada_perdida', 'feedback_mejora'] }
         }
       }),
 
       // Valor total del embudo
       prisma.crmOportunidad.aggregate({
-        _sum: { valorEstimado: true }
+        _sum: { valorEstimado: true },
+        where: comercialFilter
       }),
 
       // Valor del embudo activo
       prisma.crmOportunidad.aggregate({
         _sum: { valorEstimado: true },
         where: {
+          ...comercialFilter,
           estado: {
             notIn: ['cerrada_ganada', 'cerrada_perdida', 'seguimiento_proyecto', 'feedback_mejora']
           }
@@ -95,7 +105,8 @@ export async function GET(req: NextRequest) {
       prisma.crmOportunidad.groupBy({
         by: ['estado'],
         _count: { id: true },
-        _sum: { valorEstimado: true }
+        _sum: { valorEstimado: true },
+        where: comercialFilter
       })
     ])
 

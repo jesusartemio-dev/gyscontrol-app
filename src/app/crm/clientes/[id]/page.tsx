@@ -90,6 +90,8 @@ export default function CrmClienteDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [showContactoForm, setShowContactoForm] = useState(false)
   const [savingContacto, setSavingContacto] = useState(false)
+  const [historialStats, setHistorialStats] = useState<any>(null)
+  const [oportunidades, setOportunidades] = useState<any[]>([])
 
   useEffect(() => {
     const loadClienteData = async () => {
@@ -110,8 +112,28 @@ export default function CrmClienteDetailPage() {
           setContactos([])
         }
 
-        // Load historial de proyectos (simulated for now)
-        setHistorialProyectos([])
+        // Load historial de proyectos from API
+        try {
+          const historialRes = await fetch(`/api/crm/clientes/${clienteId}/historial`)
+          if (historialRes.ok) {
+            const historialData = await historialRes.json()
+            setHistorialProyectos(historialData.registros || [])
+            setHistorialStats(historialData.estadisticas || null)
+          }
+        } catch (historialError) {
+          console.error('Error loading historial:', historialError)
+        }
+
+        // Load oportunidades del cliente
+        try {
+          const opRes = await fetch(`/api/crm/oportunidades?clienteId=${clienteId}&limit=50`)
+          if (opRes.ok) {
+            const opData = await opRes.json()
+            setOportunidades(opData.data || [])
+          }
+        } catch (opError) {
+          console.error('Error loading oportunidades:', opError)
+        }
 
       } catch (err) {
         setError('Error al cargar los datos del cliente')
@@ -253,13 +275,9 @@ export default function CrmClienteDetailPage() {
               <Building2 className="h-4 w-4 mr-2" />
               Vista Básica
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => router.push(`/comercial/clientes/${cliente.id}`)}>
               <Edit3 className="h-4 w-4 mr-2" />
               Editar
-            </Button>
-            <Button variant="outline">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Eliminar
             </Button>
           </div>
         </div>
@@ -281,16 +299,7 @@ export default function CrmClienteDetailPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button size="sm">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Agregar Nota
-            </Button>
-            <Button size="sm">
-              <Activity className="h-4 w-4 mr-2" />
-              Nueva Actividad
-            </Button>
-          </div>
+          <div className="flex items-center gap-2" />
         </div>
 
         {/* Main Content */}
@@ -386,15 +395,15 @@ export default function CrmClienteDetailPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Valor Total Proyectos</span>
-                      <span className="font-medium">$0</span>
+                      <span className="font-medium">{historialStats?.valorTotalProyectos ? formatCurrency(historialStats.valorTotalProyectos) : '$0'}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Margen Total Obtenido</span>
-                      <span className="font-medium">$0</span>
+                      <span className="text-sm text-gray-600">Cotizaciones</span>
+                      <span className="font-medium">{historialStats?.totalCotizaciones ?? 0} ({historialStats?.cotizacionesPendientes ?? 0} pendientes)</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Último Proyecto</span>
-                      <span className="font-medium">-</span>
+                      <span className="text-sm text-gray-600">Valor Cotizaciones</span>
+                      <span className="font-medium">{historialStats?.valorTotalCotizaciones ? formatCurrency(historialStats.valorTotalCotizaciones) : '$0'}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -409,8 +418,8 @@ export default function CrmClienteDetailPage() {
                   <Briefcase className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">Proyectos completados</p>
+                  <div className="text-2xl font-bold">{historialStats?.totalProyectos ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">{historialStats?.proyectosActivos ?? 0} activos</p>
                 </CardContent>
               </Card>
 
@@ -420,8 +429,8 @@ export default function CrmClienteDetailPage() {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">$0</div>
-                  <p className="text-xs text-muted-foreground">Valor total de contratos</p>
+                  <div className="text-2xl font-bold">{historialStats?.valorTotalProyectos ? formatCurrency(historialStats.valorTotalProyectos) : '$0'}</div>
+                  <p className="text-xs text-muted-foreground">{historialStats?.totalCotizaciones ?? 0} cotizaciones</p>
                 </CardContent>
               </Card>
 
@@ -431,19 +440,19 @@ export default function CrmClienteDetailPage() {
                   <Star className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">0/5</div>
-                  <p className="text-xs text-muted-foreground">Calificación promedio</p>
+                  <div className="text-2xl font-bold">{cliente.calificacion ?? 0}/5</div>
+                  <p className="text-xs text-muted-foreground">Calificación del cliente</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Última Actividad</CardTitle>
-                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Oportunidades</CardTitle>
+                  <Target className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">-</div>
-                  <p className="text-xs text-muted-foreground">Fecha de última actividad</p>
+                  <div className="text-2xl font-bold">{oportunidades.length}</div>
+                  <p className="text-xs text-muted-foreground">Oportunidades registradas</p>
                 </CardContent>
               </Card>
             </div>
@@ -572,24 +581,45 @@ export default function CrmClienteDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Target className="h-5 w-5" />
-                  Oportunidades
+                  Oportunidades ({oportunidades.length})
                 </CardTitle>
                 <CardDescription>
-                  Oportunidades comerciales activas con este cliente
+                  Oportunidades comerciales con este cliente
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No hay oportunidades activas</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Crea oportunidades para gestionar el embudo comercial.
-                  </p>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva Oportunidad
-                  </Button>
-                </div>
+                {oportunidades.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No hay oportunidades registradas</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Las oportunidades vinculadas a este cliente aparecerán aquí.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {oportunidades.map((op: any) => (
+                      <div
+                        key={op.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/crm/oportunidades/${op.id}`)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{op.nombre}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">{op.estado}</Badge>
+                            <span className="text-xs text-muted-foreground">{op.probabilidad}%</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-4">
+                          <p className="font-medium text-sm text-green-600">
+                            {op.valorEstimado ? formatCurrency(op.valorEstimado) : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -601,14 +631,35 @@ export default function CrmClienteDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <TrendingUp className="h-5 w-5" />
-                    Tendencias de Compra
+                    Resumen Comercial
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-8">
-                    <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No hay suficientes datos para mostrar tendencias</p>
-                  </div>
+                  {historialStats ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Proyectos totales</span>
+                        <span className="font-medium">{historialStats.totalProyectos}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Cotizaciones totales</span>
+                        <span className="font-medium">{historialStats.totalCotizaciones}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Proyectos activos</span>
+                        <span className="font-medium">{historialStats.proyectosActivos}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Cotizaciones pendientes</span>
+                        <span className="font-medium">{historialStats.cotizacionesPendientes}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No hay datos disponibles</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -616,14 +667,35 @@ export default function CrmClienteDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    Análisis de Rentabilidad
+                    Oportunidades
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-8">
-                    <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No hay suficientes datos para análisis</p>
-                  </div>
+                  {oportunidades.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Total oportunidades</span>
+                        <span className="font-medium">{oportunidades.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Valor total estimado</span>
+                        <span className="font-medium text-green-600">
+                          {formatCurrency(oportunidades.reduce((sum: number, op: any) => sum + (op.valorEstimado || 0), 0))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-muted-foreground">Prob. promedio</span>
+                        <span className="font-medium">
+                          {Math.round(oportunidades.reduce((sum: number, op: any) => sum + (op.probabilidad || 0), 0) / oportunidades.length)}%
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No hay oportunidades para analizar</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

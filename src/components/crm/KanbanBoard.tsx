@@ -22,8 +22,19 @@ import {
   getOportunidades,
   cambiarEstadoOportunidad,
   CrmOportunidad,
+  CrmOportunidadFilters,
   CRM_ESTADOS_OPORTUNIDAD
 } from '@/lib/services/crm'
+
+// Map legacy states to current column IDs
+const LEGACY_STATE_MAP: Record<string, string> = {
+  cerrada_ganada: CRM_ESTADOS_OPORTUNIDAD.SEGUIMIENTO_PROYECTO,
+  ganada: CRM_ESTADOS_OPORTUNIDAD.SEGUIMIENTO_PROYECTO,
+  cerrada_perdida: CRM_ESTADOS_OPORTUNIDAD.FEEDBACK_MEJORA,
+  perdida: CRM_ESTADOS_OPORTUNIDAD.FEEDBACK_MEJORA,
+  prospecto: CRM_ESTADOS_OPORTUNIDAD.INICIO,
+  contacto_inicial: CRM_ESTADOS_OPORTUNIDAD.CONTACTO_CLIENTE,
+}
 
 // -------------------------------------------------------
 // Column configuration
@@ -123,8 +134,9 @@ function groupByEstado(items: CrmOportunidad[]): GroupedOportunidades {
     grouped[col.id] = []
   }
   for (const item of items) {
-    if (grouped[item.estado]) {
-      grouped[item.estado].push(item)
+    const mappedEstado = LEGACY_STATE_MAP[item.estado] || item.estado
+    if (grouped[mappedEstado]) {
+      grouped[mappedEstado].push(item)
     }
   }
   return grouped
@@ -342,9 +354,10 @@ function KanbanSkeleton() {
 interface KanbanBoardProps {
   onView?: (oportunidad: CrmOportunidad) => void
   onEdit?: (oportunidad: CrmOportunidad) => void
+  filters?: CrmOportunidadFilters
 }
 
-export default function KanbanBoard({ onView, onEdit }: KanbanBoardProps) {
+export default function KanbanBoard({ onView, onEdit, filters }: KanbanBoardProps) {
   const { toast } = useToast()
   const [grouped, setGrouped] = useState<GroupedOportunidades>({})
   const [loading, setLoading] = useState(true)
@@ -365,7 +378,7 @@ export default function KanbanBoard({ onView, onEdit }: KanbanBoardProps) {
 
     async function load() {
       try {
-        const response = await getOportunidades({}, { limit: 200 })
+        const response = await getOportunidades(filters || {}, { limit: 200 })
         if (!cancelled) {
           setGrouped(groupByEstado(response.data))
         }
@@ -386,7 +399,7 @@ export default function KanbanBoard({ onView, onEdit }: KanbanBoardProps) {
     load()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [filters])
 
   // ---------------------------
   // Drag handlers

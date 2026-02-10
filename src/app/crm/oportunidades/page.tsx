@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Target, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OportunidadesList, OportunidadForm } from '@/components/crm'
@@ -27,6 +28,7 @@ interface Usuario {
 
 export default function OportunidadesPage() {
   const router = useRouter()
+  const { status } = useSession()
   const [showForm, setShowForm] = useState(false)
   const [editingOportunidad, setEditingOportunidad] = useState<CrmOportunidad | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -120,12 +122,17 @@ export default function OportunidadesPage() {
     router.push(`/comercial/cotizaciones/${cotizacionId}`)
   }
 
-  if (loading) {
+  if (loading || status === 'loading') {
     return (
       <div className="p-4 flex items-center justify-center min-h-[300px]">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     )
+  }
+
+  if (status === 'unauthenticated') {
+    router.push('/login')
+    return null
   }
 
   return (

@@ -34,6 +34,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
+
     const { searchParams } = new URL(req.url)
 
     // Default period = current month
@@ -48,6 +52,7 @@ export async function GET(req: NextRequest) {
     const usuariosComerciales = await prisma.user.findMany({
       where: {
         role: { in: ['comercial', 'coordinador', 'gerente', 'admin'] as any },
+        ...(esComercial ? { id: session.user.id } : {}),
       },
       select: {
         id: true,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Target, TrendingUp, Users, Activity, PieChart, ChevronRight, BarChart3, Trophy } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -65,6 +66,20 @@ const reportes = [
 
 export default function CrmReportesPage() {
   const router = useRouter()
+  const { status } = useSession()
+
+  if (status === 'loading') {
+    return (
+      <div className="p-4 flex items-center justify-center min-h-[300px]">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    router.push('/login')
+    return null
+  }
 
   return (
     <div className="p-4 space-y-4">

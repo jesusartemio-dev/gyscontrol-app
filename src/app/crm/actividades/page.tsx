@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Loader2, Search, Phone, Mail, Calendar, MessageSquare, Clock, TrendingUp, TrendingDown, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -30,6 +31,7 @@ interface Estadisticas {
 
 export default function CrmActividadesPage() {
   const router = useRouter()
+  const { status } = useSession()
   const [actividades, setActividades] = useState<ActividadExtendida[]>([])
   const [loading, setLoading] = useState(true)
   const [estadisticas, setEstadisticas] = useState<Estadisticas | null>(null)
@@ -106,12 +108,17 @@ export default function CrmActividadesPage() {
     return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
   }
 
-  if (loading) {
+  if (loading || status === 'loading') {
     return (
       <div className="p-4 flex items-center justify-center min-h-[300px]">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     )
+  }
+
+  if (status === 'unauthenticated') {
+    router.push('/login')
+    return null
   }
 
   const totalTipo = estadisticas?.porTipo ? Object.values(estadisticas.porTipo).reduce((a, b) => a + b, 0) : 0

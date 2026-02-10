@@ -21,6 +21,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
+    const comercialFilter = esComercial ? { comercialId: session.user.id } : {}
+
     const { searchParams } = new URL(req.url)
     const fechaDesde = searchParams.get('fechaDesde') || '2024-01-01'
     const fechaHasta = searchParams.get('fechaHasta') || '2024-12-31'
@@ -45,6 +50,7 @@ export async function GET(req: NextRequest) {
         // Contar oportunidades en esta etapa
         const cantidad = await prisma.crmOportunidad.count({
           where: {
+            ...comercialFilter,
             estado: etapa.estado as any,
             createdAt: {
               gte: new Date(fechaDesde),
@@ -56,6 +62,7 @@ export async function GET(req: NextRequest) {
         // Valor total estimado de oportunidades en esta etapa
         const valorTotalResult = await prisma.crmOportunidad.aggregate({
           where: {
+            ...comercialFilter,
             estado: etapa.estado as any,
             createdAt: {
               gte: new Date(fechaDesde),
@@ -70,6 +77,7 @@ export async function GET(req: NextRequest) {
         // Calcular tiempo promedio en etapa (días)
         const oportunidadesEnEtapa = await prisma.crmOportunidad.findMany({
           where: {
+            ...comercialFilter,
             estado: etapa.estado as any,
             createdAt: {
               gte: new Date(fechaDesde),
@@ -99,6 +107,7 @@ export async function GET(req: NextRequest) {
         // Calcular probabilidad promedio para la etapa
         const probabilidadResult = await prisma.crmOportunidad.aggregate({
           where: {
+            ...comercialFilter,
             estado: etapa.estado as any,
             createdAt: {
               gte: new Date(fechaDesde),

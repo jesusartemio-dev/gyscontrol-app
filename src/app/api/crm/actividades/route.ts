@@ -13,6 +13,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
+
     const { searchParams } = new URL(request.url)
 
     // Filtros
@@ -40,6 +44,11 @@ export async function GET(request: NextRequest) {
       where.fecha = {}
       if (fechaDesde) where.fecha.gte = new Date(fechaDesde)
       if (fechaHasta) where.fecha.lte = new Date(fechaHasta)
+    }
+
+    // RBAC: comercial solo ve sus propias actividades
+    if (esComercial) {
+      where.usuarioId = session.user.id
     }
 
     // Fechas para estadísticas temporales
