@@ -80,6 +80,14 @@ export async function GET(
             fechaEnvio: true
           }
         },
+        proyecto: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true,
+            estado: true
+          }
+        },
         crmActividad: {
           include: {
             user: {
@@ -231,12 +239,26 @@ export async function PUT(
       updateData.responsableId = data.responsableId
     }
 
+    // ✅ Back-fill proyectoId: si se vincula cotización, verificar si ya tiene proyecto
+    if (data.cotizacionId !== undefined && data.cotizacionId !== oportunidadExistente.cotizacionId) {
+      updateData.cotizacionId = data.cotizacionId
+      if (data.cotizacionId) {
+        const proyectoExistente = await prisma.proyecto.findFirst({
+          where: { cotizacionId: data.cotizacionId },
+          select: { id: true }
+        })
+        if (proyectoExistente) {
+          updateData.proyectoId = proyectoExistente.id
+        }
+      }
+    }
+
     // ✅ Actualizar fecha de último contacto si se actualiza algún campo relevante
     if (Object.keys(updateData).length > 0) {
       updateData.fechaUltimoContacto = new Date()
     }
 
-    // ✅ Actualizar oportunidad
+    // ✅ Actualizar oportunidad (include matches GET for consistent response)
     const oportunidadActualizada = await prisma.crmOportunidad.update({
       where: { id },
       data: updateData,
@@ -246,7 +268,10 @@ export async function PUT(
             id: true,
             nombre: true,
             ruc: true,
-            sector: true
+            sector: true,
+            tamanoEmpresa: true,
+            sitioWeb: true,
+            frecuenciaCompra: true
           }
         },
         comercial: {
@@ -268,7 +293,35 @@ export async function PUT(
             id: true,
             codigo: true,
             nombre: true,
+            estado: true,
+            totalCliente: true,
+            grandTotal: true,
+            fechaEnvio: true
+          }
+        },
+        proyecto: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true,
             estado: true
+          }
+        },
+        crmActividad: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { fecha: 'desc' }
+        },
+        _count: {
+          select: {
+            crmActividad: true
           }
         }
       }

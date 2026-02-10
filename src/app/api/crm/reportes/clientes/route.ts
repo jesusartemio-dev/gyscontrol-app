@@ -1,8 +1,8 @@
 // ===================================================
-// 📁 Archivo: route.ts
-// 📌 Ubicación: /api/crm/reportes/clientes
-// 🔧 Descripción: API para reporte de análisis de clientes
-// ✅ GET: Obtener métricas y análisis de clientes
+// Archivo: route.ts
+// Ubicacion: /api/crm/reportes/clientes
+// Descripcion: API para reporte de análisis de clientes
+// GET: Obtener métricas y análisis de clientes
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-// ✅ Obtener análisis de clientes
+// GET - Obtener análisis de clientes (optimized: batch queries instead of N+1)
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const clienteId = searchParams.get('clienteId')
 
-    // Obtener todos los clientes o uno específico
+    // Obtener clientes
     const clientes = await prisma.cliente.findMany({
       where: clienteId ? { id: clienteId } : {},
       select: {
@@ -37,73 +37,85 @@ export async function GET(req: NextRequest) {
         ultimoProyecto: true,
         estadoRelacion: true,
         calificacion: true,
-        // TODO: Add new fields when Prisma client is regenerated
-        // frecuenciaCompraMeses: true,
-        // calificacionSatisfaccion: true
       }
     })
 
-    // Para cada cliente, calcular métricas reales
-    const clientesConMetricas = await Promise.all(
-      clientes.map(async (cliente) => {
-        // Total de proyectos asociados al cliente
-        const totalProyectos = await prisma.proyecto.count({
-          where: { clienteId: cliente.id }
-        })
+    const clienteIds = clientes.map(c => c.id)
 
-        // Valor total de todos los proyectos
-        const valorTotalResult = await prisma.proyecto.aggregate({
-          where: { clienteId: cliente.id },
-          _sum: { grandTotal: true }
-        })
+    // Batch: counts and aggregates in 3 queries instead of 4*N
+    const [countsByCliente, valorByCliente, proyectosPorCliente] = await Promise.all([
+      // Count proyectos per client
+      prisma.proyecto.groupBy({
+        by: ['clienteId'],
+        where: { clienteId: { in: clienteIds } },
+        _count: { id: true },
+      }),
+      // Sum grandTotal per client
+      prisma.proyecto.groupBy({
+        by: ['clienteId'],
+        where: { clienteId: { in: clienteIds } },
+        _sum: { grandTotal: true },
+      }),
+      // Get all projects with dates for frequency calc + ultimo proyecto
+      prisma.proyecto.findMany({
+        where: { clienteId: { in: clienteIds } },
+        select: { clienteId: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ])
 
-        // Último proyecto (más reciente)
-        const ultimoProyecto = await prisma.proyecto.findFirst({
-          where: { clienteId: cliente.id },
-          orderBy: { createdAt: 'desc' },
-          select: { createdAt: true }
-        })
+    // Build lookup maps
+    const countMap = new Map(countsByCliente.map(c => [c.clienteId, c._count.id]))
+    const valorMap = new Map(valorByCliente.map(c => [c.clienteId, c._sum.grandTotal || 0]))
 
-        // Calcular frecuencia promedio entre proyectos (en meses)
-        const proyectosCliente = await prisma.proyecto.findMany({
-          where: { clienteId: cliente.id },
-          orderBy: { createdAt: 'asc' },
-          select: { createdAt: true }
-        })
+    // Group projects by clienteId for frequency calculation
+    const proyectosMap = new Map<string, Date[]>()
+    for (const p of proyectosPorCliente) {
+      if (!proyectosMap.has(p.clienteId)) {
+        proyectosMap.set(p.clienteId, [])
+      }
+      proyectosMap.get(p.clienteId)!.push(p.createdAt)
+    }
 
-        let frecuenciaPromedio = 0
-        if (proyectosCliente.length > 1) {
-          const intervalos: number[] = []
-          for (let i = 1; i < proyectosCliente.length; i++) {
-            const diffTime = proyectosCliente[i].createdAt.getTime() - proyectosCliente[i-1].createdAt.getTime()
-            const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44) // promedio de días por mes
-            intervalos.push(diffMonths)
-          }
-          frecuenciaPromedio = intervalos.reduce((sum, val) => sum + val, 0) / intervalos.length
+    // Build response
+    const clientesConMetricas = clientes.map(cliente => {
+      const totalProyectos = countMap.get(cliente.id) || 0
+      const valorTotal = valorMap.get(cliente.id) || 0
+      const fechasProyectos = proyectosMap.get(cliente.id) || []
+
+      // Último proyecto
+      const ultimoProyectoFecha = fechasProyectos.length > 0
+        ? fechasProyectos[fechasProyectos.length - 1]
+        : cliente.ultimoProyecto
+
+      // Frecuencia promedio entre proyectos (meses)
+      let frecuenciaPromedio = 0
+      if (fechasProyectos.length > 1) {
+        const intervalos: number[] = []
+        for (let i = 1; i < fechasProyectos.length; i++) {
+          const diffTime = fechasProyectos[i].getTime() - fechasProyectos[i - 1].getTime()
+          const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44)
+          intervalos.push(diffMonths)
         }
+        frecuenciaPromedio = intervalos.reduce((sum, val) => sum + val, 0) / intervalos.length
+      }
 
-        // Calificación promedio de satisfacción (basada en calificación del cliente)
-        const calificacionSatisfaccion = cliente.calificacion || 3
+      const calificacionSatisfaccion = cliente.calificacion || 3
 
-        // Calcular métricas adicionales
-        const valorTotal = valorTotalResult._sum.grandTotal || 0
-        const ultimoProyectoFecha = ultimoProyecto?.createdAt || cliente.ultimoProyecto
-
-        return {
-          cliente,
-          metricas: {
-            totalProyectos,
-            valorTotal,
-            ultimoProyecto: ultimoProyectoFecha,
-            frecuenciaPromedio: Math.round(frecuenciaPromedio * 10) / 10, // redondear a 1 decimal
-            satisfaccion: calificacionSatisfaccion,
-            calificacion: cliente.calificacion || 3
-          }
+      return {
+        cliente,
+        metricas: {
+          totalProyectos,
+          valorTotal,
+          ultimoProyecto: ultimoProyectoFecha,
+          frecuenciaPromedio: Math.round(frecuenciaPromedio * 10) / 10,
+          satisfaccion: calificacionSatisfaccion,
+          calificacion: cliente.calificacion || 3
         }
-      })
-    )
+      }
+    })
 
-    // Calcular resumen general
+    // Resumen general
     const resumen = {
       totalClientes: clientesConMetricas.length,
       clientesActivos: clientesConMetricas.filter(c => c.cliente.estadoRelacion === 'cliente_activo').length,
@@ -120,7 +132,7 @@ export async function GET(req: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ Error al obtener reporte de clientes:', error)
+    console.error('Error al obtener reporte de clientes:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

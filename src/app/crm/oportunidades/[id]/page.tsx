@@ -30,10 +30,9 @@ import { getOportunidadById, CrmOportunidad, CRM_PRIORIDADES } from '@/lib/servi
 import { getClientes } from '@/lib/services/cliente'
 import { getUsuarios } from '@/lib/services/usuario'
 import { getCotizacionById } from '@/lib/services/cotizacion'
-import { getProyectoById } from '@/lib/services/proyecto'
 import CrearCotizacionDesdeOportunidadModal from '@/components/crm/CrearCotizacionDesdeOportunidadModal'
 import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
-import type { Proyecto, Cotizacion } from '@/types'
+import type { Cotizacion } from '@/types'
 
 interface Cliente {
   id: string
@@ -91,7 +90,7 @@ export default function OportunidadDetailPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [cotizacionFull, setCotizacionFull] = useState<Cotizacion | null>(null)
-  const [proyecto, setProyecto] = useState<Proyecto | null>(null)
+  const [proyecto, setProyecto] = useState<{ id: string; nombre: string; codigo: string; estado: string } | null>(null)
 
   const id = params.id as string
 
@@ -113,17 +112,8 @@ export default function OportunidadDetailPage() {
         setCotizacionFull(null)
       }
 
-      if (data.proyectoId) {
-        try {
-          const proyectoData = await getProyectoById(data.proyectoId)
-          setProyecto(proyectoData || null)
-        } catch (relatedErr) {
-          console.error('Error al cargar proyecto:', relatedErr)
-          setProyecto(null)
-        }
-      } else {
-        setProyecto(null)
-      }
+      // proyecto viene incluido en la respuesta del API
+      setProyecto(data.proyecto || null)
     } catch (err) {
       console.error('Error al cargar oportunidad:', err)
       setError('No se pudo cargar la oportunidad')

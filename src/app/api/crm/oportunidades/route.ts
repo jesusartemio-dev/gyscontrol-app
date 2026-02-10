@@ -289,48 +289,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    console.log('👤 Session user:', session.user)
-
-    // ✅ Verificar que el usuario existe, si no, intentar crearlo
+    // ✅ Verificar que el usuario existe en la BD
     let usuario = await prisma.user.findUnique({
       where: { id: session.user.id }
     })
 
     if (!usuario && session.user.email) {
-      // Intentar encontrar por email primero
       usuario = await prisma.user.findUnique({
         where: { email: session.user.email }
       })
     }
 
     if (!usuario) {
-      console.log('⚠️ Usuario no encontrado, intentando crear:', session.user)
-
-      try {
-        // Intentar crear el usuario desde la sesión
-        usuario = await prisma.user.create({
-          data: {
-            id: session.user.id,
-            name: session.user.name || 'Usuario',
-            email: session.user.email || `${session.user.id}@temp.com`,
-            password: '$2b$10$dummy.hash.for.session.user', // Hash dummy
-            role: 'comercial' // Rol por defecto
-          }
-        })
-        console.log('✅ Usuario creado desde sesión:', usuario.name, usuario.email)
-      } catch (createError) {
-        console.log('❌ Error creando usuario:', createError)
-        return NextResponse.json(
-          { error: 'No se pudo crear el usuario de la sesión' },
-          { status: 500 }
-        )
-      }
-    } else {
-      console.log('✅ Usuario encontrado:', usuario.name, usuario.email)
+      return NextResponse.json(
+        { error: 'Usuario no registrado en el sistema. Contacte al administrador.' },
+        { status: 403 }
+      )
     }
 
     const data = await request.json()
-    console.log('📥 Datos recibidos en POST /api/crm/oportunidades:', data)
 
     const {
       clienteId,
@@ -346,16 +323,8 @@ export async function POST(request: NextRequest) {
       competencia
     } = data
 
-    console.log('📋 Campos extraídos:', { clienteId, nombre, descripcion, valorEstimado, probabilidad, fechaCierreEstimada, fuente, prioridad, responsableId, notas, competencia })
-
     // ✅ Validaciones
     if (!clienteId?.trim() || !nombre?.trim()) {
-      console.log('❌ Validación fallida: clienteId o nombre faltantes/vacíos', {
-        clienteId: clienteId,
-        nombre: nombre,
-        clienteIdTrim: clienteId?.trim(),
-        nombreTrim: nombre?.trim()
-      })
       return NextResponse.json(
         { error: 'Cliente y nombre son obligatorios' },
         { status: 400 }
@@ -388,22 +357,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ Crear oportunidad completa
-    console.log('🔄 Intentando crear oportunidad con datos:', {
-      clienteId,
-      nombre,
-      descripcion,
-      valorEstimado,
-      probabilidad,
-      fechaCierreEstimada,
-      fuente,
-      prioridad,
-      comercialId: usuario.id,
-      responsableId: responsableId || usuario.id,
-      notas,
-      competencia
-    })
-
+    // ✅ Crear oportunidad
     const nuevaOportunidad = await prisma.crmOportunidad.create({
       data: {
         id: `crm-opp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -422,8 +376,6 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date()
       }
     })
-
-    console.log('✅ Oportunidad creada exitosamente:', nuevaOportunidad.id)
 
     // ✅ Retornar datos básicos sin include
     const oportunidadCompleta = {

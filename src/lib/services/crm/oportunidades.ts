@@ -57,6 +57,12 @@ export interface CrmOportunidad {
     grandTotal?: number
     fechaEnvio?: string
   }
+  proyecto?: {
+    id: string
+    nombre: string
+    codigo: string
+    estado: string
+  }
 
   // Conteos (opcional, disponible cuando se incluye en queries)
   _count?: {
