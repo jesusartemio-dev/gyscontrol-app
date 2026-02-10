@@ -22,6 +22,7 @@ interface OportunidadConRelaciones {
   competidorGanador: string | null
   createdAt: Date
   updatedAt: Date
+  fechaCierre: Date | null
   cliente: { nombre: string; codigo: string; sector: string | null } | null
   comercial: { id: string; name: string | null } | null
 }
@@ -76,13 +77,14 @@ function groupByDimension(
 }
 
 // ---------------------------------------------------------------------------
-// Helper: calcular promedio de días entre createdAt y updatedAt
+// Helper: calcular promedio de días entre createdAt y fechaCierre
 // ---------------------------------------------------------------------------
 
 function avgDaysToClose(list: OportunidadConRelaciones[]): number {
   if (list.length === 0) return 0
   const totalDays = list.reduce((sum, o) => {
-    const diff = o.updatedAt.getTime() - o.createdAt.getTime()
+    const closeDate = o.fechaCierre || o.updatedAt
+    const diff = closeDate.getTime() - o.createdAt.getTime()
     return sum + diff / (1000 * 60 * 60 * 24)
   }, 0)
   return Math.round((totalDays / list.length) * 10) / 10
@@ -108,9 +110,15 @@ export async function GET(req: NextRequest) {
   try {
     // Auth check
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+
+    // RBAC: comercial solo ve sus propias oportunidades
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
+    const comercialFilter = esComercial ? { comercialId: session.user.id } : {}
 
     // Parámetros de fecha
     const { searchParams } = new URL(req.url)
@@ -136,24 +144,27 @@ export async function GET(req: NextRequest) {
       competidorGanador: true,
       createdAt: true,
       updatedAt: true,
+      fechaCierre: true,
       cliente: { select: { nombre: true, codigo: true, sector: true } },
       comercial: { select: { id: true, name: true } },
     } as const
 
-    // Consultar oportunidades ganadas
+    // Consultar oportunidades ganadas (usar fechaCierre para rango)
     const ganadas = (await prisma.crmOportunidad.findMany({
       where: {
+        ...comercialFilter,
         estado: { in: ['seguimiento_proyecto', 'cerrada_ganada'] },
-        updatedAt: { gte: fechaDesde, lte: fechaHasta },
+        fechaCierre: { gte: fechaDesde, lte: fechaHasta },
       },
       select: selectFields,
     })) as unknown as OportunidadConRelaciones[]
 
-    // Consultar oportunidades perdidas
+    // Consultar oportunidades perdidas (usar fechaCierre para rango)
     const perdidas = (await prisma.crmOportunidad.findMany({
       where: {
+        ...comercialFilter,
         estado: { in: ['feedback_mejora', 'cerrada_perdida'] },
-        updatedAt: { gte: fechaDesde, lte: fechaHasta },
+        fechaCierre: { gte: fechaDesde, lte: fechaHasta },
       },
       select: selectFields,
     })) as unknown as OportunidadConRelaciones[]

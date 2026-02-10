@@ -21,12 +21,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const userRole = (session.user as any).role || 'comercial'
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    const esComercial = !rolesConAccesoTotal.includes(userRole)
+
     const { searchParams } = new URL(req.url)
     const clienteId = searchParams.get('clienteId')
 
+    // RBAC: comercial solo ve clientes con los que tiene proyectos/oportunidades
+    let clienteFilter: any = clienteId ? { id: clienteId } : {}
+    if (esComercial) {
+      const misClientes = await prisma.crmOportunidad.findMany({
+        where: { comercialId: session.user.id },
+        select: { clienteId: true },
+        distinct: ['clienteId'],
+      })
+      const misClienteIds = misClientes.map(c => c.clienteId)
+      clienteFilter = clienteId
+        ? { id: { in: misClienteIds.includes(clienteId) ? [clienteId] : [] } }
+        : { id: { in: misClienteIds } }
+    }
+
     // Obtener clientes
     const clientes = await prisma.cliente.findMany({
-      where: clienteId ? { id: clienteId } : {},
+      where: clienteFilter,
       select: {
         id: true,
         nombre: true,

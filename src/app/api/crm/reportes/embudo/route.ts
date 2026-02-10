@@ -86,6 +86,7 @@ export async function GET(req: NextRequest) {
             }
           },
           select: {
+            id: true,
             createdAt: true,
             fechaCierreEstimada: true,
             fechaUltimoContacto: true
@@ -128,7 +129,7 @@ export async function GET(req: NextRequest) {
           tiempoPromedio: Math.round(tiempoPromedio),
           probabilidadPromedio: Math.round(probabilidadResult._avg.probabilidad || 0),
           oportunidades: oportunidadesEnEtapa.map(opp => ({
-            id: opp.createdAt.getTime(), // Usar timestamp como ID temporal
+            id: opp.id,
             fechaInicio: opp.createdAt,
             fechaCierreEstimada: opp.fechaCierreEstimada,
             ultimoContacto: opp.fechaUltimoContacto

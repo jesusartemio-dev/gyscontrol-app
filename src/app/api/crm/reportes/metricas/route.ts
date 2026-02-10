@@ -133,35 +133,38 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Calcular tendencias (últimos 6 meses)
-    const tendencias = []
-    for (let i = 5; i >= 0; i--) {
+    // Calcular tendencias (últimos 6 meses) - parallelized
+    const mesesRange = Array.from({ length: 6 }, (_, idx) => {
       const fechaMes = new Date(fechaFin)
-      fechaMes.setMonth(fechaMes.getMonth() - i)
+      fechaMes.setMonth(fechaMes.getMonth() - (5 - idx))
       const mesInicio = new Date(fechaMes.getFullYear(), fechaMes.getMonth(), 1)
-      const mesFin = new Date(fechaMes.getFullYear(), fechaMes.getMonth() + 1, 0)
+      const mesFin2 = new Date(fechaMes.getFullYear(), fechaMes.getMonth() + 1, 0)
+      return { fechaMes, mesInicio, mesFin: mesFin2 }
+    })
 
-      const [cotizacionesMes, proyectosMes, valorMes] = await Promise.all([
-        prisma.cotizacion.count({
-          where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mesFin } }
-        }),
-        prisma.proyecto.count({
-          where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mesFin } }
-        }),
-        prisma.proyecto.aggregate({
-          where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mesFin } },
-          _sum: { grandTotal: true }
-        })
-      ])
-
-      tendencias.push({
-        periodo: `${fechaMes.getFullYear()}-${String(fechaMes.getMonth() + 1).padStart(2, '0')}`,
-        cotizaciones: cotizacionesMes,
-        proyectos: proyectosMes,
-        valor: valorMes._sum.grandTotal || 0,
-        conversion: proyectosMes > 0 ? (proyectosMes / cotizacionesMes) * 100 : 0
+    const tendencias = await Promise.all(
+      mesesRange.map(async ({ fechaMes, mesInicio, mesFin: mf }) => {
+        const [cotizacionesMes, proyectosMes, valorMes] = await Promise.all([
+          prisma.cotizacion.count({
+            where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mf } }
+          }),
+          prisma.proyecto.count({
+            where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mf } }
+          }),
+          prisma.proyecto.aggregate({
+            where: { ...comercialFilter, createdAt: { gte: mesInicio, lte: mf } },
+            _sum: { grandTotal: true }
+          })
+        ])
+        return {
+          periodo: `${fechaMes.getFullYear()}-${String(fechaMes.getMonth() + 1).padStart(2, '0')}`,
+          cotizaciones: cotizacionesMes,
+          proyectos: proyectosMes,
+          valor: valorMes._sum.grandTotal || 0,
+          conversion: cotizacionesMes > 0 ? (proyectosMes / cotizacionesMes) * 100 : 0
+        }
       })
-    }
+    )
 
     // Calcular métricas promedios
     const tiempoPromedioCierre = proyectosCerrados > 0 ? 24 : null // Placeholder
