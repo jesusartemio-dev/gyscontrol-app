@@ -158,16 +158,28 @@ export function DriveFileList({ files, viewMode, loading, onFileClick, onFolderC
   return (
     <div className="overflow-hidden">
       {!compact && (
-        <div className="grid grid-cols-[1fr_100px_120px] gap-2 px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground border-b">
-          <span>Nombre</span>
-          <span className="text-right">Tamano</span>
-          <span className="text-right">Modificado</span>
-        </div>
+        <>
+          {/* Desktop header */}
+          <div className="hidden sm:grid grid-cols-[1fr_100px_120px] gap-2 px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground border-b">
+            <span>Nombre</span>
+            <span className="text-right">Tamano</span>
+            <span className="text-right">Modificado</span>
+          </div>
+          {/* Mobile header */}
+          <div className="grid sm:hidden grid-cols-1 px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground border-b">
+            <span>Nombre</span>
+          </div>
+        </>
       )}
       <div className="divide-y">
         {sorted.map((item) => {
           const { icon: Icon, color } = getFileIcon(item.mimeType)
           const isSelected = selectedFileId === item.id
+          const meta = [
+            !isFolder(item.mimeType) && formatFileSize(item.size),
+            formatDate(item.modifiedTime),
+          ].filter(Boolean).join(' · ')
+
           return compact ? (
             <div
               key={item.id}
@@ -180,24 +192,45 @@ export function DriveFileList({ files, viewMode, loading, onFileClick, onFolderC
               </span>
             </div>
           ) : (
-            <div
-              key={item.id}
-              className={`grid grid-cols-[1fr_100px_120px] gap-2 px-4 py-2.5 hover:bg-accent/50 cursor-pointer transition-colors items-center ${isSelected ? 'bg-accent' : ''}`}
-              onClick={() => handleClick(item)}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <Icon className={`h-5 w-5 shrink-0 ${color}`} />
-                <span className="text-sm truncate" title={item.name}>
-                  {item.name}
+            <>
+              {/* Desktop row */}
+              <div
+                key={`d-${item.id}`}
+                className={`hidden sm:grid grid-cols-[1fr_100px_120px] gap-2 px-4 py-2.5 hover:bg-accent/50 cursor-pointer transition-colors items-center ${isSelected ? 'bg-accent' : ''}`}
+                onClick={() => handleClick(item)}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Icon className={`h-5 w-5 shrink-0 ${color}`} />
+                  <span className="text-sm truncate" title={item.name}>
+                    {item.name}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground text-right">
+                  {isFolder(item.mimeType) ? '—' : formatFileSize(item.size)}
+                </span>
+                <span className="text-xs text-muted-foreground text-right">
+                  {formatDate(item.modifiedTime)}
                 </span>
               </div>
-              <span className="text-xs text-muted-foreground text-right">
-                {isFolder(item.mimeType) ? '—' : formatFileSize(item.size)}
-              </span>
-              <span className="text-xs text-muted-foreground text-right">
-                {formatDate(item.modifiedTime)}
-              </span>
-            </div>
+              {/* Mobile row: name wraps + meta as subtitle */}
+              <div
+                key={`m-${item.id}`}
+                className={`flex sm:hidden items-start gap-3 px-4 py-2.5 hover:bg-accent/50 cursor-pointer transition-colors ${isSelected ? 'bg-accent' : ''}`}
+                onClick={() => handleClick(item)}
+              >
+                <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${color}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm break-words leading-snug" title={item.name}>
+                    {item.name}
+                  </p>
+                  {meta && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {meta}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
           )
         })}
       </div>
