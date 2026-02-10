@@ -730,8 +730,8 @@ export default function PersonalClient() {
                             {emp.fechaIngreso ? new Date(emp.fechaIngreso).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
                           </td>
                           {/* Cargo */}
-                          <td className="py-1.5 px-2">
-                            <span className="text-sm" title={emp.cargo?.nombre}>{emp.cargo?.nombre || '—'}</span>
+                          <td className="py-1.5 px-2" title={emp.cargo?.nombre}>
+                            {emp.cargo?.nombre || '—'}
                           </td>
                           {/* Area/Departamento */}
                           <td className="py-1.5 px-2 truncate" title={emp.departamento?.nombre}>{emp.departamento?.nombre || '—'}</td>
