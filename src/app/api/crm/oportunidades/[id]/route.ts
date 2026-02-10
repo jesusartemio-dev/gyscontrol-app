@@ -107,6 +107,17 @@ export async function GET(
       )
     }
 
+    // RBAC: comercial solo puede ver sus propias oportunidades
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    if (!rolesConAccesoTotal.includes(session.user.role as string)) {
+      if (oportunidad.comercialId !== session.user.id && oportunidad.responsableId !== session.user.id) {
+        return NextResponse.json(
+          { error: 'No tiene permisos para ver esta oportunidad' },
+          { status: 403 }
+        )
+      }
+    }
+
     return NextResponse.json(oportunidad)
 
   } catch (error) {
@@ -142,6 +153,17 @@ export async function PUT(
         { error: 'Oportunidad no encontrada' },
         { status: 404 }
       )
+    }
+
+    // RBAC: comercial solo puede editar sus propias oportunidades
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    if (!rolesConAccesoTotal.includes(session.user.role as string)) {
+      if (oportunidadExistente.comercialId !== session.user.id && oportunidadExistente.responsableId !== session.user.id) {
+        return NextResponse.json(
+          { error: 'No tiene permisos para editar esta oportunidad' },
+          { status: 403 }
+        )
+      }
     }
 
     // ✅ Preparar datos de actualización
@@ -376,12 +398,15 @@ export async function DELETE(
       )
     }
 
-    // ✅ Verificar permisos (solo el comercial o responsable pueden eliminar)
-    if (oportunidad.comercialId !== session.user.id && oportunidad.responsableId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'No tiene permisos para eliminar esta oportunidad' },
-        { status: 403 }
-      )
+    // ✅ Verificar permisos (admin/gerente/coordinador pueden eliminar cualquiera, otros solo las suyas)
+    const rolesConAccesoTotalDelete = ['admin', 'gerente', 'coordinador']
+    if (!rolesConAccesoTotalDelete.includes(session.user.role as string)) {
+      if (oportunidad.comercialId !== session.user.id && oportunidad.responsableId !== session.user.id) {
+        return NextResponse.json(
+          { error: 'No tiene permisos para eliminar esta oportunidad' },
+          { status: 403 }
+        )
+      }
     }
 
     // ✅ Eliminar oportunidad (las actividades se eliminan automáticamente por cascade)

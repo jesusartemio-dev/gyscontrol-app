@@ -29,7 +29,7 @@ export async function GET(
     // ✅ Verificar que la oportunidad existe
     const oportunidad = await prisma.crmOportunidad.findUnique({
       where: { id: oportunidadId },
-      select: { id: true, nombre: true }
+      select: { id: true, nombre: true, cotizacionId: true }
     })
 
     if (!oportunidad) {
@@ -39,9 +39,17 @@ export async function GET(
       )
     }
 
+    // If no cotizacion linked, return empty
+    if (!oportunidad.cotizacionId) {
+      return NextResponse.json({
+        data: [],
+        estadisticas: { total: 0, conPropuesta: 0, ganamos: 0, perdimos: 0, pendiente: 0 }
+      })
+    }
+
     // 📊 Obtener competidores
     const competidores = await prisma.crmCompetidorLicitacion.findMany({
-      where: { cotizacionId: oportunidadId },
+      where: { cotizacionId: oportunidad.cotizacionId },
       orderBy: { createdAt: 'desc' }
     })
 
@@ -107,7 +115,7 @@ export async function POST(
     // ✅ Verificar que la oportunidad existe
     const oportunidad = await prisma.crmOportunidad.findUnique({
       where: { id: oportunidadId },
-      select: { id: true, nombre: true }
+      select: { id: true, nombre: true, cotizacionId: true }
     })
 
     if (!oportunidad) {
@@ -117,11 +125,18 @@ export async function POST(
       )
     }
 
+    if (!oportunidad.cotizacionId) {
+      return NextResponse.json(
+        { error: 'La oportunidad no tiene cotización asociada para registrar competidores' },
+        { status: 400 }
+      )
+    }
+
     // ✅ Crear competidor
     const nuevoCompetidor = await prisma.crmCompetidorLicitacion.create({
       data: {
         id: `crm-comp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        cotizacionId: oportunidadId,
+        cotizacionId: oportunidad.cotizacionId,
         nombreEmpresa,
         contacto,
         telefono,

@@ -8,6 +8,8 @@
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -19,6 +21,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string; contactoId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id, contactoId } = await params
 
     const contacto = await prisma.crmContactoCliente.findFirst({
@@ -51,6 +58,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; contactoId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id, contactoId } = await params
     const data = await req.json()
 
@@ -124,6 +136,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; contactoId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id, contactoId } = await params
 
     // Verificar que el contacto existe y pertenece al cliente

@@ -168,6 +168,15 @@ export async function GET(request: NextRequest) {
       where.estado = { notIn: ['cerrada_ganada', 'cerrada_perdida', 'seguimiento_proyecto', 'feedback_mejora'] }
     }
 
+    // RBAC: comercial solo ve sus propias oportunidades
+    const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
+    if (!rolesConAccesoTotal.includes(session.user.role as string)) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        { OR: [{ comercialId: session.user.id }, { responsableId: session.user.id }] }
+      ]
+    }
+
     // 📊 Obtener oportunidades con relaciones
     const [oportunidades, total] = await Promise.all([
       prisma.crmOportunidad.findMany({

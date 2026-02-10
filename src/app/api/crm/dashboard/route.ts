@@ -6,6 +6,8 @@
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -14,6 +16,11 @@ export const dynamic = 'force-dynamic'
 // ✅ Obtener datos para dashboard CRM
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
     const userRole = searchParams.get('role') || 'comercial'
