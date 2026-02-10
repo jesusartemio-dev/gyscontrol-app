@@ -15,6 +15,8 @@ import { logStatusChange } from '@/lib/services/auditLogger'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { validarTransicion, getFechasPorTransicion, type EstadoListaEquipo } from '@/lib/utils/flujoListaEquipo'
+import { sincronizarRealesProyecto } from '@/lib/utils/syncReales'
+import { registrarActualizacion } from '@/lib/services/audit'
 
 // ✅ Obtener ListaEquipo por ID (GET)
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -89,12 +91,33 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       )
     }
 
-    const existe = await prisma.listaEquipo.findUnique({ where: { id } })
+    const existe = await prisma.listaEquipo.findUnique({
+      where: { id },
+      select: { id: true, estado: true, fechaNecesaria: true, nombre: true, codigo: true, proyectoId: true }
+    })
     if (!existe) {
       return NextResponse.json(
         { error: 'Lista no encontrada con el ID proporcionado' },
         { status: 404 }
       )
+    }
+
+    // Audit fechaNecesaria changes
+    if (body.fechaNecesaria && body.fechaNecesaria !== existe.fechaNecesaria?.toISOString().split('T')[0]) {
+      try {
+        await registrarActualizacion(
+          'LISTA_EQUIPO',
+          id,
+          session.user.id,
+          `Fecha necesaria actualizada en lista ${existe.nombre || existe.codigo}`,
+          {
+            fechaNecesariaAnterior: existe.fechaNecesaria?.toISOString().split('T')[0] || null,
+            fechaNecesariaNueva: body.fechaNecesaria
+          }
+        )
+      } catch (auditError) {
+        console.error('Error al registrar cambio de fechaNecesaria:', auditError)
+      }
     }
 
     // ✅ Validar transición de estado + rol si hay cambio de estado
@@ -145,6 +168,16 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         })
       } catch (auditError) {
         console.error('Error logging status change:', auditError)
+      }
+    }
+
+    // Auto-sync reales to ProyectoEquipoCotizadoItem when lista is approved
+    if (body.estado === 'aprobada' && existe.estado !== 'aprobada') {
+      try {
+        const syncCount = await sincronizarRealesProyecto(existe.proyectoId)
+        console.log(`✅ Auto-sync: ${syncCount} items sincronizados al aprobar lista ${id}`)
+      } catch (syncError) {
+        console.error('⚠️ Error al auto-sincronizar reales:', syncError)
       }
     }
 

@@ -249,6 +249,9 @@ export async function POST(request: Request) {
           cotizacionSeleccionada: {
             select: { precioUnitario: true },
           },
+          proveedor: {
+            select: { id: true, nombre: true },
+          },
         },
       })
       listaItemsMap = new Map(listaItems.map(item => [item.id, item]))
@@ -330,6 +333,8 @@ export async function POST(request: Request) {
               responsableId: body.responsableId,
               estado: 'pendiente',
               estadoEntrega: 'pendiente',
+              proveedorId: listaItem.proveedorId || null,
+              proveedorNombre: listaItem.proveedor?.nombre || null,
               updatedAt: now,
             },
           })
@@ -353,6 +358,30 @@ export async function POST(request: Request) {
       return { pedido, itemsCreados }
     })
 
+    // Budget validation warning
+    let _advertenciaPresupuesto: string | null = null
+    if (body.listaId) {
+      // Calculate lista budget from items since ListaEquipo has no presupuestoTotal field
+      const listaItems = await prisma.listaEquipoItem.findMany({
+        where: { listaId: body.listaId },
+        select: { presupuesto: true, precioElegido: true, cantidad: true }
+      })
+      const listaPresupuesto = listaItems.reduce((sum, item) => {
+        return sum + ((item.precioElegido ?? item.presupuesto ?? 0) * (item.cantidad || 1))
+      }, 0)
+      if (listaPresupuesto > 0) {
+        // Sum all pedidos from this lista
+        const pedidosLista = await prisma.pedidoEquipo.findMany({
+          where: { listaId: body.listaId },
+          select: { presupuestoTotal: true }
+        })
+        const totalPedidos = pedidosLista.reduce((s, p) => s + (p.presupuestoTotal || 0), 0)
+        if (totalPedidos > listaPresupuesto) {
+          _advertenciaPresupuesto = `La suma de pedidos ($${totalPedidos.toFixed(2)}) excede el presupuesto de la lista ($${listaPresupuesto.toFixed(2)})`
+        }
+      }
+    }
+
     // ✅ Registrar en auditoría (fuera de la transacción)
     try {
       await registrarCreacion(
@@ -373,7 +402,7 @@ export async function POST(request: Request) {
     }
 
     console.log(`✅ Pedido ${resultado.pedido.codigo} creado con ${resultado.itemsCreados} items`)
-    return NextResponse.json(resultado.pedido)
+    return NextResponse.json({ ...resultado.pedido, _advertenciaPresupuesto })
   } catch (error) {
     console.error('❌ Error al crear pedido:', error)
     return NextResponse.json(

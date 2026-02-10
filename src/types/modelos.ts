@@ -116,6 +116,7 @@ export type EstadoPedidoItem =
   | 'atendido'
   | 'parcial'
   | 'entregado'
+  | 'cancelado'
 
 // ✅ Estados logísticos optimizados para gestión de entregas
 export type EstadoPedidoLogistico =

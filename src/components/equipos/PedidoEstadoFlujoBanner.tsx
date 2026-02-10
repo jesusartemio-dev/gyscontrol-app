@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { flujoEstadosPedido, estadosPedidoList, estadoPedidoLabels, validarTransicionPedido, type EstadoPedidoEquipo } from '@/lib/utils/flujoPedidoEquipo'
+import { useSession } from 'next-auth/react'
 
 interface PedidoEstadoFlujoBannerProps {
   estado: string
@@ -52,15 +54,9 @@ const getEstadoInfo = (estadoKey: string) => {
   return ESTADOS_FLUJO.find((e) => e.key === estadoKey) || ESTADOS_FLUJO[0]
 }
 
-const puedeAvanzarA = (estadoActual: string, estadoSiguiente: string): boolean => {
-  const actual = getEstadoInfo(estadoActual)
-  const siguiente = getEstadoInfo(estadoSiguiente)
-
-  if (estadoSiguiente === 'cancelado') {
-    return ['borrador', 'enviado', 'atendido', 'parcial'].includes(estadoActual)
-  }
-
-  return siguiente.orden === actual.orden + 1
+const puedeAvanzarA = (estadoActual: string, estadoSiguiente: string, rol: string): boolean => {
+  const resultado = validarTransicionPedido(estadoActual, estadoSiguiente, rol)
+  return resultado.valido
 }
 
 const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
@@ -68,6 +64,8 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
   pedidoId,
   onUpdated,
 }) => {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role || ''
   const [isUpdating, setIsUpdating] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [pendingEstado, setPendingEstado] = useState('')
@@ -76,7 +74,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
 
   const handleEstadoChange = (nuevoEstado: string) => {
     if (nuevoEstado === estado) return
-    if (!puedeAvanzarA(estado, nuevoEstado)) {
+    if (!puedeAvanzarA(estado, nuevoEstado, userRole)) {
       toast.error('No se puede cambiar a este estado')
       return
     }
@@ -108,7 +106,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
 
   // Estados principales (sin cancelado en la línea)
   const estadosPrincipales = ESTADOS_FLUJO.filter((e) => e.key !== 'cancelado')
-  const puedeCancelar = puedeAvanzarA(estado, 'cancelado')
+  const puedeCancelar = puedeAvanzarA(estado, 'cancelado', userRole)
 
   return (
     <>
@@ -120,7 +118,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               const isCompleted = est.orden < estadoActual.orden
               const isCurrent = est.key === estado
               const isNext = est.orden === estadoActual.orden + 1
-              const canAdvance = isNext && puedeAvanzarA(estado, est.key)
+              const canAdvance = isNext && puedeAvanzarA(estado, est.key, userRole)
               const Icon = est.icon
 
               return (

@@ -224,23 +224,16 @@ export async function POST(request: NextRequest) {
 
     // 🔢 Obtener siguiente número secuencial
     const ultimoPedido = await prisma.pedidoEquipo.findFirst({
-      where: {
-        codigo: {
-          startsWith: `PED-${proyecto.codigo}-`
-        }
-      },
-      orderBy: { codigo: 'desc' }
+      where: { proyectoId },
+      orderBy: { numeroSecuencia: 'desc' },
     })
 
     let numeroSecuencia = 1
     if (ultimoPedido) {
-      const match = ultimoPedido.codigo.match(/-([0-9]+)$/)
-      if (match) {
-        numeroSecuencia = parseInt(match[1]) + 1
-      }
+      numeroSecuencia = ultimoPedido.numeroSecuencia + 1
     }
 
-    const codigo = `PED-${proyecto.codigo}-${numeroSecuencia.toString().padStart(3, '0')}`
+    const codigo = `${proyecto.codigo}-PED-${String(numeroSecuencia).padStart(3, '0')}`
 
     // 💾 Crear pedido
     const nuevoPedido = await prisma.pedidoEquipo.create({

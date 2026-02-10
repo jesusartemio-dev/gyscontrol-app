@@ -41,40 +41,45 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       );
     }
 
-    // 📋 Eventos de trazabilidad (modelo no disponible - retornando array vacío)
-    const eventos: any[] = [];
-    
-    logger.info('Consulta de eventos de trazabilidad', {
-      pedidoEquipoItemId: id,
-      message: 'Modelo trazabilidadEvent no disponible'
+    // Query real EntregaItem records with their events
+    const entregas = await prisma.entregaItem.findMany({
+      where: { pedidoEquipoItemId: id },
+      include: {
+        eventoTrazabilidad: {
+          orderBy: { fechaEvento: 'desc' }
+        },
+        user: {
+          select: { id: true, name: true, email: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    // 🔄 Transformar eventos para incluir información útil
-    const historialEntregas = eventos.map(evento => {
-      const metadata = evento.metadata as any || {};
-      
-      return {
-        id: evento.id,
-        estado: evento.estado,
-        descripcion: evento.descripcion,
-        fecha: evento.createdAt,
-        cantidadAtendida: metadata.cantidadAtendida || null,
-        fechaEntregaReal: metadata.fechaEntregaReal ? new Date(metadata.fechaEntregaReal) : null,
-        observaciones: metadata.observaciones || null,
-        comentarioLogistica: metadata.comentarioLogistica || null,
-        estadoAnterior: metadata.estadoAnterior || null,
-        estadoNuevo: metadata.estadoNuevo || null
-      };
-    });
+    const historialEntregas = entregas.map(entrega => ({
+      id: entrega.id,
+      estado: entrega.estado,
+      descripcion: `Entrega de ${entrega.cantidadEntregada || 0} unidades`,
+      fecha: entrega.createdAt,
+      cantidadAtendida: entrega.cantidadEntregada || 0,
+      fechaEntregaReal: entrega.fechaEntrega,
+      observaciones: entrega.observaciones || null,
+      usuario: entrega.user?.name || null,
+      eventos: entrega.eventoTrazabilidad.map(evt => ({
+        id: evt.id,
+        tipo: evt.tipo,
+        descripcion: evt.descripcion,
+        estadoAnterior: evt.estadoAnterior,
+        estadoNuevo: evt.estadoNuevo,
+        fecha: evt.fechaEvento,
+        metadata: evt.metadata
+      }))
+    }));
 
-    // 📊 Calcular estadísticas del historial
     const estadisticas = {
-      totalEventos: eventos.length,
-      ultimoEstado: eventos.length > 0 ? eventos[0].estado : null,
-      fechaUltimaActualizacion: eventos.length > 0 ? eventos[0].createdAt : null,
-      cantidadTotalAtendida: historialEntregas.reduce((total, evento) => {
-        return total + (evento.cantidadAtendida || 0);
-      }, 0)
+      totalEntregas: entregas.length,
+      ultimoEstado: entregas.length > 0 ? entregas[0].estado : null,
+      fechaUltimaActualizacion: entregas.length > 0 ? entregas[0].createdAt : null,
+      cantidadTotalEntregada: entregas.reduce((total, e) => total + (e.cantidadEntregada || 0), 0)
     };
 
     const resultado = {
@@ -89,9 +94,9 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       estadisticas
     };
 
-    logger.info('✅ Historial de entregas obtenido exitosamente:', {
+    logger.info('Historial de entregas obtenido exitosamente:', {
       itemId: id,
-      totalEventos: eventos.length
+      totalEntregas: entregas.length
     });
 
     return NextResponse.json(resultado);

@@ -102,6 +102,12 @@ export async function PUT(
       )
     }
 
+    // Get existing data for audit comparison
+    const listaExistente = await prisma.listaEquipo.findUnique({
+      where: { id },
+      select: { fechaNecesaria: true, nombre: true }
+    })
+
     // 📡 Actualizar lista de equipos
     const listaEquipoActualizada = await prisma.listaEquipo.update({
       where: { id },
@@ -133,6 +139,28 @@ export async function PUT(
       listaId: id,
       changes: body
     })
+
+    // Audit fechaNecesaria changes specifically
+    if (body.fechaNecesaria && listaExistente) {
+      const oldFecha = listaExistente.fechaNecesaria?.toISOString().split('T')[0] || null
+      const newFecha = body.fechaNecesaria
+      if (oldFecha !== newFecha) {
+        try {
+          await registrarActualizacion(
+            'LISTA_EQUIPO',
+            id,
+            session.user.id!,
+            `Fecha necesaria actualizada en lista "${listaExistente.nombre}"`,
+            {
+              fechaNecesariaAnterior: oldFecha,
+              fechaNecesariaNueva: newFecha
+            }
+          )
+        } catch (auditError) {
+          logger.error('Error al registrar cambio de fechaNecesaria:', auditError)
+        }
+      }
+    }
 
     // ✅ Registrar en auditoría
     try {

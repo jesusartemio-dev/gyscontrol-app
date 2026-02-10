@@ -115,6 +115,14 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       }
     }
 
+    // Auto-sync estado from estadoEntrega
+    if (body.estadoEntrega) {
+      if (body.estadoEntrega === 'entregado') body.estado = 'entregado'
+      else if (body.estadoEntrega === 'parcial') body.estado = 'parcial'
+      else if (body.estadoEntrega === 'cancelado') body.estado = 'cancelado'
+      else if (body.estadoEntrega === 'en_proceso') body.estado = 'atendido'
+    }
+
     // 🔧 Actualizar el ítem
     const itemActualizado = await prisma.pedidoEquipoItem.update({ 
        where: { id }, 
@@ -146,7 +154,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       await recalcularCantidadPedida(itemAnterior.listaEquipoItemId)
     }
 
-    // 🔄 Sync cantidadEntregada en ListaEquipoItem cuando cambia cantidadAtendida
+    // 🔄 Sync cantidadEntregada + costoReal en ListaEquipoItem cuando cambia cantidadAtendida
     if (body.cantidadAtendida !== undefined && itemAnterior.listaEquipoItemId) {
       try {
         // Recalcular sumando todas las cantidadAtendida de PedidoEquipoItems vinculados
@@ -154,12 +162,41 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           where: { listaEquipoItemId: itemAnterior.listaEquipoItemId },
           _sum: { cantidadAtendida: true },
         })
+        // Also sync costoReal
+        const allLinkedItems = await prisma.pedidoEquipoItem.findMany({
+          where: { listaEquipoItemId: itemAnterior.listaEquipoItemId },
+          select: { precioUnitario: true, cantidadAtendida: true }
+        })
+        const costoReal = allLinkedItems.reduce((sum, item) =>
+          sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
+
         await prisma.listaEquipoItem.update({
           where: { id: itemAnterior.listaEquipoItemId },
-          data: { cantidadEntregada: resultado._sum.cantidadAtendida || 0 },
+          data: {
+            cantidadEntregada: resultado._sum.cantidadAtendida || 0,
+            costoReal
+          },
         })
       } catch (syncError) {
         console.warn('⚠️ Error al sincronizar cantidadEntregada:', syncError)
+      }
+    }
+
+    // 🔄 Recalculate PedidoEquipo.costoRealTotal
+    if ((body.cantidadAtendida !== undefined || body.precioUnitario !== undefined) && itemAnterior.pedidoEquipo) {
+      try {
+        const allPedidoItems = await prisma.pedidoEquipoItem.findMany({
+          where: { pedidoId: itemAnterior.pedidoEquipo.id },
+          select: { precioUnitario: true, cantidadAtendida: true }
+        })
+        const costoRealTotal = allPedidoItems.reduce((sum, item) =>
+          sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
+        await prisma.pedidoEquipo.update({
+          where: { id: itemAnterior.pedidoEquipo.id },
+          data: { costoRealTotal, updatedAt: new Date() }
+        })
+      } catch (costoError) {
+        console.warn('⚠️ Error al recalcular costoRealTotal:', costoError)
       }
     }
 
@@ -172,23 +209,20 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         })
 
         const estados = allItems.map(i => i.estado)
-        let nuevoEstadoPedido: 'parcial' | 'entregado' | null = null
+        let nuevoEstadoPedido: 'parcial' | 'entregado' | 'cancelado' | null = null
 
         if (estados.length > 0) {
-          if (estados.every(e => e === 'entregado')) {
+          if (estados.every(e => e === 'cancelado')) {
+            nuevoEstadoPedido = 'cancelado'
+          } else if (estados.every(e => e === 'entregado' || e === 'cancelado')) {
             nuevoEstadoPedido = 'entregado'
-          } else if (estados.some(e => e !== 'pendiente')) {
+          } else if (estados.some(e => e !== 'pendiente' && e !== 'cancelado')) {
             nuevoEstadoPedido = 'parcial'
           }
         }
 
         // Solo actualizar si hay un nuevo estado derivado y es diferente al actual
-        const estadoActualPedido = itemAnterior.pedidoEquipo.estado
-        if (
-          nuevoEstadoPedido &&
-          nuevoEstadoPedido !== estadoActualPedido &&
-          estadoActualPedido !== 'cancelado'
-        ) {
+        if (nuevoEstadoPedido) {
           await prisma.pedidoEquipo.update({
             where: { id: itemAnterior.pedidoEquipo.id },
             data: { estado: nuevoEstadoPedido, updatedAt: new Date() },

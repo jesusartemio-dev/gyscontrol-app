@@ -184,6 +184,8 @@ export async function POST(request: NextRequest) {
               tiempoEntregaDias: itemOriginal?.tiempoEntregaDias,
               estado: 'pendiente',
               estadoEntrega: 'pendiente',
+              proveedorId: itemOriginal?.proveedorId || null,
+              proveedorNombre: itemOriginal?.proveedor?.nombre || null,
               updatedAt: now
             }
           })
@@ -221,7 +223,16 @@ export async function POST(request: NextRequest) {
 
     logger.info(`✅ Pedido creado desde lista: ${resultado.pedido.id} con ${resultado.items.length} items`)
     
-    return NextResponse.json(pedidoCompleto, { status: 201 })
+    // Budget validation warning - calculate lista budget from items
+    let _advertenciaPresupuesto: string | null = null
+    const listaPresupuesto = lista.listaEquipoItem.reduce((sum, item) => {
+      return sum + ((item.precioElegido ?? item.presupuesto ?? 0) * (item.cantidad || 1))
+    }, 0)
+    if (listaPresupuesto > 0 && costoTotal > listaPresupuesto) {
+      _advertenciaPresupuesto = `El costo del pedido ($${costoTotal.toFixed(2)}) excede el presupuesto de la lista ($${listaPresupuesto.toFixed(2)})`
+    }
+
+    return NextResponse.json({ ...pedidoCompleto, _advertenciaPresupuesto }, { status: 201 })
 
   } catch (error) {
     logger.error('❌ Error al crear pedido desde lista:', error)

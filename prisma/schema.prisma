@@ -605,6 +605,8 @@ model PedidoEquipoItem {
   fechaEntregaReal            DateTime?
   estadoEntrega               EstadoEntregaItem @default(pendiente)
   observacionesEntrega        String?
+  proveedorId                 String?
+  proveedorNombre             String?
   entregaItem                 EntregaItem[]
   listaEquipoItem             ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?      @relation(fields: [listaId], references: [id])
@@ -2645,6 +2647,7 @@ enum EstadoPedidoItem {
   atendido
   parcial
   entregado
+  cancelado
 }
 
 enum EstadoTarea {

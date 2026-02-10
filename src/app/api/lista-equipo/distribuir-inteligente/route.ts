@@ -46,28 +46,24 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Verificar que el ProyectoEquipo existe y pertenece al proyecto (temporalmente deshabilitado)
-    // TODO: Re-enable when Prisma client is updated
-    // const proyectoEquipo = await prisma.proyectoEquipoCotizado.findFirst({
-    //   where: {
-    //     id: proyectoEquipoId,
-    //     proyectoId: proyectoId
-    //   },
-    //   include: {
-    //     proyecto: true,
-    //     items: true
-    //   }
-    // })
-    //
-    // if (!proyectoEquipo) {
-    //   return NextResponse.json(
-    //     { error: 'ProyectoEquipo no encontrado o no pertenece al proyecto' },
-    //     { status: 404 }
-    //   )
-    // }
+    // Verificar que el ProyectoEquipo existe y pertenece al proyecto
+    const proyectoEquipo = await prisma.proyectoEquipoCotizado.findFirst({
+      where: {
+        id: proyectoEquipoId,
+        proyectoId: proyectoId
+      },
+      include: {
+        proyecto: true,
+        proyectoEquipoCotizadoItem: true
+      }
+    })
 
-    // Mock proyectoEquipo for now
-    const proyectoEquipo = { proyecto: { codigo: 'TEMP' }, items: [] }
+    if (!proyectoEquipo) {
+      return NextResponse.json(
+        { error: 'ProyectoEquipo no encontrado o no pertenece al proyecto' },
+        { status: 404 }
+      )
+    }
 
     // ✅ Validar que todas las sugerencias tengan items válidos
     const todosLosItemsIds = sugerencias.flatMap(s => s.itemsIds)
@@ -80,24 +76,20 @@ export async function POST(req: Request) {
       )
     }
 
-    // ✅ Verificar que todos los items existen y pertenecen al ProyectoEquipo (temporalmente deshabilitado)
-    // TODO: Re-enable when Prisma client is updated
-    // const proyectoEquipoItems = await prisma.proyectoEquipoCotizadoItem.findMany({
-    //   where: {
-    //     id: { in: Array.from(itemsUnicos) },
-    //     proyectoEquipoId: proyectoEquipoId
-    //   }
-    // })
-    //
-    // if (proyectoEquipoItems.length !== itemsUnicos.size) {
-    //   return NextResponse.json(
-    //     { error: 'Algunos items no existen o no pertenecen al ProyectoEquipo' },
-    //     { status: 400 }
-    //   )
-    // }
+    // Verificar que todos los items existen y pertenecen al ProyectoEquipo
+    const proyectoEquipoItems = await prisma.proyectoEquipoCotizadoItem.findMany({
+      where: {
+        id: { in: Array.from(itemsUnicos) },
+        proyectoEquipoId: proyectoEquipoId
+      }
+    })
 
-    // Mock proyectoEquipoItems for now
-    const proyectoEquipoItems: any[] = []
+    if (proyectoEquipoItems.length !== itemsUnicos.size) {
+      return NextResponse.json(
+        { error: 'Algunos items no existen o no pertenecen al ProyectoEquipo' },
+        { status: 400 }
+      )
+    }
 
     // ✅ Verificar que los items NO estén ya en listas activas (evitar duplicados)
     const itemsYaEnListas = proyectoEquipoItems.filter(item =>
@@ -183,18 +175,15 @@ export async function POST(req: Request) {
           })
         }
 
-        // Asociar los ProyectoEquipoItem a la lista (mantener estado 'pendiente')
-        // Solo cambiar a 'en_lista' cuando se convierta en pedido (temporalmente deshabilitado)
-        // TODO: Re-enable when Prisma client is updated
-        // await tx.proyectoEquipoCotizadoItem.updateMany({
-        //   where: {
-        //     id: { in: sugerencia.itemsIds }
-        //   },
-        //   data: {
-        //     listaId: lista.id
-        //     // estado permanece como 'pendiente' para permitir múltiples listas
-        //   }
-        // })
+        // Asociar los ProyectoEquipoItem a la lista
+        await tx.proyectoEquipoCotizadoItem.updateMany({
+          where: {
+            id: { in: sugerencia.itemsIds }
+          },
+          data: {
+            listaId: lista.id
+          }
+        })
 
         listasCreadas.push({
           ...lista,
@@ -246,54 +235,44 @@ export async function GET(req: Request) {
       )
     }
 
-    // Obtener el ProyectoEquipo con sus items (temporalmente deshabilitado)
-    // TODO: Re-enable when Prisma client is updated
-    // const proyectoEquipo = await prisma.proyectoEquipoCotizado.findFirst({
-    //   where: {
-    //     id: proyectoEquipoId,
-    //     proyectoId: proyectoId
-    //   },
-    //   include: {
-    //     items: {
-    //       where: {
-    //         OR: [
-    //           { estado: 'pendiente' },
-    //           { listaId: null } // ✅ Incluir items sin lista asignada
-    //         ]
-    //       }
-    //     },
-    //     proyecto: true,
-    //     responsable: true
-    //   }
-    // })
-    //
-    // if (!proyectoEquipo) {
-    //   return NextResponse.json(
-    //     { error: 'ProyectoEquipo no encontrado' },
-    //     { status: 404 }
-    //   )
-    // }
+    // Obtener el ProyectoEquipo con sus items
+    const proyectoEquipo = await prisma.proyectoEquipoCotizado.findFirst({
+      where: {
+        id: proyectoEquipoId,
+        proyectoId: proyectoId
+      },
+      include: {
+        proyectoEquipoCotizadoItem: {
+          where: {
+            OR: [
+              { estado: 'pendiente' },
+              { listaId: null }
+            ]
+          }
+        },
+        proyecto: true,
+        user: true
+      }
+    })
 
-    // Mock proyectoEquipo for GET endpoint
-    const proyectoEquipo = {
-      id: proyectoEquipoId,
-      nombre: 'Mock ProyectoEquipo',
-      descripcion: 'Mock description',
-      items: [],
-      proyecto: { codigo: 'TEMP', fechaFin: new Date() },
-      responsable: { nombre: 'Mock User' }
+    if (!proyectoEquipo) {
+      return NextResponse.json(
+        { error: 'ProyectoEquipo no encontrado' },
+        { status: 404 }
+      )
     }
 
     // Usar el servicio de análisis inteligente
     const { analizarProyectoEquipo } = await import('@/lib/services/analisisInteligente')
 
-    // Convertir tipos para compatibilidad (null → undefined)
+    // Convertir tipos para compatibilidad (null -> undefined)
     const proyectoEquipoCompatible = {
       ...proyectoEquipo,
+      items: proyectoEquipo.proyectoEquipoCotizadoItem,
       descripcion: proyectoEquipo.descripcion || undefined,
       proyecto: {
         ...proyectoEquipo.proyecto,
-        fechaFin: proyectoEquipo.proyecto.fechaFin || undefined
+        fechaFin: (proyectoEquipo.proyecto as any).fechaFin || undefined
       }
     }
 
@@ -303,7 +282,7 @@ export async function GET(req: Request) {
       proyectoEquipo: {
         id: proyectoEquipo.id,
         nombre: proyectoEquipo.nombre,
-        totalItems: proyectoEquipo.items.length
+        totalItems: proyectoEquipo.proyectoEquipoCotizadoItem.length
       },
       analisis
     })

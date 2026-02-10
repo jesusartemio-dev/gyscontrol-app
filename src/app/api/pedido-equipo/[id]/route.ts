@@ -14,6 +14,7 @@ import type { PedidoEquipoUpdatePayload } from '@/types'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
+import { validarTransicionPedido, getFechasPorTransicionPedido, type EstadoPedidoEquipo } from '@/lib/utils/flujoPedidoEquipo'
 
 // ✅ Obtener pedido por ID
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -109,6 +110,21 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
     }
 
+    // Validate state transition using state machine
+    if (body.estado && body.estado !== pedidoActual.estado) {
+      const userRole = session.user.role || ''
+      const resultado = validarTransicionPedido(pedidoActual.estado, body.estado, userRole)
+      if (!resultado.valido) {
+        return NextResponse.json(
+          { error: resultado.error },
+          { status: 403 }
+        )
+      }
+      // Auto-set dates based on transition
+      const fechasTransicion = getFechasPorTransicionPedido(body.estado as EstadoPedidoEquipo)
+      Object.assign(body, fechasTransicion)
+    }
+
     const data = await prisma.pedidoEquipo.update({
       where: { id },
       data: {
@@ -121,6 +137,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         fechaNecesaria: body.fechaNecesaria ? new Date(body.fechaNecesaria + 'T00:00:00') : undefined,
         fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada + 'T00:00:00') : null,
         fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : null,
+        updatedAt: new Date(),
       },
       include: {
         user: true,

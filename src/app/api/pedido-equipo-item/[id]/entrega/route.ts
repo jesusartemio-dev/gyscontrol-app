@@ -36,9 +36,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           select: {
             id: true,
             codigo: true,
-            proyecto: {
-              select: { nombre: true }
-            }
+            proyectoId: true,
+            proyecto: { select: { nombre: true } }
           }
         }
       }
@@ -51,30 +50,145 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       );
     }
 
-    // 🔄 Actualizar el item con los datos de entrega
-    const itemActualizado = await prisma.pedidoEquipoItem.update({
-      where: { id },
-      data: {
-        cantidadAtendida: validationResult.data.cantidadAtendida,
-        estadoEntrega: validationResult.data.estadoEntrega,
-        fechaEntregaReal: validationResult.data.fechaEntregaReal,
-        observacionesEntrega: validationResult.data.observacionesEntrega,
-        comentarioLogistica: validationResult.data.comentarioLogistica,
-        updatedAt: new Date()
-      },
-      include: {
-        pedidoEquipo: {
-          select: {
-            codigo: true,
-            proyecto: {
-              select: { nombre: true }
+    // Auto-sync estado from estadoEntrega
+    const estadoEntrega = validationResult.data.estadoEntrega
+    let estadoDerivado: 'pendiente' | 'atendido' | 'parcial' | 'entregado' | 'cancelado' | undefined = undefined
+    if (estadoEntrega === 'entregado') estadoDerivado = 'entregado'
+    else if (estadoEntrega === 'parcial') estadoDerivado = 'parcial'
+    else if (estadoEntrega === 'cancelado') estadoDerivado = 'cancelado'
+    else if (estadoEntrega === 'en_proceso') estadoDerivado = 'atendido'
+
+    // 🔄 Actualizar el item con los datos de entrega (dentro de transacción)
+    const itemActualizado = await prisma.$transaction(async (tx) => {
+      const updatedItem = await tx.pedidoEquipoItem.update({
+        where: { id },
+        data: {
+          cantidadAtendida: validationResult.data.cantidadAtendida,
+          estadoEntrega: validationResult.data.estadoEntrega,
+          fechaEntregaReal: validationResult.data.fechaEntregaReal,
+          observacionesEntrega: validationResult.data.observacionesEntrega,
+          comentarioLogistica: validationResult.data.comentarioLogistica,
+          ...(estadoDerivado ? { estado: estadoDerivado } : {}),
+          updatedAt: new Date()
+        },
+        include: {
+          pedidoEquipo: {
+            select: {
+              codigo: true,
+              proyecto: {
+                select: { nombre: true }
+              }
             }
           }
         }
+      });
+
+      // Calculate costoReal = precioUnitario * cantidadAtendida
+      const precioUnitario = itemExistente.precioUnitario || 0
+      const cantidadAtendida = validationResult.data.cantidadAtendida || 0
+
+      // Update costoReal on the ListaEquipoItem by summing all related pedido items
+      if (itemExistente.listaEquipoItemId) {
+        const sumResult = await tx.pedidoEquipoItem.aggregate({
+          where: { listaEquipoItemId: itemExistente.listaEquipoItemId },
+          _sum: { cantidadAtendida: true }
+        })
+        // Also get all items to calculate weighted costoReal
+        const allLinkedItems = await tx.pedidoEquipoItem.findMany({
+          where: { listaEquipoItemId: itemExistente.listaEquipoItemId },
+          select: { precioUnitario: true, cantidadAtendida: true }
+        })
+        const costoReal = allLinkedItems.reduce((sum, item) =>
+          sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
+
+        await tx.listaEquipoItem.update({
+          where: { id: itemExistente.listaEquipoItemId },
+          data: {
+            costoReal,
+            cantidadEntregada: sumResult._sum.cantidadAtendida || 0
+          }
+        })
       }
+
+      // Recalculate PedidoEquipo.costoRealTotal
+      const allPedidoItems = await tx.pedidoEquipoItem.findMany({
+        where: { pedidoId: itemExistente.pedidoEquipo.id },
+        select: { precioUnitario: true, cantidadAtendida: true }
+      })
+      const costoRealTotal = allPedidoItems.reduce((sum, item) =>
+        sum + ((item.precioUnitario || 0) * (item.cantidadAtendida || 0)), 0)
+
+      await tx.pedidoEquipo.update({
+        where: { id: itemExistente.pedidoEquipo.id },
+        data: { costoRealTotal, updatedAt: new Date() }
+      })
+
+      // Create EntregaItem record
+      const entregaItemId = `ent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const entregaItem = await tx.entregaItem.create({
+        data: {
+          id: entregaItemId,
+          pedidoEquipoItemId: id,
+          listaEquipoItemId: itemExistente.listaEquipoItemId || null,
+          proyectoId: itemExistente.pedidoEquipo.proyectoId,
+          fechaEntrega: validationResult.data.fechaEntregaReal || new Date(),
+          estado: validationResult.data.estadoEntrega as any,
+          cantidad: itemExistente.cantidadPedida || 0,
+          cantidadEntregada: validationResult.data.cantidadAtendida || 0,
+          observaciones: validationResult.data.observacionesEntrega || null,
+          usuarioId: null, // No session available in this route currently
+          updatedAt: new Date()
+        }
+      })
+
+      // Create EventoTrazabilidad record
+      await tx.eventoTrazabilidad.create({
+        data: {
+          id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          entregaItemId: entregaItemId,
+          proyectoId: itemExistente.pedidoEquipo.proyectoId,
+          tipo: 'ENTREGA',
+          descripcion: `Entrega registrada: ${validationResult.data.cantidadAtendida} unidades - ${validationResult.data.estadoEntrega}`,
+          estadoAnterior: itemExistente.estadoEntrega as any || null,
+          estadoNuevo: validationResult.data.estadoEntrega as any,
+          usuarioId: 'system', // No session in this route
+          metadata: {
+            cantidadAtendida: validationResult.data.cantidadAtendida,
+            fechaEntregaReal: validationResult.data.fechaEntregaReal?.toISOString(),
+            observaciones: validationResult.data.observacionesEntrega,
+            comentarioLogistica: validationResult.data.comentarioLogistica,
+            pedidoCodigo: itemExistente.pedidoEquipo.codigo,
+            proyectoNombre: itemExistente.pedidoEquipo.proyecto.nombre
+          },
+          updatedAt: new Date()
+        }
+      })
+
+      // Auto-derive parent pedido state
+      const allItems = await tx.pedidoEquipoItem.findMany({
+        where: { pedidoId: itemExistente.pedidoEquipo.id },
+        select: { estado: true }
+      })
+      const estados = allItems.map(i => i.estado)
+      let nuevoEstadoPedido: 'borrador' | 'enviado' | 'atendido' | 'parcial' | 'entregado' | 'cancelado' | null = null
+      if (estados.every(e => e === 'cancelado')) {
+        nuevoEstadoPedido = 'cancelado'
+      } else if (estados.every(e => e === 'entregado' || e === 'cancelado')) {
+        nuevoEstadoPedido = 'entregado'
+      } else if (estados.some(e => e !== 'pendiente' && e !== 'cancelado')) {
+        nuevoEstadoPedido = 'parcial'
+      }
+      if (nuevoEstadoPedido) {
+        await tx.pedidoEquipo.update({
+          where: { id: itemExistente.pedidoEquipo.id },
+          data: { estado: nuevoEstadoPedido, updatedAt: new Date() }
+        })
+      }
+
+      return updatedItem
     });
 
-    // 📝 Log de trazabilidad (modelo no disponible)
+    // 📝 Log de trazabilidad
     logger.info('Entrega registrada', {
       pedidoEquipoItemId: id,
       estado: validationResult.data.estadoEntrega,
@@ -82,7 +196,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       metadata: {
         cantidadAtendida: validationResult.data.cantidadAtendida,
         fechaEntregaReal: validationResult.data.fechaEntregaReal?.toISOString(),
-          observaciones: validationResult.data.observacionesEntrega,
+        observaciones: validationResult.data.observacionesEntrega,
         comentarioLogistica: validationResult.data.comentarioLogistica
       }
     });
@@ -145,6 +259,14 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
     if (body.comentarioLogistica !== undefined) {
       datosActualizacion.comentarioLogistica = body.comentarioLogistica;
+    }
+
+    // Auto-sync estado from estadoEntrega
+    if (body.estadoEntrega) {
+      if (body.estadoEntrega === 'entregado') datosActualizacion.estado = 'entregado'
+      else if (body.estadoEntrega === 'parcial') datosActualizacion.estado = 'parcial'
+      else if (body.estadoEntrega === 'cancelado') datosActualizacion.estado = 'cancelado'
+      else if (body.estadoEntrega === 'en_proceso') datosActualizacion.estado = 'atendido'
     }
 
     // 🔄 Actualizar el item
