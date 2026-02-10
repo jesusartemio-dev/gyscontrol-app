@@ -132,9 +132,10 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     })
 
     return NextResponse.json(actualizada)
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error al actualizar cotización:', error)
-    return NextResponse.json({ error: 'Error interno al actualizar cotización' }, { status: 500 })
+    const message = error?.message || 'Error interno al actualizar cotización'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

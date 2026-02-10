@@ -83,7 +83,9 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
     try {
       const dataToUpdate = {
         ...formData,
-        fechaValidezHasta: formData.fechaValidezHasta || null,
+        fechaValidezHasta: formData.fechaValidezHasta
+          ? new Date(formData.fechaValidezHasta).toISOString()
+          : null,
         tipoCambio: formData.tipoCambio ? parseFloat(String(formData.tipoCambio)) : null
       }
 
@@ -92,8 +94,8 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
       setSuccess(true)
 
       setTimeout(() => setSuccess(false), 3000)
-    } catch (err) {
-      setError('Error al actualizar la cabecera de la cotización')
+    } catch (err: any) {
+      setError(err?.message || 'Error al actualizar la cabecera de la cotización')
       console.error('Error updating cotizacion header:', err)
     } finally {
       setLoading(false)

@@ -116,7 +116,10 @@ export async function updateCotizacion(
       credentials: 'include', // ✅ Incluir cookies de sesión
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error('Error al actualizar cotización')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Error al actualizar cotización')
+    }
     return await res.json()
   } catch (error) {
     console.error('❌ updateCotizacion:', error)
