@@ -148,7 +148,7 @@ export default function ProyectosPage() {
         totalGastosInterno: 0,
         descuento: 0,
         grandTotal: 0,
-        estado: 'activo',
+        estado: 'creado',
         fechaInicio: new Date(fechaInicio).toISOString(),
       }
       const nuevo = await createProyecto(payload)
