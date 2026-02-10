@@ -8,6 +8,8 @@
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
@@ -30,6 +32,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string; faseId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id, faseId } = await params
 
     // ✅ Validar que el proyecto existe
@@ -98,6 +105,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; faseId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id, faseId } = await params
     const body = await request.json()
 
@@ -183,6 +195,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; faseId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id, faseId } = await params
 
     // ✅ Validar que la fase existe y pertenece al proyecto

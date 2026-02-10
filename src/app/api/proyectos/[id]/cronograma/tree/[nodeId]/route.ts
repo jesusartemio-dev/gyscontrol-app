@@ -8,6 +8,8 @@
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
@@ -37,6 +39,11 @@ export async function PUT(
   const resolvedParams = await params
   console.log(`🚀 [API TREE PUT] Iniciando actualización de`, resolvedParams)
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id, nodeId } = resolvedParams
     console.log(`🔍 [API TREE PUT] Proyecto ID: ${id}, Node ID: ${nodeId}`)
     const body = await request.json()
@@ -204,6 +211,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; nodeId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id, nodeId } = await params
 
     // ✅ Validar que el proyecto existe

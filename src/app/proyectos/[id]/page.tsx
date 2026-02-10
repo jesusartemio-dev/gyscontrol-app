@@ -283,7 +283,7 @@ export default function ProyectoHubPage() {
       bgColor: 'bg-amber-50',
       hoverBg: 'hover:bg-amber-50',
       borderColor: 'border-amber-200',
-      href: `${baseUrl}/cronograma`,
+      href: `${baseUrl}/tareas`,
       stats: [
         { label: 'Total', value: cronogramaStats.tareas },
         { label: 'En progreso', value: cronogramaStats.tareasEnProgreso },

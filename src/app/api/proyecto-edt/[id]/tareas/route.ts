@@ -152,7 +152,7 @@ export async function POST(
 
     const nuevaTarea = await prisma.proyectoTarea.create({
       data: {
-        id: `proyecto-tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         proyectoEdtId: id,
         proyectoCronogramaId: edt.proyectoCronogramaId,
         nombre: data.nombre,

@@ -6,6 +6,8 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse, NextRequest } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import type { ProyectoEquipoCotizadoItemUpdatePayload } from '@/types'
 
 export const dynamic = 'force-dynamic' // ✅ Para evitar problemas de caché en rutas dinámicas
@@ -13,6 +15,11 @@ export const dynamic = 'force-dynamic' // ✅ Para evitar problemas de caché en
 // ✅ Obtener un ítem de equipo por ID
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await context.params
     const item = await prisma.proyectoEquipoCotizadoItem.findUnique({
       where: { id },
@@ -40,6 +47,11 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
 // ✅ Actualizar un ítem de equipo
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await context.params
     const body: ProyectoEquipoCotizadoItemUpdatePayload = await req.json()
     
@@ -61,6 +73,11 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 // ✅ Eliminar un ítem de equipo
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await context.params
 
     await prisma.proyectoEquipoCotizadoItem.delete({ where: { id } })

@@ -8,6 +8,8 @@
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // ✅ GET /api/proyectos/[id]/cronograma/import-tareas - Obtener servicios disponibles para importar como tareas
@@ -16,6 +18,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await params
     const { searchParams } = new URL(request.url)
     const actividadId = searchParams.get('actividadId')
@@ -155,6 +162,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id } = await params
     const body = await request.json()
     const { actividadId, selectedIds } = body

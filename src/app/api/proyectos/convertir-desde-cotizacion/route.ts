@@ -91,7 +91,7 @@ async function convertirCotizacionAProyecto(cotizacionId: string, proyectoId: st
   // 2. Crear cronograma de ejecución para el proyecto
   const cronogramaEjecucion = await prisma.proyectoCronograma.create({
     data: {
-      id: `proyecto-cronograma-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: crypto.randomUUID(),
       proyectoId,
       tipo: 'ejecucion',
       nombre: 'Cronograma de Ejecución',
@@ -114,7 +114,7 @@ async function convertirCotizacionAProyecto(cotizacionId: string, proyectoId: st
 
     const edtCreado = await prisma.proyectoEdt.create({
       data: {
-        id: `proyecto-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         proyectoId,
         proyectoCronogramaId: cronogramaEjecucion.id,
         nombre: edtComercial.nombre || edtComercial.edt?.nombre || 'EDT Sin Nombre',
@@ -191,7 +191,7 @@ async function crearFasesEstandar(proyectoId: string, cronogramaId: string) {
   for (const fase of fases) {
     const faseCreada = await prisma.proyectoFase.create({
       data: {
-        id: `proyecto-fase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         proyectoId,
         proyectoCronogramaId: cronogramaId,
         nombre: fase.nombre,

@@ -18,6 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import {
   Plus,
   Search,
@@ -38,11 +39,15 @@ import {
   Settings
 } from 'lucide-react'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import { buildApiUrl } from '@/lib/utils'
 
 const ALLOWED_ROLES = ['proyectos', 'coordinador', 'gestor', 'gerente', 'admin']
 
 type ViewMode = 'cards' | 'table'
 type FilterStatus = 'all' | 'activo' | 'pausado' | 'cerrado' | 'cancelado'
+
+interface ClienteOption { id: string; nombre: string; codigo: string }
+interface UsuarioOption { id: string; name: string; email: string; role: string }
 
 export default function ProyectosPage() {
   const { data: session, status } = useSession()
@@ -51,10 +56,16 @@ export default function ProyectosPage() {
   const [filteredProyectos, setFilteredProyectos] = useState<Proyecto[]>([])
   const [nombre, setNombre] = useState('')
   const [codigo, setCodigo] = useState('')
+  const [clienteId, setClienteId] = useState('')
+  const [comercialId, setComercialId] = useState('')
+  const [gestorId, setGestorId] = useState('')
+  const [fechaInicio, setFechaInicio] = useState('')
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [clientes, setClientes] = useState<ClienteOption[]>([])
+  const [usuarios, setUsuarios] = useState<UsuarioOption[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
@@ -75,6 +86,30 @@ export default function ProyectosPage() {
       .finally(() => setPageLoading(false))
   }, [])
 
+  // Cargar clientes y usuarios cuando se abre el dialog
+  useEffect(() => {
+    if (!showCreateDialog) return
+    const loadOptions = async () => {
+      try {
+        const [clientesRes, usuariosRes] = await Promise.all([
+          fetch(buildApiUrl('/api/clientes')),
+          fetch(buildApiUrl('/api/admin/usuarios'))
+        ])
+        if (clientesRes.ok) {
+          const data = await clientesRes.json()
+          setClientes(Array.isArray(data) ? data : [])
+        }
+        if (usuariosRes.ok) {
+          const data = await usuariosRes.json()
+          setUsuarios(Array.isArray(data) ? data : data.data || [])
+        }
+      } catch (err) {
+        console.error('Error cargando opciones:', err)
+      }
+    }
+    loadOptions()
+  }, [showCreateDialog])
+
   useEffect(() => {
     let filtered = [...proyectos]
     if (searchTerm) {
@@ -93,17 +128,17 @@ export default function ProyectosPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!nombre.trim() || !codigo.trim()) {
-      setError('Todos los campos son obligatorios.')
+    if (!nombre.trim() || !codigo.trim() || !clienteId || !comercialId || !gestorId || !fechaInicio) {
+      setError('Todos los campos obligatorios deben ser completados.')
       return
     }
     setLoading(true)
     setError(null)
     try {
       const payload: ProyectoPayload = {
-        clienteId: '',
-        comercialId: '',
-        gestorId: '',
+        clienteId,
+        comercialId,
+        gestorId,
         nombre,
         codigo,
         totalCliente: 0,
@@ -114,13 +149,17 @@ export default function ProyectosPage() {
         descuento: 0,
         grandTotal: 0,
         estado: 'activo',
-        fechaInicio: new Date().toISOString(),
+        fechaInicio: new Date(fechaInicio).toISOString(),
       }
       const nuevo = await createProyecto(payload)
       if (nuevo) {
         setProyectos([...proyectos, nuevo])
         setNombre('')
         setCodigo('')
+        setClienteId('')
+        setComercialId('')
+        setGestorId('')
+        setFechaInicio('')
         setShowCreateDialog(false)
         toast.success('Proyecto creado exitosamente')
       }
@@ -213,36 +252,98 @@ export default function ProyectosPage() {
               <DialogHeader>
                 <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
+              <form onSubmit={handleCreate} className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Nombre</label>
+                  <Label className="text-xs font-medium">Nombre *</Label>
                   <Input
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
                     placeholder="Nombre del proyecto"
+                    className="h-8 text-sm"
                     required
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-medium">Código *</Label>
+                    <Input
+                      value={codigo}
+                      onChange={(e) => setCodigo(e.target.value)}
+                      placeholder="Ej: PRY-001"
+                      className="h-8 text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium">Fecha Inicio *</Label>
+                    <Input
+                      type="date"
+                      value={fechaInicio}
+                      onChange={(e) => setFechaInicio(e.target.value)}
+                      className="h-8 text-sm"
+                      required
+                    />
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Código</label>
-                  <Input
-                    value={codigo}
-                    onChange={(e) => setCodigo(e.target.value)}
-                    placeholder="Código único"
-                    required
-                  />
+                  <Label className="text-xs font-medium">Cliente *</Label>
+                  <Select value={clienteId} onValueChange={setClienteId}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Seleccionar cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes.map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          <span className="font-mono text-xs text-gray-500 mr-1">{c.codigo}</span>
+                          {c.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-medium">Comercial *</Label>
+                    <Select value={comercialId} onValueChange={setComercialId}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {usuarios.map(u => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium">Gestor *</Label>
+                    <Select value={gestorId} onValueChange={setGestorId}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {usuarios.map(u => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 {error && (
                   <div className="text-red-600 text-sm bg-red-50 p-2 rounded">
                     {error}
                   </div>
                 )}
-                <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowCreateDialog(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? 'Creando...' : 'Crear'}
+                  <Button type="submit" size="sm" disabled={loading}>
+                    {loading ? 'Creando...' : 'Crear Proyecto'}
                   </Button>
                 </div>
               </form>

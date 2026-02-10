@@ -8,6 +8,8 @@
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // ✅ GET /api/proyectos/[id]/cronograma/import-edts - Obtener EDTs disponibles para importar
@@ -16,6 +18,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id: proyectoId } = await params
     const { searchParams } = new URL(request.url)
     const faseId = searchParams.get('faseId') // Opcional: filtrar por fase específica
@@ -135,6 +142,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id: proyectoId } = await params
     const body = await request.json()
     const { edtIds, faseId } = body
@@ -218,7 +230,7 @@ export async function POST(
         // Crear el EDT en el proyecto
         const edtProyecto = await prisma.proyectoEdt.create({
           data: {
-            id: `proyecto-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: crypto.randomUUID(),
             proyectoId,
             proyectoCronogramaId: cronograma.id,
             proyectoFaseId,

@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,6 +43,11 @@ function diasEntre(fecha1: Date | null, fecha2: Date | null): number | null {
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const { id: proyectoId } = await context.params
 
     // Buscar cronograma baseline (planificación marcado como baseline)

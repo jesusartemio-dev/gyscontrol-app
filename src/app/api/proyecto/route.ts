@@ -56,21 +56,35 @@ export async function POST(req: Request) {
       )
     }
 
-    // Generar código del proyecto
-    const cliente = await prisma.cliente.findUnique({
-      where: { id: data.clienteId },
-      select: { codigo: true, numeroSecuencia: true }
-    })
+    // Determinar código del proyecto
+    let codigoProyecto: string
 
-    if (!cliente) {
-      return NextResponse.json(
-        { error: 'Cliente no encontrado' },
-        { status: 404 }
-      )
+    if (data.codigo && data.codigo.trim()) {
+      // Código proporcionado manualmente (creación sin cotización)
+      codigoProyecto = data.codigo.trim()
+    } else {
+      // Auto-generar código desde el cliente
+      const cliente = await prisma.cliente.findUnique({
+        where: { id: data.clienteId },
+        select: { codigo: true, numeroSecuencia: true }
+      })
+
+      if (!cliente) {
+        return NextResponse.json(
+          { error: 'Cliente no encontrado' },
+          { status: 404 }
+        )
+      }
+
+      const nuevoNumero = (cliente.numeroSecuencia || 0) + 1
+      codigoProyecto = `${cliente.codigo}-${String(nuevoNumero).padStart(3, '0')}`
+
+      // Actualizar el número de secuencia del cliente
+      await prisma.cliente.update({
+        where: { id: data.clienteId },
+        data: { numeroSecuencia: nuevoNumero }
+      })
     }
-
-    const nuevoNumero = (cliente.numeroSecuencia || 0) + 1
-    const codigoProyecto = `${cliente.codigo}-${String(nuevoNumero).padStart(3, '0')}`
 
     // Crear proyecto
     const nuevoProyecto = await prisma.proyecto.create({
@@ -85,12 +99,6 @@ export async function POST(req: Request) {
         comercial: true,
         gestor: true,
       }
-    })
-
-    // Actualizar el número de secuencia del cliente
-    await prisma.cliente.update({
-      where: { id: data.clienteId },
-      data: { numeroSecuencia: nuevoNumero }
     })
 
     // ✅ Auditoría removida temporalmente por refactorización

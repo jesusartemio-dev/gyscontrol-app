@@ -159,12 +159,12 @@ export async function POST(request: NextRequest) {
     // 📊 Crear proyecto
     const nuevoProyecto = await prisma.proyecto.create({
       data: {
-        id: `proy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         nombre: body.nombre,
         clienteId: body.clienteId,
         comercialId: body.comercialId || 'default-comercial-id', // TODO: Obtener del usuario actual
         gestorId: body.gestorId || 'default-gestor-id', // TODO: Obtener del usuario actual
-        codigo: body.codigo || `PROY-${Date.now()}`,
+        codigo: body.codigo || `PROY-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
         fechaInicio: body.fechaInicio ? new Date(body.fechaInicio) : new Date(),
         fechaFin: body.fechaFin ? new Date(body.fechaFin) : null,
         totalCliente: body.totalCliente || 0,

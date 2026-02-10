@@ -93,7 +93,7 @@ export async function POST(
     // Crear el cronograma
     const cronograma = await prisma.proyectoCronograma.create({
       data: {
-        id: `proyecto-cronograma-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         proyectoId,
         tipo: validatedData.tipo,
         nombre: validatedData.nombre,
@@ -168,7 +168,7 @@ async function generarCronogramaDesdeServicios({
   for (const faseData of fasesDefault) {
     const fase = await prisma.proyectoFase.create({
       data: {
-        id: `proyecto-fase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         proyectoId,
         proyectoCronogramaId: cronogramaId,
         nombre: faseData.nombre,
@@ -246,7 +246,7 @@ async function generarCronogramaDesdeServicios({
     // Crear EDT con nombre del catálogo
     const edt = await prisma.proyectoEdt.create({
       data: {
-        id: `proyecto-edt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(),
         proyectoId,
         proyectoCronogramaId: cronogramaId,
         proyectoFaseId: faseAsignada.id,
@@ -293,7 +293,7 @@ async function generarCronogramaDesdeServicios({
       for (const item of items) {
         const tarea = await prisma.proyectoTarea.create({
           data: {
-            id: `proyecto-tarea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: crypto.randomUUID(),
             proyectoEdtId: edt.id,
             proyectoActividadId: actividad.id,
             proyectoCronogramaId: cronogramaId,

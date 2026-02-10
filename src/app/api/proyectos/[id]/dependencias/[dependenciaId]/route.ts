@@ -4,6 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
@@ -13,6 +15,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string; dependenciaId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const { id: proyectoId, dependenciaId } = await params;
 
     const dependencia = await prisma.proyectoDependenciasTarea.findFirst({
@@ -91,6 +98,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; dependenciaId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const { id: proyectoId, dependenciaId } = await params;
     const body = await request.json();
 
@@ -183,6 +195,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; dependenciaId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const { id: proyectoId, dependenciaId } = await params;
 
     // Verificar que la dependencia existe y pertenece al proyecto
