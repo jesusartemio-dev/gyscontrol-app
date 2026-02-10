@@ -31,15 +31,7 @@ import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
 
 import type { Cotizacion, EstadoCotizacion } from '@/types'
 import { CotizacionContext } from './cotizacion-context'
-
-// Utility functions
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(amount)
-}
+import { formatDisplayCurrency } from '@/lib/utils/currency'
 
 interface CotizacionLayoutProps {
   children: React.ReactNode
@@ -314,7 +306,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                 </span>
                 <span className="text-muted-foreground">|</span>
                 <span className="font-semibold text-gray-900">
-                  {formatCurrency(cotizacion.grandTotal || 0)}
+                  {formatDisplayCurrency(cotizacion.grandTotal || 0, cotizacion.moneda, cotizacion.tipoCambio)}
                 </span>
                 {cotizacion.oportunidadCrm && (
                   <>

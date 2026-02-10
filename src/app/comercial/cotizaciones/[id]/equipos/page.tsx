@@ -144,7 +144,6 @@ export default function CotizacionEquiposPage() {
                 onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)}
                 onUpdatedNombre={nuevo => handleActualizarNombreEquipo(e.id, nuevo)}
                 isLocked={isLocked}
-                moneda={cotizacion.moneda || undefined}
               />
             ))}
           </div>

@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { generateEquiposKey, generateServiciosKey, generateGastosKey } from '@/lib/utils/uniqueKeyGenerator'
-import { getMonedaSymbol, formatMoneda, formatMonedaCompact } from '@/lib/utils/currency'
+import { getMonedaSymbol, formatDisplayCurrency, formatDisplayCompact } from '@/lib/utils/currency'
 import type { Cotizacion } from '@/types'
 
 // Configuración de categorías con iconos y colores
@@ -66,9 +66,10 @@ export default function ResumenTotalesCotizacion({ cotizacion }: Props) {
   // 🔧 Generate unique keys using singleton generator to avoid React 19 duplicate key issues
   const contextId = React.useMemo(() => cotizacion.id || 'default', [cotizacion.id]);
   const moneda = cotizacion.moneda || 'USD'
+  const tc = cotizacion.tipoCambio
   const sym = getMonedaSymbol(moneda)
-  const fmtCompact = (amount: number) => formatMonedaCompact(amount, moneda)
-  const fmtCurrency = (amount: number) => formatMoneda(amount, moneda)
+  const fmtCompact = (amount: number) => formatDisplayCompact(amount, moneda, tc)
+  const fmtCurrency = (amount: number) => formatDisplayCurrency(amount, moneda, tc)
   
   const categorias = [
     {

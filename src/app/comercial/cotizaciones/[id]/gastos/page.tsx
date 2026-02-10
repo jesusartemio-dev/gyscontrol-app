@@ -128,7 +128,6 @@ export default function CotizacionGastosPage() {
                 onDeletedGrupo={() => handleEliminarGrupoGasto(g.id)}
                 onUpdatedNombre={nuevo => handleActualizarNombreGasto(g.id, nuevo)}
                 isLocked={isLocked}
-                moneda={cotizacion.moneda || undefined}
               />
             ))}
           </div>

@@ -91,6 +91,29 @@ export const formatMonedaCompact = (amount: number, moneda?: string | null): str
 }
 
 /**
+ * Convierte un monto USD a la moneda de display y lo formatea.
+ * Items se almacenan siempre en USD; esta función aplica tipoCambio cuando moneda !== 'USD'.
+ */
+export const toDisplayAmount = (amountUSD: number, moneda?: string | null, tipoCambio?: number | null): number => {
+  if (!moneda || moneda === 'USD' || !tipoCambio) return amountUSD
+  return amountUSD * tipoCambio
+}
+
+/**
+ * Convierte un monto USD a la moneda de display y lo formatea con símbolo.
+ */
+export const formatDisplayCurrency = (amountUSD: number, moneda?: string | null, tipoCambio?: number | null): string => {
+  return formatMoneda(toDisplayAmount(amountUSD, moneda, tipoCambio), moneda)
+}
+
+/**
+ * Convierte un monto USD a la moneda de display y lo formatea sin símbolo.
+ */
+export const formatDisplayCompact = (amountUSD: number, moneda?: string | null, tipoCambio?: number | null): string => {
+  return formatMonedaCompact(toDisplayAmount(amountUSD, moneda, tipoCambio), moneda)
+}
+
+/**
  * Convierte un string de moneda a número
  * @param currencyString - String de moneda (ej: "$1,234.56")
  * @returns Número parseado

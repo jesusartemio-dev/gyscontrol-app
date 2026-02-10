@@ -60,11 +60,8 @@ const getStatusVariant = (estado: string): "default" | "secondary" | "destructiv
   }
 }
 
-// ✅ Currency formatter - dynamic based on cotización moneda
-import { formatMoneda } from '@/lib/utils/currency'
-const formatCurrency = (amount: number, moneda?: string | null): string => {
-  return formatMoneda(amount, moneda)
-}
+// ✅ Currency formatter - converts USD to display currency using tipoCambio
+import { formatDisplayCurrency } from '@/lib/utils/currency'
 
 // ✅ Date formatter
 const formatDate = (dateString: string): string => {
@@ -403,18 +400,18 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                     </td>
                     <td className="px-3 py-2 text-right">
                       <span className="text-xs font-medium text-gray-900">
-                        {formatCurrency(cotizacion.totalCliente, cotizacion.moneda)}
+                        {formatDisplayCurrency(cotizacion.totalCliente, cotizacion.moneda, cotizacion.tipoCambio)}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right">
                       <span className="text-xs text-gray-600">
-                        {formatCurrency(cotizacion.totalInterno, cotizacion.moneda)}
+                        {formatDisplayCurrency(cotizacion.totalInterno, cotizacion.moneda, cotizacion.tipoCambio)}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right">
                       <div className="flex flex-col items-end">
                         <span className={`text-xs font-semibold ${margen >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(margen, cotizacion.moneda)}
+                          {formatDisplayCurrency(margen, cotizacion.moneda, cotizacion.tipoCambio)}
                         </span>
                         <span className={`text-[10px] ${margen >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                           {margenPct}%
@@ -554,7 +551,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                           <span>Total Cliente</span>
                         </div>
                         <p className="font-semibold text-green-600">
-                          {formatCurrency(cotizacion.totalCliente, cotizacion.moneda)}
+                          {formatDisplayCurrency(cotizacion.totalCliente, cotizacion.moneda, cotizacion.tipoCambio)}
                         </p>
                       </div>
 
@@ -564,7 +561,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                           <span>Total Interno</span>
                         </div>
                         <p className="font-semibold text-blue-600">
-                          {formatCurrency(cotizacion.totalInterno, cotizacion.moneda)}
+                          {formatDisplayCurrency(cotizacion.totalInterno, cotizacion.moneda, cotizacion.tipoCambio)}
                         </p>
                       </div>
 
@@ -574,7 +571,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                           <span>Margen</span>
                         </div>
                         <p className="font-semibold text-purple-600">
-                          {formatCurrency(cotizacion.totalCliente - cotizacion.totalInterno, cotizacion.moneda)}
+                          {formatDisplayCurrency(cotizacion.totalCliente - cotizacion.totalInterno, cotizacion.moneda, cotizacion.tipoCambio)}
                         </p>
                       </div>
 

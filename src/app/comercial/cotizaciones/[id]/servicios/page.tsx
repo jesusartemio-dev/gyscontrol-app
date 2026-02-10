@@ -145,7 +145,6 @@ export default function CotizacionServiciosPage() {
                 onUpdatedNombre={nuevo => handleActualizarNombreServicio(s.id, nuevo)}
                 onRefresh={refreshCotizacion}
                 isLocked={isLocked}
-                moneda={cotizacion.moneda || undefined}
               />
             ))}
           </div>

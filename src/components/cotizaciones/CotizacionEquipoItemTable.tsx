@@ -12,19 +12,16 @@ import {
 } from '@/components/ui/tooltip'
 import type { CotizacionEquipoItem } from '@/types'
 import { cn } from '@/lib/utils'
-import { formatMonedaCompact } from '@/lib/utils/currency'
-
 interface Props {
   items: CotizacionEquipoItem[]
   onUpdated?: (item: CotizacionEquipoItem) => void
   onDeleted?: (id: string) => void
   onEdit?: (item: CotizacionEquipoItem) => void
   isLocked?: boolean
-  moneda?: string
 }
 
-export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, isLocked = false, moneda }: Props) {
-  const formatCompact = (amount: number) => formatMonedaCompact(amount, moneda)
+export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, isLocked = false }: Props) {
+  const formatCompact = (amount: number) => amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const [filter, setFilter] = useState('')
   const [showReferencia, setShowReferencia] = useState(false)
 

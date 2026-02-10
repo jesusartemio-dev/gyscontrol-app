@@ -20,16 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 
 import { useCotizacionContext } from './cotizacion-context'
-
-// Utility function
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount)
-}
+import { formatDisplayCurrency } from '@/lib/utils/currency'
 
 export default function CotizacionHubPage() {
   const router = useRouter()
@@ -165,7 +156,7 @@ export default function CotizacionHubPage() {
                   )}
                   {card.total !== undefined && card.total > 0 && (
                     <span className="text-sm font-semibold text-gray-700">
-                      {formatCurrency(card.total)}
+                      {formatDisplayCurrency(card.total, cotizacion?.moneda, cotizacion?.tipoCambio)}
                     </span>
                   )}
                 </div>

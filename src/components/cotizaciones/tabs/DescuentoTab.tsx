@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { descuentoAction } from '@/lib/services/cotizacion'
-import { formatMoneda } from '@/lib/utils/currency'
+import { formatDisplayCurrency } from '@/lib/utils/currency'
 import type { Cotizacion } from '@/types'
 
 interface DescuentoTabProps {
@@ -34,7 +34,7 @@ interface DescuentoTabProps {
 }
 
 export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: DescuentoTabProps) {
-  const formatCurrency = (amount: number) => formatMoneda(amount, cotizacion.moneda)
+  const formatCurrency = (amount: number) => formatDisplayCurrency(amount, cotizacion.moneda, cotizacion.tipoCambio)
   const { data: session } = useSession()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

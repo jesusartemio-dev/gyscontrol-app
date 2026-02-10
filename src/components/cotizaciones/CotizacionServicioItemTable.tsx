@@ -17,10 +17,9 @@ interface Props {
   onUpdated: (item: CotizacionServicioItem) => void
   onDeleted: (id: string) => void
   isLocked?: boolean
-  moneda?: string
 }
 
-import { formatMoneda } from '@/lib/utils/currency'
+import { formatCurrency as formatUSD } from '@/lib/utils/currency'
 
 const dificultadLabels: Record<number, string> = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Crítica' }
 const dificultadColors: Record<number, string> = {
@@ -30,8 +29,8 @@ const dificultadColors: Record<number, string> = {
   4: 'bg-red-100 text-red-700'
 }
 
-export default function CotizacionServicioItemTable({ items, onUpdated, onDeleted, isLocked = false, moneda }: Props) {
-  const formatCurrency = (amount: number) => formatMoneda(amount, moneda)
+export default function CotizacionServicioItemTable({ items, onUpdated, onDeleted, isLocked = false }: Props) {
+  const formatCurrency = (amount: number) => formatUSD(amount)
   const [recursos, setRecursos] = useState<Recurso[]>([])
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editableItem, setEditableItem] = useState<Partial<CotizacionServicioItem>>({})
