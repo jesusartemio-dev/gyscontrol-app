@@ -10,6 +10,7 @@
 // Componentes principales
 export { default as OportunidadesList } from './OportunidadesList'
 export { default as OportunidadForm } from './OportunidadForm'
+export { default as KanbanBoard } from './KanbanBoard'
 
 // Componentes de actividades
 export { default as ActividadForm } from './ActividadForm'

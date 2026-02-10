@@ -63,7 +63,8 @@ export async function PUT(
       esDecisionMaker,
       areasInfluencia,
       relacionComercial,
-      notas
+      notas,
+      fechaUltimoContacto
     } = data
 
     // Validaciones básicas
@@ -101,7 +102,9 @@ export async function PUT(
         esDecisionMaker: esDecisionMaker || false,
         areasInfluencia: areasInfluencia?.trim(),
         relacionComercial: relacionComercial?.trim(),
-        notas: notas?.trim()
+        notas: notas?.trim(),
+        fechaUltimoContacto: fechaUltimoContacto ? new Date(fechaUltimoContacto) : undefined,
+        updatedAt: new Date()
       }
     })
 

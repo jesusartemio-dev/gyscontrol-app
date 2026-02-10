@@ -203,6 +203,14 @@ export async function GET(request: NextRequest) {
               estado: true
             }
           },
+          proyecto: {
+            select: {
+              id: true,
+              nombre: true,
+              codigo: true,
+              estado: true
+            }
+          },
           crmActividad: {
             select: {
               id: true,

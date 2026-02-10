@@ -50,11 +50,18 @@ import {
   CRM_ESTADOS_OPORTUNIDAD,
   CRM_PRIORIDADES
 } from '@/lib/services/crm'
+import KanbanBoard from './KanbanBoard'
 import CrearProyectoDesdeCotizacionModal from '@/components/proyectos/CrearProyectoDesdeCotizacionModal'
 import { getCotizacionById } from '@/lib/services/cotizacion'
-import { getProyectos } from '@/lib/services/proyecto'
-import type { Proyecto } from '@/types'
 import { useRouter } from 'next/navigation'
+
+// Tipo ligero para proyecto incluido en la respuesta de oportunidades
+interface ProyectoResumen {
+  id: string
+  nombre: string
+  codigo: string
+  estado: string
+}
 
 interface Props {
   onView?: (oportunidad: CrmOportunidad) => void
@@ -168,19 +175,8 @@ const getEstadoAvanzado = (estado: string, cotizacion?: any) => {
   return estados[estado as keyof typeof estados] || estados.prospecto
 }
 
-// ✅ Función para detectar proyecto existente
-const detectarProyectoExistente = async (cotizacionId: string): Promise<Proyecto | null> => {
-  try {
-    const proyectos = await getProyectos()
-    return proyectos.find(p => p.cotizacionId === cotizacionId) || null
-  } catch (error) {
-    console.error('Error detectando proyecto existente:', error)
-    return null
-  }
-}
-
 // ✅ Componente para mostrar información del proyecto
-function ProyectoInfo({ proyecto }: { proyecto: Proyecto }) {
+function ProyectoInfo({ proyecto }: { proyecto: ProyectoResumen }) {
   const router = useRouter()
   const Icon = getEstadoAvanzado(proyecto.estado).icon
 
@@ -450,8 +446,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
   const [pagination, setPagination] = useState<CrmOportunidadPagination>({ page: 1, limit: 10 })
   const [searchTerm, setSearchTerm] = useState('')
   const [estadisticas, setEstadisticas] = useState<Record<string, { count: number; valorTotal: number }>>({})
-  const [proyectosCache, setProyectosCache] = useState<Record<string, Proyecto | null>>({})
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+  const [viewMode, setViewMode] = useState<'table' | 'card' | 'kanban'>('table')
   const { toast } = useToast()
 
   // ✅ Cargar oportunidades y detectar proyectos existentes
@@ -464,26 +459,6 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
       setOportunidades(response.data)
       setEstadisticas(response.estadisticas)
 
-      // Detectar proyectos existentes para oportunidades con cotización
-      const cotizacionIds = response.data
-        .filter(opp => opp.cotizacionId)
-        .map(opp => opp.cotizacionId!)
-
-      if (cotizacionIds.length > 0) {
-        try {
-          const proyectos = await getProyectos()
-          const proyectosMap: Record<string, Proyecto | null> = {}
-
-          cotizacionIds.forEach(cotizacionId => {
-            const proyecto = proyectos.find(p => p.cotizacionId === cotizacionId)
-            proyectosMap[cotizacionId] = proyecto || null
-          })
-
-          setProyectosCache(prev => ({ ...prev, ...proyectosMap }))
-        } catch (proyectosError) {
-          console.warn('Error al cargar proyectos:', proyectosError)
-        }
-      }
     } catch (err) {
       console.error('Error al cargar oportunidades:', err)
       setError('Error al cargar oportunidades')
@@ -609,6 +584,14 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
           >
             <Grid3X3 className="h-4 w-4" />
           </Button>
+          <Button
+            size="sm"
+            variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+            onClick={() => setViewMode('kanban')}
+            className="h-8 px-2"
+          >
+            <FolderKanban className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Filtros rápidos en línea */}
@@ -715,6 +698,8 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
           </div>
         ) : oportunidades.length === 0 ? (
           <EmptyState onCreate={onCreate} />
+        ) : viewMode === 'kanban' ? (
+          <KanbanBoard onView={onView} onEdit={onEdit} />
         ) : viewMode === 'table' ? (
           <div className="bg-white border rounded-lg overflow-x-auto">
             <table className="w-full table-fixed min-w-[800px]">
@@ -797,7 +782,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
                     </td>
                     <td className="px-3 py-3">
                       {(() => {
-                        const proyecto = oportunidad.cotizacionId ? proyectosCache[oportunidad.cotizacionId] : null
+                        const proyecto = (oportunidad as any).proyecto as ProyectoResumen | null
                         return proyecto ? (
                           <Badge
                             variant="outline"
@@ -1020,8 +1005,8 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
                     )}
 
                     {/* Información del Proyecto si existe */}
-                    {oportunidad.cotizacionId && proyectosCache[oportunidad.cotizacionId] && (
-                      <ProyectoInfo proyecto={proyectosCache[oportunidad.cotizacionId]!} />
+                    {(oportunidad as any).proyecto && (
+                      <ProyectoInfo proyecto={(oportunidad as any).proyecto as ProyectoResumen} />
                     )}
 
                     <div className="flex justify-end gap-1">
@@ -1051,7 +1036,7 @@ export default function OportunidadesList({ onView, onEdit, onDelete, onCreate, 
 
                       {(() => {
                         const puedeCrear = puedeCrearProyecto(oportunidad)
-                        const tieneProyecto = oportunidad.cotizacionId && proyectosCache[oportunidad.cotizacionId]
+                        const tieneProyecto = !!(oportunidad as any).proyecto
                         const mostrarBotonCrear = puedeCrear && !tieneProyecto
 
                         // Debug logs (remover en producción)

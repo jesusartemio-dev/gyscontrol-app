@@ -99,16 +99,35 @@ export async function GET(req: NextRequest) {
     const tasaConversion = totalOportunidades > 0 ?
       (oportunidadesGanadas / totalOportunidades) * 100 : 0
 
-    // Obtener métricas del usuario actual (si se proporciona userId)
+    // Calcular métricas del usuario actual en tiempo real
     let metricasUsuario = null
     if (userId) {
-      const periodoActual = new Date().toISOString().slice(0, 7) // YYYY-MM
-      metricasUsuario = await prisma.crmMetricaComercial.findFirst({
-        where: {
-          usuarioId: userId,
-          periodo: periodoActual
-        }
-      })
+      const ahora = new Date()
+      const mesInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1)
+      const mesFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59)
+
+      const [cotizaciones, cotizacionesAprobadas, proyectos, valorAgregado, llamadas, reuniones, propuestas, emails] = await Promise.all([
+        prisma.cotizacion.count({ where: { comercialId: userId, createdAt: { gte: mesInicio, lte: mesFin } } }),
+        prisma.cotizacion.count({ where: { comercialId: userId, estado: 'aprobada', createdAt: { gte: mesInicio, lte: mesFin } } }),
+        prisma.proyecto.count({ where: { comercialId: userId, createdAt: { gte: mesInicio, lte: mesFin } } }),
+        prisma.proyecto.aggregate({ where: { comercialId: userId, createdAt: { gte: mesInicio, lte: mesFin } }, _sum: { grandTotal: true } }),
+        prisma.crmActividad.count({ where: { usuarioId: userId, tipo: 'llamada', fecha: { gte: mesInicio, lte: mesFin } } }),
+        prisma.crmActividad.count({ where: { usuarioId: userId, tipo: { in: ['reunión', 'reunion'] }, fecha: { gte: mesInicio, lte: mesFin } } }),
+        prisma.crmActividad.count({ where: { usuarioId: userId, tipo: 'propuesta', fecha: { gte: mesInicio, lte: mesFin } } }),
+        prisma.crmActividad.count({ where: { usuarioId: userId, tipo: 'email', fecha: { gte: mesInicio, lte: mesFin } } }),
+      ])
+
+      metricasUsuario = {
+        cotizacionesGeneradas: cotizaciones,
+        cotizacionesAprobadas,
+        proyectosCerrados: proyectos,
+        valorTotalVendido: valorAgregado._sum.grandTotal || 0,
+        llamadasRealizadas: llamadas,
+        reunionesAgendadas: reuniones,
+        propuestasEnviadas: propuestas,
+        emailsEnviados: emails,
+        tasaConversion: cotizaciones > 0 ? Math.round((proyectos / cotizaciones) * 100 * 100) / 100 : 0,
+      }
     }
 
     // Formatear datos de oportunidades por estado

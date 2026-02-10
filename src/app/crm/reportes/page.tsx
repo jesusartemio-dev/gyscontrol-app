@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Target, TrendingUp, Users, Activity, PieChart, ChevronRight } from 'lucide-react'
+import { Target, TrendingUp, Users, Activity, PieChart, ChevronRight, BarChart3, Trophy } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
 const reportes = [
@@ -44,6 +44,22 @@ const reportes = [
     icon: PieChart,
     color: 'text-red-600',
     route: '/crm/reportes/metricas'
+  },
+  {
+    id: 'forecast',
+    title: 'Forecast Ponderado',
+    description: 'Proyección de ingresos por probabilidad',
+    icon: BarChart3,
+    color: 'text-cyan-600',
+    route: '/crm/reportes/forecast'
+  },
+  {
+    id: 'win-loss',
+    title: 'Win/Loss Analysis',
+    description: 'Análisis de oportunidades ganadas vs perdidas',
+    icon: Trophy,
+    color: 'text-amber-600',
+    route: '/crm/reportes/win-loss'
   }
 ]
 

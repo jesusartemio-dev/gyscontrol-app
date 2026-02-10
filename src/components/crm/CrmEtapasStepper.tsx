@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { CrmOportunidad } from '@/lib/services/crm/oportunidades'
+import { CrmOportunidad, cambiarEstadoOportunidad, updateOportunidad } from '@/lib/services/crm/oportunidades'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,8 +11,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
-import { cambiarEstadoOportunidad } from '@/lib/services/crm/oportunidades'
 import {
   Target,
   Users,
@@ -155,13 +171,73 @@ const allStatesOrdered = [
   'feedback_mejora'
 ]
 
+// Motivos de pérdida predefinidos
+const CRM_MOTIVOS_PERDIDA = [
+  { value: 'precio', label: 'Precio más alto que competencia' },
+  { value: 'tiempo', label: 'Tiempo de entrega' },
+  { value: 'tecnico', label: 'Especificaciones técnicas' },
+  { value: 'relacion', label: 'Relación con cliente' },
+  { value: 'competidor', label: 'Mejor propuesta de competidor' },
+  { value: 'presupuesto', label: 'Cliente sin presupuesto' },
+  { value: 'cancelado', label: 'Proyecto cancelado por cliente' },
+  { value: 'otro', label: 'Otro motivo' }
+]
+
+// Estados activos (no terminales)
+const activeStates = ['inicio', 'contacto_cliente', 'validacion_tecnica', 'validacion_comercial', 'negociacion']
+// Estados terminales (cierre)
+const terminalStates = ['seguimiento_proyecto', 'feedback_mejora']
+
+// Transiciones válidas entre estados
+const validTransitions: Record<string, string[]> = {
+  inicio: ['contacto_cliente', 'feedback_mejora'],
+  contacto_cliente: ['validacion_tecnica', 'validacion_comercial', 'feedback_mejora'],
+  validacion_tecnica: ['validacion_comercial', 'negociacion', 'feedback_mejora'],
+  validacion_comercial: ['validacion_tecnica', 'negociacion', 'feedback_mejora'],
+  negociacion: ['seguimiento_proyecto', 'feedback_mejora'],
+  // Terminal states can reopen to any active state
+  seguimiento_proyecto: [...activeStates, 'feedback_mejora'],
+  feedback_mejora: [...activeStates, 'seguimiento_proyecto'],
+  // Legacy states can also reopen
+  cerrada_ganada: [...activeStates, 'seguimiento_proyecto', 'feedback_mejora'],
+  cerrada_perdida: [...activeStates, 'seguimiento_proyecto', 'feedback_mejora'],
+}
+
+function isValidTransition(from: string, to: string): boolean {
+  const allowed = validTransitions[from]
+  if (!allowed) return false
+  return allowed.includes(to)
+}
+
 export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = false }: Props) {
   const [loadingEtapa, setLoadingEtapa] = useState<string | null>(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackMotivo, setFeedbackMotivo] = useState('')
+  const [feedbackCompetidor, setFeedbackCompetidor] = useState('')
+  const [feedbackAprendizajes, setFeedbackAprendizajes] = useState('')
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
   const currentEstado = oportunidad.estado || 'inicio'
   const currentConfig = etapasConfig[currentEstado as keyof typeof etapasConfig]
 
   const handleEtapaChange = async (nuevaEtapa: string) => {
     if (nuevaEtapa === currentEstado) return
+
+    // BUG 4: Validate state transition
+    if (!isValidTransition(currentEstado, nuevaEtapa)) {
+      const fromLabel = etapasConfig[currentEstado as keyof typeof etapasConfig]?.label || currentEstado
+      const toLabel = etapasConfig[nuevaEtapa as keyof typeof etapasConfig]?.label || nuevaEtapa
+      toast.error(`No se puede pasar de ${fromLabel} a ${toLabel} directamente`)
+      return
+    }
+
+    // BUG 3: Intercept feedback_mejora to show dialog
+    if (nuevaEtapa === 'feedback_mejora') {
+      setFeedbackMotivo('')
+      setFeedbackCompetidor('')
+      setFeedbackAprendizajes('')
+      setFeedbackOpen(true)
+      return
+    }
 
     try {
       setLoadingEtapa(nuevaEtapa)
@@ -175,6 +251,29 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
     }
   }
 
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackMotivo) {
+      toast.error('Selecciona un motivo de pérdida')
+      return
+    }
+    try {
+      setFeedbackLoading(true)
+      const oportunidadActualizada = await updateOportunidad(oportunidad.id, {
+        estado: 'feedback_mejora',
+        motivoPerdida: feedbackMotivo,
+        competidorGanador: feedbackCompetidor || undefined,
+        aprendizajes: feedbackAprendizajes || undefined,
+      })
+      onUpdated(oportunidadActualizada)
+      setFeedbackOpen(false)
+      toast.success('Estado actualizado a Feedback de Mejora')
+    } catch {
+      toast.error('Error al registrar feedback')
+    } finally {
+      setFeedbackLoading(false)
+    }
+  }
+
   // Get the step index for the current estado (for visual progress)
   const getCurrentStepIndex = () => {
     const config = etapasConfig[currentEstado as keyof typeof etapasConfig]
@@ -183,9 +282,67 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
 
   const currentStepIndex = getCurrentStepIndex()
 
+  // Feedback dialog (rendered always, controlled by feedbackOpen state)
+  const feedbackDialog = (
+    <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Feedback de Mejora</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="motivoPerdida">Motivo de pérdida *</Label>
+            <Select value={feedbackMotivo} onValueChange={setFeedbackMotivo}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona un motivo" />
+              </SelectTrigger>
+              <SelectContent>
+                {CRM_MOTIVOS_PERDIDA.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="competidorGanador">Competidor ganador (opcional)</Label>
+            <Input
+              id="competidorGanador"
+              value={feedbackCompetidor}
+              onChange={(e) => setFeedbackCompetidor(e.target.value)}
+              placeholder="Nombre del competidor"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="aprendizajes">Aprendizajes (opcional)</Label>
+            <Textarea
+              id="aprendizajes"
+              value={feedbackAprendizajes}
+              onChange={(e) => setFeedbackAprendizajes(e.target.value)}
+              placeholder="Lecciones aprendidas, mejoras a considerar..."
+              rows={3}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setFeedbackOpen(false)} disabled={feedbackLoading}>
+            Cancelar
+          </Button>
+          <Button onClick={handleFeedbackSubmit} disabled={feedbackLoading}>
+            {feedbackLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            Guardar Feedback
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
   // Compact version: dropdown with current status
   if (compact) {
     return (
+      <>
+      {feedbackDialog}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -282,11 +439,14 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </>
     )
   }
 
   // Full stepper version - Flujo: Inicio → Contacto → Propuesta → Negociación → [Seg. Proyecto / Feedback]
   return (
+    <>
+    {feedbackDialog}
     <div className="flex items-center gap-1 flex-wrap">
       {/* Phase 1: Inicio */}
       <StepButton
@@ -412,6 +572,7 @@ export default function CrmEtapasStepper({ oportunidad, onUpdated, compact = fal
         </div>
       )}
     </div>
+    </>
   )
 }
 

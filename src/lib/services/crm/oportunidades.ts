@@ -91,6 +91,9 @@ export interface CrmOportunidadUpdate {
   notas?: string
   competencia?: string
   cotizacionId?: string
+  motivoPerdida?: string
+  competidorGanador?: string
+  aprendizajes?: string
 }
 
 export interface CrmOportunidadFilters {
@@ -321,9 +324,10 @@ export async function deleteOportunidad(id: string): Promise<void> {
 // ✅ Cambiar estado de oportunidad
 export async function cambiarEstadoOportunidad(
   id: string,
-  estado: string
+  estado: string,
+  feedbackData?: { motivoPerdida?: string; competidorGanador?: string; aprendizajes?: string }
 ): Promise<CrmOportunidad> {
-  return updateOportunidad(id, { estado })
+  return updateOportunidad(id, { estado, ...feedbackData })
 }
 
 // ✅ Asignar responsable a oportunidad

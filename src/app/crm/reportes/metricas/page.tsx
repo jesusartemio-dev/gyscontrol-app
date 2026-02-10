@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ArrowLeft } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useRouter } from 'next/navigation'
 
 interface MetricasData {
   periodo: string
@@ -32,14 +35,55 @@ interface MetricasData {
   }>
 }
 
+function getCurrentQuarter(): string {
+  const now = new Date()
+  const q = Math.ceil((now.getMonth() + 1) / 3)
+  return `${now.getFullYear()}-Q${q}`
+}
+
+function getCurrentMonth(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+function generatePeriodOptions(): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = []
+  const now = new Date()
+  const year = now.getFullYear()
+
+  // Quarterly options for current and previous year
+  for (let y = year; y >= year - 1; y--) {
+    for (let q = 4; q >= 1; q--) {
+      options.push({ value: `${y}-Q${q}`, label: `${y} T${q}` })
+    }
+  }
+
+  // Monthly options for last 12 months
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(year, now.getMonth() - i, 1)
+    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+    options.push({ value: val, label })
+  }
+
+  // Annual
+  options.push({ value: `${year}`, label: `${year} (Anual)` })
+  options.push({ value: `${year - 1}`, label: `${year - 1} (Anual)` })
+
+  return options
+}
+
 export default function MetricasReportPage() {
+  const router = useRouter()
   const [data, setData] = useState<MetricasData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [periodo, setPeriodo] = useState(getCurrentQuarter())
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('/api/crm/reportes/metricas?periodo=2024-Q4')
+        setLoading(true)
+        const response = await fetch(`/api/crm/reportes/metricas?periodo=${periodo}`)
         if (response.ok) {
           setData(await response.json())
         }
@@ -50,7 +94,7 @@ export default function MetricasReportPage() {
       }
     }
     loadData()
-  }, [])
+  }, [periodo])
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)
@@ -77,14 +121,31 @@ export default function MetricasReportPage() {
     ? ((data.totales.proyectosCerrados / data.totales.cotizacionesGeneradas) * 100).toFixed(1)
     : '0'
 
+  const periodOptions = generatePeriodOptions()
+
   return (
     <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Métricas</h1>
-          <p className="text-sm text-muted-foreground">KPIs comerciales - {data.periodo}</p>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/crm/reportes')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Métricas</h1>
+            <p className="text-sm text-muted-foreground">KPIs comerciales - {data.periodo}</p>
+          </div>
         </div>
+        <Select value={periodo} onValueChange={setPeriodo}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Periodo" />
+          </SelectTrigger>
+          <SelectContent>
+            {periodOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* KPIs principales */}

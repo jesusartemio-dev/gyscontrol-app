@@ -86,10 +86,10 @@ export async function createContacto(clienteId: string, data: CreateContactoData
   }
 }
 
-// ✅ Actualizar contacto (placeholder para futuras implementaciones)
-export async function updateContacto(id: string, data: UpdateContactoData): Promise<CrmContactoCliente> {
+// ✅ Actualizar contacto
+export async function updateContacto(clienteId: string, contactoId: string, data: UpdateContactoData): Promise<CrmContactoCliente> {
   try {
-    const response = await fetch(`/api/crm/contactos/${id}`, {
+    const response = await fetch(`/api/crm/clientes/${clienteId}/contactos/${contactoId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -109,10 +109,10 @@ export async function updateContacto(id: string, data: UpdateContactoData): Prom
   }
 }
 
-// ✅ Eliminar contacto (placeholder para futuras implementaciones)
-export async function deleteContacto(id: string): Promise<void> {
+// ✅ Eliminar contacto
+export async function deleteContacto(clienteId: string, contactoId: string): Promise<void> {
   try {
-    const response = await fetch(`/api/crm/contactos/${id}`, {
+    const response = await fetch(`/api/crm/clientes/${clienteId}/contactos/${contactoId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

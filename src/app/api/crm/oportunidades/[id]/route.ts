@@ -13,6 +13,20 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { crearNotificacion } from '@/lib/services/notificaciones'
+
+// Mapa de labels para estados de oportunidad
+const ESTADO_LABELS: Record<string, string> = {
+  inicio: 'Inicio',
+  contacto_cliente: 'Contacto Cliente',
+  validacion_tecnica: 'Validacion Tecnica',
+  validacion_comercial: 'Validacion Comercial',
+  negociacion: 'Negociacion',
+  seguimiento_proyecto: 'Seguimiento Proyecto',
+  feedback_mejora: 'Feedback de Mejora',
+  cerrada_ganada: 'Cerrada Ganada',
+  cerrada_perdida: 'Cerrada Perdida'
+}
 
 // ✅ Obtener oportunidad por ID
 export async function GET(
@@ -149,6 +163,17 @@ export async function PUT(
     if (data.prioridad !== undefined) updateData.prioridad = data.prioridad
     if (data.notas !== undefined) updateData.notas = data.notas
     if (data.competencia !== undefined) updateData.competencia = data.competencia
+    if (data.motivoPerdida !== undefined) updateData.motivoPerdida = data.motivoPerdida
+    if (data.competidorGanador !== undefined) updateData.competidorGanador = data.competidorGanador
+    if (data.aprendizajes !== undefined) updateData.aprendizajes = data.aprendizajes
+
+    // ✅ Establecer fechaCierre si el estado cambia a un estado terminal
+    if (data.estado !== undefined && data.estado !== oportunidadExistente.estado) {
+      const estadosConCierre = ['seguimiento_proyecto', 'feedback_mejora', 'cerrada_ganada', 'cerrada_perdida']
+      if (estadosConCierre.includes(data.estado)) {
+        updateData.fechaCierre = new Date()
+      }
+    }
 
     // ✅ Validar y asignar clienteId si se proporciona
     if (data.clienteId !== undefined) {
@@ -226,6 +251,79 @@ export async function PUT(
         }
       }
     })
+
+    // ✅ Notificaciones y auto-log de actividad al cambiar estado
+    if (data.estado && data.estado !== oportunidadExistente.estado) {
+      const estadoAnterior = oportunidadExistente.estado
+      const nuevoEstado = data.estado as string
+      const labelAnterior = ESTADO_LABELS[estadoAnterior] || estadoAnterior
+      const labelNuevo = ESTADO_LABELS[nuevoEstado] || nuevoEstado
+
+      try {
+        // Determinar tipo de notificacion segun estado
+        const tipoNotificacion: 'success' | 'warning' | 'info' =
+          ['seguimiento_proyecto', 'cerrada_ganada'].includes(nuevoEstado) ? 'success' :
+          ['feedback_mejora', 'cerrada_perdida'].includes(nuevoEstado) ? 'warning' : 'info'
+
+        // Notificar al comercial (si existe y es diferente del usuario actual)
+        if (oportunidadExistente.comercialId && oportunidadExistente.comercialId !== session.user.id) {
+          await crearNotificacion({
+            titulo: 'Cambio de estado en oportunidad',
+            mensaje: `La oportunidad "${oportunidadExistente.nombre}" cambio de ${labelAnterior} a ${labelNuevo}`,
+            tipo: tipoNotificacion,
+            prioridad: 'media',
+            usuarioId: oportunidadExistente.comercialId,
+            entidadTipo: 'oportunidad',
+            entidadId: id,
+            accionUrl: `/crm/oportunidades/${id}`,
+            accionTexto: 'Ver Oportunidad'
+          })
+        }
+
+        // Notificar al responsable (si existe, es diferente del comercial y del usuario actual)
+        if (
+          oportunidadExistente.responsableId &&
+          oportunidadExistente.responsableId !== oportunidadExistente.comercialId &&
+          oportunidadExistente.responsableId !== session.user.id
+        ) {
+          await crearNotificacion({
+            titulo: 'Cambio de estado en oportunidad',
+            mensaje: `La oportunidad "${oportunidadExistente.nombre}" cambio de ${labelAnterior} a ${labelNuevo}`,
+            tipo: tipoNotificacion,
+            prioridad: 'media',
+            usuarioId: oportunidadExistente.responsableId,
+            entidadTipo: 'oportunidad',
+            entidadId: id,
+            accionUrl: `/crm/oportunidades/${id}`,
+            accionTexto: 'Ver Oportunidad'
+          })
+        }
+      } catch (notifError) {
+        console.error('Error al crear notificaciones de cambio de estado:', notifError)
+      }
+
+      // Auto-log CrmActividad
+      try {
+        const resultado =
+          nuevoEstado === 'seguimiento_proyecto' || nuevoEstado === 'cerrada_ganada' ? 'positivo' :
+          nuevoEstado === 'feedback_mejora' || nuevoEstado === 'cerrada_perdida' ? 'negativo' : 'neutro'
+
+        await prisma.crmActividad.create({
+          data: {
+            id: crypto.randomUUID(),
+            oportunidadId: id,
+            tipo: 'seguimiento',
+            descripcion: `Estado cambiado de ${labelAnterior} a ${labelNuevo}`,
+            resultado,
+            fecha: new Date(),
+            usuarioId: session.user.id,
+            updatedAt: new Date()
+          }
+        })
+      } catch (actividadError) {
+        console.error('Error al crear actividad de cambio de estado:', actividadError)
+      }
+    }
 
     return NextResponse.json(oportunidadActualizada)
 

@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import MetricasCards from './MetricasCards'
 import EmbudoChart from './EmbudoChart'
 import ActividadesRecientes from './ActividadesRecientes'
+import AlertasCrmWidget from './AlertasCrmWidget'
 
 interface DashboardData {
   resumen: {
@@ -121,6 +122,9 @@ export default function CrmDashboard({ userId, userRole = 'comercial' }: CrmDash
 
       {/* Métricas principales */}
       <MetricasCards resumen={dashboardData.resumen} />
+
+      {/* Alertas CRM */}
+      <AlertasCrmWidget />
 
       {/* Embudo y Actividades */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

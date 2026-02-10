@@ -1,8 +1,8 @@
 // ===================================================
-// 📁 Archivo: route.ts
-// 📌 Ubicación: /api/crm/reportes/rendimiento
-// 🔧 Descripción: API para reporte de rendimiento comercial
-// ✅ GET: Obtener métricas de rendimiento por usuario
+// Archivo: route.ts
+// Ubicacion: /api/crm/reportes/rendimiento
+// Descripcion: API para reporte de rendimiento comercial
+// GET: Obtener metricas de rendimiento por usuario
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
@@ -11,170 +11,159 @@ import type { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-// ✅ Obtener métricas de rendimiento comercial
+/**
+ * Returns the first and last+1 day of the month described by "YYYY-MM".
+ */
+function getDateRange(periodo: string): { gte: Date; lt: Date } {
+  const [yearStr, monthStr] = periodo.split('-')
+  const year = parseInt(yearStr)
+  const month = parseInt(monthStr) - 1 // 0-indexed
+  return {
+    gte: new Date(year, month, 1),
+    lt: new Date(year, month + 1, 1), // automatically rolls over year
+  }
+}
+
+// GET - Obtener metricas de rendimiento comercial
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const periodo = searchParams.get('periodo') || '2024-10' // Mes actual por defecto
+
+    // Default period = current month
+    const now = new Date()
+    const defaultPeriodo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const periodo = searchParams.get('periodo') || defaultPeriodo
     const usuarioId = searchParams.get('usuarioId')
 
-    // Obtener usuarios comerciales
+    const dateRange = getDateRange(periodo)
+
+    // Obtener usuarios con roles comerciales
     const usuariosComerciales = await prisma.user.findMany({
       where: {
-        role: 'comercial'
+        role: { in: ['comercial', 'coordinador', 'gerente', 'admin'] as any },
       },
       select: {
         id: true,
         name: true,
-        email: true
-      }
+        email: true,
+      },
     })
 
-    // Para cada usuario comercial, calcular métricas
+    // Para cada usuario, calcular metricas en paralelo
     const metricasUsuarios = await Promise.all(
       usuariosComerciales.map(async (usuario) => {
-        // Cotizaciones generadas
-        const cotizacionesGeneradas = await prisma.cotizacion.count({
-          where: {
-            comercialId: usuario.id,
-            createdAt: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          }
-        })
+        const [
+          cotizacionesGeneradas,
+          cotizacionesAprobadas,
+          proyectosCerrados,
+          valorTotalResult,
+          margenTotalResult,
+          llamadasRealizadas,
+          reunionesAgendadas,
+          propuestasEnviadas,
+          emailsEnviados,
+        ] = await Promise.all([
+          // Cotizaciones generadas
+          prisma.cotizacion.count({
+            where: {
+              comercialId: usuario.id,
+              createdAt: dateRange,
+            },
+          }),
 
-        // Cotizaciones aprobadas
-        const cotizacionesAprobadas = await prisma.cotizacion.count({
-          where: {
-            comercialId: usuario.id,
-            estado: 'aprobada',
-            createdAt: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          }
-        })
+          // Cotizaciones aprobadas
+          prisma.cotizacion.count({
+            where: {
+              comercialId: usuario.id,
+              estado: 'aprobada',
+              createdAt: dateRange,
+            },
+          }),
 
-        // Proyectos cerrados (cotizaciones que tienen proyectos asociados)
-        const proyectosCerrados = await prisma.proyecto.count({
-          where: {
-            comercialId: usuario.id,
-            createdAt: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          }
-        })
+          // Proyectos cerrados
+          prisma.proyecto.count({
+            where: {
+              comercialId: usuario.id,
+              createdAt: dateRange,
+            },
+          }),
 
-        // Valor total vendido (suma de grandTotal de proyectos)
-        const valorTotalResult = await prisma.proyecto.aggregate({
-          where: {
-            comercialId: usuario.id,
-            createdAt: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          },
-          _sum: {
-            grandTotal: true
-          }
-        })
+          // Valor total vendido (suma de grandTotal de proyectos)
+          prisma.proyecto.aggregate({
+            where: {
+              comercialId: usuario.id,
+              createdAt: dateRange,
+            },
+            _sum: {
+              grandTotal: true,
+            },
+          }),
 
-        // Margen total obtenido (aproximación basada en proyectos)
-        const margenTotalResult = await prisma.proyecto.aggregate({
-          where: {
-            comercialId: usuario.id,
-            createdAt: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          },
-          _sum: {
-            totalCliente: true,
-            totalInterno: true
-          }
-        })
+          // Margen total obtenido
+          prisma.proyecto.aggregate({
+            where: {
+              comercialId: usuario.id,
+              createdAt: dateRange,
+            },
+            _sum: {
+              totalCliente: true,
+              totalInterno: true,
+            },
+          }),
 
-        // Llamadas realizadas (actividades de tipo "llamada")
-        const llamadasRealizadas = await prisma.crmActividad.count({
-          where: {
-            usuarioId: usuario.id,
-            tipo: 'llamada',
-            fecha: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          }
-        })
+          // Llamadas realizadas (actividades de tipo "llamada")
+          prisma.crmActividad.count({
+            where: {
+              usuarioId: usuario.id,
+              tipo: 'llamada',
+              fecha: dateRange,
+            },
+          }),
 
-        // Reuniones agendadas (actividades de tipo "reunión")
-        const reunionesAgendadas = await prisma.crmActividad.count({
-          where: {
-            usuarioId: usuario.id,
-            tipo: 'reunión',
-            fecha: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          }
-        })
+          // Reuniones agendadas (actividades de tipo "reunion" o "reunión")
+          prisma.crmActividad.count({
+            where: {
+              usuarioId: usuario.id,
+              tipo: { in: ['reunión', 'reunion'] },
+              fecha: dateRange,
+            },
+          }),
 
-        // Propuestas enviadas (actividades de tipo "propuesta")
-        const propuestasEnviadas = await prisma.crmActividad.count({
-          where: {
-            usuarioId: usuario.id,
-            tipo: 'propuesta',
-            fecha: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          }
-        })
+          // Propuestas enviadas (actividades de tipo "propuesta")
+          prisma.crmActividad.count({
+            where: {
+              usuarioId: usuario.id,
+              tipo: 'propuesta',
+              fecha: dateRange,
+            },
+          }),
 
-        // Emails enviados (actividades de tipo "email")
-        const emailsEnviados = await prisma.crmActividad.count({
-          where: {
-            usuarioId: usuario.id,
-            tipo: 'email',
-            fecha: {
-              gte: new Date(`${periodo}-01`),
-              lt: new Date(`${periodo}-01`).getMonth() === 11
-                ? new Date(`${parseInt(periodo.split('-')[0]) + 1}-01-01`)
-                : new Date(`${periodo.split('-')[0]}-${String(parseInt(periodo.split('-')[1]) + 1).padStart(2, '0')}-01`)
-            }
-          }
-        })
+          // Emails enviados (actividades de tipo "email")
+          prisma.crmActividad.count({
+            where: {
+              usuarioId: usuario.id,
+              tipo: 'email',
+              fecha: dateRange,
+            },
+          }),
+        ])
 
-        // Calcular métricas derivadas
+        // Calcular metricas derivadas
         const valorTotalVendido = valorTotalResult._sum.grandTotal || 0
-        const margenTotalObtenido = (margenTotalResult._sum.totalCliente || 0) - (margenTotalResult._sum.totalInterno || 0)
-        const tasaConversion = cotizacionesGeneradas > 0 ? (proyectosCerrados / cotizacionesGeneradas) * 100 : 0
-        const tiempoPromedioCierre = proyectosCerrados > 0 ? 24 : null // Placeholder - requeriría cálculo más complejo
-        const valorPromedioProyecto = proyectosCerrados > 0 ? valorTotalVendido / proyectosCerrados : 0
+        const margenTotalObtenido =
+          (margenTotalResult._sum.totalCliente || 0) - (margenTotalResult._sum.totalInterno || 0)
+        const tasaConversion =
+          cotizacionesGeneradas > 0 ? (proyectosCerrados / cotizacionesGeneradas) * 100 : 0
+        const tiempoPromedioCierre = proyectosCerrados > 0 ? 24 : null // Placeholder
+        const valorPromedioProyecto =
+          proyectosCerrados > 0 ? valorTotalVendido / proyectosCerrados : 0
 
         return {
           usuarioId: usuario.id,
           usuario: {
             id: usuario.id,
             name: usuario.name,
-            email: usuario.email
+            email: usuario.email,
           },
           metaMensual: null, // TODO: Add when Prisma client is regenerated
           metaTrimestral: null, // TODO: Add when Prisma client is regenerated
@@ -190,36 +179,46 @@ export async function GET(req: NextRequest) {
             llamadasRealizadas,
             reunionesAgendadas,
             propuestasEnviadas,
-            emailsEnviados
-          }
+            emailsEnviados,
+          },
         }
       })
     )
 
-    // Filtrar por usuario específico si se proporciona
+    // Filtrar por usuario especifico si se proporciona
     const metricasFiltradas = usuarioId
-      ? metricasUsuarios.filter(m => m.usuarioId === usuarioId)
+      ? metricasUsuarios.filter((m) => m.usuarioId === usuarioId)
       : metricasUsuarios
 
     // Calcular resumen general
     const resumen = {
-      totalCotizaciones: metricasFiltradas.reduce((sum, m) => sum + m.metricas.cotizacionesGeneradas, 0),
-      totalProyectos: metricasFiltradas.reduce((sum, m) => sum + m.metricas.proyectosCerrados, 0),
-      totalValor: metricasFiltradas.reduce((sum, m) => sum + m.metricas.valorTotalVendido, 0),
-      promedioConversion: metricasFiltradas.length > 0
-        ? metricasFiltradas.reduce((sum, m) => sum + m.metricas.tasaConversion, 0) / metricasFiltradas.length
-        : 0,
-      periodo
+      totalCotizaciones: metricasFiltradas.reduce(
+        (sum, m) => sum + m.metricas.cotizacionesGeneradas,
+        0
+      ),
+      totalProyectos: metricasFiltradas.reduce(
+        (sum, m) => sum + m.metricas.proyectosCerrados,
+        0
+      ),
+      totalValor: metricasFiltradas.reduce(
+        (sum, m) => sum + m.metricas.valorTotalVendido,
+        0
+      ),
+      promedioConversion:
+        metricasFiltradas.length > 0
+          ? metricasFiltradas.reduce((sum, m) => sum + m.metricas.tasaConversion, 0) /
+            metricasFiltradas.length
+          : 0,
+      periodo,
     }
 
     return NextResponse.json({
       comerciales: metricasFiltradas,
       resumen,
-      periodo
+      periodo,
     })
-
   } catch (error) {
-    console.error('❌ Error al obtener reporte de rendimiento:', error)
+    console.error('Error al obtener reporte de rendimiento:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
