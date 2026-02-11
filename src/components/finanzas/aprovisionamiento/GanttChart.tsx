@@ -23,7 +23,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -45,18 +44,13 @@ import {
 import {
   AlertCircle,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Download,
   Eye,
   EyeOff,
-  Filter,
   Maximize2,
   Minimize2,
   Package,
   RefreshCw,
   ShoppingCart,
-  Zap,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -68,25 +62,6 @@ import type {
   GanttPedidoItem,
   AlertaTimeline,
 } from '@/types/aprovisionamiento';
-import type {
-  ListaEquipo,
-  PedidoEquipo,
-} from '@/types/modelos';
-
-// ✅ Gantt item interface
-// ✅ Union type para items del Gantt que pueden ser listas o pedidos
-type GanttItemUnion = GanttListaItem | GanttPedidoItem;
-
-// ✅ Cost display options (matching TimelineView)
-type CostDisplayMode = 'total' | 'daily' | 'percentage' | 'none';
-type CostPosition = 'right' | 'left' | 'top' | 'bottom';
-
-interface CostDisplayOptions {
-  mode: CostDisplayMode;
-  position: CostPosition;
-  compact: boolean;
-}
-
 interface GanttItemExtended extends GanttItem {
   x: number;
   width: number;
@@ -107,11 +82,8 @@ interface GanttChartProps {
   showLegend?: boolean;
   showMinimap?: boolean;
   allowEdit?: boolean;
-  showCosts?: boolean; // 💰 Show cost information next to bars
-  costOptions?: CostDisplayOptions; // 💰 Cost display configuration
+  showCosts?: boolean;
   onItemClick?: (item: GanttItem) => void;
-  onItemUpdate?: (item: GanttItem, newDates: { inicio: string; fin: string }) => void;
-  onExport?: (format: 'png' | 'pdf') => void;
 }
 
 // ✅ Time scale options
@@ -198,10 +170,8 @@ const GanttItemComponent: React.FC<{
   scale: TimeScale;
   onItemClick?: (item: GanttItem) => void;
   allowEdit?: boolean;
-  showCosts?: boolean; // 💰 Show cost information
-  costOptions?: CostDisplayOptions; // 💰 Cost display configuration
-  totalBudget?: number; // 💰 Total budget for percentage calculation
-}> = ({ item, scale, onItemClick, allowEdit, showCosts, costOptions, totalBudget }) => {
+  showCosts?: boolean;
+}> = ({ item, scale, onItemClick, allowEdit, showCosts }) => {
   const [isDragging, setIsDragging] = useState(false);
   
   const handleClick = () => {
@@ -212,8 +182,8 @@ const GanttItemComponent: React.FC<{
 
   const getIcon = () => {
     switch (item.tipo) {
-      case 'lista': return <Package className="w-3 h-3" />;
-      case 'pedido': return <ShoppingCart className="w-3 h-3" />;
+      case 'lista': return <Package className="w-2.5 h-2.5" />;
+      case 'pedido': return <ShoppingCart className="w-2.5 h-2.5" />;
       default: return null;
     }
   };
@@ -225,7 +195,7 @@ const GanttItemComponent: React.FC<{
       
       if (errorCount > 0) {
         return (
-          <Badge variant="destructive" className="text-xs px-1 py-0">
+          <Badge variant="destructive" className="text-[10px] px-0.5 py-0 h-4 leading-none">
             {errorCount}
           </Badge>
         );
@@ -233,7 +203,7 @@ const GanttItemComponent: React.FC<{
       
       if (warningCount > 0) {
         return (
-          <Badge variant="secondary" className="text-xs px-1 py-0 bg-yellow-100 text-yellow-800">
+          <Badge variant="secondary" className="text-[10px] px-0.5 py-0 h-4 leading-none bg-yellow-100 text-yellow-800">
             {warningCount}
           </Badge>
         );
@@ -257,43 +227,12 @@ const GanttItemComponent: React.FC<{
   };
 
   const formatCostDisplay = (): string => {
-    if (!costOptions || costOptions.mode === 'none') return '';
-    
     const cost = getCostValue();
-    if (cost === 0) return costOptions.compact ? '$ 0' : '$ 0.00';
-
-    switch (costOptions.mode) {
-      case 'total':
-        return costOptions.compact ? formatCompactCurrency(cost) : formatCurrency(cost, 'USD');
-      
-      case 'daily': {
-        const startDate = new Date(item.fechaInicio);
-        const endDate = new Date(item.fechaFin);
-        const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-        const dailyCost = cost / days;
-        return costOptions.compact ? `${formatCompactCurrency(dailyCost)}/día` : `${formatCurrency(dailyCost, 'USD')} por día`;
-      }
-      
-      case 'percentage': {
-        if (!totalBudget || totalBudget === 0) return '0%';
-        const percentage = (cost / totalBudget) * 100;
-        return `${percentage.toFixed(1)}%`;
-      }
-      
-      default:
-        return '';
-    }
+    if (cost === 0) return '';
+    if (cost >= 1000000) return `$ ${(cost / 1000000).toFixed(1)}M`;
+    if (cost >= 1000) return `$ ${(cost / 1000).toFixed(1)}K`;
+    return `$ ${cost.toFixed(0)}`;
   };
-
-  const formatCompactCurrency = (amount: number): string => {
-      if (amount >= 1000000) {
-        return `$ ${(amount / 1000000).toFixed(1)}M`;
-      } else if (amount >= 1000) {
-        return `$ ${(amount / 1000).toFixed(1)}K`;
-      } else {
-        return `$ ${amount.toFixed(0)}`;
-      }
-    };
 
   const costDisplay = formatCostDisplay();
 
@@ -318,14 +257,14 @@ const GanttItemComponent: React.FC<{
               }}
               onClick={handleClick}
             >
-            <div className="flex items-center justify-between h-full px-2 text-xs font-medium">
-              <div className="flex items-center gap-1 min-w-0">
+            <div className="flex items-center justify-between h-full px-1.5 text-[10px] font-medium">
+              <div className="flex items-center gap-0.5 min-w-0">
                 {getIcon()}
                 <span className="truncate">{item.codigo ? `${item.codigo} - ${item.titulo}` : item.titulo}</span>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 {item.coherencia !== undefined && item.coherencia < 100 && (
-                  <span className="text-xs opacity-75">
+                  <span className="text-[10px] opacity-75">
                     {item.coherencia}%
                   </span>
                 )}
@@ -398,28 +337,12 @@ const GanttItemComponent: React.FC<{
         </TooltipContent>
       </Tooltip>
       
-      {/* 💰 Cost display next to bar - positioned based on costOptions */}
       {showCosts && costDisplay && (
         <div
           className="absolute text-[10px] font-medium text-gray-600 bg-white/95 px-1.5 py-0.5 rounded shadow-sm border border-gray-200 whitespace-nowrap pointer-events-none"
           style={{
-            // Position based on costOptions.position
-            ...(costOptions?.position === 'left' ? {
-              right: `calc(100% - ${item.x}px + 4px)`,
-              top: item.y + (item.height / 2) - 8,
-            } : costOptions?.position === 'top' ? {
-              left: item.x + (item.width / 2),
-              top: item.y - 20,
-              transform: 'translateX(-50%)',
-            } : costOptions?.position === 'bottom' ? {
-              left: item.x + (item.width / 2),
-              top: item.y + item.height + 4,
-              transform: 'translateX(-50%)',
-            } : {
-              // Default: right
-              left: item.x + item.width + 6,
-              top: item.y + (item.height / 2) - 8,
-            }),
+            left: item.x + item.width + 6,
+            top: item.y + (item.height / 2) - 8,
             zIndex: 5,
           }}
         >
@@ -506,15 +429,12 @@ export const GanttChart: React.FC<GanttChartProps> = ({
   data,
   loading = false,
   className = '',
-  height = 600,
+  height = 700,
   showLegend = true,
   showMinimap = false,
   allowEdit = false,
-  showCosts = false, // 💰 Default to false
-  costOptions, // 💰 Cost display configuration
+  showCosts = false,
   onItemClick,
-  onItemUpdate,
-  onExport,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState<TimeScale>('week');
@@ -578,11 +498,11 @@ export const GanttChart: React.FC<GanttChartProps> = ({
   const ganttItems = useMemo(() => {
     if (!data.items) return [];
 
-    const itemHeight = 32;
-    const itemSpacing = 8;
-    const groupSpacing = 24;
-    
-    let currentY = 40; // Space for header
+    const itemHeight = 24;
+    const itemSpacing = 4;
+    const groupSpacing = 12;
+
+    let currentY = 24; // Space for header
     const items: GanttItemExtended[] = [];
     
     // Group by proyecto or tipo
@@ -645,24 +565,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({
   }, [data.items, startDate, endDate, chartWidth, visibleTypes]);
 
   // 🔁 Chart height calculation
-  const chartHeight = Math.max(height - 100, ganttItems.length * 45 + 100);
-
-  // 💰 Calculate total budget for percentage calculations
-  const totalBudget = useMemo(() => {
-    if (!data.items) return 0;
-    
-    return data.items.reduce((total, item) => {
-      // Try different cost properties based on item type
-      const cost = (() => {
-        if ('montoProyectado' in item && typeof item.montoProyectado === 'number') return item.montoProyectado;
-        if ('montoEjecutado' in item && typeof item.montoEjecutado === 'number') return item.montoEjecutado;
-        if ('amount' in item && typeof item.amount === 'number') return item.amount;
-        if ('monto' in item && typeof item.monto === 'number') return item.monto;
-        return 0;
-      })();
-      return total + cost;
-    }, 0);
-  }, [data.items]);
+  const chartHeight = Math.max(height - 80, ganttItems.length * 32 + 80);
 
   // 🔁 Handle zoom with smooth transitions
   const handleZoom = (direction: 'in' | 'out') => {
@@ -703,13 +606,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({
     });
   };
 
-  // 🔁 Handle export
-  const handleExport = (format: 'png' | 'pdf') => {
-    if (onExport) {
-      onExport(format);
-    }
-  };
-
   if (loading) {
     return (
       <Card className={className}>
@@ -727,18 +623,11 @@ export const GanttChart: React.FC<GanttChartProps> = ({
   if (!data.items || data.items.length === 0) {
     return (
       <Card className={className}>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Timeline de Aprovisionamiento
-              </CardTitle>
-              <CardDescription>
-                Visualización temporal de listas y pedidos de equipos
-              </CardDescription>
-            </div>
-          </div>
+        <CardHeader className="pb-2 pt-3 px-4">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Calendar className="w-4 h-4" />
+            Timeline de Aprovisionamiento
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center h-96 text-center">
           <div className="flex flex-col items-center gap-4 max-w-md">
@@ -767,23 +656,37 @@ export const GanttChart: React.FC<GanttChartProps> = ({
 
   return (
     <Card className={`${className} ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Timeline de Aprovisionamiento
-            </CardTitle>
-            <CardDescription>
-              Visualización temporal de listas y pedidos de equipos
-            </CardDescription>
+      <CardHeader className="pb-2 pt-3 px-4">
+        <div className="flex items-center justify-between gap-2">
+          {/* Left: Type filters */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant={visibleTypes.has('lista') ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleTypeVisibility('lista')}
+              className="h-7 text-xs gap-1"
+            >
+              {visibleTypes.has('lista') ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+              <Package className="w-3 h-3" />
+              Listas
+            </Button>
+            <Button
+              variant={visibleTypes.has('pedido') ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleTypeVisibility('pedido')}
+              className="h-7 text-xs gap-1"
+            >
+              {visibleTypes.has('pedido') ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+              <ShoppingCart className="w-3 h-3" />
+              Pedidos
+            </Button>
           </div>
-          
-          <div className="flex items-center gap-2">
-            {/* Scale selector */}
+
+          {/* Right: Scale + Zoom + Fullscreen */}
+          <div className="flex items-center gap-1.5">
             <Select value={scale} onValueChange={(value) => setScale(value as TimeScale)}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Seleccionar escala" />
+              <SelectTrigger className="w-28 h-7 text-xs">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(TIME_SCALES).map(([key, { label }]) => (
@@ -793,97 +696,26 @@ export const GanttChart: React.FC<GanttChartProps> = ({
                 ))}
               </SelectContent>
             </Select>
-            
-            {/* Zoom controls */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleZoom('out')}
-                disabled={zoom <= 0.25}
-                title="Alejar"
-              >
-                <ZoomOut className="w-4 h-4" />
+
+            <div className="flex items-center gap-0.5">
+              <Button variant="outline" size="sm" onClick={() => handleZoom('out')} disabled={zoom <= 0.25} title="Alejar" className="h-7 w-7 p-0">
+                <ZoomOut className="w-3.5 h-3.5" />
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleZoomReset}
-                title="Restablecer zoom (100%)"
-                className="px-2"
-              >
-                <span className="text-sm font-medium">{Math.round(zoom * 100)}%</span>
+              <Button variant="outline" size="sm" onClick={handleZoomReset} title="Restablecer zoom" className="h-7 px-1.5">
+                <span className="text-xs font-medium">{Math.round(zoom * 100)}%</span>
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleZoom('in')}
-                disabled={zoom >= 8}
-                title="Acercar"
-              >
-                <ZoomIn className="w-4 h-4" />
+              <Button variant="outline" size="sm" onClick={() => handleZoom('in')} disabled={zoom >= 8} title="Acercar" className="h-7 w-7 p-0">
+                <ZoomIn className="w-3.5 h-3.5" />
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleZoomToFit}
-                title="Ajustar al contenido"
-              >
-                <Maximize2 className="w-4 h-4" />
+              <Button variant="outline" size="sm" onClick={handleZoomToFit} title="Ajustar al contenido" className="h-7 w-7 p-0">
+                <Maximize2 className="w-3.5 h-3.5" />
               </Button>
             </div>
-            
-            {/* Export */}
-            {onExport && (
-              <Select onValueChange={handleExport}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Exportar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="png">PNG</SelectItem>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            
-            {/* Fullscreen */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-            >
-              {isFullscreen ? (
-                <Minimize2 className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
+
+            <Button variant="outline" size="sm" onClick={() => setIsFullscreen(!isFullscreen)} className="h-7 w-7 p-0">
+              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
             </Button>
           </div>
-        </div>
-        
-        {/* Type filters */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Mostrar:</span>
-          <Button
-            variant={visibleTypes.has('lista') ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => toggleTypeVisibility('lista')}
-            className="flex items-center gap-1"
-          >
-            {visibleTypes.has('lista') ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-            <Package className="w-3 h-3" />
-            Listas
-          </Button>
-          <Button
-            variant={visibleTypes.has('pedido') ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => toggleTypeVisibility('pedido')}
-            className="flex items-center gap-1"
-          >
-            {visibleTypes.has('pedido') ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-            <ShoppingCart className="w-3 h-3" />
-            Pedidos
-          </Button>
         </div>
       </CardHeader>
 
@@ -915,9 +747,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({
                 scale={scale}
                 onItemClick={onItemClick}
                 allowEdit={allowEdit}
-                showCosts={showCosts} // 💰 Pass showCosts prop
-                costOptions={costOptions} // 💰 Pass cost display options
-                totalBudget={totalBudget} // 💰 Pass total budget for percentage calculation
+                showCosts={showCosts}
               />
             ))}
             
@@ -947,53 +777,42 @@ export const GanttChart: React.FC<GanttChartProps> = ({
           </div>
         </div>
         
-        {/* Legend */}
-        {showLegend && (
-          <div className="mt-4 flex flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: ITEM_COLORS.lista.default }} />
-              <span>Lista de Equipos</span>
+        {/* Legend + Summary stats in one compact row */}
+        <div className="mt-2 flex items-center justify-between flex-wrap gap-2">
+          {showLegend && (
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: ITEM_COLORS.lista.default }} />
+                <span>Listas</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: ITEM_COLORS.pedido.default }} />
+                <span>Pedidos</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: ITEM_COLORS.lista.warning }} />
+                <span>Alertas</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: ITEM_COLORS.lista.danger }} />
+                <span>Errores</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-0.5 h-3 bg-red-500" />
+                <span>Hoy</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: ITEM_COLORS.pedido.default }} />
-              <span>Pedido de Equipos</span>
+          )}
+
+          {data.resumen && (
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span><strong className="text-foreground">{data.resumen.totalItems || ganttItems.length}</strong> items</span>
+              <span><strong className="text-foreground">{data.resumen.itemsConAlertas || 0}</strong> alertas</span>
+              <span><strong className="text-foreground">{data.resumen.coherenciaPromedio || 0}%</strong> coherencia</span>
+              <span><strong className="text-foreground">{Math.round(totalDays)}</strong> días</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: ITEM_COLORS.lista.warning }} />
-              <span>Con Alertas</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: ITEM_COLORS.lista.danger }} />
-              <span>Con Errores</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-0.5 h-4 bg-red-500" />
-              <span>Fecha Actual</span>
-            </div>
-          </div>
-        )}
-        
-        {/* Summary stats */}
-        {data.resumen && (
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="text-center">
-              <div className="font-medium text-lg">{data.resumen.totalItems || ganttItems.length}</div>
-              <div className="text-muted-foreground">Total Items</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-lg">{data.resumen.itemsConAlertas || 0}</div>
-              <div className="text-muted-foreground">Con Alertas</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-lg">{data.resumen.coherenciaPromedio || 0}%</div>
-              <div className="text-muted-foreground">Coherencia Promedio</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-lg">{Math.round(totalDays)}</div>
-              <div className="text-muted-foreground">Días Totales</div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );

@@ -20,6 +20,7 @@ export interface ItemGantt {
   monto: number
   estado: string
   progreso: number
+  coherencia?: number
   alertas: AlertaTimeline[]
   color: string
   responsable?: string

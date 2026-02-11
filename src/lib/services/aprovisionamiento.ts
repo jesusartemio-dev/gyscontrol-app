@@ -1,23 +1,20 @@
 // ✅ Servicios para Aprovisionamiento Financiero
 // 📡 Funciones para conectar con las APIs de aprovisionamiento
 
-import type { 
-  ProyectoAprovisionamiento, 
-  FiltrosProyectoAprovisionamiento, 
-  ItemGantt, 
+import type {
+  ProyectoAprovisionamiento,
+  FiltrosProyectoAprovisionamiento,
+  ItemGantt,
   GanttItem,
   TimelineData,
-  ConfiguracionGantt, 
-  ResumenTimeline, 
-  KPIAprovisionamiento, 
-  AlertaTimeline,
+  ResumenTimeline,
+  KPIAprovisionamiento,
   AlertaTimelineExtendida,
   ResponseListas,
-  ResponsePedidos 
+  ResponsePedidos
 } from '@/types/aprovisionamiento'
-import type { PedidoEquipoItem } from '@/types/modelos'
 import { buildApiUrl } from '@/lib/utils'
-import { AprovisionamientoCalculos, type CoherenciaResult } from './aprovisionamientoCalculos'
+import { AprovisionamientoCalculos } from './aprovisionamientoCalculos'
 import { AprovisionamientoNotificaciones, crearCoherenciaExtendida, type CoherenciaResultExtended } from './aprovisionamientoNotificaciones'
 
 // 🌐 Base URL para las APIs
@@ -301,6 +298,8 @@ export async function getTimelineData(filtros: {
       proyectoId: filtros.proyectoId,
       fechaInicio: filtros.fechaInicio,
       fechaFin: filtros.fechaFin,
+      tipoVista: filtros.vista,
+      agrupacion: filtros.agrupacion,
       soloConAlertas: filtros.soloAlertas,
       tipo: 'ambos'
     })
@@ -347,7 +346,7 @@ export async function getTimelineData(filtros: {
       color: item.color,
       progress: item.progreso,
       progreso: item.progreso,
-      coherencia: 85, // 📊 Valor por defecto
+      coherencia: item.coherencia,
       dependencies: item.dependencias,
       alertas: item.alertas,
       diasRetraso: item.diasRetraso // ✅ Mapear días de retraso

@@ -18,14 +18,11 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import logger from '@/lib/logger'
 import { z } from 'zod'
-import type { 
+import type {
   ItemGantt,
-  ConfiguracionGantt,
   ResumenTimeline,
-  AlertaTimeline 
+  AlertaTimeline
 } from '@/types/aprovisionamiento'
-import type { TimelinePaginationParams } from '@/types/payloads'
-import { parsePaginationParams, PAGINATION_CONFIGS } from '@/lib/utils/pagination'
 
 // 📋 Schema de validación para filtros de timeline con paginación
 const timelineFiltersSchema = z.object({
@@ -238,6 +235,9 @@ export async function GET(request: NextRequest) {
               precioElegido: true,
               tiempoEntregaDias: true
             }
+          },
+          _count: {
+            select: { pedidoEquipo: true }
           }
         },
         orderBy: {
@@ -287,6 +287,19 @@ export async function GET(request: NextRequest) {
           case 'rechazada': color = '#ef4444'; break
         }
 
+        // 📊 Calcular coherencia per-item basada en estado de aprovisionamiento
+        let coherencia = 100
+        const tienePedidos = (lista as any)._count?.pedidoEquipo > 0
+        if (lista.estado === 'aprobada') {
+          coherencia = 100
+        } else if (diasRetraso > 0 && !tienePedidos) {
+          coherencia = Math.max(0, 30 - diasRetraso) // vencida sin pedidos = crítico
+        } else if (diasRetraso > 0) {
+          coherencia = Math.max(20, 70 - diasRetraso * 2) // vencida con pedidos
+        } else if (!tienePedidos && !['borrador', 'por_revisar'].includes(lista.estado)) {
+          coherencia = 50 // avanzada sin pedidos
+        }
+
         const itemGantt: ItemGantt = {
           id: lista.id,
           tipo: 'lista',
@@ -306,6 +319,7 @@ export async function GET(request: NextRequest) {
                    lista.estado === 'por_validar' ? 75 :
                    lista.estado === 'por_aprobar' ? 50 :
                    lista.estado === 'por_revisar' ? 25 : 0,
+          coherencia,
           alertas,
           color,
           responsable: lista.proyecto.gestor?.name || undefined,
@@ -429,6 +443,18 @@ export async function GET(request: NextRequest) {
           case 'cancelado': color = '#ef4444'; break
         }
 
+        // 📊 Calcular coherencia per-item para pedidos
+        let coherenciaPedido = 100
+        if (pedido.estado === 'entregado') {
+          coherenciaPedido = 100
+        } else if (pedido.estado === 'cancelado') {
+          coherenciaPedido = 0
+        } else if (diasRetrasoPedido > 0) {
+          coherenciaPedido = Math.max(10, 80 - diasRetrasoPedido * 3)
+        } else if (!pedido.listaId) {
+          coherenciaPedido = 70 // pedido sin lista asociada
+        }
+
         const itemGantt: ItemGantt = {
           id: pedido.id,
           tipo: 'pedido',
@@ -444,10 +470,11 @@ export async function GET(request: NextRequest) {
           fechaNecesaria: fechaFin,
           monto,
           estado: pedido.estado,
-          progreso: pedido.estado === 'entregado' ? 100 : 
+          progreso: pedido.estado === 'entregado' ? 100 :
                    pedido.estado === 'parcial' ? 80 :
                    pedido.estado === 'atendido' ? 60 :
                    pedido.estado === 'enviado' ? 30 : 0,
+          coherencia: coherenciaPedido,
           alertas,
           color,
           responsable: pedido.proyecto.gestor?.name || undefined,
@@ -524,8 +551,8 @@ export async function GET(request: NextRequest) {
         )
       },
       itemsConAlertas: itemsFiltrados.filter(item => item.alertas.length > 0).length,
-      coherenciaPromedio: itemsFiltrados.length > 0 ? 
-        itemsFiltrados.reduce((sum, item) => sum + (item.progreso || 0), 0) / itemsFiltrados.length : 100
+      coherenciaPromedio: itemsFiltrados.length > 0 ?
+        Math.round(itemsFiltrados.reduce((sum, item) => sum + (item.coherencia ?? 100), 0) / itemsFiltrados.length) : 100
     }
 
     // 📄 Aplicar paginación a los items finales
