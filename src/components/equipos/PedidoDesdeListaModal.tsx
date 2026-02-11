@@ -242,8 +242,8 @@ export default function PedidoDesdeListaModal({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-4 pt-4 pb-3 border-b bg-gradient-to-r from-green-50 to-white">
+      <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]">
+        <DialogHeader className="px-4 pt-4 pb-3 border-b bg-gradient-to-r from-green-50 to-white flex-shrink-0">
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="flex items-center gap-2 text-base font-semibold">
@@ -261,7 +261,7 @@ export default function PedidoDesdeListaModal({
           </div>
         </DialogHeader>
 
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
           {/* Status banner */}
           <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-green-50 border border-green-200">
             <div className="flex items-center gap-3">
@@ -436,7 +436,7 @@ export default function PedidoDesdeListaModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+        <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 flex-shrink-0">
           <div className="text-xs text-gray-500">
             {itemsSeleccionados.length > 0 && (
               <span>{itemsSeleccionados.length} items • ${costoTotalEstimado.toLocaleString()}</span>
