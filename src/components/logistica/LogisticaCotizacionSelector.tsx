@@ -225,11 +225,11 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
                       </div>
                       <div className="text-[9px] text-muted-foreground">total</div>
                     </div>
-                    <div className="w-12">
+                    <div className="w-14">
                       <div className={`text-[10px] font-medium ${
                         isSelected ? 'text-blue-600' : isCurrent ? 'text-green-600' : ''
                       }`}>
-                        {cot.tiempoEntregaDias ? `${cot.tiempoEntregaDias}d` : '-'}
+                        {cot.tiempoEntrega || (cot.tiempoEntregaDias ? `${cot.tiempoEntregaDias}d` : '-')}
                       </div>
                       <div className="text-[9px] text-muted-foreground">entrega</div>
                     </div>

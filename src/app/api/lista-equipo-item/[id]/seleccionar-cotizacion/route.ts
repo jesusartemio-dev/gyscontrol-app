@@ -130,9 +130,9 @@ export async function PATCH(
     const cantidad = cotizacionItem.cantidad ?? cotizacionItem.cantidadOriginal ?? 0
     const costoElegido = precioUnitario * cantidad
 
-    // 📦 Paso 4: obtener datos adicionales como tiempo de entrega
-    const tiempoEntrega = cotizacionItem.tiempoEntrega ?? null
-    const tiempoEntregaDias = cotizacionItem.tiempoEntregaDias ?? null
+    // 📦 Paso 4: obtener datos adicionales como tiempo de entrega (default: Stock)
+    const tiempoEntrega = cotizacionItem.tiempoEntrega || 'Stock'
+    const tiempoEntregaDias = cotizacionItem.tiempoEntregaDias ?? 0
 
     // 📝 Paso 5: actualizar el ListaEquipoItem con la información final (incluyendo proveedor)
     const proveedorId = cotizacionItem.cotizacionProveedor?.proveedorId ?? null

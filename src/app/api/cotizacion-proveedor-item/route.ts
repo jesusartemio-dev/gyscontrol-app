@@ -75,8 +75,8 @@ export async function POST(request: Request) {
         precioUnitario: body.precioUnitario ?? null,
         cantidad: body.cantidad ?? item.cantidad,
         costoTotal: body.costoTotal ?? null,
-        tiempoEntrega: body.tiempoEntrega ?? item.tiempoEntrega ?? (item.tiempoEntregaDias ? `${item.tiempoEntregaDias} días` : null),
-        tiempoEntregaDias: body.tiempoEntregaDias ?? item.tiempoEntregaDias ?? null,
+        tiempoEntrega: body.tiempoEntrega ?? item.tiempoEntrega ?? (item.tiempoEntregaDias ? `${item.tiempoEntregaDias} días` : 'Stock'),
+        tiempoEntregaDias: body.tiempoEntregaDias ?? item.tiempoEntregaDias ?? 0,
 
         estado: body.estado ?? 'pendiente',
         esSeleccionada: body.esSeleccionada ?? false,

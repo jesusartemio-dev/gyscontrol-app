@@ -868,10 +868,15 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                    )}
                    {visibleColumns.entrega && (
                      <td className={`${cellPadding} ${columnWidths.entrega} text-center text-gray-700`}>
-                      {item.cotizacionSeleccionada?.tiempoEntrega ? (
+                      {item.tiempoEntrega ? (
                         <div className="flex items-center justify-center gap-1">
                           <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{item.cotizacionSeleccionada.tiempoEntrega}</span>
+                          <span className="text-xs">{item.tiempoEntrega}</span>
+                        </div>
+                      ) : item.tiempoEntregaDias ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs">{item.tiempoEntregaDias}d</span>
                         </div>
                       ) : (
                         <span className="text-gray-400 italic text-xs">—</span>
@@ -1209,12 +1214,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                         />
                       </div>
 
-                      {item.cotizacionSeleccionada?.tiempoEntrega && (
+                      {(item.tiempoEntrega || item.tiempoEntregaDias) && (
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground">Entrega:</span>
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3 text-muted-foreground" />
-                            <span>{item.cotizacionSeleccionada.tiempoEntrega}</span>
+                            <span>{item.tiempoEntrega || `${item.tiempoEntregaDias}d`}</span>
                           </div>
                         </div>
                       )}
