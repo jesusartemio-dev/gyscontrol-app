@@ -774,6 +774,7 @@ export interface Cotizacion {
    descuento: number
    grandTotal: number
    createdAt: string
+   fecha: string
    updatedAt: string
 
    // ✅ Nuevos campos para cabecera comercial

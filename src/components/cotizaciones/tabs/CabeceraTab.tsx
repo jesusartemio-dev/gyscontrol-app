@@ -33,6 +33,9 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
   const [success, setSuccess] = useState(false)
 
   const [formData, setFormData] = useState({
+    fecha: cotizacion.fecha
+      ? new Date(cotizacion.fecha).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0],
     codigo: cotizacion.codigo || '',
     referencia: cotizacion.referencia || '',
     formaPago: cotizacion.formaPago || '',
@@ -51,6 +54,9 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
 
   useEffect(() => {
     setFormData({
+      fecha: cotizacion.fecha
+        ? new Date(cotizacion.fecha).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0],
       codigo: cotizacion.codigo || '',
       referencia: cotizacion.referencia || '',
       formaPago: cotizacion.formaPago || '',
@@ -93,6 +99,9 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
     try {
       const dataToUpdate = {
         ...formData,
+        fecha: formData.fecha
+          ? new Date(formData.fecha).toISOString()
+          : new Date().toISOString(),
         fechaValidezHasta: formData.fechaValidezHasta
           ? new Date(formData.fechaValidezHasta).toISOString()
           : null,
@@ -157,6 +166,24 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Fecha de Cotizacion */}
+              <div className="space-y-2">
+                <Label htmlFor="fecha" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Fecha de Cotizacion
+                </Label>
+                <Input
+                  id="fecha"
+                  type="date"
+                  value={formData.fecha}
+                  onChange={(e) => handleInputChange('fecha', e.target.value)}
+                  disabled={isLocked}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Fecha de negocio de la cotizacion
+                </p>
+              </div>
+
               {/* Código */}
               <div className="space-y-2">
                 <Label htmlFor="codigo" className="flex items-center gap-2">

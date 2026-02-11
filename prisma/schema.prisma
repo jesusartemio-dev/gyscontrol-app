@@ -200,6 +200,7 @@ model Cotizacion {
   fechaCierreEstimada       DateTime?
   notas                     String?
   createdAt                 DateTime                    @default(now())
+  fecha                     DateTime                    @default(now())
   updatedAt                 DateTime
   fechaValidezHasta         DateTime?
   formaPago                 String?

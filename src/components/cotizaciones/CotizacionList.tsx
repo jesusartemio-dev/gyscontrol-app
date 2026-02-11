@@ -132,6 +132,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString())
   const [editingCotizacion, setEditingCotizacion] = useState<Cotizacion | null>(null)
   const { toast } = useToast()
 
@@ -193,6 +194,17 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
     return uniqueStatuses.sort()
   }, [cotizaciones])
 
+  // Get available years from cotizaciones
+  const availableYears = useMemo(() => {
+    const years = cotizaciones
+      .map(c => {
+        const dateStr = c.fecha || c.createdAt
+        return dateStr ? new Date(dateStr).getFullYear() : null
+      })
+      .filter((y): y is number => y !== null)
+    return [...new Set(years)].sort((a, b) => b - a)
+  }, [cotizaciones])
+
   // Filter cotizaciones based on search and filters
   const filteredCotizaciones = useMemo(() => {
     return cotizaciones.filter(cotizacion => {
@@ -203,13 +215,20 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
 
       const matchesStatus = statusFilter === 'all' || cotizacion.estado === statusFilter
 
-      return matchesSearch && matchesStatus
+      const matchesYear = yearFilter === 'todos' || (() => {
+        const dateStr = cotizacion.fecha || cotizacion.createdAt
+        if (!dateStr) return true
+        return new Date(dateStr).getFullYear().toString() === yearFilter
+      })()
+
+      return matchesSearch && matchesStatus && matchesYear
     })
-  }, [cotizaciones, searchTerm, statusFilter])
+  }, [cotizaciones, searchTerm, statusFilter, yearFilter])
 
   const clearFilters = () => {
     setSearchTerm('')
     setStatusFilter('all')
+    setYearFilter(new Date().getFullYear().toString())
   }
 
   // 🔁 Loading state
@@ -258,6 +277,18 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                   <SelectItem value="all">Todos los estados</SelectItem>
                   {statuses.map(status => (
                     <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={yearFilter} onValueChange={setYearFilter}>
+                <SelectTrigger className="w-28">
+                  <SelectValue placeholder="Ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -356,7 +387,7 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                               {cotizacion.nombre}
                             </div>
                             <div className="text-[10px] text-gray-500 mt-0.5">
-                              {cotizacion.createdAt ? formatDate(cotizacion.createdAt) : ''}
+                              {cotizacion.fecha ? formatDate(cotizacion.fecha) : (cotizacion.createdAt ? formatDate(cotizacion.createdAt) : '')}
                             </div>
                           </div>
                         </TooltipTrigger>
@@ -526,10 +557,10 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                             <span>{(cotizacion as any).user.name}</span>
                           </div>
                         )}
-                        {cotizacion.createdAt && (
+                        {(cotizacion.fecha || cotizacion.createdAt) && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-4 w-4" />
-                            <span>{formatDate(cotizacion.createdAt)}</span>
+                            <span>{formatDate(cotizacion.fecha || cotizacion.createdAt)}</span>
                           </div>
                         )}
                       </div>

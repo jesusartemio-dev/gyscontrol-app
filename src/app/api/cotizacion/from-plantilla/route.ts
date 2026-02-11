@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { plantillaId, clienteId } = body
+    const { plantillaId, clienteId, fecha } = body
     console.log('🔍 [DEBUG] Iniciando creación de cotización desde plantilla')
     console.log('📋 [DEBUG] Datos recibidos:', { plantillaId, clienteId })
     console.log('🔍 [DEBUG] Sesión del usuario:', {
@@ -107,6 +107,7 @@ export async function POST(req: Request) {
       clienteId,
       comercialId: session.user.id, // Se actualizará más adelante si es necesario
       plantillaId: plantilla.id,
+      fecha: fecha ? new Date(fecha) : new Date(),
       updatedAt: new Date(),
       totalInterno: plantilla.totalInterno,
       totalCliente: plantilla.totalCliente,

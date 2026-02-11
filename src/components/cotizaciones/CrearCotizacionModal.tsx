@@ -54,6 +54,7 @@ export default function CrearCotizacionModal({
   const [plantilla, setPlantilla] = useState<Plantilla | null>(null)
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('')
   const [creating, setCreating] = useState(false)
+  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [error, setError] = useState<string | null>(null)
   const [previewCodigo, setPreviewCodigo] = useState<string>('')
 
@@ -85,6 +86,7 @@ export default function CrearCotizacionModal({
   const handleClose = () => {
     if (!creating) {
       setClienteIdSeleccionado('')
+      setFecha(new Date().toISOString().split('T')[0])
       setError(null)
       setPreviewCodigo('')
       setPlantilla(null)
@@ -110,7 +112,8 @@ export default function CrearCotizacionModal({
 
       const nuevaCotizacion = await createCotizacionFromPlantilla({
         plantillaId,
-        clienteId: clienteIdSeleccionado
+        clienteId: clienteIdSeleccionado,
+        fecha
       })
 
       console.log('✅ Cotización creada:', nuevaCotizacion)
@@ -232,6 +235,26 @@ export default function CrearCotizacionModal({
               selectedId={clienteIdSeleccionado} 
               onChange={setClienteIdSeleccionado}
             />
+          </div>
+
+          {/* Fecha */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-gray-600" />
+              <label className="text-sm font-medium text-gray-700">
+                Fecha de Cotizacion
+              </label>
+            </div>
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              className="border px-3 py-2 rounded w-full text-sm"
+              disabled={creating}
+            />
+            <p className="text-xs text-gray-500">
+              Por defecto es hoy. Cambiar solo si registra una cotizacion pasada.
+            </p>
           </div>
 
           <Separator />

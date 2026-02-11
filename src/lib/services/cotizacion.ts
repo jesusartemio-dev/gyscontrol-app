@@ -46,6 +46,7 @@ export async function getCotizacionById(id: string): Promise<Cotizacion> {
 export async function createCotizacionFromPlantilla(data: {
   plantillaId: string
   clienteId: string
+  fecha?: string
 }): Promise<Cotizacion> {
   try {
     console.log('🚀 Enviando datos al backend:', data)
@@ -76,6 +77,7 @@ export async function createCotizacion(data: {
   clienteId: string
   comercialId: string
   nombre: string
+  fecha?: string
 }): Promise<Cotizacion> {
   try {
     const res = await fetch(buildApiUrl('/api/cotizacion'), {

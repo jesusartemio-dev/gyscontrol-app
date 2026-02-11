@@ -21,6 +21,7 @@ export default function CotizacionForm({ onCreated }: Props) {
   const [nombre, setNombre] = useState('')
   const [clienteId, setClienteId] = useState('')
   const [clientes, setClientes] = useState<Cliente[]>([])
+  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -65,7 +66,7 @@ export default function CotizacionForm({ onCreated }: Props) {
 
     setLoading(true)
     try {
-      const nueva = await createCotizacion({ clienteId, comercialId, nombre })
+      const nueva = await createCotizacion({ clienteId, comercialId, nombre, fecha })
       onCreated(nueva)
       setNombre('')
       setClienteId('')
@@ -107,6 +108,17 @@ export default function CotizacionForm({ onCreated }: Props) {
           </option>
         ))}
       </select>
+
+      <div className="space-y-1">
+        <label className="text-sm text-gray-600">Fecha de cotizacion</label>
+        <input
+          type="date"
+          value={fecha}
+          onChange={(e) => setFecha(e.target.value)}
+          className="border px-3 py-2 rounded w-full"
+          disabled={loading}
+        />
+      </div>
 
       <button
         type="submit"

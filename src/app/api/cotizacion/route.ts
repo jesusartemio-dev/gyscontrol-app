@@ -42,16 +42,23 @@ export async function GET(request: NextRequest) {
     const estado = searchParams.get('estado')
     const fechaDesde = searchParams.get('fechaDesde')
     const fechaHasta = searchParams.get('fechaHasta')
-    
+    const anio = searchParams.get('anio')
+
     // 🔧 Construir filtros adicionales
     const additionalWhere = {
       ...(clienteId && { clienteId }),
       ...(comercialId && { comercialId }),
       ...(estado && estado !== 'todos' && { estado }),
       ...(fechaDesde && fechaHasta && {
-        createdAt: {
+        fecha: {
           gte: new Date(fechaDesde),
           lte: new Date(fechaHasta)
+        }
+      }),
+      ...(!fechaDesde && !fechaHasta && anio && anio !== 'todos' && {
+        fecha: {
+          gte: new Date(`${anio}-01-01T00:00:00.000Z`),
+          lt: new Date(`${parseInt(anio) + 1}-01-01T00:00:00.000Z`)
         }
       })
     }
@@ -68,6 +75,7 @@ export async function GET(request: NextRequest) {
           totalInterno: true,
           totalCliente: true,
           createdAt: true,
+          fecha: true,
           updatedAt: true,
           cliente: {
             select: {
@@ -137,7 +145,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await req.json()
-    const { nombre, clienteId, comercialId } = data
+    const { nombre, clienteId, comercialId, fecha } = data
 
     if (!nombre || !clienteId || !comercialId) {
       const missingFields = []
@@ -189,6 +197,7 @@ export async function POST(req: NextRequest) {
         estado: 'borrador',
         totalInterno: 0,
         totalCliente: 0,
+        fecha: fecha ? new Date(fecha) : new Date(),
         updatedAt: new Date()
       },
       include: {
