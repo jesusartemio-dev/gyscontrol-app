@@ -316,8 +316,10 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
 
                     {/* Entrega */}
                     <td className="px-3 py-2 text-center">
-                      {itemStats.selectedCot?.tiempoEntregaDias ? (
-                        <span className="text-gray-700">{itemStats.selectedCot.tiempoEntregaDias}d</span>
+                      {item.tiempoEntrega ? (
+                        <span className="text-gray-700 text-xs">{item.tiempoEntrega}</span>
+                      ) : item.tiempoEntregaDias ? (
+                        <span className="text-gray-700">{item.tiempoEntregaDias}d</span>
                       ) : (
                         <span className="text-gray-400">—</span>
                       )}

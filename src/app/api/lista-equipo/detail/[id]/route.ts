@@ -90,6 +90,8 @@ export async function GET(
                 cantidad: true,
                 estado: true,
                 esSeleccionada: true,
+                tiempoEntrega: true,
+                tiempoEntregaDias: true,
                 createdAt: true,
                 cotizacionProveedor: {
                   select: {
