@@ -95,15 +95,13 @@ export async function POST(request: NextRequest) {
     const itemsParaPedido = payload.itemsSeleccionados.map(itemSeleccionado => {
       const itemLista = itemsEncontrados.find(item => item.id === itemSeleccionado.listaEquipoItemId)!
       
-      // 🔍 Obtener precio unitario con prioridad: precioElegido > cotizacionSeleccionada.precioUnitario > presupuesto > 0
-      // precioElegido ya es precio unitario; presupuesto es total, se divide por cantidad
+      // 🔍 Obtener precio unitario con prioridad: precioElegido > cotizacionSeleccionada.precioUnitario > 0
+      // Si no hay precio confirmado, usar 0 (presupuesto es solo estimación, no precio real)
       let precioUnitario = 0
       if (itemLista.precioElegido !== null && itemLista.precioElegido !== undefined) {
         precioUnitario = itemLista.precioElegido
       } else if (itemLista.cotizacionSeleccionada?.precioUnitario) {
         precioUnitario = itemLista.cotizacionSeleccionada.precioUnitario
-      } else if (itemLista.presupuesto !== null && itemLista.presupuesto !== undefined) {
-        precioUnitario = itemLista.presupuesto / (itemLista.cantidad || 1)
       }
       
       const costoTotalItem = precioUnitario * itemSeleccionado.cantidadPedida

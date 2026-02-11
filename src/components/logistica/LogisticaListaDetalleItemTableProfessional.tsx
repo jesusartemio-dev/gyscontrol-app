@@ -421,9 +421,9 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
 
       {/* Modal para selección */}
       <Dialog open={selectorModal.open} onOpenChange={closeSelectorModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="sr-only">
+        <DialogContent className="max-w-md p-0 gap-0 flex flex-col max-h-[85vh] overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
               Seleccionar Cotización
             </DialogTitle>
           </DialogHeader>

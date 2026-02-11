@@ -302,15 +302,13 @@ export async function POST(request: Request) {
           const listaItem = listaItemsMap.get(itemSel.listaEquipoItemId)!
           const cantidad = listaItem.cantidad || 1
 
-          // Pricing fallback: precioElegido > cotizacionSeleccionada > presupuesto > 0
-          // precioElegido ya es precio unitario; presupuesto es total, se divide por cantidad
+          // Pricing fallback: precioElegido > cotizacionSeleccionada > 0
+          // Si no hay precio confirmado, usar 0 (presupuesto es solo estimación, no precio real)
           let precioUnitario = 0
           if (listaItem.precioElegido !== null && listaItem.precioElegido !== undefined) {
             precioUnitario = listaItem.precioElegido
           } else if (listaItem.cotizacionSeleccionada?.precioUnitario) {
             precioUnitario = listaItem.cotizacionSeleccionada.precioUnitario
-          } else if (listaItem.presupuesto !== null && listaItem.presupuesto !== undefined) {
-            precioUnitario = listaItem.presupuesto / cantidad
           }
 
           const costoTotal = precioUnitario * itemSel.cantidadPedida

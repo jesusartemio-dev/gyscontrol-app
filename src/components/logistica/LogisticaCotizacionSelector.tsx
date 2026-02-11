@@ -122,9 +122,9 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
     cot.cotizacion?.codigo || cot.cotizacionProveedor?.codigo || '-'
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col min-h-0 max-h-full">
       {/* Header compacto */}
-      <div className="flex items-center gap-2 pb-2 border-b">
+      <div className="flex items-center gap-2 p-4 pb-3 border-b flex-shrink-0">
         <Trophy className="h-4 w-4 text-yellow-500 shrink-0" />
         <div className="min-w-0">
           <h3 className="text-sm font-semibold truncate">{item.descripcion}</h3>
@@ -134,14 +134,14 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
         </div>
       </div>
 
-      {/* Lista de cotizaciones */}
+      {/* Lista de cotizaciones (scrollable) */}
       {cotizaciones.length === 0 ? (
-        <div className="text-center py-6">
+        <div className="text-center py-6 px-4">
           <AlertCircle className="h-6 w-6 mx-auto mb-2 text-gray-300" />
           <p className="text-xs text-muted-foreground">Sin cotizaciones</p>
         </div>
       ) : (
-        <div className="space-y-1.5">
+        <div className="overflow-y-auto flex-1 min-h-0 p-4 py-3 space-y-1.5">
           {cotizaciones.map((cot: any) => {
             const precio = cot.precioUnitario ?? 0
             const costoTotal = precio * (item.cantidad ?? 1)
@@ -243,7 +243,7 @@ export default function LogisticaCotizacionSelector({ item, onUpdated }: Props) 
 
       {/* Footer con acciones */}
       {cotizaciones.length > 0 && (
-        <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0">
           <span className="text-[10px] text-muted-foreground">
             {cotizaciones.length} opción{cotizaciones.length > 1 ? 'es' : ''} •
             ${stats.precioMin.toFixed(2)}
