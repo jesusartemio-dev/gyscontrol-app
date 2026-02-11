@@ -22,7 +22,8 @@ import {
   Package,
   ShoppingCart,
   AlertTriangle,
-  FolderOpen
+  FolderOpen,
+  ArrowLeft
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -57,13 +58,15 @@ export default async function AprovisionamientoProyectosPage({ searchParams }: P
       {/* Header compacto */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+            <Link href="/finanzas/aprovisionamiento">
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+              Dashboard
+            </Link>
+          </Button>
           <FolderOpen className="h-5 w-5 text-emerald-600" />
           <h1 className="text-lg font-semibold">Proyectos Consolidados</h1>
         </div>
-        <Button variant="outline" size="sm" className="h-7 text-xs">
-          <Download className="h-3 w-3 mr-1" />
-          Exportar
-        </Button>
       </div>
 
       {/* KPIs compactos */}
@@ -220,7 +223,7 @@ async function TablaProyectos({ filtros }: { filtros?: FiltrosAprovisionamiento 
                 </TableCell>
                 <TableCell className="py-2">
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
-                    <Link href={`/proyectos/${proyecto.id}`}>
+                    <Link href={`/finanzas/aprovisionamiento/proyectos/${proyecto.id}`}>
                       <Eye className="h-3.5 w-3.5 text-blue-600" />
                     </Link>
                   </Button>
@@ -235,7 +238,27 @@ async function TablaProyectos({ filtros }: { filtros?: FiltrosAprovisionamiento 
             <span>
               {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total}
             </span>
-            <span>Página {pagination.page} de {pagination.pages}</span>
+            <div className="flex items-center gap-2">
+              {pagination.page > 1 ? (
+                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" asChild>
+                  <Link href={`/finanzas/aprovisionamiento/proyectos?page=${pagination.page - 1}${filtros?.search ? `&search=${filtros.search}` : ''}${filtros?.estado ? `&estado=${filtros.estado}` : ''}`}>
+                    Anterior
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" disabled>Anterior</Button>
+              )}
+              <span>Pág. {pagination.page}/{pagination.pages}</span>
+              {pagination.page < pagination.pages ? (
+                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" asChild>
+                  <Link href={`/finanzas/aprovisionamiento/proyectos?page=${pagination.page + 1}${filtros?.search ? `&search=${filtros.search}` : ''}${filtros?.estado ? `&estado=${filtros.estado}` : ''}`}>
+                    Siguiente
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" disabled>Siguiente</Button>
+              )}
+            </div>
           </div>
         )}
       </div>

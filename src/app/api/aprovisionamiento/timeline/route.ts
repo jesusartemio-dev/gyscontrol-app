@@ -125,7 +125,7 @@ function generarAlertas(item: any, tipo: 'lista' | 'pedido'): AlertaTimeline[] {
   
   // 🟡 Alertas por estado
   if (tipo === 'lista') {
-    if (item.estado === 'BORRADOR' && diasHastaVencimiento <= 14) {
+    if (item.estado === 'borrador' && diasHastaVencimiento <= 14) {
       alertas.push({
         tipo: 'warning',
         titulo: 'Estado Pendiente',
@@ -134,7 +134,7 @@ function generarAlertas(item: any, tipo: 'lista' | 'pedido'): AlertaTimeline[] {
       })
     }
   } else {
-    if (item.estado === 'BORRADOR' && diasHastaVencimiento <= 10) {
+    if (item.estado === 'borrador' && diasHastaVencimiento <= 10) {
       alertas.push({
         tipo: 'warning',
         titulo: 'Estado Pendiente',
@@ -163,18 +163,13 @@ export async function GET(request: NextRequest) {
   let session: any = null
   
   try {
-    // 🔐 Verificar autenticación (bypass temporal para desarrollo)
+    // 🔐 Verificar autenticación
     session = await getServerSession(authOptions)
-    if (!session?.user && process.env.NODE_ENV === 'production') {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
       )
-    }
-    
-    // ⚠️ Log para desarrollo - remover en producción
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔐 Session status:', session ? 'authenticated' : 'not authenticated')
     }
 
     // ✅ Validar parámetros de consulta con paginación
@@ -185,17 +180,17 @@ export async function GET(request: NextRequest) {
       fechaFin: searchParams.get('fechaFin') || undefined,
       incluirCompletados: searchParams.get('incluirCompletados') === 'true',
       soloAlertas: searchParams.get('soloAlertas') === 'true',
-      tipoVista: searchParams.get('tipoVista') as any || 'gantt',
-      agrupacion: searchParams.get('agrupacion') as any || 'proyecto',
+      tipoVista: searchParams.get('tipoVista') || 'gantt',
+      agrupacion: searchParams.get('agrupacion') || 'proyecto',
       validarCoherencia: searchParams.get('validarCoherencia') !== 'false',
       incluirSugerencias: searchParams.get('incluirSugerencias') !== 'false',
-      tipo: searchParams.get('tipo') as any || 'ambos',
+      tipo: searchParams.get('tipo') || 'ambos',
       estado: searchParams.get('estado') ? searchParams.get('estado')!.split(',') : undefined,
       montoMinimo: searchParams.get('montoMinimo') ? parseFloat(searchParams.get('montoMinimo')!) : undefined,
       montoMaximo: searchParams.get('montoMaximo') ? parseFloat(searchParams.get('montoMaximo')!) : undefined,
       responsableId: searchParams.get('responsableId') || undefined,
       soloConAlertas: searchParams.get('soloConAlertas') === 'true',
-      zoom: searchParams.get('zoom') as any || 'mes',
+      zoom: searchParams.get('zoom') || 'mes',
       page: parseInt(searchParams.get('page') || '1'),
       limit: parseInt(searchParams.get('limit') || '50')
     })
@@ -410,8 +405,8 @@ export async function GET(request: NextRequest) {
         // 🧮 Calcular días de retraso para pedidos
         const hoy = new Date()
         let diasRetrasoPedido = 0
-        if (pedido.fechaNecesaria && hoy > pedido.fechaNecesaria && pedido.estado !== 'entregado') {
-          diasRetrasoPedido = Math.ceil((hoy.getTime() - pedido.fechaNecesaria.getTime()) / (1000 * 60 * 60 * 24))
+        if (pedido.fechaEntregaEstimada && hoy > pedido.fechaEntregaEstimada && pedido.estado !== 'entregado') {
+          diasRetrasoPedido = Math.ceil((hoy.getTime() - pedido.fechaEntregaEstimada.getTime()) / (1000 * 60 * 60 * 24))
         } else if (fechaFin && hoy > fechaFin && pedido.estado !== 'entregado') {
           diasRetrasoPedido = Math.ceil((hoy.getTime() - fechaFin.getTime()) / (1000 * 60 * 60 * 24))
         }
@@ -491,8 +486,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (filtros.responsableId) {
-      itemsFiltrados = itemsFiltrados.filter(item => 
-        item.proyecto.id === filtros.responsableId // Simplificado, en real sería por responsable
+      itemsFiltrados = itemsFiltrados.filter(item =>
+        item.responsable === filtros.responsableId || item.proyecto.id === filtros.responsableId
       )
     }
 
@@ -504,8 +499,8 @@ export async function GET(request: NextRequest) {
     const resumen: ResumenTimeline = {
       totalItems: itemsFiltrados.length,
       montoTotal: itemsFiltrados.reduce((sum, item) => sum + item.monto, 0),
-      itemsVencidos: itemsFiltrados.filter(item => 
-        item.fechaFin < new Date() && !['COMPLETADA', 'ENTREGADO', 'CANCELADO', 'CANCELADA'].includes(item.estado)
+      itemsVencidos: itemsFiltrados.filter(item =>
+        item.fechaFin < new Date() && !['aprobada', 'entregado', 'cancelado'].includes(item.estado)
       ).length,
       itemsEnRiesgo: itemsFiltrados.filter(item => {
         const diasHastaVencimiento = Math.ceil((item.fechaFin.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -568,7 +563,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error en GET /api/aprovisionamiento/timeline:', error)
+    logger.error('Error en GET /api/aprovisionamiento/timeline:', { error: error instanceof Error ? error.message : 'Error desconocido' })
     
     if (error instanceof z.ZodError) {
       logger.error('❌ Error de validación en timeline:', {
@@ -607,18 +602,13 @@ export async function POST(request: NextRequest) {
   let session: any = null
   
   try {
-    // 🔐 Verificar autenticación (bypass temporal para desarrollo)
+    // 🔐 Verificar autenticación
     session = await getServerSession(authOptions)
-    if (!session?.user && process.env.NODE_ENV === 'production') {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
       )
-    }
-    
-    // ⚠️ Log para desarrollo - remover en producción
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔐 POST Session status:', session ? 'authenticated' : 'not authenticated')
     }
 
     const body = await request.json()
@@ -693,8 +683,8 @@ export async function POST(request: NextRequest) {
       const fechaActual = new Date()
 
       proyectos.forEach(proyecto => {
-        const listas = proyecto.listaEquipos || []
-        const pedidos = proyecto.pedidoEquipos || []
+        const listas = proyecto.listaEquipo || []
+        const pedidos = proyecto.pedidoEquipo || []
         
         validaciones.estadisticas.listasAnalizadas += listas.length
         validaciones.estadisticas.pedidosAnalizados += pedidos.length
@@ -702,7 +692,7 @@ export async function POST(request: NextRequest) {
         // 🔍 Validar coherencia temporal entre listas y pedidos
         listas.forEach((lista: any) => {
           const fechaNecesaria = new Date(lista.fechaNecesaria)
-          const pedidosLista = lista.pedidos || []
+          const pedidosLista = lista.pedidoEquipo || []
           
           // Error: Lista vencida sin pedidos
           if (fechaNecesaria < fechaActual && pedidosLista.length === 0) {
@@ -738,7 +728,7 @@ export async function POST(request: NextRequest) {
 
           // 🔍 Validar coherencia de pedidos con lista
           pedidosLista.forEach((pedido: any) => {
-            const fechaEntrega = new Date(pedido.fechaEntrega)
+            const fechaEntrega = new Date(pedido.fechaEntregaEstimada || pedido.createdAt)
             
             // Error: Pedido con entrega posterior a fecha necesaria
             if (fechaEntrega > fechaNecesaria) {
@@ -794,12 +784,14 @@ export async function POST(request: NextRequest) {
         if (listas.length > 0) {
           const montoTotalListas = listas.reduce((total: number, lista: any) => {
             return total + (lista.listaEquipoItem?.reduce((subtotal: number, item: any) => {
-              return subtotal + (item.cantidad * (item.equipo?.precio || 0))
+              return subtotal + (item.cantidad * (item.precioElegido || 0))
             }, 0) || 0)
           }, 0)
 
           const montoTotalPedidos = pedidos.reduce((total: number, pedido: any) => {
-            return total + (pedido.montoTotal || 0)
+            return total + (pedido.pedidoEquipoItem?.reduce((subtotal: number, item: any) => {
+              return subtotal + ((item.cantidadPedida || 0) * (item.precioUnitario || 0))
+            }, 0) || 0)
           }, 0)
 
           const porcentajeEjecutado = montoTotalListas > 0 ? (montoTotalPedidos / montoTotalListas) * 100 : 0

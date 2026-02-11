@@ -1,426 +1,550 @@
-/**
- * 💰 Página de Aprovisionamiento Financiero
- * 
- * Vista principal del sistema de aprovisionamiento con:
- * - Gestión de proyectos con indicadores financieros
- * - Control de coherencia entre listas y pedidos
- * - KPIs y métricas de desempeño
- * - Timeline interactivo con Gantt
- * - Reportes y exportación
- * 
- * @author GYS Team
- * @version 1.0.0
- */
-
 'use client'
 
-import React, { Suspense, useState, useEffect, use, useMemo, useCallback, useRef } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { 
-  BarChart3, 
-  Calendar, 
-  FileText, 
-  Package, 
-  ShoppingCart, 
-  TrendingUp,
+import { Suspense, useEffect, useState, useMemo } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  Package,
+  FileText,
+  ShoppingCart,
+  Truck,
+  DollarSign,
   AlertTriangle,
+  TrendingUp,
+  ArrowRight,
+  RefreshCw,
+  Search,
+  X,
+  Calendar,
+  Loader2,
+  Eye,
+  Building2,
   CheckCircle,
   Clock,
-  DollarSign,
-  Home
+  Filter
 } from 'lucide-react'
-import Link from 'next/link'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { buildApiUrl } from '@/lib/utils'
+import type {
+  ProyectoConsolidado,
+  KPIsConsolidados,
+} from '@/lib/services/aprovisionamientoFinanciero'
 
-// ✅ Components
-import { ProyectoAprovisionamientoTable } from '@/components/finanzas/aprovisionamiento/ProyectoAprovisionamientoTable'
-import { ProyectoAprovisionamientoStats } from '@/components/finanzas/aprovisionamiento/ProyectoAprovisionamientoStats'
-import { ProyectoAprovisionamientoFilters } from '@/components/finanzas/aprovisionamiento/ProyectoAprovisionamientoFilters'
-
-// TooltipProvider removed - using global provider from layout
-
-// 📡 Services
-import { proyectosAprovisionamientoService } from '@/lib/services/aprovisionamiento'
-
-// 🔧 Types
-import type { FiltrosProyectoAprovisionamiento } from '@/types/aprovisionamiento'
-
-
-
-interface PageProps {
-  searchParams: Promise<{
-    estado?: string
-    comercial?: string
-    fechaInicio?: string
-    fechaFin?: string
-    coherencia?: string
-    page?: string
-  }>
+interface ConsolidatedResponse {
+  success: boolean
+  data: ProyectoConsolidado[]
+  pagination: { page: number; limit: number; total: number; pages: number }
+  kpis: KPIsConsolidados
 }
 
-export default function AprovisionamientoPage({ searchParams }: PageProps) {
-  // ✅ Framer-motion conflicts resolved
-  
-  // ✅ Unwrap searchParams usando React.use()
-  const params = use(searchParams)
-  
-  const [proyectos, setProyectos] = useState<any[]>([])
-  const [pagination, setPagination] = useState<any>(null)
+export default function AprovisionamientoPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+      <AprovisionamientoContent />
+    </Suspense>
+  )
+}
+
+function AprovisionamientoContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [data, setData] = useState<ConsolidatedResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  
+  const [refreshing, setRefreshing] = useState(false)
 
-  
-  // 🔧 Memoize initial filters to prevent infinite re-renders
-  const initialFiltros = useMemo<FiltrosProyectoAprovisionamiento>(() => ({
-    estado: params.estado,
-    clienteId: params.comercial,
-    fechaInicio: params.fechaInicio && params.fechaFin ? {
-      desde: params.fechaInicio,
-      hasta: params.fechaFin
-    } : undefined,
-    page: parseInt(params.page || '1'),
-    limit: 20
-  }), [params.estado, params.comercial, params.fechaInicio, params.fechaFin, params.page])
-  
-  const [filtros, setFiltros] = useState<FiltrosProyectoAprovisionamiento>(initialFiltros)
+  // Filters from URL
+  const [search, setSearch] = useState(searchParams.get('search') || '')
+  const estado = searchParams.get('estado') || 'all'
+  const page = parseInt(searchParams.get('page') || '1')
 
-  // 🔄 Sync filtros with URL params changes - only when params actually change
-  const paramsRef = useRef(params)
-  
-  useEffect(() => {
-    // Skip if params haven't actually changed (deep comparison)
-    if (JSON.stringify(paramsRef.current) === JSON.stringify(params)) {
-      return
+  const fetchData = async () => {
+    try {
+      setRefreshing(true)
+      const params = new URLSearchParams()
+      params.set('page', String(page))
+      params.set('limit', '20')
+      if (searchParams.get('search')) params.set('search', searchParams.get('search')!)
+      if (estado !== 'all') params.set('estado', estado)
+
+      const res = await fetch(buildApiUrl(`/api/finanzas/aprovisionamiento/proyectos?${params.toString()}`))
+      if (!res.ok) throw new Error('Error al cargar datos')
+      const json: ConsolidatedResponse = await res.json()
+      setData(json)
+    } catch (error) {
+      console.error('Error fetching aprovisionamiento:', error)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-    
-    paramsRef.current = params
-    
-    const newFiltros = {
-      estado: params.estado,
-      clienteId: params.comercial,
-      fechaInicio: params.fechaInicio && params.fechaFin ? {
-        desde: params.fechaInicio,
-        hasta: params.fechaFin
-      } : undefined,
-      page: parseInt(params.page || '1'),
-      limit: 20
-    }
-    
-    setFiltros(newFiltros)
-  }, [params])
-
-  // 📡 Fetch data effect
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        const response = await proyectosAprovisionamientoService.obtenerProyectos(filtros)
-        setProyectos(response.data || [])
-        setPagination(response.pagination)
-      } catch (error) {
-        console.error('Error fetching projects:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [filtros])
-
-  // 🔁 Calculate summary stats
-  const stats = {
-    totalProyectos: pagination?.total || 0,
-    proyectosActivos: proyectos.filter(p => p.estado === 'activo').length,
-    alertasCoherencia: 0, // TODO: Implementar cuando se agregue lógica de coherencia
-    montoTotal: proyectos.reduce((sum, p) => sum + (p.totalCliente || 0), 0)
   }
 
-  // 🔄 Handle filter changes - Memoized to prevent infinite re-renders
-  const handleFiltrosChange = useCallback((newFiltros: any) => {
-    setFiltros(prev => {
-      // Deep comparison to avoid unnecessary updates
-      const merged = { ...prev, ...newFiltros }
-      const hasChanged = JSON.stringify(prev) !== JSON.stringify(merged)
-      return hasChanged ? merged : prev
-    })
-  }, [])
+  useEffect(() => {
+    fetchData()
+  }, [searchParams.toString()])
+
+  const kpis = data?.kpis
+  const proyectos = data?.data || []
+  const pagination = data?.pagination
+
+  // Derived stats
+  const desviacion = useMemo(() => {
+    if (!kpis || kpis.montoTotalListas === 0) return 0
+    return Math.round(((kpis.montoTotalPedidos - kpis.montoTotalListas) / kpis.montoTotalListas) * 100)
+  }, [kpis])
+
+  const handleSearch = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', '1')
+    if (search) params.set('search', search)
+    else params.delete('search')
+    router.push(`/finanzas/aprovisionamiento?${params.toString()}`)
+  }
+
+  const handleEstadoChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', '1')
+    if (value !== 'all') params.set('estado', value)
+    else params.delete('estado')
+    router.push(`/finanzas/aprovisionamiento?${params.toString()}`)
+  }
+
+  const clearFilters = () => {
+    setSearch('')
+    router.push('/finanzas/aprovisionamiento')
+  }
+
+  const hasFilters = search || estado !== 'all'
+
+  const formatMonto = (monto: number) =>
+    `$${monto.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+
+  if (loading) {
+    return (
+      <div className="p-4 space-y-4">
+        <Skeleton className="h-10 w-48" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20" />)}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16" />)}
+        </div>
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
+  }
 
   return (
-      <div className="container mx-auto py-6 space-y-6">
-      {/* 🧭 Breadcrumb Navigation */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/" className="flex items-center gap-1">
-              <Home className="h-3 w-3" />
-              Inicio
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Aprovisionamiento</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className="min-h-screen bg-gray-50/50">
+      {/* Header sticky */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div>
+                <h1 className="text-base font-semibold">Aprovisionamiento Financiero</h1>
+                <p className="text-[10px] text-muted-foreground">Previsión de gastos: listas vs pedidos</p>
+              </div>
+            </div>
 
-      {/* 🎨 Header Section */}
-      <div className="flex flex-col space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Aprovisionamiento</h1>
-            <p className="text-muted-foreground mt-2">
-              Gestión integral de listas y pedidos de equipos con control de coherencia
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchData}
+                disabled={refreshing}
+                className="h-7 text-xs"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+                <Link href="/finanzas/aprovisionamiento/timeline">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  Timeline
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* KPIs principales */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="border-l-4 border-l-blue-400">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-blue-500" />
+                <div>
+                  <div className="text-lg font-bold text-blue-600">{kpis?.totalProyectos || 0}</div>
+                  <div className="text-[11px] text-muted-foreground">Proyectos</div>
+                  <div className="text-[10px] text-muted-foreground">{kpis?.proyectosActivos || 0} activos</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-emerald-400">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-emerald-500" />
+                <div>
+                  <div className="text-lg font-bold text-emerald-600">{kpis?.totalListas || 0}</div>
+                  <div className="text-[11px] text-muted-foreground">Listas</div>
+                  <div className="text-[10px] text-muted-foreground">{formatMonto(kpis?.montoTotalListas || 0)}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-purple-400">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-purple-500" />
+                <div>
+                  <div className="text-lg font-bold text-purple-600">{kpis?.totalPedidos || 0}</div>
+                  <div className="text-[11px] text-muted-foreground">Pedidos</div>
+                  <div className="text-[10px] text-muted-foreground">{formatMonto(kpis?.montoTotalPedidos || 0)}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className={`border-l-4 ${(kpis?.totalAlertas || 0) > 0 ? 'border-l-red-400' : 'border-l-green-400'}`}>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                {(kpis?.totalAlertas || 0) > 0
+                  ? <AlertTriangle className="h-4 w-4 text-red-500" />
+                  : <CheckCircle className="h-4 w-4 text-green-500" />
+                }
+                <div>
+                  <div className={`text-lg font-bold ${(kpis?.totalAlertas || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {kpis?.totalAlertas || 0}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">Alertas</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {desviacion !== 0 ? `${desviacion > 0 ? '+' : ''}${desviacion}% desviación` : 'Sin desviación'}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Resumen financiero */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Presupuesto Listas</span>
+              <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
+            </div>
+            <p className="text-base font-bold mt-1">{formatMonto(kpis?.montoTotalListas || 0)}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Monto Pedidos</span>
+              <DollarSign className="h-3.5 w-3.5 text-purple-500" />
+            </div>
+            <p className="text-base font-bold mt-1">{formatMonto(kpis?.montoTotalPedidos || 0)}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Diferencia</span>
+              <TrendingUp className={`h-3.5 w-3.5 ${desviacion > 5 ? 'text-red-500' : desviacion < -5 ? 'text-amber-500' : 'text-green-500'}`} />
+            </div>
+            <p className={`text-base font-bold mt-1 ${desviacion > 5 ? 'text-red-600' : desviacion < -5 ? 'text-amber-600' : 'text-green-600'}`}>
+              {formatMonto(Math.abs((kpis?.montoTotalPedidos || 0) - (kpis?.montoTotalListas || 0)))}
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button asChild>
-              <Link href="/finanzas/aprovisionamiento/timeline">
-                <Calendar className="h-4 w-4 mr-2" />
-                Vista Timeline
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/finanzas/aprovisionamiento/reportes">
-                <FileText className="h-4 w-4 mr-2" />
-                Reportes
-              </Link>
-            </Button>
+          <div className="bg-white rounded-lg border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Progreso Promedio</span>
+              <Clock className="h-3.5 w-3.5 text-blue-500" />
+            </div>
+            <p className="text-base font-bold mt-1 text-blue-600">{kpis?.progresoPromedio || 0}%</p>
           </div>
         </div>
 
-        {/* 📊 Quick Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Proyectos</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalProyectos}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.proyectosActivos} activos
-              </p>
-            </CardContent>
-          </Card>
+        {/* Secciones rápidas */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          {[
+            {
+              title: 'Proyectos',
+              href: '/finanzas/aprovisionamiento/proyectos',
+              icon: Building2,
+              color: 'bg-blue-100 text-blue-600',
+              borderColor: 'border-l-blue-400',
+              stat: kpis?.totalProyectos || 0,
+              sub: `${kpis?.proyectosActivos || 0} activos`,
+            },
+            {
+              title: 'Listas Técnicas',
+              href: '/finanzas/aprovisionamiento/listas',
+              icon: FileText,
+              color: 'bg-emerald-100 text-emerald-600',
+              borderColor: 'border-l-emerald-400',
+              stat: kpis?.totalListas || 0,
+              sub: formatMonto(kpis?.montoTotalListas || 0),
+            },
+            {
+              title: 'Pedidos',
+              href: '/finanzas/aprovisionamiento/pedidos',
+              icon: ShoppingCart,
+              color: 'bg-purple-100 text-purple-600',
+              borderColor: 'border-l-purple-400',
+              stat: kpis?.totalPedidos || 0,
+              sub: formatMonto(kpis?.montoTotalPedidos || 0),
+            },
+            {
+              title: 'Timeline',
+              href: '/finanzas/aprovisionamiento/timeline',
+              icon: Calendar,
+              color: 'bg-amber-100 text-amber-600',
+              borderColor: 'border-l-amber-400',
+              stat: kpis?.progresoPromedio || 0,
+              sub: 'progreso promedio',
+              isStat: true,
+            },
+          ].map(section => {
+            const Icon = section.icon
+            return (
+              <Link key={section.href} href={section.href}>
+                <Card className={`border-l-4 ${section.borderColor} hover:shadow-md transition-shadow cursor-pointer h-full`}>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`h-7 w-7 rounded-lg ${section.color} flex items-center justify-center flex-shrink-0`}>
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-semibold">{section.title}</h3>
+                          <p className="text-[10px] text-muted-foreground">{section.sub}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-lg font-bold text-muted-foreground">
+                          {section.isStat ? `${section.stat}%` : section.stat}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
+        </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monto Total</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ${stats.montoTotal.toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                En listas aprobadas
-              </p>
-            </CardContent>
-          </Card>
+        {/* Filtros */}
+        <div className="bg-white rounded-lg border p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <Input
+                placeholder="Buscar proyecto por nombre, código..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Coherencia</CardTitle>
-              {stats.alertasCoherencia > 0 ? (
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-              ) : (
-                <CheckCircle className="h-4 w-4 text-green-600" />
+            <Select value={estado} onValueChange={handleEstadoChange}>
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <Filter className="h-3 w-3 mr-1.5 text-gray-400" />
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">Todos</SelectItem>
+                <SelectItem value="activo" className="text-xs">Activo</SelectItem>
+                <SelectItem value="pausado" className="text-xs">Pausado</SelectItem>
+                <SelectItem value="completado" className="text-xs">Completado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleSearch}>
+              Buscar
+            </Button>
+
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs text-red-600">
+                <X className="h-3 w-3 mr-1" />
+                Limpiar
+              </Button>
+            )}
+
+            <div className="ml-auto text-xs text-muted-foreground">
+              {proyectos.length} de {pagination?.total || 0}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabla de proyectos */}
+        <div className="bg-white rounded-lg border overflow-hidden">
+          {proyectos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Package className="h-10 w-10 text-gray-300 mb-3" />
+              <p className="text-sm text-muted-foreground">
+                {hasFilters ? 'No se encontraron proyectos con los filtros aplicados' : 'No hay proyectos con aprovisionamiento'}
+              </p>
+              {hasFilters && (
+                <Button variant="link" size="sm" className="text-xs mt-2" onClick={clearFilters}>
+                  Limpiar filtros
+                </Button>
               )}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats.alertasCoherencia > 0 ? (
-                  <Badge variant="destructive">{stats.alertasCoherencia} alertas</Badge>
-                ) : (
-                  <Badge variant="default" className="bg-green-600">OK</Badge>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-xs font-medium">Proyecto</TableHead>
+                  <TableHead className="text-xs font-medium">Cliente</TableHead>
+                  <TableHead className="text-xs font-medium w-20">Estado</TableHead>
+                  <TableHead className="text-xs font-medium text-right">Pres. Listas</TableHead>
+                  <TableHead className="text-xs font-medium text-right">Monto Pedidos</TableHead>
+                  <TableHead className="text-xs font-medium text-center w-16">Listas</TableHead>
+                  <TableHead className="text-xs font-medium text-center w-16">Pedidos</TableHead>
+                  <TableHead className="text-xs font-medium text-center w-16">Alertas</TableHead>
+                  <TableHead className="text-xs font-medium text-center w-16">Prog.</TableHead>
+                  <TableHead className="text-xs font-medium w-10"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {proyectos.map(proy => {
+                  const devProy = proy.listas.montoTotal > 0
+                    ? Math.round(((proy.pedidos.montoTotal - proy.listas.montoTotal) / proy.listas.montoTotal) * 100)
+                    : 0
+
+                  return (
+                    <TableRow key={proy.id} className="hover:bg-gray-50/50">
+                      <TableCell className="py-2">
+                        <div>
+                          <p className="text-xs font-medium truncate max-w-[180px]">{proy.nombre}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono">{proy.codigo}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <span className="text-xs truncate max-w-[120px] block">{proy.cliente}</span>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Badge className={`text-[10px] h-5 border-0 ${
+                          proy.estado === 'activo' ? 'bg-green-100 text-green-700' :
+                          proy.estado === 'pausado' ? 'bg-amber-100 text-amber-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {proy.estado}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-2 text-right">
+                        <span className="text-xs font-medium">{formatMonto(proy.listas.montoTotal)}</span>
+                      </TableCell>
+                      <TableCell className="py-2 text-right">
+                        <div>
+                          <span className="text-xs font-medium">{formatMonto(proy.pedidos.montoTotal)}</span>
+                          {devProy !== 0 && (
+                            <span className={`text-[10px] ml-1 ${devProy > 5 ? 'text-red-500' : devProy < -5 ? 'text-amber-500' : 'text-green-500'}`}>
+                              {devProy > 0 ? '+' : ''}{devProy}%
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2 text-center">
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5">{proy.listas.total}</Badge>
+                      </TableCell>
+                      <TableCell className="py-2 text-center">
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5">{proy.pedidos.total}</Badge>
+                      </TableCell>
+                      <TableCell className="py-2 text-center">
+                        {proy.alertas > 0 ? (
+                          <Badge className="bg-red-100 text-red-700 text-[10px] h-5 px-1.5 border-0">{proy.alertas}</Badge>
+                        ) : (
+                          <Badge className="bg-green-100 text-green-700 text-[10px] h-5 px-1.5 border-0">0</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2 text-center">
+                        <Badge className={`text-[10px] h-5 px-1.5 border-0 ${
+                          proy.progreso >= 80 ? 'bg-green-100 text-green-700' :
+                          proy.progreso >= 40 ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {proy.progreso}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
+                          <Link href={`/finanzas/aprovisionamiento/proyectos/${proy.id}`}>
+                            <Eye className="h-3.5 w-3.5 text-blue-600" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
+
+          {pagination && pagination.pages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2 border-t text-xs text-muted-foreground">
+              <span>
+                {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total}
+              </span>
+              <div className="flex items-center gap-1">
+                {pagination.page > 1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-[10px] px-2"
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams.toString())
+                      params.set('page', String(pagination.page - 1))
+                      router.push(`/finanzas/aprovisionamiento?${params.toString()}`)
+                    }}
+                  >
+                    Anterior
+                  </Button>
+                )}
+                <span>Página {pagination.page} de {pagination.pages}</span>
+                {pagination.page < pagination.pages && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-[10px] px-2"
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams.toString())
+                      params.set('page', String(pagination.page + 1))
+                      router.push(`/finanzas/aprovisionamiento?${params.toString()}`)
+                    }}
+                  >
+                    Siguiente
+                  </Button>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Listas vs Pedidos
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Acciones Rápidas</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button size="sm" variant="outline" className="w-full" asChild>
-                <Link href="/finanzas/aprovisionamiento/listas">
-                  <Package className="h-3 w-3 mr-1" />
-                  Listas
-                </Link>
-              </Button>
-              <Button size="sm" variant="outline" className="w-full" asChild>
-                <Link href="/finanzas/aprovisionamiento/pedidos">
-                  <ShoppingCart className="h-3 w-3 mr-1" />
-                  Pedidos
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+            </div>
+          )}
         </div>
       </div>
-
-      <Separator />
-
-      {/* 🎯 Main Content Tabs */}
-      <Tabs defaultValue="proyectos" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="proyectos" className="flex items-center space-x-2">
-            <BarChart3 className="h-4 w-4" />
-            <span>Vista Proyectos</span>
-          </TabsTrigger>
-          <TabsTrigger value="estadisticas" className="flex items-center space-x-2">
-            <TrendingUp className="h-4 w-4" />
-            <span>Estadísticas</span>
-          </TabsTrigger>
-          <TabsTrigger value="timeline" className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4" />
-            <span>Timeline</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* 📋 Projects Tab */}
-        <TabsContent value="proyectos" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Filtros y Búsqueda</CardTitle>
-              <CardDescription>
-                Utiliza los filtros para encontrar proyectos específicos
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<div className="h-32 bg-muted animate-pulse rounded" />}>
-                <ProyectoAprovisionamientoFilters 
-                  filtros={filtros}
-                  onFiltrosChange={handleFiltrosChange}
-                  loading={loading}
-                />
-              </Suspense>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Proyectos de Aprovisionamiento</CardTitle>
-              <CardDescription>
-                Lista consolidada con indicadores de coherencia y KPIs financieros
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<div className="h-96 bg-muted animate-pulse rounded" />}>
-                <ProyectoAprovisionamientoTable 
-                  proyectos={proyectos}
-                  loading={loading}
-                />
-              </Suspense>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 📊 Statistics Tab */}
-        <TabsContent value="estadisticas" className="space-y-6">
-          <Suspense fallback={<div className="h-96 bg-muted animate-pulse rounded" />}>
-            <ProyectoAprovisionamientoStats 
-              variant="detailed"
-              proyectos={proyectos}
-            />
-          </Suspense>
-        </TabsContent>
-
-        {/* 📅 Timeline Tab */}
-        <TabsContent value="timeline" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Vista Timeline</CardTitle>
-              <CardDescription>
-                Visualización temporal del aprovisionamiento con Gantt interactivo
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Timeline Interactivo</h3>
-                <p className="text-muted-foreground mb-4">
-                  Accede a la vista completa del timeline con Gantt interactivo
-                </p>
-                <Button asChild>
-                  <Link href="/finanzas/aprovisionamiento/timeline">
-                    Abrir Timeline Completo
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-      </div>
-  )
-}
-
-// 🔄 Loading Component
-function Loading() {
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="space-y-4">
-        <div className="h-8 bg-muted animate-pulse rounded w-1/3" />
-        <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-32 bg-muted animate-pulse rounded" />
-        ))}
-      </div>
-      
-      <div className="h-96 bg-muted animate-pulse rounded" />
-    </div>
-  )
-}
-
-// ❌ Error Component
-function Error({ 
-  error, 
-  reset 
-}: { 
-  error: Error & { digest?: string }
-  reset: () => void 
-}) {
-  return (
-    <div className="container mx-auto p-6">
-      <Card className="border-destructive">
-        <CardHeader>
-          <CardTitle className="text-destructive flex items-center">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            Error en Aprovisionamiento
-          </CardTitle>
-          <CardDescription>
-            Ha ocurrido un error al cargar los datos de aprovisionamiento
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {error.message || 'Error desconocido'}
-          </p>
-          <div className="flex space-x-2">
-            <Button onClick={reset}>
-              Reintentar
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/">
-                Volver al Inicio
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

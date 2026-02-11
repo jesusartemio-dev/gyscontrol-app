@@ -18,7 +18,7 @@ const ActualizarListaSchema = z.object({
 
 // 🔁 Función para recalcular datos de Gantt
 function calcularDatosGantt(lista: any) {
-  const items = lista.items || []
+  const items = lista.listaEquipoItem || []
   const maxTiempoEntrega = Math.max(...items.map((item: any) => item.tiempoEntregaDias || 0), 0)
   const fechaNecesaria = new Date(lista.fechaNecesaria)
   const fechaInicio = new Date(fechaNecesaria)
@@ -39,8 +39,8 @@ function calcularDatosGantt(lista: any) {
 
 // 🔁 Función para validar coherencia
 function validarCoherencia(lista: any) {
-  const pedidos = lista.pedidos || []
-  const items = lista.items || []
+  const pedidos = lista.pedidoEquipo || []
+  const items = lista.listaEquipoItem || []
   
   const validaciones = {
     tieneItems: items.length > 0,
@@ -57,11 +57,11 @@ function validarCoherencia(lista: any) {
     }, 0)
     
     const montoPedidos = pedidos.reduce((total: number, pedido: any) => {
-      return total + (pedido.items?.reduce((subtotal: number, item: any) => {
-        return subtotal + (item.cantidadPedida * item.precioUnitario)
+      return total + (pedido.pedidoEquipoItem?.reduce((subtotal: number, item: any) => {
+        return subtotal + ((item.cantidadPedida || 0) * (item.precioUnitario || 0))
       }, 0) || 0)
     }, 0)
-    
+
     validaciones.pedidosCoherentes = Math.abs(montoPedidos - montoLista) <= (montoLista * 0.05)
   }
   

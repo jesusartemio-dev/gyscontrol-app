@@ -121,19 +121,21 @@ export const proyectosAprovisionamientoService = {
 
    /**
     * 📊 Obtener KPIs generales de aprovisionamiento
+    * Uses the consolidated GET endpoint which returns kpis in its response
     */
   async obtenerKPIs(): Promise<KPIAprovisionamiento> {
     try {
-      const response = await fetch(`${API_BASE}/proyectos`, {
-        method: 'POST',
+      const url = buildApiUrl('/api/finanzas/aprovisionamiento/proyectos?limit=1')
+      const cookie = await getServerCookies()
+      const response = await fetch(url, {
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(cookie && { 'Cookie': cookie })
         },
-        body: JSON.stringify({
-          accion: 'obtener-kpis'
-        })
+        credentials: 'include'
       })
-      
+
       const data = await handleApiResponse<{ kpis: KPIAprovisionamiento }>(response)
       return data.kpis
     } catch (error) {
@@ -147,14 +149,22 @@ export const proyectosAprovisionamientoService = {
    */
   async obtenerProyectoPorId(proyectoId: string): Promise<ProyectoAprovisionamiento> {
     try {
-      const response = await this.obtenerProyectos({ proyectoId })
-      const proyecto = response.data.find(p => p.id === proyectoId)
-      
-      if (!proyecto) {
+      const url = buildApiUrl(`${API_BASE}/proyectos/${proyectoId}`)
+      const cookie = await getServerCookies()
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(cookie && { 'Cookie': cookie })
+        },
+        credentials: 'include'
+      })
+
+      const data = await handleApiResponse<{ success: boolean; data: ProyectoAprovisionamiento }>(response)
+      if (!data.data) {
         throw new Error('Proyecto no encontrado')
       }
-      
-      return proyecto
+      return data.data
     } catch (error) {
       console.error('Error al obtener proyecto por ID:', error)
       throw error
@@ -422,7 +432,7 @@ export const listasEquipoService = {
   } = {}): Promise<ResponseListas> {
     try {
       const queryParams = buildQueryParams(filtros)
-      const url = buildApiUrl(`${API_BASE}${queryParams ? `?${queryParams}` : ''}`)
+      const url = buildApiUrl(`${API_BASE}/listas${queryParams ? `?${queryParams}` : ''}`)
       
       // 📡 Obtener cookies de la petición para Server Components
       const cookie = await getServerCookies()
@@ -451,7 +461,7 @@ export const listasEquipoService = {
       const data = await this.obtenerListas({ proyectoId })
       
       // 🧮 Calcular resumen
-      const listas = data.data?.listas || []
+      const listas: any[] = data.data?.listas || []
       const resumen = {
         total: listas.length,
         porEstado: listas.reduce((acc: any, lista: any) => {
@@ -776,28 +786,32 @@ export const validacionCoherenciaService = {
    */
   async validarCoherenciaListaPedidos(listaEquipoId: string) {
     try {
-      const response = await fetch(`${API_BASE}/${listaEquipoId}`, {
+      const url = buildApiUrl(`${API_BASE}/listas/${listaEquipoId}`)
+      const cookie = await getServerCookies()
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          ...(cookie && { 'Cookie': cookie })
+        },
+        credentials: 'include'
       })
-      
+
       const data = await handleApiResponse<any>(response)
-      const lista = data.lista
-      
+      const lista = data.data
+
       if (!lista) {
         throw new Error('Lista no encontrada')
       }
-      
+
       // 🧮 Calcular monto total de la lista
-      const montoLista = lista.items?.reduce((sum: number, item: any) => 
-        sum + (item.cantidad * item.precioElegido), 0) || 0
-      
+      const montoLista = lista.listaEquipoItem?.reduce((sum: number, item: any) =>
+        sum + ((item.cantidad || 0) * (item.precioElegido || 0)), 0) || 0
+
       // 🧮 Calcular monto total de pedidos asociados
-      const montoPedidos = lista.pedidoEquipos?.reduce((sum: number, pedido: any) => 
-        sum + (pedido.items?.reduce((itemSum: number, item: any) => 
-          itemSum + (item.cantidadPedida * item.precioUnitario), 0) || 0), 0) || 0
+      const montoPedidos = lista.pedidoEquipo?.reduce((sum: number, pedido: any) =>
+        sum + (pedido.pedidoEquipoItem?.reduce((itemSum: number, item: any) =>
+          itemSum + ((item.cantidadPedida || 0) * (item.precioUnitario || 0)), 0) || 0), 0) || 0
       
       const diferencia = Math.abs(montoLista - montoPedidos)
       const porcentajeDesviacion = montoLista > 0 ? (diferencia / montoLista) * 100 : 0
@@ -835,40 +849,43 @@ export const validacionCoherenciaService = {
       // 🔍 Procesar coherencia por cada lista
       const coherenciaExtendida: CoherenciaResultExtended[] = [];
       
-      for (const lista of listas.data.listas) {
+      const listasArray: any[] = (listas as any).data?.listas || []
+      const pedidosArray: any[] = (pedidos as any).data?.pedidos || []
+
+      for (const lista of listasArray) {
         // 📊 Obtener pedidos asociados a esta lista
-        const pedidosLista = pedidos.data.pedidos.filter(p => p.listaId === lista.id);
-        
+        const pedidosLista = pedidosArray.filter((p: any) => p.listaId === lista.id);
+
         // 💰 Calcular montos
-        const montoLista = lista.items?.reduce(
-          (sum: number, item: any) => sum + (item.cantidad * item.precioElegido), 0
+        const montoLista = lista.listaEquipoItem?.reduce(
+          (sum: number, item: any) => sum + ((item.cantidad || 0) * (item.precioElegido || 0)), 0
         ) || 0;
-        
-        const montoPedidos = pedidosLista.reduce((sum, pedido) => {
-          return sum + (pedido.items?.reduce(
-            (subSum: number, item: any) => subSum + (item.cantidadPedida * item.precioUnitario), 0
+
+        const montoPedidos = pedidosLista.reduce((sum: number, pedido: any) => {
+          return sum + (pedido.pedidoEquipoItem?.reduce(
+            (subSum: number, item: any) => subSum + ((item.cantidadPedida || 0) * (item.precioUnitario || 0)), 0
           ) || 0);
         }, 0);
-        
+
         // 🔍 Validar coherencia usando el servicio de cálculos
         const coherenciaBase = AprovisionamientoCalculos.validarCoherenciaListaPedidos(
           {
             id: lista.id,
             codigo: lista.codigo,
             fechaNecesaria: lista.fechaNecesaria ? new Date(lista.fechaNecesaria) : new Date(),
-            items: (lista.items || []).map(item => ({
+            items: (lista.listaEquipoItem || []).map((item: any) => ({
               tiempoEntregaDias: item.tiempoEntregaDias || 30,
               cantidad: item.cantidad || 0,
               precioElegido: item.precioElegido || 0
             })),
             estado: lista.estado
           },
-          pedidosLista.map(p => ({
+          pedidosLista.map((p: any) => ({
             id: p.id,
             codigo: p.codigo,
             fechaNecesaria: p.fechaNecesaria ? new Date(p.fechaNecesaria) : new Date(),
             listaEquipoId: p.listaId!,
-            items: (p.items || []).map((item: PedidoEquipoItem) => ({
+            items: (p.pedidoEquipoItem || []).map((item: any) => ({
                tiempoEntregaDias: item.tiempoEntregaDias || 30,
                cantidadPedida: item.cantidadPedida || 0,
                precioUnitario: item.precioUnitario || 0
@@ -876,17 +893,17 @@ export const validacionCoherenciaService = {
             estado: p.estado
           }))
         );
-        
+
         // ✅ Crear coherencia extendida con información adicional
         const coherenciaConDatos = crearCoherenciaExtendida(
           coherenciaBase,
           lista.id,
           montoLista,
           montoPedidos,
-          pedidosLista.map(p => ({
+          pedidosLista.map((p: any) => ({
             codigo: p.codigo,
-            monto: p.items?.reduce(
-              (sum: number, item: any) => sum + (item.cantidadPedida * item.precioUnitario), 0
+            monto: p.pedidoEquipoItem?.reduce(
+              (sum: number, item: any) => sum + ((item.cantidadPedida || 0) * (item.precioUnitario || 0)), 0
             ) || 0
           }))
         );
@@ -928,23 +945,27 @@ export const validacionCoherenciaService = {
    */
   async validarCantidadesPorItem(listaEquipoId: string) {
     try {
-      const response = await fetch(`${API_BASE}/${listaEquipoId}`, {
+      const url = buildApiUrl(`${API_BASE}/listas/${listaEquipoId}`)
+      const cookie = await getServerCookies()
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          ...(cookie && { 'Cookie': cookie })
+        },
+        credentials: 'include'
       })
-      
+
       const data = await handleApiResponse<any>(response)
-      const lista = data.lista
-      
+      const lista = data.data
+
       if (!lista) {
         throw new Error('Lista no encontrada')
       }
-      
-      const validaciones = lista.items?.map((item: any) => {
-        const cantidadPedida = lista.pedidoEquipos?.reduce((sum: number, pedido: any) => {
-          const itemPedido = pedido.items?.find((pi: any) => pi.listaEquipoItemId === item.id)
+
+      const validaciones = lista.listaEquipoItem?.map((item: any) => {
+        const cantidadPedida = lista.pedidoEquipo?.reduce((sum: number, pedido: any) => {
+          const itemPedido = pedido.pedidoEquipoItem?.find((pi: any) => pi.listaEquipoItemId === item.id)
           return sum + (itemPedido?.cantidadPedida || 0)
         }, 0) || 0
         
@@ -1168,42 +1189,21 @@ export async function getPedidoEquipo(pedidoId: string) {
   }
 }
 
-// 📡 Función para obtener items de un pedido
+// 📡 Función para obtener items de un pedido (extraídos del detalle del pedido)
 export async function getItemsPedido(pedidoId: string) {
   try {
-    const cookies = await getServerCookies()
-    const response = await fetch(buildApiUrl(`${API_BASE}/pedidos/${pedidoId}/items`), {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookies && { Cookie: cookies })
-      },
-      cache: 'no-store'
-    })
-    
-    return await handleApiResponse(response)
+    const pedido = await getPedidoEquipo(pedidoId)
+    const data = (pedido as any)?.data || pedido
+    return { success: true, data: data?.pedidoEquipoItem || [] }
   } catch (error) {
     console.error('❌ Error al obtener items del pedido:', error)
-    throw error
+    return { success: false, data: [] }
   }
 }
 
-// 📡 Función para obtener documentos de un pedido
-export async function getDocumentosPedido(pedidoId: string) {
-  try {
-    const cookies = await getServerCookies()
-    const response = await fetch(buildApiUrl(`${API_BASE}/pedidos/${pedidoId}/documentos`), {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookies && { Cookie: cookies })
-      },
-      cache: 'no-store'
-    })
-    
-    return await handleApiResponse(response)
-  } catch (error) {
-    console.error('❌ Error al obtener documentos del pedido:', error)
-    throw error
-  }
+// 📡 Función para obtener documentos de un pedido (pendiente de implementación)
+export async function getDocumentosPedido(_pedidoId: string) {
+  return { success: true, data: [] }
 }
 
 export default {

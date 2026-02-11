@@ -30,7 +30,8 @@ import {
   DollarSign,
   FileText,
   Search,
-  Eye
+  Eye,
+  ArrowLeft
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -120,12 +121,20 @@ export default function ListasEquipoPageContent() {
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
-      case 'aprobada':
-        return <Badge className="bg-green-100 text-green-700 text-[10px] h-5">Aprobada</Badge>
-      case 'rechazada':
-        return <Badge className="bg-red-100 text-red-700 text-[10px] h-5">Rechazada</Badge>
-      case 'pendiente':
-        return <Badge className="bg-yellow-100 text-yellow-700 text-[10px] h-5">Pendiente</Badge>
+      case 'borrador':
+        return <Badge className="bg-gray-100 text-gray-700 text-[10px] h-5">Borrador</Badge>
+      case 'por_revisar':
+        return <Badge className="bg-yellow-100 text-yellow-700 text-[10px] h-5">Por Revisar</Badge>
+      case 'por_cotizar':
+        return <Badge className="bg-orange-100 text-orange-700 text-[10px] h-5">Por Cotizar</Badge>
+      case 'por_validar':
+        return <Badge className="bg-amber-100 text-amber-700 text-[10px] h-5">Por Validar</Badge>
+      case 'por_aprobar':
+        return <Badge className="bg-blue-100 text-blue-700 text-[10px] h-5">Por Aprobar</Badge>
+      case 'aprobado': case 'aprobada':
+        return <Badge className="bg-green-100 text-green-700 text-[10px] h-5">Aprobado</Badge>
+      case 'rechazado': case 'rechazada':
+        return <Badge className="bg-red-100 text-red-700 text-[10px] h-5">Rechazado</Badge>
       default:
         return <Badge variant="secondary" className="text-[10px] h-5">{estado}</Badge>
     }
@@ -172,18 +181,14 @@ export default function ListasEquipoPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+            <Link href="/finanzas/aprovisionamiento">
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+              Dashboard
+            </Link>
+          </Button>
           <FileText className="h-5 w-5 text-emerald-600" />
           <h1 className="text-lg font-semibold">Listas de Equipo</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-7 text-xs">
-            <Download className="h-3 w-3 mr-1" />
-            Exportar
-          </Button>
-          <Button size="sm" className="h-7 text-xs">
-            <Plus className="h-3 w-3 mr-1" />
-            Nueva
-          </Button>
         </div>
       </div>
 
@@ -250,9 +255,13 @@ export default function ListasEquipoPageContent() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="aprobada">Aprobada</SelectItem>
-            <SelectItem value="rechazada">Rechazada</SelectItem>
+            <SelectItem value="borrador">Borrador</SelectItem>
+            <SelectItem value="por_revisar">Por Revisar</SelectItem>
+            <SelectItem value="por_cotizar">Por Cotizar</SelectItem>
+            <SelectItem value="por_validar">Por Validar</SelectItem>
+            <SelectItem value="por_aprobar">Por Aprobar</SelectItem>
+            <SelectItem value="aprobado">Aprobado</SelectItem>
+            <SelectItem value="rechazado">Rechazado</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSearch}>
@@ -319,7 +328,7 @@ export default function ListasEquipoPageContent() {
                     </TableCell>
                     <TableCell className="py-2">
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
-                        <Link href={`/proyectos/${lista.proyectoId}/equipos/listas/${lista.id}`}>
+                        <Link href={`/finanzas/aprovisionamiento/listas/${lista.id}`}>
                           <Eye className="h-3.5 w-3.5 text-blue-600" />
                         </Link>
                       </Button>

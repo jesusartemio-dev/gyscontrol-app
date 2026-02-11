@@ -34,7 +34,8 @@ import {
   Search,
   Eye,
   TrendingUp,
-  Calendar
+  Calendar,
+  ArrowLeft
 } from 'lucide-react'
 
 import PedidoEquipoGanttClient from '@/components/aprovisionamiento/PedidoEquipoGanttClient'
@@ -154,12 +155,16 @@ function PedidosEquipoContent() {
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
-      case 'entregado':
-        return <Badge className="bg-green-100 text-green-700 text-[10px] h-5">Entregado</Badge>
+      case 'borrador':
+        return <Badge className="bg-gray-100 text-gray-700 text-[10px] h-5">Borrador</Badge>
       case 'enviado':
         return <Badge className="bg-blue-100 text-blue-700 text-[10px] h-5">Enviado</Badge>
-      case 'pendiente':
-        return <Badge className="bg-yellow-100 text-yellow-700 text-[10px] h-5">Pendiente</Badge>
+      case 'atendido':
+        return <Badge className="bg-indigo-100 text-indigo-700 text-[10px] h-5">Atendido</Badge>
+      case 'parcial':
+        return <Badge className="bg-purple-100 text-purple-700 text-[10px] h-5">Parcial</Badge>
+      case 'entregado':
+        return <Badge className="bg-green-100 text-green-700 text-[10px] h-5">Entregado</Badge>
       case 'cancelado':
         return <Badge className="bg-red-100 text-red-700 text-[10px] h-5">Cancelado</Badge>
       default:
@@ -204,18 +209,14 @@ function PedidosEquipoContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+            <Link href="/finanzas/aprovisionamiento">
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+              Dashboard
+            </Link>
+          </Button>
           <Package className="h-5 w-5 text-emerald-600" />
           <h1 className="text-lg font-semibold">Pedidos de Equipo</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-7 text-xs">
-            <Download className="h-3 w-3 mr-1" />
-            Exportar
-          </Button>
-          <Button size="sm" className="h-7 text-xs">
-            <Plus className="h-3 w-3 mr-1" />
-            Nuevo
-          </Button>
         </div>
       </div>
 
@@ -291,8 +292,10 @@ function PedidosEquipoContent() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="pendiente">Pendiente</SelectItem>
+              <SelectItem value="borrador">Borrador</SelectItem>
               <SelectItem value="enviado">Enviado</SelectItem>
+              <SelectItem value="atendido">Atendido</SelectItem>
+              <SelectItem value="parcial">Parcial</SelectItem>
               <SelectItem value="entregado">Entregado</SelectItem>
               <SelectItem value="cancelado">Cancelado</SelectItem>
             </SelectContent>
@@ -336,6 +339,7 @@ function PedidosEquipoContent() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs font-medium">Pedido</TableHead>
+                  <TableHead className="text-xs font-medium">Proyecto</TableHead>
                   <TableHead className="text-xs font-medium">Proveedor</TableHead>
                   <TableHead className="text-xs font-medium w-20">Estado</TableHead>
                   <TableHead className="text-xs font-medium text-center w-16">Items</TableHead>
@@ -364,7 +368,12 @@ function PedidosEquipoContent() {
                         </div>
                       </TableCell>
                       <TableCell className="py-2">
-                        <span className="text-xs truncate max-w-[150px] block" title={proveedor?.nombre}>
+                        <span className="text-xs truncate max-w-[120px] block" title={pedido.proyecto?.nombre}>
+                          {pedido.proyecto?.nombre || '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <span className="text-xs truncate max-w-[120px] block" title={proveedor?.nombre}>
                           {proveedor?.nombre || '-'}
                         </span>
                       </TableCell>
@@ -388,7 +397,7 @@ function PedidosEquipoContent() {
                       </TableCell>
                       <TableCell className="py-2">
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
-                          <Link href={`/proyectos/${pedido.lista?.proyectoId}/equipos/pedidos/${pedido.id}`}>
+                          <Link href={`/finanzas/aprovisionamiento/pedidos/${pedido.id}`}>
                             <Eye className="h-3.5 w-3.5 text-blue-600" />
                           </Link>
                         </Button>

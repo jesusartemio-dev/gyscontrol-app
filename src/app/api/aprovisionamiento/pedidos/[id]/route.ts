@@ -23,7 +23,7 @@ function calcularDatosGantt(pedido: any) {
   const fechaEntrega = pedido.fechaEntregaEstimada || new Date()
 
   const montoReal = items.reduce((total: number, item: any) => {
-    return total + (item.cantidadPedida * item.precioUnitario)
+    return total + (item.cantidadPedida * (item.precioUnitario || 0))
   }, 0)
 
   const msPerDay = 1000 * 60 * 60 * 24
@@ -64,9 +64,9 @@ function validarCoherencia(pedido: any) {
   const itemsLista = lista.listaEquipoItem || []
   
   // Validar fecha de entrega vs fecha necesaria
-  const fechaEntrega = new Date(pedido.fechaEntregaEstimada)
+  const fechaEntregaRaw = pedido.fechaEntregaEstimada ? new Date(pedido.fechaEntregaEstimada) : null
   const fechaNecesaria = new Date(lista.fechaNecesaria)
-  const fechaCoherente = fechaEntrega <= fechaNecesaria
+  const fechaCoherente = fechaEntregaRaw ? fechaEntregaRaw <= fechaNecesaria : true
   
   // Validar items
   const itemsValidados = itemsPedido.map((itemPedido: any) => {
@@ -83,17 +83,17 @@ function validarCoherencia(pedido: any) {
     }
     
     const cantidadValida = itemPedido.cantidadPedida <= itemLista.cantidad
-    const precioValido = itemLista.precioElegido ? 
-      Math.abs(itemPedido.precioUnitario - itemLista.precioElegido) <= (itemLista.precioElegido * 0.1) :
+    const precioValido = itemLista.precioElegido ?
+      Math.abs((itemPedido.precioUnitario || 0) - itemLista.precioElegido) <= (itemLista.precioElegido * 0.1) :
       true // Si no hay precio elegido, cualquier precio es válido
-    
+
     return {
       itemPedido,
       itemLista,
       cantidadValida,
       precioValido,
-      desviacionPrecio: itemLista.precioElegido ? 
-        ((itemPedido.precioUnitario - itemLista.precioElegido) / itemLista.precioElegido) * 100 :
+      desviacionPrecio: (itemLista.precioElegido && itemLista.precioElegido > 0) ?
+        (((itemPedido.precioUnitario || 0) - itemLista.precioElegido) / itemLista.precioElegido) * 100 :
         0
     }
   })
@@ -184,11 +184,38 @@ export async function GET(
           }
         },
 
+        proyecto: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true,
+            comercial: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            gestor: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
         pedidoEquipoItem: {
           select: {
             id: true,
+            codigo: true,
+            descripcion: true,
+            unidad: true,
             cantidadPedida: true,
+            cantidadAtendida: true,
             precioUnitario: true,
+            costoTotal: true,
+            estado: true,
             listaEquipoItemId: true
           }
         }
@@ -387,10 +414,11 @@ export async function DELETE(
     // 📡 Verificar que el pedido existe
     const pedido = await prisma.pedidoEquipo.findUnique({
       where: { id },
-      select: { 
-        id: true, 
-        estado: true, 
-        codigo: true
+      select: {
+        id: true,
+        estado: true,
+        codigo: true,
+        observacion: true
       }
     })
 
@@ -415,8 +443,8 @@ export async function DELETE(
       where: { id },
       data: {
         estado: 'cancelado',
-        observacion: (pedido as any).observacion ? 
-          `${(pedido as any).observacion}\n\nCANCELADO: ${new Date().toLocaleString()}` :
+        observacion: pedido.observacion ?
+          `${pedido.observacion}\n\nCANCELADO: ${new Date().toLocaleString()}` :
           `CANCELADO: ${new Date().toLocaleString()}`,
         updatedAt: new Date()
       }

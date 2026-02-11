@@ -136,19 +136,17 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
     }
   }
 
-  // ✅ Datos reales de la API - sin mock data
+  // ✅ Calculate stats from ALL filtered items (not paginated subset)
+  const totalEquipos = filteredItems.length
 
-  // 🔁 Calculate lista stats from real API data
-  const totalEquipos = equiposData.pagination?.total || 0
-      
   const stats = {
     totalEquipos,
-    equiposValidados: equiposData.items?.filter(item => item.verificado).length || 0,
-    montoTotal: equiposData.items?.reduce((sum, item) => sum + ((item.precioElegido || 0) * item.cantidad), 0) || 0,
-    categorias: [...new Set(equiposData.items?.map(item => item.catalogoEquipo?.categoriaEquipo?.nombre || 'Sin categoría') || [])].length,
-    alertasCoherencia: equiposData.items?.filter(item => item.estado === 'por_revisar').length || 0,
-    progresoValidacion: totalEquipos > 0 ? 
-      Math.round(((equiposData.items?.filter(item => item.verificado).length || 0) / totalEquipos) * 100) : 0
+    equiposValidados: filteredItems.filter(item => item.verificado).length,
+    montoTotal: filteredItems.reduce((sum, item) => sum + ((item.precioElegido || 0) * item.cantidad), 0),
+    categorias: [...new Set(filteredItems.map(item => item.catalogoEquipo?.categoriaEquipo?.nombre || 'Sin categoría'))].length,
+    alertasCoherencia: filteredItems.filter(item => item.estado === 'por_revisar').length,
+    progresoValidacion: totalEquipos > 0 ?
+      Math.round((filteredItems.filter(item => item.verificado).length / totalEquipos) * 100) : 0
   }
 
   const activeTab = searchParamsResolved.tab || 'equipos'
@@ -208,24 +206,7 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicar
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-            <Button variant="outline" size="sm">
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Generar Pedido
-            </Button>
-            <Button size="sm">
-              <Edit className="h-4 w-4 mr-2" />
-              Editar
-            </Button>
-          </div>
+          {/* Action buttons will be enabled as features are implemented */}
         </div>
       </div>
 
@@ -319,13 +300,13 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
           </CardHeader>
           <CardContent>
             <div className="text-sm font-bold">
-              {lista.fechaModificacion ? 
-                new Date(lista.fechaModificacion).toLocaleDateString('es-PE') : 
+              {lista.updatedAt ?
+                new Date(lista.updatedAt).toLocaleDateString('es-PE') :
                 'No disponible'
               }
             </div>
             <p className="text-xs text-muted-foreground">
-              Por {lista.modificadoPor || 'Sistema'}
+              Última actualización
             </p>
           </CardContent>
         </Card>
@@ -368,33 +349,9 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="mb-6">
-                <ListaEquipoFilters
-                  filtros={{
-                    busqueda: searchParamsResolved.search || '',
-                    categoria: searchParamsResolved.categoria || undefined
-                  }}
-                  onFiltrosChange={(filtros) => {
-                    const params = new URLSearchParams(window.location.search)
-                    if (filtros.busqueda) {
-                      params.set('search', filtros.busqueda)
-                    } else {
-                      params.delete('search')
-                    }
-                    if (filtros.categoria && filtros.categoria !== 'all') {
-                      params.set('categoria', filtros.categoria)
-                    } else {
-                      params.delete('categoria')
-                    }
-                    window.location.href = `/finanzas/aprovisionamiento/listas/${id}?${params.toString()}`
-                  }}
-                  loading={false}
-                  showQuickFilters={true}
-                  className="w-full"
-                />
-              </div>
+              {/* Filters are handled via URL search params */}
 
-              {/* Equipment List */}
+              {/* Equipment List - callbacks handled internally by the client component */}
                <ListaEquipoItemList
                  listaId={lista.id}
                  proyectoId={lista.proyecto?.id || ''}
@@ -402,24 +359,6 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
                  listaNombre={lista.nombre || ''}
                  items={equiposData.items}
                  editable={true}
-                 onCreated={async () => {
-                   // Refresh page to show new item
-                   window.location.reload()
-                 }}
-                 onItemUpdated={async (itemId: string) => {
-                   // Refresh specific item or entire list
-                   console.log(`Item ${itemId} updated, refreshing...`)
-                   window.location.reload()
-                 }}
-                 onItemsUpdated={async () => {
-                   // Refresh equipment data after bulk operations
-                   console.log('Items updated, refreshing...')
-                   window.location.reload()
-                 }}
-                 onRefresh={async () => {
-                   // Manual refresh triggered by user
-                   window.location.reload()
-                 }}
                />
 
               {/* 📄 Equipment Pagination */}
@@ -429,33 +368,27 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
                     Mostrando {((page - 1) * limit) + 1} a {Math.min(page * limit, totalEquipos)} de {totalEquipos} equipos
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page <= 1}
-                      onClick={() => {
-                        const params = new URLSearchParams(window.location.search)
-                        params.set('page', (page - 1).toString())
-                        window.location.href = `/finanzas/aprovisionamiento/listas/${id}?${params.toString()}`
-                      }}
-                    >
-                      Anterior
-                    </Button>
+                    {page > 1 ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/finanzas/aprovisionamiento/listas/${id}?page=${page - 1}${equipoSearch ? `&search=${equipoSearch}` : ''}${equipoCategoria !== 'all' ? `&categoria=${equipoCategoria}` : ''}`}>
+                          Anterior
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" disabled>Anterior</Button>
+                    )}
                     <span className="text-sm">
                       Página {page} de {Math.ceil(totalEquipos / limit)}
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page >= Math.ceil(totalEquipos / limit)}
-                      onClick={() => {
-                        const params = new URLSearchParams(window.location.search)
-                        params.set('page', (page + 1).toString())
-                        window.location.href = `/finanzas/aprovisionamiento/listas/${id}?${params.toString()}`
-                      }}
-                    >
-                      Siguiente
-                    </Button>
+                    {page < Math.ceil(totalEquipos / limit) ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/finanzas/aprovisionamiento/listas/${id}?page=${page + 1}${equipoSearch ? `&search=${equipoSearch}` : ''}${equipoCategoria !== 'all' ? `&categoria=${equipoCategoria}` : ''}`}>
+                          Siguiente
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" disabled>Siguiente</Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -556,14 +489,10 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Estado del Proyecto</label>
                       <p className="text-sm">
-                        <Badge variant="secondary">
-                          Activo
+                        <Badge variant="default">
+                          {(lista.proyecto as any).estado || 'activo'}
                         </Badge>
                       </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Responsable</label>
-                      <p className="text-sm">No asignado</p>
                     </div>
                     <div className="pt-2">
                       <Button variant="outline" size="sm" asChild>
@@ -636,55 +565,12 @@ export default async function ListaEquipoDetallePage({ params, searchParams }: P
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {/* Mock history entries */}
-                <div className="flex items-start space-x-3 pb-4 border-b">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Lista aprobada</p>
-                      <span className="text-sm text-muted-foreground">Hace 2 días</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Por: Juan Pérez</p>
-                    <p className="text-sm mt-1">La lista ha sido aprobada y está lista para generar pedidos</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3 pb-4 border-b">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Equipo modificado</p>
-                      <span className="text-sm text-muted-foreground">Hace 3 días</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Por: María García</p>
-                    <p className="text-sm mt-1">Actualizado precio unitario del equipo EQ-001 de $1,200.00 a $1,350.00</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3 pb-4 border-b">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Alerta de coherencia</p>
-                      <span className="text-sm text-muted-foreground">Hace 4 días</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Por: Sistema</p>
-                    <p className="text-sm mt-1">Detectada diferencia de precios en equipo EQ-003 comparado con listas similares</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3 pb-4">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Lista creada</p>
-                      <span className="text-sm text-muted-foreground">Hace 1 semana</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Por: Carlos López</p>
-                    <p className="text-sm mt-1">Lista de equipos creada con 15 elementos iniciales</p>
-                  </div>
-                </div>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <History className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">El historial de cambios estará disponible próximamente</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Creado: {lista.createdAt ? new Date(lista.createdAt).toLocaleDateString('es-PE') : 'No disponible'}
+                </p>
               </div>
             </CardContent>
           </Card>

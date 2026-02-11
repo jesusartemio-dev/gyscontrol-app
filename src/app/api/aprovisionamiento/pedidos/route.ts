@@ -14,7 +14,10 @@ const FiltrosPedidosSchema = z.object({
   proyectoId: z.string().optional(),
   listaId: z.string().optional(),
   proveedorId: z.string().optional(),
-  estado: z.enum(['borrador', 'enviado', 'atendido', 'parcial', 'entregado', 'cancelado']).optional(),
+  estado: z.union([
+    z.enum(['borrador', 'enviado', 'atendido', 'parcial', 'entregado', 'cancelado']),
+    z.array(z.enum(['borrador', 'enviado', 'atendido', 'parcial', 'entregado', 'cancelado']))
+  ]).optional(),
   responsable: z.string().optional(),
   fechaDesde: z.string().optional(),
   fechaHasta: z.string().optional(),
@@ -118,15 +121,15 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    console.log('🔍 API pedidos - Iniciando GET request')
-
     // 📡 Extraer y validar parámetros de consulta
     const { searchParams } = new URL(request.url)
     const params = {
       proyectoId: searchParams.get('proyectoId') || undefined,
       listaId: searchParams.get('listaId') || undefined,
       proveedorId: searchParams.get('proveedorId') || undefined,
-      estado: searchParams.get('estado') || undefined,
+      estado: searchParams.getAll('estado').length > 1
+        ? searchParams.getAll('estado')
+        : searchParams.get('estado') || undefined,
       responsable: searchParams.get('responsable') || undefined,
       fechaDesde: searchParams.get('fechaDesde') || undefined,
       fechaHasta: searchParams.get('fechaHasta') || undefined,
@@ -155,35 +158,46 @@ export async function GET(request: NextRequest) {
     // Nota: proveedorId filtro removido ya que no hay relación directa con proveedor
     
     if (filtros.estado) {
-      where.estado = filtros.estado
+      where.estado = Array.isArray(filtros.estado) ? { in: filtros.estado } : filtros.estado
     }
-    
+
+    // Build AND array to avoid OR clause overwrites
+    const andConditions: any[] = []
+
     if (filtros.responsable) {
-      where.OR = [
-        { proyecto: { comercialId: filtros.responsable } },
-        { proyecto: { gestorId: filtros.responsable } },
-        { responsableId: filtros.responsable }
-      ]
+      andConditions.push({
+        OR: [
+          { proyecto: { comercialId: filtros.responsable } },
+          { proyecto: { gestorId: filtros.responsable } },
+          { responsableId: filtros.responsable }
+        ]
+      })
     }
-    
+
     if (filtros.fechaDesde || filtros.fechaHasta) {
-      where.fechaEntrega = {}
+      where.fechaEntregaEstimada = {}
       if (filtros.fechaDesde) {
-        where.fechaEntrega.gte = new Date(filtros.fechaDesde)
+        where.fechaEntregaEstimada.gte = new Date(filtros.fechaDesde)
       }
       if (filtros.fechaHasta) {
-        where.fechaEntrega.lte = new Date(filtros.fechaHasta)
+        where.fechaEntregaEstimada.lte = new Date(filtros.fechaHasta)
       }
     }
-    
+
     if (filtros.busqueda) {
-      where.OR = [
-        { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
-        { observacion: { contains: filtros.busqueda, mode: 'insensitive' } },
-        { listaEquipo: { codigo: { contains: filtros.busqueda, mode: 'insensitive' } } },
-        { proyecto: { codigo: { contains: filtros.busqueda, mode: 'insensitive' } } },
-        { proyecto: { nombre: { contains: filtros.busqueda, mode: 'insensitive' } } }
-      ]
+      andConditions.push({
+        OR: [
+          { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
+          { observacion: { contains: filtros.busqueda, mode: 'insensitive' } },
+          { listaEquipo: { codigo: { contains: filtros.busqueda, mode: 'insensitive' } } },
+          { proyecto: { codigo: { contains: filtros.busqueda, mode: 'insensitive' } } },
+          { proyecto: { nombre: { contains: filtros.busqueda, mode: 'insensitive' } } }
+        ]
+      })
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions
     }
 
     // 📡 Calcular offset para paginación
@@ -223,7 +237,14 @@ export async function GET(request: NextRequest) {
               codigo: true,
               nombre: true,
               estado: true,
-              fechaNecesaria: true
+              fechaNecesaria: true,
+              listaEquipoItem: {
+                select: {
+                  id: true,
+                  cantidad: true,
+                  precioElegido: true
+                }
+              }
             }
           },
           // ✅ Items del pedido para calcular monto total
@@ -301,12 +322,15 @@ export async function GET(request: NextRequest) {
       }
     }).filter(Boolean)
 
+    // Adjust total if monto filters removed items
+    const adjustedTotal = (filtros.montoMinimo || filtros.montoMaximo) ? pedidosConCalculos.length : total
+
     // 📡 Calcular estadísticas generales
     const estadisticas = {
-      total,
+      total: adjustedTotal,
       pagina: filtros.page,
       limite: filtros.limit,
-      totalPaginas: Math.ceil(total / filtros.limit),
+      totalPaginas: Math.ceil(adjustedTotal / filtros.limit),
       montoTotalReal: pedidosConCalculos.reduce((sum, pedido) => sum + (pedido?.gantt.montoReal || 0), 0),
       estadosDistribucion: pedidos.reduce((acc: any, pedido) => {
         acc[pedido.estado] = (acc[pedido.estado] || 0) + 1
@@ -335,9 +359,9 @@ export async function GET(request: NextRequest) {
         pagination: {
           page: filtros.page,
           limit: filtros.limit,
-          total,
-          pages: Math.ceil(total / filtros.limit),
-          hasNext: filtros.page < Math.ceil(total / filtros.limit),
+          total: adjustedTotal,
+          pages: Math.ceil(adjustedTotal / filtros.limit),
+          hasNext: filtros.page < Math.ceil(adjustedTotal / filtros.limit),
           hasPrev: filtros.page > 1
         }
       },
@@ -369,29 +393,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ✅ POST - Crear nuevo pedido (opcional para completitud)
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
-
-    // 📡 Por ahora retornamos método no implementado
-    // En el futuro se puede implementar creación de pedidos desde aprovisionamiento
-    return NextResponse.json(
-      { error: 'Método no implementado en esta versión' },
-      { status: 501 }
-    )
-
-  } catch (error) {
-    logger.error('Error en POST pedidos aprovisionamiento', { error })
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    )
-  }
-}
+// POST: Use /api/pedido-equipo for creating orders

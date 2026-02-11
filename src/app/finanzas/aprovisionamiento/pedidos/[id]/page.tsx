@@ -58,7 +58,7 @@ import Link from 'next/link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 // 📡 Services
-import { getPedidoEquipo, getItemsPedido, getDocumentosPedido } from '@/lib/services/aprovisionamiento'
+import { getPedidoEquipo } from '@/lib/services/aprovisionamiento'
 
 interface PageProps {
   params: Promise<{
@@ -73,18 +73,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params
   
   try {
-    const pedido = await getPedidoEquipo(id) as any
-    
+    const response = await getPedidoEquipo(id) as any
+    const pedido = response?.data || response
+
     if (!pedido) {
       return {
         title: 'Pedido no encontrado - GYS',
         description: 'El pedido solicitado no existe o no tienes permisos para verlo.'
       }
     }
-    
+
+    const proyecto = pedido.proyecto || pedido.listaEquipo?.proyecto
     return {
       title: `Pedido ${pedido.codigo} - GYS`,
-      description: `Detalles del pedido de equipo ${pedido.codigo} del proyecto ${pedido.proyecto?.nombre || 'Sin proyecto'}`
+      description: `Detalles del pedido de equipo ${pedido.codigo} del proyecto ${proyecto?.nombre || 'Sin proyecto'}`
     }
   } catch (error) {
     return {
@@ -99,36 +101,56 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
   const { id } = await params
   const searchParamsResolved = await searchParams
   
-  // 📡 Fetch pedido data
+  // 📡 Fetch pedido data - API returns { success, data: { ...pedido, gantt, validacion, estadisticas } }
   let pedido: any
   try {
-    pedido = await getPedidoEquipo(id)
-    if (!pedido) {
+    const response = await getPedidoEquipo(id) as any
+    const rawPedido = response?.data || response
+    if (!rawPedido) {
       notFound()
     }
+    // Normalize: derive missing fields from available data
+    pedido = {
+      ...rawPedido,
+      proyecto: rawPedido.proyecto || rawPedido.listaEquipo?.proyecto || null,
+      fechaCreacion: rawPedido.fechaPedido || rawPedido.createdAt,
+      fechaActualizacion: rawPedido.updatedAt,
+      prioridad: rawPedido.prioridad || null,
+      proveedor: rawPedido.proveedor || null,
+      transportista: rawPedido.transportista || null,
+      numeroGuia: rawPedido.numeroGuia || null,
+      fechaEnvio: rawPedido.fechaEnvio || null,
+    }
   } catch (error) {
-    console.error('❌ Error al obtener pedido:', error)
+    console.error('Error al obtener pedido:', error)
     notFound()
   }
 
-  // 📡 Fetch related data
-  const [itemsData, documentosData] = await Promise.all([
-    getItemsPedido(id) as Promise<any>,
-    getDocumentosPedido(id) as Promise<any>
-  ])
+  // 📡 Extract items from the main pedido response (no sub-endpoints needed)
+  const pedidoItems = pedido.pedidoEquipoItem || []
+  const itemsData = {
+    total: pedidoItems.length,
+    items: pedidoItems.map((item: any) => ({
+      ...item,
+      nombre: item.descripcion || item.codigo || 'Item',
+      descripcion: item.descripcion,
+      cantidadRecibida: item.cantidadAtendida || 0
+    }))
+  }
+  const documentosData = { items: [] }
 
-  // 🔁 Calculate pedido stats
+  // 🔁 Calculate pedido stats from embedded items
   const stats = {
     totalItems: itemsData.total,
-    itemsRecibidos: itemsData.items.filter((item: any) => item.cantidadRecibida >= item.cantidadPedida).length,
-    itemsPendientes: itemsData.items.filter((item: any) => item.cantidadRecibida < item.cantidadPedida).length,
-    montoTotal: itemsData.items.reduce((sum: number, item: any) => sum + (item.precioUnitario * item.cantidadPedida), 0),
-    montoRecibido: itemsData.items.reduce((sum: number, item: any) => sum + (item.precioUnitario * item.cantidadRecibida), 0),
-    progresoEntrega: itemsData.total > 0 ? 
-      Math.round((itemsData.items.filter((item: any) => item.cantidadRecibida >= item.cantidadPedida).length / itemsData.total) * 100) : 0,
-    diasDesdeCreacion: pedido.fechaCreacion ? 
-      Math.floor((new Date().getTime() - new Date(pedido.fechaCreacion).getTime()) / (1000 * 60 * 60 * 24)) : 0,
-    diasParaEntrega: pedido.fechaEntregaEstimada ? 
+    itemsRecibidos: itemsData.items.filter((item: any) => (item.cantidadRecibida || 0) >= item.cantidadPedida).length,
+    itemsPendientes: itemsData.items.filter((item: any) => (item.cantidadRecibida || 0) < item.cantidadPedida).length,
+    montoTotal: itemsData.items.reduce((sum: number, item: any) => sum + ((item.precioUnitario || 0) * (item.cantidadPedida || 0)), 0),
+    montoRecibido: itemsData.items.reduce((sum: number, item: any) => sum + ((item.precioUnitario || 0) * (item.cantidadRecibida || 0)), 0),
+    progresoEntrega: itemsData.total > 0 ?
+      Math.round((itemsData.items.filter((item: any) => (item.cantidadRecibida || 0) >= item.cantidadPedida).length / itemsData.total) * 100) : 0,
+    diasDesdeCreacion: (pedido.fechaPedido || pedido.createdAt) ?
+      Math.floor((new Date().getTime() - new Date(pedido.fechaPedido || pedido.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+    diasParaEntrega: pedido.fechaEntregaEstimada ?
       Math.floor((new Date(pedido.fechaEntregaEstimada).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0
   }
 
@@ -137,11 +159,12 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
   // 🎨 Status color mapping
   const getStatusVariant = (estado: string) => {
     switch (estado) {
-      case 'ENVIADO': return 'default'
-      case 'CONFIRMADO': return 'default'
-      case 'EN_TRANSITO': return 'secondary'
-      case 'RECIBIDO': return 'default'
-      case 'CANCELADO': return 'destructive'
+      case 'enviado': return 'default'
+      case 'atendido': return 'default'
+      case 'parcial': return 'secondary'
+      case 'entregado': return 'default'
+      case 'cancelado': return 'destructive'
+      case 'borrador': return 'outline'
       default: return 'outline'
     }
   }
@@ -202,28 +225,11 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
                 )}
               </div>
               <p className="text-muted-foreground mt-2">
-                Proveedor: {pedido.proveedor?.nombre} • Proyecto: {pedido.proyecto?.nombre}
+                {pedido.proveedor?.nombre ? `Proveedor: ${pedido.proveedor.nombre} • ` : ''}Proyecto: {pedido.proyecto?.nombre || 'Sin proyecto'}
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Contactar Proveedor
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-            <Button variant="outline" size="sm">
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicar
-            </Button>
-            <Button size="sm">
-              <Edit className="h-4 w-4 mr-2" />
-              Editar
-            </Button>
-          </div>
+          {/* Action buttons will be enabled as features are implemented */}
         </div>
       </div>
 
@@ -285,7 +291,7 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
               ${stats.montoRecibido.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((stats.montoRecibido / stats.montoTotal) * 100)}% recibido
+              {stats.montoTotal > 0 ? Math.round((stats.montoRecibido / stats.montoTotal) * 100) : 0}% recibido
             </p>
           </CardContent>
         </Card>
@@ -390,21 +396,21 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Creado Por</label>
-                    <p className="text-sm">{pedido.creadoPor || 'Sistema'}</p>
+                    <p className="text-sm">{pedido.proyecto?.comercial?.name || 'Sistema'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Prioridad</label>
                     <p className="text-sm">
-                      <Badge variant={pedido.prioridad === 'ALTA' ? 'destructive' : 'outline'}>
-                        {pedido.prioridad}
+                      <Badge variant={pedido.prioridad?.toLowerCase() === 'alta' ? 'destructive' : 'outline'}>
+                        {pedido.prioridad || 'Normal'}
                       </Badge>
                     </p>
                   </div>
                 </div>
-                {pedido.observaciones && (
+                {pedido.observacion && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Observaciones</label>
-                    <p className="text-sm mt-1 p-3 bg-muted rounded">{pedido.observaciones}</p>
+                    <p className="text-sm mt-1 p-3 bg-muted rounded">{pedido.observacion}</p>
                   </div>
                 )}
               </CardContent>
@@ -423,45 +429,34 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={pedido.proveedor.logo} />
+                        <AvatarImage src={pedido.proveedor?.logo} alt={`Logo de ${pedido.proveedor?.nombre || 'proveedor'}`} />
                         <AvatarFallback>
-                          {pedido.proveedor.nombre.substring(0, 2).toUpperCase()}
+                          {(pedido.proveedor?.nombre || 'PR').substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{pedido.proveedor.nombre}</p>
-                        <p className="text-sm text-muted-foreground">{pedido.proveedor.ruc}</p>
+                        <p className="font-medium">{pedido.proveedor?.nombre || 'Sin nombre'}</p>
+                        <p className="text-sm text-muted-foreground">{pedido.proveedor?.ruc || ''}</p>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-3">
                       <div className="flex items-center space-x-2">
                         <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{pedido.proveedor.contacto || 'No disponible'}</span>
+                        <span className="text-sm">{pedido.proveedor?.contacto || 'No disponible'}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{pedido.proveedor.email || 'No disponible'}</span>
+                        <span className="text-sm">{pedido.proveedor?.email || 'No disponible'}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{pedido.proveedor.telefono || 'No disponible'}</span>
+                        <span className="text-sm">{pedido.proveedor?.telefono || 'No disponible'}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{pedido.proveedor.direccion || 'No disponible'}</span>
+                        <span className="text-sm">{pedido.proveedor?.direccion || 'No disponible'}</span>
                       </div>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Phone className="h-4 w-4 mr-2" />
-                        Llamar
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Mail className="h-4 w-4 mr-2" />
-                        Enviar Email
-                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -480,29 +475,23 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Subtotal</label>
-                  <p className="text-2xl font-bold">
-                    ${(stats.montoTotal * 0.82).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">IGV (18%)</label>
-                  <p className="text-2xl font-bold">
-                    ${(stats.montoTotal * 0.18).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Total</label>
+                  <label className="text-sm font-medium text-muted-foreground">Monto Total</label>
                   <p className="text-2xl font-bold">
                     ${stats.montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Recibido</label>
+                  <label className="text-sm font-medium text-muted-foreground">Monto Recibido</label>
                   <p className="text-2xl font-bold text-green-600">
                     ${stats.montoRecibido.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Pendiente</label>
+                  <p className="text-2xl font-bold text-orange-600">
+                    ${(stats.montoTotal - stats.montoRecibido).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -517,38 +506,42 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
             </CardContent>
           </Card>
 
-          {/* Recent Activity */}
+          {/* Items Summary */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Clock className="h-5 w-5" />
-                <span>Actividad Reciente</span>
+                <Package2 className="h-5 w-5" />
+                <span>Resumen de Items</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Entrega parcial recibida</p>
-                    <p className="text-xs text-muted-foreground">5 items recibidos • Hace 2 horas</p>
-                  </div>
+              {itemsData.items.length > 0 ? (
+                <div className="space-y-3">
+                  {itemsData.items.slice(0, 5).map((item: any) => {
+                    const progreso = item.cantidadPedida > 0 ? Math.round(((item.cantidadRecibida || 0) / item.cantidadPedida) * 100) : 0
+                    return (
+                      <div key={item.id} className="flex items-center justify-between text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.codigo} - {item.nombre || item.descripcion}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.cantidadRecibida || 0}/{item.cantidadPedida} recibidos
+                          </p>
+                        </div>
+                        <Badge variant={progreso >= 100 ? 'default' : progreso > 0 ? 'secondary' : 'outline'} className="text-[10px] ml-2">
+                          {progreso >= 100 ? 'Completo' : progreso > 0 ? `${progreso}%` : 'Pendiente'}
+                        </Badge>
+                      </div>
+                    )
+                  })}
+                  {itemsData.items.length > 5 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      y {itemsData.items.length - 5} items más...
+                    </p>
+                  )}
                 </div>
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Estado actualizado a EN_TRANSITO</p>
-                    <p className="text-xs text-muted-foreground">Por proveedor • Hace 1 día</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Pedido confirmado por proveedor</p>
-                    <p className="text-xs text-muted-foreground">Fecha estimada actualizada • Hace 3 días</p>
-                  </div>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Sin items en este pedido</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -573,22 +566,22 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
             <CardContent>
               <div className="border rounded-lg">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[800px]">
                     <thead className="border-b bg-muted/50">
                       <tr>
-                        <th className="text-left p-4 font-medium">Código</th>
-                        <th className="text-left p-4 font-medium">Descripción</th>
-                        <th className="text-right p-4 font-medium">Cant. Pedida</th>
-                        <th className="text-right p-4 font-medium">Cant. Recibida</th>
-                        <th className="text-right p-4 font-medium">Precio Unit.</th>
-                        <th className="text-right p-4 font-medium">Total</th>
-                        <th className="text-center p-4 font-medium">Estado</th>
+                        <th scope="col" className="text-left p-4 font-medium">Código</th>
+                        <th scope="col" className="text-left p-4 font-medium">Descripción</th>
+                        <th scope="col" className="text-right p-4 font-medium">Cant. Pedida</th>
+                        <th scope="col" className="text-right p-4 font-medium">Cant. Recibida</th>
+                        <th scope="col" className="text-right p-4 font-medium">Precio Unit.</th>
+                        <th scope="col" className="text-right p-4 font-medium">Total</th>
+                        <th scope="col" className="text-center p-4 font-medium">Estado</th>
                       </tr>
                     </thead>
                     <tbody>
                       {itemsData.items.map((item: any, index: number) => {
-                        const progreso = item.cantidadPedida > 0 ? 
-                          Math.round((item.cantidadRecibida / item.cantidadPedida) * 100) : 0
+                        const progreso = item.cantidadPedida > 0 ?
+                          Math.round(((item.cantidadRecibida || 0) / item.cantidadPedida) * 100) : 0
                         
                         return (
                           <tr key={item.id} className="border-b hover:bg-muted/50">
@@ -608,12 +601,12 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
                               </div>
                             </td>
                             <td className="p-4 text-right font-mono">
-                              {item.cantidadPedida.toLocaleString()}
+                              {(item.cantidadPedida || 0).toLocaleString()}
                             </td>
                             <td className="p-4 text-right font-mono">
                               <div className="space-y-1">
-                                <span className={item.cantidadRecibida >= item.cantidadPedida ? 'text-green-600' : ''}>
-                                  {item.cantidadRecibida.toLocaleString()}
+                                <span className={(item.cantidadRecibida || 0) >= item.cantidadPedida ? 'text-green-600' : ''}>
+                                  {(item.cantidadRecibida || 0).toLocaleString()}
                                 </span>
                                 <div className="w-full bg-muted rounded-full h-1">
                                   <div 
@@ -624,10 +617,10 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
                               </div>
                             </td>
                             <td className="p-4 text-right font-mono">
-                              ${item.precioUnitario.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                              ${(item.precioUnitario || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                             </td>
                             <td className="p-4 text-right font-mono font-medium">
-                              ${(item.cantidadPedida * item.precioUnitario).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                              ${((item.cantidadPedida || 0) * (item.precioUnitario || 0)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                             </td>
                             <td className="p-4 text-center">
                               <Badge variant={progreso >= 100 ? 'default' : progreso > 0 ? 'secondary' : 'outline'}>
@@ -700,10 +693,10 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
                     <div className="flex-1">
                       <p className="font-medium text-orange-800">En Tránsito</p>
                       <p className="text-sm text-orange-600">
-                        {pedido.estado === 'EN_TRANSITO' ? 'En proceso' : 'Pendiente'}
+                        {pedido.estado === 'parcial' || pedido.estado === 'enviado' ? 'En proceso' : 'Pendiente'}
                       </p>
                     </div>
-                    {pedido.estado === 'EN_TRANSITO' ? <Truck className="h-5 w-5 text-orange-500" /> : <Clock className="h-5 w-5 text-orange-400" />}
+                    {pedido.estado === 'parcial' || pedido.estado === 'enviado' ? <Truck className="h-5 w-5 text-orange-500" /> : <Clock className="h-5 w-5 text-orange-400" />}
                   </div>
                   
                   <div className="flex items-center space-x-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
@@ -822,55 +815,12 @@ export default async function PedidoEquipoDetallePage({ params, searchParams }: 
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {/* Mock history entries */}
-                <div className="flex items-start space-x-3 pb-4 border-b">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Entrega parcial registrada</p>
-                      <span className="text-sm text-muted-foreground">Hace 2 horas</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Por: Sistema de Recepción</p>
-                    <p className="text-sm mt-1">5 items recibidos y validados correctamente</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3 pb-4 border-b">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Estado actualizado</p>
-                      <span className="text-sm text-muted-foreground">Hace 1 día</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Por: {pedido.proveedor?.nombre}</p>
-                    <p className="text-sm mt-1">Estado cambiado de CONFIRMADO a EN_TRANSITO</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3 pb-4 border-b">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Fecha de entrega actualizada</p>
-                      <span className="text-sm text-muted-foreground">Hace 3 días</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Por: {pedido.proveedor?.contacto}</p>
-                    <p className="text-sm mt-1">Nueva fecha estimada: {pedido.fechaEntregaEstimada ? new Date(pedido.fechaEntregaEstimada).toLocaleDateString('es-PE') : 'No disponible'}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3 pb-4">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Pedido creado</p>
-                      <span className="text-sm text-muted-foreground">Hace 1 semana</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Por: {pedido.creadoPor}</p>
-                    <p className="text-sm mt-1">Pedido generado desde lista {pedido.listaEquipo?.codigo}</p>
-                  </div>
-                </div>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <History className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">El historial de cambios estará disponible próximamente</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Creado: {pedido.fechaCreacion ? new Date(pedido.fechaCreacion).toLocaleDateString('es-PE') : 'No disponible'}
+                </p>
               </div>
             </CardContent>
           </Card>

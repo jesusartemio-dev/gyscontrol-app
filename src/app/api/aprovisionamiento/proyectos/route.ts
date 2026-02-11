@@ -1,18 +1,15 @@
 // ===================================================
-// 📁 Archivo: route.ts
-// 📌 Ubicación: src/app/api/aprovisionamiento/proyectos/
-// 🔧 Descripción: API endpoints para gestión de proyectos de aprovisionamiento
-//
-// 🧠 Funcionalidades:
-// - GET: Obtener lista de proyectos con filtros y KPIs
-// - POST: Crear nuevo proyecto de aprovisionamiento
-// ✍️ Autor: Sistema GYS
-// 📅 Última actualización: 2025-01-20
+// DEPRECATED: This API is superseded by /api/finanzas/aprovisionamiento/proyectos
+// which provides real consolidated KPIs (listas, pedidos, montos).
+// This endpoint still serves the detail page via getProyectoAprovisionamiento().
+// TODO: Migrate detail page to the consolidated service and remove this file.
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 // ✅ Schema de validación para filtros
 const FiltrosProyectosSchema = z.object({
@@ -39,9 +36,12 @@ function calcularKPIsProyecto(proyecto: any) {
 
 // 🎯 GET - Obtener proyectos con filtros y paginación
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
-    console.log('🔍 Iniciando GET /api/aprovisionamiento/proyectos')
-    
     const { searchParams } = new URL(request.url)
     
     // 📋 Parsear parámetros con valores por defecto
@@ -141,6 +141,11 @@ export async function GET(request: NextRequest) {
 
 // 🎯 POST - Crear nuevo proyecto
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const body = await request.json()
     
@@ -162,15 +167,15 @@ export async function POST(request: NextRequest) {
         id: crypto.randomUUID(),
         nombre: body.nombre,
         clienteId: body.clienteId,
-        comercialId: body.comercialId || 'default-comercial-id', // TODO: Obtener del usuario actual
-        gestorId: body.gestorId || 'default-gestor-id', // TODO: Obtener del usuario actual
+        comercialId: body.comercialId || session.user.id,
+        gestorId: body.gestorId || session.user.id,
         codigo: body.codigo || `PROY-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
         fechaInicio: body.fechaInicio ? new Date(body.fechaInicio) : new Date(),
         fechaFin: body.fechaFin ? new Date(body.fechaFin) : null,
         totalCliente: body.totalCliente || 0,
         moneda: body.moneda || 'USD',
         tipoCambio: body.tipoCambio || null,
-        estado: body.estado || 'activo',
+        estado: body.estado || 'creado',
         updatedAt: new Date()
       },
       select: {

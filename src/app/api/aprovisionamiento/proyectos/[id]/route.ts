@@ -24,8 +24,6 @@ const actualizarProyectoSchema = z.object({
   estado: z.enum(['creado', 'en_planificacion', 'listas_pendientes', 'listas_aprobadas', 'pedidos_creados', 'en_ejecucion', 'en_cierre', 'cerrado', 'pausado', 'cancelado']).optional(),
   fechaInicio: z.string().datetime().optional(),
   fechaFin: z.string().datetime().optional(),
-  presupuesto: z.number().min(0, 'El presupuesto debe ser positivo').optional(),
-  descripcion: z.string().optional(),
   comercialId: z.string().optional(),
   gestorId: z.string().optional()
 })
@@ -132,20 +130,22 @@ export async function GET(
       // 💰 Calcular montos de listas
       const montoListas = listas.reduce((total: number, lista: any) => {
         const montoLista = lista.listaEquipoItem?.reduce((subtotal: number, item: any) => {
-          return subtotal + (item.cantidad * (item.equipo?.precio || 0))
+          return subtotal + (item.cantidad * (item.precioElegido || 0))
         }, 0) || 0
         return total + montoLista
       }, 0)
 
       // 💰 Calcular montos de pedidos
       const montoPedidos = pedidos.reduce((total: number, pedido: any) => {
-        return total + (pedido.montoTotal || 0)
+        return total + (pedido.pedidoEquipoItem?.reduce((subtotal: number, item: any) => {
+          return subtotal + ((item.cantidadPedida || 0) * (item.precioUnitario || 0))
+        }, 0) || 0)
       }, 0)
 
       // 📊 Calcular porcentajes y desviaciones
       const porcentajeEjecutado = montoListas > 0 ? (montoPedidos / montoListas) * 100 : 0
-      const porcentajeDesviacion = proyecto.presupuesto > 0 ?
-        ((montoListas - proyecto.presupuesto) / proyecto.presupuesto) * 100 : 0
+      const porcentajeDesviacion = proyecto.totalInterno > 0 ?
+        ((montoListas - proyecto.totalInterno) / proyecto.totalInterno) * 100 : 0
 
       // 🚨 Calcular alertas
       const fechaActual = new Date()
@@ -156,7 +156,8 @@ export async function GET(
       }).length
       
       const pedidosRetrasados = pedidos.filter((pedido: any) => {
-        const fechaEntrega = new Date(pedido.fechaEntrega)
+        if (!pedido.fechaEntregaEstimada) return false
+        const fechaEntrega = new Date(pedido.fechaEntregaEstimada)
         return fechaEntrega < fechaActual && pedido.estado !== 'entregado'
       }).length
       
@@ -211,8 +212,10 @@ export async function GET(
       
       let fechaFinPedidos = fechaFinListas
       if (pedidos.length > 0) {
-        const fechasEntrega = pedidos.map((p: any) => new Date(p.fechaEntrega))
-        fechaFinPedidos = new Date(Math.max(...fechasEntrega.map((f: Date) => f.getTime())))
+        const fechasEntrega = pedidos.filter((p: any) => p.fechaEntregaEstimada).map((p: any) => new Date(p.fechaEntregaEstimada))
+        if (fechasEntrega.length > 0) {
+          fechaFinPedidos = new Date(Math.max(...fechasEntrega.map((f: Date) => f.getTime())))
+        }
       }
       
       const fechaInicio = proyecto.fechaInicio ? new Date(proyecto.fechaInicio) : fechaInicioListas
@@ -234,9 +237,9 @@ export async function GET(
           descripcion: `Lista requerida: ${lista.nombre}`,
           listaId: lista.id
         })),
-        ...pedidos.map((pedido: any) => ({
+        ...pedidos.filter((pedido: any) => pedido.fechaEntregaEstimada).map((pedido: any) => ({
           tipo: 'entrega_pedido',
-          fecha: pedido.fechaEntrega,
+          fecha: pedido.fechaEntregaEstimada,
           descripcion: `Entrega de pedido`,
           pedidoId: pedido.id
         })),
@@ -362,8 +365,6 @@ export async function PUT(
     if (datosValidados.estado !== undefined) updateData.estado = datosValidados.estado
     if (datosValidados.fechaInicio !== undefined) updateData.fechaInicio = datosValidados.fechaInicio
     if (datosValidados.fechaFin !== undefined) updateData.fechaFin = datosValidados.fechaFin
-    if (datosValidados.presupuesto !== undefined) updateData.presupuesto = datosValidados.presupuesto
-    if (datosValidados.descripcion !== undefined) updateData.descripcion = datosValidados.descripcion
     if (datosValidados.comercialId !== undefined) updateData.comercialId = datosValidados.comercialId
     if (datosValidados.gestorId !== undefined) updateData.gestorId = datosValidados.gestorId
 

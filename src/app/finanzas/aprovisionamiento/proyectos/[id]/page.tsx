@@ -22,11 +22,8 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { 
-  ArrowLeft, 
-  Edit, 
-  Download, 
-  Share,
+import {
+  ArrowLeft,
   Calendar,
   DollarSign,
   Package,
@@ -35,7 +32,7 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
-  Users,
+  Eye,
   FileText,
   BarChart3,
   Home
@@ -111,7 +108,7 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
         itemSum + (item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))), 0) || 0
       return sum + montoPedido
     }, 0),
-    progresoGeneral: proyecto.porcentajeEjecucion || 0,
+    progresoGeneral: (proyecto as any).kpis?.porcentajeEjecutado || 0,
     diasTranscurridos: proyecto.fechaInicio ? 
       Math.floor((new Date().getTime() - new Date(proyecto.fechaInicio).getTime()) / (1000 * 60 * 60 * 24)) : 0,
     diasRestantes: proyecto.fechaFin ? 
@@ -155,7 +152,7 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
             <div>
               <div className="flex items-center space-x-3">
                 <h1 className="text-3xl font-bold tracking-tight">{proyecto.nombre}</h1>
-                <Badge variant={proyecto.estado === 'ACTIVO' ? 'default' : 'secondary'}>
+                <Badge variant={!['cerrado', 'cancelado', 'pausado'].includes(proyecto.estado) ? 'default' : 'secondary'}>
                   {proyecto.estado}
                 </Badge>
               </div>
@@ -165,17 +162,11 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
-              <Share className="h-4 w-4 mr-2" />
-              Compartir
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-            <Button size="sm">
-              <Edit className="h-4 w-4 mr-2" />
-              Editar
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/finanzas/aprovisionamiento/proyectos/${id}`}>
+                <Eye className="h-4 w-4 mr-2" />
+                Detalle
+              </Link>
             </Button>
           </div>
         </div>
@@ -321,7 +312,7 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Estado</label>
                     <p className="text-sm">
-                      <Badge variant={proyecto.estado === 'ACTIVO' ? 'default' : 'secondary'}>
+                      <Badge variant={!['cerrado', 'cancelado', 'pausado'].includes(proyecto.estado) ? 'default' : 'secondary'}>
                         {proyecto.estado}
                       </Badge>
                     </p>
@@ -340,21 +331,17 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Responsable</label>
-                    <p className="text-sm">{proyecto.gestorNombre || 'No asignado'}</p>
+                    <p className="text-sm">{(proyecto as any).gestor?.name || 'No asignado'}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Prioridad</label>
-                    <p className="text-sm">
-                      <Badge variant="outline">
-                        Normal
-                      </Badge>
-                    </p>
+                    <label className="text-sm font-medium text-muted-foreground">Moneda</label>
+                    <p className="text-sm">{(proyecto as any).moneda || 'USD'}</p>
                   </div>
                 </div>
-                {proyecto.gestorNombre && (
+                {(proyecto as any).gestor?.name && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Gestor</label>
-                    <p className="text-sm mt-1">{proyecto.gestorNombre}</p>
+                    <p className="text-sm mt-1">{(proyecto as any).gestor?.name}</p>
                   </div>
                 )}
               </CardContent>
@@ -407,41 +394,66 @@ export default async function ProyectoDetallePage({ params, searchParams }: Page
             </Card>
           </div>
 
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Clock className="h-5 w-5" />
-                <span>Actividad Reciente</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Mock recent activities */}
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Lista de equipos aprobada</p>
-                    <p className="text-xs text-muted-foreground">LEQ-2024-001 • Hace 2 horas</p>
+          {/* Resumen de Listas y Pedidos */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Package className="h-5 w-5" />
+                  <span>Últimas Listas</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {listasData.data.listas.length > 0 ? (
+                  <div className="space-y-3">
+                    {listasData.data.listas.slice(0, 5).map((lista: any) => (
+                      <div key={lista.id} className="flex items-center justify-between text-sm">
+                        <div>
+                          <p className="font-medium">{lista.codigo}</p>
+                          <p className="text-xs text-muted-foreground">{lista.nombre}</p>
+                        </div>
+                        <Badge variant={lista.estado === 'aprobada' ? 'default' : 'secondary'} className="text-[10px]">
+                          {lista.estado}
+                        </Badge>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Nuevo pedido creado</p>
-                    <p className="text-xs text-muted-foreground">PEQ-2024-003 • Hace 4 horas</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">Sin listas registradas</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <ShoppingCart className="h-5 w-5" />
+                  <span>Últimos Pedidos</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pedidosData.data.pedidos.length > 0 ? (
+                  <div className="space-y-3">
+                    {pedidosData.data.pedidos.slice(0, 5).map((pedido: any) => (
+                      <div key={pedido.id} className="flex items-center justify-between text-sm">
+                        <div>
+                          <p className="font-medium">{pedido.codigo}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {pedido.fechaPedido ? new Date(pedido.fechaPedido).toLocaleDateString('es-PE') : '-'}
+                          </p>
+                        </div>
+                        <Badge variant={pedido.estado === 'entregado' ? 'default' : 'secondary'} className="text-[10px]">
+                          {pedido.estado}
+                        </Badge>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Alerta de coherencia detectada</p>
-                    <p className="text-xs text-muted-foreground">Diferencia en precios • Hace 6 horas</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">Sin pedidos registrados</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* 📦 Listas Tab */}

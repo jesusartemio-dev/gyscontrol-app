@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       where: {
         proyectoId,
         ...(fechaDesde && fechaHasta ? {
-          fechaNecesaria: {
+          fechaEntregaEstimada: {
             gte: new Date(fechaDesde),
             lte: new Date(fechaHasta)
           }
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
         id: true,
         codigo: true,
         estado: true,
-        fechaNecesaria: true,
+        fechaEntregaEstimada: true,
         fechaPedido: true,
         presupuestoTotal: true,
         costoRealTotal: true,
@@ -134,8 +134,8 @@ export async function GET(request: Request) {
 
     const pedidosPorSemana = new Map<string, typeof pedidos>()
     for (const pedido of pedidos) {
-      if (!pedido.fechaNecesaria) continue
-      const fecha = new Date(pedido.fechaNecesaria)
+      if (!pedido.fechaEntregaEstimada) continue
+      const fecha = new Date(pedido.fechaEntregaEstimada)
       // ISO week calculation
       const startOfYear = new Date(fecha.getFullYear(), 0, 1)
       const weekNumber = Math.ceil(((fecha.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24) + startOfYear.getDay() + 1) / 7)

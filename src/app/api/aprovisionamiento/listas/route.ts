@@ -12,7 +12,7 @@ import { z } from 'zod'
 // 🔁 Schema de validación para filtros
 const FiltrosListasSchema = z.object({
   proyectoId: z.string().optional(),
-  estado: z.enum(['borrador', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobado', 'rechazado']).optional(),
+  estado: z.enum(['borrador', 'enviada', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'rechazada', 'completada']).optional(),
   responsable: z.string().optional(),
   fechaDesde: z.string().optional(),
   fechaHasta: z.string().optional(),
@@ -60,10 +60,10 @@ function calcularCoherencia(lista: any) {
 
   const montoPedidos = pedidos.reduce((total: number, pedido: any) => {
     return total + (pedido.pedidoEquipoItem?.reduce((subtotal: number, item: any) => {
-      return subtotal + (item.cantidadPedida * item.precioUnitario)
+      return subtotal + ((item.cantidadPedida || 0) * (item.precioUnitario || 0))
     }, 0) || 0)
   }, 0)
-  
+
   const porcentajeEjecutado = montoLista > 0 ? (montoPedidos / montoLista) * 100 : 0
   const desviacion = montoPedidos - montoLista
   const esCoherente = Math.abs(desviacion) <= (montoLista * 0.05) // 5% tolerancia
@@ -124,13 +124,18 @@ export async function GET(request: NextRequest) {
       where.estado = filtros.estado
     }
     
+    // Build AND array to avoid OR clause overwrites
+    const andConditions: any[] = []
+
     if (filtros.responsable) {
-      where.OR = [
-        { proyecto: { comercialId: filtros.responsable } },
-        { proyecto: { gestorId: filtros.responsable } }
-      ]
+      andConditions.push({
+        OR: [
+          { proyecto: { comercialId: filtros.responsable } },
+          { proyecto: { gestorId: filtros.responsable } }
+        ]
+      })
     }
-    
+
     if (filtros.fechaDesde || filtros.fechaHasta) {
       where.fechaNecesaria = {}
       if (filtros.fechaDesde) {
@@ -140,13 +145,19 @@ export async function GET(request: NextRequest) {
         where.fechaNecesaria.lte = new Date(filtros.fechaHasta)
       }
     }
-    
+
     if (filtros.busqueda) {
-      where.OR = [
-        { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
-        { nombre: { contains: filtros.busqueda, mode: 'insensitive' } },
-        { proyecto: { nombre: { contains: filtros.busqueda, mode: 'insensitive' } } }
-      ]
+      andConditions.push({
+        OR: [
+          { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
+          { nombre: { contains: filtros.busqueda, mode: 'insensitive' } },
+          { proyecto: { nombre: { contains: filtros.busqueda, mode: 'insensitive' } } }
+        ]
+      })
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions
     }
 
     // 📡 Calcular offset para paginación
@@ -245,12 +256,15 @@ export async function GET(request: NextRequest) {
       }
     }).filter(Boolean)
 
+    // Adjust total if monto filters removed items
+    const adjustedTotal = (filtros.montoMinimo || filtros.montoMaximo) ? listasConCalculos.length : total
+
     // 📡 Calcular estadísticas generales
     const estadisticas = {
-      total,
+      total: adjustedTotal,
       pagina: filtros.page,
       limite: filtros.limit,
-      totalPaginas: Math.ceil(total / filtros.limit),
+      totalPaginas: Math.ceil(adjustedTotal / filtros.limit),
       montoTotalProyectado: listasConCalculos.reduce((sum, lista) => sum + (lista?.gantt.montoProyectado || 0), 0),
       estadosDistribucion: listas.reduce((acc: any, lista) => {
         acc[lista.estado] = (acc[lista.estado] || 0) + 1
@@ -272,7 +286,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: listasConCalculos,
+      data: {
+        listas: listasConCalculos,
+        pagination: {
+          page: filtros.page,
+          limit: filtros.limit,
+          total: adjustedTotal,
+          pages: Math.ceil(adjustedTotal / filtros.limit),
+          hasNext: filtros.page < Math.ceil(adjustedTotal / filtros.limit),
+          hasPrev: filtros.page > 1
+        }
+      },
       estadisticas,
       filtros: filtros
     })
@@ -300,30 +324,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ✅ POST - Crear nueva lista (opcional para completitud)
-export async function POST(request: NextRequest) {
-  try {
-    // 📡 Verificar autenticación
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
-    }
-
-    // 📡 Por ahora retornamos método no implementado
-    // En el futuro se puede implementar creación de listas desde aprovisionamiento
-    return NextResponse.json(
-      { error: 'Método no implementado en esta versión' },
-      { status: 501 }
-    )
-
-  } catch (error) {
-    logger.error('Error en POST listas aprovisionamiento', { error })
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    )
-  }
-}
+// POST: Use /api/lista-equipo for creating lists

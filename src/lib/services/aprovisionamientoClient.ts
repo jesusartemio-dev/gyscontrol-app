@@ -1,6 +1,11 @@
-// 🚀 Servicios de Aprovisionamiento para Client Components
-// ✅ Versión optimizada para componentes del cliente que maneja automáticamente las cookies de NextAuth
-// 🔄 MIGRADO A REACT QUERY - Este archivo será deprecado gradualmente
+// ============================================================
+// DEPRECATED - DO NOT USE IN NEW CODE
+// Migrated to React Query hooks in aprovisionamientoQuery.ts
+// This file is kept only for backward compatibility.
+// All new client-side data fetching should use:
+//   - useListasEquipo() from aprovisionamientoQuery.ts
+//   - usePedidosEquipo() from aprovisionamientoQuery.ts
+// ============================================================
 
 import type { 
   ResponseListas,
@@ -10,6 +15,7 @@ import { buildApiUrl } from '@/lib/utils'
 import logger from '@/lib/logger'
 
 const API_BASE = '/api/listas-equipo'
+const PEDIDOS_API_BASE = '/api/aprovisionamiento/pedidos'
 
 // 🔧 Utilidad para manejar respuestas de API en el cliente
 async function handleApiResponse<T>(response: Response): Promise<T> {
@@ -146,7 +152,7 @@ export const pedidosEquipoClientService = {
   } = {}): Promise<ResponsePedidos> {
     try {
       const queryParams = buildQueryParams(filtros)
-      const url = buildApiUrl(`${API_BASE}/pedidos${queryParams ? `?${queryParams}` : ''}`)
+      const url = buildApiUrl(`${PEDIDOS_API_BASE}${queryParams ? `?${queryParams}` : ''}`)
       
       // 📡 En Client Components, fetch automáticamente incluye las cookies de sesión
       const response = await fetch(url, {

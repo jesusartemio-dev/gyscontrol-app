@@ -61,8 +61,8 @@ interface ProyectoConsolidado {
 
 // 🎯 Función para calcular estado del proyecto
 function calcularEstadoProyecto(proyecto: any): 'activo' | 'pausado' | 'completado' {
-  if (proyecto.estado === 'completado') return 'completado'
-  if (proyecto.estado === 'pausado') return 'pausado'
+  if (proyecto.estado === 'completado' || proyecto.estado === 'cerrado') return 'completado'
+  if (proyecto.estado === 'pausado' || proyecto.estado === 'cancelado') return 'pausado'
   return 'activo'
 }
 
@@ -84,13 +84,13 @@ function contarAlertas(proyecto: any, listas: any[], pedidos: any[]): number {
   let alertas = 0
   
   // ⚠️ Alertas por listas pendientes
-  const listasPendientes = listas.filter(l => l.estado === 'borrador' || l.estado === 'pendiente')
+  const listasPendientes = listas.filter(l => l.estado === 'borrador' || l.estado === 'por_revisar')
   alertas += listasPendientes.length
-  
+
   // ⚠️ Alertas por pedidos atrasados
   const pedidosAtrasados = pedidos.filter(p => {
     if (!p.fechaEntregaEstimada) return false
-    return new Date(p.fechaEntregaEstimada) < new Date() && p.estado !== 'completado'
+    return new Date(p.fechaEntregaEstimada) < new Date() && p.estado !== 'entregado' && p.estado !== 'cancelado'
   })
   alertas += pedidosAtrasados.length
   
@@ -107,8 +107,6 @@ function contarAlertas(proyecto: any, listas: any[], pedidos: any[]): number {
 // 🎯 GET - Obtener proyectos consolidados
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Iniciando GET /api/finanzas/aprovisionamiento/proyectos')
-    
     // 🔐 Verificar autenticación
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -132,39 +130,53 @@ export async function GET(request: NextRequest) {
       alertas: searchParams.get('alertas') === 'true'
     })
     
-    console.log('📋 Filtros aplicados:', filtros)
-    
     // 🔍 Construir condiciones WHERE dinámicamente
     const whereConditions: any = {}
-    
+    const andConditions: any[] = []
+
     if (filtros.search) {
-      whereConditions.OR = [
-        { nombre: { contains: filtros.search, mode: 'insensitive' } },
-        { codigo: { contains: filtros.search, mode: 'insensitive' } },
-        { responsable: { contains: filtros.search, mode: 'insensitive' } }
-      ]
+      andConditions.push({
+        OR: [
+          { nombre: { contains: filtros.search, mode: 'insensitive' } },
+          { codigo: { contains: filtros.search, mode: 'insensitive' } },
+          { comercial: { name: { contains: filtros.search, mode: 'insensitive' } } },
+          { gestor: { name: { contains: filtros.search, mode: 'insensitive' } } }
+        ]
+      })
     }
-    
+
     if (filtros.estado && filtros.estado !== 'todos') {
-      whereConditions.estado = filtros.estado
+      if (filtros.estado === 'activo') {
+        whereConditions.estado = { notIn: ['completado', 'cerrado', 'pausado', 'cancelado'] }
+      } else if (filtros.estado === 'completado') {
+        whereConditions.estado = { in: ['completado', 'cerrado'] }
+      } else if (filtros.estado === 'pausado') {
+        whereConditions.estado = { in: ['pausado', 'cancelado'] }
+      }
     }
-    
+
     if (filtros.responsable && filtros.responsable !== 'todos') {
-      whereConditions.responsable = filtros.responsable
+      andConditions.push({
+        OR: [
+          { comercialId: filtros.responsable },
+          { gestorId: filtros.responsable }
+        ]
+      })
     }
-    
+
     if (filtros.fechaInicio) {
       whereConditions.fechaInicio = { gte: new Date(filtros.fechaInicio) }
     }
-    
+
     if (filtros.fechaFin) {
       whereConditions.fechaFin = { lte: new Date(filtros.fechaFin) }
     }
-    
-    // 📊 Obtener total de registros para paginación
-    const total = await prisma.proyecto.count({ where: whereConditions })
-    
-    // 📊 Obtener proyectos con relaciones y paginación
+
+    if (andConditions.length > 0) {
+      whereConditions.AND = andConditions
+    }
+
+    // 📊 Obtener todos los proyectos (sin paginar, para KPIs globales y filtro de alertas)
     const proyectos = await prisma.proyecto.findMany({
       where: whereConditions,
       include: {
@@ -224,14 +236,10 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      skip: (filtros.page - 1) * filtros.limit,
-      take: filtros.limit,
       orderBy: {
         updatedAt: 'desc'
       }
     })
-    
-    console.log(`📊 Encontrados ${proyectos.length} proyectos de ${total} total`)
     
     // 🔄 Transformar datos a formato consolidado
     let proyectosConsolidados: ProyectoConsolidado[] = proyectos.map(proyecto => {
@@ -316,9 +324,9 @@ export async function GET(request: NextRequest) {
       proyectosConsolidados = proyectosConsolidados.filter(p => p.alertas > 0)
     }
     
-    // 📊 Calcular KPIs globales
+    // 📊 Calcular KPIs globales (desde TODOS los proyectos filtrados, no solo la página)
     const kpis = {
-      totalProyectos: total,
+      totalProyectos: proyectosConsolidados.length,
       proyectosActivos: proyectosConsolidados.filter(p => p.estado === 'activo').length,
       proyectosPausados: proyectosConsolidados.filter(p => p.estado === 'pausado').length,
       proyectosCompletados: proyectosConsolidados.filter(p => p.estado === 'completado').length,
@@ -332,16 +340,21 @@ export async function GET(request: NextRequest) {
         : 0
     }
     
-    console.log('✅ Datos consolidados procesados exitosamente')
-    
+    // 📄 Paginación manual (después de filtros computados y KPIs)
+    const adjustedTotal = proyectosConsolidados.length
+    const paginatedData = proyectosConsolidados.slice(
+      (filtros.page - 1) * filtros.limit,
+      filtros.page * filtros.limit
+    )
+
     return NextResponse.json({
       success: true,
-      data: proyectosConsolidados,
+      data: paginatedData,
       pagination: {
         page: filtros.page,
         limit: filtros.limit,
-        total: total,
-        pages: Math.ceil(total / filtros.limit)
+        total: adjustedTotal,
+        pages: Math.ceil(adjustedTotal / filtros.limit)
       },
       kpis,
       timestamp: new Date().toISOString()

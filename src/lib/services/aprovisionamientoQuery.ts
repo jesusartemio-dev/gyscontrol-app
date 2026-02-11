@@ -58,18 +58,32 @@ const fetchListasEquipo = async (params: ListasEquipoPaginationParams): Promise<
       searchParams.append(key, String(value))
     }
   })
-  const url = buildApiUrl(`/api/listas-equipo?${searchParams.toString()}`)
+  const url = buildApiUrl(`/api/aprovisionamiento/listas?${searchParams.toString()}`)
   const response = await fetch(url, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' }
   })
-  
+
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.message || 'Error al cargar listas de equipo')
   }
-  
-  return response.json()
+
+  const raw = await response.json()
+  // Transform API response { success, data: { listas: [...], pagination: {...} }, estadisticas } to PaginatedResponse
+  const listas = raw.data?.listas || raw.data || []
+  const pagination = raw.data?.pagination
+  return {
+    data: listas,
+    meta: {
+      page: pagination?.page || raw.estadisticas?.pagina || params.page || 1,
+      limit: pagination?.limit || raw.estadisticas?.limite || params.limit || 20,
+      total: pagination?.total || raw.estadisticas?.total || 0,
+      totalPages: pagination?.pages || raw.estadisticas?.totalPaginas || 0,
+      hasNextPage: pagination?.hasNext || (raw.estadisticas?.pagina || 1) < (raw.estadisticas?.totalPaginas || 1),
+      hasPrevPage: pagination?.hasPrev || (raw.estadisticas?.pagina || 1) > 1
+    }
+  }
 }
 
 const fetchListaEquipoDetail = async (id: string): Promise<ListaEquipoDetail> => {
@@ -123,15 +137,15 @@ const fetchPedidosEquipo = async (params: PedidosEquipoPaginationParams): Promis
       page: data.data?.pagination?.page || params.page || 1,
       limit: data.data?.pagination?.limit || params.limit || 20,
       total: data.data?.pagination?.total || 0,
-      totalPages: data.data?.pagination?.totalPages || 0,
-      hasNextPage: data.data?.pagination?.hasNextPage || false,
-      hasPrevPage: data.data?.pagination?.hasPrevPage || false
+      totalPages: data.data?.pagination?.pages || data.data?.pagination?.totalPages || 0,
+      hasNextPage: data.data?.pagination?.hasNext ?? data.data?.pagination?.hasNextPage ?? false,
+      hasPrevPage: data.data?.pagination?.hasPrev ?? data.data?.pagination?.hasPrevPage ?? false
     }
   }
 }
 
 const fetchPedidoEquipoDetail = async (id: string): Promise<PedidoEquipo> => {
-  const response = await fetch(`/api/pedidos-equipo/${id}`, {
+  const response = await fetch(`/api/aprovisionamiento/pedidos/${id}`, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' }
   })
@@ -654,7 +668,7 @@ export const usePedidoEquipoMutation = () => {
   
   return useMutation({
     mutationFn: async (data: { id?: string; payload: any }) => {
-      const url = data.id ? `/api/pedidos-equipo/${data.id}` : '/api/pedidos-equipo'
+      const url = data.id ? `/api/pedido-equipo/${data.id}` : '/api/pedido-equipo'
       const method = data.id ? 'PUT' : 'POST'
       
       const response = await fetch(url, {
@@ -733,7 +747,7 @@ export const useDeletePedidoEquipo = () => {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/pedidos-equipo/${id}`, {
+      const response = await fetch(`/api/aprovisionamiento/pedidos/${id}`, {
         method: 'DELETE',
         credentials: 'include'
       })
