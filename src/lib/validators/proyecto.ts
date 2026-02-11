@@ -63,6 +63,7 @@ export const createProyectoSchema = z.object({
 
 // ✅ Schema para actualizar proyecto
 export const updateProyectoSchema = z.object({
+  codigo: z.string().min(1, 'Código es requerido').optional(),
   nombre: z.string().min(1, 'Nombre es requerido').optional(),
   descripcion: z.string().optional(),
   fechaInicio: z.string().optional(),

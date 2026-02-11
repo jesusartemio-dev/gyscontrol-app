@@ -33,11 +33,16 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
   const [success, setSuccess] = useState(false)
 
   const [formData, setFormData] = useState({
+    codigo: cotizacion.codigo || '',
     referencia: cotizacion.referencia || '',
     formaPago: cotizacion.formaPago || '',
     validezOferta: cotizacion.validezOferta || 15,
     fechaValidezHasta: cotizacion.fechaValidezHasta ?
       new Date(cotizacion.fechaValidezHasta).toISOString().split('T')[0] : '',
+    fechaInicio: cotizacion.fechaInicio ?
+      new Date(cotizacion.fechaInicio).toISOString().split('T')[0] : '',
+    fechaFin: cotizacion.fechaFin ?
+      new Date(cotizacion.fechaFin).toISOString().split('T')[0] : '',
     moneda: cotizacion.moneda || 'USD',
     tipoCambio: cotizacion.tipoCambio || '',
     revision: cotizacion.revision || '',
@@ -46,11 +51,16 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
 
   useEffect(() => {
     setFormData({
+      codigo: cotizacion.codigo || '',
       referencia: cotizacion.referencia || '',
       formaPago: cotizacion.formaPago || '',
       validezOferta: cotizacion.validezOferta || 15,
       fechaValidezHasta: cotizacion.fechaValidezHasta ?
         new Date(cotizacion.fechaValidezHasta).toISOString().split('T')[0] : '',
+      fechaInicio: cotizacion.fechaInicio ?
+        new Date(cotizacion.fechaInicio).toISOString().split('T')[0] : '',
+      fechaFin: cotizacion.fechaFin ?
+        new Date(cotizacion.fechaFin).toISOString().split('T')[0] : '',
       moneda: cotizacion.moneda || 'USD',
       tipoCambio: cotizacion.tipoCambio || '',
       revision: cotizacion.revision || '',
@@ -85,6 +95,12 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
         ...formData,
         fechaValidezHasta: formData.fechaValidezHasta
           ? new Date(formData.fechaValidezHasta).toISOString()
+          : null,
+        fechaInicio: formData.fechaInicio
+          ? new Date(formData.fechaInicio).toISOString()
+          : null,
+        fechaFin: formData.fechaFin
+          ? new Date(formData.fechaFin).toISOString()
           : null,
         tipoCambio: formData.tipoCambio ? parseFloat(String(formData.tipoCambio)) : null
       }
@@ -141,6 +157,24 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Código */}
+              <div className="space-y-2">
+                <Label htmlFor="codigo" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Código
+                </Label>
+                <Input
+                  id="codigo"
+                  value={formData.codigo}
+                  onChange={(e) => handleInputChange('codigo', e.target.value)}
+                  placeholder="Ej: GYS-4251-25"
+                  disabled={isLocked}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Formato: GYS-XXXX-AA (ej: GYS-4251-25)
+                </p>
+              </div>
+
               {/* Referencia */}
               <div className="space-y-2">
                 <Label htmlFor="referencia" className="flex items-center gap-2">
@@ -273,6 +307,36 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
                   type="date"
                   value={formData.fechaValidezHasta}
                   onChange={(e) => handleInputChange('fechaValidezHasta', e.target.value)}
+                  disabled={isLocked}
+                />
+              </div>
+
+              {/* Fecha de Inicio */}
+              <div className="space-y-2">
+                <Label htmlFor="fechaInicio" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Fecha de Inicio
+                </Label>
+                <Input
+                  id="fechaInicio"
+                  type="date"
+                  value={formData.fechaInicio}
+                  onChange={(e) => handleInputChange('fechaInicio', e.target.value)}
+                  disabled={isLocked}
+                />
+              </div>
+
+              {/* Fecha de Fin */}
+              <div className="space-y-2">
+                <Label htmlFor="fechaFin" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Fecha de Fin
+                </Label>
+                <Input
+                  id="fechaFin"
+                  type="date"
+                  value={formData.fechaFin}
+                  onChange={(e) => handleInputChange('fechaFin', e.target.value)}
                   disabled={isLocked}
                 />
               </div>

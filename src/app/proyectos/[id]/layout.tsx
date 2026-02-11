@@ -12,13 +12,18 @@ import {
   PanelRightOpen,
   FileText,
   ExternalLink,
-  Megaphone
+  Megaphone,
+  Pencil,
+  Save,
+  X,
+  Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getProyectoById } from '@/lib/services/proyecto'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 
 import EstadoProyectoStepper from '@/components/proyectos/EstadoProyectoStepper'
@@ -69,6 +74,52 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   })
 
   const [oportunidadId, setOportunidadId] = useState<string | null>(null)
+
+  // Estado para edición inline de codigo y fecha
+  const [editingHeader, setEditingHeader] = useState(false)
+  const [savingHeader, setSavingHeader] = useState(false)
+  const [editCodigo, setEditCodigo] = useState('')
+  const [editFechaInicio, setEditFechaInicio] = useState('')
+
+  const startEditingHeader = () => {
+    if (!proyecto) return
+    setEditCodigo(proyecto.codigo || '')
+    setEditFechaInicio(proyecto.fechaInicio
+      ? new Date(proyecto.fechaInicio).toISOString().split('T')[0]
+      : '')
+    setEditingHeader(true)
+  }
+
+  const cancelEditingHeader = () => {
+    setEditingHeader(false)
+  }
+
+  const saveHeaderChanges = async () => {
+    if (!proyecto) return
+    setSavingHeader(true)
+    try {
+      const res = await fetch(`/api/proyecto/${proyecto.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codigo: editCodigo,
+          fechaInicio: editFechaInicio ? new Date(editFechaInicio).toISOString() : proyecto.fechaInicio
+        })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al actualizar')
+      }
+      const updated = await res.json()
+      handleDataUpdate({ ...proyecto, codigo: updated.codigo, fechaInicio: updated.fechaInicio })
+      setEditingHeader(false)
+      toast.success('Código y fecha actualizados')
+    } catch (err: any) {
+      toast.error(err.message || 'Error al guardar cambios')
+    } finally {
+      setSavingHeader(false)
+    }
+  }
 
   // Determinar si estamos en el hub o en una sub-página
   const isHubPage = pathname === `/proyectos/${id}`
@@ -347,9 +398,18 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                     </>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="font-mono bg-muted px-2 py-0.5 rounded border">
-                        {proyecto.codigo}
-                      </span>
+                      {editingHeader ? (
+                        <Input
+                          value={editCodigo}
+                          onChange={(e) => setEditCodigo(e.target.value)}
+                          className="h-7 w-36 font-mono text-sm"
+                          placeholder="Código"
+                        />
+                      ) : (
+                        <span className="font-mono bg-muted px-2 py-0.5 rounded border">
+                          {proyecto.codigo}
+                        </span>
+                      )}
                       <h1 className="text-lg sm:text-xl font-semibold text-gray-900" title={proyecto.nombre}>
                         {proyecto.nombre}
                       </h1>
@@ -403,14 +463,56 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                     {proyecto.cliente?.nombre || 'Sin cliente'}
                   </span>
                   <span className="text-muted-foreground">|</span>
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {formatDate(proyecto.fechaInicio)}
-                  </span>
+                  {editingHeader ? (
+                    <Input
+                      type="date"
+                      value={editFechaInicio}
+                      onChange={(e) => setEditFechaInicio(e.target.value)}
+                      className="h-7 w-40 text-sm"
+                    />
+                  ) : (
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {formatDate(proyecto.fechaInicio)}
+                    </span>
+                  )}
                   <span className="text-muted-foreground">|</span>
                   <span className="font-semibold text-gray-900">
                     {formatCurrency(proyecto.grandTotal || 0)}
                   </span>
+                  <span className="text-muted-foreground">|</span>
+                  {editingHeader ? (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-green-700 hover:text-green-800 hover:bg-green-50"
+                        onClick={saveHeaderChanges}
+                        disabled={savingHeader}
+                      >
+                        {savingHeader ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                        onClick={cancelEditingHeader}
+                        disabled={savingHeader}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                      onClick={startEditingHeader}
+                      title="Editar código y fecha"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </motion.div>

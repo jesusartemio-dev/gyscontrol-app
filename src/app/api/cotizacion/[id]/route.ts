@@ -126,6 +126,19 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       )
     }
 
+    // Validar unicidad de código si se está cambiando
+    if (data.codigo && data.codigo !== existente.codigo) {
+      const codigoExistente = await prisma.cotizacion.findUnique({
+        where: { codigo: data.codigo }
+      })
+      if (codigoExistente) {
+        return NextResponse.json(
+          { error: `El código "${data.codigo}" ya existe en otra cotización` },
+          { status: 400 }
+        )
+      }
+    }
+
     const actualizada = await prisma.cotizacion.update({
       where: { id },
       data

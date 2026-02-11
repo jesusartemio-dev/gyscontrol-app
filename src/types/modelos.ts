@@ -785,6 +785,8 @@ export interface Cotizacion {
    tipoCambio?: number | null
    revision?: string | null
    incluyeIGV?: boolean | null
+   fechaInicio?: string | null
+   fechaFin?: string | null
 
    cliente: {
      id: string
