@@ -34,15 +34,14 @@ export function DependencyCreator({ proyectoId, cronogramaId, tasks, onDependenc
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/proyectos/${proyectoId}/dependencies`, {
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          fromTaskId,
-          toTaskId,
-          type,
-          cronogramaId
+          tareaOrigenId: fromTaskId,
+          tareaDependienteId: toTaskId,
+          tipo: type
         })
       })
 

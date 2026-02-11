@@ -71,26 +71,28 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
       const [fasesResponse, edtsResponse, tareasResponse, subtareasResponse, dependenciesResponse] = await Promise.all([
         fetch(`/api/proyectos/${proyectoId}/fases?cronogramaId=${cronogramaId || ''}`, { credentials: 'include' }),
         fetch(`/api/proyectos/${proyectoId}/edt?cronogramaId=${cronogramaId || ''}`, { credentials: 'include' }),
-        fetch(`/api/proyectos/${proyectoId}/tareas?cronogramaId=${cronogramaId || ''}`, { credentials: 'include' }),
+        fetch(`/api/proyectos/${proyectoId}/cronograma/tareas?cronogramaId=${cronogramaId || ''}`, { credentials: 'include' }),
         fetch(`/api/proyectos/${proyectoId}/subtareas?cronogramaId=${cronogramaId || ''}`, { credentials: 'include' }),
-        fetch(`/api/proyectos/${proyectoId}/dependencies?cronogramaId=${cronogramaId || ''}`, { credentials: 'include' })
+        fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias`, { credentials: 'include' })
       ])
 
       const fasesResponseData = fasesResponse.ok ? await fasesResponse.json() : { data: [] }
-      const edtsResponseData = edtsResponse.ok ? await edtsResponse.json() : []
-      const tareasData = tareasResponse.ok ? await tareasResponse.json() : []
+      const edtsResponseData = edtsResponse.ok ? await edtsResponse.json() : { data: [] }
+      const tareasResponseData = tareasResponse.ok ? await tareasResponse.json() : { data: [] }
       const subtareasData = subtareasResponse.ok ? await subtareasResponse.json() : []
-      const dependenciesData = dependenciesResponse.ok ? await dependenciesResponse.json() : []
+      const dependenciesResponseData = dependenciesResponse.ok ? await dependenciesResponse.json() : { data: [] }
 
       const fasesData = fasesResponseData.data || fasesResponseData || []
       const edtsData = edtsResponseData.data || edtsResponseData || []
+      const tareasData = tareasResponseData.data || tareasResponseData || []
+      const rawDepsData = dependenciesResponseData.data || dependenciesResponseData || []
 
       console.log('📦 [GANTT CHART] API responses:', {
-        fases: fasesData.length,
-        edts: edtsData.length,
-        tareas: tareasData.length,
-        subtareas: subtareasData.length,
-        dependencies: dependenciesData.length
+        fases: Array.isArray(fasesData) ? fasesData.length : 0,
+        edts: Array.isArray(edtsData) ? edtsData.length : 0,
+        tareas: Array.isArray(tareasData) ? tareasData.length : 0,
+        subtareas: Array.isArray(subtareasData) ? subtareasData.length : 0,
+        dependencies: Array.isArray(rawDepsData) ? rawDepsData.length : 0
       })
 
       // Ensure all data is arrays
@@ -98,7 +100,13 @@ export function ProyectoGanttChart({ proyectoId, cronogramaId, height = 600 }: P
       const safeEdtsData = Array.isArray(edtsData) ? edtsData : []
       const safeTareasData = Array.isArray(tareasData) ? tareasData : []
       const safeSubtareasData = Array.isArray(subtareasData) ? subtareasData : []
-      const safeDependenciesData = Array.isArray(dependenciesData) ? dependenciesData : []
+      // Transform canonical dependency fields to GanttDependencies format
+      const safeDependenciesData = (Array.isArray(rawDepsData) ? rawDepsData : []).map((dep: any) => ({
+        id: dep.id,
+        fromTaskId: dep.tareaOrigenId,
+        toTaskId: dep.tareaDependienteId,
+        type: dep.tipo
+      }))
 
       const newState = {
         fases: safeFasesData,

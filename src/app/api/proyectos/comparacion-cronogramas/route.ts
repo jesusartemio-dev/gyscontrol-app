@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 // ✅ GET /api/proyectos/comparacion-cronogramas?proyectoId=xxx
 export async function GET(request: NextRequest) {
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error obteniendo comparación de cronogramas:', error);
+    logger.error('Error obteniendo comparación de cronogramas:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

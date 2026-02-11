@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
@@ -87,7 +88,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('❌ Error obteniendo tareas disponibles:', error)
+    logger.error('❌ Error obteniendo tareas disponibles:', error)
     return NextResponse.json({
       error: 'Error interno del servidor',
       details: error instanceof Error ? error.message : 'Error desconocido'

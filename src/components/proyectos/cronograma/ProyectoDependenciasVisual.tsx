@@ -80,7 +80,7 @@ export function ProyectoDependenciasVisual({
       setLoading(true);
 
       // Cargar tareas
-      const tareasResponse = await fetch(`/api/proyectos/${proyectoId}/tareas`);
+      const tareasResponse = await fetch(`/api/proyectos/${proyectoId}/cronograma/tareas`);
       if (!tareasResponse.ok) {
         throw new Error('Error al cargar tareas');
       }
@@ -88,7 +88,7 @@ export function ProyectoDependenciasVisual({
       setTareas(tareasData.data || []);
 
       // Cargar dependencias
-      const dependenciasResponse = await fetch(`/api/proyectos/${proyectoId}/dependencias`);
+      const dependenciasResponse = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias`);
       if (!dependenciasResponse.ok) {
         throw new Error('Error al cargar dependencias');
       }
@@ -148,7 +148,7 @@ export function ProyectoDependenciasVisual({
     try {
       setCreandoDependencia(true);
 
-      const response = await fetch(`/api/proyectos/${proyectoId}/dependencias`, {
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +197,7 @@ export function ProyectoDependenciasVisual({
     }
 
     try {
-      const response = await fetch(`/api/proyectos/${proyectoId}/dependencias/${dependenciaId}`, {
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias/${dependenciaId}`, {
         method: 'DELETE',
       });
 

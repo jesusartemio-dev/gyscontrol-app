@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // ✅ Schema de validación para crear cronograma
 const createCronogramaSchema = z.object({
@@ -66,7 +67,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al obtener cronogramas:', error)
+    logger.error('Error al obtener cronogramas:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -393,7 +394,7 @@ export async function POST(
         }
 
       } catch (copyError) {
-        console.error('Error durante la copia:', copyError)
+        logger.error('Error durante la copia:', copyError)
         throw new Error(`Error copiando estructura: ${copyError instanceof Error ? copyError.message : 'Error desconocido'}`)
       }
 
@@ -456,11 +457,11 @@ export async function POST(
       )
     }
 
-    console.error('❌ Error al crear cronograma:', error)
-    console.error('❌ Error type:', typeof error)
-    console.error('❌ Error name:', error instanceof Error ? error.name : 'Unknown')
-    console.error('❌ Error message:', error instanceof Error ? error.message : String(error))
-    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
+    logger.error('❌ Error al crear cronograma:', error)
+    logger.error('❌ Error type:', typeof error)
+    logger.error('❌ Error name:', error instanceof Error ? error.name : 'Unknown')
+    logger.error('❌ Error message:', error instanceof Error ? error.message : String(error))
+    logger.error('❌ Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
 
     // Extraer mensaje de error más específico
     let errorMessage = 'Error desconocido'
@@ -588,7 +589,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('Error al eliminar cronograma:', error)
+    logger.error('Error al eliminar cronograma:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

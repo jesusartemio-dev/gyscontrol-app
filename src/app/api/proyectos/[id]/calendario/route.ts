@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 // GET: obtener calendario asignado al proyecto
 export async function GET(
@@ -43,7 +44,7 @@ export async function GET(
       calendarios,
     })
   } catch (error) {
-    console.error('[ERROR proyecto/calendario GET]', error)
+    logger.error('[ERROR proyecto/calendario GET]', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error del servidor' },
       { status: 500 }
@@ -110,7 +111,7 @@ export async function PUT(
       },
     })
   } catch (error) {
-    console.error('[ERROR proyecto/calendario PUT]', error)
+    logger.error('[ERROR proyecto/calendario PUT]', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error del servidor' },
       { status: 500 }

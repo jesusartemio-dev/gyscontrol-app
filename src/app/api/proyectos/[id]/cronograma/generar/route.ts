@@ -16,6 +16,7 @@ import {
   calcularFechaFinConCalendario,
   ajustarFechaADiaLaborable
 } from '@/lib/utils/calendarioLaboral'
+import { logger } from '@/lib/logger'
 
 const generateSchema = z.object({
   generarFases: z.boolean().optional().default(true),
@@ -282,7 +283,7 @@ export async function POST(
       }, { status: 400 })
     }
 
-    console.error('❌ [GENERAR CRONOGRAMA] Error:', error)
+    logger.error('❌ [GENERAR CRONOGRAMA] Error:', error)
     return NextResponse.json({
       error: 'Error interno del servidor',
       details: error instanceof Error ? error.message : 'Error desconocido'

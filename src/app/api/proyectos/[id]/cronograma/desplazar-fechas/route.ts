@@ -10,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
+import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -318,7 +319,7 @@ export async function POST(
       }, { status: 400 })
     }
 
-    console.error('❌ [PROYECTO] Error desplazando cronograma:', error)
+    logger.error('❌ [PROYECTO] Error desplazando cronograma:', error)
     return NextResponse.json({
       error: 'Error interno del servidor',
       details: error instanceof Error ? error.message : 'Error desconocido'

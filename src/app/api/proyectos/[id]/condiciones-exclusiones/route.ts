@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
 
     return NextResponse.json({ condiciones, exclusiones })
   } catch (error) {
-    console.error('Error al obtener condiciones/exclusiones del proyecto:', error)
+    logger.error('Error al obtener condiciones/exclusiones del proyecto:', error)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ ok: true, data: proyectos, proyectos })
   } catch (error) {
-    console.error('❌ Error al obtener proyectos:', error)
+    logger.error('❌ Error al obtener proyectos:', error)
     return NextResponse.json(
       { ok: false, error: 'Error al obtener proyectos: ' + String(error) },
       { status: 500 }

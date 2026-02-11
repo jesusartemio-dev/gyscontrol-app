@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
@@ -56,7 +57,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error fetching cronograma Gantt data:', error)
+    logger.error('Error fetching cronograma Gantt data:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 const asignarResponsableSchema = z.object({
   tipo: z.enum(['edt', 'tarea']), // Solo EDT y Tarea tienen responsables en el schema actual
@@ -146,7 +147,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    console.error('Error asignando responsable:', error)
+    logger.error('Error asignando responsable:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -253,7 +254,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error obteniendo responsables disponibles:', error)
+    logger.error('Error obteniendo responsables disponibles:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

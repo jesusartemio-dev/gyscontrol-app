@@ -10,6 +10,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 const generateSchema = z.object({
   tipo: z.enum(['comercial', 'planificacion', 'ejecucion']),
@@ -129,7 +130,7 @@ export async function POST(
       }, { status: 400 })
     }
 
-    console.error('❌ Error generando cronograma:', error)
+    logger.error('❌ Error generando cronograma:', error)
     return NextResponse.json({
       error: 'Error interno del servidor',
       details: error instanceof Error ? error.message : 'Error desconocido'

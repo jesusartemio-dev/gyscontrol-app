@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // Schema de validación para actualizar nodos
 const updateNodeSchema = z.object({
@@ -180,8 +181,8 @@ export async function PUT(
       await recalcularPadresPostOperacion(id, nodeType, nodeId)
       console.log('✅ [API TREE UPDATE] Recálculo de padres completado exitosamente')
     } catch (error) {
-      console.error('❌ [API TREE UPDATE] Error en recálculo de padres:', error)
-      console.error('❌ [API TREE UPDATE] Stack trace:', error instanceof Error ? error.stack : 'No stack trace available')
+      logger.error('❌ [API TREE UPDATE] Error en recálculo de padres:', error)
+      logger.error('❌ [API TREE UPDATE] Stack trace:', error instanceof Error ? error.stack : 'No stack trace available')
     }
 
     return NextResponse.json({
@@ -197,7 +198,7 @@ export async function PUT(
       )
     }
 
-    console.error('Error al actualizar nodo:', error)
+    logger.error('Error al actualizar nodo:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -304,7 +305,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('Error al eliminar nodo:', error)
+    logger.error('Error al eliminar nodo:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -448,7 +449,7 @@ async function recalcularNodoPadre(parentType: string, parentId: string): Promis
         break
     }
   } catch (error) {
-    console.error(`❌ [ROLLUP] Error recalculando ${parentType} ${fullParentId}:`, error)
+    logger.error(`❌ [ROLLUP] Error recalculando ${parentType} ${fullParentId}:`, error)
   }
 }
 

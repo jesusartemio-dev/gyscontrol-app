@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 const createActividadSchema = z.object({
   nombre: z.string().min(1, 'Nombre requerido'),
@@ -71,6 +72,7 @@ export async function POST(
     }
 
     // ✅ Crear actividad directamente bajo EDT (sin zona)
+    actividadData.updatedAt = new Date()
     const actividad = await prisma.proyectoActividad.create({
       data: actividadData,
       include: {
@@ -81,7 +83,7 @@ export async function POST(
 
     return NextResponse.json(actividad)
   } catch (error) {
-    console.error('Error creando actividad:', error)
+    logger.error('Error creando actividad:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -126,7 +128,7 @@ export async function GET(
 
     return NextResponse.json(actividades)
   } catch (error) {
-    console.error('Error obteniendo actividades:', error)
+    logger.error('Error obteniendo actividades:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 // ✅ POST /api/proyectos/convertir-desde-cotizacion
 export async function POST(request: NextRequest) {
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error en conversión:', error);
+    logger.error('Error en conversión:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor', details: error instanceof Error ? error.message : 'Error desconocido' },
       { status: 500 }
@@ -271,7 +272,8 @@ async function ajustarFechasFases(fases: any[]) {
           where: { id: fase.id },
           data: {
             fechaInicioPlan: fechasInicio[0],
-            fechaFinPlan: fechasFin[0]
+            fechaFinPlan: fechasFin[0],
+            updatedAt: new Date()
           }
         });
       }

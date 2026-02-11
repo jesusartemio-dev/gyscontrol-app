@@ -21,6 +21,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // Schema de validación para la importación
 const importSchema = z.object({
@@ -144,7 +145,7 @@ export async function POST(
       }, { status: 400 })
     }
 
-    console.error('❌ Error en importación de cronograma:', error)
+    logger.error('❌ Error en importación de cronograma:', error)
     return NextResponse.json({
       error: 'Error interno del servidor',
       details: error instanceof Error ? error.message : 'Error desconocido'

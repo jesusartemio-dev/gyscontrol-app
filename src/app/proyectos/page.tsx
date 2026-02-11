@@ -387,15 +387,15 @@ export default function ProyectosPage() {
         </div>
 
         <Select value={filterStatus} onValueChange={(value: FilterStatus) => setFilterStatus(value)}>
-          <SelectTrigger className="w-32 h-8 text-xs">
+          <SelectTrigger className="w-[150px] h-8 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="activo">Activos</SelectItem>
-            <SelectItem value="pausado">Pausados</SelectItem>
-            <SelectItem value="cerrado">Cerrados</SelectItem>
-            <SelectItem value="cancelado">Cancelados</SelectItem>
+            <SelectItem value="all">Estado: Todos</SelectItem>
+            <SelectItem value="activo">Estado: Activos</SelectItem>
+            <SelectItem value="pausado">Estado: Pausados</SelectItem>
+            <SelectItem value="cerrado">Estado: Cerrados</SelectItem>
+            <SelectItem value="cancelado">Estado: Cancelados</SelectItem>
           </SelectContent>
         </Select>
 

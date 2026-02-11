@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // ✅ Schema de validación para actualizar fase
 const updateFaseSchema = z.object({
@@ -53,7 +54,7 @@ export async function GET(
     }
 
     // ✅ Obtener la fase específica
-    const fase = await (prisma as any).proyectoFase.findFirst({
+    const fase = await prisma.proyectoFase.findFirst({
       where: {
         id: faseId,
         proyectoId: id
@@ -91,7 +92,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al obtener fase:', error)
+    logger.error('Error al obtener fase:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -117,7 +118,7 @@ export async function PUT(
     const validatedData = updateFaseSchema.parse(body)
 
     // ✅ Validar que la fase existe y pertenece al proyecto
-    const faseExistente = await (prisma as any).proyectoFase.findFirst({
+    const faseExistente = await prisma.proyectoFase.findFirst({
       where: {
         id: faseId,
         proyectoId: id
@@ -155,7 +156,8 @@ export async function PUT(
     }
 
     // ✅ Actualizar la fase
-    const faseActualizada = await (prisma as any).proyectoFase.update({
+    updateData.updatedAt = new Date()
+    const faseActualizada = await prisma.proyectoFase.update({
       where: { id: faseId },
       data: updateData,
       include: {
@@ -163,7 +165,7 @@ export async function PUT(
           select: { id: true, nombre: true, tipo: true }
         },
         _count: {
-          select: { edts: true }
+          select: { proyectoEdt: true }
         }
       }
     })
@@ -181,7 +183,7 @@ export async function PUT(
       )
     }
 
-    console.error('Error al actualizar fase:', error)
+    logger.error('Error al actualizar fase:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -203,14 +205,14 @@ export async function DELETE(
     const { id, faseId } = await params
 
     // ✅ Validar que la fase existe y pertenece al proyecto
-    const fase = await (prisma as any).proyectoFase.findFirst({
+    const fase = await prisma.proyectoFase.findFirst({
       where: {
         id: faseId,
         proyectoId: id
       },
       include: {
         _count: {
-          select: { edts: true }
+          select: { proyectoEdt: true }
         }
       }
     })
@@ -223,7 +225,7 @@ export async function DELETE(
     }
 
     // ✅ Verificar que no tenga EDTs asociados
-    if (fase._count.edts > 0) {
+    if (fase._count.proyectoEdt > 0) {
       return NextResponse.json(
         { error: 'No se puede eliminar la fase porque tiene EDTs asociados' },
         { status: 400 }
@@ -231,7 +233,7 @@ export async function DELETE(
     }
 
     // ✅ Eliminar la fase
-    await (prisma as any).proyectoFase.delete({
+    await prisma.proyectoFase.delete({
       where: { id: faseId }
     })
 
@@ -241,7 +243,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('Error al eliminar fase:', error)
+    logger.error('Error al eliminar fase:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

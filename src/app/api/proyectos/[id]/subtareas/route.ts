@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 const createProyectoSubtareaSchema = z.object({
   nombre: z.string().min(1),
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json(subtareas)
   } catch (error) {
-    console.error('Error al obtener subtareas:', error)
+    logger.error('Error al obtener subtareas:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json(subtarea, { status: 201 })
   } catch (error) {
-    console.error('Error al crear subtarea:', error)
+    logger.error('Error al crear subtarea:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }

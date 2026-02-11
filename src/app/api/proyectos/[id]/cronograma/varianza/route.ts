@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -278,7 +279,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     })
 
   } catch (error) {
-    console.error('Error calculando varianza:', error)
+    logger.error('Error calculando varianza:', error)
     return NextResponse.json(
       { error: 'Error calculando varianza del cronograma' },
       { status: 500 }

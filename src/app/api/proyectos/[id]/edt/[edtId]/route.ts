@@ -216,6 +216,7 @@ export async function PUT(
     }
 
     // 🏗️ Actualizar EDT
+    updateData.updatedAt = new Date()
     const edtActualizado = await prisma.proyectoEdt.update({
         where: { id: edtId },
       data: updateData,
@@ -252,7 +253,7 @@ export async function PUT(
 
       await prisma.proyectoEdt.update({
         where: { id: edtId },
-        data: { horasReales: horasReales._sum.horasTrabajadas || 0 }
+        data: { horasReales: horasReales._sum.horasTrabajadas || 0, updatedAt: new Date() }
       });
     }
 

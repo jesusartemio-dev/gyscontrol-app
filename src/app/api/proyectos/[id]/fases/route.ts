@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
+import { logger } from '@/lib/logger'
 
 // ✅ Schema de validación para crear fase
 const createFaseSchema = z.object({
@@ -68,7 +69,7 @@ export async function GET(
     const cronogramaId = searchParams.get('cronogramaId') || undefined;
 
     // ✅ Obtener fases del proyecto con filtrado opcional por cronograma
-    const fases = await (prisma as any).proyectoFase.findMany({
+    const fases = await prisma.proyectoFase.findMany({
       where: {
         proyectoId: id,
         ...(cronogramaId && { proyectoCronogramaId: cronogramaId })
@@ -97,7 +98,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al obtener fases:', error)
+    logger.error('Error al obtener fases:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -141,7 +142,7 @@ export async function POST(
     }
 
     // ✅ Validar que el cronograma existe y pertenece al proyecto
-    const cronograma = await (prisma as any).proyectoCronograma.findFirst({
+    const cronograma = await prisma.proyectoCronograma.findFirst({
       where: {
         id: validatedData.proyectoCronogramaId,
         proyectoId: id
@@ -156,7 +157,7 @@ export async function POST(
     }
 
     // ✅ Obtener el orden máximo actual para asignar el siguiente
-    const maxOrden = await (prisma as any).proyectoFase.aggregate({
+    const maxOrden = await prisma.proyectoFase.aggregate({
       where: { proyectoCronogramaId: validatedData.proyectoCronogramaId },
       _max: { orden: true }
     })
@@ -164,8 +165,9 @@ export async function POST(
     const nuevoOrden = (maxOrden._max?.orden || 0) + 1
 
     // ✅ Crear la fase
-    const fase = await (prisma as any).proyectoFase.create({
+    const fase = await prisma.proyectoFase.create({
       data: {
+        id: crypto.randomUUID(),
         proyectoId: id,
         proyectoCronogramaId: validatedData.proyectoCronogramaId,
         nombre: validatedData.nombre,
@@ -174,14 +176,15 @@ export async function POST(
         estado: 'planificado',
         porcentajeAvance: 0,
         fechaInicioPlan: validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null,
-        fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null
+        fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null,
+        updatedAt: new Date()
       },
       include: {
         proyectoCronograma: {
           select: { id: true, nombre: true, tipo: true }
         },
         _count: {
-          select: { edts: true }
+          select: { proyectoEdt: true }
         }
       }
     })
@@ -199,7 +202,7 @@ export async function POST(
       )
     }
 
-    console.error('Error al crear fase:', error)
+    logger.error('Error al crear fase:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

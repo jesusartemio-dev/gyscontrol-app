@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
 export async function GET(
@@ -302,7 +303,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al obtener árbol del cronograma:', error)
+    logger.error('Error al obtener árbol del cronograma:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

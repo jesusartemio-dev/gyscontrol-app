@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 interface ReorderRequest {
   tipo: 'edt' | 'actividad' | 'tarea'
@@ -116,7 +117,7 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('❌ [REORDER API] Error al reordenar elementos:', error)
+    logger.error('❌ [REORDER API] Error al reordenar elementos:', error)
 
     return NextResponse.json(
       {
@@ -198,7 +199,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('❌ [REORDER API] Error al obtener elementos:', error)
+    logger.error('❌ [REORDER API] Error al obtener elementos:', error)
 
     return NextResponse.json(
       {

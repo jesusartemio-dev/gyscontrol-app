@@ -76,7 +76,7 @@ export function ProyectoDependenciasList({
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/proyectos/${proyectoId}/dependencias`);
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias`);
       if (!response.ok) {
         throw new Error('Error al cargar dependencias');
       }
@@ -107,7 +107,7 @@ export function ProyectoDependenciasList({
     }
 
     try {
-      const response = await fetch(`/api/proyectos/${proyectoId}/dependencias/${dependenciaId}`, {
+      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias/${dependenciaId}`, {
         method: 'DELETE',
       });
 

@@ -12,240 +12,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-
-// ✅ Función auxiliar para extraer ID real de nodeId con prefijo
-function extractRealId(nodeId: string): string {
-  const parts = nodeId.split('-', 2)
-  return parts.length === 2 ? parts[1] : nodeId
-}
-
-// ✅ Función auxiliar para construir nodeId con prefijo
-function buildNodeId(type: string, id: string): string {
-  return `${type}-${id}`
-}
-
-// Import rollup functions
-async function recalcularPadresPostOperacion(
-  proyectoId: string,
-  nodeType: string,
-  nodeId: string
-): Promise<void> {
-  console.log(`🔄 GYS-GEN-12: Recalculando padres después de operación en ${nodeType} ${nodeId}`)
-
-  let parentId: string | null = null
-  let parentType: string | null = null
-
-  // Extraer ID real para consultas a BD
-  const realId = extractRealId(nodeId)
-
-  // Determinar el padre según el tipo de nodo
-  switch (nodeType) {
-    case 'tarea':
-      // Buscar la actividad padre de la tarea
-      try {
-        console.log(`🔍 [ROLLUP] Buscando tarea ${realId} para encontrar su actividad padre`)
-        const tarea = await prisma.proyectoTarea.findUnique({
-          where: { id: realId },
-          select: { proyectoActividadId: true, nombre: true }
-        })
-        console.log(`🔍 [ROLLUP] Tarea encontrada:`, { id: realId, nombre: tarea?.nombre, proyectoActividadId: tarea?.proyectoActividadId })
-        if (tarea?.proyectoActividadId) {
-          parentId = buildNodeId('actividad', tarea.proyectoActividadId)
-          parentType = 'actividad'
-          console.log(`✅ [ROLLUP] Tarea ${realId} pertenece a actividad ${tarea.proyectoActividadId} (nodeId: ${parentId})`)
-        } else {
-          console.log(`⚠️ [ROLLUP] Tarea ${realId} no tiene actividad padre asignada`)
-        }
-      } catch (error) {
-        console.log(`❌ [ROLLUP] Error buscando tarea ${realId}:`, error)
-      }
-      break
-
-    case 'actividad':
-      // Buscar el EDT padre de la actividad
-      try {
-        console.log(`🔍 [ROLLUP] Buscando actividad ${realId} para encontrar su EDT padre`)
-        const actividad = await prisma.proyectoActividad.findUnique({
-          where: { id: realId },
-          select: { proyectoEdtId: true, nombre: true }
-        })
-        console.log(`🔍 [ROLLUP] Actividad encontrada:`, { id: realId, nombre: actividad?.nombre, proyectoEdtId: actividad?.proyectoEdtId })
-        if (actividad?.proyectoEdtId) {
-          parentId = buildNodeId('edt', actividad.proyectoEdtId)
-          parentType = 'edt'
-          console.log(`✅ [ROLLUP] Actividad ${realId} pertenece a EDT ${actividad.proyectoEdtId} (nodeId: ${parentId})`)
-        } else {
-          console.log(`⚠️ [ROLLUP] Actividad ${realId} no tiene EDT padre asignado`)
-        }
-      } catch (error) {
-        console.log(`❌ [ROLLUP] Error buscando actividad ${realId}:`, error)
-      }
-      break
-
-    case 'edt':
-      // Buscar la fase padre del EDT
-      try {
-        const edt = await prisma.proyectoEdt.findUnique({
-          where: { id: realId },
-          select: { proyectoFaseId: true, nombre: true }
-        })
-        console.log(`🔍 [ROLLUP] Buscando padre de EDT ${realId} (${edt?.nombre}): proyectoFaseId = ${edt?.proyectoFaseId}`)
-        if (edt?.proyectoFaseId) {
-          parentId = buildNodeId('fase', edt.proyectoFaseId)
-          parentType = 'fase'
-          console.log(`✅ [ROLLUP] EDT ${realId} pertenece a fase ${edt.proyectoFaseId} (nodeId: ${parentId})`)
-        } else {
-          console.log(`⚠️ [ROLLUP] EDT ${realId} no tiene fase padre asignada`)
-        }
-      } catch (error) {
-        console.log(`❌ [ROLLUP] Error buscando EDT ${realId}:`, error)
-      }
-      break
-
-    case 'fase':
-      // Las fases no tienen padre en el árbol jerárquico
-      console.log(`🔍 [ROLLUP] Fase ${realId} no tiene padre (es raíz)`)
-      return
-  }
-
-  // Si encontramos un padre, recalcularlo
-  if (parentId && parentType) {
-    console.log(`🔄 [ROLLUP] Recalculando padre ${parentType} ${parentId}`)
-    await recalcularNodoPadre(parentType, parentId)
-
-    // Recalcular recursivamente hacia arriba
-    console.log(`🔄 [ROLLUP] Continuando recursión hacia arriba desde ${parentType} ${parentId}`)
-    await recalcularPadresPostOperacion(proyectoId, parentType, parentId)
-  } else {
-    console.log(`⚠️ [ROLLUP] No se encontró padre para ${nodeType} ${nodeId}`)
-  }
-}
-
-// ✅ Función auxiliar para recalcular un nodo padre específico
-async function recalcularNodoPadre(parentType: string, parentId: string): Promise<void> {
-  console.log(`🔄 Recalculando ${parentType} ${parentId}`)
-
-  // Para las funciones de recálculo, usamos el ID completo (con guiones) ya que así están almacenados en la BD
-  const fullParentId = parentId.startsWith(`${parentType}-`) ? extractRealId(parentId) : parentId
-
-  try {
-    switch (parentType) {
-      case 'actividad':
-        await recalcularActividadPadre(fullParentId)
-        console.log(`✅ [ROLLUP] Actividad ${fullParentId} recalculada`)
-        break
-      case 'edt':
-        await recalcularEdtPadre(fullParentId)
-        console.log(`✅ [ROLLUP] EDT ${fullParentId} recalculado`)
-        break
-      case 'fase':
-        await recalcularFasePadre(fullParentId)
-        console.log(`✅ [ROLLUP] Fase ${fullParentId} recalculada`)
-        break
-    }
-  } catch (error) {
-    console.error(`❌ [ROLLUP] Error recalculando ${parentType} ${fullParentId}:`, error)
-  }
-}
-
-// ✅ Recalcular actividad padre (suma horas de tareas, fechas min/max)
-async function recalcularActividadPadre(actividadId: string): Promise<void> {
-  const tareas = await prisma.proyectoTarea.findMany({
-    where: { proyectoActividadId: actividadId },
-    select: {
-      fechaInicio: true,
-      fechaFin: true,
-      horasEstimadas: true
-    }
-  })
-
-  if (tareas.length === 0) return
-
-  // Calcular fechas: min fechaInicio, max fechaFin
-  const fechasInicio = tareas.map(t => t.fechaInicio).filter(f => f !== null) as Date[]
-  const fechasFin = tareas.map(t => t.fechaFin).filter(f => f !== null) as Date[]
-
-  const fechaInicioMin = fechasInicio.length > 0 ? new Date(Math.min(...fechasInicio.map(d => d.getTime()))) : undefined
-  const fechaFinMax = fechasFin.length > 0 ? new Date(Math.max(...fechasFin.map(d => d.getTime()))) : undefined
-
-  // Calcular horas totales
-  const horasTotales = tareas.reduce((sum, tarea) => sum + Number(tarea.horasEstimadas || 0), 0)
-
-  await prisma.proyectoActividad.update({
-    where: { id: actividadId },
-    data: {
-      fechaInicioPlan: fechaInicioMin,
-      fechaFinPlan: fechaFinMax,
-      horasPlan: horasTotales
-    }
-  })
-}
-
-// ✅ Recalcular EDT padre (suma horas de actividades, fechas min/max)
-async function recalcularEdtPadre(edtId: string): Promise<void> {
-  const actividades = await prisma.proyectoActividad.findMany({
-    where: { proyectoEdtId: edtId },
-    select: {
-      fechaInicioPlan: true,
-      fechaFinPlan: true,
-      horasPlan: true
-    }
-  })
-
-  if (actividades.length === 0) return
-
-  // Calcular fechas: min fechaInicio, max fechaFin
-  const fechasInicio = actividades.map(a => a.fechaInicioPlan).filter(f => f !== null) as Date[]
-  const fechasFin = actividades.map(a => a.fechaFinPlan).filter(f => f !== null) as Date[]
-
-  const fechaInicioMin = fechasInicio.length > 0 ? new Date(Math.min(...fechasInicio.map(d => d.getTime()))) : undefined
-  const fechaFinMax = fechasFin.length > 0 ? new Date(Math.max(...fechasFin.map(d => d.getTime()))) : undefined
-
-  // Calcular horas totales
-  const horasTotales = actividades.reduce((sum, actividad) => sum + Number(actividad.horasPlan || 0), 0)
-
-  await prisma.proyectoEdt.update({
-    where: { id: edtId },
-    data: {
-      fechaInicioPlan: fechaInicioMin,
-      fechaFinPlan: fechaFinMax,
-      horasPlan: horasTotales
-    }
-  })
-}
-
-// ✅ Recalcular fase padre (suma horas de EDTs, fechas min/max)
-async function recalcularFasePadre(faseId: string): Promise<void> {
-  const edts = await prisma.proyectoEdt.findMany({
-    where: { proyectoFaseId: faseId },
-    select: {
-      fechaInicioPlan: true,
-      fechaFinPlan: true,
-      horasPlan: true
-    }
-  })
-
-  if (edts.length === 0) return
-
-  // Calcular fechas: min fechaInicio, max fechaFin
-  const fechasInicio = edts.map(e => e.fechaInicioPlan).filter(f => f !== null) as Date[]
-  const fechasFin = edts.map(e => e.fechaFinPlan).filter(f => f !== null) as Date[]
-
-  const fechaInicioMin = fechasInicio.length > 0 ? new Date(Math.min(...fechasInicio.map(d => d.getTime()))) : undefined
-  const fechaFinMax = fechasFin.length > 0 ? new Date(Math.max(...fechasFin.map(d => d.getTime()))) : undefined
-
-  // Calcular horas totales (aunque las fases no tienen campo horasPlan, lo calculamos para consistencia)
-  const horasTotales = edts.reduce((sum, edt) => sum + Number(edt.horasPlan || 0), 0)
-
-  await prisma.proyectoFase.update({
-    where: { id: faseId },
-    data: {
-      fechaInicioPlan: fechaInicioMin,
-      fechaFinPlan: fechaFinMax,
-      // Las fases no tienen campo horasPlan en el esquema actual
-    }
-  })
-}
+import { recalcularPadresPostOperacion } from '@/lib/utils/cronogramaRollup'
+import { logger } from '@/lib/logger'
 
 // ✅ Schema de validación para crear tarea
 const createTareaSchema = z.object({
@@ -291,6 +59,8 @@ export async function GET(
     }
 
     const { id } = await params
+    const { searchParams } = new URL(request.url)
+    const cronogramaId = searchParams.get('cronogramaId')
 
     // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
@@ -305,9 +75,14 @@ export async function GET(
       )
     }
 
-    // ✅ Obtener todas las tareas del proyecto
+    // ✅ Obtener tareas del proyecto (filtradas por cronograma si se especifica)
+    const where: any = { proyectoEdt: { proyectoId: id } }
+    if (cronogramaId && cronogramaId.trim() !== '') {
+      where.proyectoCronogramaId = cronogramaId
+    }
+
     const tareas = await prisma.proyectoTarea.findMany({
-      where: { proyectoEdt: { proyectoId: id } },
+      where,
       include: {
         proyectoEdt: {
           include: {
@@ -333,7 +108,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al obtener tareas:', error)
+    logger.error('Error al obtener tareas:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -372,7 +147,7 @@ export async function POST(
     }
 
     // ✅ Validar que la actividad existe y pertenece al proyecto
-    let actividad = await (prisma as any).proyectoActividad.findFirst({
+    let actividad = await prisma.proyectoActividad.findFirst({
       where: {
         id: validatedData.proyectoActividadId
       },
@@ -496,12 +271,12 @@ export async function POST(
     })
 
     // ✅ Verificar que el cronograma existe
-    const cronogramaExists = await (prisma as any).proyectoCronograma.findUnique({
+    const cronogramaExists = await prisma.proyectoCronograma.findUnique({
       where: { id: cronogramaId }
     })
 
     if (!cronogramaExists) {
-      console.error('❌ [API TAREAS] Cronograma no encontrado:', cronogramaId)
+      logger.error('❌ [API TAREAS] Cronograma no encontrado:', cronogramaId)
       return NextResponse.json(
         { error: 'Cronograma no encontrado' },
         { status: 404 }
@@ -512,32 +287,33 @@ export async function POST(
 
     // ✅ Crear la tarea
     const tareaData = {
+      id: crypto.randomUUID(),
       proyectoEdtId: actividad.proyectoEdtId,
       proyectoCronogramaId: actividad.proyectoCronogramaId,
       proyectoActividadId: validatedData.proyectoActividadId,
       nombre: validatedData.nombre,
       descripcion: validatedData.descripcion,
-      fechaInicio: fechaInicio,
-      fechaFin: fechaFin,
+      fechaInicio: fechaInicio ?? new Date(),
+      fechaFin: fechaFin ?? new Date(),
       horasEstimadas: validatedData.horasEstimadas,
       personasEstimadas: validatedData.personasEstimadas || 1,
-      prioridad: validatedData.prioridad,
+      prioridad: validatedData.prioridad as 'baja' | 'media' | 'alta' | 'critica',
       dependenciaId: validatedData.dependenciaId,
       responsableId: validatedData.responsableId,
-      estado: 'pendiente',
+      estado: 'pendiente' as const,
       porcentajeCompletado: 0
     }
 
     console.log('🔍 [API TAREAS] Datos finales para crear tarea:', tareaData)
 
-    const tarea = await (prisma as any).proyectoTarea.create({
-      data: tareaData
+    const tarea = await prisma.proyectoTarea.create({
+      data: { ...tareaData, updatedAt: new Date() }
     })
 
     console.log('✅ [API TAREAS] Tarea creada exitosamente:', tarea.id)
 
     // ✅ GYS-GEN-12: Recalcular fechas y horas de padres después de crear tarea
-    await recalcularPadresPostOperacion(id, 'tarea', `tarea-${tarea.id}`)
+    await recalcularPadresPostOperacion(id, 'tarea', tarea.id)
 
     return NextResponse.json({
       success: true,
@@ -552,7 +328,7 @@ export async function POST(
       )
     }
 
-    console.error('Error al crear tarea:', error)
+    logger.error('Error al crear tarea:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

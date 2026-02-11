@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // ✅ Schema de validación para crear fase
 const createFaseSchema = z.object({
@@ -69,7 +70,7 @@ export async function GET(
     if (cronogramaId) where.proyectoCronogramaId = cronogramaId
 
     // ✅ Obtener fases del proyecto (filtradas por cronograma si se especifica)
-    const fases = await (prisma as any).proyectoFase.findMany({
+    const fases = await prisma.proyectoFase.findMany({
       where,
       include: {
         proyectoEdt: true,
@@ -86,7 +87,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al obtener fases:', error)
+    logger.error('Error al obtener fases:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -125,7 +126,7 @@ export async function POST(
     }
 
     // ✅ Validar que el cronograma existe y pertenece al proyecto
-    const cronograma = await (prisma as any).proyectoCronograma.findFirst({
+    const cronograma = await prisma.proyectoCronograma.findFirst({
       where: {
         id: validatedData.proyectoCronogramaId,
         proyectoId: id
@@ -140,7 +141,7 @@ export async function POST(
     }
 
     // ✅ Verificar que no existe una fase con el mismo nombre en el mismo cronograma
-    const existingFase = await (prisma as any).proyectoFase.findFirst({
+    const existingFase = await prisma.proyectoFase.findFirst({
       where: {
         proyectoCronogramaId: validatedData.proyectoCronogramaId,
         nombre: validatedData.nombre
@@ -155,8 +156,9 @@ export async function POST(
     }
 
     // ✅ Crear la fase
-    const fase = await (prisma as any).proyectoFase.create({
+    const fase = await prisma.proyectoFase.create({
       data: {
+        id: crypto.randomUUID(),
         proyectoId: id,
         proyectoCronogramaId: validatedData.proyectoCronogramaId,
         nombre: validatedData.nombre,
@@ -165,7 +167,8 @@ export async function POST(
         fechaInicioPlan: validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null,
         fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null,
         estado: 'planificado',
-        porcentajeAvance: 0
+        porcentajeAvance: 0,
+        updatedAt: new Date()
       },
       include: {
         proyectoEdt: true
@@ -185,7 +188,7 @@ export async function POST(
       )
     }
 
-    console.error('Error al crear fase:', error)
+    logger.error('Error al crear fase:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

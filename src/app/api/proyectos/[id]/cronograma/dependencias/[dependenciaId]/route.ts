@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 // ✅ DELETE /api/proyectos/[id]/cronograma/dependencias/[dependenciaId]
 export async function DELETE(
@@ -55,7 +56,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('❌ Error eliminando dependencia:', error)
+    logger.error('❌ Error eliminando dependencia:', error)
     return NextResponse.json({
       error: 'Error interno del servidor',
       details: error instanceof Error ? error.message : 'Error desconocido'

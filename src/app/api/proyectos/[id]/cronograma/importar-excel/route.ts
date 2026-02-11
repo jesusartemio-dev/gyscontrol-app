@@ -9,6 +9,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDuration, parseWork } from '@/lib/utils/msProjectExcelParser'
 import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
+import { logger } from '@/lib/logger'
 
 interface RowData {
   id: number
@@ -73,7 +74,7 @@ export async function POST(
     }
 
     // Buscar o crear cronograma de planificación
-    let cronograma = await (prisma as any).proyectoCronograma.findFirst({
+    let cronograma = await prisma.proyectoCronograma.findFirst({
       where: { proyectoId, tipo: 'planificacion' },
     })
 
@@ -84,7 +85,7 @@ export async function POST(
 
     if (cronograma) {
       // Verificar si ya tiene contenido
-      const faseCount = await (prisma as any).proyectoFase.count({
+      const faseCount = await prisma.proyectoFase.count({
         where: { proyectoCronogramaId: cronograma.id },
       })
       if (faseCount > 0) {
@@ -93,7 +94,7 @@ export async function POST(
         }, { status: 409 })
       }
     } else {
-      cronograma = await (prisma as any).proyectoCronograma.create({
+      cronograma = await prisma.proyectoCronograma.create({
         data: {
           id: crypto.randomUUID(),
           proyectoId,
@@ -101,6 +102,7 @@ export async function POST(
           nombre: 'Línea Base',
           esBaseline: true,
           version: 1,
+          updatedAt: new Date(),
         },
       })
     }
@@ -122,7 +124,7 @@ export async function POST(
 
       // Crear Fase
       const faseId = crypto.randomUUID()
-      await (prisma as any).proyectoFase.create({
+      await prisma.proyectoFase.create({
         data: {
           id: faseId,
           proyectoId,
@@ -169,7 +171,7 @@ export async function POST(
         const dur = parseDuration(edtData.row.duration, horasPorDia)
         const proyectoEdtId = crypto.randomUUID()
 
-        await (prisma as any).proyectoEdt.create({
+        await prisma.proyectoEdt.create({
           data: {
             id: proyectoEdtId,
             proyectoId,
@@ -208,7 +210,7 @@ export async function POST(
             ? new Date(actData.row.finish)
             : (edtData.row.finish ? new Date(edtData.row.finish) : new Date())
 
-          await (prisma as any).proyectoActividad.create({
+          await prisma.proyectoActividad.create({
             data: {
               id: actividadId,
               proyectoEdtId: proyectoEdtId,
@@ -256,7 +258,7 @@ export async function POST(
               ? new Date(tareaData.row.finish)
               : actFinish
 
-            await (prisma as any).proyectoTarea.create({
+            await prisma.proyectoTarea.create({
               data: {
                 id: tareaId,
                 proyectoEdtId: proyectoEdtId,
@@ -314,12 +316,13 @@ export async function POST(
         // Solo crear como ProyectoDependenciasTarea si ambas son tareas
         if (origenLevel === 5 && depLevel === 5) {
           try {
-            await (prisma as any).proyectoDependenciasTarea.create({
+            await prisma.proyectoDependenciasTarea.create({
               data: {
                 id: crypto.randomUUID(),
                 tareaOrigenId: origenId,
                 tareaDependienteId: dependienteId,
                 tipo: 'finish_to_start',
+                updatedAt: new Date(),
               },
             })
             dependenciasCreadas++
@@ -333,11 +336,11 @@ export async function POST(
     // Asegurar que el cronograma es baseline
     if (!cronograma.esBaseline) {
       // Desmarcar otros baselines
-      await (prisma as any).proyectoCronograma.updateMany({
+      await prisma.proyectoCronograma.updateMany({
         where: { proyectoId, esBaseline: true },
         data: { esBaseline: false },
       })
-      await (prisma as any).proyectoCronograma.update({
+      await prisma.proyectoCronograma.update({
         where: { id: cronograma.id },
         data: { esBaseline: true },
       })
@@ -356,7 +359,7 @@ export async function POST(
       },
     })
   } catch (error) {
-    console.error('[ERROR importar-excel]', error)
+    logger.error('[ERROR importar-excel]', error)
     return NextResponse.json(
       { message: error instanceof Error ? error.message : 'Error del servidor' },
       { status: 500 }

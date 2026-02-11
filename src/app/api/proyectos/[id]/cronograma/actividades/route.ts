@@ -12,201 +12,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-
-// ✅ Función auxiliar para extraer ID real de nodeId con prefijo
-function extractRealId(nodeId: string): string {
-  const parts = nodeId.split('-', 2)
-  return parts.length === 2 ? parts[1] : nodeId
-}
-
-// Import rollup functions
-async function recalcularPadresPostOperacion(
-  proyectoId: string,
-  nodeType: string,
-  nodeId: string
-): Promise<void> {
-  console.log(`🔄 GYS-GEN-12: Recalculando padres después de operación en ${nodeType} ${nodeId}`)
-
-  let parentId: string | null = null
-  let parentType: string | null = null
-
-  // Determinar el padre según el tipo de nodo
-  switch (nodeType) {
-    case 'tarea':
-      // Buscar la actividad padre de la tarea
-      const tarea = await prisma.proyectoTarea.findUnique({
-        where: { id: nodeId },
-        select: { proyectoActividadId: true }
-      })
-      if (tarea?.proyectoActividadId) {
-        parentId = tarea.proyectoActividadId
-        parentType = 'actividad'
-      }
-      break
-
-    case 'actividad':
-      // Buscar el EDT padre de la actividad
-      const actividad = await prisma.proyectoActividad.findUnique({
-        where: { id: nodeId },
-        select: { proyectoEdtId: true }
-      })
-      if (actividad?.proyectoEdtId) {
-        parentId = actividad.proyectoEdtId
-        parentType = 'edt'
-      }
-      break
-
-    case 'edt':
-      // Buscar la fase padre del EDT
-      const edt = await prisma.proyectoEdt.findUnique({
-        where: { id: nodeId },
-        select: { proyectoFaseId: true }
-      })
-      if (edt?.proyectoFaseId) {
-        parentId = edt.proyectoFaseId
-        parentType = 'fase'
-      }
-      break
-
-    case 'fase':
-      // Las fases no tienen padre en el árbol jerárquico
-      return
-  }
-
-  // Si encontramos un padre, recalcularlo
-  if (parentId && parentType) {
-    await recalcularNodoPadre(parentType, parentId)
-
-    // Recalcular recursivamente hacia arriba
-    await recalcularPadresPostOperacion(proyectoId, parentType, parentId)
-  }
-}
-
-// ✅ Función auxiliar para recalcular un nodo padre específico
-async function recalcularNodoPadre(parentType: string, parentId: string): Promise<void> {
-  console.log(`🔄 Recalculando ${parentType} ${parentId}`)
-
-  // Para las funciones de recálculo, usamos el ID completo (con guiones) ya que así están almacenados en la BD
-  const fullParentId = parentId.startsWith(`${parentType}-`) ? extractRealId(parentId) : parentId
-
-  try {
-    switch (parentType) {
-      case 'actividad':
-        await recalcularActividadPadre(fullParentId)
-        console.log(`✅ [ROLLUP] Actividad ${fullParentId} recalculada`)
-        break
-      case 'edt':
-        await recalcularEdtPadre(fullParentId)
-        console.log(`✅ [ROLLUP] EDT ${fullParentId} recalculado`)
-        break
-      case 'fase':
-        await recalcularFasePadre(fullParentId)
-        console.log(`✅ [ROLLUP] Fase ${fullParentId} recalculada`)
-        break
-    }
-  } catch (error) {
-    console.error(`❌ [ROLLUP] Error recalculando ${parentType} ${fullParentId}:`, error)
-  }
-}
-
-// ✅ Recalcular actividad padre (suma horas de tareas, fechas min/max)
-async function recalcularActividadPadre(actividadId: string): Promise<void> {
-  const tareas = await prisma.proyectoTarea.findMany({
-    where: { proyectoActividadId: actividadId },
-    select: {
-      fechaInicio: true,
-      fechaFin: true,
-      horasEstimadas: true
-    }
-  })
-
-  if (tareas.length === 0) return
-
-  // Calcular fechas: min fechaInicio, max fechaFin
-  const fechasInicio = tareas.map(t => t.fechaInicio).filter(f => f !== null) as Date[]
-  const fechasFin = tareas.map(t => t.fechaFin).filter(f => f !== null) as Date[]
-
-  const fechaInicioMin = fechasInicio.length > 0 ? new Date(Math.min(...fechasInicio.map(d => d.getTime()))) : undefined
-  const fechaFinMax = fechasFin.length > 0 ? new Date(Math.max(...fechasFin.map(d => d.getTime()))) : undefined
-
-  // Calcular horas totales
-  const horasTotales = tareas.reduce((sum, tarea) => sum + Number(tarea.horasEstimadas || 0), 0)
-
-  await prisma.proyectoActividad.update({
-    where: { id: actividadId },
-    data: {
-      fechaInicioPlan: fechaInicioMin,
-      fechaFinPlan: fechaFinMax,
-      horasPlan: horasTotales
-    }
-  })
-}
-
-// ✅ Recalcular EDT padre (suma horas de actividades, fechas min/max)
-async function recalcularEdtPadre(edtId: string): Promise<void> {
-  const actividades = await prisma.proyectoActividad.findMany({
-    where: { proyectoEdtId: edtId },
-    select: {
-      fechaInicioPlan: true,
-      fechaFinPlan: true,
-      horasPlan: true
-    }
-  })
-
-  if (actividades.length === 0) return
-
-  // Calcular fechas: min fechaInicio, max fechaFin
-  const fechasInicio = actividades.map(a => a.fechaInicioPlan).filter(f => f !== null) as Date[]
-  const fechasFin = actividades.map(a => a.fechaFinPlan).filter(f => f !== null) as Date[]
-
-  const fechaInicioMin = fechasInicio.length > 0 ? new Date(Math.min(...fechasInicio.map(d => d.getTime()))) : undefined
-  const fechaFinMax = fechasFin.length > 0 ? new Date(Math.max(...fechasFin.map(d => d.getTime()))) : undefined
-
-  // Calcular horas totales
-  const horasTotales = actividades.reduce((sum, actividad) => sum + Number(actividad.horasPlan || 0), 0)
-
-  await prisma.proyectoEdt.update({
-    where: { id: edtId },
-    data: {
-      fechaInicioPlan: fechaInicioMin,
-      fechaFinPlan: fechaFinMax,
-      horasPlan: horasTotales
-    }
-  })
-}
-
-// ✅ Recalcular fase padre (suma horas de EDTs, fechas min/max)
-async function recalcularFasePadre(faseId: string): Promise<void> {
-  const edts = await prisma.proyectoEdt.findMany({
-    where: { proyectoFaseId: faseId },
-    select: {
-      fechaInicioPlan: true,
-      fechaFinPlan: true,
-      horasPlan: true
-    }
-  })
-
-  if (edts.length === 0) return
-
-  // Calcular fechas: min fechaInicio, max fechaFin
-  const fechasInicio = edts.map(e => e.fechaInicioPlan).filter(f => f !== null) as Date[]
-  const fechasFin = edts.map(e => e.fechaFinPlan).filter(f => f !== null) as Date[]
-
-  const fechaInicioMin = fechasInicio.length > 0 ? new Date(Math.min(...fechasInicio.map(d => d.getTime()))) : undefined
-  const fechaFinMax = fechasFin.length > 0 ? new Date(Math.max(...fechasFin.map(d => d.getTime()))) : undefined
-
-  // Calcular horas totales (aunque las fases no tienen campo horasPlan, lo calculamos para consistencia)
-  const horasTotales = edts.reduce((sum, edt) => sum + Number(edt.horasPlan || 0), 0)
-
-  await prisma.proyectoFase.update({
-    where: { id: faseId },
-    data: {
-      fechaInicioPlan: fechaInicioMin,
-      fechaFinPlan: fechaFinMax,
-      // Las fases no tienen campo horasPlan en el esquema actual
-    }
-  })
-}
+import { recalcularPadresPostOperacion } from '@/lib/utils/cronogramaRollup'
+import { logger } from '@/lib/logger'
 
 // ✅ Schema de validación para crear actividad (5 niveles)
 const createActividadSchema = z.object({
@@ -334,7 +141,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al obtener actividades:', error)
+    logger.error('Error al obtener actividades:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -521,15 +328,15 @@ export async function POST(
       posicionamiento: validatedData.posicionamiento
     })
 
-    const actividad = await (prisma as any).proyectoActividad.create({
+    const actividad = await prisma.proyectoActividad.create({
       data: {
         id: crypto.randomUUID(),
         proyectoEdtId: edtId,
         proyectoCronogramaId: cronogramaId,
         nombre: validatedData.nombre,
         descripcion: validatedData.descripcion,
-        fechaInicioPlan: fechaInicioPlan,
-        fechaFinPlan: fechaFinPlan,
+        fechaInicioPlan: fechaInicioPlan ?? new Date(),
+        fechaFinPlan: fechaFinPlan ?? new Date(),
         horasPlan: validatedData.horasPlan,
         prioridad: validatedData.prioridad,
         responsableId: validatedData.responsableId,
@@ -555,7 +362,7 @@ export async function POST(
     console.log('✅ [API ACTIVIDADES] Actividad creada exitosamente:', actividad.id)
 
     // ✅ GYS-GEN-12: Recalcular fechas y horas de padres después de crear actividad
-    await recalcularPadresPostOperacion(id, 'actividad', `actividad-${actividad.id}`)
+    await recalcularPadresPostOperacion(id, 'actividad', actividad.id)
 
     return NextResponse.json({
       success: true,
@@ -564,14 +371,14 @@ export async function POST(
 
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('❌ [API ACTIVIDADES] Error de validación:', error.errors)
+      logger.error('❌ [API ACTIVIDADES] Error de validación:', error.errors)
       return NextResponse.json(
         { error: 'Datos inválidos', details: error.errors },
         { status: 400 }
       )
     }
 
-    console.error('❌ [API ACTIVIDADES] Error al crear actividad:', error)
+    logger.error('❌ [API ACTIVIDADES] Error al crear actividad:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

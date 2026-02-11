@@ -174,7 +174,8 @@ export async function PUT(
         }),
         ...(horasPlan !== undefined && { horasPlan: parseFloat(horasPlan) }),
         ...(prioridad !== undefined && { prioridad }),
-        ...(estado !== undefined && { estado })
+        ...(estado !== undefined && { estado }),
+        updatedAt: new Date()
       },
       include: {
         proyectoEdt: {

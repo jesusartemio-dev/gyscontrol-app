@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
@@ -46,7 +47,7 @@ export async function GET(
     }
 
     // ✅ Obtener todos los EDTs del proyecto/cronograma
-    const edts = await (prisma as any).proyectoEdt.findMany({
+    const edts = await prisma.proyectoEdt.findMany({
       where: edtWhere,
       include: {
         proyectoTarea: {
@@ -133,7 +134,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al calcular métricas:', error)
+    logger.error('Error al calcular métricas:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 // ✅ GET /api/proyectos/[id]/cronograma/import-edts - Obtener EDTs disponibles para importar
 export async function GET(
@@ -128,7 +129,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('❌ [API IMPORT EDTS] Error al obtener EDTs para importar:', error)
+    logger.error('❌ [API IMPORT EDTS] Error al obtener EDTs para importar:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -260,7 +261,7 @@ export async function POST(
         })
 
       } catch (error) {
-        console.error(`❌ Error importando EDT ${edtCatalogo.nombre}:`, error)
+        logger.error(`❌ Error importando EDT ${edtCatalogo.nombre}:`, error)
         errores.push(`Error importando EDT ${edtCatalogo.nombre}: ${error instanceof Error ? error.message : 'Error desconocido'}`)
       }
     }
@@ -288,7 +289,7 @@ export async function POST(
         console.log('ℹ️ EDTs importados sin horas iniciales (se calcularán con actividades/tareas)')
 
       } catch (updateError) {
-        console.error('❌ Error en preparación para actualizar horas en fase:', updateError)
+        logger.error('❌ Error en preparación para actualizar horas en fase:', updateError)
         // No fallar la importación por error en preparación
       }
     }
@@ -307,7 +308,7 @@ export async function POST(
     }, { status: 201 })
 
   } catch (error) {
-    console.error('❌ [API IMPORT EDTS] Error en importación:', error)
+    logger.error('❌ [API IMPORT EDTS] Error en importación:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

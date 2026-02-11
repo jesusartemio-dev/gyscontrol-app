@@ -112,6 +112,7 @@ export default function ProyectoTareasPage() {
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos')
   const [filtroPrioridad, setFiltroPrioridad] = useState<FiltroPrioridad>('todos')
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>('todos')
+  const [filtroEdt, setFiltroEdt] = useState<string>('todos')
   const [expandedEdts, setExpandedEdts] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -140,6 +141,17 @@ export default function ProyectoTareasPage() {
     }
   }
 
+  // Extract unique EDTs for filter dropdown
+  const edtsUnicos = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const t of tareas) {
+      if (!map.has(t.proyectoEdtId)) {
+        map.set(t.proyectoEdtId, t.proyectoEdt?.edt?.nombre || t.proyectoEdt?.nombre || 'Sin EDT')
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [tareas])
+
   // Classify: cronograma (has actividadId) vs extra (no actividadId)
   const tareasFiltradas = useMemo(() => {
     return tareas.filter(t => {
@@ -155,9 +167,10 @@ export default function ProyectoTareasPage() {
       if (filtroPrioridad !== 'todos' && t.prioridad !== filtroPrioridad) return false
       if (filtroTipo === 'cronograma' && !t.proyectoActividadId) return false
       if (filtroTipo === 'extra' && t.proyectoActividadId) return false
+      if (filtroEdt !== 'todos' && t.proyectoEdtId !== filtroEdt) return false
       return true
     })
-  }, [tareas, busqueda, filtroEstado, filtroPrioridad, filtroTipo])
+  }, [tareas, busqueda, filtroEstado, filtroPrioridad, filtroTipo, filtroEdt])
 
   // Group by EDT
   const tareasAgrupadas = useMemo(() => {
@@ -274,43 +287,57 @@ export default function ProyectoTareasPage() {
         </div>
 
         <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as FiltroTipo)}>
-          <SelectTrigger className="h-8 w-[140px] text-xs">
-            <SelectValue placeholder="Tipo" />
+          <SelectTrigger className="h-8 w-[155px] text-xs">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todas</SelectItem>
-            <SelectItem value="cronograma">Cronograma</SelectItem>
-            <SelectItem value="extra">Extras</SelectItem>
+            <SelectItem value="todos">Tipo: Todas</SelectItem>
+            <SelectItem value="cronograma">Tipo: Cronograma</SelectItem>
+            <SelectItem value="extra">Tipo: Extras</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={filtroEdt} onValueChange={setFiltroEdt}>
+          <SelectTrigger className="h-8 w-[180px] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">EDT: Todos</SelectItem>
+            {edtsUnicos.map(([edtId, edtNombre]) => (
+              <SelectItem key={edtId} value={edtId}>
+                EDT: {edtNombre}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
         <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v as FiltroEstado)}>
-          <SelectTrigger className="h-8 w-[140px] text-xs">
-            <SelectValue placeholder="Estado" />
+          <SelectTrigger className="h-8 w-[165px] text-xs">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="en_progreso">En Progreso</SelectItem>
-            <SelectItem value="completada">Completada</SelectItem>
-            <SelectItem value="cancelada">Cancelada</SelectItem>
+            <SelectItem value="todos">Estado: Todos</SelectItem>
+            <SelectItem value="pendiente">Estado: Pendiente</SelectItem>
+            <SelectItem value="en_progreso">Estado: En Progreso</SelectItem>
+            <SelectItem value="completada">Estado: Completada</SelectItem>
+            <SelectItem value="cancelada">Estado: Cancelada</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={filtroPrioridad} onValueChange={(v) => setFiltroPrioridad(v as FiltroPrioridad)}>
-          <SelectTrigger className="h-8 w-[130px] text-xs">
-            <SelectValue placeholder="Prioridad" />
+          <SelectTrigger className="h-8 w-[155px] text-xs">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todas</SelectItem>
-            <SelectItem value="baja">Baja</SelectItem>
-            <SelectItem value="media">Media</SelectItem>
-            <SelectItem value="alta">Alta</SelectItem>
-            <SelectItem value="critica">Critica</SelectItem>
+            <SelectItem value="todos">Prioridad: Todas</SelectItem>
+            <SelectItem value="baja">Prioridad: Baja</SelectItem>
+            <SelectItem value="media">Prioridad: Media</SelectItem>
+            <SelectItem value="alta">Prioridad: Alta</SelectItem>
+            <SelectItem value="critica">Prioridad: Critica</SelectItem>
           </SelectContent>
         </Select>
 
-        {(filtroEstado !== 'todos' || filtroPrioridad !== 'todos' || filtroTipo !== 'todos' || busqueda) && (
+        {(filtroEstado !== 'todos' || filtroPrioridad !== 'todos' || filtroTipo !== 'todos' || filtroEdt !== 'todos' || busqueda) && (
           <Button
             variant="ghost"
             size="sm"
@@ -320,6 +347,7 @@ export default function ProyectoTareasPage() {
               setFiltroEstado('todos')
               setFiltroPrioridad('todos')
               setFiltroTipo('todos')
+              setFiltroEdt('todos')
             }}
           >
             Limpiar filtros

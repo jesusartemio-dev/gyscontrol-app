@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
+import { logger } from '@/lib/logger'
 
 // ✅ Schema de validación para crear dependencia
 const createDependenciaSchema = z.object({
@@ -85,7 +86,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error al obtener dependencias:', error)
+    logger.error('Error al obtener dependencias:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
@@ -224,7 +225,7 @@ export async function POST(
       )
     }
 
-    console.error('Error al crear dependencia:', error)
+    logger.error('Error al crear dependencia:', error)
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
