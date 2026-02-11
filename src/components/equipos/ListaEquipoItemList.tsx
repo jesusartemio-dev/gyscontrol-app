@@ -13,10 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Pencil, Trash2, CheckCircle2, X, Search, Filter, Package, DollarSign, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, Settings, Eye, EyeOff, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, X, Search, Package, Clock, AlertTriangle, CheckCircle, Grid3X3, List, RotateCcw, Recycle, Plus, ShoppingCart, FileText, Download, Tag } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -46,9 +44,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { CotizacionInfo, CotizacionCodigoSimple } from './CotizacionSelector'
+import { CotizacionCodigoSimple } from './CotizacionSelector'
 import { 
   calcularResumenPedidos, 
   getBadgeVariantPorEstado, 
@@ -128,23 +124,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const [showModalAgregarEquipo, setShowModalAgregarEquipo] = useState(false)
   const [showModalImportarExcel, setShowModalImportarExcel] = useState(false)
   
-  const [visibleColumns, setVisibleColumns] = useState({
-    codigoDescripcion: true, // ✅ Combined column
-    marca: true, // ✅ Nueva columna marca
-    unidad: false, // ✅ Oculta cuando está activa la unificada
-    cantidad: false, // ✅ Oculta cuando está activa la unificada
-    cantidadUnidad: true, // ✅ Nueva columna unificada (activada por defecto)
-    pedidos: false, // ✅ Oculta por defecto (integrado en Cant./Und)
-    cotizacion: true,
-    costo: true,
-    entrega: false,
-    origen: true,
-    estado: true,
-    verificadoComentario: true, // ✅ Combined verificado + comentario column
-    pedidosLinks: true, // ✅ Nueva columna de pedidos (links)
-    equipo: false,
-    acciones: true
-  })
 
   // 📊 Memoize pedido summaries to prevent infinite loops
   const itemsWithResumen = useMemo(() => {
@@ -478,71 +457,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
           </Button>
         </div>
 
-        {/* Column Visibility Toggle */}
-        {viewMode === 'list' && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                <Settings className="h-3 w-3" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-44 p-2" align="end">
-              <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between py-0.5">
-                  <Label className="text-[10px] font-medium">Columnas unificadas</Label>
-                   <Switch
-                     checked={visibleColumns.cantidadUnidad}
-                     onCheckedChange={(checked) => {
-                       setVisibleColumns(prev => ({
-                         ...prev,
-                         cantidadUnidad: checked,
-                         unidad: !checked,
-                         cantidad: !checked
-                       }))
-                     }}
-                   />
-                </div>
-                <div className="h-px bg-border" />
-                {Object.entries({
-                  codigoDescripcion: 'Código',
-                  marca: 'Marca',
-                  unidad: 'Unidad',
-                  cantidad: 'Cantidad',
-                  cantidadUnidad: 'Cant./Unidad',
-                  pedidos: 'Pedidos',
-                  cotizacion: 'Cotización',
-                  costo: 'Costo',
-                  entrega: 'Entrega',
-                  origen: 'Origen',
-                  estado: 'Estado',
-                  pedidosLinks: 'Links Pedidos',
-                  verificadoComentario: 'Verif./Comentario'
-                }).map(([key, label]) => {
-                  if (visibleColumns.cantidadUnidad && (key === 'unidad' || key === 'cantidad')) {
-                    return null
-                  }
-                  if (!visibleColumns.cantidadUnidad && key === 'cantidadUnidad') {
-                    return null
-                  }
-
-                  return (
-                    <div key={key} className="flex items-center justify-between py-0.5">
-                      <Label htmlFor={key} className="text-[10px]">{label}</Label>
-                      <Switch
-                        id={key}
-                        checked={visibleColumns[key as keyof typeof visibleColumns]}
-                        onCheckedChange={(checked) =>
-                          setVisibleColumns(prev => ({ ...prev, [key]: checked }))
-                        }
-                        disabled={key === 'codigoDescripcion'}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
       </div>
     </div>
   )
@@ -588,21 +502,17 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
 
     // ✅ Define optimized column widths for compact layout
     const columnWidths = {
-      codigoDescripcion: 'min-w-[180px]',
-      marca: 'w-28',
-      unidad: 'w-16',
-      cantidad: 'w-20',
-      cantidadUnidad: 'w-28',
-      pedidos: 'w-24',
-      cotizacion: 'w-28',
-      costo: 'w-24',
-      entrega: 'w-20',
-      origen: 'w-20',
-      estado: 'w-24',
-      pedidosLinks: 'w-32',
-      verificadoComentario: 'w-40',
-      equipo: 'w-24',
-      acciones: 'w-24'
+      codigoDescripcion: 'min-w-[120px]',
+      marca: 'w-24',
+      cantidadUnidad: 'w-24',
+      cotizacion: 'w-24',
+      costo: 'w-20',
+      entrega: 'w-16',
+      origen: 'w-16',
+      estado: 'w-20',
+      pedidosLinks: 'w-28',
+      verificadoComentario: 'min-w-[120px]',
+      acciones: 'w-20'
     }
 
     return (
@@ -611,82 +521,40 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
           <table className={`w-full ${textSize}`}>
             <thead>
               <tr className="bg-gray-50 border-b">
-                {visibleColumns.codigoDescripcion && (
-                  <th className={`${cellPadding} ${columnWidths.codigoDescripcion} text-left font-semibold text-gray-700`}>
-                    Código / Descripción
-                  </th>
-                )}
-                {visibleColumns.marca && (
-                  <th className={`${cellPadding} ${columnWidths.marca} text-left font-semibold text-gray-700`}>
-                    Marca
-                  </th>
-                )}
-                {visibleColumns.unidad && (
-                  <th className={`${cellPadding} ${columnWidths.unidad} text-center font-semibold text-gray-700`}>
-                    Und
-                  </th>
-                )}
-                {visibleColumns.cantidad && (
-                  <th className={`${cellPadding} ${columnWidths.cantidad} text-center font-semibold text-gray-700`}>
-                    Cant.
-                  </th>
-                )}
-                {visibleColumns.cantidadUnidad && (
-                  <th className={`${cellPadding} ${columnWidths.cantidadUnidad} text-center font-semibold text-gray-700`}>
-                    Cant./Und
-                  </th>
-                )}
-                {visibleColumns.pedidos && (
-                  <th className={`${cellPadding} ${columnWidths.pedidos} text-center font-semibold text-gray-700`}>
-                    Pedidos
-                  </th>
-                )}
-                {visibleColumns.cotizacion && (
-                  <th className={`${cellPadding} ${columnWidths.cotizacion} text-center font-semibold text-gray-700`}>
-                    Cotización
-                  </th>
-                )}
-                {visibleColumns.costo && (
-                  <th className={`${cellPadding} ${columnWidths.costo} text-right font-semibold text-gray-700`}>
-                    Costo
-                  </th>
-                )}
-                {visibleColumns.entrega && (
-                  <th className={`${cellPadding} ${columnWidths.entrega} text-center font-semibold text-gray-700`}>
-                    Entrega
-                  </th>
-                )}
-                {visibleColumns.origen && (
-                  <th className={`${cellPadding} ${columnWidths.origen} text-center font-semibold text-gray-700`}>
-                    Origen
-                  </th>
-                )}
-                {visibleColumns.estado && (
-                  <th className={`${cellPadding} ${columnWidths.estado} text-center font-semibold text-gray-700`}>
-                    Estado
-                  </th>
-                )}
-                {visibleColumns.pedidosLinks && (
-                  <th className={`${cellPadding} ${columnWidths.pedidosLinks} text-center font-semibold text-gray-700`}>
-                    Pedidos
-                  </th>
-                )}
-                {visibleColumns.verificadoComentario && (
-                  <th className={`${cellPadding} ${columnWidths.verificadoComentario} text-left font-semibold text-gray-700`}>
-                    <div className="flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3" />
-                      <span>Comentario</span>
-                    </div>
-                  </th>
-                )}
-                {visibleColumns.equipo && (
-                  <th className={`${cellPadding} ${columnWidths.equipo} text-center font-semibold text-gray-700`}>
-                    Equipo
-                  </th>
-                )}
-                {visibleColumns.acciones && (
-                  <th className={`${cellPadding} ${columnWidths.acciones} text-center font-semibold text-gray-700`}></th>
-                )}
+                <th className={`${cellPadding} ${columnWidths.codigoDescripcion} text-left font-semibold text-gray-700`}>
+                  Código / Descripción
+                </th>
+                <th className={`${cellPadding} ${columnWidths.marca} text-left font-semibold text-gray-700`}>
+                  Marca
+                </th>
+                <th className={`${cellPadding} ${columnWidths.cantidadUnidad} text-center font-semibold text-gray-700`}>
+                  Cant./Und
+                </th>
+                <th className={`${cellPadding} ${columnWidths.cotizacion} text-center font-semibold text-gray-700`}>
+                  Cotización
+                </th>
+                <th className={`${cellPadding} ${columnWidths.costo} text-right font-semibold text-gray-700`}>
+                  Costo
+                </th>
+                <th className={`${cellPadding} ${columnWidths.entrega} text-center font-semibold text-gray-700`}>
+                  Entrega
+                </th>
+                <th className={`${cellPadding} ${columnWidths.origen} text-center font-semibold text-gray-700`}>
+                  Origen
+                </th>
+                <th className={`${cellPadding} ${columnWidths.estado} text-center font-semibold text-gray-700`}>
+                  Estado
+                </th>
+                <th className={`${cellPadding} ${columnWidths.pedidosLinks} text-center font-semibold text-gray-700`}>
+                  Pedidos
+                </th>
+                <th className={`${cellPadding} ${columnWidths.verificadoComentario} text-left font-semibold text-gray-700`}>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    <span>Comentario</span>
+                  </div>
+                </th>
+                <th className={`${cellPadding} ${columnWidths.acciones} text-center font-semibold text-gray-700`}></th>
               </tr>
             </thead>
           <tbody>
@@ -708,13 +576,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                      rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
                    }`}
                  >
-                   {visibleColumns.codigoDescripcion && (
-                     <td className={`${cellPadding} ${columnWidths.codigoDescripcion} text-gray-700`}>
+                   <td className={`${cellPadding} ${columnWidths.codigoDescripcion} text-gray-700`}>
                        <div className="space-y-0.5">
-                         <div className="font-medium text-gray-900 text-xs truncate" title={item.codigo}>
+                         <div className="font-medium text-gray-900 text-xs" title={item.codigo}>
                            {item.codigo}
                          </div>
-                         <div className="text-[11px] text-gray-500 truncate" title={item.descripcion}>
+                         <div className="text-[11px] text-gray-500 line-clamp-2 leading-tight" title={item.descripcion}>
                            {item.descripcion}
                          </div>
                          {item.categoria && item.categoria !== 'SIN-CATEGORIA' && (
@@ -723,58 +590,13 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                            </span>
                          )}
                        </div>
-                     </td>
-                   )}
-                   {visibleColumns.marca && (
-                     <td className={`${cellPadding} ${columnWidths.marca}`}>
-                       <span className="text-gray-600 truncate line-clamp-1" title={item.marca || ''}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.marca}`}>
+                       <span className="text-gray-600 line-clamp-1" title={item.marca || ''}>
                          {item.marca || '-'}
                        </span>
-                     </td>
-                   )}
-                   {visibleColumns.unidad && (
-                     <td className={`${cellPadding} ${columnWidths.unidad} text-center text-gray-600`}>
-                       {item.unidad}
-                     </td>
-                   )}
-                   {visibleColumns.cantidad && (
-                     <td className={`${cellPadding} ${columnWidths.cantidad}`}>
-                      {isEditingCantidad ? (
-                        <div className="flex gap-1 items-center justify-center">
-                          <Input
-                            type="number"
-                            value={editCantidadValues[item.id] ?? item.cantidad?.toString() ?? ''}
-                            onChange={(e) => setEditCantidadValues((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                            className="w-16 h-7 text-center text-xs"
-                          />
-                          <Button size="sm" onClick={() => handleSaveCantidad(item.id)} className="h-7 w-7 p-0">
-                            <CheckCircle2 className="h-3 w-3" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditCantidadItemId(null)} className="h-7 w-7 p-0">
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div>
-                          <div
-                            className="flex items-center justify-center gap-1 font-medium cursor-pointer hover:text-blue-600 transition-colors"
-                            onClick={() => editable && setEditCantidadItemId(item.id)}
-                          >
-                            {item.cantidad}
-                            {editable && <Pencil className="h-3 w-3 text-muted-foreground" />}
-                          </div>
-                          {item.origen === 'cotizado' && item.proyectoEquipoItem?.cantidad != null && item.cantidad > item.proyectoEquipoItem.cantidad && (
-                            <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                              <AlertTriangle className="h-3 w-3 text-amber-500" />
-                              <span className="text-[10px] text-amber-600">Cotizado: {item.proyectoEquipoItem.cantidad}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                     </td>
-                   )}
-                   {visibleColumns.cantidadUnidad && (
-                     <td className={`${cellPadding} ${columnWidths.cantidadUnidad}`}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.cantidadUnidad}`}>
                       {isEditingCantidad ? (
                         <div className="flex gap-1 items-center justify-center">
                           <Input
@@ -807,38 +629,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                               <span className="text-[10px] text-amber-600">Cotizado: {item.proyectoEquipoItem.cantidad}</span>
                             </div>
                           )}
-                          {/* Pedido status integrated */}
-                          {(() => {
-                            const cantidadPedida = item.cantidadPedida || 0
-                            const cantidadTotal = item.cantidad || 0
-                            if (cantidadPedida === 0) return null
-                            if (cantidadPedida >= cantidadTotal) {
-                              return <div className="text-center mt-0.5"><span className="text-[9px] text-green-600">Completo</span></div>
-                            }
-                            return <div className="text-center mt-0.5"><span className="text-[9px] text-muted-foreground">{cantidadPedida}/{cantidadTotal} ped.</span></div>
-                          })()}
                         </div>
                       )}
-                     </td>
-                   )}
-                   {visibleColumns.pedidos && (
-                     <td className={`${cellPadding} ${columnWidths.pedidos} text-center`}>
-                       {(() => {
-                         const cantidadPedida = item.cantidadPedida || 0
-                         const cantidadTotal = item.cantidad || 0
-
-                         if (cantidadPedida === 0) {
-                           return <Badge variant="outline" className="text-xs text-gray-500">Sin pedidos</Badge>
-                         } else if (cantidadPedida >= cantidadTotal) {
-                           return <Badge variant="default" className="text-xs bg-blue-600">Completo</Badge>
-                         } else {
-                           return <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">{cantidadPedida}/{cantidadTotal}</Badge>
-                         }
-                       })()}
-                     </td>
-                   )}
-                   {visibleColumns.cotizacion && (
-                     <td className={`${cellPadding} ${columnWidths.cotizacion}`}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.cotizacion}`}>
                       <div className="flex items-start justify-center gap-1">
                         {(() => {
                           const n = item.cotizaciones?.length || 0
@@ -859,39 +653,25 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           interactive={false}
                         />
                       </div>
-                     </td>
-                   )}
-                   {visibleColumns.costo && (
-                     <td className={`${cellPadding} ${columnWidths.costo} text-right font-medium text-gray-900`}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.costo} text-right font-medium text-gray-900`}>
                       {costoTotal > 0 ? formatCurrency(costoTotal) : '—'}
-                    </td>
-                   )}
-                   {visibleColumns.entrega && (
-                     <td className={`${cellPadding} ${columnWidths.entrega} text-center text-gray-700`}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.entrega} text-center text-gray-700`}>
                       {item.tiempoEntrega ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{item.tiempoEntrega}</span>
-                        </div>
+                        <span className="text-xs">{item.tiempoEntrega}</span>
                       ) : item.tiempoEntregaDias ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{item.tiempoEntregaDias}d</span>
-                        </div>
+                        <span className="text-xs">{item.tiempoEntregaDias}d</span>
                       ) : (
-                        <span className="text-gray-400 italic text-xs">—</span>
+                        <span className="text-gray-400 text-xs">—</span>
                       )}
-                     </td>
-                   )}
-                   {visibleColumns.origen && (
-                     <td className={`${cellPadding} ${columnWidths.origen} text-center`}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.origen} text-center`}>
                       <span className={`text-[11px] ${item.origen === 'nuevo' ? 'text-amber-600' : 'text-muted-foreground'}`}>
                         {labelOrigen[item.origen] || item.origen}
                       </span>
-                     </td>
-                   )}
-                   {visibleColumns.estado && (
-                     <td className={`${cellPadding} ${columnWidths.estado} text-center`}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.estado} text-center`}>
                       <span className={`text-[11px] ${
                         item.estado === 'aprobado' ? 'text-green-600' :
                         item.estado === 'rechazado' ? 'text-red-500' :
@@ -899,23 +679,23 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                       }`}>
                         {item.estado || 'sin estado'}
                       </span>
-                     </td>
-                   )}
-                   {visibleColumns.pedidosLinks && (
-                     <td className={`${cellPadding} ${columnWidths.pedidosLinks}`}>
-                      <div className="flex flex-col gap-1 min-w-0">
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.pedidosLinks}`}>
+                      <div className="flex flex-col gap-0.5 min-w-0">
                         {(() => {
                           const pedidos = obtenerTodosLosPedidos(item)
-                          
-                          if (pedidos.length === 0) {
-                            return (
-                               <span className="text-[10px] text-muted-foreground">—</span>
-                             )
+                          const cantidadPedida = item.cantidadPedida || 0
+                          const cantidadTotal = item.cantidad || 0
+                          if (pedidos.length === 0 && cantidadPedida === 0) {
+                            return <span className="text-[10px] text-muted-foreground">—</span>
                           }
-
-                          // Mostrar todos los pedidos directamente
                           return (
-                            <div className="flex flex-col gap-0.5">
+                            <>
+                              {cantidadPedida > 0 && (
+                                <span className={`text-[9px] font-medium ${cantidadPedida >= cantidadTotal ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                  {cantidadPedida >= cantidadTotal ? 'Completo' : `${cantidadPedida}/${cantidadTotal} ped.`}
+                                </span>
+                              )}
                               {pedidos.map((codigo, index) => (
                                 <Tooltip key={index}>
                                   <TooltipTrigger asChild>
@@ -936,17 +716,13 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                                   </TooltipContent>
                                 </Tooltip>
                               ))}
-                            </div>
+                            </>
                           )
-                        })()
-                        }
+                        })()}
                       </div>
-                     </td>
-                   )}
-                   {visibleColumns.verificadoComentario && (
-                     <td className={`${cellPadding} ${columnWidths.verificadoComentario}`}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.verificadoComentario}`}>
                       <div className="flex items-center gap-2">
-                        {/* Checkbox */}
                         <div className="flex-shrink-0">
                           <Checkbox
                             checked={item.verificado}
@@ -954,7 +730,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             onCheckedChange={(val) => editable && handleVerificado(item, Boolean(val))}
                           />
                         </div>
-                        {/* Comment with Popover */}
                         <div className="flex-1 min-w-0">
                           <Popover
                             open={isEditingComentario}
@@ -968,7 +743,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                                 return (
                                   <div
                                     onClick={() => editable && setEditComentarioItemId(item.id)}
-                                    className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors line-clamp-2 leading-tight ${
+                                    className={`text-xs cursor-pointer hover:bg-muted/50 rounded transition-colors leading-tight ${
                                       editable ? 'hover:text-blue-600' : ''
                                     } ${item.verificado ? 'text-green-700' : 'text-gray-600'}`}
                                     title={displayComment || 'Click para agregar comentario'}
@@ -1021,28 +796,17 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           )}
                         </div>
                       </div>
-                     </td>
-                   )}
-                   {visibleColumns.equipo && (
-                     <td className={`${cellPadding} ${columnWidths.equipo} text-center`}>
-                      {item.proyectoEquipo?.nombre ? (
-                        <Badge variant="outline" className="text-xs">{item.proyectoEquipo.nombre}</Badge>
-                      ) : (
-                        <span className="text-gray-400 italic text-xs">—</span>
-                      )}
-                     </td>
-                   )}
-                   {visibleColumns.acciones && (
-                     <td className={`${cellPadding} ${columnWidths.acciones} text-center`}>
+                   </td>
+                   <td className={`${cellPadding} ${columnWidths.acciones} text-center`}>
                       <div className="flex justify-end gap-1 items-center">
                         {(item.estado !== 'rechazado') && (item.origen === 'cotizado' || item.origen === 'reemplazo') && (
                           !item.reemplazaProyectoEquipoCotizadoItemId ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => setItemReemplazoOriginal(item)} 
-                                  variant="outline" 
+                                <Button
+                                  size="sm"
+                                  onClick={() => setItemReemplazoOriginal(item)}
+                                  variant="outline"
                                   disabled={!editable}
                                   className="h-7 w-7 p-0"
                                 >
@@ -1054,10 +818,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           ) : (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => setItemReemplazoReemplazo(item)} 
-                                  variant="secondary" 
+                                <Button
+                                  size="sm"
+                                  onClick={() => setItemReemplazoReemplazo(item)}
+                                  variant="secondary"
                                   disabled={!editable}
                                   className="h-7 w-7 p-0"
                                 >
@@ -1068,7 +832,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             </Tooltip>
                           )
                         )}
-                        
+
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -1084,8 +848,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                           <TooltipContent>Eliminar ítem</TooltipContent>
                         </Tooltip>
                       </div>
-                     </td>
-                   )}
+                   </td>
                    </tr>
                )
                  })
