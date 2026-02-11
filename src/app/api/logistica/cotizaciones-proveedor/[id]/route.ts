@@ -1,12 +1,18 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import type { CotizacionProveedorUpdatePayload } from '@/types'
 
-// GET → Obtener cotización por ID
 export async function GET(
   req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const { id } = await context.params
 
@@ -55,7 +61,6 @@ export async function GET(
       )
     }
 
-    // 🔄 Frontend compatibility mapping
     const data = {
       ...rawData,
       items: rawData.cotizacionProveedorItem?.map((item: any) => ({
@@ -66,7 +71,7 @@ export async function GET(
 
     return NextResponse.json({ ok: true, data })
   } catch (error) {
-    console.error('❌ Error al obtener la cotización:', error)
+    console.error('Error al obtener la cotización:', error)
     return NextResponse.json(
       { ok: false, error: 'Error al obtener la cotización: ' + String(error) },
       { status: 500 }
@@ -74,23 +79,27 @@ export async function GET(
   }
 }
 
-// PATCH → Actualizar cotización por ID
 export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const { id } = await context.params
     const body: CotizacionProveedorUpdatePayload = await req.json()
 
     const data = await prisma.cotizacionProveedor.update({
       where: { id },
-      data: { ...body, updatedAt: new Date() },
+      data: { ...body },
     })
 
     return NextResponse.json({ ok: true, data })
   } catch (error) {
-    console.error('❌ Error al actualizar la cotización:', error)
+    console.error('Error al actualizar la cotización:', error)
     return NextResponse.json(
       { ok: false, error: 'Error al actualizar la cotización: ' + String(error) },
       { status: 500 }
@@ -98,23 +107,25 @@ export async function PATCH(
   }
 }
 
-// DELETE → Eliminar cotización por ID
 export async function DELETE(
   req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const { id } = await context.params
 
     await prisma.$transaction(async (tx) => {
-      // Buscar items que se van a eliminar
       const items = await tx.cotizacionProveedorItem.findMany({
         where: { cotizacionId: id },
         select: { id: true },
       })
       const itemIds = items.map(i => i.id)
 
-      // Limpiar referencias en ListaEquipoItem antes de borrar
       if (itemIds.length > 0) {
         await tx.listaEquipoItem.updateMany({
           where: { cotizacionSeleccionadaId: { in: itemIds } },
@@ -124,7 +135,6 @@ export async function DELETE(
             costoElegido: null,
             tiempoEntrega: null,
             tiempoEntregaDias: null,
-            updatedAt: new Date(),
           },
         })
       }
@@ -140,7 +150,7 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true, data: { message: 'Cotización eliminada' } })
   } catch (error) {
-    console.error('❌ Error al eliminar la cotización:', error)
+    console.error('Error al eliminar la cotización:', error)
     return NextResponse.json(
       { ok: false, error: 'Error al eliminar la cotización: ' + String(error) },
       { status: 500 }

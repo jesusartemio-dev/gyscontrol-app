@@ -124,7 +124,7 @@ export default function ProyectoTareasPage() {
     if (!proyecto?.id) return
     try {
       setLoading(true)
-      const response = await fetch(`/api/proyectos/${proyecto.id}/cronograma/tareas`)
+      const response = await fetch(`/api/proyectos/${proyecto.id}/cronograma/tareas?tipo=ejecucion`)
       if (!response.ok) throw new Error('Error al cargar tareas')
       const data = await response.json()
       setTareas(data.success ? data.data : [])

@@ -1,18 +1,17 @@
-// ===================================================
-// 📁 Archivo: /api/logistica/listas/[id]/route.ts
-// 📌 Descripción: API para obtener el detalle de una lista logística por ID
-// 🧠 Uso: GET /api/logistica/listas/[id]
-// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
-// 📅 Última actualización: 2025-05-31 (💥 incluye cotizacion.codigo y proveedor en cotizaciones)
-// ===================================================
-
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(
   req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const { id } = await context.params
 
@@ -41,7 +40,7 @@ export async function GET(
             },
             pedidoEquipoItem: {
               include: {
-                pedidoEquipo: true // ✅ Incluir relación al pedido padre para acceder al código
+                pedidoEquipo: true
               }
             },
             proyectoEquipoItem: {
@@ -61,7 +60,6 @@ export async function GET(
       )
     }
 
-    // 🔄 Frontend compatibility mapping
     const lista = {
       ...listaRaw,
       responsable: listaRaw.user,
@@ -82,7 +80,7 @@ export async function GET(
 
     return NextResponse.json(lista)
   } catch (error) {
-    console.error('❌ Error en /api/logistica/listas/[id]:', error)
+    console.error('Error en /api/logistica/listas/[id]:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }

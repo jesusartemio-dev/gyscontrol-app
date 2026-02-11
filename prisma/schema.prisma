@@ -43,7 +43,7 @@ model CatalogoEquipo {
   precioReal                       Float?
   fechaActualizacion               DateTime?
   createdAt                        DateTime                           @default(now())
-  updatedAt                        DateTime
+  updatedAt                        DateTime                           @updatedAt
   categoriaEquipo                  CategoriaEquipo                    @relation(fields: [categoriaId], references: [id])
   unidad                           Unidad                             @relation(fields: [unidadId], references: [id])
   cotizacionEquipoItem             CotizacionEquipoItem[]
@@ -334,12 +334,13 @@ model CotizacionProveedor {
   codigo                  String                    @unique
   numeroSecuencia         Int
   createdAt               DateTime                  @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime                  @updatedAt
   estado                  EstadoCotizacionProveedor @default(pendiente)
   proveedor               Proveedor                 @relation(fields: [proveedorId], references: [id])
-  proyecto                Proyecto                  @relation(fields: [proyectoId], references: [id])
+  proyecto                Proyecto                  @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   cotizacionProveedorItem CotizacionProveedorItem[]
 
+  @@index([proyectoId, estado])
   @@map("cotizacion_proveedor")
 }
 
@@ -359,13 +360,14 @@ model CotizacionProveedorItem {
   estado                      EstadoCotizacionProveedor @default(pendiente)
   esSeleccionada              Boolean?                  @default(false)
   createdAt                   DateTime                  @default(now())
-  updatedAt                   DateTime
+  updatedAt                   DateTime                  @updatedAt
   listaId                     String?
-  cotizacionProveedor         CotizacionProveedor       @relation(fields: [cotizacionId], references: [id])
+  cotizacionProveedor         CotizacionProveedor       @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
   listaEquipoItem             ListaEquipoItem?          @relation("cotizacionProveedorItemListaEquipoItem", fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?              @relation(fields: [listaId], references: [id])
   cotizacionSeleccionadaItems ListaEquipoItem?          @relation("listaEquipoItemCotizacionSeleccionada")
 
+  @@index([cotizacionId, estado])
   @@map("cotizacion_proveedor_item")
 }
 
@@ -482,7 +484,7 @@ model ListaEquipo {
   numeroSecuencia            Int
   estado                     EstadoListaEquipo            @default(borrador)
   createdAt                  DateTime                     @default(now())
-  updatedAt                  DateTime
+  updatedAt                  DateTime                     @updatedAt
   responsableId              String
   fechaAprobacionFinal       DateTime?
   fechaAprobacionRevision    DateTime?
@@ -533,7 +535,7 @@ model ListaEquipoItem {
   cantidadEntregada                     Float?                       @default(0)
   estado                                EstadoListaItem              @default(borrador)
   createdAt                             DateTime                     @default(now())
-  updatedAt                             DateTime
+  updatedAt                             DateTime                     @updatedAt
   origen                                OrigenListaItem              @default(nuevo)
   tiempoEntrega                         String?
   tiempoEntregaDias                     Int?
@@ -572,7 +574,7 @@ model PedidoEquipo {
   fechaEntregaEstimada DateTime?
   fechaEntregaReal     DateTime?
   createdAt            DateTime           @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime           @updatedAt
   fechaNecesaria       DateTime
   costoRealTotal       Float              @default(0)
   esUrgente            Boolean            @default(false)
@@ -603,7 +605,7 @@ model PedidoEquipoItem {
   comentarioLogisticaPorId    String?
   comentarioLogisticaAt       DateTime?
   createdAt                   DateTime          @default(now())
-  updatedAt                   DateTime
+  updatedAt                   DateTime          @updatedAt
   listaId                     String?
   codigo                      String
   descripcion                 String
@@ -785,7 +787,7 @@ model Proveedor {
   telefono            String?
   correo              String?
   createdAt           DateTime              @default(now())
-  updatedAt           DateTime
+  updatedAt           DateTime              @updatedAt
   cotizacionProveedor CotizacionProveedor[]
   listaEquipoItem     ListaEquipoItem[]
 
@@ -2300,7 +2302,7 @@ model ProyectoDependenciasTarea {
   tareaDependienteId String
   lagMinutos         Int             @default(0)
   createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
   tareaDependiente   ProyectoTarea   @relation("dependenciasTareaDependiente", fields: [tareaDependienteId], references: [id], onDelete: Cascade)
   tareaOrigen        ProyectoTarea   @relation("dependenciasTareaOrigen", fields: [tareaOrigenId], references: [id], onDelete: Cascade)
 

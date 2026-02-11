@@ -60,8 +60,6 @@ interface PedidoSeguimientoDetalle extends PedidoEquipo {
   itemsTotal: number
   proveedorPrincipal: string
   proyectoNombre: string
-  // Propiedades adicionales para seguimiento
-  proyecto?: { id: string; nombre: string }
   proveedor?: { id: string; nombre: string }
   fechaEstimada: string
   prioridad?: 'baja' | 'media' | 'alta' | 'critica'

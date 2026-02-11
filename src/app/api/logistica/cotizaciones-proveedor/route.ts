@@ -1,19 +1,16 @@
-// ===================================================
-// 📁 Archivo: route.ts
-// 📌 Ubicación: src/app/api/logistica/cotizaciones-proveedor/
-// 🔧 Descripción: API para crear y listar cotizaciones de proveedores
-//
-// 🧠 Uso: Usado por logística para registrar cotizaciones de equipos
-// ✍️ Autor: Asistente IA GYS
-// 📅 Última actualización: 2025-12-16
-// ===================================================
-
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 import type { CotizacionProveedorPayload } from '@/types'
 
 export async function GET() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const rawData = await prisma.cotizacionProveedor.findMany({
       include: {
@@ -31,7 +28,6 @@ export async function GET() {
       },
     })
 
-    // 🔄 Frontend compatibility mapping
     const data = rawData.map((cotizacion: any) => ({
       ...cotizacion,
       items: cotizacion.cotizacionProveedorItem?.map((item: any) => ({
@@ -42,7 +38,7 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, data })
   } catch (error) {
-    console.error('❌ Error al obtener cotizaciones:', error)
+    console.error('Error al obtener cotizaciones:', error)
     return NextResponse.json(
       { ok: false, error: 'Error al obtener cotizaciones: ' + String(error) },
       { status: 500 }
@@ -51,10 +47,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const body: CotizacionProveedorPayload = await request.json()
 
-    // ✅ Validación básica
     if (!body.proveedorId || !body.proyectoId) {
       return NextResponse.json(
         { ok: false, error: 'Faltan campos requeridos: proveedorId, proyectoId' },
@@ -73,7 +73,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Obtener último numeroSecuencia
     const ultimaCotizacion = await prisma.cotizacionProveedor.findFirst({
       where: { proyectoId: body.proyectoId },
       orderBy: { numeroSecuencia: 'desc' },
@@ -89,13 +88,12 @@ export async function POST(request: Request) {
         proyectoId: body.proyectoId,
         codigo: codigoGenerado,
         numeroSecuencia: nuevoNumero,
-        updatedAt: new Date(),
       },
     })
 
     return NextResponse.json({ ok: true, data: nuevaCotizacion })
   } catch (error) {
-    console.error('❌ Error al crear cotización:', error)
+    console.error('Error al crear cotización:', error)
     return NextResponse.json(
       { ok: false, error: 'Error al crear cotización: ' + String(error) },
       { status: 500 }

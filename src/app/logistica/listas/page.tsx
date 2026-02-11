@@ -236,11 +236,27 @@ export default function LogisticaListasPage() {
 
         {/* Tabla */}
         <div className="bg-white rounded-lg border overflow-hidden">
-          <LogisticaListasTable
-            listas={listasFiltradas}
-            proyectos={proyectos}
-            onRefresh={fetchData}
-          />
+          {listasFiltradas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Package className="h-10 w-10 text-gray-300 mb-3" />
+              <p className="text-sm text-muted-foreground">
+                {listas.length === 0
+                  ? 'No hay listas técnicas registradas'
+                  : 'No se encontraron listas con los filtros aplicados'}
+              </p>
+              {hasFilters && (
+                <Button variant="link" size="sm" className="text-xs mt-2" onClick={clearFilters}>
+                  Limpiar filtros
+                </Button>
+              )}
+            </div>
+          ) : (
+            <LogisticaListasTable
+              listas={listasFiltradas}
+              proyectos={proyectos}
+              onRefresh={fetchData}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Table as TableIcon, LayoutGrid } from 'lucide-react'
+import { RefreshCw, Truck, Package, Search, Filter, X, CheckCircle, AlertTriangle, Clock, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,7 +43,7 @@ export default function LogisticaPedidosPage() {
   // Filters
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [proyectoId, setProyectoId] = useState<string>('all')
 
   const fetchData = async () => {
     try {
@@ -63,6 +63,11 @@ export default function LogisticaPedidosPage() {
     fetchData()
   }, [])
 
+  // Unique projects for filter
+  const proyectosUnicos = Array.from(
+    new Map(pedidos.filter(p => p.proyecto).map(p => [p.proyecto!.id, p.proyecto!])).values()
+  )
+
   // Filter pedidos
   const pedidosFiltrados = pedidos.filter((pedido) => {
     if (search) {
@@ -70,10 +75,12 @@ export default function LogisticaPedidosPage() {
       const match =
         pedido.codigo?.toLowerCase().includes(s) ||
         pedido.responsable?.name?.toLowerCase().includes(s) ||
+        pedido.proyecto?.nombre?.toLowerCase().includes(s) ||
         pedido.observacion?.toLowerCase().includes(s)
       if (!match) return false
     }
     if (estado !== 'all' && pedido.estado !== estado) return false
+    if (proyectoId !== 'all' && pedido.proyectoId !== proyectoId) return false
     return true
   })
 
@@ -89,11 +96,12 @@ export default function LogisticaPedidosPage() {
     }).length,
   }
 
-  const hasFilters = search || estado !== 'all'
+  const hasFilters = search || estado !== 'all' || proyectoId !== 'all'
 
   const clearFilters = () => {
     setSearch('')
     setEstado('all')
+    setProyectoId('all')
   }
 
   const handleDelete = async (id: string) => {
@@ -138,26 +146,6 @@ export default function LogisticaPedidosPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* View toggle */}
-              <div className="flex items-center border rounded-md p-0.5">
-                <Button
-                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                  className="h-6 px-2"
-                >
-                  <TableIcon className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('cards')}
-                  className="h-6 px-2"
-                >
-                  <LayoutGrid className="h-3 w-3" />
-                </Button>
-              </div>
-
               <Button
                 variant="outline"
                 size="sm"
@@ -225,6 +213,21 @@ export default function LogisticaPedidosPage() {
                 className="h-8 pl-8 text-xs"
               />
             </div>
+
+            <Select value={proyectoId} onValueChange={setProyectoId}>
+              <SelectTrigger className="h-8 w-[180px] text-xs">
+                <Building2 className="h-3 w-3 mr-1.5 text-gray-400" />
+                <SelectValue placeholder="Proyecto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">Todos los proyectos</SelectItem>
+                {proyectosUnicos.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">
+                    {p.codigo || p.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Select value={estado} onValueChange={setEstado}>
               <SelectTrigger className="h-8 w-[140px] text-xs">

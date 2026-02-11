@@ -15,8 +15,6 @@ import {
   Search,
   Filter,
   X,
-  Table as TableIcon,
-  LayoutGrid,
   Users,
   FileText,
   Upload
@@ -49,7 +47,6 @@ export default function ProveedoresPage() {
 
   // Filters
   const [search, setSearch] = useState('')
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
   const fetchData = async () => {
     try {
@@ -156,26 +153,6 @@ export default function ProveedoresPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* View toggle */}
-              <div className="flex items-center border rounded-md p-0.5">
-                <Button
-                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                  className="h-6 px-2"
-                >
-                  <TableIcon className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('cards')}
-                  className="h-6 px-2"
-                >
-                  <LayoutGrid className="h-3 w-3" />
-                </Button>
-              </div>
-
               <Button
                 variant="outline"
                 size="sm"

@@ -76,9 +76,16 @@ export async function GET(
     }
 
     // ✅ Obtener tareas del proyecto (filtradas por cronograma si se especifica)
+    const tipo = searchParams.get('tipo')
     const where: any = { proyectoEdt: { proyectoId: id } }
     if (cronogramaId && cronogramaId.trim() !== '') {
       where.proyectoCronogramaId = cronogramaId
+    } else if (tipo && tipo.trim() !== '') {
+      // Filtrar por tipo de cronograma + tareas extras (sin actividad)
+      where.OR = [
+        { proyectoCronograma: { tipo } },
+        { proyectoActividadId: null }
+      ]
     }
 
     const tareas = await prisma.proyectoTarea.findMany({

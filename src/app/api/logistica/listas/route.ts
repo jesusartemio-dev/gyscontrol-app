@@ -1,16 +1,15 @@
-// ===================================================
-// 📁 src/app/api/logistica/listas/route.ts
-// 🔧 API dedicada para logística → listas filtradas con resumen de cotizaciones
-// ✅ Incluye resumen de ítems cotizados, pendientes y respondidos
-// ✍️ Autor: Jesús Artemio (Master Experto 🧙‍♂️)
-// 📅 Última actualización: 2025-05-27
-// ===================================================
-
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { EstadoCotizacionProveedor } from '@prisma/client'
 
 export async function GET(request: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const proyectoId = searchParams.get('proyectoId')
 
@@ -20,7 +19,7 @@ export async function GET(request: Request) {
         estado: {
           in: ['por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'completada'],
         },
-        ...(proyectoId && { proyectoId }), // ✅ aplicar filtro si existe
+        ...(proyectoId && { proyectoId }),
       },
       include: {
         proyecto: {
@@ -61,7 +60,6 @@ export async function GET(request: Request) {
       ).length
       const pendientes = totalItems - cotizados
 
-
       return {
         ...lista,
         resumen: {
@@ -75,7 +73,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(listasConResumen)
   } catch (error) {
-    console.error('❌ Error en /api/logistica/listas:', error)
+    console.error('Error en /api/logistica/listas:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }

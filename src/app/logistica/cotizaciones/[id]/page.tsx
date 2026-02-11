@@ -338,7 +338,10 @@ Equipo de Compras`
       {/* Modal agregar items */}
       <ModalAgregarItemCotizacionProveedor
         open={showAgregarItems}
-        onClose={() => setShowAgregarItems(false)}
+        onClose={() => {
+          setShowAgregarItems(false)
+          handleRefresh()
+        }}
         cotizacion={cotizacion}
         proyectoId={cotizacion.proyectoId || ''}
         onAdded={handleRefresh}

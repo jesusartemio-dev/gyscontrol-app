@@ -1450,6 +1450,7 @@ export interface PedidoEquipo {
   observacionesLogisticas?: string    // Observaciones específicas de logística
 
   responsable?: User
+  proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'>
   lista?: ListaEquipo
   responsableLogistico?: User         // Relación con responsable de logística
   items: PedidoEquipoItem[]

@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function PATCH(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
-    const { listaId, quotationIds, action } = await request.json()
+    const { quotationIds, action } = await request.json()
 
     if (!quotationIds || !Array.isArray(quotationIds) || quotationIds.length === 0) {
       return NextResponse.json(
@@ -12,7 +19,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    let updateData = {}
+    let updateData: Record<string, unknown> = {}
 
     switch (action) {
       case 'received':
@@ -31,16 +38,12 @@ export async function PATCH(request: NextRequest) {
         )
     }
 
-    // Update quotations in bulk
     const result = await prisma.cotizacionProveedorItem.updateMany({
       where: {
         id: { in: quotationIds }
       },
       data: updateData
     })
-
-    // Log the bulk operation
-    console.log(`Bulk update: ${action} applied to ${result.count} quotations`)
 
     return NextResponse.json({
       success: true,

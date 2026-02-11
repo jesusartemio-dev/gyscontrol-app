@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   try {
     const { id } = await params
     const { selections } = await request.json()
@@ -16,7 +23,6 @@ export async function POST(
       )
     }
 
-    // Validate that all selected quotations exist and belong to this list
     const quotationIds = Object.values(selections) as string[]
     const validQuotations = await prisma.cotizacionProveedorItem.findMany({
       where: {
@@ -34,9 +40,8 @@ export async function POST(
       )
     }
 
-    // Start a transaction to update selections
     await prisma.$transaction(async (tx) => {
-      // First, clear all previous selections for this list
+      // Clear all previous selections for this list
       await tx.cotizacionProveedorItem.updateMany({
         where: {
           listaEquipoItem: {
@@ -44,24 +49,16 @@ export async function POST(
           }
         },
         data: {
-          esSeleccionada: false
+          esSeleccionada: false,
         }
       })
 
-      // Then, set the new selections
+      // Set the new selections
       for (const [itemId, quotationId] of Object.entries(selections)) {
         await tx.cotizacionProveedorItem.update({
           where: { id: quotationId as string },
           data: {
             esSeleccionada: true,
-            listaEquipoItem: {
-              update: {
-                precioElegido: undefined, // Will be set from the quotation
-                tiempoEntrega: undefined,
-                tiempoEntregaDias: undefined,
-                costoElegido: undefined
-              }
-            }
           }
         })
 
@@ -75,15 +72,12 @@ export async function POST(
               precioElegido: winnerQuotation.precioUnitario,
               tiempoEntrega: winnerQuotation.tiempoEntrega,
               tiempoEntregaDias: winnerQuotation.tiempoEntregaDias,
-              costoElegido: winnerQuotation.costoTotal
+              costoElegido: winnerQuotation.costoTotal,
             }
           })
         }
       }
     })
-
-    // Log the selection operation
-    console.log(`Winner selection completed for list ${id}: ${quotationIds.length} winners selected`)
 
     return NextResponse.json({
       success: true,
