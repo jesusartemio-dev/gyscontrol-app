@@ -139,6 +139,7 @@ export default function Sidebar() {
       links: [
         { href: '/comercial/plantillas', label: 'Plantillas', icon: FileText },
         { href: '/comercial/cotizaciones', label: 'Cotizaciones', icon: Calculator, badge: 'cotizaciones-pendientes' as NotificationBadgeType },
+        { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
       ],
     },
     // 1.1. CRM - Gestión de Relaciones con Clientes
@@ -224,6 +225,7 @@ export default function Sidebar() {
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
+        { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
       ],
     },
     // 4. Aprovisionamiento - Gestión de adquisiciones y compras
