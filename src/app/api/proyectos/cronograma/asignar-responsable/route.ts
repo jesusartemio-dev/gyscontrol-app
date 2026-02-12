@@ -15,7 +15,8 @@ import { logger } from '@/lib/logger'
 const asignarResponsableSchema = z.object({
   tipo: z.enum(['edt', 'tarea']), // Solo EDT y Tarea tienen responsables en el schema actual
   id: z.string(),
-  responsableId: z.string().nullable() // null para quitar asignación
+  responsableId: z.string().nullable(), // null para quitar asignación
+  cascadeToTasks: z.boolean().optional() // Solo aplica cuando tipo=edt
 })
 
 export async function PUT(request: NextRequest) {
@@ -32,7 +33,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const validatedData = asignarResponsableSchema.parse(body)
 
-    const { tipo, id, responsableId } = validatedData
+    const { tipo, id, responsableId, cascadeToTasks } = validatedData
 
     // Verificar que el elemento existe
     let elemento: any = null
@@ -94,24 +95,41 @@ export async function PUT(request: NextRequest) {
 
     // Actualizar responsable
     let elementoActualizado: any = null
+    let tareasActualizadas: number | null = null
 
     switch (tipo) {
       case 'edt':
         elementoActualizado = await prisma.proyectoEdt.update({
           where: { id },
-          data: { responsableId },
+          data: { responsableId, updatedAt: new Date() },
           include: {
             user: {
               select: { id: true, name: true, email: true }
             }
           }
         })
+
+        // Cascade to all tasks under this EDT if requested
+        if (cascadeToTasks) {
+          const result = await prisma.proyectoTarea.updateMany({
+            where: {
+              proyectoActividad: {
+                proyectoEdtId: id
+              }
+            },
+            data: {
+              responsableId,
+              updatedAt: new Date()
+            }
+          })
+          tareasActualizadas = result.count
+        }
         break
 
       case 'tarea':
         elementoActualizado = await prisma.proyectoTarea.update({
           where: { id },
-          data: { responsableId },
+          data: { responsableId, updatedAt: new Date() },
           include: {
             user: {
               select: { id: true, name: true, email: true }
@@ -132,7 +150,8 @@ export async function PUT(request: NextRequest) {
         elementoNombre: elemento.nombre,
         responsableAnterior: elemento.responsable?.id || null,
         responsableNuevo: responsableId,
-        elementoActualizado
+        elementoActualizado,
+        tareasActualizadas
       },
       message: responsableId
         ? `Responsable asignado correctamente`

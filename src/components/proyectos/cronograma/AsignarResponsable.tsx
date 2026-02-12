@@ -49,6 +49,7 @@ export function AsignarResponsable({
 }: AsignarResponsableProps) {
   const [usuariosDisponibles, setUsuariosDisponibles] = useState<Usuario[]>([])
   const [responsableSeleccionado, setResponsableSeleccionado] = useState<string>('')
+  const [cascadeToTasks, setCascadeToTasks] = useState(true)
   const [loading, setLoading] = useState(false)
   const [loadingUsuarios, setLoadingUsuarios] = useState(false)
   const { toast } = useToast()
@@ -92,23 +93,30 @@ export function AsignarResponsable({
       
       const responsableId = responsableSeleccionado === 'null' ? null : responsableSeleccionado
       
+      const payload: Record<string, any> = {
+        tipo,
+        id: elementoId,
+        responsableId
+      }
+      if (tipo === 'edt') {
+        payload.cascadeToTasks = cascadeToTasks
+      }
+
       const response = await fetch('/api/proyectos/cronograma/asignar-responsable', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo,
-          id: elementoId,
-          responsableId
-        })
+        body: JSON.stringify(payload)
       })
 
       if (!response.ok) throw new Error('Error al asignar responsable')
 
       const data = await response.json()
-      
+
       toast({
         title: data.message,
-        description: `Se ${responsableId ? 'asignó' : 'removió'} el responsable correctamente`
+        description: data.data?.tareasActualizadas != null
+          ? `Se ${responsableId ? 'asignó' : 'removió'} el responsable. ${data.data.tareasActualizadas} tarea(s) actualizadas.`
+          : `Se ${responsableId ? 'asignó' : 'removió'} el responsable correctamente`
       })
 
       onAsignacionExitosa()
@@ -209,6 +217,26 @@ export function AsignarResponsable({
               </Select>
             )}
           </div>
+
+          {/* Opción de cascada para EDT */}
+          {tipo === 'edt' && responsableSeleccionado && responsableSeleccionado !== 'null' && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={cascadeToTasks}
+                  onChange={(e) => setCascadeToTasks(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="text-sm">
+                  <p className="font-medium text-blue-800">Asignar también a todas las tareas</p>
+                  <p className="text-xs text-blue-600 mt-0.5">
+                    Se asignará el mismo responsable a todas las tareas de este EDT
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* Información sobre la asignación */}
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
