@@ -13,6 +13,19 @@ import type {
 } from '@/types'
 import { buildApiUrl } from '@/lib/utils'
 
+async function getServerCookies(): Promise<string | null> {
+  try {
+    if (typeof window === 'undefined') {
+      const { headers } = await import('next/headers')
+      const headersList = await headers()
+      return headersList.get('cookie')
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 // ✅ Obtener ítems de equipos del proyecto, con opción de filtrar solo disponibles
 export async function getProyectoEquipoItems(
   proyectoId: string,
@@ -22,9 +35,16 @@ export async function getProyectoEquipoItems(
     const endpoint = soloDisponibles
       ? `/api/proyecto-equipo-item/from-proyecto/${proyectoId}?soloDisponibles=true`
       : `/api/proyecto-equipo-item/from-proyecto/${proyectoId}`
-    
+
     const url = buildApiUrl(endpoint)
-    const res = await fetch(url, { cache: 'no-store' })
+    const cookie = await getServerCookies()
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(cookie && { Cookie: cookie }),
+      },
+      cache: 'no-store',
+    })
     if (!res.ok) throw new Error('Error al obtener ítems de equipos del proyecto')
     return await res.json()
   } catch (error) {
@@ -42,7 +62,14 @@ export async function getProyectoEquipoItemsDisponibles(proyectoId: string): Pro
 export async function getProyectoEquipoItemById(id: string): Promise<ProyectoEquipoCotizadoItem | null> {
   try {
     const url = buildApiUrl(`/api/proyecto-equipo-item/${id}`)
-    const res = await fetch(url, { cache: 'no-store' })
+    const cookie = await getServerCookies()
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(cookie && { Cookie: cookie }),
+      },
+      cache: 'no-store',
+    })
     if (!res.ok) throw new Error('Error al obtener ítem de equipo por ID')
     return await res.json()
   } catch (error) {
