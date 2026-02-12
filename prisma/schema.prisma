@@ -610,6 +610,9 @@ model PedidoEquipoItem {
   listaId                     String?
   codigo                      String
   descripcion                 String
+  categoria                   String?
+  marca                       String?
+  catalogoEquipoId            String?
   tiempoEntrega               String?
   tiempoEntregaDias           Int?
   unidad                      String

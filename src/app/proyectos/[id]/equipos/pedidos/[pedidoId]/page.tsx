@@ -29,12 +29,14 @@ import {
   AlertCircle,
   ChevronRight,
   FileText,
+  Plus,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
 import PedidoEquipoHistorial from '@/components/equipos/PedidoEquipoHistorial'
 import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
 import PedidoEquipoEditModal from '@/components/equipos/PedidoEquipoEditModal'
+import { PedidoItemDirectoModal } from '@/components/equipos/PedidoItemDirectoModal'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface PageProps {
@@ -62,6 +64,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [proyectoId, setProyectoId] = useState('')
   const [pedidoId, setPedidoId] = useState('')
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showItemDirectoModal, setShowItemDirectoModal] = useState(false)
 
   useEffect(() => {
     params.then((p) => {
@@ -261,6 +264,15 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
               <Badge variant="outline" className="text-[10px] h-5">
                 {stats.pendientes} pendientes
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-[10px] gap-1"
+                onClick={() => setShowItemDirectoModal(true)}
+              >
+                <Plus className="h-3 w-3" />
+                Item Directo
+              </Button>
             </div>
           </div>
 
@@ -361,6 +373,18 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
         onOpenChange={setShowEditModal}
         onUpdated={(pedidoActualizado) => setPedido(pedidoActualizado)}
         fields={['fechaNecesaria', 'observacion']}
+      />
+
+      {/* Modal de item directo */}
+      <PedidoItemDirectoModal
+        open={showItemDirectoModal}
+        onClose={() => setShowItemDirectoModal(false)}
+        pedidoId={pedidoId}
+        onCreated={async () => {
+          // Refresh pedido data
+          const pedidoData = await getPedidoEquipoById(pedidoId)
+          if (pedidoData) setPedido(pedidoData)
+        }}
       />
     </div>
   )

@@ -6,6 +6,7 @@ import { PedidoEquipoFiltersWrapper } from '@/components/proyectos/PedidoEquipoF
 import { PedidosPageContent } from '@/components/proyectos/PedidosPageContent'
 import { PedidosTabSwitcher } from '@/components/proyectos/PedidosTabSwitcher'
 import { PedidoItemsView } from '@/components/proyectos/PedidoItemsView'
+import { PedidoConsolidadoView } from '@/components/proyectos/PedidoConsolidadoView'
 import { getPedidosEquipo } from '@/lib/services/aprovisionamiento'
 import { getProyectos } from '@/lib/services/proyecto'
 
@@ -52,6 +53,18 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
         <PedidosTabSwitcher activeTab={activeTab} />
         <Suspense fallback={<LoadingState />}>
           <PedidoItemsView />
+        </Suspense>
+      </div>
+    )
+  }
+
+  // Consolidado view - client component handles its own data
+  if (activeTab === 'consolidado') {
+    return (
+      <div className="p-4 space-y-3">
+        <PedidosTabSwitcher activeTab={activeTab} />
+        <Suspense fallback={<LoadingState />}>
+          <PedidoConsolidadoView />
         </Suspense>
       </div>
     )

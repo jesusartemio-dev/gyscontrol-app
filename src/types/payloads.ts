@@ -701,7 +701,7 @@ export interface PedidoEquipoItemPayload {
   pedidoId: string
   responsableId: string
   listaId?: string
-  listaEquipoItemId: string
+  listaEquipoItemId?: string
   // 📦 Datos solicitados
   cantidadPedida: number
   // 💰 Datos económicos (opcionalmente copiados desde cotización seleccionada)
@@ -711,10 +711,13 @@ export interface PedidoEquipoItemPayload {
   estado?: EstadoPedidoItem
   cantidadAtendida?: number
   comentarioLogistica?: string
-  // 🔁 Copiados desde ListaEquipoItem
+  // 🔁 Copiados desde ListaEquipoItem o ingresados manualmente
   codigo: string
   descripcion: string
   unidad: string
+  categoria?: string
+  marca?: string
+  catalogoEquipoId?: string
   tiempoEntrega?: string
   tiempoEntregaDias?: number
   // 🚚 Campos de trazabilidad de entregas

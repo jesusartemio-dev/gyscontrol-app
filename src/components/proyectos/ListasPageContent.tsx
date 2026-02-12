@@ -1,11 +1,12 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ClipboardList, Package } from 'lucide-react'
+import { ClipboardList, Package, Layers } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { ListasEquipoView } from './ListasEquipoView'
 import { ListaItemsView } from './ListaItemsView'
+import { ListaConsolidadoView } from './ListaConsolidadoView'
 
 interface Props {
   activeTab: string
@@ -58,11 +59,24 @@ export function ListasPageContent({ activeTab }: Props) {
             <Package className="h-3.5 w-3.5" />
             Items
           </button>
+          <button
+            onClick={() => setTab('consolidado')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+              activeTab === 'consolidado'
+                ? "bg-white shadow-sm text-gray-900"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <Layers className="h-3.5 w-3.5" />
+            Consolidado
+          </button>
         </div>
       </div>
 
       {/* Content */}
-      {activeTab === 'items' ? <ListaItemsView /> : <ListasEquipoView />}
+      {activeTab === 'consolidado' ? <ListaConsolidadoView /> :
+       activeTab === 'items' ? <ListaItemsView /> : <ListasEquipoView />}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { ShoppingCart, Package } from 'lucide-react'
+import { ShoppingCart, Package, Layers } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -14,8 +14,8 @@ export function PedidosTabSwitcher({ activeTab }: Props) {
 
   const setTab = (tab: string) => {
     const url = new URL(window.location.href)
-    if (tab === 'items') {
-      url.searchParams.set('tab', 'items')
+    if (tab === 'items' || tab === 'consolidado') {
+      url.searchParams.set('tab', tab)
     } else {
       url.searchParams.delete('tab')
     }
@@ -38,7 +38,7 @@ export function PedidosTabSwitcher({ activeTab }: Props) {
           onClick={() => setTab('pedidos')}
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-            activeTab !== 'items'
+            activeTab !== 'items' && activeTab !== 'consolidado'
               ? "bg-white shadow-sm text-gray-900"
               : "text-gray-500 hover:text-gray-700"
           )}
@@ -57,6 +57,18 @@ export function PedidosTabSwitcher({ activeTab }: Props) {
         >
           <Package className="h-3.5 w-3.5" />
           Items
+        </button>
+        <button
+          onClick={() => setTab('consolidado')}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+            activeTab === 'consolidado'
+              ? "bg-white shadow-sm text-gray-900"
+              : "text-gray-500 hover:text-gray-700"
+          )}
+        >
+          <Layers className="h-3.5 w-3.5" />
+          Consolidado
         </button>
       </div>
     </div>

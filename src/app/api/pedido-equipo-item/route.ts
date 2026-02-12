@@ -30,7 +30,11 @@ export async function GET(request: Request) {
           },
         },
         listaEquipoItem: {
-          include: {
+          select: {
+            id: true,
+            categoria: true,
+            marca: true,
+            catalogoEquipoId: true,
             proveedor: { select: { id: true, nombre: true } },
           },
         },
@@ -68,34 +72,6 @@ export async function POST(request: Request) {
 
     const body: PedidoEquipoItemPayload = await request.json()
 
-    // ✅ Validación: existencia del ítem de la lista
-    const listaItem = await prisma.listaEquipoItem.findUnique({
-      where: { id: body.listaEquipoItemId },
-    })
-
-    if (!listaItem) {
-      return NextResponse.json(
-        { error: 'Ítem de lista no encontrado' },
-        { status: 400 }
-      )
-    }
-
-    // ✅ Validación: total acumulado de pedidos
-    const pedidosPrevios = await prisma.pedidoEquipoItem.aggregate({
-      where: { listaEquipoItemId: body.listaEquipoItemId },
-      _sum: { cantidadPedida: true },
-    })
-
-    const totalPrevio = pedidosPrevios._sum.cantidadPedida || 0
-    const totalSolicitado = totalPrevio + body.cantidadPedida
-
-    if (totalSolicitado > listaItem.cantidad) {
-      return NextResponse.json(
-        { error: 'La cantidad total pedida excede la cantidad disponible en la lista' },
-        { status: 400 }
-      )
-    }
-
     // ✅ Obtener datos del pedido (incluye fechaNecesaria)
     const pedido = await prisma.pedidoEquipo.findUnique({
       where: { id: body.pedidoId },
@@ -103,16 +79,63 @@ export async function POST(request: Request) {
 
     if (!pedido) {
       return NextResponse.json(
-        { error: 'Pedido no encontrado para calcular fechaOrdenCompraRecomendada' },
+        { error: 'Pedido no encontrado' },
         { status: 400 }
       )
     }
 
-    // ✅ Tiempo de entrega y días: usar lo del body o respaldar desde ListaEquipoItem
-    const tiempoEntrega = body.tiempoEntrega ?? listaItem.tiempoEntrega ?? null
-    const tiempoEntregaDias = body.tiempoEntregaDias ?? listaItem.tiempoEntregaDias ?? null
+    let tiempoEntrega = body.tiempoEntrega ?? null
+    let tiempoEntregaDias = body.tiempoEntregaDias ?? null
 
-    // ✅ Calcular la fecha recomendada para emitir la orden de compra
+    // ============================================================
+    // FLUJO A: Item proveniente de una Lista (flujo existente)
+    // ============================================================
+    if (body.listaEquipoItemId) {
+      const listaItem = await prisma.listaEquipoItem.findUnique({
+        where: { id: body.listaEquipoItemId },
+      })
+
+      if (!listaItem) {
+        return NextResponse.json(
+          { error: 'Ítem de lista no encontrado' },
+          { status: 400 }
+        )
+      }
+
+      // Validación: total acumulado de pedidos
+      const pedidosPrevios = await prisma.pedidoEquipoItem.aggregate({
+        where: { listaEquipoItemId: body.listaEquipoItemId },
+        _sum: { cantidadPedida: true },
+      })
+
+      const totalPrevio = pedidosPrevios._sum.cantidadPedida || 0
+      const totalSolicitado = totalPrevio + body.cantidadPedida
+
+      if (totalSolicitado > listaItem.cantidad) {
+        return NextResponse.json(
+          { error: 'La cantidad total pedida excede la cantidad disponible en la lista' },
+          { status: 400 }
+        )
+      }
+
+      // Tiempo de entrega: usar del body o respaldar desde ListaEquipoItem
+      tiempoEntrega = body.tiempoEntrega ?? listaItem.tiempoEntrega ?? null
+      tiempoEntregaDias = body.tiempoEntregaDias ?? listaItem.tiempoEntregaDias ?? null
+    }
+    // ============================================================
+    // FLUJO B: Item directo (sin lista) - pedidos urgentes
+    // ============================================================
+    else {
+      // Validación mínima para items directos
+      if (!body.codigo || !body.descripcion || !body.unidad || !body.cantidadPedida) {
+        return NextResponse.json(
+          { error: 'Items directos requieren: codigo, descripcion, unidad y cantidadPedida' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // ✅ Calcular fecha recomendada para emitir la orden de compra
     let fechaOrdenCompraRecomendada: Date | null = null
     if (tiempoEntregaDias != null) {
       const base = new Date(pedido.fechaNecesaria)
@@ -128,7 +151,7 @@ export async function POST(request: Request) {
         responsableId: userId,
         updatedAt: new Date(),
         listaId: body.listaId ?? null,
-        listaEquipoItemId: body.listaEquipoItemId,
+        listaEquipoItemId: body.listaEquipoItemId ?? null,
         cantidadPedida: body.cantidadPedida,
         cantidadAtendida: body.cantidadAtendida ?? null,
         precioUnitario: body.precioUnitario ?? null,
@@ -141,23 +164,27 @@ export async function POST(request: Request) {
         codigo: body.codigo,
         descripcion: body.descripcion,
         unidad: body.unidad,
+        categoria: body.categoria ?? null,
+        marca: body.marca ?? null,
+        catalogoEquipoId: body.catalogoEquipoId ?? null,
       },
     })
 
-    // ✅ Actualizar el acumulado de cantidadPedida en ListaEquipoItem usando validación
-    const { sincronizarCantidadPedida } = await import('@/lib/utils/cantidadPedidaValidator')
-    
-    const resultado = await sincronizarCantidadPedida(
-      body.listaEquipoItemId,
-      'increment',
-      body.cantidadPedida
-    )
+    // ✅ Actualizar cantidadPedida solo si viene de una lista
+    if (body.listaEquipoItemId) {
+      const { sincronizarCantidadPedida } = await import('@/lib/utils/cantidadPedidaValidator')
 
-    if (!resultado.exito) {
-      console.warn('⚠️ Advertencia al incrementar cantidadPedida:', resultado.mensaje)
-      // 🔄 Recalcular desde cero para corregir inconsistencias
-      const { recalcularCantidadPedida } = await import('@/lib/utils/cantidadPedidaValidator')
-      await recalcularCantidadPedida(body.listaEquipoItemId)
+      const resultado = await sincronizarCantidadPedida(
+        body.listaEquipoItemId,
+        'increment',
+        body.cantidadPedida
+      )
+
+      if (!resultado.exito) {
+        console.warn('⚠️ Advertencia al incrementar cantidadPedida:', resultado.mensaje)
+        const { recalcularCantidadPedida } = await import('@/lib/utils/cantidadPedidaValidator')
+        await recalcularCantidadPedida(body.listaEquipoItemId)
+      }
     }
 
     return NextResponse.json(nuevoItem)
