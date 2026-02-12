@@ -113,9 +113,7 @@ export async function PUT(request: NextRequest) {
         if (cascadeToTasks) {
           const result = await prisma.proyectoTarea.updateMany({
             where: {
-              proyectoActividad: {
-                proyectoEdtId: id
-              }
+              proyectoEdtId: id
             },
             data: {
               responsableId,
