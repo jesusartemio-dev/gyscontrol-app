@@ -4,6 +4,8 @@ import { Loader2 } from 'lucide-react'
 import { EstadoPedido } from '@prisma/client'
 import { PedidoEquipoFiltersWrapper } from '@/components/proyectos/PedidoEquipoFiltersWrapper'
 import { PedidosPageContent } from '@/components/proyectos/PedidosPageContent'
+import { PedidosTabSwitcher } from '@/components/proyectos/PedidosTabSwitcher'
+import { PedidoItemsView } from '@/components/proyectos/PedidoItemsView'
 import { getPedidosEquipo } from '@/lib/services/aprovisionamiento'
 import { getProyectos } from '@/lib/services/proyecto'
 
@@ -14,6 +16,7 @@ export const metadata: Metadata = {
 
 interface PageProps {
   searchParams: Promise<{
+    tab?: string
     proyecto?: string
     proveedor?: string
     estado?: string
@@ -40,11 +43,24 @@ function LoadingState() {
 
 export default async function PedidosEquipoPage({ searchParams }: PageProps) {
   const params = await searchParams
+  const activeTab = params.tab || 'pedidos'
 
+  // Items view - client component handles its own data
+  if (activeTab === 'items') {
+    return (
+      <div className="p-4 space-y-3">
+        <PedidosTabSwitcher activeTab={activeTab} />
+        <Suspense fallback={<LoadingState />}>
+          <PedidoItemsView />
+        </Suspense>
+      </div>
+    )
+  }
+
+  // Pedidos view - server-side data fetching
   const page = parseInt(params.page || '1')
   const limit = parseInt(params.limit || '10')
 
-  // Fetch proyectos para los filtros
   const proyectos = await getProyectos()
   const proyectosParaFiltros = proyectos.map(p => ({
     id: p.id,
@@ -93,7 +109,6 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
     busqueda: ''
   }
 
-  // Calculate stats
   const stats = {
     total: pedidosData.total,
     pendientes: pedidosData.items.filter(p => p.estado === EstadoPedido.borrador || p.estado === EstadoPedido.enviado).length,
@@ -106,7 +121,9 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-3">
+      <PedidosTabSwitcher activeTab={activeTab} />
+
       {/* Filters */}
       <Suspense fallback={<div className="h-10 bg-gray-100 rounded animate-pulse" />}>
         <PedidoEquipoFiltersWrapper filtros={filtros} proyectos={proyectosParaFiltros} />

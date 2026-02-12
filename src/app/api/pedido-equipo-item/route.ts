@@ -10,14 +10,30 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import type { PedidoEquipoItemPayload } from '@/types'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const proyectoId = searchParams.get('proyectoId')
+
+    const whereClause: any = {}
+    if (proyectoId) {
+      whereClause.pedidoEquipo = { proyectoId }
+    }
+
     const data = await prisma.pedidoEquipoItem.findMany({
+      where: whereClause,
       include: {
         pedidoEquipo: {
-          include: { proyecto: true, user: true },
+          include: {
+            proyecto: { select: { id: true, codigo: true, nombre: true } },
+            user: { select: { id: true, name: true } },
+          },
         },
-        listaEquipoItem: true,
+        listaEquipoItem: {
+          include: {
+            proveedor: { select: { id: true, nombre: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'asc' },
     })
