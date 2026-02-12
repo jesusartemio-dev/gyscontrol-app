@@ -26,7 +26,6 @@ import {
   LogOut,
   ChevronDown,
   ChevronUp,
-  DollarSign,
   TrendingUp,
   CreditCard,
   PieChart,
@@ -253,8 +252,6 @@ export default function Sidebar() {
         { href: '/gestion', label: 'KPIs', icon: PieChart },
         { href: '/gestion/reportes', label: 'Reportes', icon: BarChart3 },
         { href: '/gestion/reportes/pedidos', label: 'Pedidos', icon: Package },
-        { href: '/gestion/reportes/performance', label: 'Performance', icon: TrendingUp },
-        { href: '/gestion/reportes/financiero', label: 'Financiero', icon: DollarSign },
       ],
     },
     // 6. Configuración - Administración del sistema y catálogos (solo admin y gerente)
