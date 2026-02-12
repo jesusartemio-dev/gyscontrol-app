@@ -339,14 +339,19 @@ export function PedidoConsolidadoView() {
               {groupedByCategory.map((catGroup) => (
                 <Fragment key={`cat-${catGroup.categoria}`}>
                   {/* Category separator row */}
-                  <TableRow className="bg-gray-100 hover:bg-gray-100">
-                    <TableCell colSpan={7} className="py-1.5 px-3">
-                      <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        {catGroup.categoria}
-                      </span>
-                      <span className="text-[10px] text-gray-400 ml-2">
-                        ({catGroup.items.length} items)
-                      </span>
+                  <TableRow className="bg-blue-50/80 hover:bg-blue-50/80 border-l-[3px] border-l-blue-500">
+                    <TableCell colSpan={7} className="py-2 px-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded bg-blue-100 flex items-center justify-center">
+                          <Layers className="h-3 w-3 text-blue-600" />
+                        </div>
+                        <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">
+                          {catGroup.categoria}
+                        </span>
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-blue-100 text-blue-700 border-0">
+                          {catGroup.items.length} items
+                        </Badge>
+                      </div>
                     </TableCell>
                   </TableRow>
                   {catGroup.items.map((item, idx) => {
