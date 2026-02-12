@@ -61,12 +61,17 @@ export default async function PedidosEquipoPage({ searchParams }: PageProps) {
   const page = parseInt(params.page || '1')
   const limit = parseInt(params.limit || '10')
 
-  const proyectos = await getProyectos()
-  const proyectosParaFiltros = proyectos.map(p => ({
-    id: p.id,
-    nombre: p.nombre,
-    codigo: p.codigo
-  }))
+  let proyectosParaFiltros: { id: string; nombre: string; codigo: string }[] = []
+  try {
+    const proyectos = await getProyectos()
+    proyectosParaFiltros = proyectos.map(p => ({
+      id: p.id,
+      nombre: p.nombre,
+      codigo: p.codigo
+    }))
+  } catch (error) {
+    console.error('Error al obtener proyectos para filtros:', error)
+  }
 
   const pedidosResponse = await getPedidosEquipo({
     proyectoId: params.proyecto,

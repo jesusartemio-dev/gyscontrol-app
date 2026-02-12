@@ -2,10 +2,30 @@ import type { Proyecto, ProyectoPayload } from '@/types'
 import logger from '@/lib/logger'
 import { buildApiUrl } from '@/lib/utils'
 
+async function getServerCookies(): Promise<string | null> {
+  try {
+    if (typeof window === 'undefined') {
+      const { headers } = await import('next/headers')
+      const headersList = await headers()
+      return headersList.get('cookie')
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 // Obtener todos los proyectos
 export async function getProyectos(): Promise<Proyecto[]> {
   const url = buildApiUrl('/api/proyectos')
-  const res = await fetch(url)
+  const cookie = await getServerCookies()
+  const res = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(cookie && { Cookie: cookie }),
+    },
+    cache: 'no-store',
+  })
   if (!res.ok) throw new Error('Error al obtener proyectos')
   const response = await res.json()
   if (!response.ok) throw new Error(response.error)
