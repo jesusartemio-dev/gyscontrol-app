@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const whereClause: any = {}
 
     if (proyectoId) {
-      whereClause.lista = {
+      whereClause.listaEquipo = {
         proyectoId: proyectoId
       }
     }

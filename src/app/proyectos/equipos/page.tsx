@@ -7,6 +7,7 @@ import { EquiposTableWrapper } from '@/components/proyectos/EquiposTableWrapper'
 import { EquiposFiltersWrapper } from '@/components/proyectos/EquiposFiltersWrapper'
 import { EquiposTabSwitcher } from '@/components/proyectos/EquiposTabSwitcher'
 import { EquipoItemsGroupedView } from '@/components/proyectos/EquipoItemsGroupedView'
+import { EquipoConsolidadoView } from '@/components/proyectos/EquipoConsolidadoView'
 
 export const metadata: Metadata = {
   title: 'Equipos - Proyectos | GYS',
@@ -119,7 +120,7 @@ function LoadingState() {
 
 export default async function EquiposPage({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams
-  const activeTab = resolvedSearchParams.tab || 'items'
+  const activeTab = resolvedSearchParams.tab || 'equipos'
   const equiposData = await getEquiposData(resolvedSearchParams)
   const { stats } = equiposData
 
@@ -135,7 +136,12 @@ export default async function EquiposPage({ searchParams }: PageProps) {
       {/* Header with tabs */}
       <EquiposTabSwitcher activeTab={activeTab} totalItems={stats.total} />
 
-      {activeTab === 'agrupado' ? (
+      {activeTab === 'consolidado' ? (
+        /* Consolidado view */
+        <Suspense fallback={<LoadingState />}>
+          <EquipoConsolidadoView />
+        </Suspense>
+      ) : activeTab === 'items' ? (
         /* Grouped view */
         <Suspense fallback={<LoadingState />}>
           <EquipoItemsGroupedView
@@ -144,7 +150,7 @@ export default async function EquiposPage({ searchParams }: PageProps) {
           />
         </Suspense>
       ) : (
-        /* Flat items view (original) */
+        /* Flat equipos view (default) */
         <>
           {/* Inline Stats - Desktop */}
           <div className="hidden md:flex items-center gap-3 text-xs">
