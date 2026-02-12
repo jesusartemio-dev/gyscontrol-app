@@ -86,14 +86,14 @@ export default function PlantillaEquipoItemTable({ items, onUpdated, onDeleted }
               <th className="p-2 text-right">P. Cliente (USD)</th>
               <th className="p-2 text-right text-blue-700">Costo Interno</th>
               <th className="p-2 text-right text-green-700">Costo Cliente</th>
-              <th className="p-2 text-right">% Margen</th>
+              <th className="p-2 text-right">% Rent.</th>
               <th className="p-2 text-center">Acción</th>
             </tr>
           </thead>
           <tbody>
             {filteredItems.map(item => {
               const isEdit = editModeId === item.id
-              const margen = item.costoInterno > 0
+              const rentabilidad = item.costoInterno > 0
                 ? ((item.costoCliente - item.costoInterno) / item.costoInterno) * 100
                 : 0
 
@@ -125,7 +125,7 @@ export default function PlantillaEquipoItemTable({ items, onUpdated, onDeleted }
                     USD {item.costoCliente.toFixed(2)}
                   </td>
                   <td className="p-2 text-right text-purple-700">
-                    {margen.toFixed(1)}%
+                    {rentabilidad.toFixed(1)}%
                   </td>
                   <td className="p-2 text-center space-x-1">
                     {isEdit ? (

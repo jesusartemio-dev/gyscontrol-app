@@ -28,10 +28,10 @@ export function exportarPlantillaEquipoItemsAExcel(
       'Unidad': item.unidad || '',
       'Marca': item.marca || '',
       'Cantidad': item.cantidad || 1,
-      'P.Lista': item.precioLista || '',
+      'P.Lista': item.precioLista || 0,
+      'F.Costo': item.factorCosto ?? 1.00,
+      'F.Venta': item.factorVenta ?? 1.15,
       'P.Interno': item.precioInterno || 0,
-      'Diferencia': diferencia ?? '',
-      'Margen': +((1 + (item.margen || 0)).toFixed(2)),
       'P.Cliente': item.precioCliente || 0,
       'Total Interno': item.costoInterno || 0,
       'Total Cliente': item.costoCliente || 0
@@ -50,9 +50,9 @@ export function exportarPlantillaEquipoItemsAExcel(
     { wch: 15 },  // Marca
     { wch: 10 },  // Cantidad
     { wch: 12 },  // P.Lista
+    { wch: 10 },  // F.Costo
+    { wch: 10 },  // F.Venta
     { wch: 12 },  // P.Interno
-    { wch: 12 },  // Diferencia
-    { wch: 10 },  // Margen %
     { wch: 12 },  // P.Cliente
     { wch: 14 },  // Total Interno
     { wch: 14 },  // Total Cliente
@@ -78,8 +78,6 @@ export function exportarPlantillaEquipoItemsAExcel(
 // GENERAR PLANTILLA EXCEL PARA IMPORTACIÓN
 // ============================================
 export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'PlantillaEquipos') {
-  // Columnas: Código, Descripción, Marca, Categoría, Unidad, Cantidad, P.Lista, P.Real, Margen
-  // P.Cliente se calcula: P.Real × Margen (donde Margen = 1.15 significa 15% de ganancia)
   const ejemplos = [
     {
       'Código': 'EQ-001',
@@ -89,8 +87,8 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
       'Unidad': 'Unidad',
       'Cantidad': 2,
       'P.Lista': 120.00,
-      'P.Real': 130.00,
-      'Margen': 1.15
+      'F.Costo': 1.00,
+      'F.Venta': 1.15
     },
     {
       'Código': 'EQ-002',
@@ -100,8 +98,8 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
       'Unidad': 'Unidad',
       'Cantidad': 1,
       'P.Lista': 700.00,
-      'P.Real': 739.13,
-      'Margen': 1.15
+      'F.Costo': 1.00,
+      'F.Venta': 1.15
     }
   ]
 
@@ -115,8 +113,8 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
     { wch: 10 },  // Unidad
     { wch: 10 },  // Cantidad
     { wch: 12 },  // P.Lista
-    { wch: 12 },  // P.Real
-    { wch: 10 },  // Margen
+    { wch: 10 },  // F.Costo
+    { wch: 10 },  // F.Venta
   ]
 
   const workbook = XLSX.utils.book_new()
@@ -168,9 +166,10 @@ export interface ImportedPlantillaEquipoItem {
   unidad: string
   marca: string
   cantidad: number
-  precioLista?: number
+  precioLista: number
   precioInterno: number
-  margen: number
+  factorCosto: number
+  factorVenta: number
   precioCliente: number
   costoInterno: number
   costoCliente: number
@@ -207,7 +206,6 @@ export function validarEImportarPlantillaEquipoItems(
   for (let [index, row] of rows.entries()) {
     const fila = index + 2 // +2 porque fila 1 es header
 
-    // Leer campos en el nuevo orden: Código, Descripción, Marca, Categoría, Unidad, Cantidad, P.Lista, P.Real, Margen
     const codigo = String(row['Código'] || row['Codigo'] || '').trim()
     const descripcion = String(row['Descripción'] || row['Descripcion'] || '').trim()
     const marca = String(row['Marca'] || '').trim()
@@ -215,10 +213,10 @@ export function validarEImportarPlantillaEquipoItems(
     const unidad = String(row['Unidad'] || '').trim()
     const cantidad = parseInt(row['Cantidad'] || 1) || 1
 
-    // Leer precios y margen del Excel (margen como multiplicador: 1.15 = 15% ganancia)
+    // Leer P.Lista, F.Costo, F.Venta del Excel
     const precioListaExcel = parseFloat(row['P.Lista'] || row['Precio Lista'] || row['PrecioLista'] || 0) || undefined
-    const precioRealExcel = parseFloat(row['P.Real'] || row['Precio Real'] || row['PrecioReal'] || row['P.Interno'] || 0) || undefined
-    const margenExcel = parseFloat(row['Margen'] || row['Margen %'] || 0) || undefined
+    const factorCostoExcel = parseFloat(row['F.Costo'] || row['Factor Costo'] || 0) || undefined
+    const factorVentaExcel = parseFloat(row['F.Venta'] || row['Factor Venta'] || 0) || undefined
 
     // Validaciones básicas
     if (!codigo) {
@@ -242,20 +240,19 @@ export function validarEImportarPlantillaEquipoItems(
     )
 
     // Prioridad: Excel > Catálogo > Default
-    const precioLista = precioListaExcel ?? catalogoEquipo?.precioLista ?? undefined
-    const precioInterno = precioRealExcel ?? catalogoEquipo?.precioInterno ?? 0
-    // margenExcel es multiplicador (1.15), convertir a decimal (0.15) para almacenar
-    // catalogoEquipo.margen ya está en decimal (0.15)
-    const margen = margenExcel !== undefined ? (margenExcel - 1) : (catalogoEquipo?.margen ?? 0.15)
+    const precioLista = precioListaExcel ?? catalogoEquipo?.precioLista ?? 0
+    const factorCosto = factorCostoExcel ?? catalogoEquipo?.factorCosto ?? 1.00
+    const factorVenta = factorVentaExcel ?? catalogoEquipo?.factorVenta ?? 1.15
 
-    // Validar que tengamos precio interno
-    if (precioInterno <= 0) {
-      errores.push(`Fila ${fila}: El precio real (P.Real) es requerido y debe ser mayor a 0`)
+    // Validar que tengamos precio lista
+    if (precioLista <= 0) {
+      errores.push(`Fila ${fila}: El precio lista (P.Lista) es requerido y debe ser mayor a 0`)
       continue
     }
 
-    // CALCULAR precioCliente = precioInterno × (1 + margen) = precioInterno × margenMultiplier
-    const precioCliente = Math.round(precioInterno * (1 + margen) * 100) / 100
+    // Calcular precios
+    const precioInterno = Math.round(precioLista * factorCosto * 100) / 100
+    const precioCliente = Math.round(precioInterno * factorVenta * 100) / 100
 
     // Calcular costos
     const costoInterno = Math.round(precioInterno * cantidad * 100) / 100
@@ -275,7 +272,8 @@ export function validarEImportarPlantillaEquipoItems(
       cantidad,
       precioLista,
       precioInterno,
-      margen,
+      factorCosto,
+      factorVenta,
       precioCliente,
       costoInterno,
       costoCliente,

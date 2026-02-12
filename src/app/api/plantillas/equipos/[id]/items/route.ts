@@ -19,7 +19,7 @@ export async function POST(
   try {
     const { id } = await params
     const data = await req.json()
-    const { catalogoEquipoId, cantidad, precioInterno, precioCliente } = data
+    const { catalogoEquipoId, cantidad, precioLista, precioInterno, factorCosto, factorVenta, precioCliente } = data
 
     if (!catalogoEquipoId || !cantidad || cantidad <= 0) {
       return NextResponse.json(
@@ -68,7 +68,10 @@ export async function POST(
         categoria: catalogoEquipo.categoriaEquipo.nombre,
         unidad: catalogoEquipo.unidad.nombre,
         marca: catalogoEquipo.marca,
+        precioLista: precioLista ?? precioInterno,
         precioInterno,
+        factorCosto: factorCosto ?? 1.00,
+        factorVenta: factorVenta ?? 1.15,
         precioCliente,
         cantidad,
         costoInterno,

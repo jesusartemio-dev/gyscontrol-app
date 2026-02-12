@@ -25,8 +25,10 @@ export default function LogisticaCatalogoEquipoCrearAcordeon({ onCreated }: Prop
     codigo: '',
     descripcion: '',
     marca: '',
+    precioLista: 0,
     precioInterno: 0,
-    margen: 0.15,
+    factorCosto: 1.00,
+    factorVenta: 1.15,
   })
 
   const handleSubmit = () => {
@@ -36,18 +38,23 @@ export default function LogisticaCatalogoEquipoCrearAcordeon({ onCreated }: Prop
       form.codigo &&
       form.descripcion &&
       form.marca &&
-      form.precioInterno !== undefined &&
-      form.margen !== undefined
+      form.precioLista !== undefined &&
+      form.factorCosto !== undefined &&
+      form.factorVenta !== undefined
     ) {
-      onCreated(form as CatalogoEquipoPayload)
+      const precioInterno = +(form.precioLista * form.factorCosto).toFixed(2)
+      const precioVenta = +(precioInterno * form.factorVenta).toFixed(2)
+      onCreated({ ...form, precioInterno, precioVenta } as CatalogoEquipoPayload)
       setForm({
         categoriaId: '',
         unidadId: '',
         codigo: '',
         descripcion: '',
         marca: '',
+        precioLista: 0,
         precioInterno: 0,
-        margen: 0.15,
+        factorCosto: 1.00,
+        factorVenta: 1.15,
       })
       setOpen(false)
     } else {
@@ -115,24 +122,36 @@ export default function LogisticaCatalogoEquipoCrearAcordeon({ onCreated }: Prop
           />
           <input
             type="number"
-            placeholder="Precio Interno"
-            value={form.precioInterno || ''}
+            placeholder="Precio Lista"
+            value={form.precioLista || ''}
             onChange={(e) =>
               setForm((prev) => ({
                 ...prev,
-                precioInterno: parseFloat(e.target.value),
+                precioLista: parseFloat(e.target.value),
               }))
             }
             className="w-full border px-2 py-1 rounded"
           />
           <input
             type="number"
-            placeholder="Margen (0-1)"
-            value={form.margen || ''}
+            placeholder="Factor Costo (ej: 1.00)"
+            value={form.factorCosto || ''}
             onChange={(e) =>
               setForm((prev) => ({
                 ...prev,
-                margen: parseFloat(e.target.value),
+                factorCosto: parseFloat(e.target.value),
+              }))
+            }
+            className="w-full border px-2 py-1 rounded"
+          />
+          <input
+            type="number"
+            placeholder="Factor Venta (ej: 1.15)"
+            value={form.factorVenta || ''}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                factorVenta: parseFloat(e.target.value),
               }))
             }
             className="w-full border px-2 py-1 rounded"

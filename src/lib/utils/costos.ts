@@ -10,7 +10,8 @@
 
 /**
  * Calcula los subtotales interno y cliente de un arreglo de ítems.
- * Si los ítems tienen precioInterno, margen y cantidad, calcula sin redondeo intermedio (como Excel).
+ * Si los ítems tienen precioInterno y cantidad, calcula sin redondeo intermedio (como Excel).
+ * Soporta factorVenta (equipos, multiplicador directo 1.15) y margen (servicios/gastos, decimal 0.15).
  * De lo contrario, suma los costoInterno y costoCliente ya calculados.
  *
  * @param items Lista de ítems
@@ -21,7 +22,8 @@ export function calcularSubtotal(
     costoInterno: number
     costoCliente: number
     precioInterno?: number
-    margen?: number | null
+    factorVenta?: number   // Para equipos (multiplicador directo, ej. 1.15)
+    margen?: number | null // Para servicios/gastos (decimal, ej. 0.15)
     cantidad?: number
   }[]
 ): { subtotalInterno: number; subtotalCliente: number } {
@@ -37,8 +39,10 @@ export function calcularSubtotal(
 
     const subtotalCliente = Math.round(
       items.reduce((sum, item) => {
-        const margen = item.margen ?? 0.15
-        return sum + (item.precioInterno ?? 0) * (1 + margen) * (item.cantidad ?? 0)
+        // factorVenta (equipos): multiplicador directo (1.15)
+        // margen (servicios/gastos): decimal que se suma a 1 (0.15 → 1.15)
+        const factor = item.factorVenta ?? (1 + (item.margen ?? 0.15))
+        return sum + (item.precioInterno ?? 0) * factor * (item.cantidad ?? 0)
       }, 0) * 100
     ) / 100
 

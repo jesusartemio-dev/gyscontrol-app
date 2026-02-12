@@ -146,8 +146,10 @@ export async function createTestData() {
         codigo: 'EXC-TEST-001',
         descripcion: 'Excavadora Test E2E',
         marca: 'Caterpillar',
+        precioLista: 150000,
         precioInterno: 150000,
-        margen: 0.2,
+        factorCosto: 1.00,
+        factorVenta: 1.20,
         precioVenta: 180000,
         estado: 'ACTIVO',
         updatedAt: new Date()

@@ -309,7 +309,8 @@ export default function CotizacionEquipoItemImportExcelModal({
           marca: item.marca,
           precioLista: item.precioLista,
           precioInterno: item.precioInterno,
-          margen: item.margen,
+          factorCosto: item.factorCosto,
+          factorVenta: item.factorVenta,
           precioCliente: item.precioCliente,
           cantidad: item.cantidad,
           costoInterno: item.costoInterno,
@@ -334,9 +335,10 @@ export default function CotizacionEquipoItemImportExcelModal({
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                precioInterno: item.precioInterno,
                 precioLista: item.precioLista,
-                margen: item.margen
+                precioInterno: item.precioInterno,
+                factorCosto: item.factorCosto,
+                factorVenta: item.factorVenta
               })
             })
             if (catalogUpdateRes.ok) {
@@ -361,13 +363,15 @@ export default function CotizacionEquipoItemImportExcelModal({
 
             // Si no encontramos categoría o unidad, usar valores por defecto o saltar
             if (categoria && unidad) {
-              const precioVenta = Math.round(item.precioInterno * (1 + item.margen) * 100) / 100
+              const precioVenta = Math.round(item.precioInterno * item.factorVenta * 100) / 100
               const catalogPayload = {
                 codigo: item.codigo,
                 descripcion: item.descripcion,
                 marca: item.marca || '',
+                precioLista: item.precioLista,
                 precioInterno: item.precioInterno,
-                margen: item.margen,
+                factorCosto: item.factorCosto,
+                factorVenta: item.factorVenta,
                 precioVenta,
                 categoriaId: categoria.id,
                 unidadId: unidad.id,
@@ -399,7 +403,8 @@ export default function CotizacionEquipoItemImportExcelModal({
         const updatePayload = {
           precioLista: item.precioLista,
           precioInterno: item.precioInterno,
-          margen: item.margen,
+          factorCosto: item.factorCosto,
+          factorVenta: item.factorVenta,
           precioCliente: item.precioCliente,
           cantidad: item.cantidad,
           costoInterno: item.costoInterno,
@@ -460,7 +465,7 @@ export default function CotizacionEquipoItemImportExcelModal({
   const itemsSeleccionados = getItemsSeleccionados()
   const totalSeleccionado = Math.round(
     itemsSeleccionados.reduce((sum, item) =>
-      sum + item.precioInterno * (1 + item.margen) * item.cantidad, 0
+      sum + item.precioInterno * item.factorVenta * item.cantidad, 0
     ) * 100
   ) / 100
 
@@ -504,7 +509,7 @@ export default function CotizacionEquipoItemImportExcelModal({
                   Arrastra un archivo Excel o haz clic para seleccionar
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Formato .xlsx con columnas: Código, Descripción, Cantidad, P.Real, Margen
+                  Formato .xlsx con columnas: Código, Descripción, Cantidad, P.Lista, F.Costo, F.Venta
                 </p>
               </label>
             </div>
@@ -694,16 +699,16 @@ export default function CotizacionEquipoItemImportExcelModal({
                                   <div className="space-y-1">
                                     <div className="flex items-center gap-1 text-[10px] text-gray-500">
                                       <FileSpreadsheet className="h-3 w-3" />
-                                      <span>Precio Excel</span>
+                                      <span>P.Lista Excel</span>
                                     </div>
                                     <p className="text-sm font-mono font-medium text-amber-600">
-                                      {formatCurrency(item.precioInterno)}
+                                      {formatCurrency(item.precioLista)}
                                     </p>
                                   </div>
                                   <div className="space-y-1">
                                     <div className="flex items-center gap-1 text-[10px] text-gray-500">
                                       <Database className="h-3 w-3" />
-                                      <span>Precio Catálogo</span>
+                                      <span>P.Lista Catálogo</span>
                                       {item.catalogComparison && (
                                         <span className="text-gray-400">
                                           ({formatTimeAgo(item.catalogComparison.catalogoUpdatedAt)})
@@ -711,7 +716,7 @@ export default function CotizacionEquipoItemImportExcelModal({
                                       )}
                                     </div>
                                     <p className="text-sm font-mono font-medium text-blue-600">
-                                      {item.catalogComparison ? formatCurrency(item.catalogComparison.catalogoPrecioInterno) : '-'}
+                                      {item.catalogComparison ? formatCurrency(item.catalogComparison.catalogoPrecioLista) : '-'}
                                     </p>
                                   </div>
                                 </div>
@@ -742,13 +747,13 @@ export default function CotizacionEquipoItemImportExcelModal({
                                   <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="excel" id={`excel-${idx}`} />
                                     <Label htmlFor={`excel-${idx}`} className="text-[11px] cursor-pointer">
-                                      Usar precio Excel ({formatCurrency(item.precioInterno)})
+                                      Usar P.Lista Excel ({formatCurrency(item.precioLista)})
                                     </Label>
                                   </div>
                                   <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="catalog" id={`catalog-${idx}`} />
                                     <Label htmlFor={`catalog-${idx}`} className="text-[11px] cursor-pointer">
-                                      Usar precio Catálogo ({item.catalogComparison ? formatCurrency(item.catalogComparison.catalogoPrecioInterno) : '-'})
+                                      Usar P.Lista Catálogo ({item.catalogComparison ? formatCurrency(item.catalogComparison.catalogoPrecioLista) : '-'})
                                     </Label>
                                   </div>
                                   <div className="flex items-center space-x-2">
@@ -834,7 +839,7 @@ export default function CotizacionEquipoItemImportExcelModal({
                               {item.cantidad}
                             </div>
                             <div className="w-20 text-right font-mono">
-                              {formatCurrency(item.precioInterno)}
+                              {formatCurrency(item.precioLista)}
                             </div>
                             <div className="w-24 text-right font-mono font-medium text-green-600">
                               {formatCurrency(item.costoCliente)}
@@ -896,7 +901,7 @@ export default function CotizacionEquipoItemImportExcelModal({
                           <th className="px-2 py-1.5 text-left w-24">Código</th>
                           <th className="px-2 py-1.5 text-left">Descripción</th>
                           <th className="px-2 py-1.5 text-center w-12">Cant.</th>
-                          <th className="px-2 py-1.5 text-right w-20">P.Real</th>
+                          <th className="px-2 py-1.5 text-right w-20">P.Lista</th>
                           <th className="px-2 py-1.5 text-right w-24">Total</th>
                         </tr>
                       </thead>
@@ -928,7 +933,7 @@ export default function CotizacionEquipoItemImportExcelModal({
                               {item.cantidad}
                             </td>
                             <td className="px-2 py-1.5 text-right font-mono">
-                              {formatCurrency(item.precioInterno)}
+                              {formatCurrency(item.precioLista)}
                             </td>
                             <td className="px-2 py-1.5 text-right font-mono font-medium text-blue-600">
                               {formatCurrency(item.costoCliente)}

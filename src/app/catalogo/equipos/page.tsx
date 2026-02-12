@@ -96,8 +96,9 @@ export default function CatalogoEquipoPage() {
 
   // Edit state
   const [editandoId, setEditandoId] = useState<string | null>(null)
-  const [nuevoPrecio, setNuevoPrecio] = useState<number | null>(null)
-  const [nuevoMargen, setNuevoMargen] = useState<number | null>(null)
+  const [nuevoPrecioLista, setNuevoPrecioLista] = useState<number | null>(null)
+  const [nuevoFactorCosto, setNuevoFactorCosto] = useState<number | null>(null)
+  const [nuevoFactorVenta, setNuevoFactorVenta] = useState<number | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<CatalogoEquipo | null>(null)
   const [eliminando, setEliminando] = useState(false)
@@ -190,8 +191,10 @@ export default function CatalogoEquipoPage() {
           codigo: eq.codigo,
           descripcion: eq.descripcion,
           marca: eq.marca,
+          precioLista: eq.precioLista,
           precioInterno: eq.precioInterno,
-          margen: eq.margen,
+          factorCosto: eq.factorCosto,
+          factorVenta: eq.factorVenta,
           precioVenta: eq.precioVenta,
           categoriaId: eq.categoriaId,
           unidadId: eq.unidadId,
@@ -257,17 +260,20 @@ export default function CatalogoEquipoPage() {
   }
 
   const guardarEdicion = async (equipo: CatalogoEquipo) => {
-    if (nuevoPrecio === null || nuevoMargen === null) return
-    if (nuevoPrecio === equipo.precioInterno && nuevoMargen === equipo.margen) {
+    if (nuevoPrecioLista === null || nuevoFactorCosto === null || nuevoFactorVenta === null) return
+    if (nuevoPrecioLista === equipo.precioLista && nuevoFactorCosto === equipo.factorCosto && nuevoFactorVenta === equipo.factorVenta) {
       cancelarEdicion()
       return
     }
     setGuardando(true)
-    const precioVenta = parseFloat((nuevoPrecio * (1 + nuevoMargen)).toFixed(2))
+    const precioInterno = parseFloat((nuevoPrecioLista * nuevoFactorCosto).toFixed(2))
+    const precioVenta = parseFloat((precioInterno * nuevoFactorVenta).toFixed(2))
     try {
       const actualizado = await updateCatalogoEquipo(equipo.id, {
-        precioInterno: nuevoPrecio,
-        margen: nuevoMargen,
+        precioLista: nuevoPrecioLista,
+        precioInterno,
+        factorCosto: nuevoFactorCosto,
+        factorVenta: nuevoFactorVenta,
         precioVenta,
       })
       setEquipos(prev => prev.map(eq => eq.id === equipo.id ? actualizado : eq))
@@ -282,8 +288,9 @@ export default function CatalogoEquipoPage() {
 
   const cancelarEdicion = () => {
     setEditandoId(null)
-    setNuevoPrecio(null)
-    setNuevoMargen(null)
+    setNuevoPrecioLista(null)
+    setNuevoFactorCosto(null)
+    setNuevoFactorVenta(null)
   }
 
   const handleEditField = async (id: string, field: keyof CatalogoEquipo, value: string | number) => {
@@ -520,10 +527,16 @@ export default function CatalogoEquipoPage() {
                         Uso
                       </th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        P. Interno
+                        P. Lista
                       </th>
                       <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        Margen
+                        F. Costo
+                      </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        F. Venta
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        P. Interno
                       </th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         P. Venta
@@ -599,8 +612,8 @@ export default function CatalogoEquipoPage() {
                           {editandoId === eq.id ? (
                             <Input
                               type="number"
-                              value={nuevoPrecio ?? ''}
-                              onChange={e => setNuevoPrecio(parseFloat(e.target.value))}
+                              value={nuevoPrecioLista ?? ''}
+                              onChange={e => setNuevoPrecioLista(parseFloat(e.target.value))}
                               onKeyDown={(e) => handleKeyDown(e, eq)}
                               className="w-24 h-7 text-right text-xs"
                               step="0.01"
@@ -608,7 +621,7 @@ export default function CatalogoEquipoPage() {
                             />
                           ) : (
                             <span className="text-muted-foreground">
-                              {formatCurrency(eq.precioInterno)}
+                              {formatCurrency(eq.precioLista)}
                             </span>
                           )}
                         </td>
@@ -617,16 +630,35 @@ export default function CatalogoEquipoPage() {
                             <Input
                               type="number"
                               step="0.01"
-                              value={nuevoMargen ?? ''}
-                              onChange={e => setNuevoMargen(parseFloat(e.target.value))}
+                              value={nuevoFactorCosto ?? ''}
+                              onChange={e => setNuevoFactorCosto(parseFloat(e.target.value))}
+                              onKeyDown={(e) => handleKeyDown(e, eq)}
+                              className="w-16 h-7 text-center text-xs"
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {(eq.factorCosto ?? 1.00).toFixed(2)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {editandoId === eq.id ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={nuevoFactorVenta ?? ''}
+                              onChange={e => setNuevoFactorVenta(parseFloat(e.target.value))}
                               onKeyDown={(e) => handleKeyDown(e, eq)}
                               className="w-16 h-7 text-center text-xs"
                             />
                           ) : (
                             <span className="text-xs text-muted-foreground">
-                              {(eq.margen * 100).toFixed(0)}%
+                              {(eq.factorVenta ?? 1.15).toFixed(2)} ({(((eq.factorVenta ?? 1.15) - 1) * 100).toFixed(0)}%)
                             </span>
                           )}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono text-sm text-muted-foreground">
+                          {formatCurrency(eq.precioInterno)}
                         </td>
                         <td className="py-2 px-3 text-right font-mono text-sm font-medium text-emerald-600">
                           {formatCurrency(eq.precioVenta)}
@@ -693,8 +725,9 @@ export default function CatalogoEquipoPage() {
                                       className="h-7 w-7 p-0"
                                       onClick={() => {
                                         setEditandoId(eq.id)
-                                        setNuevoPrecio(eq.precioInterno)
-                                        setNuevoMargen(eq.margen)
+                                        setNuevoPrecioLista(eq.precioLista)
+                                        setNuevoFactorCosto(eq.factorCosto ?? 1.00)
+                                        setNuevoFactorVenta(eq.factorVenta ?? 1.15)
                                       }}
                                       disabled={editandoId !== null}
                                     >

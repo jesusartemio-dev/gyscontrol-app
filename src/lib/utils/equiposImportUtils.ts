@@ -9,14 +9,16 @@
 // ===================================================
 
 import { CategoriaEquipo, Unidad } from '@/types'
-import { calcularPrecioVenta } from './recalculoCatalogoEquipo'
+import { calcularPrecioInterno, calcularPrecioVenta } from './recalculoCatalogoEquipo'
 
 export interface EquipoImportadoTemporal {
   codigo: string
   descripcion: string
   marca: string
+  precioLista: number
   precioInterno: number
-  margen: number
+  factorCosto: number
+  factorVenta: number
   precioVenta: number
   categoriaId: string
   unidadId: string
@@ -63,16 +65,20 @@ export async function importarEquiposDesdeExcelValidado(
     }
 
     const yaExiste = codigosExistentes.includes(codigo)
-    const precioInterno = parseFloat(row['PrecioInterno']) || 0
-    const margen = 0.15
-    const precioVenta = calcularPrecioVenta(precioInterno, margen)
+    const precioLista = parseFloat(row['PrecioLista'] || row['PrecioInterno']) || 0
+    const factorCosto = 1.00
+    const factorVenta = 1.15
+    const precioInterno = calcularPrecioInterno(precioLista, factorCosto)
+    const precioVenta = calcularPrecioVenta(precioInterno, factorVenta)
 
     equiposValidos.push({
       codigo,
       descripcion: row['Descripción'] || '',
       marca: row['Marca'] || '',
+      precioLista,
       precioInterno,
-      margen,
+      factorCosto,
+      factorVenta,
       precioVenta,
       categoriaId: categoria.id,
       unidadId: unidad.id,

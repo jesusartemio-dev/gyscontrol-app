@@ -98,8 +98,9 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
   const [unidadFiltro, setUnidadFiltro] = useState('__ALL__')
   const [textoFiltro, setTextoFiltro] = useState('')
   const [editandoId, setEditandoId] = useState<string | null>(null)
-  const [nuevoPrecio, setNuevoPrecio] = useState<number | null>(null)
-  const [nuevoMargen, setNuevoMargen] = useState<number | null>(null)
+  const [nuevoPrecioLista, setNuevoPrecioLista] = useState<number | null>(null)
+  const [nuevoFactorCosto, setNuevoFactorCosto] = useState<number | null>(null)
+  const [nuevoFactorVenta, setNuevoFactorVenta] = useState<number | null>(null)
 
   useEffect(() => {
     setEquipos(data)
@@ -120,20 +121,23 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
   }
 
   const guardarEdicion = async (equipo: CatalogoEquipo) => {
-    if (nuevoPrecio === null || nuevoMargen === null) return
+    if (nuevoPrecioLista === null || nuevoFactorCosto === null || nuevoFactorVenta === null) return
 
-    if (nuevoPrecio === equipo.precioInterno && nuevoMargen === equipo.margen) {
+    if (nuevoPrecioLista === equipo.precioLista && nuevoFactorCosto === equipo.factorCosto && nuevoFactorVenta === equipo.factorVenta) {
       toast('No se detectaron cambios.')
       cancelarEdicion()
       return
     }
 
-    const precioVenta = parseFloat((nuevoPrecio * (1 + nuevoMargen)).toFixed(2))
+    const precioInterno = parseFloat((nuevoPrecioLista * nuevoFactorCosto).toFixed(2))
+    const precioVenta = parseFloat((precioInterno * nuevoFactorVenta).toFixed(2))
 
     try {
       const actualizado = await updateCatalogoEquipo(equipo.id, {
-        precioInterno: nuevoPrecio,
-        margen: nuevoMargen,
+        precioLista: nuevoPrecioLista,
+        precioInterno,
+        factorCosto: nuevoFactorCosto,
+        factorVenta: nuevoFactorVenta,
         precioVenta,
       })
       setEquipos(prev => prev.map(eq => (eq.id === equipo.id ? actualizado : eq)))
@@ -148,8 +152,9 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
 
   const cancelarEdicion = () => {
     setEditandoId(null)
-    setNuevoPrecio(null)
-    setNuevoMargen(null)
+    setNuevoPrecioLista(null)
+    setNuevoFactorCosto(null)
+    setNuevoFactorVenta(null)
   }
 
   const handleDelete = async (id: string) => {
@@ -314,9 +319,11 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                     <TableHead>Categoría</TableHead>
                     <TableHead>Unidad</TableHead>
                     <TableHead>Marca</TableHead>
-                    <TableHead className="text-right">Precio Interno</TableHead>
-                    <TableHead className="text-right">Margen</TableHead>
-                    <TableHead className="text-right">Precio Venta</TableHead>
+                    <TableHead className="text-right">P.Lista</TableHead>
+                    <TableHead className="text-right">F.Costo</TableHead>
+                    <TableHead className="text-right">F.Venta</TableHead>
+                    <TableHead className="text-right">P.Interno</TableHead>
+                    <TableHead className="text-right">P.Venta</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-center">Acciones</TableHead>
                   </TableRow>
@@ -355,14 +362,14 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                         {editandoId === eq.id ? (
                           <Input
                             type="number"
-                            value={nuevoPrecio ?? ''}
-                            onChange={e => setNuevoPrecio(parseFloat(e.target.value))}
+                            value={nuevoPrecioLista ?? ''}
+                            onChange={e => setNuevoPrecioLista(parseFloat(e.target.value))}
                             className="w-24 text-right"
                             step="0.01"
                           />
                         ) : (
                           <span className="text-muted-foreground">
-                            {formatCurrency(eq.precioInterno)}
+                            {formatCurrency(eq.precioLista)}
                           </span>
                         )}
                       </TableCell>
@@ -371,15 +378,38 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                           <Input
                             type="number"
                             step="0.01"
-                            value={nuevoMargen ?? ''}
-                            onChange={e => setNuevoMargen(parseFloat(e.target.value))}
+                            value={nuevoFactorCosto ?? ''}
+                            onChange={e => setNuevoFactorCosto(parseFloat(e.target.value))}
+                            className="w-20 text-right"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground font-mono">
+                            {(eq.factorCosto ?? 1.00).toFixed(2)}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {editandoId === eq.id ? (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={nuevoFactorVenta ?? ''}
+                            onChange={e => setNuevoFactorVenta(parseFloat(e.target.value))}
                             className="w-20 text-right"
                           />
                         ) : (
                           <Badge variant="secondary">
-                            {(eq.margen * 100).toFixed(0)}%
+                            {(eq.factorVenta ?? 1.15).toFixed(2)}
+                            <span className="ml-1 text-[10px] opacity-70">
+                              ({(((eq.factorVenta ?? 1.15) - 1) * 100).toFixed(0)}%)
+                            </span>
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        <span className="text-muted-foreground">
+                          {formatCurrency(eq.precioInterno)}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right font-mono font-semibold">
                         <span className="text-green-600">
@@ -443,8 +473,9 @@ export default function CatalogoEquipoList({ data, onUpdate, onDelete }: Props) 
                                 variant="ghost" 
                                 onClick={() => {
                                   setEditandoId(eq.id)
-                                  setNuevoPrecio(eq.precioInterno)
-                                  setNuevoMargen(eq.margen)
+                                  setNuevoPrecioLista(eq.precioLista)
+                                  setNuevoFactorCosto(eq.factorCosto ?? 1.00)
+                                  setNuevoFactorVenta(eq.factorVenta ?? 1.15)
                                 }}
                                 className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                               >

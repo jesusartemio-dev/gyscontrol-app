@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const data = await req.json()
 
     // 🔎 Validación mínima de campos requeridos
-    const requiredFields = ['codigo', 'descripcion', 'marca', 'precioInterno', 'margen', 'precioVenta', 'categoriaId', 'unidadId', 'estado']
+    const requiredFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'categoriaId', 'unidadId', 'estado']
     for (const field of requiredFields) {
       if (!(field in data)) {
         return NextResponse.json({ error: `Falta el campo obligatorio: ${field}` }, { status: 400 })
@@ -47,8 +47,10 @@ export async function POST(req: Request) {
         codigo: data.codigo,
         descripcion: data.descripcion,
         marca: data.marca,
+        precioLista: data.precioLista,
         precioInterno: data.precioInterno,
-        margen: data.margen,
+        factorCosto: data.factorCosto,
+        factorVenta: data.factorVenta,
         precioVenta: data.precioVenta,
         categoriaId: data.categoriaId,
         unidadId: data.unidadId,

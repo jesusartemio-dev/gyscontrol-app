@@ -41,8 +41,10 @@ export async function createCatalogoEquipo(data: {
   codigo: string
   descripcion: string
   marca: string
+  precioLista: number
   precioInterno: number
-  margen: number
+  factorCosto: number
+  factorVenta: number
   precioVenta: number
   categoriaId: string
   unidadId: string
@@ -69,8 +71,10 @@ export async function updateCatalogoEquipo(id: string, data: {
   categoriaEquipoId?: string
   unidadId?: string
   precio?: number
+  precioLista?: number
   precioInterno?: number
-  margen?: number
+  factorCosto?: number
+  factorVenta?: number
   precioVenta?: number
 }): Promise<CatalogoEquipo> {
   try {

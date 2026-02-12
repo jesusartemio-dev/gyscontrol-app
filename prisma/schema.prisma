@@ -35,9 +35,10 @@ model CatalogoEquipo {
   codigo                           String                             @unique
   descripcion                      String
   marca                            String
-  precioLista                      Float?
+  precioLista                      Float
   precioInterno                    Float
-  margen                           Float
+  factorCosto                      Float                              @default(1.00)
+  factorVenta                      Float                              @default(1.15)
   precioVenta                      Float
   estado                           String
   precioReal                       Float?
@@ -279,9 +280,10 @@ model CotizacionEquipoItem {
   categoria          String
   unidad             String
   marca              String
-  precioLista        Float?
+  precioLista        Float
   precioInterno      Float
-  margen             Float            @default(0.15)
+  factorCosto        Float            @default(1.00)
+  factorVenta        Float            @default(1.15)
   precioCliente      Float
   cantidad           Float
   costoInterno       Float
@@ -686,9 +688,10 @@ model PlantillaEquipoItem {
   categoria         String
   unidad            String
   marca             String
-  precioLista       Float?
+  precioLista       Float
   precioInterno     Float
-  margen            Float           @default(0.15)
+  factorCosto       Float           @default(1.00)
+  factorVenta       Float           @default(1.15)
   precioCliente     Float
   cantidad          Float
   costoInterno      Float
@@ -2072,9 +2075,10 @@ model PlantillaEquipoItemIndependiente {
   categoria                    String
   unidad                       String
   marca                        String
-  precioLista                  Float?
+  precioLista                  Float
   precioInterno                Float
-  margen                       Float                        @default(0.15)
+  factorCosto                  Float                        @default(1.00)
+  factorVenta                  Float                        @default(1.15)
   precioCliente                Float
   cantidad                     Float
   costoInterno                 Float

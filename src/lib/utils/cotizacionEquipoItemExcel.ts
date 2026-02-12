@@ -41,8 +41,8 @@ export async function exportarCotizacionEquipoItemsAExcel(
     { header: 'Unidad', key: 'unidad', width: 10 },
     { header: 'Cantidad', key: 'cantidad', width: 10 },
     { header: 'P.Lista', key: 'precioLista', width: 12 },
-    { header: 'P.Real', key: 'precioReal', width: 12 },
-    { header: 'Margen', key: 'margen', width: 10 },
+    { header: 'F.Costo', key: 'factorCosto', width: 10 },
+    { header: 'F.Venta', key: 'factorVenta', width: 10 },
     { header: 'P.Cliente', key: 'precioCliente', width: 12 },
     { header: 'Diferencia', key: 'diferencia', width: 12 },
     { header: 'Total Interno', key: 'totalInterno', width: 14 },
@@ -62,9 +62,9 @@ export async function exportarCotizacionEquipoItemsAExcel(
       categoria: item.categoria || '',
       unidad: item.unidad || '',
       cantidad: item.cantidad || 1,
-      precioLista: item.precioLista || '',
-      precioReal: item.precioInterno || 0,
-      margen: +((1 + (item.margen || 0)).toFixed(2)),
+      precioLista: item.precioLista || 0,
+      factorCosto: item.factorCosto ?? 1.00,
+      factorVenta: item.factorVenta ?? 1.15,
       precioCliente: item.precioCliente || 0,
       diferencia: diferencia ?? '',
       totalInterno: item.costoInterno || 0,
@@ -156,8 +156,8 @@ export async function generarPlantillaEquiposImportacion(
     { header: 'Unidad', key: 'unidad', width: 10 },
     { header: 'Cantidad', key: 'cantidad', width: 10 },
     { header: 'P.Lista', key: 'precioLista', width: 12 },
-    { header: 'P.Real', key: 'precioReal', width: 12 },
-    { header: 'Margen', key: 'margen', width: 10 },
+    { header: 'F.Costo', key: 'factorCosto', width: 10 },
+    { header: 'F.Venta', key: 'factorVenta', width: 10 },
   ]
   wsEquipos.getRow(1).font = { bold: true }
   wsEquipos.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }
@@ -171,8 +171,8 @@ export async function generarPlantillaEquiposImportacion(
     unidad: unidades[0]?.nombre || 'Unidad',
     cantidad: 2,
     precioLista: 120.00,
-    precioReal: 130.00,
-    margen: 1.15,
+    factorCosto: 1.00,
+    factorVenta: 1.15,
   })
   wsEquipos.addRow({
     codigo: 'EQ-002',
@@ -182,8 +182,8 @@ export async function generarPlantillaEquiposImportacion(
     unidad: unidades[1]?.nombre || 'Unidad',
     cantidad: 1,
     precioLista: 700.00,
-    precioReal: 739.13,
-    margen: 1.15,
+    factorCosto: 1.00,
+    factorVenta: 1.15,
   })
 
   // --- Sheet 2: Categorias (visible reference with descriptions) ---
@@ -287,11 +287,12 @@ export type PriceSource =
 // Info del catálogo para comparación
 export interface CatalogComparisonInfo {
   catalogoEquipoId: string
+  catalogoPrecioLista: number
   catalogoPrecioInterno: number
-  catalogoPrecioLista?: number
-  catalogoMargen: number
+  catalogoFactorCosto: number
+  catalogoFactorVenta: number
   catalogoUpdatedAt: Date | string
-  priceDifference: number       // Diferencia absoluta
+  priceDifference: number       // Diferencia absoluta (precioLista)
   priceDifferencePercent: number // Diferencia porcentual
 }
 
@@ -302,9 +303,10 @@ export interface ImportedEquipoItem {
   unidad: string
   marca: string
   cantidad: number
-  precioLista?: number
+  precioLista: number
   precioInterno: number
-  margen: number
+  factorCosto: number
+  factorVenta: number
   precioCliente: number
   costoInterno: number
   costoCliente: number
@@ -430,7 +432,7 @@ export function validarEImportarEquipoItems(
   for (let [index, row] of rows.entries()) {
     const fila = index + 2 // +2 porque fila 1 es header
 
-    // Leer campos en el nuevo orden: Código, Descripción, Marca, Categoría, Unidad, Cantidad, P.Lista, P.Real, Margen
+    // Leer campos: Código, Descripción, Marca, Categoría, Unidad, Cantidad, P.Lista, F.Costo, F.Venta
     let codigo = String(row['Código'] || row['Codigo'] || '').trim()
     const descripcion = String(row['Descripción'] || row['Descripcion'] || '').trim()
     const marca = String(row['Marca'] || '').trim()
@@ -438,10 +440,10 @@ export function validarEImportarEquipoItems(
     const unidad = String(row['Unidad'] || '').trim()
     const cantidad = parseInt(row['Cantidad'] || 1) || 1
 
-    // Leer precios y margen del Excel (margen como multiplicador: 1.15 = 15% ganancia)
+    // Leer precios y factores del Excel
     const precioListaExcel = parseFloat(row['P.Lista'] || row['Precio Lista'] || row['PrecioLista'] || 0) || undefined
-    const precioRealExcel = parseFloat(row['P.Real'] || row['Precio Real'] || row['PrecioReal'] || row['P.Interno'] || 0) || undefined
-    const margenExcel = parseFloat(row['Margen'] || row['Margen %'] || 0) || undefined
+    const factorCostoExcel = parseFloat(row['F.Costo'] || row['Factor Costo'] || row['FactorCosto'] || 0) || undefined
+    const factorVentaExcel = parseFloat(row['F.Venta'] || row['Factor Venta'] || row['FactorVenta'] || 0) || undefined
 
     // Validaciones básicas
     // Si no hay código, generar uno provisional
@@ -480,21 +482,24 @@ export function validarEImportarEquipoItems(
       }
     }
 
-    // Determinar precio interno a usar (Excel tiene prioridad si está definido)
-    const precioInternoExcel = precioRealExcel ?? 0
-    const precioInternoCatalogo = catalogoEquipo?.precioInterno ?? 0
+    // Determinar precioLista a usar (Excel tiene prioridad si está definido)
+    const precioListaCatalogo = catalogoEquipo?.precioLista ?? 0
 
-    // Si no hay precio en Excel, usar catálogo
-    const precioInterno = precioInternoExcel > 0 ? precioInternoExcel : precioInternoCatalogo
+    // Si no hay precioLista en Excel, usar catálogo
+    const precioLista = (precioListaExcel && precioListaExcel > 0) ? precioListaExcel : precioListaCatalogo
 
-    // margenExcel es multiplicador (1.15), convertir a decimal (0.15) para almacenar
-    const margenExcelDecimal = margenExcel !== undefined ? (margenExcel - 1) : undefined
-    const margenCatalogo = catalogoEquipo?.margen ?? 0.15
-    const margen = margenExcelDecimal ?? margenCatalogo
+    // Determinar factores (Excel tiene prioridad, luego catálogo, luego defaults)
+    const factorCostoCatalogo = catalogoEquipo?.factorCosto ?? 1.00
+    const factorVentaCatalogo = catalogoEquipo?.factorVenta ?? 1.15
+    const factorCosto = factorCostoExcel ?? factorCostoCatalogo
+    const factorVenta = factorVentaExcel ?? factorVentaCatalogo
 
-    // Validar que tengamos precio interno
-    if (precioInterno <= 0) {
-      errores.push(`Fila ${fila}: El precio real (P.Real) es requerido y debe ser mayor a 0`)
+    // precioInterno es calculado: precioLista × factorCosto
+    const precioInterno = +(precioLista * factorCosto).toFixed(2)
+
+    // Validar que tengamos precio de lista
+    if (precioLista <= 0) {
+      errores.push(`Fila ${fila}: El precio de lista (P.Lista) es requerido y debe ser mayor a 0`)
       continue
     }
 
@@ -504,31 +509,32 @@ export function validarEImportarEquipoItems(
     let priceSource: PriceSource = 'excel'
 
     if (catalogoEquipo) {
-      // Calcular diferencia de precio
-      const priceDifference = precioInternoExcel > 0
-        ? Math.round((precioInternoExcel - precioInternoCatalogo) * 100) / 100
+      // Calcular diferencia de precio basada en precioLista
+      const priceDifference = precioListaExcel && precioListaExcel > 0
+        ? Math.round((precioListaExcel - precioListaCatalogo) * 100) / 100
         : 0
-      const priceDifferencePercent = precioInternoCatalogo > 0
-        ? Math.round((priceDifference / precioInternoCatalogo) * 10000) / 100
+      const priceDifferencePercent = precioListaCatalogo > 0
+        ? Math.round((priceDifference / precioListaCatalogo) * 10000) / 100
         : 0
 
-      // Si hay precio en Excel y es diferente al catálogo
-      if (precioInternoExcel > 0 && Math.abs(priceDifference) > PRICE_TOLERANCE) {
+      // Si hay precioLista en Excel y es diferente al catálogo
+      if (precioListaExcel && precioListaExcel > 0 && Math.abs(priceDifference) > PRICE_TOLERANCE) {
         catalogStatus = 'conflict'
         totalConflict++
         priceSource = 'excel' // Por defecto usar Excel, usuario puede cambiar
       } else {
         catalogStatus = 'match'
         totalMatch++
-        // Si no hay precio en Excel, usar catálogo
-        priceSource = precioInternoExcel > 0 ? 'excel' : 'catalog'
+        // Si no hay precioLista en Excel, usar catálogo
+        priceSource = (precioListaExcel && precioListaExcel > 0) ? 'excel' : 'catalog'
       }
 
       catalogComparison = {
         catalogoEquipoId: catalogoEquipo.id,
-        catalogoPrecioInterno: precioInternoCatalogo,
-        catalogoPrecioLista: catalogoEquipo.precioLista ?? undefined,
-        catalogoMargen: margenCatalogo,
+        catalogoPrecioLista: precioListaCatalogo,
+        catalogoPrecioInterno: catalogoEquipo.precioInterno,
+        catalogoFactorCosto: factorCostoCatalogo,
+        catalogoFactorVenta: factorVentaCatalogo,
         catalogoUpdatedAt: catalogoEquipo.updatedAt,
         priceDifference,
         priceDifferencePercent
@@ -539,12 +545,9 @@ export function validarEImportarEquipoItems(
       priceSource = 'excel'
     }
 
-    // Usar precio según priceSource para los cálculos
-    const precioLista = precioListaExcel ?? catalogoEquipo?.precioLista ?? undefined
-
-    // CALCULAR precioCliente = precioInterno × (1 + margen) = precioInterno × margenMultiplier
+    // CALCULAR precioCliente = precioInterno × factorVenta
     // Mantener precisión completa para cálculo del total (como Excel)
-    const precioClienteExact = precioInterno * (1 + margen)
+    const precioClienteExact = precioInterno * factorVenta
     const precioCliente = Math.round(precioClienteExact * 100) / 100
 
     // Calcular costos - usar precioClienteExact para mantener precisión como Excel
@@ -568,7 +571,8 @@ export function validarEImportarEquipoItems(
       cantidad,
       precioLista,
       precioInterno,
-      margen,
+      factorCosto,
+      factorVenta,
       precioCliente,
       costoInterno,
       costoCliente,
@@ -622,24 +626,29 @@ export function recalcularItemConPriceSource(
   item: ImportedEquipoItem,
   priceSource: PriceSource
 ): ImportedEquipoItem {
-  let precioInterno = item.precioInterno
-  let margen = item.margen
+  let precioLista = item.precioLista
+  let factorCosto = item.factorCosto
+  let factorVenta = item.factorVenta
 
   if (priceSource === 'catalog' && item.catalogComparison) {
-    precioInterno = item.catalogComparison.catalogoPrecioInterno
-    margen = item.catalogComparison.catalogoMargen
+    precioLista = item.catalogComparison.catalogoPrecioLista
+    factorCosto = item.catalogComparison.catalogoFactorCosto
+    factorVenta = item.catalogComparison.catalogoFactorVenta
   }
   // Para 'excel' y 'excel_update_catalog' usamos los valores originales del Excel
 
-  const precioClienteExact = precioInterno * (1 + margen)
+  const precioInterno = +(precioLista * factorCosto).toFixed(2)
+  const precioClienteExact = precioInterno * factorVenta
   const precioCliente = Math.round(precioClienteExact * 100) / 100
   const costoInterno = Math.round(precioInterno * item.cantidad * 100) / 100
   const costoCliente = Math.round(precioClienteExact * item.cantidad * 100) / 100
 
   return {
     ...item,
+    precioLista,
     precioInterno,
-    margen,
+    factorCosto,
+    factorVenta,
     precioCliente,
     costoInterno,
     costoCliente,

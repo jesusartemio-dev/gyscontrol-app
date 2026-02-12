@@ -67,9 +67,9 @@ export default function CotizacionEquipoItemCreateModal({
   const [categoria, setCategoria] = useState('')
   const [unidad, setUnidad] = useState('Unidad')
   const [cantidad, setCantidad] = useState(1)
-  const [precioLista, setPrecioLista] = useState<number | undefined>(undefined)
-  const [precioInterno, setPrecioInterno] = useState(0)
-  const [margen, setMargen] = useState(0.15) // 15% default
+  const [precioLista, setPrecioLista] = useState(0)
+  const [factorCosto, setFactorCosto] = useState(1.00)
+  const [factorVenta, setFactorVenta] = useState(1.15)
 
   useEffect(() => {
     if (isOpen) {
@@ -82,9 +82,9 @@ export default function CotizacionEquipoItemCreateModal({
         setCategoria(item.categoria || '')
         setUnidad(item.unidad || 'Unidad')
         setCantidad(item.cantidad || 1)
-        setPrecioLista(item.precioLista || undefined)
-        setPrecioInterno(item.precioInterno || 0)
-        setMargen(item.margen || 0.15)
+        setPrecioLista(item.precioLista || 0)
+        setFactorCosto(item.factorCosto || 1.00)
+        setFactorVenta(item.factorVenta || 1.15)
       } else {
         // Create mode - reset form
         resetForm()
@@ -111,31 +111,32 @@ export default function CotizacionEquipoItemCreateModal({
     setCategoria('')
     setUnidad('Unidad')
     setCantidad(1)
-    setPrecioLista(undefined)
-    setPrecioInterno(0)
-    setMargen(0.15)
+    setPrecioLista(0)
+    setFactorCosto(1.00)
+    setFactorVenta(1.15)
   }
 
   // Calcular costos en tiempo real
+  const precioInterno = +(precioLista * factorCosto).toFixed(2)
+
   const calculados = useMemo(() => {
-    // precioCliente = precioInterno × (1 + margen)
-    const precioCliente = +(precioInterno * (1 + margen)).toFixed(2)
+    const pInterno = +(precioLista * factorCosto).toFixed(2)
+    // precioCliente = precioInterno × factorVenta
+    const precioCliente = +(pInterno * factorVenta).toFixed(2)
     // costos
-    const costoInterno = +(precioInterno * cantidad).toFixed(2)
+    const costoInterno = +(pInterno * cantidad).toFixed(2)
     const costoCliente = +(precioCliente * cantidad).toFixed(2)
-    // diferencia con precio lista
-    const diferencia = precioLista ? +((precioInterno - precioLista) * cantidad).toFixed(2) : null
     // rentabilidad %
     const rentabilidad = costoInterno > 0 ? ((costoCliente - costoInterno) / costoInterno) * 100 : 0
 
     return {
+      precioInterno: pInterno,
       precioCliente,
       costoInterno,
       costoCliente,
-      diferencia,
       rentabilidad
     }
-  }, [precioInterno, margen, cantidad, precioLista])
+  }, [precioLista, factorCosto, factorVenta, cantidad])
 
   const handleSave = async () => {
     // Validaciones
@@ -147,8 +148,8 @@ export default function CotizacionEquipoItemCreateModal({
       toast.error('La descripción es requerida')
       return
     }
-    if (precioInterno <= 0) {
-      toast.error('El precio real debe ser mayor a 0')
+    if (precioLista <= 0) {
+      toast.error('El precio lista debe ser mayor a 0')
       return
     }
     if (cantidad <= 0) {
@@ -165,9 +166,10 @@ export default function CotizacionEquipoItemCreateModal({
         categoria: categoria.trim() || 'Sin categoría',
         unidad: unidad.trim() || 'Unidad',
         marca: marca.trim() || 'Sin marca',
-        precioLista: precioLista || undefined,
-        precioInterno,
-        margen,
+        precioLista,
+        precioInterno: calculados.precioInterno,
+        factorCosto,
+        factorVenta,
         precioCliente: calculados.precioCliente,
         cantidad,
         costoInterno: calculados.costoInterno,
@@ -306,41 +308,45 @@ export default function CotizacionEquipoItemCreateModal({
 
             <div className="grid grid-cols-4 gap-2">
               <div>
-                <Label className="text-[10px] text-muted-foreground">P.Lista</Label>
+                <Label className="text-[10px] text-muted-foreground">P.Lista *</Label>
                 <Input
                   type="number"
                   min={0}
                   step={0.01}
                   value={precioLista || ''}
-                  onChange={(e) => setPrecioLista(e.target.value ? parseFloat(e.target.value) : undefined)}
-                  placeholder="Ref."
-                  className="h-7 text-xs font-mono"
-                />
-              </div>
-              <div>
-                <Label className="text-[10px] text-muted-foreground">P.Real *</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={precioInterno || ''}
-                  onChange={(e) => setPrecioInterno(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setPrecioLista(parseFloat(e.target.value) || 0)}
                   placeholder="0.00"
                   className="h-7 text-xs font-mono"
                 />
               </div>
               <div>
-                <Label className="text-[10px] text-muted-foreground">Margen</Label>
+                <Label className="text-[10px] text-muted-foreground">F.Costo</Label>
                 <Input
                   type="number"
-                  min={0}
-                  max={2}
+                  min={0.5}
+                  max={3}
                   step={0.01}
-                  value={+(1 + margen).toFixed(2)}
-                  onChange={(e) => setMargen(Math.max(0, (parseFloat(e.target.value) || 1) - 1))}
+                  value={factorCosto}
+                  onChange={(e) => setFactorCosto(parseFloat(e.target.value) || 1.00)}
+                  placeholder="1.00"
+                  className="h-7 text-xs font-mono"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">F.Venta</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={3}
+                  step={0.01}
+                  value={factorVenta}
+                  onChange={(e) => setFactorVenta(parseFloat(e.target.value) || 1.15)}
                   placeholder="1.15"
                   className="h-7 text-xs font-mono"
                 />
+                <span className="text-[9px] text-muted-foreground">
+                  {((factorVenta - 1) * 100).toFixed(0)}%
+                </span>
               </div>
               <div>
                 <Label className="text-[10px] text-muted-foreground">Cantidad *</Label>
@@ -355,10 +361,16 @@ export default function CotizacionEquipoItemCreateModal({
               </div>
             </div>
 
-            {/* Precio Cliente calculado */}
-            <div className="mt-2 pt-2 border-t border-gray-200">
+            {/* Precios calculados */}
+            <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">P.Cliente (calculado):</span>
+                <span className="text-muted-foreground">P.Interno (P.Lista × F.Costo):</span>
+                <span className="font-mono font-medium text-blue-600">
+                  {formatCurrency(calculados.precioInterno)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">P.Cliente (P.Interno × F.Venta):</span>
                 <span className="font-mono font-medium text-green-600">
                   {formatCurrency(calculados.precioCliente)}
                 </span>
@@ -368,7 +380,7 @@ export default function CotizacionEquipoItemCreateModal({
 
           {/* Resumen de costos */}
           <div className={cn(
-            "grid grid-cols-4 gap-2 p-3 rounded-lg border",
+            "grid grid-cols-3 gap-2 p-3 rounded-lg border",
             calculados.rentabilidad >= 15 ? "bg-green-50/50 border-green-200" : "bg-orange-50/50 border-orange-200"
           )}>
             <div className="text-center">
@@ -393,16 +405,6 @@ export default function CotizacionEquipoItemCreateModal({
                 {calculados.rentabilidad.toFixed(0)}%
               </p>
             </div>
-            <div className="text-center">
-              <p className="text-[10px] text-muted-foreground">Difer.</p>
-              <p className={cn(
-                "text-sm font-semibold",
-                calculados.diferencia === null ? 'text-gray-400' :
-                calculados.diferencia >= 0 ? 'text-green-600' : 'text-red-500'
-              )}>
-                {calculados.diferencia !== null ? formatCurrency(calculados.diferencia) : '-'}
-              </p>
-            </div>
           </div>
 
           {/* Footer */}
@@ -413,7 +415,7 @@ export default function CotizacionEquipoItemCreateModal({
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={saving || !codigo.trim() || !descripcion.trim() || precioInterno <= 0}
+              disabled={saving || !codigo.trim() || !descripcion.trim() || precioLista <= 0}
               className="bg-orange-600 hover:bg-orange-700"
             >
               {saving ? (

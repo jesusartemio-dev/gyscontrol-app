@@ -161,8 +161,10 @@ export interface CatalogoEquipoPayload {
   codigo: string
   descripcion: string
   marca: string
+  precioLista: number
   precioInterno: number
-  margen: number
+  factorCosto: number
+  factorVenta: number
   precioVenta: number
   categoriaId: string
   unidadId: string
@@ -215,9 +217,10 @@ export interface PlantillaEquipoItemPayload {
   categoria: string
   unidad: string
   marca: string
-  precioLista?: number
+  precioLista: number
   precioInterno: number
-  margen: number
+  factorCosto: number
+  factorVenta: number
   precioCliente: number
   cantidad: number
   costoInterno: number
@@ -340,9 +343,10 @@ export interface CotizacionEquipoItemPayload {
   categoria: string
   unidad: string
   marca: string
-  precioLista?: number
+  precioLista: number
   precioInterno: number
-  margen: number
+  factorCosto: number
+  factorVenta: number
   precioCliente: number
 
   cantidad: number

@@ -32,17 +32,18 @@ export default function PlantillaEquipoItemRow({ item, onUpdate, onDelete }: Pro
       [field]: typeof value === 'string' ? parseFloat(value) || 0 : value
     }
 
-    // Si cambia el margen, recalcular precioCliente
-    if (field === 'margen') {
-      updated.precioCliente = +(updated.precioInterno * (1 + updated.margen)).toFixed(2)
+    // Si cambia precioLista o factorCosto, recalcular precioInterno
+    if (field === 'precioLista' || field === 'factorCosto') {
+      updated.precioInterno = +(updated.precioLista * updated.factorCosto).toFixed(2)
+      updated.precioCliente = +(updated.precioInterno * updated.factorVenta).toFixed(2)
     }
-    // Si cambia precioInterno, recalcular precioCliente basado en margen
-    if (field === 'precioInterno') {
-      updated.precioCliente = +(updated.precioInterno * (1 + updated.margen)).toFixed(2)
+    // Si cambia factorVenta, recalcular precioCliente
+    if (field === 'factorVenta') {
+      updated.precioCliente = +(updated.precioInterno * updated.factorVenta).toFixed(2)
     }
-    // Si cambia precioCliente, recalcular margen
+    // Si cambia precioCliente, recalcular factorVenta
     if (field === 'precioCliente' && updated.precioInterno > 0) {
-      updated.margen = +((updated.precioCliente / updated.precioInterno) - 1).toFixed(4)
+      updated.factorVenta = +(updated.precioCliente / updated.precioInterno).toFixed(4)
     }
 
     updated.costoInterno = +(updated.cantidad * updated.precioInterno).toFixed(2)
@@ -51,8 +52,10 @@ export default function PlantillaEquipoItemRow({ item, onUpdate, onDelete }: Pro
 
     onUpdate(item.id, {
       cantidad: updated.cantidad,
+      precioLista: updated.precioLista,
       precioInterno: updated.precioInterno,
-      margen: updated.margen,
+      factorCosto: updated.factorCosto,
+      factorVenta: updated.factorVenta,
       precioCliente: updated.precioCliente,
       costoInterno: updated.costoInterno,
       costoCliente: updated.costoCliente
@@ -77,8 +80,8 @@ export default function PlantillaEquipoItemRow({ item, onUpdate, onDelete }: Pro
         <Input
           type="number"
           step="any"
-          value={localItem.precioInterno}
-          onChange={(e) => handleChange('precioInterno', e.target.value)}
+          value={localItem.precioLista}
+          onChange={(e) => handleChange('precioLista', e.target.value)}
           className="w-24"
         />
       </td>
@@ -86,8 +89,17 @@ export default function PlantillaEquipoItemRow({ item, onUpdate, onDelete }: Pro
         <Input
           type="number"
           step="0.01"
-          value={Math.round((localItem.margen || 0) * 100)}
-          onChange={(e) => handleChange('margen', parseFloat(e.target.value) / 100 || 0)}
+          value={localItem.factorCosto}
+          onChange={(e) => handleChange('factorCosto', e.target.value)}
+          className="w-16 text-center"
+        />
+      </td>
+      <td className="p-2">
+        <Input
+          type="number"
+          step="0.01"
+          value={localItem.factorVenta}
+          onChange={(e) => handleChange('factorVenta', e.target.value)}
           className="w-16 text-center"
         />
       </td>

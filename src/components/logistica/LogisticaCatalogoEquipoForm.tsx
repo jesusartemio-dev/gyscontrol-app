@@ -23,11 +23,13 @@ const schema = z.object({
   codigo: z.string().min(1, 'Código requerido'),
   descripcion: z.string().min(1, 'Descripción requerida'),
   marca: z.string().min(1, 'Marca requerida'),
-  precioInterno: z.number().min(0, 'Debe ser positivo'),
-  margen: z.number().min(0).max(1, 'Debe ser entre 0 y 1')
+  precioLista: z.number().min(0, 'Debe ser positivo'),
+  factorCosto: z.number().min(0.5).max(3, 'Debe ser entre 0.5 y 3'),
+  factorVenta: z.number().min(1).max(3, 'Debe ser entre 1 y 3')
 })
 
 export default function LogisticaCatalogoEquipoForm({ onCreated }: LogisticaCatalogoEquipoFormProps) {
+  const [precioInterno, setPrecioInterno] = useState(0)
   const [precioVenta, setPrecioVenta] = useState(0)
   const [categorias, setCategorias] = useState<{ value: string; label: string }[]>([])
   const [unidades, setUnidades] = useState<{ value: string; label: string }[]>([])
@@ -49,17 +51,21 @@ export default function LogisticaCatalogoEquipoForm({ onCreated }: LogisticaCata
       codigo: '',
       descripcion: '',
       marca: '',
-      precioInterno: 0,
-      margen: 0.15
+      precioLista: 0,
+      factorCosto: 1.00,
+      factorVenta: 1.15
     }
   })
 
-  const watchInterno = watch('precioInterno')
-  const watchMargen = watch('margen')
+  const watchPrecioLista = watch('precioLista')
+  const watchFactorCosto = watch('factorCosto')
+  const watchFactorVenta = watch('factorVenta')
 
   useEffect(() => {
-    setPrecioVenta(parseFloat((watchInterno * (1 + watchMargen)).toFixed(2)))
-  }, [watchInterno, watchMargen])
+    const pInterno = parseFloat((watchPrecioLista * watchFactorCosto).toFixed(2))
+    setPrecioInterno(pInterno)
+    setPrecioVenta(parseFloat((pInterno * watchFactorVenta).toFixed(2)))
+  }, [watchPrecioLista, watchFactorCosto, watchFactorVenta])
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -86,7 +92,7 @@ export default function LogisticaCatalogoEquipoForm({ onCreated }: LogisticaCata
     }
 
     try {
-      const nuevo = await createEquipoLogistica({ ...values, precioVenta, estado: 'pendiente' })
+      const nuevo = await createEquipoLogistica({ ...values, precioInterno, precioVenta, estado: 'pendiente' })
       if (nuevo) {
         onCreated(nuevo)
         reset()
@@ -157,15 +163,26 @@ export default function LogisticaCatalogoEquipoForm({ onCreated }: LogisticaCata
         </div>
 
         <div>
-          <Label>Precio Interno (S/)</Label>
-          <Input type="number" step="0.01" {...register('precioInterno', { valueAsNumber: true })} />
-          {errors.precioInterno && <p className="text-red-500 text-sm">{errors.precioInterno.message}</p>}
+          <Label>Precio Lista</Label>
+          <Input type="number" step="0.01" {...register('precioLista', { valueAsNumber: true })} />
+          {errors.precioLista && <p className="text-red-500 text-sm">{errors.precioLista.message}</p>}
         </div>
 
         <div>
-          <Label>Margen (%)</Label>
-          <Input type="number" step="0.01" {...register('margen', { valueAsNumber: true })} />
-          {errors.margen && <p className="text-red-500 text-sm">{errors.margen.message}</p>}
+          <Label>Factor Costo</Label>
+          <Input type="number" step="0.01" {...register('factorCosto', { valueAsNumber: true })} />
+          {errors.factorCosto && <p className="text-red-500 text-sm">{errors.factorCosto.message}</p>}
+        </div>
+
+        <div>
+          <Label>Factor Venta</Label>
+          <Input type="number" step="0.01" {...register('factorVenta', { valueAsNumber: true })} />
+          {errors.factorVenta && <p className="text-red-500 text-sm">{errors.factorVenta.message}</p>}
+        </div>
+
+        <div>
+          <Label>Precio Interno (Calculado)</Label>
+          <Input value={precioInterno} readOnly className="bg-gray-100 text-gray-600" />
         </div>
 
         <div>

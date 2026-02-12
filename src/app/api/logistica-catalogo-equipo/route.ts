@@ -51,9 +51,11 @@ export async function POST(req: Request) {
         codigo: data.codigo,
         descripcion: data.descripcion,
         marca: data.marca,
+        precioLista: data.precioInterno,  // Logística ingresa un precio que se usa como precioLista
         precioInterno: data.precioInterno,
-        margen: 0,          // Logística no define margen → fijo en 0
-        precioVenta: 0,     // Logística no define precioVenta → fijo en 0
+        factorCosto: 1.00,
+        factorVenta: 1.00,  // Logística no define factorVenta → fijo en 1.00
+        precioVenta: data.precioInterno, // Sin margen: precioVenta = precioInterno
         categoriaId: data.categoriaId,
         unidadId: data.unidadId,
         estado: data.estado,

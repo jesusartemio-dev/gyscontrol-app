@@ -180,8 +180,10 @@ export async function verificarExistenciaEquipos(
             marca,
             categoriaId,
             unidadId,
+            precioLista: 0,
             precioInterno: 0,
-            margen: 0.15,
+            factorCosto: 1.00,
+            factorVenta: 1.15,
             precioVenta: 0,
             estado: 'pendiente'
           })
