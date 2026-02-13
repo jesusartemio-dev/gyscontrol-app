@@ -112,6 +112,11 @@ async function eliminarCronogramaCompleto(
       where: { proyectoTareaId: { in: tareaIds } },
       data: { proyectoTareaId: null },
     })
+    // Detach campo tareas (RegistroHorasCampoTarea → ProyectoTarea FK)
+    await tx.registroHorasCampoTarea.updateMany({
+      where: { proyectoTareaId: { in: tareaIds } },
+      data: { proyectoTareaId: null },
+    })
   }
   if (edtIds.length > 0) {
     await tx.registroHoras.updateMany({

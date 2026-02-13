@@ -474,10 +474,17 @@ async function limpiarCronogramaExistente(cronogramaId: string, proyectoId: stri
 
   // 2. Detach timesheet entries (don't delete them - just remove the FK link)
   if (tareaIds.length > 0) {
-    await prisma.registroHoras.updateMany({
-      where: { proyectoTareaId: { in: tareaIds } },
-      data: { proyectoTareaId: null },
-    })
+    await Promise.all([
+      prisma.registroHoras.updateMany({
+        where: { proyectoTareaId: { in: tareaIds } },
+        data: { proyectoTareaId: null },
+      }),
+      // Detach campo tareas (RegistroHorasCampoTarea → ProyectoTarea FK)
+      prisma.registroHorasCampoTarea.updateMany({
+        where: { proyectoTareaId: { in: tareaIds } },
+        data: { proyectoTareaId: null },
+      }),
+    ])
   }
   if (edtIds.length > 0) {
     await Promise.all([
