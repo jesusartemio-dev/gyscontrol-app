@@ -17,9 +17,6 @@ export function exportarPlantillaEquipoItemsAExcel(
   nombreArchivo: string = 'EquiposPlantilla'
 ) {
   const data = items.map((item, idx) => {
-    const diferencia = item.precioLista && item.precioInterno
-      ? +((item.precioInterno - item.precioLista) * item.cantidad).toFixed(2)
-      : null
     return {
       '#': idx + 1,
       'Código': item.codigo,
@@ -29,8 +26,8 @@ export function exportarPlantillaEquipoItemsAExcel(
       'Marca': item.marca || '',
       'Cantidad': item.cantidad || 1,
       'P.Lista': item.precioLista || 0,
-      'F.Costo': item.factorCosto ?? 1.00,
-      'F.Venta': item.factorVenta ?? 1.15,
+      'Factor Costo': +(item.factorCosto ?? 1.00).toFixed(2),
+      'Factor Venta': +(item.factorVenta ?? 1.15).toFixed(2),
       'P.Interno': item.precioInterno || 0,
       'P.Cliente': item.precioCliente || 0,
       'Total Interno': item.costoInterno || 0,
@@ -50,8 +47,8 @@ export function exportarPlantillaEquipoItemsAExcel(
     { wch: 15 },  // Marca
     { wch: 10 },  // Cantidad
     { wch: 12 },  // P.Lista
-    { wch: 10 },  // F.Costo
-    { wch: 10 },  // F.Venta
+    { wch: 12 },  // Factor Costo
+    { wch: 12 },  // Factor Venta
     { wch: 12 },  // P.Interno
     { wch: 12 },  // P.Cliente
     { wch: 14 },  // Total Interno
@@ -87,8 +84,8 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
       'Unidad': 'Unidad',
       'Cantidad': 2,
       'P.Lista': 120.00,
-      'F.Costo': 1.00,
-      'F.Venta': 1.15
+      'Factor Costo': 1.00,
+      'Factor Venta': 1.15
     },
     {
       'Código': 'EQ-002',
@@ -98,8 +95,8 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
       'Unidad': 'Unidad',
       'Cantidad': 1,
       'P.Lista': 700.00,
-      'F.Costo': 1.00,
-      'F.Venta': 1.15
+      'Factor Costo': 1.00,
+      'Factor Venta': 1.15
     }
   ]
 
@@ -113,8 +110,8 @@ export function generarPlantillaEquiposImportacion(nombreArchivo: string = 'Plan
     { wch: 10 },  // Unidad
     { wch: 10 },  // Cantidad
     { wch: 12 },  // P.Lista
-    { wch: 10 },  // F.Costo
-    { wch: 10 },  // F.Venta
+    { wch: 12 },  // Factor Costo
+    { wch: 12 },  // Factor Venta
   ]
 
   const workbook = XLSX.utils.book_new()

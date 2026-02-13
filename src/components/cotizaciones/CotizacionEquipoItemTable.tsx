@@ -87,7 +87,7 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, is
                 <th colSpan={2} className="px-1 py-0.5 text-center font-semibold text-blue-700 bg-blue-50 border-r">GYS</th>
                 <th rowSpan={2} className="px-1 py-0.5 text-center font-semibold text-gray-700 border-r">%</th>
                 {showReferencia && (
-                  <th colSpan={4} className="px-1 py-0.5 text-center font-semibold text-gray-500 bg-gray-50 border-r">REF.</th>
+                  <th colSpan={3} className="px-1 py-0.5 text-center font-semibold text-gray-500 bg-gray-50 border-r">REF.</th>
                 )}
                 {!isLocked && <th rowSpan={2} className="px-1 py-0.5 text-center font-semibold text-gray-700 w-10"></th>}
               </tr>
@@ -101,8 +101,7 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, is
                   <>
                     <th className="px-1 py-0.5 text-right font-medium text-gray-500">P.Lista</th>
                     <th className="px-1 py-0.5 text-right font-medium text-gray-500">F.Costo</th>
-                    <th className="px-1 py-0.5 text-right font-medium text-gray-500">F.Venta</th>
-                    <th className="px-1 py-0.5 text-right font-medium text-gray-500 border-r">Dif.</th>
+                    <th className="px-1 py-0.5 text-right font-medium text-gray-500 border-r">F.Venta</th>
                   </>
                 )}
               </tr>
@@ -115,11 +114,6 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, is
                   : (item.costoInterno > 0
                     ? ((item.costoCliente - item.costoInterno) / item.costoInterno) * 100
                     : 0)
-
-                // Calcular diferencia
-                const diferencia = item.precioLista && item.precioInterno
-                  ? (item.precioInterno - item.precioLista) * item.cantidad
-                  : null
 
                 return (
                   <tr
@@ -196,13 +190,6 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, is
                         <td className="px-1 py-1 text-right font-mono text-[10px] text-gray-400">
                           {(item.factorVenta ?? 1.15).toFixed(2)}
                         </td>
-                        <td className="px-1 py-1 text-right font-mono text-[10px]">
-                          {diferencia !== null ? (
-                            <span className={diferencia >= 0 ? 'text-green-600' : 'text-red-500'}>
-                              {formatCompact(diferencia)}
-                            </span>
-                          ) : '-'}
-                        </td>
                       </>
                     )}
                     {/* Acciones */}
@@ -258,7 +245,7 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, is
                   {formatCompact(totalInterno)}
                 </td>
                 <td></td>
-                {showReferencia && <td colSpan={4}></td>}
+                {showReferencia && <td colSpan={3}></td>}
                 <td></td>
               </tr>
             </tfoot>

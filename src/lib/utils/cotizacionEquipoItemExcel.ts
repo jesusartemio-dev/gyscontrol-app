@@ -41,10 +41,9 @@ export async function exportarCotizacionEquipoItemsAExcel(
     { header: 'Unidad', key: 'unidad', width: 10 },
     { header: 'Cantidad', key: 'cantidad', width: 10 },
     { header: 'P.Lista', key: 'precioLista', width: 12 },
-    { header: 'F.Costo', key: 'factorCosto', width: 10 },
-    { header: 'F.Venta', key: 'factorVenta', width: 10 },
+    { header: 'Factor Costo', key: 'factorCosto', width: 12 },
+    { header: 'Factor Venta', key: 'factorVenta', width: 12 },
     { header: 'P.Cliente', key: 'precioCliente', width: 12 },
-    { header: 'Diferencia', key: 'diferencia', width: 12 },
     { header: 'Total Interno', key: 'totalInterno', width: 14 },
     { header: 'Total Cliente', key: 'totalCliente', width: 14 },
   ]
@@ -52,9 +51,6 @@ export async function exportarCotizacionEquipoItemsAExcel(
   wsEquipos.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }
 
   items.forEach((item) => {
-    const diferencia = item.precioLista && item.precioInterno
-      ? +((item.precioInterno - item.precioLista) * item.cantidad).toFixed(2)
-      : null
     wsEquipos.addRow({
       codigo: item.codigo,
       descripcion: item.descripcion,
@@ -63,10 +59,9 @@ export async function exportarCotizacionEquipoItemsAExcel(
       unidad: item.unidad || '',
       cantidad: item.cantidad || 1,
       precioLista: item.precioLista || 0,
-      factorCosto: item.factorCosto ?? 1.00,
-      factorVenta: item.factorVenta ?? 1.15,
+      factorCosto: +(item.factorCosto ?? 1.00).toFixed(2),
+      factorVenta: +(item.factorVenta ?? 1.15).toFixed(2),
       precioCliente: item.precioCliente || 0,
-      diferencia: diferencia ?? '',
       totalInterno: item.costoInterno || 0,
       totalCliente: item.costoCliente || 0,
     })
@@ -156,8 +151,8 @@ export async function generarPlantillaEquiposImportacion(
     { header: 'Unidad', key: 'unidad', width: 10 },
     { header: 'Cantidad', key: 'cantidad', width: 10 },
     { header: 'P.Lista', key: 'precioLista', width: 12 },
-    { header: 'F.Costo', key: 'factorCosto', width: 10 },
-    { header: 'F.Venta', key: 'factorVenta', width: 10 },
+    { header: 'Factor Costo', key: 'factorCosto', width: 12 },
+    { header: 'Factor Venta', key: 'factorVenta', width: 12 },
   ]
   wsEquipos.getRow(1).font = { bold: true }
   wsEquipos.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }
