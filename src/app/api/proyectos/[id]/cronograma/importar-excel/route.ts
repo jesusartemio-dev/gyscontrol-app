@@ -376,6 +376,29 @@ export async function POST(
       })
     }
 
+    // Actualizar fechaInicio y fechaFin del proyecto con las fechas del Excel importado
+    let minFecha: Date | null = null
+    let maxFecha: Date | null = null
+    for (const fase of body.fases) {
+      if (fase.row.start) {
+        const d = new Date(fase.row.start)
+        if (!minFecha || d < minFecha) minFecha = d
+      }
+      if (fase.row.finish) {
+        const d = new Date(fase.row.finish)
+        if (!maxFecha || d > maxFecha) maxFecha = d
+      }
+    }
+    if (minFecha || maxFecha) {
+      await prisma.proyecto.update({
+        where: { id: proyectoId },
+        data: {
+          ...(minFecha ? { fechaInicio: minFecha } : {}),
+          ...(maxFecha ? { fechaFin: maxFecha } : {}),
+        },
+      })
+    }
+
     return NextResponse.json({
       success: true,
       cronogramaId: cronograma.id,
