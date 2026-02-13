@@ -31,9 +31,9 @@ export default function CotizacionGastoItemTable({ items, onUpdate, onDelete, is
   }
 
   const calcularCostosDesdeItem = (item: CotizacionGastoItem) => {
-    // Nueva fórmula: costoCliente es el cálculo directo, costoInterno se deriva del margen
-    const costoCliente = +(item.cantidad * item.precioUnitario * item.factorSeguridad).toFixed(2)
-    const costoInterno = +(costoCliente / (item.margen || 1.25)).toFixed(2)
+    // costoInterno = base (cantidad * precio * factor), costoCliente = base * margen
+    const costoInterno = +(item.cantidad * item.precioUnitario * item.factorSeguridad).toFixed(2)
+    const costoCliente = +(costoInterno * (item.margen || 1.25)).toFixed(2)
     return { costoInterno, costoCliente }
   }
 
