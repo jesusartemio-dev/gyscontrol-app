@@ -21,7 +21,7 @@ import {
   type MSProjectTree, type MSProjectFase
 } from '@/lib/utils/msProjectExcelParser'
 
-type Step = 'upload' | 'preview' | 'mapping' | 'importing' | 'success' | 'error'
+type Step = 'upload' | 'preview' | 'mapping' | 'importing' | 'success' | 'error' | 'conflict'
 
 interface CatalogEdt {
   id: string
@@ -67,6 +67,7 @@ export default function ImportExcelCronogramaModal({
   const [progress, setProgress] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
   const [importStats, setImportStats] = useState<Record<string, number>>({})
+  const [conflictData, setConflictData] = useState<{ fases: number; edts: number; actividades: number; tareas: number; registrosHoras: number } | null>(null)
   const [expandedFases, setExpandedFases] = useState<Set<number>>(new Set())
 
   // EDT mapping state
@@ -87,6 +88,7 @@ export default function ImportExcelCronogramaModal({
     setProgress(0)
     setErrorMessage('')
     setImportStats({})
+    setConflictData(null)
     setExpandedFases(new Set())
     setCatalogEdts([])
     setEdtMappings({})
@@ -172,8 +174,36 @@ export default function ImportExcelCronogramaModal({
   const allMapped = Object.values(edtMappings).every(v => v && v.length > 0)
   const skippedCount = Object.values(edtMappings).filter(v => v === SKIP_EDT).length
 
-  const handleImport = async () => {
-    if (!tree) return
+  const buildImportBody = () => {
+    if (!tree) return null
+
+    const finalMappings: Record<string, string> = {}
+    const skippedEdtNames = new Set<string>()
+    for (const [name, edtId] of Object.entries(edtMappings)) {
+      if (edtId === SKIP_EDT) {
+        skippedEdtNames.add(name)
+      } else if (edtId !== CREATE_NEW) {
+        finalMappings[name] = edtId
+      }
+    }
+
+    const filteredTree: MSProjectTree = {
+      ...tree,
+      fases: tree.fases.map(fase => ({
+        ...fase,
+        edts: fase.edts.filter(edt => !skippedEdtNames.has(edt.row.name)),
+      })).filter(fase => fase.edts.length > 0),
+    }
+
+    return {
+      ...serializeTree(filteredTree) as Record<string, unknown>,
+      edtMappings: finalMappings,
+    }
+  }
+
+  const handleImport = async (reemplazar = false) => {
+    const body = buildImportBody()
+    if (!body) return
 
     setStep('importing')
     setProgress(10)
@@ -181,35 +211,10 @@ export default function ImportExcelCronogramaModal({
     try {
       setProgress(30)
 
-      // Build final mappings: only include entries mapped to existing catalog EDTs (not CREATE_NEW or SKIP)
-      const finalMappings: Record<string, string> = {}
-      const skippedEdtNames = new Set<string>()
-      for (const [name, edtId] of Object.entries(edtMappings)) {
-        if (edtId === SKIP_EDT) {
-          skippedEdtNames.add(name)
-        } else if (edtId !== CREATE_NEW) {
-          finalMappings[name] = edtId
-        }
-      }
-
-      // Filter out skipped EDTs from the tree before serializing
-      const filteredTree: MSProjectTree = {
-        ...tree,
-        fases: tree.fases.map(fase => ({
-          ...fase,
-          edts: fase.edts.filter(edt => !skippedEdtNames.has(edt.row.name)),
-        })).filter(fase => fase.edts.length > 0), // Remove fases left empty
-      }
-
-      const body = {
-        ...serializeTree(filteredTree) as Record<string, unknown>,
-        edtMappings: finalMappings,
-      }
-
       const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/importar-excel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, reemplazar }),
       })
 
       setProgress(90)
@@ -217,8 +222,14 @@ export default function ImportExcelCronogramaModal({
       const data = await res.json()
 
       if (!res.ok) {
-        setErrorMessage(data.message || 'Error al importar')
-        setStep('error')
+        if (res.status === 409 && data.existente) {
+          setErrorMessage(data.message)
+          setConflictData(data.existente)
+          setStep('conflict')
+        } else {
+          setErrorMessage(data.message || 'Error al importar')
+          setStep('error')
+        }
         return
       }
 
@@ -652,7 +663,7 @@ export default function ImportExcelCronogramaModal({
                 Volver
               </Button>
               <Button
-                onClick={handleImport}
+                onClick={() => handleImport()}
                 className="bg-green-600 hover:bg-green-700"
                 disabled={!allMapped || allSkipped}
               >
@@ -714,6 +725,51 @@ export default function ImportExcelCronogramaModal({
           </div>
         )}
 
+        {/* STEP: Conflict (409) */}
+        {step === 'conflict' && (
+          <div className="py-6 space-y-4">
+            <div className="text-center">
+              <AlertTriangle className="h-12 w-12 mx-auto text-amber-500" />
+              <p className="text-lg font-medium text-gray-900 mt-2">Cronograma Existente</p>
+            </div>
+            <p className="text-sm text-gray-600 text-center max-w-md mx-auto">{errorMessage}</p>
+
+            {conflictData && (
+              <div className="grid grid-cols-5 gap-2 max-w-md mx-auto">
+                {[
+                  { label: 'Fases', value: conflictData.fases },
+                  { label: 'EDTs', value: conflictData.edts },
+                  { label: 'Actividades', value: conflictData.actividades },
+                  { label: 'Tareas', value: conflictData.tareas },
+                  { label: 'Reg. Horas', value: conflictData.registrosHoras },
+                ].map(s => (
+                  <div key={s.label} className="text-center">
+                    <div className="text-xl font-bold text-gray-900">{s.value}</div>
+                    <div className="text-[10px] text-gray-500">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {conflictData && conflictData.registrosHoras > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 flex items-start gap-2 max-w-md mx-auto">
+                <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                <span>Los registros de horas (timesheet) no se eliminarán, solo se desvincularán del cronograma anterior.</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-center">
+              <Button variant="outline" onClick={reset}>
+                Cancelar
+              </Button>
+              <Button onClick={() => handleImport(true)} className="bg-amber-600 hover:bg-amber-700">
+                <Upload className="h-4 w-4 mr-2" />
+                Reemplazar y reimportar
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* STEP: Error */}
         {step === 'error' && (
           <div className="py-6 text-center space-y-4">
@@ -724,7 +780,7 @@ export default function ImportExcelCronogramaModal({
               <Button variant="outline" onClick={reset}>
                 Volver al inicio
               </Button>
-              <Button onClick={handleImport} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => handleImport()} className="bg-blue-600 hover:bg-blue-700">
                 Reintentar
               </Button>
             </div>

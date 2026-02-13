@@ -33,6 +33,7 @@ interface ImportRequest {
   fases: FaseData[]
   stats: { fases: number; edts: number; actividades: number; tareas: number }
   edtMappings?: Record<string, string> // Excel EDT name → catalog edtId
+  reemplazar?: boolean // If true, delete existing content before importing
 }
 
 export async function POST(
@@ -84,14 +85,43 @@ export async function POST(
     }
 
     if (cronograma) {
-      // Verificar si ya tiene contenido
-      const faseCount = await prisma.proyectoFase.count({
-        where: { proyectoCronogramaId: cronograma.id },
-      })
-      if (faseCount > 0) {
-        return NextResponse.json({
-          message: 'El cronograma de planificación ya tiene contenido. Debe vaciarlo primero antes de importar.',
-        }, { status: 409 })
+      // Verificar si ya tiene contenido (phases, EDTs, activities, or tasks)
+      const [faseCount, edtCount, actividadCount, tareaCount] = await Promise.all([
+        prisma.proyectoFase.count({ where: { proyectoCronogramaId: cronograma.id } }),
+        prisma.proyectoEdt.count({ where: { proyectoCronogramaId: cronograma.id } }),
+        prisma.proyectoActividad.count({ where: { proyectoCronogramaId: cronograma.id } }),
+        prisma.proyectoTarea.count({ where: { proyectoCronogramaId: cronograma.id } }),
+      ])
+      const totalExistente = faseCount + edtCount + actividadCount + tareaCount
+
+      if (totalExistente > 0) {
+        if (body.reemplazar) {
+          // User explicitly requested replacement - clean up everything
+          await limpiarCronogramaExistente(cronograma.id, proyectoId)
+        } else {
+          // Check if there are timesheet entries linked
+          const [registroHorasCount, registrosCampoCount] = await Promise.all([
+            prisma.registroHoras.count({
+              where: {
+                OR: [
+                  { proyectoEdtId: { not: null }, proyectoEdt: { proyectoCronogramaId: cronograma.id } },
+                  { proyectoTareaId: { not: null }, proyectoTarea: { proyectoCronogramaId: cronograma.id } },
+                ],
+              },
+            }),
+            prisma.registroHorasCampo.count({
+              where: { proyectoEdtId: { not: null }, proyectoEdt: { proyectoCronogramaId: cronograma.id } },
+            }),
+          ])
+          const totalRegistros = registroHorasCount + registrosCampoCount
+
+          return NextResponse.json({
+            message: totalRegistros > 0
+              ? `El cronograma ya tiene contenido (${faseCount} fases, ${edtCount} EDTs, ${actividadCount} actividades, ${tareaCount} tareas) con ${totalRegistros} registro(s) de horas vinculados. Puede reemplazarlo (los registros de horas se desvincularán del cronograma anterior pero no se eliminarán).`
+              : `El cronograma ya tiene contenido (${faseCount} fases, ${edtCount} EDTs, ${actividadCount} actividades, ${tareaCount} tareas). Puede reemplazarlo para importar el nuevo.`,
+            existente: { fases: faseCount, edts: edtCount, actividades: actividadCount, tareas: tareaCount, registrosHoras: totalRegistros },
+          }, { status: 409 })
+        }
       }
     } else {
       cronograma = await prisma.proyectoCronograma.create({
@@ -360,9 +390,91 @@ export async function POST(
     })
   } catch (error) {
     logger.error('[ERROR importar-excel]', error)
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : 'Error del servidor' },
-      { status: 500 }
-    )
+
+    // Provide user-friendly messages for common Prisma errors
+    let message = 'Error del servidor'
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint failed')) {
+        const match = error.message.match(/fields: \(([^)]+)\)/)
+        message = `Ya existen registros con datos duplicados${match ? ` en los campos ${match[1]}` : ''}. Intente reemplazar el cronograma existente.`
+      } else {
+        message = error.message
+      }
+    }
+
+    return NextResponse.json({ message }, { status: 500 })
   }
+}
+
+/**
+ * Clean up all existing cronograma content before re-import.
+ * Detaches timesheet entries (nullifies FKs) instead of deleting them.
+ */
+async function limpiarCronogramaExistente(cronogramaId: string, proyectoId: string) {
+  // 1. Get all tarea and EDT IDs for this cronograma
+  const [tareaIds, edtIds] = await Promise.all([
+    prisma.proyectoTarea.findMany({
+      where: { proyectoCronogramaId: cronogramaId },
+      select: { id: true },
+    }).then(rows => rows.map(r => r.id)),
+    prisma.proyectoEdt.findMany({
+      where: { proyectoCronogramaId: cronogramaId },
+      select: { id: true },
+    }).then(rows => rows.map(r => r.id)),
+  ])
+
+  // 2. Detach timesheet entries (don't delete them - just remove the FK link)
+  if (tareaIds.length > 0) {
+    await prisma.registroHoras.updateMany({
+      where: { proyectoTareaId: { in: tareaIds } },
+      data: { proyectoTareaId: null },
+    })
+  }
+  if (edtIds.length > 0) {
+    await Promise.all([
+      prisma.registroHoras.updateMany({
+        where: { proyectoEdtId: { in: edtIds } },
+        data: { proyectoEdtId: null },
+      }),
+      prisma.registroHorasCampo.updateMany({
+        where: { proyectoEdtId: { in: edtIds } },
+        data: { proyectoEdtId: null },
+      }),
+    ])
+  }
+
+  // 3. Delete dependencies
+  if (tareaIds.length > 0) {
+    await prisma.proyectoDependenciasTarea.deleteMany({
+      where: {
+        OR: [
+          { tareaOrigenId: { in: tareaIds } },
+          { tareaDependienteId: { in: tareaIds } },
+        ],
+      },
+    })
+  }
+
+  // 4. Delete subtareas if any
+  if (tareaIds.length > 0) {
+    await prisma.proyectoSubtarea.deleteMany({
+      where: { proyectoTareaId: { in: tareaIds } },
+    })
+  }
+
+  // 5. Delete in proper order: tareas → actividades → EDTs → fases
+  await prisma.proyectoTarea.deleteMany({
+    where: { proyectoCronogramaId: cronogramaId },
+  })
+  await prisma.proyectoActividad.deleteMany({
+    where: { proyectoCronogramaId: cronogramaId },
+  })
+  await prisma.proyectoEdt.deleteMany({
+    where: { proyectoCronogramaId: cronogramaId },
+  })
+  await prisma.proyectoFase.deleteMany({
+    where: { proyectoCronogramaId: cronogramaId },
+  })
+
+  logger.info(`[importar-excel] Cronograma ${cronogramaId} limpiado: ${tareaIds.length} tareas, ${edtIds.length} EDTs eliminados`)
 }

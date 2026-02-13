@@ -95,80 +95,78 @@ async function eliminarCronogramaCompleto(
     ? { proyectoId, proyectoCronogramaId: cronogramaId }
     : { proyectoId }
 
-  // 1. Eliminar dependencias (ProyectoDependenciasTarea)
-  console.log('🗑️ ELIMINACIÓN - Eliminando dependencias')
-  try {
-    // Obtener IDs de tareas del proyecto/cronograma
-    const tareaIds = await tx.proyectoTarea.findMany({
-      where: baseFilter,
-      select: { id: true }
-    }).then((tasks: { id: string }[]) => tasks.map(t => t.id))
+  // 0. Collect IDs for FK detachment
+  const tareaIds = await tx.proyectoTarea.findMany({
+    where: baseFilter,
+    select: { id: true }
+  }).then((tasks: { id: string }[]) => tasks.map(t => t.id))
 
-    if (tareaIds.length > 0) {
-      const dependencias = await tx.proyectoDependenciasTarea.deleteMany({
-        where: {
-          OR: [
-            { tareaOrigenId: { in: tareaIds } },
-            { tareaDependienteId: { in: tareaIds } }
-          ]
-        }
-      })
-      dependenciasEliminadas = dependencias.count
-      console.log(`✅ ELIMINACIÓN - Dependencias eliminadas: ${dependencias.count}`)
-    }
-  } catch (error) {
-    console.warn('⚠️ ELIMINACIÓN - Error eliminando dependencias:', error)
+  const edtIds = await tx.proyectoEdt.findMany({
+    where: baseFilter,
+    select: { id: true }
+  }).then((edts: { id: string }[]) => edts.map(e => e.id))
+
+  // 0b. Detach timesheet entries (nullify FKs, don't delete)
+  if (tareaIds.length > 0) {
+    await tx.registroHoras.updateMany({
+      where: { proyectoTareaId: { in: tareaIds } },
+      data: { proyectoTareaId: null },
+    })
+  }
+  if (edtIds.length > 0) {
+    await tx.registroHoras.updateMany({
+      where: { proyectoEdtId: { in: edtIds } },
+      data: { proyectoEdtId: null },
+    })
+    await tx.registroHorasCampo.updateMany({
+      where: { proyectoEdtId: { in: edtIds } },
+      data: { proyectoEdtId: null },
+    })
+  }
+
+  // 1. Eliminar dependencias (ProyectoDependenciasTarea)
+  if (tareaIds.length > 0) {
+    const dependencias = await tx.proyectoDependenciasTarea.deleteMany({
+      where: {
+        OR: [
+          { tareaOrigenId: { in: tareaIds } },
+          { tareaDependienteId: { in: tareaIds } }
+        ]
+      }
+    })
+    dependenciasEliminadas = dependencias.count
+
+    // 1b. Eliminar subtareas
+    await tx.proyectoSubtarea.deleteMany({
+      where: { proyectoTareaId: { in: tareaIds } },
+    })
   }
 
   // 2. Eliminar tareas
-  console.log('🗑️ ELIMINACIÓN - Eliminando tareas')
-  try {
-    const tareas = await tx.proyectoTarea.deleteMany({
-      where: baseFilter
-    })
-    tareasEliminadas = tareas.count
-    console.log(`✅ ELIMINACIÓN - Tareas eliminadas: ${tareas.count}`)
-  } catch (error) {
-    console.warn('⚠️ ELIMINACIÓN - Error eliminando tareas:', error)
-  }
+  const tareas = await tx.proyectoTarea.deleteMany({
+    where: baseFilter
+  })
+  tareasEliminadas = tareas.count
 
   // 3. Eliminar actividades
-  console.log('🗑️ ELIMINACIÓN - Eliminando actividades')
-  try {
-    const actividades = await tx.proyectoActividad.deleteMany({
-      where: cronogramaId
-        ? { proyectoCronogramaId: cronogramaId }
-        : { proyectoEdt: { proyectoId } }
-    })
-    actividadesEliminadas = actividades.count
-    console.log(`✅ ELIMINACIÓN - Actividades eliminadas: ${actividades.count}`)
-  } catch (error) {
-    console.warn('⚠️ ELIMINACIÓN - Error eliminando actividades:', error)
-  }
+  const actividades = await tx.proyectoActividad.deleteMany({
+    where: cronogramaId
+      ? { proyectoCronogramaId: cronogramaId }
+      : { proyectoEdt: { proyectoId } }
+  })
+  actividadesEliminadas = actividades.count
 
   // 4. Eliminar EDTs
-  console.log('🗑️ ELIMINACIÓN - Eliminando EDTs')
-  try {
-    const edts = await tx.proyectoEdt.deleteMany({
-      where: baseFilter
-    })
-    edtsEliminados = edts.count
-    console.log(`✅ ELIMINACIÓN - EDTs eliminados: ${edts.count}`)
-  } catch (error) {
-    console.warn('⚠️ ELIMINACIÓN - Error eliminando EDTs:', error)
-  }
+  const edts = await tx.proyectoEdt.deleteMany({
+    where: baseFilter
+  })
+  edtsEliminados = edts.count
 
   // 5. Eliminar fases
-  console.log('🗑️ ELIMINACIÓN - Eliminando fases')
-  try {
-    const fases = await tx.proyectoFase.deleteMany({
-      where: baseFilter
-    })
-    fasesEliminadas = fases.count
-    console.log(`✅ ELIMINACIÓN - Fases eliminadas: ${fases.count}`)
-  } catch (error) {
-    console.warn('⚠️ ELIMINACIÓN - Error eliminando fases:', error)
-  }
+  const fases = await tx.proyectoFase.deleteMany({
+    where: baseFilter
+  })
+  fasesEliminadas = fases.count
 
   const totalEliminados = fasesEliminadas + edtsEliminados + actividadesEliminadas + tareasEliminadas + dependenciasEliminadas
 
