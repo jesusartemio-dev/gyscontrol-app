@@ -83,18 +83,21 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
 
       processNodes(data.data.tree)
 
-      console.log('🔄 [HOOK TREE] Setting state with expanded nodes:', expandedNodes)
-      console.log('🌳 [TREE STATE] Árbol recargado. Nodos expandidos preservados:', expandedNodes.length)
+      // Auto-expand project-level nodes (always visible)
+      const autoExpandedNodes = new Set(expandedNodes)
+      rootNodes.forEach(nodeId => {
+        const node = nodesMap.get(nodeId)
+        if (node?.type === 'proyecto') {
+          autoExpandedNodes.add(nodeId)
+        }
+      })
 
       setState(prev => {
-        console.log('🌳 [TREE STATE] Estado anterior - nodos expandidos:', prev.expandedNodes.size)
-        console.log('🌳 [TREE STATE] Estado nuevo - nodos expandidos:', expandedNodes.length)
-
         return {
           ...prev,
           nodes: nodesMap,
           rootNodes,
-          expandedNodes: new Set(expandedNodes),
+          expandedNodes: autoExpandedNodes,
           loadingNodes: new Set()
         }
       })
@@ -420,12 +423,27 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
             parent.metadata.hasChildren = true
           }
         } else if (parentId === 'root') {
-          // Agregar a nodos raíz
-          const newRootNodes = [...prev.rootNodes, treeNode.id]
-          return {
-            ...prev,
-            nodes: newNodes,
-            rootNodes: newRootNodes
+          // Si hay un nodo proyecto raíz, agregar como hijo del proyecto
+          const projectNodeId = prev.rootNodes.find(id => {
+            const node = newNodes.get(id)
+            return node?.type === 'proyecto'
+          })
+          if (projectNodeId) {
+            const projectNode = newNodes.get(projectNodeId)
+            if (projectNode) {
+              projectNode.children = [...(projectNode.children || []), treeNode]
+              projectNode.metadata.totalChildren++
+              projectNode.metadata.hasChildren = true
+              treeNode.parentId = projectNodeId
+            }
+          } else {
+            // Fallback: agregar a nodos raíz
+            const newRootNodes = [...prev.rootNodes, treeNode.id]
+            return {
+              ...prev,
+              nodes: newNodes,
+              rootNodes: newRootNodes
+            }
           }
         }
 

@@ -425,5 +425,9 @@ export function serializeTree(tree: MSProjectTree): unknown {
       })),
     })),
     stats: tree.stats,
+    dateRange: {
+      start: tree.dateRange.start?.toISOString() || null,
+      finish: tree.dateRange.finish?.toISOString() || null,
+    },
   }
 }

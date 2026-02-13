@@ -34,6 +34,7 @@ interface ImportRequest {
   stats: { fases: number; edts: number; actividades: number; tareas: number }
   edtMappings?: Record<string, string> // Excel EDT name → catalog edtId
   reemplazar?: boolean // If true, delete existing content before importing
+  dateRange?: { start: string | null; finish: string | null } // Pre-computed date range from parser
 }
 
 export async function POST(
@@ -379,16 +380,41 @@ export async function POST(
     // Actualizar fechaInicio y fechaFin del proyecto con las fechas del Excel importado
     let minFecha: Date | null = null
     let maxFecha: Date | null = null
-    for (const fase of body.fases) {
-      if (fase.row.start) {
-        const d = new Date(fase.row.start)
-        if (!minFecha || d < minFecha) minFecha = d
-      }
-      if (fase.row.finish) {
-        const d = new Date(fase.row.finish)
-        if (!maxFecha || d > maxFecha) maxFecha = d
+
+    // 1) Usar dateRange pre-computado del parser (incluye todos los niveles)
+    if (body.dateRange?.start) {
+      minFecha = new Date(body.dateRange.start)
+    }
+    if (body.dateRange?.finish) {
+      maxFecha = new Date(body.dateRange.finish)
+    }
+
+    // 2) Fallback: recorrer toda la jerarquía buscando fechas en todos los niveles
+    if (!minFecha || !maxFecha) {
+      for (const fase of body.fases) {
+        const checkDate = (start: string | null, finish: string | null) => {
+          if (start) {
+            const d = new Date(start)
+            if (!isNaN(d.getTime()) && (!minFecha || d < minFecha)) minFecha = d
+          }
+          if (finish) {
+            const d = new Date(finish)
+            if (!isNaN(d.getTime()) && (!maxFecha || d > maxFecha)) maxFecha = d
+          }
+        }
+        checkDate(fase.row.start, fase.row.finish)
+        for (const edt of fase.edts) {
+          checkDate(edt.row.start, edt.row.finish)
+          for (const act of edt.actividades) {
+            checkDate(act.row.start, act.row.finish)
+            for (const tarea of act.tareas) {
+              checkDate(tarea.row.start, tarea.row.finish)
+            }
+          }
+        }
       }
     }
+
     if (minFecha || maxFecha) {
       await prisma.proyecto.update({
         where: { id: proyectoId },

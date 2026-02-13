@@ -36,7 +36,7 @@ export async function GET(
     // ✅ Validar que el proyecto existe
     const proyecto = await prisma.proyecto.findUnique({
       where: { id },
-      select: { id: true, nombre: true }
+      select: { id: true, nombre: true, fechaInicio: true, fechaFin: true }
     })
 
     if (!proyecto) {
@@ -169,12 +169,16 @@ export async function GET(
       }
     }
 
-    // ✅ Construir árbol jerárquico de 5 niveles
-    const tree = fases.map(fase => {
+    // ✅ Construir árbol jerárquico de 5 niveles (Proyecto → Fase → EDT → Actividad → Tarea)
+    // Calcular horas totales del proyecto
+    let proyectoHorasTotales = 0
+
+    const faseNodes = fases.map(fase => {
       const faseEdts = fase.proyectoEdt || []
 
       // Calcular horas totales de la fase (suma de horas de todos los EDTs)
       const faseHorasTotales = faseEdts.reduce((sum: number, edt: any) => sum + Number(edt.horasPlan || 0), 0)
+      proyectoHorasTotales += faseHorasTotales
 
       return {
         id: `fase-${fase.id}`,
@@ -295,6 +299,29 @@ export async function GET(
         })
       }
     })
+
+    // ✅ Nodo raíz del proyecto (nivel 0) - envuelve todas las fases
+    const projectNode = {
+      id: `proyecto-${id}`,
+      type: 'proyecto',
+      nombre: proyecto.nombre,
+      level: 0,
+      expanded: true, // Siempre expandido por defecto
+      data: {
+        fechaInicioComercial: proyecto.fechaInicio,
+        fechaFinComercial: proyecto.fechaFin,
+        horasEstimadas: proyectoHorasTotales,
+      },
+      metadata: {
+        hasChildren: faseNodes.length > 0,
+        totalChildren: faseNodes.length,
+        progressPercentage: 0,
+        status: 'pendiente'
+      },
+      children: faseNodes,
+    }
+
+    const tree = [projectNode]
 
 
     return NextResponse.json({

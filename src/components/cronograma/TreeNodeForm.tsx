@@ -29,7 +29,8 @@ interface TreeNodeFormProps {
   nodes?: Map<string, TreeNode>
 }
 
-const NODE_TYPE_LABELS = {
+const NODE_TYPE_LABELS: Record<string, string> = {
+  proyecto: 'Proyecto',
   fase: 'Fase',
   edt: 'EDT',
   actividad: 'Actividad',

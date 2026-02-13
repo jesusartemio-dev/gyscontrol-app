@@ -279,6 +279,8 @@ export function ProyectoCronogramaTreeView({
       // Determinar permisos según el tipo de cronograma o estado de bloqueo
       const isReadOnly = selectedCronograma?.tipo === 'comercial' || selectedCronograma?.bloqueado === true
       const isExecutionLimited = selectedCronograma?.tipo === 'ejecucion'
+      // Nodo proyecto es solo lectura (no editable, no eliminable)
+      const isProjectNode = node.type === 'proyecto'
 
       return (
         <React.Fragment key={nodeId}>
@@ -286,13 +288,13 @@ export function ProyectoCronogramaTreeView({
             <TreeNode
               node={node}
               onToggle={() => actions.toggleNode(nodeId)}
-              onAddChild={isReadOnly ? undefined : (type) => handleAddChild(nodeId, type)}
-              onEdit={isReadOnly ? undefined : () => handleEditNode(nodeId)}
-              onDelete={isReadOnly ? undefined : () => actions.deleteNode(nodeId)}
-              onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
+              onAddChild={isReadOnly || isProjectNode ? undefined : (type) => handleAddChild(nodeId, type)}
+              onEdit={isReadOnly || isProjectNode ? undefined : () => handleEditNode(nodeId)}
+              onDelete={isReadOnly || isProjectNode ? undefined : () => actions.deleteNode(nodeId)}
+              onImport={isReadOnly || isProjectNode ? undefined : () => handleImportItems(nodeId)}
               onSelect={() => actions.selectNode(nodeId)}
               isSelected={isSelected}
-              readOnly={isReadOnly}
+              readOnly={isReadOnly || isProjectNode}
             />
             
           </div>

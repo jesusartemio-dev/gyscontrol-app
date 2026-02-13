@@ -7,7 +7,7 @@
 
 export interface TreeNode {
   id: string
-  type: 'fase' | 'edt' | 'actividad' | 'tarea'
+  type: 'proyecto' | 'fase' | 'edt' | 'actividad' | 'tarea'
   nombre: string
   parentId?: string
   children?: TreeNode[]
@@ -66,7 +66,7 @@ export interface TreeApiResponse {
   }
 }
 
-export type NodeType = 'fase' | 'edt' | 'actividad' | 'tarea'
+export type NodeType = 'proyecto' | 'fase' | 'edt' | 'actividad' | 'tarea'
 
 export type PositioningMode = 'inicio_padre' | 'despues_ultima'
 

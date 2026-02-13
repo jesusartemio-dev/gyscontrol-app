@@ -27,7 +27,13 @@ interface TreeNodeProps {
   executionMode?: boolean
 }
 
-const NODE_CONFIG = {
+const NODE_CONFIG: Record<string, { icon: string; color: string; canAdd: NodeType[]; label: string }> = {
+  proyecto: {
+    icon: '📁',
+    color: 'bg-indigo-100 text-indigo-800',
+    canAdd: ['fase'] as NodeType[],
+    label: 'Proyecto'
+  },
   fase: {
     icon: '📊',
     color: 'bg-blue-100 text-blue-800',
