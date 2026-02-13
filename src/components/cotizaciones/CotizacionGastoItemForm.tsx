@@ -221,6 +221,7 @@ export default function CotizacionGastoItemForm({ gastoId, onCreated }: Props) {
                           placeholder="1.00"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          onFocus={(e) => e.target.select()}
                           className="focus:border-orange-500"
                         />
                       </FormControl>
@@ -246,6 +247,7 @@ export default function CotizacionGastoItemForm({ gastoId, onCreated }: Props) {
                           placeholder="0.00"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          onFocus={(e) => e.target.select()}
                           className="focus:border-orange-500"
                         />
                       </FormControl>
@@ -275,6 +277,7 @@ export default function CotizacionGastoItemForm({ gastoId, onCreated }: Props) {
                           placeholder="1.0"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                          onFocus={(e) => e.target.select()}
                           className="focus:border-orange-500"
                         />
                       </FormControl>
@@ -301,6 +304,7 @@ export default function CotizacionGastoItemForm({ gastoId, onCreated }: Props) {
                           placeholder="1.25"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                          onFocus={(e) => e.target.select()}
                           className="focus:border-orange-500"
                         />
                       </FormControl>

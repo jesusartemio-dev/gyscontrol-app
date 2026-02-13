@@ -330,6 +330,7 @@ export default function CotizacionServicioItemCreateModal({
                       step={10}
                       value={precioClienteInput || ''}
                       onChange={(e) => setPrecioClienteInput(parseFloat(e.target.value) || 0)}
+                      onFocus={(e) => e.target.select()}
                       placeholder="0.00"
                       className="h-8 text-sm font-mono"
                     />
@@ -343,6 +344,7 @@ export default function CotizacionServicioItemCreateModal({
                         step={0.1}
                         value={factorSeguridad}
                         onChange={(e) => setFactorSeguridad(parseFloat(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
                         className="h-7 text-xs"
                       />
                     </div>
@@ -372,6 +374,7 @@ export default function CotizacionServicioItemCreateModal({
                         step={0.05}
                         value={margen}
                         onChange={(e) => setMargen(parseFloat(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
                         className="h-7 text-xs"
                       />
                     </div>
@@ -389,6 +392,7 @@ export default function CotizacionServicioItemCreateModal({
                         step={0.5}
                         value={horaBase}
                         onChange={(e) => setHoraBase(parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
                         className="h-7 text-xs"
                       />
                     </div>
@@ -400,6 +404,7 @@ export default function CotizacionServicioItemCreateModal({
                         step={0.5}
                         value={horaRepetido}
                         onChange={(e) => setHoraRepetido(parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
                         className="h-7 text-xs"
                       />
                     </div>
@@ -410,6 +415,7 @@ export default function CotizacionServicioItemCreateModal({
                         min={1}
                         value={cantidad}
                         onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
                         className="h-7 text-xs"
                       />
                     </div>
@@ -423,6 +429,7 @@ export default function CotizacionServicioItemCreateModal({
                         step={0.1}
                         value={factorSeguridad}
                         onChange={(e) => setFactorSeguridad(parseFloat(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
                         className="h-7 text-xs"
                       />
                     </div>
@@ -452,6 +459,7 @@ export default function CotizacionServicioItemCreateModal({
                         step={0.05}
                         value={margen}
                         onChange={(e) => setMargen(parseFloat(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
                         className="h-7 text-xs"
                       />
                     </div>

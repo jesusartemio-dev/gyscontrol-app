@@ -242,6 +242,7 @@ export default function CotizacionEquipoItemForm({ cotizacionEquipoId, onCreated
                           placeholder="1"
                           {...field}
                           onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                          onFocus={(e) => e.target.select()}
                           className="focus:border-red-500"
                         />
                       </FormControl>

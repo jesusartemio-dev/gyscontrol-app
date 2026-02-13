@@ -168,6 +168,7 @@ export default function CotizacionServicioItemModal({
                 type="number"
                 value={form[field] ?? ''}
                 onChange={handleNumericChange(field)}
+                onFocus={(e) => e.target.select()}
               />
             </div>
           ))}

@@ -393,6 +393,7 @@ export default function CotizacionEquipoItemCreateModal({
                   step={0.01}
                   value={precioLista || ''}
                   onChange={(e) => setPrecioLista(parseFloat(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   placeholder="0.00"
                   className="h-7 text-xs font-mono"
                 />
@@ -409,6 +410,7 @@ export default function CotizacionEquipoItemCreateModal({
                     setFactorCostoDisplay(e.target.value)
                     setFactorCosto(parseFloat(e.target.value) || 1.00)
                   }}
+                  onFocus={(e) => e.target.select()}
                   onBlur={() => setFactorCostoDisplay(factorCosto.toFixed(2))}
                   placeholder="1.00"
                   className="h-7 text-xs font-mono"
@@ -426,6 +428,7 @@ export default function CotizacionEquipoItemCreateModal({
                     setFactorVentaDisplay(e.target.value)
                     setFactorVenta(parseFloat(e.target.value) || 1.15)
                   }}
+                  onFocus={(e) => e.target.select()}
                   onBlur={() => setFactorVentaDisplay(factorVenta.toFixed(2))}
                   placeholder="1.15"
                   className="h-7 text-xs font-mono"
@@ -442,6 +445,7 @@ export default function CotizacionEquipoItemCreateModal({
                   step={1}
                   value={cantidad}
                   onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
+                  onFocus={(e) => e.target.select()}
                   className="h-7 text-xs font-mono"
                 />
               </div>

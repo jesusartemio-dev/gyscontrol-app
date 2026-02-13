@@ -225,6 +225,7 @@ export default function CotizacionServicioItemForm({
                           placeholder="1"
                           {...field}
                           onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                          onFocus={(e) => e.target.select()}
                           className="focus:border-blue-500"
                         />
                       </FormControl>
@@ -251,6 +252,7 @@ export default function CotizacionServicioItemForm({
                           placeholder="1.0"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                          onFocus={(e) => e.target.select()}
                           className="focus:border-blue-500"
                         />
                       </FormControl>
@@ -277,6 +279,7 @@ export default function CotizacionServicioItemForm({
                           placeholder="1.35"
                           {...field}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                          onFocus={(e) => e.target.select()}
                           className="focus:border-blue-500"
                         />
                       </FormControl>

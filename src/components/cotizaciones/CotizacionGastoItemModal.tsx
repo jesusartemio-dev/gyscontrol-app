@@ -256,6 +256,7 @@ export default function CotizacionGastoItemModal({
                         placeholder="1"
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
                         disabled={loading}
                       />
                     </FormControl>
@@ -281,6 +282,7 @@ export default function CotizacionGastoItemModal({
                         placeholder="0.00"
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
                         disabled={loading}
                       />
                     </FormControl>
@@ -310,6 +312,7 @@ export default function CotizacionGastoItemModal({
                         placeholder="1"
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
                         disabled={loading}
                       />
                     </FormControl>
@@ -336,6 +339,7 @@ export default function CotizacionGastoItemModal({
                         placeholder="1.25"
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
                         disabled={loading}
                       />
                     </FormControl>
