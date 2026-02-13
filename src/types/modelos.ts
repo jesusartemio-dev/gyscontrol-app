@@ -2427,3 +2427,88 @@ export interface CalendarioLaboral {
   createdAt: string
   updatedAt: string
 }
+
+// ======================
+// Anticipos y Rendiciones
+// ======================
+
+export interface SolicitudAnticipo {
+  id: string
+  numero: string
+  proyectoId: string
+  solicitanteId: string
+  aprobadorId?: string | null
+  monto: number
+  moneda: string
+  motivo: string
+  fechaInicio?: string | null
+  fechaFin?: string | null
+  estado: string
+  comentarioRechazo?: string | null
+  fechaSolicitud: string
+  fechaAprobacion?: string | null
+  fechaPago?: string | null
+  montoLiquidado: number
+  montoPendiente: number
+  createdAt: string
+  updatedAt: string
+  // Relations
+  proyecto?: Proyecto
+  solicitante?: { id: string; name: string | null; email: string }
+  aprobador?: { id: string; name: string | null; email: string } | null
+  rendiciones?: RendicionGasto[]
+}
+
+export interface RendicionGasto {
+  id: string
+  numero: string
+  solicitudAnticipoId?: string | null
+  proyectoId: string
+  empleadoId: string
+  aprobadorId?: string | null
+  estado: string
+  montoTotal: number
+  comentarioRechazo?: string | null
+  observaciones?: string | null
+  fechaEnvio?: string | null
+  fechaAprobacion?: string | null
+  createdAt: string
+  updatedAt: string
+  // Relations
+  solicitudAnticipo?: SolicitudAnticipo | null
+  proyecto?: Proyecto
+  empleado?: { id: string; name: string | null; email: string }
+  aprobador?: { id: string; name: string | null; email: string } | null
+  lineas?: GastoLinea[]
+}
+
+export interface GastoLinea {
+  id: string
+  rendicionGastoId: string
+  categoriaGastoId?: string | null
+  descripcion: string
+  fecha: string
+  monto: number
+  moneda: string
+  tipoComprobante?: string | null
+  numeroComprobante?: string | null
+  proveedorNombre?: string | null
+  proveedorRuc?: string | null
+  observaciones?: string | null
+  createdAt: string
+  updatedAt: string
+  // Relations
+  categoriaGasto?: CategoriaGasto | null
+  adjuntos?: GastoAdjunto[]
+}
+
+export interface GastoAdjunto {
+  id: string
+  gastoLineaId: string
+  nombreArchivo: string
+  urlArchivo: string
+  driveFileId?: string | null
+  tipoArchivo?: string | null
+  tamano?: number | null
+  createdAt: string
+}

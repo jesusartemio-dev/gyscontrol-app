@@ -99,6 +99,7 @@ model CategoriaGasto {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   catalogoGastos CatalogoGasto[]
+  gastoLineas    GastoLinea[]
 
   @@map("categoria_gasto")
 }
@@ -856,6 +857,9 @@ model Proyecto {
   registrosCampo           RegistroHorasCampo[]
   proyectoCondicion        ProyectoCondicion[]
   proyectoExclusion        ProyectoExclusion[]
+  // Anticipos y rendiciones
+  solicitudesAnticipo      SolicitudAnticipo[]
+  rendicionesGasto         RendicionGasto[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1260,6 +1264,11 @@ model User {
   // Descuentos cotización
   cotizacionDescuentosSolicitados       Cotizacion[]                 @relation("CotizacionDescuentoSolicitante")
   cotizacionDescuentosAprobados         Cotizacion[]                 @relation("CotizacionDescuentoAprobador")
+  // Anticipos y rendiciones
+  anticiposSolicitados                  SolicitudAnticipo[]          @relation("AnticipoSolicitante")
+  anticiposAprobados                    SolicitudAnticipo[]          @relation("AnticipoAprobador")
+  rendicionesComoEmpleado               RendicionGasto[]             @relation("RendicionEmpleado")
+  rendicionesComoAprobador              RendicionGasto[]             @relation("RendicionAprobador")
 
   @@map("user")
 }
@@ -2793,4 +2802,107 @@ model RoleSectionAccess {
   @@unique([role, sectionKey])
   @@index([role])
   @@map("role_section_access")
+}
+
+// ======================
+// 💰 Anticipos y Rendiciones de Gastos
+// ======================
+
+model SolicitudAnticipo {
+  id                String    @id @default(cuid())
+  numero            String    @unique
+  proyectoId        String
+  solicitanteId     String
+  aprobadorId       String?
+  monto             Float
+  moneda            String    @default("PEN")
+  motivo            String
+  fechaInicio       DateTime?
+  fechaFin          DateTime?
+  estado            String    @default("borrador")
+  comentarioRechazo String?
+  fechaSolicitud    DateTime  @default(now())
+  fechaAprobacion   DateTime?
+  fechaPago         DateTime?
+  montoLiquidado    Float     @default(0)
+  montoPendiente    Float     @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime
+
+  proyecto    Proyecto         @relation(fields: [proyectoId], references: [id])
+  solicitante User             @relation("AnticipoSolicitante", fields: [solicitanteId], references: [id])
+  aprobador   User?            @relation("AnticipoAprobador", fields: [aprobadorId], references: [id])
+  rendiciones RendicionGasto[]
+
+  @@index([proyectoId, estado])
+  @@index([solicitanteId, estado])
+  @@map("solicitud_anticipo")
+}
+
+model RendicionGasto {
+  id                  String             @id @default(cuid())
+  numero              String             @unique
+  solicitudAnticipoId String?
+  proyectoId          String
+  empleadoId          String
+  aprobadorId         String?
+  estado              String             @default("borrador")
+  montoTotal          Float              @default(0)
+  comentarioRechazo   String?
+  observaciones       String?
+  fechaEnvio          DateTime?
+  fechaAprobacion     DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime
+
+  solicitudAnticipo SolicitudAnticipo? @relation(fields: [solicitudAnticipoId], references: [id])
+  proyecto          Proyecto           @relation(fields: [proyectoId], references: [id])
+  empleado          User               @relation("RendicionEmpleado", fields: [empleadoId], references: [id])
+  aprobador         User?              @relation("RendicionAprobador", fields: [aprobadorId], references: [id])
+  lineas            GastoLinea[]
+
+  @@index([proyectoId, estado])
+  @@index([empleadoId, estado])
+  @@index([solicitudAnticipoId])
+  @@map("rendicion_gasto")
+}
+
+model GastoLinea {
+  id                String          @id @default(cuid())
+  rendicionGastoId  String
+  categoriaGastoId  String?
+  descripcion       String
+  fecha             DateTime
+  monto             Float
+  moneda            String          @default("PEN")
+  tipoComprobante   String?
+  numeroComprobante String?
+  proveedorNombre   String?
+  proveedorRuc      String?
+  observaciones     String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime
+
+  rendicionGasto RendicionGasto  @relation(fields: [rendicionGastoId], references: [id], onDelete: Cascade)
+  categoriaGasto CategoriaGasto? @relation(fields: [categoriaGastoId], references: [id])
+  adjuntos       GastoAdjunto[]
+
+  @@index([rendicionGastoId])
+  @@map("gasto_linea")
+}
+
+model GastoAdjunto {
+  id            String   @id @default(cuid())
+  gastoLineaId  String
+  nombreArchivo String
+  urlArchivo    String
+  driveFileId   String?
+  tipoArchivo   String?
+  tamano        Int?
+  createdAt     DateTime @default(now())
+
+  gastoLinea GastoLinea @relation(fields: [gastoLineaId], references: [id], onDelete: Cascade)
+
+  @@index([gastoLineaId])
+  @@map("gasto_adjunto")
 }

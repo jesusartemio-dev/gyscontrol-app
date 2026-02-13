@@ -155,7 +155,10 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       'gastos': 'Gastos',
       'cronograma': 'Cronograma',
       'listas': 'Listas',
-      'pedidos': 'Pedidos'
+      'pedidos': 'Pedidos',
+      'anticipos': 'Anticipos',
+      'rendiciones': 'Rendiciones',
+      'nueva': 'Nueva Rendición',
     }
     return subPageNames[lastSegment] || lastSegment
   }

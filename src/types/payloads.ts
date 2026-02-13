@@ -1306,3 +1306,63 @@ export interface CreateProyectoEdtPayload {
   prioridad?: PrioridadEdt
 }
 
+// ======================
+// Anticipos y Rendiciones
+// ======================
+
+export interface SolicitudAnticipoPayload {
+  proyectoId: string
+  solicitanteId: string
+  monto: number
+  moneda?: string
+  motivo: string
+  fechaInicio?: string
+  fechaFin?: string
+}
+
+export interface SolicitudAnticipoUpdatePayload {
+  monto?: number
+  moneda?: string
+  motivo?: string
+  fechaInicio?: string | null
+  fechaFin?: string | null
+}
+
+export interface RendicionGastoPayload {
+  solicitudAnticipoId?: string
+  proyectoId: string
+  empleadoId: string
+  observaciones?: string
+}
+
+export interface RendicionGastoUpdatePayload {
+  observaciones?: string
+}
+
+export interface GastoLineaPayload {
+  rendicionGastoId: string
+  categoriaGastoId?: string
+  descripcion: string
+  fecha: string
+  monto: number
+  moneda?: string
+  tipoComprobante?: string
+  numeroComprobante?: string
+  proveedorNombre?: string
+  proveedorRuc?: string
+  observaciones?: string
+}
+
+export interface GastoLineaUpdatePayload {
+  categoriaGastoId?: string | null
+  descripcion?: string
+  fecha?: string
+  monto?: number
+  moneda?: string
+  tipoComprobante?: string | null
+  numeroComprobante?: string | null
+  proveedorNombre?: string | null
+  proveedorRuc?: string | null
+  observaciones?: string | null
+}
+
