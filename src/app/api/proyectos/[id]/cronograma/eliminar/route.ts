@@ -90,19 +90,24 @@ async function eliminarCronogramaCompleto(
   let tareasEliminadas = 0
   let dependenciasEliminadas = 0
 
-  // Construir filtro base
-  const baseFilter = cronogramaId
+  // Construir filtros por modelo
+  // ProyectoFase y ProyectoEdt tienen campo proyectoId directo
+  const faseEdtFilter = cronogramaId
     ? { proyectoId, proyectoCronogramaId: cronogramaId }
     : { proyectoId }
+  // ProyectoTarea NO tiene proyectoId - filtrar solo por cronogramaId o vía relación
+  const tareaFilter = cronogramaId
+    ? { proyectoCronogramaId: cronogramaId }
+    : { proyectoEdt: { proyectoId } }
 
   // 0. Collect IDs for FK detachment
   const tareaIds = await tx.proyectoTarea.findMany({
-    where: baseFilter,
+    where: tareaFilter,
     select: { id: true }
   }).then((tasks: { id: string }[]) => tasks.map(t => t.id))
 
   const edtIds = await tx.proyectoEdt.findMany({
-    where: baseFilter,
+    where: faseEdtFilter,
     select: { id: true }
   }).then((edts: { id: string }[]) => edts.map(e => e.id))
 
@@ -147,13 +152,13 @@ async function eliminarCronogramaCompleto(
     })
   }
 
-  // 2. Eliminar tareas
+  // 2. Eliminar tareas (ProyectoTarea NO tiene proyectoId)
   const tareas = await tx.proyectoTarea.deleteMany({
-    where: baseFilter
+    where: tareaFilter
   })
   tareasEliminadas = tareas.count
 
-  // 3. Eliminar actividades
+  // 3. Eliminar actividades (ProyectoActividad NO tiene proyectoId)
   const actividades = await tx.proyectoActividad.deleteMany({
     where: cronogramaId
       ? { proyectoCronogramaId: cronogramaId }
@@ -163,13 +168,13 @@ async function eliminarCronogramaCompleto(
 
   // 4. Eliminar EDTs
   const edts = await tx.proyectoEdt.deleteMany({
-    where: baseFilter
+    where: faseEdtFilter
   })
   edtsEliminados = edts.count
 
   // 5. Eliminar fases
   const fases = await tx.proyectoFase.deleteMany({
-    where: baseFilter
+    where: faseEdtFilter
   })
   fasesEliminadas = fases.count
 
