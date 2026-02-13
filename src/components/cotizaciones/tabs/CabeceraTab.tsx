@@ -114,8 +114,10 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
         tipoCambio: formData.tipoCambio ? parseFloat(String(formData.tipoCambio)) : null
       }
 
-      const updatedCotizacion = await updateCotizacion(cotizacion.id, dataToUpdate)
-      onUpdated(updatedCotizacion)
+      const updatedScalars = await updateCotizacion(cotizacion.id, dataToUpdate)
+      // Merge: preserve existing relations (equipos, servicios, gastos, etc.)
+      // while updating scalar fields (moneda, tipoCambio, dates, etc.)
+      onUpdated({ ...cotizacion, ...updatedScalars })
       setSuccess(true)
 
       setTimeout(() => setSuccess(false), 3000)
