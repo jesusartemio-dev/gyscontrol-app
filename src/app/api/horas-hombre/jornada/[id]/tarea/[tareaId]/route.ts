@@ -20,6 +20,13 @@ interface MiembroUpdate {
   observaciones?: string
 }
 
+interface TareaUpdate {
+  proyectoTareaId?: string | null
+  nombreTareaExtra?: string | null
+  descripcion?: string | null
+  miembros: MiembroUpdate[]
+}
+
 // GET - Obtener detalle de una tarea
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
@@ -96,7 +103,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const { id: jornadaId, tareaId } = await context.params
     const body = await request.json()
-    const { miembros } = body as { miembros: MiembroUpdate[] }
+    const { miembros, proyectoTareaId, nombreTareaExtra, descripcion } = body as TareaUpdate
 
     // Obtener la tarea con su jornada
     const tarea = await prisma.registroHorasCampoTarea.findUnique({
@@ -164,8 +171,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
-    // Usar transacción para actualizar miembros
+    // Usar transacción para actualizar tarea y miembros
     await prisma.$transaction(async (tx) => {
+      // Update task fields if provided
+      const tareaUpdate: Record<string, unknown> = {}
+      if (proyectoTareaId !== undefined) {
+        tareaUpdate.proyectoTareaId = proyectoTareaId || null
+      }
+      if (nombreTareaExtra !== undefined) {
+        tareaUpdate.nombreTareaExtra = nombreTareaExtra || null
+      }
+      if (descripcion !== undefined) {
+        tareaUpdate.descripcion = descripcion || null
+      }
+
+      if (Object.keys(tareaUpdate).length > 0) {
+        await tx.registroHorasCampoTarea.update({
+          where: { id: tareaId },
+          data: tareaUpdate,
+        })
+      }
+
       // Eliminar miembros existentes
       await tx.registroHorasCampoMiembro.deleteMany({
         where: { registroCampoTareaId: tareaId }

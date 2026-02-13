@@ -118,6 +118,8 @@ export function JornadaActiva({
   const [cerrarJornadaOpen, setCerrarJornadaOpen] = useState(false)
   const [eliminarJornadaOpen, setEliminarJornadaOpen] = useState(false)
   const [eliminando, setEliminando] = useState(false)
+  const [tareaAEliminar, setTareaAEliminar] = useState<TareaJornada | null>(null)
+  const [eliminandoTarea, setEliminandoTarea] = useState(false)
 
   // Calcular estadisticas
   const cantidadTareas = jornada.tareas.length
@@ -154,6 +156,35 @@ export function JornadaActiva({
   const handleEditarTarea = (tarea: TareaJornada) => {
     setTareaSeleccionada(tarea)
     setEditarTareaOpen(true)
+  }
+
+  const handleEliminarTarea = async () => {
+    if (!tareaAEliminar) return
+    try {
+      setEliminandoTarea(true)
+      const response = await fetch(`/api/horas-hombre/jornada/${jornada.id}/tarea/${tareaAEliminar.id}`, {
+        method: 'DELETE'
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Error eliminando tarea')
+      }
+      toast({
+        title: 'Tarea eliminada',
+        description: 'La tarea ha sido eliminada correctamente'
+      })
+      onRefresh()
+    } catch (error) {
+      console.error('Error:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Error eliminando tarea'
+      })
+    } finally {
+      setEliminandoTarea(false)
+      setTareaAEliminar(null)
+    }
   }
 
   const handleEliminarJornada = async () => {
@@ -338,14 +369,22 @@ export function JornadaActiva({
                           ))}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEditarTarea(tarea)}
-                          className="h-7 w-7 p-0 text-gray-300 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                         >
                           <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setTareaAEliminar(tarea)}
+                          className="h-7 w-7 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                         <Badge variant="secondary" className="text-[11px] font-semibold px-2 py-0 rounded-full">
                           {horasTarea}h
@@ -410,6 +449,7 @@ export function JornadaActiva({
           }}
           jornadaId={jornada.id}
           tarea={tareaSeleccionada}
+          proyectoEdtId={jornada.proyectoEdt?.id}
           personalPlanificado={jornada.personalPlanificado}
           onSuccess={onRefresh}
         />
@@ -440,6 +480,27 @@ export function JornadaActiva({
               className="bg-red-600 hover:bg-red-700"
             >
               {eliminando ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!tareaAEliminar} onOpenChange={(open) => { if (!open) setTareaAEliminar(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar tarea?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la tarea &quot;{tareaAEliminar ? getNombreTarea(tareaAEliminar) : ''}&quot; y las horas registradas de sus miembros.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminandoTarea}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEliminarTarea}
+              disabled={eliminandoTarea}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {eliminandoTarea ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

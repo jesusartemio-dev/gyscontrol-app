@@ -1,24 +1,38 @@
 'use client'
 
 /**
- * EditarTareaModal - Modal para editar horas de una tarea existente
+ * EditarTareaModal - Modal para editar una tarea existente de la jornada
  *
- * Permite modificar las horas de cada miembro antes de cerrar la jornada
+ * Permite:
+ * - Cambiar la tarea (del cronograma o tarea extra)
+ * - Modificar miembros y horas
+ * - Eliminar la tarea
  */
 
 import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Clock,
   Users,
   Loader2,
   Pencil,
-  Trash2
+  Trash2,
+  ListTodo,
+  FileText
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -70,11 +84,23 @@ interface MiembroEditable {
   observaciones?: string
 }
 
+interface TareaDelCronograma {
+  id: string
+  nombre: string
+}
+
+interface Actividad {
+  id: string
+  nombre: string
+  tareas: TareaDelCronograma[]
+}
+
 interface EditarTareaModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   jornadaId: string
   tarea: TareaData
+  proyectoEdtId?: string | null
   personalPlanificado: PersonalPlanificado[]
   onSuccess: () => void
 }
@@ -84,6 +110,7 @@ export function EditarTareaModal({
   onOpenChange,
   jornadaId,
   tarea,
+  proyectoEdtId,
   personalPlanificado,
   onSuccess
 }: EditarTareaModalProps) {
@@ -96,9 +123,20 @@ export function EditarTareaModal({
   const [horasBase, setHorasBase] = useState(8)
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroEditable[]>([])
 
-  // Inicializar miembros cuando se abre el modal
+  // Task selection state
+  const [tipoTarea, setTipoTarea] = useState<'cronograma' | 'extra'>('cronograma')
+  const [actividades, setActividades] = useState<Actividad[]>([])
+  const [tareasDisponibles, setTareasDisponibles] = useState<TareaDelCronograma[]>([])
+  const [actividadId, setActividadId] = useState('')
+  const [tareaId, setTareaId] = useState('')
+  const [nombreTareaExtra, setNombreTareaExtra] = useState('')
+  const [descripcion, setDescripcion] = useState('')
+  const [loadingActividades, setLoadingActividades] = useState(false)
+
+  // Inicializar cuando se abre el modal
   useEffect(() => {
     if (open && tarea) {
+      // Initialize members
       const miembrosIniciales = tarea.miembros.map(m => ({
         usuarioId: m.usuario.id,
         nombre: m.usuario.name || m.usuario.email.split('@')[0],
@@ -106,11 +144,62 @@ export function EditarTareaModal({
         observaciones: m.observaciones || undefined
       }))
       setMiembrosSeleccionados(miembrosIniciales)
-    }
-  }, [open, tarea])
 
-  const nombreTarea = tarea.proyectoTarea?.nombre || tarea.nombreTareaExtra || 'Tarea sin nombre'
-  const actividadNombre = tarea.proyectoTarea?.proyectoActividad?.nombre
+      // Initialize task type
+      if (tarea.proyectoTarea) {
+        setTipoTarea('cronograma')
+        setTareaId(tarea.proyectoTarea.id)
+        setNombreTareaExtra('')
+      } else {
+        setTipoTarea('extra')
+        setTareaId('')
+        setNombreTareaExtra(tarea.nombreTareaExtra || '')
+      }
+      setDescripcion(tarea.descripcion || '')
+
+      // Load activities if EDT available
+      if (proyectoEdtId) {
+        cargarActividades()
+      }
+    }
+  }, [open, tarea, proyectoEdtId])
+
+  // Set actividadId once actividades are loaded (for cronograma tasks)
+  useEffect(() => {
+    if (actividades.length > 0 && tarea?.proyectoTarea?.proyectoActividad) {
+      const actNombre = tarea.proyectoTarea.proyectoActividad.nombre
+      const found = actividades.find(a => a.nombre === actNombre)
+      if (found) {
+        setActividadId(found.id)
+      }
+    }
+  }, [actividades, tarea])
+
+  // Update available tasks when activity changes
+  useEffect(() => {
+    if (actividadId) {
+      const actividadSeleccionada = actividades.find(a => a.id === actividadId)
+      setTareasDisponibles(actividadSeleccionada?.tareas || [])
+    } else {
+      setTareasDisponibles([])
+    }
+  }, [actividadId, actividades])
+
+  const cargarActividades = async () => {
+    if (!proyectoEdtId) return
+    try {
+      setLoadingActividades(true)
+      const response = await fetch(`/api/horas-hombre/actividades-edt/${proyectoEdtId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setActividades(data.actividades || [])
+      }
+    } catch (error) {
+      console.error('Error cargando actividades:', error)
+    } finally {
+      setLoadingActividades(false)
+    }
+  }
 
   const toggleMiembro = (userId: string, nombre: string) => {
     setMiembrosSeleccionados(prev => {
@@ -135,6 +224,15 @@ export function EditarTareaModal({
   }
 
   const handleSubmit = async () => {
+    // Validations
+    if (tipoTarea === 'cronograma' && !tareaId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Selecciona una tarea del cronograma' })
+      return
+    }
+    if (tipoTarea === 'extra' && !nombreTareaExtra.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Ingresa el nombre de la tarea extra' })
+      return
+    }
     if (miembrosSeleccionados.length === 0) {
       toast({ variant: 'destructive', title: 'Error', description: 'Selecciona al menos un miembro' })
       return
@@ -146,6 +244,9 @@ export function EditarTareaModal({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          proyectoTareaId: tipoTarea === 'cronograma' ? tareaId : null,
+          nombreTareaExtra: tipoTarea === 'extra' ? nombreTareaExtra.trim() : null,
+          descripcion: descripcion.trim() || null,
           miembros: miembrosSeleccionados.map(m => ({
             usuarioId: m.usuarioId,
             horas: m.horas,
@@ -215,6 +316,12 @@ export function EditarTareaModal({
   }
 
   const totalHoras = miembrosSeleccionados.reduce((sum, m) => sum + m.horas, 0)
+  const tareaSeleccionadaCronograma = tareasDisponibles.find(t => t.id === tareaId)
+  const nombreResumen = tipoTarea === 'cronograma' && tareaSeleccionadaCronograma
+    ? tareaSeleccionadaCronograma.nombre
+    : tipoTarea === 'extra' && nombreTareaExtra
+      ? nombreTareaExtra
+      : 'Selecciona una tarea'
 
   return (
     <>
@@ -228,15 +335,86 @@ export function EditarTareaModal({
           </DialogHeader>
 
           <div className="space-y-5">
-            {/* Info de la tarea (solo lectura) */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-1">
-              <div className="font-medium">{nombreTarea}</div>
-              {actividadNombre && (
-                <div className="text-sm text-gray-500">{actividadNombre}</div>
-              )}
-              {tarea.descripcion && (
-                <div className="text-sm text-gray-600 mt-2">{tarea.descripcion}</div>
-              )}
+            {/* Task selection */}
+            <Tabs value={tipoTarea} onValueChange={(v) => setTipoTarea(v as 'cronograma' | 'extra')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="cronograma">
+                  <ListTodo className="h-4 w-4 mr-2" />
+                  Del cronograma
+                </TabsTrigger>
+                <TabsTrigger value="extra">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Tarea extra
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="cronograma" className="space-y-4 mt-4">
+                {proyectoEdtId ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Actividad EDT</Label>
+                      <Select value={actividadId} onValueChange={setActividadId} disabled={loadingActividades}>
+                        <SelectTrigger className="h-auto min-h-9 py-1.5 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm">
+                          <SelectValue placeholder="Seleccionar actividad" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
+                          {actividades.map(a => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {actividadId && (
+                      <div className="space-y-2">
+                        <Label>Tarea</Label>
+                        <Select value={tareaId} onValueChange={setTareaId}>
+                          <SelectTrigger className="h-auto min-h-9 py-1.5 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm">
+                            <SelectValue placeholder="Seleccionar tarea" />
+                          </SelectTrigger>
+                          <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
+                            {tareasDisponibles.map(t => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center text-gray-500 py-4">
+                    Esta jornada no tiene un EDT asignado.
+                    <br />
+                    Usa &quot;Tarea extra&quot; para asignar tareas.
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="extra" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Nombre de la tarea *</Label>
+                  <Input
+                    placeholder="Ej: Limpieza de zona, Traslado de materiales"
+                    value={nombreTareaExtra}
+                    onChange={e => setNombreTareaExtra(e.target.value)}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {/* Descripción */}
+            <div className="space-y-2">
+              <Label>Descripción (opcional)</Label>
+              <Textarea
+                placeholder="Detalles adicionales de la tarea..."
+                value={descripcion}
+                onChange={e => setDescripcion(e.target.value)}
+                rows={2}
+              />
             </div>
 
             {/* Horas base y miembros */}
@@ -270,7 +448,7 @@ export function EditarTareaModal({
               </div>
 
               {/* Lista de personal planificado */}
-              <div className="border rounded-lg max-h-64 overflow-y-auto">
+              <div className="border rounded-lg max-h-48 overflow-y-auto">
                 {personalPlanificado.length === 0 ? (
                   <div className="p-4 text-center text-gray-500 text-sm">
                     No hay personal planificado
@@ -316,7 +494,7 @@ export function EditarTareaModal({
             {miembrosSeleccionados.length > 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-blue-800 font-medium">{nombreTarea}</span>
+                  <span className="text-blue-800 font-medium">{nombreResumen}</span>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">
                       {miembrosSeleccionados.length} personas
@@ -354,7 +532,12 @@ export function EditarTareaModal({
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={submitting || deleting || miembrosSeleccionados.length === 0}
+                  disabled={
+                    submitting || deleting ||
+                    miembrosSeleccionados.length === 0 ||
+                    (tipoTarea === 'cronograma' && !tareaId) ||
+                    (tipoTarea === 'extra' && !nombreTareaExtra.trim())
+                  }
                 >
                   {submitting ? (
                     <>
@@ -380,7 +563,7 @@ export function EditarTareaModal({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará la tarea "{nombreTarea}" y todas las horas registradas para sus miembros.
+              Se eliminará la tarea y todas las horas registradas para sus miembros.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
