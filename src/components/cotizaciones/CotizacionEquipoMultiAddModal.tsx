@@ -24,6 +24,7 @@ interface Props {
   onClose: () => void
   cotizacionEquipoId: string
   onItemsCreated: (items: CotizacionEquipoItem[]) => void
+  onRequestCreate?: () => void
 }
 
 interface SelectedEquipo {
@@ -36,7 +37,8 @@ export default function CotizacionEquipoMultiAddModal({
   isOpen,
   onClose,
   cotizacionEquipoId,
-  onItemsCreated
+  onItemsCreated,
+  onRequestCreate
 }: Props) {
   const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])  
   const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])  
@@ -297,6 +299,20 @@ export default function CotizacionEquipoMultiAddModal({
               </SelectContent>
             </Select>
           </div>
+          {onRequestCreate && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onClose()
+                onRequestCreate()
+              }}
+              className="h-9 text-xs text-green-600 border-green-200 hover:bg-green-50 shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Crear nuevo
+            </Button>
+          )}
         </div>
 
         {/* Layout de Dos Columnas Lado a Lado */}
@@ -372,7 +388,21 @@ export default function CotizacionEquipoMultiAddModal({
                 <div className="text-center py-12 text-muted-foreground">
                   <Package className="mx-auto h-10 w-10 mb-3 opacity-50" />
                   <p className="text-sm">No se encontraron equipos</p>
-                  <p className="text-xs text-gray-400">Ajusta los filtros de búsqueda</p>
+                  <p className="text-xs text-gray-400 mb-3">Ajusta los filtros de búsqueda</p>
+                  {onRequestCreate && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        onClose()
+                        onRequestCreate()
+                      }}
+                      className="text-xs text-green-600 border-green-200 hover:bg-green-50"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Crear equipo nuevo
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

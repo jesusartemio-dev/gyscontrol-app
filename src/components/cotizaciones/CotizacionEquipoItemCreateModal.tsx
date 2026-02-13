@@ -21,11 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Package, Loader2, Calculator } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Package, Loader2, Calculator, Database } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
-import type { CotizacionEquipoItem, CotizacionEquipoItemPayload, CategoriaEquipo } from '@/types'
+import { getUnidades } from '@/lib/services/unidad'
+import { createCatalogoEquipo } from '@/lib/services/catalogoEquipo'
+import type { CotizacionEquipoItem, CotizacionEquipoItemPayload, CategoriaEquipo, Unidad, CatalogoEquipoPayload } from '@/types'
 
 interface Props {
   isOpen: boolean
@@ -37,6 +40,7 @@ interface Props {
   item?: CotizacionEquipoItem // Si se pasa, es modo edición
   onItemCreated: (item: CotizacionEquipoItem) => void
   onItemUpdated?: (item: CotizacionEquipoItem) => void
+  defaultGuardarEnCatalogo?: boolean
 }
 
 const formatCurrency = (amount: number): string => {
@@ -53,11 +57,13 @@ export default function CotizacionEquipoItemCreateModal({
   equipo,
   item,
   onItemCreated,
-  onItemUpdated
+  onItemUpdated,
+  defaultGuardarEnCatalogo = false
 }: Props) {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
+  const [unidades, setUnidades] = useState<Unidad[]>([])
   const isEditMode = !!item
 
   // Form state
@@ -65,40 +71,59 @@ export default function CotizacionEquipoItemCreateModal({
   const [descripcion, setDescripcion] = useState('')
   const [marca, setMarca] = useState('')
   const [categoria, setCategoria] = useState('')
+  const [categoriaId, setCategoriaId] = useState('')
   const [unidad, setUnidad] = useState('Unidad')
+  const [unidadId, setUnidadId] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [precioLista, setPrecioLista] = useState(0)
   const [factorCosto, setFactorCosto] = useState(1.00)
   const [factorVenta, setFactorVenta] = useState(1.15)
+  const [factorCostoDisplay, setFactorCostoDisplay] = useState('1.00')
+  const [factorVentaDisplay, setFactorVentaDisplay] = useState('1.15')
+  const [guardarEnCatalogo, setGuardarEnCatalogo] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
-      loadCategorias()
-      if (item) {
-        // Edit mode - populate form with item data
-        setCodigo(item.codigo || '')
-        setDescripcion(item.descripcion || '')
-        setMarca(item.marca || '')
-        setCategoria(item.categoria || '')
-        setUnidad(item.unidad || 'Unidad')
-        setCantidad(item.cantidad || 1)
-        setPrecioLista(item.precioLista || 0)
-        setFactorCosto(item.factorCosto || 1.00)
-        setFactorVenta(item.factorVenta || 1.15)
-      } else {
-        // Create mode - reset form
+      loadFormData()
+      if (!item) {
         resetForm()
+        setGuardarEnCatalogo(defaultGuardarEnCatalogo)
       }
     }
-  }, [isOpen, item])
+  }, [isOpen, item, defaultGuardarEnCatalogo])
 
-  const loadCategorias = async () => {
+  // Populate edit mode after data is loaded
+  useEffect(() => {
+    if (isOpen && item && categorias.length > 0 && unidades.length > 0) {
+      setCodigo(item.codigo || '')
+      setDescripcion(item.descripcion || '')
+      setMarca(item.marca || '')
+      setCategoria(item.categoria || '')
+      const matchedCat = categorias.find(c => c.nombre === item.categoria)
+      setCategoriaId(matchedCat?.id || '')
+      setUnidad(item.unidad || 'Unidad')
+      const matchedUni = unidades.find(u => u.nombre === item.unidad)
+      setUnidadId(matchedUni?.id || '')
+      setCantidad(item.cantidad || 1)
+      setPrecioLista(item.precioLista || 0)
+      setFactorCosto(item.factorCosto || 1.00)
+      setFactorVenta(item.factorVenta || 1.15)
+      setFactorCostoDisplay((item.factorCosto || 1).toFixed(2))
+      setFactorVentaDisplay((item.factorVenta || 1.15).toFixed(2))
+    }
+  }, [isOpen, item, categorias, unidades])
+
+  const loadFormData = async () => {
     setLoading(true)
     try {
-      const data = await getCategoriasEquipo()
-      setCategorias(data)
+      const [cats, unis] = await Promise.all([
+        getCategoriasEquipo(),
+        getUnidades()
+      ])
+      setCategorias(cats)
+      setUnidades(unis)
     } catch (error) {
-      console.error('Error loading categorias:', error)
+      console.error('Error loading form data:', error)
     } finally {
       setLoading(false)
     }
@@ -109,11 +134,16 @@ export default function CotizacionEquipoItemCreateModal({
     setDescripcion('')
     setMarca('')
     setCategoria('')
+    setCategoriaId('')
     setUnidad('Unidad')
+    setUnidadId('')
     setCantidad(1)
     setPrecioLista(0)
     setFactorCosto(1.00)
     setFactorVenta(1.15)
+    setFactorCostoDisplay('1.00')
+    setFactorVentaDisplay('1.15')
+    setGuardarEnCatalogo(false)
   }
 
   // Calcular costos en tiempo real
@@ -156,11 +186,47 @@ export default function CotizacionEquipoItemCreateModal({
       toast.error('La cantidad debe ser mayor a 0')
       return
     }
+    if (guardarEnCatalogo && !categoriaId) {
+      toast.error('Selecciona una categoría para guardar en catálogo')
+      return
+    }
+    if (guardarEnCatalogo && !unidadId) {
+      toast.error('Selecciona una unidad para guardar en catálogo')
+      return
+    }
 
     setSaving(true)
     try {
+      let catalogoEquipoId: string | undefined = undefined
+
+      // Si "Guardar en Catálogo" está marcado, crear primero en catálogo
+      if (guardarEnCatalogo && !isEditMode) {
+        try {
+          const catalogoPayload: CatalogoEquipoPayload = {
+            codigo: codigo.trim(),
+            descripcion: descripcion.trim(),
+            marca: marca.trim() || 'Sin marca',
+            precioLista,
+            precioInterno: calculados.precioInterno,
+            factorCosto,
+            factorVenta,
+            precioVenta: calculados.precioCliente,
+            categoriaId,
+            unidadId,
+            estado: 'activo'
+          }
+          const catalogoEquipo = await createCatalogoEquipo(catalogoPayload)
+          catalogoEquipoId = catalogoEquipo.id
+          toast.success('Equipo guardado en catálogo')
+        } catch (error) {
+          console.error('Error saving to catalog:', error)
+          toast.warning('No se pudo guardar en catálogo (código duplicado?). Se creará solo en la cotización.')
+        }
+      }
+
       const payload: CotizacionEquipoItemPayload = {
         cotizacionEquipoId: equipo.id,
+        catalogoEquipoId,
         codigo: codigo.trim(),
         descripcion: descripcion.trim(),
         categoria: categoria.trim() || 'Sin categoría',
@@ -177,7 +243,6 @@ export default function CotizacionEquipoItemCreateModal({
       }
 
       if (isEditMode && item) {
-        // Update existing item
         const res = await fetch(`/api/cotizacion-equipo-item/${item.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -188,7 +253,6 @@ export default function CotizacionEquipoItemCreateModal({
         toast.success('Equipo actualizado')
         onItemUpdated?.(updated)
       } else {
-        // Create new item
         const res = await fetch('/api/cotizacion-equipo-item', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -275,13 +339,17 @@ export default function CotizacionEquipoItemCreateModal({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-xs">Categoría</Label>
-              <Select value={categoria} onValueChange={setCategoria}>
+              <Select value={categoriaId} onValueChange={(id) => {
+                setCategoriaId(id)
+                const cat = categorias.find(c => c.id === id)
+                setCategoria(cat?.nombre || '')
+              }}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
                 <SelectContent>
                   {categorias.map(cat => (
-                    <SelectItem key={cat.id} value={cat.nombre} className="text-sm">
+                    <SelectItem key={cat.id} value={cat.id!} className="text-sm">
                       {cat.nombre}
                     </SelectItem>
                   ))}
@@ -290,12 +358,22 @@ export default function CotizacionEquipoItemCreateModal({
             </div>
             <div>
               <Label className="text-xs">Unidad</Label>
-              <Input
-                value={unidad}
-                onChange={(e) => setUnidad(e.target.value)}
-                placeholder="Unidad"
-                className="h-8 text-sm"
-              />
+              <Select value={unidadId} onValueChange={(id) => {
+                setUnidadId(id)
+                const uni = unidades.find(u => u.id === id)
+                setUnidad(uni?.nombre || 'Unidad')
+              }}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {unidades.map(u => (
+                    <SelectItem key={u.id} value={u.id} className="text-sm">
+                      {u.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -326,8 +404,12 @@ export default function CotizacionEquipoItemCreateModal({
                   min={0.5}
                   max={3}
                   step={0.01}
-                  value={factorCosto}
-                  onChange={(e) => setFactorCosto(parseFloat(e.target.value) || 1.00)}
+                  value={factorCostoDisplay}
+                  onChange={(e) => {
+                    setFactorCostoDisplay(e.target.value)
+                    setFactorCosto(parseFloat(e.target.value) || 1.00)
+                  }}
+                  onBlur={() => setFactorCostoDisplay(factorCosto.toFixed(2))}
                   placeholder="1.00"
                   className="h-7 text-xs font-mono"
                 />
@@ -339,8 +421,12 @@ export default function CotizacionEquipoItemCreateModal({
                   min={1}
                   max={3}
                   step={0.01}
-                  value={factorVenta}
-                  onChange={(e) => setFactorVenta(parseFloat(e.target.value) || 1.15)}
+                  value={factorVentaDisplay}
+                  onChange={(e) => {
+                    setFactorVentaDisplay(e.target.value)
+                    setFactorVenta(parseFloat(e.target.value) || 1.15)
+                  }}
+                  onBlur={() => setFactorVentaDisplay(factorVenta.toFixed(2))}
                   placeholder="1.15"
                   className="h-7 text-xs font-mono"
                 />
@@ -406,6 +492,24 @@ export default function CotizacionEquipoItemCreateModal({
               </p>
             </div>
           </div>
+
+          {/* Guardar en Catálogo - solo en modo crear */}
+          {!isEditMode && (
+            <div className="flex items-center space-x-2 pt-1">
+              <Checkbox
+                id="guardarCatalogo"
+                checked={guardarEnCatalogo}
+                onCheckedChange={(checked) => setGuardarEnCatalogo(checked === true)}
+              />
+              <Label
+                htmlFor="guardarCatalogo"
+                className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
+              >
+                <Database className="h-3 w-3" />
+                Guardar en Catálogo de Equipos
+              </Label>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex justify-end gap-2 pt-2">

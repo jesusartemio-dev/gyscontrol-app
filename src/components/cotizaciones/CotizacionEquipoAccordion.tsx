@@ -68,6 +68,7 @@ export default function CotizacionEquipoAccordion({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingItem, setEditingItem] = useState<CotizacionEquipoItem | undefined>(undefined)
+  const [createFromCatalog, setCreateFromCatalog] = useState(false)
 
   useEffect(() => {
     setNuevoNombre(equipo.nombre)
@@ -147,6 +148,14 @@ export default function CotizacionEquipoAccordion({
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
     setEditingItem(undefined)
+    setCreateFromCatalog(false)
+  }
+
+  const handleRequestCreateFromCatalog = () => {
+    setShowMultiAddModal(false)
+    setEditingItem(undefined)
+    setCreateFromCatalog(true)
+    setShowCreateModal(true)
   }
 
   const handleItemCreated = (item: CotizacionEquipoItem) => {
@@ -389,6 +398,7 @@ export default function CotizacionEquipoAccordion({
         onClose={() => setShowMultiAddModal(false)}
         cotizacionEquipoId={equipo.id}
         onItemsCreated={handleMultipleItemsCreated}
+        onRequestCreate={handleRequestCreateFromCatalog}
       />
 
       {/* Modal para importar desde Excel */}
@@ -409,6 +419,7 @@ export default function CotizacionEquipoAccordion({
         item={editingItem}
         onItemCreated={handleItemCreated}
         onItemUpdated={handleItemUpdated}
+        defaultGuardarEnCatalogo={createFromCatalog}
       />
 
       {/* Delete confirmation dialog */}
