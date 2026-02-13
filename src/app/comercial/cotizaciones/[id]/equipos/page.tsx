@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 
 import { updateCotizacion } from '@/lib/services/cotizacion'
 import { deleteCotizacionEquipo, updateCotizacionEquipo } from '@/lib/services/cotizacionEquipo'
-import { updateCotizacionEquipoItem } from '@/lib/services/cotizacionEquipoItem'
+import { deleteCotizacionEquipoItem, updateCotizacionEquipoItem } from '@/lib/services/cotizacionEquipoItem'
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
 
 import { Button } from '@/components/ui/button'
@@ -140,7 +140,15 @@ export default function CotizacionEquiposPage() {
                     toast.error('Error al actualizar el item')
                   }
                 }}
-                onDeleted={id => actualizarEquipo(e.id, items => items.filter(i => i.id !== id))}
+                onDeleted={async (id) => {
+                  try {
+                    await deleteCotizacionEquipoItem(id)
+                    actualizarEquipo(e.id, items => items.filter(i => i.id !== id))
+                  } catch (error) {
+                    console.error('Error al eliminar item de equipo:', error)
+                    toast.error('Error al eliminar el item')
+                  }
+                }}
                 onDeletedGrupo={() => handleEliminarGrupoEquipo(e.id)}
                 onUpdatedNombre={nuevo => handleActualizarNombreEquipo(e.id, nuevo)}
                 isLocked={isLocked}

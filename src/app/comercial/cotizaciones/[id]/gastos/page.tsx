@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 
 import { updateCotizacion } from '@/lib/services/cotizacion'
 import { deleteCotizacionGasto, updateCotizacionGasto } from '@/lib/services/cotizacionGasto'
+import { deleteCotizacionGastoItem, updateCotizacionGastoItem } from '@/lib/services/cotizacionGastoItem'
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
 
 import { Button } from '@/components/ui/button'
@@ -123,8 +124,30 @@ export default function CotizacionGastosPage() {
                 key={g.id}
                 gasto={g}
                 onCreated={i => actualizarGasto(g.id, items => [...items, i])}
-                onUpdated={item => actualizarGasto(g.id, items => items.map(i => i.id === item.id ? item : i))}
-                onDeleted={id => actualizarGasto(g.id, items => items.filter(i => i.id !== id))}
+                onUpdated={async (item) => {
+                  try {
+                    await updateCotizacionGastoItem(item.id, {
+                      cantidad: item.cantidad,
+                      factorSeguridad: item.factorSeguridad,
+                      margen: item.margen,
+                      costoInterno: item.costoInterno,
+                      costoCliente: item.costoCliente,
+                    })
+                    actualizarGasto(g.id, items => items.map(i => i.id === item.id ? item : i))
+                  } catch (error) {
+                    console.error('Error al actualizar item de gasto:', error)
+                    toast.error('Error al actualizar el item')
+                  }
+                }}
+                onDeleted={async (id) => {
+                  try {
+                    await deleteCotizacionGastoItem(id)
+                    actualizarGasto(g.id, items => items.filter(i => i.id !== id))
+                  } catch (error) {
+                    console.error('Error al eliminar item de gasto:', error)
+                    toast.error('Error al eliminar el item')
+                  }
+                }}
                 onDeletedGrupo={() => handleEliminarGrupoGasto(g.id)}
                 onUpdatedNombre={nuevo => handleActualizarNombreGasto(g.id, nuevo)}
                 isLocked={isLocked}

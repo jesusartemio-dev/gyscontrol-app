@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 
 import { updateCotizacion } from '@/lib/services/cotizacion'
 import { deleteCotizacionServicio, updateCotizacionServicio } from '@/lib/services/cotizacionServicio'
-import { deleteCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
+import { deleteCotizacionServicioItem, updateCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
 import { calcularSubtotal, calcularTotal } from '@/lib/utils/costos'
 
 import { Button } from '@/components/ui/button'
