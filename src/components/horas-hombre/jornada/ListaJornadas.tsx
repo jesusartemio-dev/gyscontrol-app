@@ -468,7 +468,7 @@ export function ListaJornadas({
                   <TableHead className="w-24">Fecha</TableHead>
                   <TableHead>Proyecto / Objetivo</TableHead>
                   {showSupervisor && <TableHead>Gestión</TableHead>}
-                  <TableHead>Campo</TableHead>
+                  <TableHead>Sup / Seg</TableHead>
                   <TableHead>Equipo</TableHead>
                   <TableHead>Estado / Avance</TableHead>
                   <TableHead>Tareas</TableHead>
@@ -660,8 +660,13 @@ export function ListaJornadas({
                         <span className="text-gray-400 text-sm">{jornada.cantidadTareas}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-center font-medium">
-                      {jornada.totalHoras}h
+                    <TableCell className="text-center">
+                      <div className="font-medium">{jornada.totalHoras}h</div>
+                      {jornada.cantidadMiembros > 0 && (
+                        <div className="text-[10px] text-muted-foreground">
+                          ~{(jornada.totalHoras / jornada.cantidadMiembros).toFixed(1)}h/pers
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       {aprobando === jornada.id ? (
@@ -803,6 +808,9 @@ export function ListaJornadas({
                       <span className="text-gray-300">·</span>
                       <Clock className="h-3.5 w-3.5 text-orange-500" />
                       <span className="font-medium">{jornada.totalHoras}h</span>
+                      {jornada.cantidadMiembros > 0 && (
+                        <span className="text-[10px] text-muted-foreground">(~{(jornada.totalHoras / jornada.cantidadMiembros).toFixed(1)}h/pers)</span>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {jornada.tareas.slice(0, 3).map(tarea => {
@@ -860,6 +868,9 @@ export function ListaJornadas({
                     <span className="flex items-center gap-1 font-medium">
                       <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-500" />
                       {jornada.totalHoras}h
+                      {jornada.cantidadMiembros > 0 && (
+                        <span className="text-[10px] text-muted-foreground font-normal">(~{(jornada.totalHoras / jornada.cantidadMiembros).toFixed(1)}h/pers)</span>
+                      )}
                     </span>
                   </div>
                 )}
