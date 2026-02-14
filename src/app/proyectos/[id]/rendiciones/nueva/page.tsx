@@ -90,12 +90,12 @@ export default function NuevaRendicionPage() {
           <Label className="text-sm font-medium">
             Vincular a anticipo <span className="text-muted-foreground font-normal">(opcional)</span>
           </Label>
-          <Select value={selectedAnticipoId} onValueChange={setSelectedAnticipoId}>
+          <Select value={selectedAnticipoId || '__none__'} onValueChange={(v) => setSelectedAnticipoId(v === '__none__' ? '' : v)}>
             <SelectTrigger className="h-9 text-sm">
               <SelectValue placeholder="Sin anticipo vinculado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sin anticipo</SelectItem>
+              <SelectItem value="__none__">Sin anticipo</SelectItem>
               {anticipos.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   {a.numero} - S/ {a.monto.toFixed(2)} ({a.motivo?.substring(0, 40)})
