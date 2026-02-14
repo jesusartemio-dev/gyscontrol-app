@@ -71,6 +71,7 @@ export function parseWork(work: string, horasPorDia: number = 8): number {
 }
 
 // Parsear duración de MS Project: "107 days", "2 hours", "4.63 days", "0 days"
+// Soporta inglés y español: "23 días", "2 horas", "1 día", "5 semanas", "3 meses"
 // horasPorDia: horas laborables por día (default 8, configurable desde calendario laboral)
 export function parseDuration(duration: string, horasPorDia: number = 8): ParsedDuration {
   if (!duration) return { days: 0, hours: 0, isMilestone: false }
@@ -81,40 +82,41 @@ export function parseDuration(duration: string, horasPorDia: number = 8): Parsed
   const diasPorMes = 20
 
   // Milestone
-  if (str === '0 days' || str === '0 day' || str === '0 hrs' || str === '0 hours') {
+  const zeroMatch = str.match(/^0\s*(days?|d[íi]as?|hrs?|hours?|horas?)$/i)
+  if (zeroMatch) {
     return { days: 0, hours: 0, isMilestone: true }
   }
 
-  // "X days" or "X day"
-  const dayMatch = str.match(/^([\d.]+)\s*days?$/i)
+  // "X days" / "X day" / "X días" / "X día" / "X dias" / "X dia"
+  const dayMatch = str.match(/^([\d.]+)\s*(days?|d[íi]as?)$/i)
   if (dayMatch) {
     const days = parseFloat(dayMatch[1])
     return { days, hours: days * hpd, isMilestone: false }
   }
 
-  // "X hours" or "X hrs"
-  const hourMatch = str.match(/^([\d.]+)\s*(hours?|hrs?)$/i)
+  // "X hours" / "X hrs" / "X horas" / "X hora"
+  const hourMatch = str.match(/^([\d.]+)\s*(hours?|hrs?|horas?)$/i)
   if (hourMatch) {
     const hours = parseFloat(hourMatch[1])
     return { days: hours / hpd, hours, isMilestone: false }
   }
 
-  // "X mins" or "X minutes"
-  const minMatch = str.match(/^([\d.]+)\s*(mins?|minutes?)$/i)
+  // "X mins" / "X minutes" / "X minutos" / "X minuto"
+  const minMatch = str.match(/^([\d.]+)\s*(mins?|minutes?|minutos?)$/i)
   if (minMatch) {
     const mins = parseFloat(minMatch[1])
     return { days: mins / (hpd * 60), hours: mins / 60, isMilestone: false }
   }
 
-  // "X wks" or "X weeks"
-  const weekMatch = str.match(/^([\d.]+)\s*(wks?|weeks?)$/i)
+  // "X wks" / "X weeks" / "X semanas" / "X semana" / "X sems"
+  const weekMatch = str.match(/^([\d.]+)\s*(wks?|weeks?|semanas?|sems?)$/i)
   if (weekMatch) {
     const weeks = parseFloat(weekMatch[1])
     return { days: weeks * diasPorSemana, hours: weeks * diasPorSemana * hpd, isMilestone: false }
   }
 
-  // "X mons" or "X months"
-  const monthMatch = str.match(/^([\d.]+)\s*(mons?|months?)$/i)
+  // "X mons" / "X months" / "X meses" / "X mes"
+  const monthMatch = str.match(/^([\d.]+)\s*(mons?|months?|meses|mes)$/i)
   if (monthMatch) {
     const months = parseFloat(monthMatch[1])
     return { days: months * diasPorMes, hours: months * diasPorMes * hpd, isMilestone: false }
@@ -123,7 +125,25 @@ export function parseDuration(duration: string, horasPorDia: number = 8): Parsed
   return { days: 0, hours: 0, isMilestone: false }
 }
 
-// Parsear fecha de MS Project: "29 December 2025 08:00 a.m.", "08 January 2026 10:00 a.m."
+// Mapa de nombres de meses (completos y abreviados) en inglés y español
+const MONTH_MAP: Record<string, number> = {
+  // English full
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+  // English abbreviated
+  jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+  // Spanish full
+  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+  julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11,
+  // Spanish abbreviated (3-letter) - 'may' already covered by English full
+  ene: 0, abr: 3, ago: 7, dic: 11,
+}
+
+function resolveMonthName(name: string): number | undefined {
+  return MONTH_MAP[name.toLowerCase().replace(/\.$/, '')]
+}
+
+// Parsear fecha de MS Project: "29 December 2025 08:00 a.m.", "30 diciembre 2025 08:00", "30-dic-2025"
 export function parseMSProjectDate(dateStr: string | number | null | undefined): Date | null {
   if (!dateStr) return null
 
@@ -142,25 +162,19 @@ export function parseMSProjectDate(dateStr: string | number | null | undefined):
   const str = String(dateStr).trim()
   if (!str) return null
 
-  // Intentar Date.parse directo
+  // Intentar Date.parse directo (funciona con formatos ISO y formatos en inglés)
   const directParse = new Date(str)
   if (!isNaN(directParse.getTime())) {
     return directParse
   }
 
-  // Formato MS Project: "29 December 2025 08:00 a.m." o "29 December 2025 08:00 a. m."
-  const msMatch = str.match(
+  // Formato con AM/PM: "29 December 2025 08:00 a.m." o "29 December 2025 08:00 a. m."
+  const msMatchAmPm = str.match(
     /^(\d{1,2})\s+(\w+)\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*(a\.?\s*m\.?|p\.?\s*m\.?)$/i
   )
-  if (msMatch) {
-    const [, day, monthName, year, hourStr, minute, ampm] = msMatch
-    const months: Record<string, number> = {
-      january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
-      july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
-      enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-      julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11,
-    }
-    const month = months[monthName.toLowerCase()]
+  if (msMatchAmPm) {
+    const [, day, monthName, year, hourStr, minute, ampm] = msMatchAmPm
+    const month = resolveMonthName(monthName)
     if (month === undefined) return null
 
     let hour = parseInt(hourStr)
@@ -169,6 +183,53 @@ export function parseMSProjectDate(dateStr: string | number | null | undefined):
     if (!isPM && hour === 12) hour = 0
 
     return new Date(parseInt(year), month, parseInt(day), hour, parseInt(minute))
+  }
+
+  // Formato 24h sin AM/PM: "30 diciembre 2025 08:00", "30 December 2025 14:30"
+  const msMatch24h = str.match(
+    /^(\d{1,2})\s+(\w+)\s+(\d{4})\s+(\d{1,2}):(\d{2})$/i
+  )
+  if (msMatch24h) {
+    const [, day, monthName, year, hour, minute] = msMatch24h
+    const month = resolveMonthName(monthName)
+    if (month === undefined) return null
+    return new Date(parseInt(year), month, parseInt(day), parseInt(hour), parseInt(minute))
+  }
+
+  // Formato solo fecha con nombre de mes: "30 diciembre 2025", "29 December 2025"
+  const dateOnlyLong = str.match(
+    /^(\d{1,2})\s+(\w+)\s+(\d{4})$/i
+  )
+  if (dateOnlyLong) {
+    const [, day, monthName, year] = dateOnlyLong
+    const month = resolveMonthName(monthName)
+    if (month === undefined) return null
+    return new Date(parseInt(year), month, parseInt(day))
+  }
+
+  // Formato con guiones y mes abreviado: "30-dic-2025", "29-Dec-2025", "30-dic.-2025"
+  const dashAbbrev = str.match(
+    /^(\d{1,2})[-/](\w+\.?)[-/](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/i
+  )
+  if (dashAbbrev) {
+    const [, day, monthName, yearStr, hour, minute] = dashAbbrev
+    const month = resolveMonthName(monthName)
+    if (month === undefined) return null
+    let year = parseInt(yearStr)
+    if (year < 100) year += 2000
+    return new Date(year, month, parseInt(day), parseInt(hour || '0'), parseInt(minute || '0'))
+  }
+
+  // Formato numérico DD/MM/YYYY HH:mm o DD-MM-YYYY HH:mm
+  const numericDMY = str.match(
+    /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/
+  )
+  if (numericDMY) {
+    const [, day, monthNum, year, hour, minute] = numericDMY
+    const m = parseInt(monthNum)
+    if (m >= 1 && m <= 12) {
+      return new Date(parseInt(year), m - 1, parseInt(day), parseInt(hour || '0'), parseInt(minute || '0'))
+    }
   }
 
   return null
@@ -219,9 +280,9 @@ export function parseMSProjectExcel(file: File): Promise<MSProjectRow[]> {
         const colId = findCol(['ID']) || headers[0]
         const colName = findCol(['Name', 'Nombre', 'Task Name']) || headers[3]
         const colDuration = findCol(['Duration', 'Duración']) || headers[4]
-        const colStart = findCol(['Start', 'Inicio']) || headers[5]
-        const colFinish = findCol(['Finish', 'Fin']) || headers[6]
-        const colPredecessors = findCol(['Predecessors', 'Predecesoras']) || headers[7]
+        const colStart = findCol(['Start', 'Inicio', 'Comienzo']) || headers[5]
+        const colFinish = findCol(['Finish', 'Fin', 'Finalizar']) || headers[6]
+        const colPredecessors = findCol(['Predecessors', 'Predecesoras', 'Predecesores']) || headers[7]
         const colOutlineLevel = findCol(['Outline Level', 'Nivel de esquema', 'Outline']) || headers[8]
         const colNotes = findCol(['Notes', 'Notas']) || headers[9]
         const colWork = findCol(['Work', 'Trabajo'])
