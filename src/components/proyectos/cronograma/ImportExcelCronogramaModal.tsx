@@ -26,6 +26,7 @@ type Step = 'upload' | 'preview' | 'mapping' | 'importing' | 'success' | 'error'
 interface CatalogEdt {
   id: string
   nombre: string
+  descripcion?: string | null
 }
 
 interface ImportExcelCronogramaModalProps {
@@ -639,7 +640,7 @@ export default function ImportExcelCronogramaModal({
                             </SelectItem>
                             {catalogEdts.map(edt => (
                               <SelectItem key={edt.id} value={edt.id}>
-                                {edt.nombre}
+                                {edt.descripcion ? `${edt.nombre} - ${edt.descripcion}` : edt.nombre}
                               </SelectItem>
                             ))}
                           </SelectContent>
