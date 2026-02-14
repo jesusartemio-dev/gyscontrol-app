@@ -86,6 +86,7 @@ interface NuevaTarea {
   responsableId: string
   prioridad: string
   horasEstimadas: string
+  personasEstimadas: string
 }
 
 interface ProyectoEdt {
@@ -159,7 +160,8 @@ export default function SupervisionTareasPage() {
     fechaFin: '',
     responsableId: '',
     prioridad: 'media',
-    horasEstimadas: ''
+    horasEstimadas: '',
+    personasEstimadas: '1'
   })
 
   const { data: session, status } = useSession()
@@ -521,7 +523,8 @@ export default function SupervisionTareasPage() {
       fechaFin: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
       responsableId: '',
       prioridad: 'media',
-      horasEstimadas: ''
+      horasEstimadas: '',
+      personasEstimadas: '1'
     })
     // Cargar EDTs si ya hay proyecto seleccionado
     if (proyectoIdInicial) {
@@ -565,6 +568,8 @@ export default function SupervisionTareasPage() {
       setCreandoTarea(true)
       setErrorCrearTarea(null)
 
+      const personas = parseInt(nuevaTarea.personasEstimadas) || 1
+      const horasPP = parseFloat(nuevaTarea.horasEstimadas) || 0
       const payload = {
         proyectoId: nuevaTarea.proyectoId,
         proyectoEdtId: nuevaTarea.proyectoEdtId,
@@ -574,7 +579,8 @@ export default function SupervisionTareasPage() {
         fechaFin: nuevaTarea.fechaFin,
         responsableId: nuevaTarea.responsableId || null,
         prioridad: nuevaTarea.prioridad,
-        horasEstimadas: nuevaTarea.horasEstimadas || null
+        horasEstimadas: horasPP > 0 ? horasPP * personas : null,
+        personasEstimadas: personas
       }
 
       console.log('📤 CREAR TAREA - Payload:', payload)
@@ -1148,8 +1154,8 @@ export default function SupervisionTareasPage() {
               </div>
             </div>
 
-            {/* Responsable, Prioridad y Horas */}
-            <div className="grid grid-cols-3 gap-3">
+            {/* Responsable y Prioridad */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs text-gray-500">Responsable</Label>
                 <Select
@@ -1186,15 +1192,43 @@ export default function SupervisionTareasPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Horas por persona, Personas y Total HH */}
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label className="text-xs text-gray-500">Horas Est.</Label>
+                <Label className="text-xs text-gray-500">Hrs/persona</Label>
                 <Input
                   type="number"
                   placeholder="8"
                   value={nuevaTarea.horasEstimadas}
                   onChange={(e) => setNuevaTarea({ ...nuevaTarea, horasEstimadas: e.target.value })}
                   className="h-9"
+                  min={0}
+                  step={0.5}
                 />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500">Personas</Label>
+                <Input
+                  type="number"
+                  placeholder="1"
+                  value={nuevaTarea.personasEstimadas}
+                  onChange={(e) => setNuevaTarea({ ...nuevaTarea, personasEstimadas: e.target.value })}
+                  className="h-9"
+                  min={1}
+                  step={1}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500">Total HH</Label>
+                <div className="h-9 flex items-center px-3 bg-gray-50 border rounded-md text-sm font-medium text-gray-700">
+                  {(() => {
+                    const h = parseFloat(nuevaTarea.horasEstimadas) || 0
+                    const p = parseInt(nuevaTarea.personasEstimadas) || 1
+                    return h > 0 ? `${h * p}h` : '-'
+                  })()}
+                </div>
               </div>
             </div>
           </div>

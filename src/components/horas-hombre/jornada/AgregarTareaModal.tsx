@@ -107,7 +107,7 @@ export function AgregarTareaModal({
   const [nombreTareaExtra, setNombreTareaExtra] = useState('')
   const [extraFechaInicio, setExtraFechaInicio] = useState('')
   const [extraFechaFin, setExtraFechaFin] = useState('')
-  const [extraHorasEstimadas, setExtraHorasEstimadas] = useState<number | ''>('')
+  const [extraHorasPorPersona, setExtraHorasPorPersona] = useState<number | ''>('')
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroSeleccionado[]>([])
 
   // Reset al abrir
@@ -122,7 +122,7 @@ export function AgregarTareaModal({
       const defaultDate = fechaTrabajo ? fechaTrabajo.slice(0, 10) : new Date().toISOString().slice(0, 10)
       setExtraFechaInicio(defaultDate)
       setExtraFechaFin(defaultDate)
-      setExtraHorasEstimadas('')
+      setExtraHorasPorPersona('')
       setMiembrosSeleccionados([])
       if (proyectoEdtId) {
         cargarActividades()
@@ -199,11 +199,14 @@ export function AgregarTareaModal({
     if (extraSeleccion !== CREAR_NUEVA) {
       return { proyectoTareaId: extraSeleccion }
     }
+    const personas = miembrosSeleccionados.length || 1
+    const horasPP = extraHorasPorPersona || undefined
     return {
       nombreTareaExtra: nombreTareaExtra.trim(),
       fechaInicio: extraFechaInicio || undefined,
       fechaFin: extraFechaFin || undefined,
-      horasEstimadas: extraHorasEstimadas || undefined
+      horasEstimadas: horasPP ? horasPP * personas : undefined,
+      personasEstimadas: personas
     }
   }
 
@@ -386,7 +389,7 @@ export function AgregarTareaModal({
                     />
                   </div>
 
-                  {/* Fechas y horas estimadas */}
+                  {/* Fechas */}
                   <div className="flex items-center gap-2">
                     <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                     <Input
@@ -407,15 +410,22 @@ export function AgregarTareaModal({
                     />
                     <Input
                       type="number"
-                      placeholder="Hrs est."
-                      value={extraHorasEstimadas}
-                      onChange={e => setExtraHorasEstimadas(e.target.value ? Number(e.target.value) : '')}
-                      className="h-8 text-sm w-20"
+                      placeholder="Hrs/pers"
+                      value={extraHorasPorPersona}
+                      onChange={e => setExtraHorasPorPersona(e.target.value ? Number(e.target.value) : '')}
+                      className="h-8 text-sm w-[5.5rem]"
                       min={0}
                       step={0.5}
-                      title="Horas estimadas"
+                      title="Horas por persona"
                     />
                   </div>
+
+                  {/* Total HH calculado */}
+                  {extraHorasPorPersona && miembrosSeleccionados.length > 0 && (
+                    <p className="text-xs text-gray-500 text-right">
+                      {extraHorasPorPersona}h/pers × {miembrosSeleccionados.length} pers = <span className="font-medium text-gray-700">{extraHorasPorPersona * miembrosSeleccionados.length} HH</span>
+                    </p>
+                  )}
                 </>
               )}
             </TabsContent>

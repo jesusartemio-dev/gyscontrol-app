@@ -437,7 +437,8 @@ export async function POST(request: NextRequest) {
       fechaFin,
       responsableId,
       prioridad = 'media',
-      horasEstimadas
+      horasEstimadas,
+      personasEstimadas
     } = body
 
     // Validaciones
@@ -549,6 +550,7 @@ export async function POST(request: NextRequest) {
         creadoPorId: session.user.id,
         prioridad,
         horasEstimadas: horasEstimadas ? parseFloat(horasEstimadas) : null,
+        personasEstimadas: personasEstimadas && parseInt(personasEstimadas) > 0 ? parseInt(personasEstimadas) : 1,
         estado: 'pendiente',
         orden: 0,
         updatedAt: new Date()
