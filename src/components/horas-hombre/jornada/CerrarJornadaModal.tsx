@@ -1,14 +1,13 @@
 'use client'
 
 /**
- * CerrarJornadaModal - Modal para cerrar una jornada de campo
+ * CerrarJornadaModal - Modal wizard de 2 pasos para cerrar una jornada de campo
  *
- * Permite registrar:
- * - Horas por tarea/miembro (requerido)
- * - Progreso de tareas (slider %)
- * - Avance del día (requerido)
- * - Bloqueos encontrados (opcional, compactos)
- * - Plan para el día siguiente (opcional)
+ * Paso 1: Asignación de horas por tarea/miembro
+ * Paso 2: Progreso, avance del día, bloqueos, plan siguiente
+ *
+ * Defaults inteligentes: si un miembro aparece en N tareas,
+ * se le asigna 9.5/N horas por tarea (redondeado a 0.5).
  */
 
 import React, { useState, useMemo } from 'react'
@@ -30,7 +29,9 @@ import {
   X,
   CheckCircle,
   Send,
-  TrendingUp
+  TrendingUp,
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -78,6 +79,9 @@ export function CerrarJornadaModal({
 }: CerrarJornadaModalProps) {
   const { toast } = useToast()
 
+  // Wizard step
+  const [paso, setPaso] = useState<1 | 2>(1)
+
   // Estado
   const [submitting, setSubmitting] = useState(false)
   const [avanceDia, setAvanceDia] = useState('')
@@ -115,6 +119,7 @@ export function CerrarJornadaModal({
   // Reset al abrir
   React.useEffect(() => {
     if (open) {
+      setPaso(1)
       setAvanceDia('')
       setBloqueos([])
       setPlanSiguiente('')
@@ -128,18 +133,48 @@ export function CerrarJornadaModal({
       })
       setProgresoTareas(inicial)
 
-      // Inicializar horas con defaults inteligentes
-      const horasIniciales: Record<string, number> = {}
-      const cantTareas = tareas.length
-      const defaultHoras = cantTareas === 1 ? 9.5 : Math.round(9.5 / cantTareas * 2) / 2
-
+      // Calcular cuántas tareas tiene cada persona
+      const tareasPerPersona: Record<string, number> = {}
       for (const tarea of tareas) {
         for (const m of tarea.miembros) {
-          // Si el miembro ya tiene horas > 0 (editado previamente), usar ese valor
-          horasIniciales[m.id] = m.horas > 0 ? m.horas : defaultHoras
+          tareasPerPersona[m.usuarioId] = (tareasPerPersona[m.usuarioId] || 0) + 1
+        }
+      }
+
+      // Defaults inteligentes por miembro
+      const horasIniciales: Record<string, number> = {}
+      const basesPorTarea: Record<string, number[]> = {}
+
+      for (const tarea of tareas) {
+        basesPorTarea[tarea.id] = []
+        for (const m of tarea.miembros) {
+          if (m.horas > 0) {
+            // Si ya tiene horas (editado previamente), usar ese valor
+            horasIniciales[m.id] = m.horas
+            basesPorTarea[tarea.id].push(m.horas)
+          } else {
+            const cantTareas = tareasPerPersona[m.usuarioId] || 1
+            const defaultHoras = Math.round(9.5 / cantTareas * 2) / 2
+            horasIniciales[m.id] = defaultHoras
+            basesPorTarea[tarea.id].push(defaultHoras)
+          }
         }
       }
       setHorasMiembros(horasIniciales)
+
+      // Pre-llenar input "Aplicar" con el valor más común de cada tarea
+      const basesIniciales: Record<string, string> = {}
+      for (const tarea of tareas) {
+        const valores = basesPorTarea[tarea.id] || []
+        if (valores.length > 0) {
+          // Valor más frecuente
+          const freq: Record<number, number> = {}
+          for (const v of valores) freq[v] = (freq[v] || 0) + 1
+          const moda = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]
+          basesIniciales[tarea.id] = moda[0]
+        }
+      }
+      setHorasBase(basesIniciales)
     }
   }, [open, tareas])
 
@@ -261,268 +296,336 @@ export function CerrarJornadaModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Resumen compacto */}
-          <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2.5">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-semibold text-sm">{proyecto.codigo}</span>
-              <span className="text-xs text-gray-500 hidden sm:inline">·</span>
-              <span className="text-xs text-gray-500 hidden sm:inline">{formatFecha(fechaTrabajo)}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Badge variant="secondary" className="text-xs gap-1 px-1.5">
-                <ListTodo className="h-3 w-3" />{tareas.length}
-              </Badge>
-              <Badge variant="secondary" className="text-xs gap-1 px-1.5">
-                <Users className="h-3 w-3" />{totalMiembros}
-              </Badge>
-              {totalHoras > 0 && (
-                <Badge variant="secondary" className="text-xs gap-1 px-1.5 font-semibold">
-                  <Clock className="h-3 w-3" />{totalHoras}h
+          {/* Header: proyecto + step indicator */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-semibold text-sm">{proyecto.codigo}</span>
+                <span className="text-xs text-gray-500">·</span>
+                <span className="text-xs text-gray-500">{formatFecha(fechaTrabajo)}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Badge variant="secondary" className="text-xs gap-1 px-1.5">
+                  <ListTodo className="h-3 w-3" />{tareas.length}
                 </Badge>
-              )}
+                <Badge variant="secondary" className="text-xs gap-1 px-1.5">
+                  <Users className="h-3 w-3" />{totalMiembros}
+                </Badge>
+                {totalHoras > 0 && (
+                  <Badge variant="secondary" className="text-xs gap-1 px-1.5 font-semibold">
+                    <Clock className="h-3 w-3" />{totalHoras}h
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => setPaso(1)}
+                className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                  paso === 1 ? 'text-orange-600' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  paso === 1 ? 'bg-orange-600 text-white' : todasHorasAsignadas ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
+                }`}>
+                  {paso > 1 && todasHorasAsignadas ? <CheckCircle className="h-3 w-3" /> : '1'}
+                </span>
+                Horas
+              </button>
+              <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
+              <button
+                type="button"
+                onClick={() => todasHorasAsignadas && setPaso(2)}
+                className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                  paso === 2 ? 'text-orange-600' : 'text-gray-400 hover:text-gray-600'
+                } ${!todasHorasAsignadas ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  paso === 2 ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-500'
+                }`}>
+                  2
+                </span>
+                Cierre
+              </button>
             </div>
           </div>
 
-          {/* Horas por tarea */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-orange-600" />
-              Horas por tarea <span className="text-red-500">*</span>
-            </Label>
-            <div className="space-y-2">
-              {tareas.map(tarea => (
-                <div key={tarea.id} className="rounded-lg border px-3 py-2.5 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium truncate">{tarea.nombre}</span>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="24"
-                        step="0.5"
-                        placeholder="Hrs"
-                        value={horasBase[tarea.id] ?? ''}
-                        onChange={e => setHorasBase(prev => ({ ...prev, [tarea.id]: e.target.value }))}
-                        className="w-16 h-7 text-xs text-center"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => aplicarHorasTarea(tarea)}
-                        disabled={!horasBase[tarea.id] || parseFloat(horasBase[tarea.id]) <= 0}
-                        className="h-7 text-[11px] px-2"
-                      >
-                        Aplicar
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-2">
-                    {tarea.miembros.map(m => (
-                      <div key={m.id} className="flex items-center gap-1.5">
-                        <span className="text-xs text-gray-600 min-w-0 truncate max-w-[100px]">{m.nombre}</span>
+          {/* ===== PASO 1: Horas ===== */}
+          {paso === 1 && (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-orange-600" />
+                Horas por tarea <span className="text-red-500">*</span>
+              </Label>
+              <div className="space-y-2">
+                {tareas.map(tarea => (
+                  <div key={tarea.id} className="rounded-lg border px-3 py-2.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate">{tarea.nombre}</span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <Input
                           type="number"
                           min="0"
                           max="24"
                           step="0.5"
-                          value={horasMiembros[m.id] ?? 0}
-                          onChange={e => actualizarHoras(m.id, parseFloat(e.target.value) || 0)}
-                          className="w-[4.5rem] h-7 text-xs text-center"
+                          placeholder="Hrs"
+                          value={horasBase[tarea.id] ?? ''}
+                          onChange={e => setHorasBase(prev => ({ ...prev, [tarea.id]: e.target.value }))}
+                          className="w-16 h-7 text-xs text-center"
                         />
-                        <span className="text-[11px] text-gray-400">h</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => aplicarHorasTarea(tarea)}
+                          disabled={!horasBase[tarea.id] || parseFloat(horasBase[tarea.id]) <= 0}
+                          className="h-7 text-[11px] px-2"
+                        >
+                          Aplicar
+                        </Button>
                       </div>
-                    ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                      {tarea.miembros.map(m => (
+                        <div key={m.id} className="flex items-center gap-1.5">
+                          <span className="text-xs text-gray-600 min-w-0 truncate max-w-[100px]">{m.nombre}</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="24"
+                            step="0.5"
+                            value={horasMiembros[m.id] ?? 0}
+                            onChange={e => actualizarHoras(m.id, parseFloat(e.target.value) || 0)}
+                            className="w-[4.5rem] h-7 text-xs text-center"
+                          />
+                          <span className="text-[11px] text-gray-400">h</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Totales por persona */}
-            {Object.keys(totalesPorPersona).length > 0 && (
-              <div className="flex flex-wrap gap-x-3 gap-y-1 px-1">
-                {Object.values(totalesPorPersona).map(p => (
-                  <span
-                    key={p.nombre}
-                    className={`text-[11px] flex items-center gap-1 ${
-                      p.total > 9.5 ? 'text-amber-600 font-medium' : 'text-gray-500'
-                    }`}
-                  >
-                    {p.nombre}: {p.total}h
-                    {p.total > 0 && p.total <= 9.5 && <CheckCircle className="h-3 w-3 text-green-500" />}
-                    {p.total > 9.5 && <AlertTriangle className="h-3 w-3 text-amber-500" />}
-                  </span>
                 ))}
               </div>
-            )}
-          </div>
 
-          {/* Progreso de tareas - integrado */}
-          {tareasConProgreso.length > 0 && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-sm">
-                <TrendingUp className="h-4 w-4 text-purple-600" />
-                Progreso de tareas
-              </Label>
-              <div className="space-y-2">
-                {tareasConProgreso.map(tarea => {
-                  const progreso = progresoTareas[tarea.proyectoTareaId!] ?? 0
-                  const changed = tarea.porcentajeActual !== undefined && tarea.porcentajeActual !== progreso
-                  return (
-                    <div key={tarea.id} className="rounded-lg border px-3 py-2.5 space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm truncate flex-1">{tarea.nombre}</span>
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getProgresoColor(progreso)}`}>
-                          {progreso}%
-                        </span>
-                      </div>
-                      <Slider
-                        value={[progreso]}
-                        onValueChange={([val]) => {
-                          setProgresoTareas(prev => ({
-                            ...prev,
-                            [tarea.proyectoTareaId!]: val
-                          }))
-                        }}
-                        max={100}
-                        step={5}
-                      />
-                      {changed && (
-                        <div className="text-[11px] text-gray-400">
-                          {tarea.porcentajeActual}% → {progreso}%
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+              {/* Totales por persona */}
+              {Object.keys(totalesPorPersona).length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 px-1">
+                  {Object.values(totalesPorPersona).map(p => (
+                    <span
+                      key={p.nombre}
+                      className={`text-[11px] flex items-center gap-1 ${
+                        p.total > 9.5 ? 'text-amber-600 font-medium' : 'text-gray-500'
+                      }`}
+                    >
+                      {p.nombre}: {p.total}h
+                      {p.total > 0 && p.total <= 9.5 && <CheckCircle className="h-3 w-3 text-green-500" />}
+                      {p.total > 9.5 && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Avance del día */}
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-2 text-sm">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              Avance del día <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              placeholder="Describe el avance logrado hoy..."
-              value={avanceDia}
-              onChange={e => setAvanceDia(e.target.value)}
-              rows={3}
-              className="resize-none"
-            />
-          </div>
-
-          {/* Bloqueos - compactos */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2 text-sm">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                Bloqueos
-              </Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={agregarBloqueo}
-                className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Agregar
-              </Button>
-            </div>
-
-            {bloqueos.length > 0 && (
-              <div className="space-y-2">
-                {bloqueos.map((bloqueo, index) => (
-                  <div key={index} className="rounded-lg border border-amber-200 bg-amber-50/50 p-2.5 space-y-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <Input
-                        placeholder="Descripcion del bloqueo"
-                        value={bloqueo.descripcion}
-                        onChange={e => actualizarBloqueo(index, 'descripcion', e.target.value)}
-                        className="h-8 text-sm bg-white"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => eliminarBloqueo(index)}
-                        className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 flex-shrink-0"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <Input
-                        placeholder="Impacto"
-                        value={bloqueo.impacto}
-                        onChange={e => actualizarBloqueo(index, 'impacto', e.target.value)}
-                        className="h-7 text-xs bg-white"
-                      />
-                      <Input
-                        placeholder="Accion tomada"
-                        value={bloqueo.accion}
-                        onChange={e => actualizarBloqueo(index, 'accion', e.target.value)}
-                        className="h-7 text-xs bg-white"
-                      />
-                    </div>
+          {/* ===== PASO 2: Cierre ===== */}
+          {paso === 2 && (
+            <div className="space-y-4">
+              {/* Progreso de tareas */}
+              {tareasConProgreso.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <TrendingUp className="h-4 w-4 text-purple-600" />
+                    Progreso de tareas
+                  </Label>
+                  <div className="space-y-2">
+                    {tareasConProgreso.map(tarea => {
+                      const progreso = progresoTareas[tarea.proyectoTareaId!] ?? 0
+                      const changed = tarea.porcentajeActual !== undefined && tarea.porcentajeActual !== progreso
+                      return (
+                        <div key={tarea.id} className="rounded-lg border px-3 py-2.5 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm truncate flex-1">{tarea.nombre}</span>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${getProgresoColor(progreso)}`}>
+                              {progreso}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[progreso]}
+                            onValueChange={([val]) => {
+                              setProgresoTareas(prev => ({
+                                ...prev,
+                                [tarea.proyectoTareaId!]: val
+                              }))
+                            }}
+                            max={100}
+                            step={5}
+                          />
+                          {changed && (
+                            <div className="text-[11px] text-gray-400">
+                              {tarea.porcentajeActual}% → {progreso}%
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Plan siguiente */}
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-blue-600" />
-              Plan para mañana
-            </Label>
-            <Textarea
-              placeholder="Que se planea hacer el proximo dia..."
-              value={planSiguiente}
-              onChange={e => setPlanSiguiente(e.target.value)}
-              rows={2}
-              className="resize-none"
-            />
-          </div>
-
-          {/* Nota sutil */}
-          <p className="text-[11px] text-gray-400 leading-tight">
-            Al cerrar, la jornada sera enviada para aprobacion. Las horas apareceran en los timesheets una vez aprobada.
-          </p>
-
-          {/* Botones */}
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-              disabled={submitting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={submitting || !avanceDia.trim() || tareas.length === 0 || !todasHorasAsignadas}
-              size="sm"
-              className="bg-orange-600 hover:bg-orange-700"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  Cerrando...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-1.5" />
-                  Cerrar y Enviar
-                </>
+                </div>
               )}
-            </Button>
+
+              {/* Avance del día */}
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  Avance del día <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  placeholder="Describe el avance logrado hoy..."
+                  value={avanceDia}
+                  onChange={e => setAvanceDia(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+
+              {/* Bloqueos - compactos */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    Bloqueos
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={agregarBloqueo}
+                    className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Agregar
+                  </Button>
+                </div>
+
+                {bloqueos.length > 0 && (
+                  <div className="space-y-2">
+                    {bloqueos.map((bloqueo, index) => (
+                      <div key={index} className="rounded-lg border border-amber-200 bg-amber-50/50 p-2.5 space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            placeholder="Descripcion del bloqueo"
+                            value={bloqueo.descripcion}
+                            onChange={e => actualizarBloqueo(index, 'descripcion', e.target.value)}
+                            className="h-8 text-sm bg-white"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => eliminarBloqueo(index)}
+                            className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 flex-shrink-0"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <Input
+                            placeholder="Impacto"
+                            value={bloqueo.impacto}
+                            onChange={e => actualizarBloqueo(index, 'impacto', e.target.value)}
+                            className="h-7 text-xs bg-white"
+                          />
+                          <Input
+                            placeholder="Accion tomada"
+                            value={bloqueo.accion}
+                            onChange={e => actualizarBloqueo(index, 'accion', e.target.value)}
+                            className="h-7 text-xs bg-white"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Plan siguiente */}
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-blue-600" />
+                  Plan para mañana
+                </Label>
+                <Textarea
+                  placeholder="Que se planea hacer el proximo dia..."
+                  value={planSiguiente}
+                  onChange={e => setPlanSiguiente(e.target.value)}
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
+
+              {/* Nota sutil */}
+              <p className="text-[11px] text-gray-400 leading-tight">
+                Al cerrar, la jornada sera enviada para aprobacion. Las horas apareceran en los timesheets una vez aprobada.
+              </p>
+            </div>
+          )}
+
+          {/* Botones de navegación */}
+          <div className="flex justify-between gap-2 pt-2 border-t">
+            {paso === 1 ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setPaso(2)}
+                  disabled={!todasHorasAsignadas}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPaso(1)}
+                  disabled={submitting}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Atrás
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={submitting || !avanceDia.trim() || tareas.length === 0 || !todasHorasAsignadas}
+                  size="sm"
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      Cerrando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-1.5" />
+                      Cerrar y Enviar
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </DialogContent>
