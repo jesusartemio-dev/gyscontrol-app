@@ -13,7 +13,6 @@ import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -93,7 +92,6 @@ export function AgregarTareaModal({
   const [actividadId, setActividadId] = useState('')
   const [tareaId, setTareaId] = useState('')
   const [nombreTareaExtra, setNombreTareaExtra] = useState('')
-  const [descripcion, setDescripcion] = useState('')
   const [horasBase, setHorasBase] = useState(8)
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroSeleccionado[]>([])
 
@@ -104,7 +102,6 @@ export function AgregarTareaModal({
       setActividadId('')
       setTareaId('')
       setNombreTareaExtra('')
-      setDescripcion('')
       setHorasBase(8)
       setMiembrosSeleccionados([])
       if (proyectoEdtId) {
@@ -196,7 +193,6 @@ export function AgregarTareaModal({
         body: JSON.stringify({
           proyectoTareaId: tipoTarea === 'cronograma' ? tareaId : undefined,
           nombreTareaExtra: tipoTarea === 'extra' ? nombreTareaExtra.trim() : undefined,
-          descripcion: descripcion.trim() || undefined,
           miembros: miembrosSeleccionados.map(m => ({
             usuarioId: m.usuarioId,
             horas: m.horas,
@@ -236,36 +232,36 @@ export function AgregarTareaModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5 text-blue-600" />
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Plus className="h-4 w-4 text-blue-600" />
             Agregar Tarea
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="space-y-3">
           {/* Tipo de tarea */}
           <Tabs value={tipoTarea} onValueChange={(v) => setTipoTarea(v as 'cronograma' | 'extra')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="cronograma">
-                <ListTodo className="h-4 w-4 mr-2" />
+            <TabsList className="grid w-full grid-cols-2 h-8">
+              <TabsTrigger value="cronograma" className="text-xs gap-1.5">
+                <ListTodo className="h-3.5 w-3.5" />
                 Del cronograma
               </TabsTrigger>
-              <TabsTrigger value="extra">
-                <FileText className="h-4 w-4 mr-2" />
+              <TabsTrigger value="extra" className="text-xs gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
                 Tarea extra
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="cronograma" className="space-y-4 mt-4">
+            <TabsContent value="cronograma" className="space-y-2.5 mt-3">
               {proyectoEdtId ? (
                 <>
-                  {/* Actividad */}
-                  <div className="space-y-2">
-                    <Label>Actividad EDT</Label>
+                  {/* Actividad - inline */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                    <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Actividad</Label>
                     <Select value={actividadId} onValueChange={setActividadId}>
-                      <SelectTrigger className="h-auto min-h-9 py-1.5 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm">
+                      <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
                         <SelectValue placeholder="Seleccionar actividad" />
                       </SelectTrigger>
                       <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
@@ -278,12 +274,12 @@ export function AgregarTareaModal({
                     </Select>
                   </div>
 
-                  {/* Tarea */}
+                  {/* Tarea - inline */}
                   {actividadId && (
-                    <div className="space-y-2">
-                      <Label>Tarea</Label>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                      <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Tarea</Label>
                       <Select value={tareaId} onValueChange={setTareaId} disabled={loading}>
-                        <SelectTrigger className="h-auto min-h-9 py-1.5 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm">
+                        <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
                           <SelectValue placeholder="Seleccionar tarea" />
                         </SelectTrigger>
                         <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
@@ -298,46 +294,33 @@ export function AgregarTareaModal({
                   )}
                 </>
               ) : (
-                <div className="text-center text-gray-500 py-4">
-                  Esta jornada no tiene un EDT asignado.
-                  <br />
-                  Usa "Tarea extra" para agregar tareas.
+                <div className="text-center text-gray-500 text-xs py-3">
+                  Sin EDT asignado. Usa &quot;Tarea extra&quot;.
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="extra" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>Nombre de la tarea *</Label>
+            <TabsContent value="extra" className="mt-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Nombre *</Label>
                 <Input
                   placeholder="Ej: Limpieza de zona, Traslado de materiales"
                   value={nombreTareaExtra}
                   onChange={e => setNombreTareaExtra(e.target.value)}
+                  className="h-8 text-sm flex-1"
                 />
               </div>
             </TabsContent>
           </Tabs>
 
-          {/* Descripción */}
+          {/* Miembros y horas */}
           <div className="space-y-2">
-            <Label>Descripción (opcional)</Label>
-            <Textarea
-              placeholder="Detalles adicionales de la tarea..."
-              value={descripcion}
-              onChange={e => setDescripcion(e.target.value)}
-              rows={2}
-            />
-          </div>
-
-          {/* Horas base y miembros */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Miembros y horas ({miembrosSeleccionados.length} seleccionados)
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                <Users className="h-3.5 w-3.5" />
+                Miembros ({miembrosSeleccionados.length})
               </Label>
-              <div className="flex items-center gap-2">
-                <Label className="text-sm text-gray-600">Horas base:</Label>
+              <div className="flex items-center gap-1.5">
                 <Input
                   type="number"
                   min="0.5"
@@ -345,53 +328,49 @@ export function AgregarTareaModal({
                   step="0.5"
                   value={horasBase}
                   onChange={e => setHorasBase(parseFloat(e.target.value) || 8)}
-                  className="w-16 h-8 text-sm"
+                  className="w-14 h-7 text-xs text-center"
                 />
-                <Button
+                <span className="text-[11px] text-gray-400">h</span>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
                   onClick={aplicarHorasBase}
                   disabled={miembrosSeleccionados.length === 0}
+                  className="text-[11px] text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
                 >
                   Aplicar
-                </Button>
+                </button>
               </div>
             </div>
 
-            <Button
+            <button
               type="button"
-              variant="outline"
-              size="sm"
               onClick={seleccionarTodosMiembros}
-              className="w-full"
+              className="w-full text-xs text-center py-1.5 border border-dashed rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
             >
               Seleccionar todo el personal planificado
-            </Button>
+            </button>
 
-            {/* Lista de personal planificado */}
-            <div className="border rounded-lg max-h-48 overflow-y-auto">
+            {/* Lista de personal */}
+            <div className="border rounded-lg max-h-44 overflow-y-auto">
               {personalPlanificado.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 text-sm">
-                  No hay personal planificado para esta jornada
+                <div className="p-3 text-center text-gray-500 text-xs">
+                  No hay personal planificado
                 </div>
               ) : (
                 <div className="divide-y">
                   {personalPlanificado.map(p => {
                     const seleccionado = miembrosSeleccionados.find(m => m.usuarioId === p.userId)
                     return (
-                      <div key={p.userId} className="flex items-center gap-3 p-3">
+                      <label key={p.userId} className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-gray-50 cursor-pointer">
                         <Checkbox
                           checked={!!seleccionado}
                           onCheckedChange={() => toggleMiembro(p.userId, p.nombre)}
                         />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {p.nombre}
-                          </div>
-                        </div>
+                        <span className="flex-1 min-w-0 text-sm truncate">
+                          {p.nombre}
+                        </span>
                         {seleccionado && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-0.5 shrink-0">
                             <Input
                               type="number"
                               min="0.5"
@@ -399,12 +378,12 @@ export function AgregarTareaModal({
                               step="0.5"
                               value={seleccionado.horas}
                               onChange={e => actualizarHorasMiembro(p.userId, parseFloat(e.target.value) || 0)}
-                              className="w-16 h-8 text-sm text-center"
+                              className="w-14 h-7 text-xs text-center"
                             />
-                            <span className="text-sm text-gray-500">h</span>
+                            <span className="text-[11px] text-gray-400">h</span>
                           </div>
                         )}
-                      </div>
+                      </label>
                     )
                   })}
                 </div>
@@ -412,39 +391,36 @@ export function AgregarTareaModal({
             </div>
           </div>
 
-          {/* Resumen */}
+          {/* Resumen compacto */}
           {miembrosSeleccionados.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-blue-800">
-                  {tipoTarea === 'cronograma' && tareaSeleccionada ? (
-                    <span className="font-medium">{tareaSeleccionada.nombre}</span>
-                  ) : tipoTarea === 'extra' && nombreTareaExtra ? (
-                    <span className="font-medium">{nombreTareaExtra}</span>
-                  ) : (
-                    'Selecciona una tarea'
-                  )}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
-                    {miembrosSeleccionados.length} personas
-                  </Badge>
-                  <Badge className="bg-blue-600">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {totalHoras}h total
-                  </Badge>
-                </div>
+            <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+              <span className="text-xs text-blue-800 truncate mr-2">
+                {tipoTarea === 'cronograma' && tareaSeleccionada
+                  ? tareaSeleccionada.nombre
+                  : tipoTarea === 'extra' && nombreTareaExtra
+                    ? nombreTareaExtra
+                    : 'Selecciona una tarea'}
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
+                  {miembrosSeleccionados.length} pers.
+                </Badge>
+                <Badge className="bg-blue-600 text-[11px] px-1.5 py-0">
+                  <Clock className="h-3 w-3 mr-0.5" />
+                  {totalHoras}h
+                </Badge>
               </div>
             </div>
           )}
 
           {/* Botones */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex gap-2 pt-3 border-t">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={submitting}
+              className="flex-1 sm:flex-none"
             >
               Cancelar
             </Button>
@@ -456,16 +432,17 @@ export function AgregarTareaModal({
                 (tipoTarea === 'cronograma' && !tareaId) ||
                 (tipoTarea === 'extra' && !nombreTareaExtra.trim())
               }
+              className="flex-1 sm:flex-none"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
                   Agregando...
                 </>
               ) : (
                 <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Tarea
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Agregar
                 </>
               )}
             </Button>

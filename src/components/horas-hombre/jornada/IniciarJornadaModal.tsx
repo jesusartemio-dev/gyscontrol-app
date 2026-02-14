@@ -21,7 +21,6 @@ import {
   Calendar,
   Target,
   Users,
-  MapPin,
   Loader2,
   Search,
   Play,
@@ -92,7 +91,6 @@ export function IniciarJornadaModal({
   const [proyectoEdtId, setProyectoEdtId] = useState('')
   const [fechaTrabajo, setFechaTrabajo] = useState(new Date().toISOString().split('T')[0])
   const [objetivosDia, setObjetivosDia] = useState('')
-  const [ubicacion, setUbicacion] = useState('')
   const [personalSeleccionado, setPersonalSeleccionado] = useState<string[]>([])
 
   // Responsables
@@ -109,7 +107,6 @@ export function IniciarJornadaModal({
       setProyectoEdtId('')
       setFechaTrabajo(new Date().toISOString().split('T')[0])
       setObjetivosDia('')
-      setUbicacion('')
       setPersonalSeleccionado([])
       setSupervisorId('')
       setSeguridadId('')
@@ -158,6 +155,13 @@ export function IniciarJornadaModal({
           return true
         })
         setEdts(edtsUnicos)
+        // Auto-seleccionar EDT "CON" (Construcción) si existe
+        const conEdt = edtsUnicos.find((e: EdtProyecto) =>
+          e.edt?.nombre?.toUpperCase().startsWith('CON')
+        )
+        if (conEdt) {
+          setProyectoEdtId(conEdt.id)
+        }
       }
     } catch (error) {
       console.error('Error cargando EDTs:', error)
@@ -239,8 +243,7 @@ export function IniciarJornadaModal({
           proyectoEdtId: proyectoEdtId || undefined,
           fechaTrabajo,
           objetivosDia: objetivosDia.trim(),
-          personalPlanificado,
-          ubicacion: ubicacion.trim() || undefined
+          personalPlanificado
         })
       })
 
@@ -283,8 +286,6 @@ export function IniciarJornadaModal({
   // Usuarios seleccionados para los selects de responsable
   const usuariosSeleccionados = usuarios.filter(u => personalSeleccionado.includes(u.id))
 
-  const proyectoSeleccionado = proyectos.find(p => p.id === proyectoId)
-
   const formatRol = (role: string) => {
     const roles: Record<string, string> = {
       colaborador: 'Colaborador',
@@ -301,25 +302,25 @@ export function IniciarJornadaModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Play className="h-5 w-5 text-green-600" />
-            Iniciar Jornada de Campo
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Play className="h-4 w-4 text-green-600" />
+            Nueva Jornada
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
-          {/* Proyecto y EDT */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
+        <div className="space-y-4">
+          {/* Proyecto, EDT y Fecha */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                <Building className="h-3.5 w-3.5" />
                 Proyecto *
               </Label>
               <Select value={proyectoId} onValueChange={setProyectoId} disabled={loading}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar proyecto" />
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Seleccionar" />
                 </SelectTrigger>
                 <SelectContent position="popper" className="max-h-[250px]">
                   {proyectos.map(p => (
@@ -331,18 +332,18 @@ export function IniciarJornadaModal({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <FolderOpen className="h-4 w-4" />
-                EDT (opcional)
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                <FolderOpen className="h-3.5 w-3.5" />
+                EDT
               </Label>
               <Select
                 value={proyectoEdtId}
                 onValueChange={setProyectoEdtId}
                 disabled={!proyectoId || edts.length === 0}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={!proyectoId ? 'Seleccionar proyecto primero' : edts.length === 0 ? 'Sin cronograma' : 'Seleccionar EDT'} />
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder={!proyectoId ? 'Proyecto primero' : edts.length === 0 ? 'Sin cronograma' : 'Seleccionar'} />
                 </SelectTrigger>
                 <SelectContent position="popper" className="max-h-[250px]">
                   {edts.map(e => (
@@ -353,134 +354,120 @@ export function IniciarJornadaModal({
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {/* Fecha y Ubicación */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                <Calendar className="h-3.5 w-3.5" />
                 Fecha *
               </Label>
               <Input
                 type="date"
                 value={fechaTrabajo}
                 onChange={e => setFechaTrabajo(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Ubicación (opcional)
-              </Label>
-              <Input
-                placeholder="Ej: Zona norte, Sector A"
-                value={ubicacion}
-                onChange={e => setUbicacion(e.target.value)}
+                className="h-9"
               />
             </div>
           </div>
 
           {/* Objetivos del día */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+              <Target className="h-3.5 w-3.5" />
               Objetivos del día *
             </Label>
             <Textarea
-              placeholder="Describe los objetivos planificados para hoy..."
+              placeholder="¿Qué se planifica hacer hoy?"
               value={objetivosDia}
               onChange={e => setObjetivosDia(e.target.value)}
-              rows={3}
+              rows={2}
+              className="resize-none"
             />
           </div>
 
           {/* Personal planificado */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Personal * ({personalSeleccionado.length} seleccionados)
+              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                <Users className="h-3.5 w-3.5" />
+                Personal * ({personalSeleccionado.length})
               </Label>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={seleccionarTodosFiltrados}>
+              <div className="flex gap-1.5">
+                <button type="button" onClick={seleccionarTodosFiltrados} className="text-[11px] text-blue-600 hover:underline">
                   Todos
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={deseleccionarTodos}>
+                </button>
+                <span className="text-gray-300">|</span>
+                <button type="button" onClick={deseleccionarTodos} className="text-[11px] text-gray-500 hover:underline">
                   Ninguno
-                </Button>
+                </button>
               </div>
             </div>
 
-            {/* Filtro por rol - tabs */}
-            <div className="flex flex-wrap gap-1">
-              {ROLE_TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setFiltroRol(tab.key)}
-                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                    filtroRol === tab.key
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {tab.label}
-                  {tab.key !== 'todos' && (
-                    <span className="ml-1 opacity-70">
-                      ({usuarios.filter(u => u.role === tab.key).length})
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Búsqueda */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar personal..."
-                value={busquedaPersonal}
-                onChange={e => setBusquedaPersonal(e.target.value)}
-                className="pl-9"
-              />
+            {/* Filtro por rol + búsqueda en una fila */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-wrap gap-1 flex-1">
+                {ROLE_TABS.map(tab => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setFiltroRol(tab.key)}
+                    className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${
+                      filtroRol === tab.key
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.key !== 'todos' && (
+                      <span className="ml-0.5 opacity-70">
+                        {usuarios.filter(u => u.role === tab.key).length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="relative sm:w-40">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                <Input
+                  placeholder="Buscar..."
+                  value={busquedaPersonal}
+                  onChange={e => setBusquedaPersonal(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
             </div>
 
             {/* Lista de personal */}
-            <div className="border rounded-lg max-h-48 overflow-y-auto">
+            <div className="border rounded-lg max-h-40 overflow-y-auto">
               {usuarios.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 text-sm">
+                <div className="p-3 text-center text-gray-500 text-xs">
                   Cargando usuarios...
                 </div>
               ) : usuariosMostrados.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 text-sm">
-                  No se encontró personal con ese filtro
+                <div className="p-3 text-center text-gray-500 text-xs">
+                  No se encontró personal
                 </div>
               ) : (
                 <div className="divide-y">
                   {usuariosMostrados.map(u => (
                     <label
                       key={u.id}
-                      className="flex items-center gap-3 p-2.5 hover:bg-gray-50 cursor-pointer"
+                      className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-gray-50 cursor-pointer"
                     >
                       <Checkbox
                         checked={personalSeleccionado.includes(u.id)}
                         onCheckedChange={() => togglePersonal(u.id)}
                       />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
-                          {u.name || u.email}
-                        </div>
-                        <div className="text-xs text-gray-500">{formatRol(u.role)}</div>
-                      </div>
+                      <span className="flex-1 min-w-0 text-sm truncate">
+                        {u.name || u.email}
+                      </span>
+                      <span className="text-[10px] text-gray-400 shrink-0">{formatRol(u.role)}</span>
                       {personalSeleccionado.includes(u.id) && (
-                        <div className="flex gap-1">
+                        <div className="flex gap-0.5 shrink-0">
                           {u.id === supervisorId && (
-                            <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">SUP</Badge>
+                            <Badge className="bg-orange-100 text-orange-700 text-[9px] px-1 py-0">SUP</Badge>
                           )}
                           {u.id === seguridadId && (
-                            <Badge className="bg-red-100 text-red-700 text-[10px] px-1.5">SEG</Badge>
+                            <Badge className="bg-red-100 text-red-700 text-[9px] px-1 py-0">SEG</Badge>
                           )}
                         </div>
                       )}
@@ -493,7 +480,7 @@ export function IniciarJornadaModal({
             {/* Badges de seleccionados */}
             {personalSeleccionado.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {personalSeleccionado.slice(0, 8).map(userId => {
+                {personalSeleccionado.slice(0, 10).map(userId => {
                   const usuario = usuarios.find(u => u.id === userId)
                   const esSupervisor = userId === supervisorId
                   const esSeguridad = userId === seguridadId
@@ -501,17 +488,17 @@ export function IniciarJornadaModal({
                     <Badge
                       key={userId}
                       variant="secondary"
-                      className={`text-xs ${esSupervisor ? 'bg-orange-100 text-orange-800' : esSeguridad ? 'bg-red-100 text-red-800' : ''}`}
+                      className={`text-[11px] px-1.5 py-0 ${esSupervisor ? 'bg-orange-100 text-orange-800' : esSeguridad ? 'bg-red-100 text-red-800' : ''}`}
                     >
                       {usuario?.name?.split(' ')[0] || 'Usuario'}
-                      {esSupervisor && ' (Sup)'}
-                      {esSeguridad && ' (Seg)'}
+                      {esSupervisor && ' ★'}
+                      {esSeguridad && ' ⛑'}
                     </Badge>
                   )
                 })}
-                {personalSeleccionado.length > 8 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{personalSeleccionado.length - 8} más
+                {personalSeleccionado.length > 10 && (
+                  <Badge variant="outline" className="text-[11px] px-1.5 py-0">
+                    +{personalSeleccionado.length - 10}
                   </Badge>
                 )}
               </div>
@@ -520,15 +507,15 @@ export function IniciarJornadaModal({
 
           {/* Responsables - Supervisor y Seguridad */}
           {personalSeleccionado.length > 0 && (
-            <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg border">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-sm">
-                  <HardHat className="h-4 w-4 text-orange-600" />
-                  Supervisor de campo *
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2.5 bg-gray-50 rounded-lg border">
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <HardHat className="h-3.5 w-3.5 text-orange-600" />
+                  Supervisor *
                 </Label>
                 <Select value={supervisorId} onValueChange={setSupervisorId}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Seleccionar supervisor" />
+                  <SelectTrigger className="bg-white h-9">
+                    <SelectValue placeholder="Seleccionar" />
                   </SelectTrigger>
                   <SelectContent position="popper" className="max-h-[200px]">
                     {usuariosSeleccionados.map(u => (
@@ -540,14 +527,14 @@ export function IniciarJornadaModal({
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-sm">
-                  <Shield className="h-4 w-4 text-red-600" />
-                  Resp. Seguridad
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <Shield className="h-3.5 w-3.5 text-red-600" />
+                  Seguridad
                 </Label>
                 <Select value={seguridadId} onValueChange={setSeguridadId}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Seleccionar (opcional)" />
+                  <SelectTrigger className="bg-white h-9">
+                    <SelectValue placeholder="Opcional" />
                   </SelectTrigger>
                   <SelectContent position="popper" className="max-h-[200px]">
                     {usuariosSeleccionados.map(u => (
@@ -557,63 +544,34 @@ export function IniciarJornadaModal({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-          )}
-
-          {/* Resumen */}
-          {proyectoSeleccionado && personalSeleccionado.length > 0 && objetivosDia && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="text-sm text-green-800">
-                <strong>Resumen:</strong> Jornada para{' '}
-                <span className="font-semibold">{proyectoSeleccionado.codigo}</span>
-                {' '}el día{' '}
-                <span className="font-semibold">
-                  {new Date(fechaTrabajo + 'T12:00:00').toLocaleDateString('es-CL')}
-                </span>
-                {' '}con{' '}
-                <span className="font-semibold">{personalSeleccionado.length} persona(s)</span>
-                {supervisorId && (
-                  <>
-                    {' '}- Supervisor: <span className="font-semibold">
-                      {usuarios.find(u => u.id === supervisorId)?.name?.split(' ')[0]}
-                    </span>
-                  </>
-                )}
-                {seguridadId && (
-                  <>
-                    {' '}- Seguridad: <span className="font-semibold">
-                      {usuarios.find(u => u.id === seguridadId)?.name?.split(' ')[0]}
-                    </span>
-                  </>
-                )}
               </div>
             </div>
           )}
 
           {/* Botones */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex gap-2 pt-3 border-t">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={submitting}
+              className="flex-1 sm:flex-none"
             >
               Cancelar
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={submitting || !proyectoId || !objetivosDia || personalSeleccionado.length === 0 || !supervisorId}
-              className="bg-green-600 hover:bg-green-700"
+              className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
                   Iniciando...
                 </>
               ) : (
                 <>
-                  <Play className="h-4 w-4 mr-2" />
+                  <Play className="h-4 w-4 mr-1.5" />
                   Iniciar Jornada
                 </>
               )}
