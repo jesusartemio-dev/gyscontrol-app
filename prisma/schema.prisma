@@ -1136,12 +1136,14 @@ model RegistroHorasCampo {
 // Tarea dentro de un registro de campo
 // Puede ser una tarea del cronograma o una tarea extra (nombreTareaExtra)
 model RegistroHorasCampoTarea {
-  id               String   @id @default(cuid())
-  registroCampoId  String
-  proyectoTareaId  String?
-  nombreTareaExtra String?
-  descripcion      String?
-  createdAt        DateTime @default(now())
+  id                 String   @id @default(cuid())
+  registroCampoId    String
+  proyectoTareaId    String?
+  nombreTareaExtra   String?
+  descripcion        String?
+  porcentajeInicial  Int?
+  porcentajeFinal    Int?
+  createdAt          DateTime @default(now())
 
   registroCampo RegistroHorasCampo          @relation(fields: [registroCampoId], references: [id], onDelete: Cascade)
   proyectoTarea ProyectoTarea?              @relation(fields: [proyectoTareaId], references: [id])

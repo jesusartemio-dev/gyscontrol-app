@@ -89,6 +89,8 @@ interface TareaJornadaResumen {
     porcentajeCompletado?: number | null
   } | null
   nombreTareaExtra?: string | null
+  porcentajeInicial?: number | null
+  porcentajeFinal?: number | null
 }
 
 interface JornadaResumen {
@@ -631,23 +633,34 @@ export function ListaJornadas({
                       {jornada.tareas && jornada.tareas.length > 0 ? (
                         <div className="flex flex-col gap-1">
                           {jornada.tareas.slice(0, 3).map(tarea => {
-                            const pct = tarea.proyectoTarea?.porcentajeCompletado
-                            const hasPct = tarea.proyectoTarea && pct !== null && pct !== undefined
+                            const pctFinal = tarea.porcentajeFinal ?? tarea.proyectoTarea?.porcentajeCompletado
+                            const pctInicial = tarea.porcentajeInicial
+                            const hasRange = pctInicial !== null && pctInicial !== undefined && pctFinal !== null && pctFinal !== undefined
+                            const hasPct = pctFinal !== null && pctFinal !== undefined
+                            const colorPct = hasPct ? pctFinal! : 0
                             const nombreCompleto = tarea.proyectoTarea?.nombre || tarea.nombreTareaExtra || 'Tarea'
                             return (
                               <Tooltip key={tarea.id}>
                                 <TooltipTrigger asChild>
                                   <Badge
                                     variant="outline"
-                                    className={`text-[10px] px-1.5 py-0 font-normal w-fit cursor-default ${hasPct ? getProgresoColor(pct!) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                                    className={`text-[10px] px-1.5 py-0 font-normal w-fit cursor-default ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
                                   >
                                     <span className="truncate max-w-[140px]">{getNombreTareaCorto(tarea)}</span>
-                                    {hasPct && <span className="ml-1 font-semibold">{pct}%</span>}
+                                    {hasRange ? (
+                                      <span className="ml-1 font-semibold">{pctInicial}%→{pctFinal}%</span>
+                                    ) : hasPct ? (
+                                      <span className="ml-1 font-semibold">{pctFinal}%</span>
+                                    ) : null}
                                   </Badge>
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-[250px]">
                                   <p className="font-medium">{nombreCompleto}</p>
-                                  {hasPct && <p className="text-[11px] opacity-80">Progreso: {pct}%</p>}
+                                  {hasRange ? (
+                                    <p className="text-[11px] opacity-80">Progreso: {pctInicial}% → {pctFinal}%</p>
+                                  ) : hasPct ? (
+                                    <p className="text-[11px] opacity-80">Progreso: {pctFinal}%</p>
+                                  ) : null}
                                 </TooltipContent>
                               </Tooltip>
                             )
@@ -663,10 +676,12 @@ export function ListaJornadas({
                                 <div className="space-y-0.5">
                                   {jornada.tareas.slice(3).map(t => {
                                     const nombre = t.proyectoTarea?.nombre || t.nombreTareaExtra || 'Tarea'
-                                    const p = t.proyectoTarea?.porcentajeCompletado
+                                    const pF = t.porcentajeFinal ?? t.proyectoTarea?.porcentajeCompletado
+                                    const pI = t.porcentajeInicial
+                                    const hasR = pI !== null && pI !== undefined && pF !== null && pF !== undefined
                                     return (
                                       <p key={t.id} className="text-[11px]">
-                                        {nombre}{p !== null && p !== undefined ? ` · ${p}%` : ''}
+                                        {nombre}{hasR ? ` · ${pI}%→${pF}%` : pF !== null && pF !== undefined ? ` · ${pF}%` : ''}
                                       </p>
                                     )
                                   })}
@@ -867,23 +882,34 @@ export function ListaJornadas({
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {jornada.tareas.slice(0, 3).map(tarea => {
-                        const pct = tarea.proyectoTarea?.porcentajeCompletado
-                        const hasPct = tarea.proyectoTarea && pct !== null && pct !== undefined
+                        const pctFinal = tarea.porcentajeFinal ?? tarea.proyectoTarea?.porcentajeCompletado
+                        const pctInicial = tarea.porcentajeInicial
+                        const hasRange = pctInicial !== null && pctInicial !== undefined && pctFinal !== null && pctFinal !== undefined
+                        const hasPct = pctFinal !== null && pctFinal !== undefined
+                        const colorPct = hasPct ? pctFinal! : 0
                         const nombreCompleto = tarea.proyectoTarea?.nombre || tarea.nombreTareaExtra || 'Tarea'
                         return (
                           <Tooltip key={tarea.id}>
                             <TooltipTrigger asChild>
                               <Badge
                                 variant="outline"
-                                className={`text-[10px] px-1.5 py-0 font-normal cursor-default ${hasPct ? getProgresoColor(pct!) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                                className={`text-[10px] px-1.5 py-0 font-normal cursor-default ${hasPct ? getProgresoColor(colorPct) : 'bg-gray-50 text-gray-600 border-gray-200'}`}
                               >
                                 <span className="truncate max-w-[100px]">{getNombreTareaCorto(tarea)}</span>
-                                {hasPct && <span className="ml-1 font-semibold">{pct}%</span>}
+                                {hasRange ? (
+                                  <span className="ml-1 font-semibold">{pctInicial}%→{pctFinal}%</span>
+                                ) : hasPct ? (
+                                  <span className="ml-1 font-semibold">{pctFinal}%</span>
+                                ) : null}
                               </Badge>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-[250px]">
                               <p className="font-medium">{nombreCompleto}</p>
-                              {hasPct && <p className="text-[11px] opacity-80">Progreso: {pct}%</p>}
+                              {hasRange ? (
+                                <p className="text-[11px] opacity-80">Progreso: {pctInicial}% → {pctFinal}%</p>
+                              ) : hasPct ? (
+                                <p className="text-[11px] opacity-80">Progreso: {pctFinal}%</p>
+                              ) : null}
                             </TooltipContent>
                           </Tooltip>
                         )
@@ -899,10 +925,12 @@ export function ListaJornadas({
                             <div className="space-y-0.5">
                               {jornada.tareas.slice(3).map(t => {
                                 const nombre = t.proyectoTarea?.nombre || t.nombreTareaExtra || 'Tarea'
-                                const p = t.proyectoTarea?.porcentajeCompletado
+                                const pF = t.porcentajeFinal ?? t.proyectoTarea?.porcentajeCompletado
+                                const pI = t.porcentajeInicial
+                                const hasR = pI !== null && pI !== undefined && pF !== null && pF !== undefined
                                 return (
                                   <p key={t.id} className="text-[11px]">
-                                    {nombre}{p !== null && p !== undefined ? ` · ${p}%` : ''}
+                                    {nombre}{hasR ? ` · ${pI}%→${pF}%` : pF !== null && pF !== undefined ? ` · ${pF}%` : ''}
                                   </p>
                                 )
                               })}

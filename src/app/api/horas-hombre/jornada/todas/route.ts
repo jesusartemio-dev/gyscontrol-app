@@ -153,6 +153,8 @@ export async function GET(request: NextRequest) {
           proyectoTarea: t.proyectoTarea,
           nombreTareaExtra: t.nombreTareaExtra,
           descripcion: t.descripcion,
+          porcentajeInicial: t.porcentajeInicial,
+          porcentajeFinal: t.porcentajeFinal,
           miembros: t.miembros.map(m => ({
             id: m.id,
             usuario: m.usuario,

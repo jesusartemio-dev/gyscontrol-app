@@ -118,6 +118,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         select: {
           id: true,
           nombre: true,
+          porcentajeCompletado: true,
           proyectoEdtId: true,
           proyectoEdt: { select: { proyectoId: true } }
         }
@@ -161,6 +162,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       )
     }
 
+    // Capturar porcentaje inicial de la tarea del cronograma
+    let porcentajeInicial: number | null = null
+    if (proyectoTareaId) {
+      const tareaActual = await prisma.proyectoTarea.findUnique({
+        where: { id: proyectoTareaId },
+        select: { porcentajeCompletado: true }
+      })
+      porcentajeInicial = tareaActual?.porcentajeCompletado ?? 0
+    }
+
     // Crear la tarea con sus miembros
     const tareaCampo = await prisma.registroHorasCampoTarea.create({
       data: {
@@ -168,6 +179,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         proyectoTareaId: proyectoTareaId || null,
         nombreTareaExtra: nombreTareaExtra || null,
         descripcion: descripcion || null,
+        porcentajeInicial,
         miembros: {
           create: miembros.map(m => ({
             usuarioId: m.usuarioId,

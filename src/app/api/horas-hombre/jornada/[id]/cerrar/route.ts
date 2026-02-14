@@ -189,6 +189,24 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       }
     }
 
+    // Guardar porcentajeFinal en cada tarea de campo que tenga progreso
+    if (progresoTareas && progresoTareas.length > 0) {
+      for (const { proyectoTareaId, porcentaje } of progresoTareas) {
+        if (proyectoTareaId && porcentaje >= 0 && porcentaje <= 100) {
+          // Actualizar todas las tareas de campo de esta jornada que apunten a esa tarea del cronograma
+          await prisma.registroHorasCampoTarea.updateMany({
+            where: {
+              registroCampoId: jornadaId,
+              proyectoTareaId: proyectoTareaId
+            },
+            data: {
+              porcentajeFinal: Math.round(porcentaje)
+            }
+          })
+        }
+      }
+    }
+
     // Obtener la jornada actualizada con relaciones
     const jornadaCerrada = await prisma.registroHorasCampo.findUnique({
       where: { id: jornadaId },
