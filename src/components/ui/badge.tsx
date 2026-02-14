@@ -14,6 +14,6 @@ interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function Badge({ className, variant = 'default', ...props }: BadgeProps) {
   return (
-    <div className={cn('inline-block px-2 py-1 rounded text-sm', badgeVariants[variant], className)} {...props} />
+    <div className={cn('inline-flex items-center px-2 py-1 rounded text-sm', badgeVariants[variant], className)} {...props} />
   )
 }
