@@ -539,7 +539,7 @@ export function CerrarJornadaModal({
                   </SelectContent>
                 </Select>
                 <Textarea
-                  placeholder="Describe el bloqueo con detalle..."
+                  placeholder="Ej: No llegaron los tubos de 4&quot; solicitados el lunes, se esperó hasta las 11am..."
                   value={nuevoBloqueo.descripcion}
                   onChange={e => setNuevoBloqueo(prev => ({ ...prev, descripcion: e.target.value }))}
                   rows={2}
@@ -547,7 +547,7 @@ export function CerrarJornadaModal({
                 />
                 <div className="flex items-center gap-2">
                   <Input
-                    placeholder="Impacto (opcional)"
+                    placeholder="Ej: 4h perdidas, 3 personas paradas"
                     value={nuevoBloqueo.impacto}
                     onChange={e => setNuevoBloqueo(prev => ({ ...prev, impacto: e.target.value }))}
                     className="h-7 text-xs flex-1"
