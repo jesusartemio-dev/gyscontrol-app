@@ -13,7 +13,7 @@ import {
 import {
   Upload, FileSpreadsheet, Loader2, CheckCircle, AlertCircle,
   ChevronRight, ChevronDown, Layers, ListTree, ClipboardList,
-  Target, AlertTriangle, Calendar, ArrowRight, Info, Plus, Pencil, Users
+  Target, AlertTriangle, Calendar, ArrowRight, Info, Pencil, Users
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -35,7 +35,6 @@ interface ImportExcelCronogramaModalProps {
   onImportSuccess: () => void
 }
 
-const CREATE_NEW = '__create_new__'
 const SKIP_EDT = '__skip__'
 
 /**
@@ -155,7 +154,7 @@ export default function ImportExcelCronogramaModal({
       const mappings: Record<string, string> = {}
       for (const name of excelEdtNames) {
         const matchId = autoMatchEdt(name, catalog)
-        mappings[name] = matchId || CREATE_NEW
+        mappings[name] = matchId || ''
       }
 
       setEdtMappings(mappings)
@@ -182,7 +181,7 @@ export default function ImportExcelCronogramaModal({
     for (const [name, edtId] of Object.entries(edtMappings)) {
       if (edtId === SKIP_EDT) {
         skippedEdtNames.add(name)
-      } else if (edtId !== CREATE_NEW) {
+      } else if (edtId) {
         finalMappings[name] = edtId
       }
     }
@@ -307,7 +306,7 @@ export default function ImportExcelCronogramaModal({
   }
 
   // Count how many were auto-matched
-  const autoMatchCount = Object.values(edtMappings).filter(v => v !== CREATE_NEW && v !== SKIP_EDT).length
+  const autoMatchCount = Object.values(edtMappings).filter(v => v && v !== SKIP_EDT).length
   const totalEdts = Object.keys(edtMappings).length
   const allSkipped = skippedCount === totalEdts
 
@@ -614,7 +613,7 @@ export default function ImportExcelCronogramaModal({
 
                   {/* Rows */}
                   {Object.entries(edtMappings).map(([excelName, mappedId]) => {
-                    const isMatched = mappedId !== CREATE_NEW && mappedId !== SKIP_EDT
+                    const isMatched = !!mappedId && mappedId !== SKIP_EDT
                     const isSkipped = mappedId === SKIP_EDT
                     return (
                       <div key={excelName} className={`grid grid-cols-[1fr,auto,1fr] gap-2 px-4 py-2.5 items-center ${isSkipped ? 'opacity-50' : ''}`}>
@@ -637,12 +636,6 @@ export default function ImportExcelCronogramaModal({
                           <SelectContent>
                             <SelectItem value={SKIP_EDT}>
                               <span className="text-red-600 font-medium">No importar</span>
-                            </SelectItem>
-                            <SelectItem value={CREATE_NEW}>
-                              <div className="flex items-center gap-1.5">
-                                <Plus className="h-3 w-3 text-orange-500" />
-                                <span className="text-orange-600 font-medium">Crear nuevo</span>
-                              </div>
                             </SelectItem>
                             {catalogEdts.map(edt => (
                               <SelectItem key={edt.id} value={edt.id}>

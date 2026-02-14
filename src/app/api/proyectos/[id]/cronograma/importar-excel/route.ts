@@ -180,21 +180,18 @@ export async function POST(
       for (let edtIdx = 0; edtIdx < faseData.edts.length; edtIdx++) {
         const edtData = faseData.edts[edtIdx]
 
-        // Resolve EDT catalog entry: use mapping if provided, otherwise find/create
+        // Resolve EDT catalog entry: use mapping if provided, otherwise find by exact name
         let edtMaestroId: string
         if (body.edtMappings?.[edtData.row.name]) {
           edtMaestroId = body.edtMappings[edtData.row.name]
         } else {
-          let edtMaestro = await prisma.edt.findFirst({
+          // Only find existing catalog EDT by name - never auto-create
+          const edtMaestro = await prisma.edt.findFirst({
             where: { nombre: edtData.row.name },
           })
           if (!edtMaestro) {
-            edtMaestro = await prisma.edt.create({
-              data: {
-                nombre: edtData.row.name,
-                descripcion: edtData.row.notes || null,
-              },
-            })
+            logger.warn(`[importar-excel] EDT "${edtData.row.name}" no encontrado en catálogo, saltando`)
+            continue
           }
           edtMaestroId = edtMaestro.id
         }
