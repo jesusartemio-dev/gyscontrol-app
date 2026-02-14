@@ -342,7 +342,7 @@ export function IniciarJornadaModal({
                 disabled={!proyectoId || edts.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar EDT" />
+                  <SelectValue placeholder={!proyectoId ? 'Seleccionar proyecto primero' : edts.length === 0 ? 'Sin cronograma' : 'Seleccionar EDT'} />
                 </SelectTrigger>
                 <SelectContent position="popper" className="max-h-[250px]">
                   {edts.map(e => (
