@@ -47,7 +47,8 @@ import {
   MapPin,
   HardHat,
   ClipboardList,
-  HardDrive
+  HardDrive,
+  ShieldAlert
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -296,6 +297,8 @@ export default function Sidebar() {
         { href: '/configuracion/duraciones-cronograma', label: 'Duraciones Cronograma', icon: Calendar },
         // 🗓️ Configuración de calendarios laborales
         { href: '/configuracion/calendario-laboral', label: 'Calendarios Laborales', icon: Calendar },
+        // ⚠️ Tipos de bloqueo para jornadas de campo
+        { href: '/configuracion/tipos-bloqueo', label: 'Tipos de Bloqueo', icon: ShieldAlert },
       ],
     },
   ]

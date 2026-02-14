@@ -87,6 +87,8 @@ interface PersonalPlanificado {
 }
 
 interface Bloqueo {
+  tipoBloqueoId?: string
+  tipoBloqueoNombre?: string
   descripcion: string
   impacto?: string
   accion?: string
@@ -408,6 +410,11 @@ export default function MiJornadaPage() {
                   <div className="space-y-2">
                     {(jornadaDetalle.bloqueos as Bloqueo[]).map((bloqueo, index) => (
                       <div key={index} className="text-xs sm:text-sm">
+                        {bloqueo.tipoBloqueoNombre && (
+                          <span className="inline-block text-[10px] font-semibold text-amber-800 bg-amber-200 rounded px-1.5 py-0.5 mr-1.5 mb-0.5">
+                            {bloqueo.tipoBloqueoNombre}
+                          </span>
+                        )}
                         <div className="font-medium">{bloqueo.descripcion}</div>
                         {bloqueo.impacto && <div className="text-amber-600">Impacto: {bloqueo.impacto}</div>}
                         {bloqueo.accion && <div className="text-amber-600">Accion: {bloqueo.accion}</div>}

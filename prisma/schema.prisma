@@ -1433,6 +1433,19 @@ model AuditLog {
   @@map("audit_log")
 }
 
+model TipoBloqueo {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  descripcion String?
+  activo      Boolean  @default(true)
+  orden       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([activo, orden])
+  @@map("tipo_bloqueo")
+}
+
 model CalendarioLaboral {
   id                      String                    @id
   nombre                  String                    @unique

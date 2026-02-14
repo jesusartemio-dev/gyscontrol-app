@@ -1,16 +1,17 @@
 'use client'
 
 /**
- * CerrarJornadaModal - Modal wizard de 2 pasos para cerrar una jornada de campo
+ * CerrarJornadaModal - Modal wizard de 3 pasos para cerrar una jornada de campo
  *
  * Paso 1: Asignación de horas por tarea/miembro
- * Paso 2: Progreso, avance del día, bloqueos, plan siguiente
+ * Paso 2: Bloqueos (selección de tipo + descripción)
+ * Paso 3: Progreso, avance del día, plan siguiente
  *
  * Defaults inteligentes: si un miembro aparece en N tareas,
  * se le asigna 9.5/N horas por tarea (redondeado a 0.5).
  */
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import {
   Clock,
   Users,
@@ -31,14 +39,23 @@ import {
   Send,
   TrendingUp,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  ShieldAlert
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
+interface TipoBloqueo {
+  id: string
+  nombre: string
+  descripcion: string | null
+  activo: boolean
+}
+
 interface Bloqueo {
+  tipoBloqueoId: string
+  tipoBloqueoNombre: string
   descripcion: string
   impacto: string
-  accion: string
 }
 
 interface MiembroCierre {
@@ -79,8 +96,8 @@ export function CerrarJornadaModal({
 }: CerrarJornadaModalProps) {
   const { toast } = useToast()
 
-  // Wizard step
-  const [paso, setPaso] = useState<1 | 2>(1)
+  // Wizard step (1=Horas, 2=Bloqueos, 3=Cierre)
+  const [paso, setPaso] = useState<1 | 2 | 3>(1)
 
   // Estado
   const [submitting, setSubmitting] = useState(false)
@@ -90,6 +107,9 @@ export function CerrarJornadaModal({
   const [progresoTareas, setProgresoTareas] = useState<Record<string, number>>({})
   const [horasMiembros, setHorasMiembros] = useState<Record<string, number>>({})
   const [horasBase, setHorasBase] = useState<Record<string, string>>({})
+
+  // Tipos de bloqueo from DB
+  const [tiposBloqueo, setTiposBloqueo] = useState<TipoBloqueo[]>([])
 
   // Tareas vinculadas a cronograma (solo esas tienen progreso)
   const tareasConProgreso = tareas.filter(t => t.proyectoTareaId)
@@ -116,8 +136,20 @@ export function CerrarJornadaModal({
     return tareas.every(t => t.miembros.every(m => (horasMiembros[m.id] ?? 0) > 0))
   }, [tareas, horasMiembros])
 
+  // Cargar tipos de bloqueo
+  useEffect(() => {
+    if (open && tiposBloqueo.length === 0) {
+      fetch('/api/configuracion/tipos-bloqueo')
+        .then(res => res.json())
+        .then((data: TipoBloqueo[]) => {
+          setTiposBloqueo(data.filter(t => t.activo))
+        })
+        .catch(() => {})
+    }
+  }, [open, tiposBloqueo.length])
+
   // Reset al abrir
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
       setPaso(1)
       setAvanceDia('')
@@ -149,7 +181,6 @@ export function CerrarJornadaModal({
         basesPorTarea[tarea.id] = []
         for (const m of tarea.miembros) {
           if (m.horas > 0) {
-            // Si ya tiene horas (editado previamente), usar ese valor
             horasIniciales[m.id] = m.horas
             basesPorTarea[tarea.id].push(m.horas)
           } else {
@@ -167,7 +198,6 @@ export function CerrarJornadaModal({
       for (const tarea of tareas) {
         const valores = basesPorTarea[tarea.id] || []
         if (valores.length > 0) {
-          // Valor más frecuente
           const freq: Record<number, number> = {}
           for (const v of valores) freq[v] = (freq[v] || 0) + 1
           const moda = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]
@@ -179,11 +209,18 @@ export function CerrarJornadaModal({
   }, [open, tareas])
 
   const agregarBloqueo = () => {
-    setBloqueos(prev => [...prev, { descripcion: '', impacto: '', accion: '' }])
+    setBloqueos(prev => [...prev, { tipoBloqueoId: '', tipoBloqueoNombre: '', descripcion: '', impacto: '' }])
   }
 
   const actualizarBloqueo = (index: number, campo: keyof Bloqueo, valor: string) => {
-    setBloqueos(prev => prev.map((b, i) => i === index ? { ...b, [campo]: valor } : b))
+    setBloqueos(prev => prev.map((b, i) => {
+      if (i !== index) return b
+      if (campo === 'tipoBloqueoId') {
+        const tipo = tiposBloqueo.find(t => t.id === valor)
+        return { ...b, tipoBloqueoId: valor, tipoBloqueoNombre: tipo?.nombre || '' }
+      }
+      return { ...b, [campo]: valor }
+    }))
   }
 
   const eliminarBloqueo = (index: number) => {
@@ -218,7 +255,14 @@ export function CerrarJornadaModal({
       return
     }
 
-    const bloqueosValidos = bloqueos.filter(b => b.descripcion.trim())
+    // Validar bloqueos: cada uno debe tener tipo y descripción
+    const bloqueosValidos = bloqueos.filter(b => b.tipoBloqueoId && b.descripcion.trim())
+    const bloqueosIncompletos = bloqueos.filter(b => b.tipoBloqueoId || b.descripcion.trim()).length - bloqueosValidos.length
+    if (bloqueosIncompletos > 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Cada bloqueo debe tener tipo y descripción' })
+      setPaso(2)
+      return
+    }
 
     try {
       setSubmitting(true)
@@ -228,9 +272,10 @@ export function CerrarJornadaModal({
         body: JSON.stringify({
           avanceDia: avanceDia.trim(),
           bloqueos: bloqueosValidos.length > 0 ? bloqueosValidos.map(b => ({
+            tipoBloqueoId: b.tipoBloqueoId,
+            tipoBloqueoNombre: b.tipoBloqueoNombre,
             descripcion: b.descripcion.trim(),
-            impacto: b.impacto.trim() || undefined,
-            accion: b.accion.trim() || undefined
+            impacto: b.impacto.trim() || undefined
           })) : undefined,
           planSiguiente: planSiguiente.trim() || undefined,
           progresoTareas: Object.entries(progresoTareas).map(([proyectoTareaId, porcentaje]) => ({
@@ -285,6 +330,20 @@ export function CerrarJornadaModal({
     return 'text-gray-500 bg-gray-100'
   }
 
+  // Step indicator helpers
+  const stepDone = (step: number) => {
+    if (step === 1) return todasHorasAsignadas && paso > 1
+    if (step === 2) return paso > 2
+    return false
+  }
+
+  const canGoToStep = (step: number) => {
+    if (step === 1) return true
+    if (step === 2) return todasHorasAsignadas
+    if (step === 3) return todasHorasAsignadas
+    return false
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
@@ -319,37 +378,35 @@ export function CerrarJornadaModal({
               </div>
             </div>
 
-            {/* Step indicator */}
-            <div className="flex items-center gap-2 px-1">
-              <button
-                type="button"
-                onClick={() => setPaso(1)}
-                className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-                  paso === 1 ? 'text-orange-600' : 'text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  paso === 1 ? 'bg-orange-600 text-white' : todasHorasAsignadas ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {paso > 1 && todasHorasAsignadas ? <CheckCircle className="h-3 w-3" /> : '1'}
-                </span>
-                Horas
-              </button>
-              <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
-              <button
-                type="button"
-                onClick={() => todasHorasAsignadas && setPaso(2)}
-                className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-                  paso === 2 ? 'text-orange-600' : 'text-gray-400 hover:text-gray-600'
-                } ${!todasHorasAsignadas ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  paso === 2 ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  2
-                </span>
-                Cierre
-              </button>
+            {/* Step indicator - 3 steps */}
+            <div className="flex items-center gap-1.5 px-1">
+              {[
+                { num: 1, label: 'Horas' },
+                { num: 2, label: 'Bloqueos' },
+                { num: 3, label: 'Cierre' }
+              ].map((step, idx) => (
+                <React.Fragment key={step.num}>
+                  {idx > 0 && <ChevronRight className="h-3 w-3 text-gray-300 flex-shrink-0" />}
+                  <button
+                    type="button"
+                    onClick={() => canGoToStep(step.num) && setPaso(step.num as 1 | 2 | 3)}
+                    className={`flex items-center gap-1 text-xs font-medium transition-colors ${
+                      paso === step.num ? 'text-orange-600' : 'text-gray-400 hover:text-gray-600'
+                    } ${!canGoToStep(step.num) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                      paso === step.num
+                        ? 'bg-orange-600 text-white'
+                        : stepDone(step.num)
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-200 text-gray-500'
+                    }`}>
+                      {stepDone(step.num) ? <CheckCircle className="h-3 w-3" /> : step.num}
+                    </span>
+                    {step.label}
+                  </button>
+                </React.Fragment>
+              ))}
             </div>
           </div>
 
@@ -429,8 +486,103 @@ export function CerrarJornadaModal({
             </div>
           )}
 
-          {/* ===== PASO 2: Cierre ===== */}
+          {/* ===== PASO 2: Bloqueos ===== */}
           {paso === 2 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2 text-sm">
+                  <ShieldAlert className="h-4 w-4 text-amber-500" />
+                  Bloqueos del dia
+                </Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={agregarBloqueo}
+                  className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Agregar
+                </Button>
+              </div>
+
+              {bloqueos.length === 0 ? (
+                <div className="text-center py-6 border rounded-lg border-dashed">
+                  <ShieldAlert className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500 mb-1">Sin bloqueos reportados</p>
+                  <p className="text-xs text-gray-400 mb-3">Si hubo problemas que impidieron avanzar, registralos aqui</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={agregarBloqueo}
+                    className="text-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Reportar bloqueo
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {bloqueos.map((bloqueo, index) => (
+                    <div key={index} className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 space-y-2">
+                          <Select
+                            value={bloqueo.tipoBloqueoId}
+                            onValueChange={val => actualizarBloqueo(index, 'tipoBloqueoId', val)}
+                          >
+                            <SelectTrigger className="h-8 text-sm bg-white">
+                              <SelectValue placeholder="Seleccionar tipo de bloqueo..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {tiposBloqueo.map(tipo => (
+                                <SelectItem key={tipo.id} value={tipo.id}>
+                                  <span className="font-medium">{tipo.nombre}</span>
+                                  {tipo.descripcion && (
+                                    <span className="text-gray-500"> — {tipo.descripcion}</span>
+                                  )}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Textarea
+                            placeholder="Describe el bloqueo con detalle..."
+                            value={bloqueo.descripcion}
+                            onChange={e => actualizarBloqueo(index, 'descripcion', e.target.value)}
+                            rows={2}
+                            className="text-sm bg-white resize-none"
+                          />
+                          <Input
+                            placeholder="Impacto (opcional) — Ej: 3h de trabajo perdidas"
+                            value={bloqueo.impacto}
+                            onChange={e => actualizarBloqueo(index, 'impacto', e.target.value)}
+                            className="h-7 text-xs bg-white"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => eliminarBloqueo(index)}
+                          className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 flex-shrink-0 mt-0.5"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-[11px] text-gray-400 leading-tight px-1">
+                Los bloqueos ayudan a identificar causas de retrasos y sustentar adicionales.
+              </p>
+            </div>
+          )}
+
+          {/* ===== PASO 3: Cierre ===== */}
+          {paso === 3 && (
             <div className="space-y-4">
               {/* Progreso de tareas */}
               {tareasConProgreso.length > 0 && (
@@ -478,7 +630,7 @@ export function CerrarJornadaModal({
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4 text-green-600" />
-                  Avance del día <span className="text-red-500">*</span>
+                  Avance del dia <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   placeholder="Describe el avance logrado hoy..."
@@ -489,71 +641,11 @@ export function CerrarJornadaModal({
                 />
               </div>
 
-              {/* Bloqueos - compactos */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2 text-sm">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    Bloqueos
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={agregarBloqueo}
-                    className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Agregar
-                  </Button>
-                </div>
-
-                {bloqueos.length > 0 && (
-                  <div className="space-y-2">
-                    {bloqueos.map((bloqueo, index) => (
-                      <div key={index} className="rounded-lg border border-amber-200 bg-amber-50/50 p-2.5 space-y-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <Input
-                            placeholder="Descripcion del bloqueo"
-                            value={bloqueo.descripcion}
-                            onChange={e => actualizarBloqueo(index, 'descripcion', e.target.value)}
-                            className="h-8 text-sm bg-white"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => eliminarBloqueo(index)}
-                            className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 flex-shrink-0"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                        <div className="flex gap-1.5">
-                          <Input
-                            placeholder="Impacto"
-                            value={bloqueo.impacto}
-                            onChange={e => actualizarBloqueo(index, 'impacto', e.target.value)}
-                            className="h-7 text-xs bg-white"
-                          />
-                          <Input
-                            placeholder="Accion tomada"
-                            value={bloqueo.accion}
-                            onChange={e => actualizarBloqueo(index, 'accion', e.target.value)}
-                            className="h-7 text-xs bg-white"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               {/* Plan siguiente */}
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4 text-blue-600" />
-                  Plan para mañana
+                  Plan para manana
                 </Label>
                 <Textarea
                   placeholder="Que se planea hacer el proximo dia..."
@@ -564,6 +656,18 @@ export function CerrarJornadaModal({
                 />
               </div>
 
+              {/* Resumen bloqueos si hay */}
+              {bloqueos.filter(b => b.tipoBloqueoId).length > 0 && (
+                <div className="flex flex-wrap gap-1.5 px-1">
+                  <span className="text-[11px] text-gray-400">Bloqueos:</span>
+                  {bloqueos.filter(b => b.tipoBloqueoId).map((b, i) => (
+                    <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 text-amber-700">
+                      {b.tipoBloqueoNombre}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
               {/* Nota sutil */}
               <p className="text-[11px] text-gray-400 leading-tight">
                 Al cerrar, la jornada sera enviada para aprobacion. Las horas apareceran en los timesheets una vez aprobada.
@@ -573,7 +677,7 @@ export function CerrarJornadaModal({
 
           {/* Botones de navegación */}
           <div className="flex justify-between gap-2 pt-2 border-t">
-            {paso === 1 ? (
+            {paso === 1 && (
               <>
                 <Button
                   type="button"
@@ -594,17 +698,40 @@ export function CerrarJornadaModal({
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </>
-            ) : (
+            )}
+            {paso === 2 && (
               <>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => setPaso(1)}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Atras
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setPaso(3)}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </>
+            )}
+            {paso === 3 && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPaso(2)}
                   disabled={submitting}
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" />
-                  Atrás
+                  Atras
                 </Button>
                 <Button
                   onClick={handleSubmit}

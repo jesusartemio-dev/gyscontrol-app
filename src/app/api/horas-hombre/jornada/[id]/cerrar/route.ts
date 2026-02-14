@@ -12,6 +12,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 interface Bloqueo {
+  tipoBloqueoId?: string
+  tipoBloqueoNombre?: string
   descripcion: string
   impacto?: string
   accion?: string
