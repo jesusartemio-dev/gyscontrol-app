@@ -239,7 +239,7 @@ export function JornadaActiva({
     <>
       <div className="rounded-xl border-l-4 border-l-green-500 border border-gray-200 bg-white shadow-sm overflow-hidden">
         {/* Header */}
-        <div className="px-4 py-3 sm:py-4">
+        <div className="px-4 py-2.5 sm:py-3">
           {/* Fila principal: Proyecto + Fecha + Acciones */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -330,95 +330,78 @@ export function JornadaActiva({
           </div>
         </div>
 
-        {/* Objetivos */}
+        {/* Objetivos - truncated to 1 line */}
         {jornada.objetivosDia && (
-          <div className="mx-4 mb-3 bg-gray-50 rounded-lg px-3 py-2 flex items-start gap-2">
-            <Target className="h-3.5 w-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-gray-600 leading-relaxed">{jornada.objetivosDia}</p>
+          <div className="mx-4 mb-2 flex items-center gap-1.5 text-xs text-gray-500 min-w-0" title={jornada.objetivosDia}>
+            <Target className="h-3 w-3 text-gray-400 flex-shrink-0" />
+            <span className="truncate">{jornada.objetivosDia}</span>
           </div>
         )}
 
         {/* Ubicacion mobile */}
         {jornada.ubicacion && (
-          <div className="mx-4 mb-3 sm:hidden flex items-center gap-1.5 text-xs text-gray-500">
-            <MapPin className="h-3.5 w-3.5" />
-            {jornada.ubicacion}
+          <div className="mx-4 mb-2 sm:hidden flex items-center gap-1.5 text-xs text-gray-500">
+            <MapPin className="h-3 w-3" />
+            <span className="truncate">{jornada.ubicacion}</span>
           </div>
         )}
 
-        {/* Lista de tareas */}
+        {/* Lista de tareas - compact: single line per task */}
         <div className="border-t border-gray-100">
           {cantidadTareas > 0 ? (
             <div className="divide-y divide-gray-50">
               {jornada.tareas.map(tarea => {
-                const horasTarea = tarea.miembros.reduce((s, m) => s + m.horas, 0)
                 const pct = tarea.proyectoTarea?.porcentajeCompletado
                 const hasPct = tarea.proyectoTarea && pct !== undefined && pct !== null
+                const miembrosStr = tarea.miembros.map(m =>
+                  m.usuario.name?.split(' ')[0] || m.usuario.email.split('@')[0]
+                ).join(', ')
                 return (
                   <div
                     key={tarea.id}
-                    className="px-4 py-2.5 hover:bg-gray-50/50 transition-colors group"
+                    className="flex items-center gap-2 px-4 py-1.5 hover:bg-gray-50/50 transition-colors group"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">
-                            {getNombreTarea(tarea)}
-                          </span>
-                          {hasPct && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0 rounded-full text-white ${getProgresoColor(pct!)}`}>
-                              {pct}%
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
-                          {tarea.miembros.map(m => (
-                            <span key={m.id} className="text-[11px] text-gray-400">
-                              {m.usuario.name?.split(' ')[0] || m.usuario.email.split('@')[0]}{m.horas > 0 ? ` (${m.horas}h)` : ''}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditarTarea(tarea)}
-                          className="h-7 w-7 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setTareaAEliminar(tarea)}
-                          className="h-7 w-7 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                        {horasTarea > 0 && (
-                          <Badge variant="secondary" className="text-[11px] font-semibold px-2 py-0 rounded-full">
-                            {horasTarea}h
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    {/* Barra de progreso */}
-                    {hasPct && (
-                      <div className="mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${getProgresoColor(pct!)}`}
-                          style={{ width: `${Math.min(pct!, 100)}%` }}
-                        />
-                      </div>
+                    {/* Progress badge */}
+                    {hasPct ? (
+                      <span className={`text-[10px] font-bold px-1.5 py-0 rounded-full text-white flex-shrink-0 ${getProgresoColor(pct!)}`}>
+                        {pct}%
+                      </span>
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
                     )}
+
+                    {/* Task name + members inline */}
+                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                      <span className="font-medium text-sm truncate">{getNombreTarea(tarea)}</span>
+                      <span className="text-[11px] text-gray-400 truncate hidden sm:inline">{miembrosStr}</span>
+                    </div>
+
+                    {/* Actions - visible on hover (desktop) / always (mobile) */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditarTarea(tarea)}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setTareaAEliminar(tarea)}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 )
               })}
             </div>
           ) : (
-            <div className="px-4 py-4 flex items-center gap-2 text-amber-600 text-sm">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <div className="px-4 py-3 flex items-center gap-2 text-amber-600 text-xs">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
               <span>Agrega tareas antes de cerrar la jornada</span>
             </div>
           )}
