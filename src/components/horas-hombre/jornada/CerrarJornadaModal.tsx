@@ -85,6 +85,7 @@ export function CerrarJornadaModal({
   const [planSiguiente, setPlanSiguiente] = useState('')
   const [progresoTareas, setProgresoTareas] = useState<Record<string, number>>({})
   const [horasMiembros, setHorasMiembros] = useState<Record<string, number>>({})
+  const [horasBase, setHorasBase] = useState<Record<string, string>>({})
 
   // Tareas vinculadas a cronograma (solo esas tienen progreso)
   const tareasConProgreso = tareas.filter(t => t.proyectoTareaId)
@@ -156,6 +157,19 @@ export function CerrarJornadaModal({
 
   const actualizarHoras = (miembroId: string, horas: number) => {
     setHorasMiembros(prev => ({ ...prev, [miembroId]: horas }))
+  }
+
+  const aplicarHorasTarea = (tarea: TareaCierre) => {
+    const valor = parseFloat(horasBase[tarea.id] || '0')
+    if (valor > 0 && valor <= 24) {
+      setHorasMiembros(prev => {
+        const updated = { ...prev }
+        for (const m of tarea.miembros) {
+          updated[m.id] = valor
+        }
+        return updated
+      })
+    }
   }
 
   const handleSubmit = async () => {
@@ -278,7 +292,31 @@ export function CerrarJornadaModal({
             <div className="space-y-2">
               {tareas.map(tarea => (
                 <div key={tarea.id} className="rounded-lg border px-3 py-2.5 space-y-2">
-                  <span className="text-sm font-medium truncate block">{tarea.nombre}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium truncate">{tarea.nombre}</span>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="24"
+                        step="0.5"
+                        placeholder="Hrs"
+                        value={horasBase[tarea.id] ?? ''}
+                        onChange={e => setHorasBase(prev => ({ ...prev, [tarea.id]: e.target.value }))}
+                        className="w-16 h-7 text-xs text-center"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => aplicarHorasTarea(tarea)}
+                        disabled={!horasBase[tarea.id] || parseFloat(horasBase[tarea.id]) <= 0}
+                        className="h-7 text-[11px] px-2"
+                      >
+                        Aplicar
+                      </Button>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-2">
                     {tarea.miembros.map(m => (
                       <div key={m.id} className="flex items-center gap-1.5">
