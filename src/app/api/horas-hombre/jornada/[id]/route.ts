@@ -1,7 +1,7 @@
 /**
  * API para operaciones sobre una jornada específica
  * GET /api/horas-hombre/jornada/[id] - Obtener detalle
- * DELETE /api/horas-hombre/jornada/[id] - Eliminar (solo si iniciado)
+ * DELETE /api/horas-hombre/jornada/[id] - Eliminar (iniciado o rechazado)
  * PATCH /api/horas-hombre/jornada/[id] - Actualizar campos (solo si iniciado)
  */
 
@@ -9,6 +9,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { ProgresoService } from '@/lib/services/progresoService'
+import { limpiarHorasJornadaRechazada } from '@/lib/utils/jornadaCleanup'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -128,18 +130,36 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       )
     }
 
-    // Solo se puede eliminar si está en estado 'iniciado'
-    if (jornada.estado !== 'iniciado') {
+    // Solo se puede eliminar si está en estado 'iniciado' o 'rechazado'
+    if (jornada.estado !== 'iniciado' && jornada.estado !== 'rechazado') {
       return NextResponse.json(
-        { error: 'Solo se pueden eliminar jornadas en estado "iniciado"' },
+        { error: 'Solo se pueden eliminar jornadas en estado "iniciado" o "rechazado"' },
         { status: 400 }
       )
     }
 
-    // Eliminar la jornada (cascade eliminará tareas y miembros)
-    await prisma.registroHorasCampo.delete({
-      where: { id: jornadaId }
-    })
+    let tareasAfectadas: string[] = []
+
+    if (jornada.estado === 'rechazado') {
+      // Revertir horas del cronograma y eliminar RegistroHoras
+      await prisma.$transaction(async (tx) => {
+        const cleanup = await limpiarHorasJornadaRechazada(tx, jornadaId)
+        tareasAfectadas = cleanup.tareasAfectadas
+        await tx.registroHorasCampo.delete({ where: { id: jornadaId } })
+      })
+    } else {
+      // Estado 'iniciado': no hay horas que revertir
+      await prisma.registroHorasCampo.delete({ where: { id: jornadaId } })
+    }
+
+    // Actualizar progreso de tareas afectadas
+    for (const tareaId of tareasAfectadas) {
+      try {
+        await ProgresoService.actualizarProgresoTarea(tareaId)
+      } catch (err) {
+        console.error(`⚠️ Error actualizando progreso tarea ${tareaId}:`, err)
+      }
+    }
 
     console.log(`✅ JORNADA CAMPO: Eliminada jornada ${jornadaId} del proyecto ${jornada.proyecto.codigo}`)
 

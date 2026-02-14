@@ -52,7 +52,9 @@ import {
   HardHat,
   MoreVertical,
   Loader2,
-  X
+  X,
+  RefreshCcw,
+  Trash2
 } from 'lucide-react'
 
 type EstadoJornada = 'iniciado' | 'pendiente' | 'aprobado' | 'rechazado'
@@ -113,7 +115,11 @@ interface ListaJornadasProps {
   onVerDetalle: (jornadaId: string) => void
   onAprobar?: (jornadaId: string) => void
   onRechazar?: (jornadaId: string) => void
+  onReabrir?: (jornadaId: string) => void
+  onEliminar?: (jornadaId: string) => void
   aprobando?: string | null
+  reabriendo?: string | null
+  eliminando?: string | null
   loading?: boolean
   showSupervisor?: boolean
   title?: string
@@ -124,7 +130,11 @@ export function ListaJornadas({
   onVerDetalle,
   onAprobar,
   onRechazar,
+  onReabrir,
+  onEliminar,
   aprobando = null,
+  reabriendo = null,
+  eliminando = null,
   loading = false,
   showSupervisor = false,
   title
@@ -701,6 +711,40 @@ export function ListaJornadas({
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                      ) : jornada.estado === 'rechazado' && (onReabrir || onEliminar) ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => onVerDetalle(jornada.id)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver detalle
+                            </DropdownMenuItem>
+                            {onReabrir && (
+                              <DropdownMenuItem
+                                onClick={() => setTimeout(() => onReabrir(jornada.id), 0)}
+                                className="text-blue-600 focus:text-blue-600"
+                                disabled={reabriendo === jornada.id}
+                              >
+                                <RefreshCcw className="h-4 w-4 mr-2" />
+                                Reabrir
+                              </DropdownMenuItem>
+                            )}
+                            {onEliminar && (
+                              <DropdownMenuItem
+                                onClick={() => setTimeout(() => onEliminar(jornada.id), 0)}
+                                className="text-red-600 focus:text-red-600"
+                                disabled={eliminando === jornada.id}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       ) : (
                         <Button
                           variant="ghost"
@@ -911,6 +955,42 @@ export function ListaJornadas({
                           <XCircle className="h-3.5 w-3.5 mr-1" />
                           Rechazar
                         </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Acciones para rechazadas (cards) */}
+                {jornada.estado === 'rechazado' && (onReabrir || onEliminar) && (
+                  <div className="flex gap-2 pt-1" onClick={e => e.stopPropagation()}>
+                    {(reabriendo === jornada.id || eliminando === jornada.id) ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Procesando...
+                      </div>
+                    ) : (
+                      <>
+                        {onReabrir && (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 h-8 text-xs"
+                            onClick={() => onReabrir(jornada.id)}
+                          >
+                            <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+                            Reabrir
+                          </Button>
+                        )}
+                        {onEliminar && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 border-red-200 text-red-600 hover:bg-red-50 h-8 text-xs"
+                            onClick={() => onEliminar(jornada.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Eliminar
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>

@@ -10,6 +10,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Plus,
   HardHat,
   Loader2,
@@ -112,6 +122,10 @@ export default function MiJornadaPage() {
   const [iniciarModalOpen, setIniciarModalOpen] = useState(false)
   const [detalleModalOpen, setDetalleModalOpen] = useState(false)
   const [jornadaDetalle, setJornadaDetalle] = useState<JornadaCompleta | null>(null)
+  const [reabrirJornadaId, setReabrirJornadaId] = useState<string | null>(null)
+  const [eliminarJornadaId, setEliminarJornadaId] = useState<string | null>(null)
+  const [reabriendo, setReabriendo] = useState<string | null>(null)
+  const [eliminandoRechazada, setEliminandoRechazada] = useState<string | null>(null)
 
   const cargarJornadas = useCallback(async () => {
     try {
@@ -160,6 +174,56 @@ export default function MiJornadaPage() {
         title: 'Error',
         description: 'No se pudo cargar el detalle de la jornada'
       })
+    }
+  }
+
+  const handleReabrir = (jornadaId: string) => {
+    setReabrirJornadaId(jornadaId)
+  }
+
+  const confirmarReabrir = async () => {
+    if (!reabrirJornadaId) return
+    try {
+      setReabriendo(reabrirJornadaId)
+      const response = await fetch(`/api/horas-hombre/jornada/${reabrirJornadaId}/reabrir`, {
+        method: 'PUT'
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Error reabriendo jornada')
+      }
+      toast({ title: 'Jornada reabierta', description: 'La jornada ha sido reabierta y puedes editarla' })
+      cargarJornadas()
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Error reabriendo jornada' })
+    } finally {
+      setReabriendo(null)
+      setReabrirJornadaId(null)
+    }
+  }
+
+  const handleEliminarRechazada = (jornadaId: string) => {
+    setEliminarJornadaId(jornadaId)
+  }
+
+  const confirmarEliminarRechazada = async () => {
+    if (!eliminarJornadaId) return
+    try {
+      setEliminandoRechazada(eliminarJornadaId)
+      const response = await fetch(`/api/horas-hombre/jornada/${eliminarJornadaId}`, {
+        method: 'DELETE'
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Error eliminando jornada')
+      }
+      toast({ title: 'Jornada eliminada', description: 'La jornada rechazada ha sido eliminada' })
+      cargarJornadas()
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Error eliminando jornada' })
+    } finally {
+      setEliminandoRechazada(null)
+      setEliminarJornadaId(null)
     }
   }
 
@@ -255,6 +319,10 @@ export default function MiJornadaPage() {
           <ListaJornadas
             jornadas={jornadas}
             onVerDetalle={handleVerDetalle}
+            onReabrir={handleReabrir}
+            onEliminar={handleEliminarRechazada}
+            reabriendo={reabriendo}
+            eliminando={eliminandoRechazada}
             loading={loading}
           />
         </div>
@@ -402,6 +470,52 @@ export default function MiJornadaPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Confirmar Reabrir */}
+      <AlertDialog open={!!reabrirJornadaId} onOpenChange={(open) => !open && setReabrirJornadaId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reabrir jornada rechazada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La jornada volverá al estado &quot;en curso&quot; y podrás editarla.
+              Las horas registradas en el cronograma serán revertidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!reabriendo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarReabrir}
+              disabled={!!reabriendo}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {reabriendo ? 'Reabriendo...' : 'Reabrir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmar Eliminar Rechazada */}
+      <AlertDialog open={!!eliminarJornadaId} onOpenChange={(open) => !open && setEliminarJornadaId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar jornada rechazada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la jornada y todas sus tareas permanentemente.
+              Las horas registradas en el cronograma serán revertidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!eliminandoRechazada}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarEliminarRechazada}
+              disabled={!!eliminandoRechazada}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {eliminandoRechazada ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
