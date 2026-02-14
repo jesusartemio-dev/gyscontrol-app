@@ -29,7 +29,8 @@ import {
   Users,
   Loader2,
   Plus,
-  FileText
+  FileText,
+  Calendar
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -69,6 +70,7 @@ interface AgregarTareaModalProps {
   jornadaId: string
   proyectoId: string
   proyectoEdtId?: string | null
+  fechaTrabajo?: string
   personalPlanificado: PersonalPlanificado[]
   onSuccess: () => void
 }
@@ -81,6 +83,7 @@ export function AgregarTareaModal({
   jornadaId,
   proyectoId,
   proyectoEdtId,
+  fechaTrabajo,
   personalPlanificado,
   onSuccess
 }: AgregarTareaModalProps) {
@@ -102,6 +105,9 @@ export function AgregarTareaModal({
   // Extra: selector de existente o crear nueva
   const [extraSeleccion, setExtraSeleccion] = useState(CREAR_NUEVA)
   const [nombreTareaExtra, setNombreTareaExtra] = useState('')
+  const [extraFechaInicio, setExtraFechaInicio] = useState('')
+  const [extraFechaFin, setExtraFechaFin] = useState('')
+  const [extraHorasEstimadas, setExtraHorasEstimadas] = useState<number | ''>('')
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroSeleccionado[]>([])
 
   // Reset al abrir
@@ -112,6 +118,11 @@ export function AgregarTareaModal({
       setTareaId('')
       setExtraSeleccion(CREAR_NUEVA)
       setNombreTareaExtra('')
+      // Default dates to fechaTrabajo (YYYY-MM-DD)
+      const defaultDate = fechaTrabajo ? fechaTrabajo.slice(0, 10) : new Date().toISOString().slice(0, 10)
+      setExtraFechaInicio(defaultDate)
+      setExtraFechaFin(defaultDate)
+      setExtraHorasEstimadas('')
       setMiembrosSeleccionados([])
       if (proyectoEdtId) {
         cargarActividades()
@@ -188,7 +199,12 @@ export function AgregarTareaModal({
     if (extraSeleccion !== CREAR_NUEVA) {
       return { proyectoTareaId: extraSeleccion }
     }
-    return { nombreTareaExtra: nombreTareaExtra.trim() }
+    return {
+      nombreTareaExtra: nombreTareaExtra.trim(),
+      fechaInicio: extraFechaInicio || undefined,
+      fechaFin: extraFechaFin || undefined,
+      horasEstimadas: extraHorasEstimadas || undefined
+    }
   }
 
   const isExtraValid = () => {
@@ -356,18 +372,51 @@ export function AgregarTareaModal({
                 </Select>
               </div>
 
-              {/* Input nombre solo si está creando nueva */}
+              {/* Campos para crear nueva tarea extra */}
               {extraSeleccion === CREAR_NUEVA && (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
-                  <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Nombre *</Label>
-                  <Input
-                    placeholder="Ej: Limpieza de zona, Traslado de materiales"
-                    value={nombreTareaExtra}
-                    onChange={e => setNombreTareaExtra(e.target.value)}
-                    className="h-8 text-sm flex-1"
-                    autoFocus
-                  />
-                </div>
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                    <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Nombre *</Label>
+                    <Input
+                      placeholder="Ej: Limpieza de zona, Traslado de materiales"
+                      value={nombreTareaExtra}
+                      onChange={e => setNombreTareaExtra(e.target.value)}
+                      className="h-8 text-sm flex-1"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Fechas y horas estimadas */}
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                    <Input
+                      type="date"
+                      value={extraFechaInicio}
+                      onChange={e => setExtraFechaInicio(e.target.value)}
+                      className="h-8 text-sm flex-1"
+                      title="Fecha inicio"
+                    />
+                    <span className="text-xs text-gray-400">a</span>
+                    <Input
+                      type="date"
+                      value={extraFechaFin}
+                      onChange={e => setExtraFechaFin(e.target.value)}
+                      className="h-8 text-sm flex-1"
+                      min={extraFechaInicio}
+                      title="Fecha fin"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Hrs est."
+                      value={extraHorasEstimadas}
+                      onChange={e => setExtraHorasEstimadas(e.target.value ? Number(e.target.value) : '')}
+                      className="h-8 text-sm w-20"
+                      min={0}
+                      step={0.5}
+                      title="Horas estimadas"
+                    />
+                  </div>
+                </>
               )}
             </TabsContent>
           </Tabs>

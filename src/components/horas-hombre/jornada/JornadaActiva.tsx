@@ -432,6 +432,7 @@ export function JornadaActiva({
         jornadaId={jornada.id}
         proyectoId={jornada.proyecto.id}
         proyectoEdtId={jornada.proyectoEdt?.id}
+        fechaTrabajo={jornada.fechaTrabajo}
         personalPlanificado={jornada.personalPlanificado as PersonalPlanificado[]}
         onSuccess={onRefresh}
       />
