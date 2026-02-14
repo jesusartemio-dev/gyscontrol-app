@@ -624,7 +624,7 @@ export function RegistroHorasWizard({
                     <SelectItem key={proyecto.id} value={proyecto.id}>
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-semibold text-blue-700">{proyecto.codigo}</span>
-                        <span className="text-xs text-gray-500">• {proyecto.responsableNombre}</span>
+                        <span className="text-xs text-gray-500">- {proyecto.nombre}</span>
                       </div>
                     </SelectItem>
                   )
@@ -639,10 +639,7 @@ export function RegistroHorasWizard({
               <div className="flex items-center gap-3">
                 <Building className="h-5 w-5 text-blue-600 shrink-0" />
                 <div className="min-w-0">
-                  <div className="font-mono font-bold text-blue-800 text-lg">{proyectoSeleccionado.codigo}</div>
-                  <div className="text-xs text-gray-600 truncate">
-                    {proyectoSeleccionado.responsableNombre}
-                  </div>
+                  <div className="font-mono font-bold text-blue-800 text-lg">{proyectoSeleccionado.codigo} - {proyectoSeleccionado.nombre}</div>
                 </div>
               </div>
             </CardContent>
