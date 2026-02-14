@@ -302,6 +302,15 @@ export function ListaJornadas({
     return true
   })
 
+  // Ordenar: En curso → Pendiente → Rechazado → Aprobado, luego por fecha desc
+  const estadoPrioridad: Record<string, number> = { iniciado: 0, pendiente: 1, rechazado: 2, aprobado: 3 }
+  jornadasFiltradas.sort((a, b) => {
+    const pa = estadoPrioridad[a.estado] ?? 9
+    const pb = estadoPrioridad[b.estado] ?? 9
+    if (pa !== pb) return pa - pb
+    return new Date(b.fechaTrabajo).getTime() - new Date(a.fechaTrabajo).getTime()
+  })
+
   // Separar jornadas iniciadas del resto
   const jornadasIniciadas = jornadasFiltradas.filter(j => j.estado === 'iniciado')
   const otrasJornadas = jornadasFiltradas.filter(j => j.estado !== 'iniciado')
