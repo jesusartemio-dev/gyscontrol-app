@@ -80,12 +80,14 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   const [savingHeader, setSavingHeader] = useState(false)
   const [editCodigo, setEditCodigo] = useState('')
   const [editNombre, setEditNombre] = useState('')
+  const [editDescripcion, setEditDescripcion] = useState('')
   const [editFechaInicio, setEditFechaInicio] = useState('')
 
   const startEditingHeader = () => {
     if (!proyecto) return
     setEditCodigo(proyecto.codigo || '')
     setEditNombre(proyecto.nombre || '')
+    setEditDescripcion(proyecto.descripcion || '')
     setEditFechaInicio(proyecto.fechaInicio
       ? new Date(proyecto.fechaInicio).toISOString().split('T')[0]
       : '')
@@ -106,6 +108,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         body: JSON.stringify({
           codigo: editCodigo,
           nombre: editNombre,
+          descripcion: editDescripcion || null,
           fechaInicio: editFechaInicio ? new Date(editFechaInicio).toISOString() : proyecto.fechaInicio
         })
       })
@@ -114,7 +117,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         throw new Error(err.error || 'Error al actualizar')
       }
       const updated = await res.json()
-      handleDataUpdate({ ...proyecto, codigo: updated.codigo, nombre: updated.nombre, fechaInicio: updated.fechaInicio })
+      handleDataUpdate({ ...proyecto, codigo: updated.codigo, nombre: updated.nombre, descripcion: updated.descripcion, fechaInicio: updated.fechaInicio })
       setEditingHeader(false)
       toast.success('Datos del proyecto actualizados')
     } catch (err: any) {
@@ -417,7 +420,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                               value={editNombre}
                               onChange={(e) => setEditNombre(e.target.value)}
                               className="h-7 w-64 text-sm"
-                              placeholder="Nombre del proyecto"
+                              placeholder="Nombre corto del proyecto"
                             />
                           </>
                         ) : (
@@ -431,10 +434,19 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                           </>
                         )}
                       </div>
-                      {!editingHeader && proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
-                        <span className="text-xs text-muted-foreground ml-0.5 truncate max-w-[500px]" title={proyecto.descripcion}>
-                          {proyecto.descripcion}
-                        </span>
+                      {editingHeader ? (
+                        <Input
+                          value={editDescripcion}
+                          onChange={(e) => setEditDescripcion(e.target.value)}
+                          className="h-6 text-xs text-muted-foreground ml-0.5"
+                          placeholder="Descripción completa (opcional)"
+                        />
+                      ) : (
+                        proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
+                          <span className="text-xs text-muted-foreground ml-0.5 truncate max-w-[500px]" title={proyecto.descripcion}>
+                            {proyecto.descripcion}
+                          </span>
+                        )
                       )}
                     </div>
                   )}
