@@ -38,7 +38,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   IniciarJornadaModal,
   JornadaActiva,
-  ListaJornadas
+  MiJornadaTimeline
 } from '@/components/horas-hombre/jornada'
 
 type EstadoJornada = 'iniciado' | 'pendiente' | 'aprobado' | 'rechazado'
@@ -317,8 +317,8 @@ export default function MiJornadaPage() {
             </div>
           )}
 
-          {/* Lista de mis jornadas */}
-          <ListaJornadas
+          {/* Timeline de mis jornadas */}
+          <MiJornadaTimeline
             jornadas={jornadas}
             onVerDetalle={handleVerDetalle}
             onReabrir={handleReabrir}
