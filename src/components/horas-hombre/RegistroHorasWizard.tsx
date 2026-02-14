@@ -679,7 +679,9 @@ export function RegistroHorasWizard({
             {edts.map((edt) => (
               <SelectItem key={edt.id} value={edt.id}>
                 <div className="flex flex-col">
-                  <span className="font-medium">{edt.nombre}</span>
+                  <span className="font-medium">
+                    {edt.categoriaNombre && edt.categoriaNombre !== edt.nombre ? `${edt.categoriaNombre} - ${edt.nombre}` : edt.nombre}
+                  </span>
                   <span className="text-sm text-gray-600">
                     {edt.responsableNombre} • {edt.horasReales}h/{edt.horasPlan}h
                   </span>
@@ -695,7 +697,9 @@ export function RegistroHorasWizard({
             <div className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4 text-purple-600" />
               <div>
-                <div className="font-medium">{edtSeleccionado.nombre}</div>
+                <div className="font-medium">
+                  {edtSeleccionado.categoriaNombre && edtSeleccionado.categoriaNombre !== edtSeleccionado.nombre ? `${edtSeleccionado.categoriaNombre} - ${edtSeleccionado.nombre}` : edtSeleccionado.nombre}
+                </div>
                 <div className="text-sm text-gray-600">
                   {edtSeleccionado.responsableNombre} • {edtSeleccionado.horasReales}h/{edtSeleccionado.horasPlan}h
                 </div>
