@@ -222,13 +222,17 @@ export function JornadaActiva({
     }
   }
 
-  const tareasResumen = jornada.tareas.map(t => ({
+  const tareasCierre = jornada.tareas.map(t => ({
     id: t.id,
     nombre: getNombreTarea(t),
-    miembros: t.miembros.length,
-    horas: t.miembros.reduce((sum, m) => sum + m.horas, 0),
     proyectoTareaId: t.proyectoTarea?.id || null,
-    porcentajeActual: t.proyectoTarea?.porcentajeCompletado ?? 0
+    porcentajeActual: t.proyectoTarea?.porcentajeCompletado ?? 0,
+    miembros: t.miembros.map(m => ({
+      id: m.id,
+      usuarioId: m.usuario.id,
+      nombre: m.usuario.name?.split(' ')[0] || m.usuario.email.split('@')[0],
+      horas: m.horas
+    }))
   }))
 
   return (
@@ -273,10 +277,12 @@ export function JornadaActiva({
                   <Users className="h-3.5 w-3.5" />
                   {miembrosUnicos}
                 </span>
-                <span className="flex items-center gap-1 text-orange-600 font-medium">
-                  <Clock className="h-3.5 w-3.5" />
-                  {totalHoras}h
-                </span>
+                {totalHoras > 0 && (
+                  <span className="flex items-center gap-1 text-orange-600 font-medium">
+                    <Clock className="h-3.5 w-3.5" />
+                    {totalHoras}h
+                  </span>
+                )}
               </div>
             </div>
 
@@ -368,7 +374,7 @@ export function JornadaActiva({
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                           {tarea.miembros.map(m => (
                             <span key={m.id} className="text-[11px] text-gray-400">
-                              {m.usuario.name?.split(' ')[0] || m.usuario.email.split('@')[0]} ({m.horas}h)
+                              {m.usuario.name?.split(' ')[0] || m.usuario.email.split('@')[0]}{m.horas > 0 ? ` (${m.horas}h)` : ''}
                             </span>
                           ))}
                         </div>
@@ -390,9 +396,11 @@ export function JornadaActiva({
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
-                        <Badge variant="secondary" className="text-[11px] font-semibold px-2 py-0 rounded-full">
-                          {horasTarea}h
-                        </Badge>
+                        {horasTarea > 0 && (
+                          <Badge variant="secondary" className="text-[11px] font-semibold px-2 py-0 rounded-full">
+                            {horasTarea}h
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     {/* Barra de progreso */}
@@ -435,9 +443,7 @@ export function JornadaActiva({
         proyecto={jornada.proyecto}
         fechaTrabajo={jornada.fechaTrabajo}
         objetivosDia={jornada.objetivosDia}
-        tareasResumen={tareasResumen}
-        totalHoras={totalHoras}
-        totalMiembros={miembrosUnicos}
+        tareas={tareasCierre}
         onSuccess={() => {
           onRefresh()
           onClosed()

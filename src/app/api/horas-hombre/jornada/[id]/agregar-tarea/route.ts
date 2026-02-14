@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto'
 
 interface MiembroTarea {
   usuarioId: string
-  horas: number
+  horas?: number
   observaciones?: string
 }
 
@@ -96,17 +96,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       )
     }
 
-    // Validar horas de cada miembro
+    // Validar usuarioId de cada miembro
     for (const miembro of miembros) {
       if (!miembro.usuarioId) {
         return NextResponse.json(
           { error: 'Cada miembro debe tener un usuarioId' },
-          { status: 400 }
-        )
-      }
-      if (!miembro.horas || miembro.horas <= 0 || miembro.horas > 24) {
-        return NextResponse.json(
-          { error: 'Las horas de cada miembro deben estar entre 0.5 y 24' },
           { status: 400 }
         )
       }
@@ -234,7 +228,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         miembros: {
           create: miembros.map(m => ({
             usuarioId: m.usuarioId,
-            horas: m.horas,
+            horas: m.horas ?? 0,
             observaciones: m.observaciones || null
           }))
         }
@@ -255,20 +249,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     })
 
-    const totalHorasTarea = miembros.reduce((sum, m) => sum + m.horas, 0)
-
-    console.log(`✅ JORNADA CAMPO: Agregada tarea a jornada ${jornadaId} con ${miembros.length} miembros (${totalHorasTarea}h)`)
+    console.log(`✅ JORNADA CAMPO: Agregada tarea a jornada ${jornadaId} con ${miembros.length} miembros`)
 
     return NextResponse.json({
       success: true,
-      message: `Tarea agregada con ${miembros.length} miembro(s) (${totalHorasTarea}h)`,
+      message: `Tarea agregada con ${miembros.length} miembro(s)`,
       data: {
         id: tareaCampo.id,
         proyectoTarea: tareaCampo.proyectoTarea,
         nombreTareaExtra: tareaCampo.nombreTareaExtra,
         descripcion: tareaCampo.descripcion,
-        miembros: tareaCampo.miembros,
-        totalHoras: totalHorasTarea
+        miembros: tareaCampo.miembros
       }
     })
 

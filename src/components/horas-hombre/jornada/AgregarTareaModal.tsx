@@ -6,7 +6,7 @@
  * Permite seleccionar:
  * - Actividad EDT (para filtrar tareas)
  * - Tarea del cronograma o tarea extra (existente o nueva)
- * - Miembros con sus horas individuales
+ * - Miembros del equipo (horas se registran al cerrar la jornada)
  */
 
 import React, { useState, useEffect } from 'react'
@@ -26,7 +26,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   ListTodo,
-  Clock,
   Users,
   Loader2,
   Plus,
@@ -62,8 +61,6 @@ interface PersonalPlanificado {
 interface MiembroSeleccionado {
   usuarioId: string
   nombre: string
-  horas: number
-  observaciones?: string
 }
 
 interface AgregarTareaModalProps {
@@ -105,7 +102,6 @@ export function AgregarTareaModal({
   // Extra: selector de existente o crear nueva
   const [extraSeleccion, setExtraSeleccion] = useState(CREAR_NUEVA)
   const [nombreTareaExtra, setNombreTareaExtra] = useState('')
-  const [horasBase, setHorasBase] = useState(9.5)
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroSeleccionado[]>([])
 
   // Reset al abrir
@@ -116,7 +112,6 @@ export function AgregarTareaModal({
       setTareaId('')
       setExtraSeleccion(CREAR_NUEVA)
       setNombreTareaExtra('')
-      setHorasBase(9.5)
       setMiembrosSeleccionados([])
       if (proyectoEdtId) {
         cargarActividades()
@@ -171,29 +166,16 @@ export function AgregarTareaModal({
       if (existe) {
         return prev.filter(m => m.usuarioId !== userId)
       }
-      return [...prev, { usuarioId: userId, nombre, horas: horasBase }]
+      return [...prev, { usuarioId: userId, nombre }]
     })
-  }
-
-  const actualizarHorasMiembro = (userId: string, horas: number) => {
-    setMiembrosSeleccionados(prev =>
-      prev.map(m => m.usuarioId === userId ? { ...m, horas } : m)
-    )
   }
 
   const seleccionarTodosMiembros = () => {
     setMiembrosSeleccionados(
       personalPlanificado.map(p => ({
         usuarioId: p.userId,
-        nombre: p.nombre,
-        horas: horasBase
+        nombre: p.nombre
       }))
-    )
-  }
-
-  const aplicarHorasBase = () => {
-    setMiembrosSeleccionados(prev =>
-      prev.map(m => ({ ...m, horas: horasBase }))
     )
   }
 
@@ -238,9 +220,7 @@ export function AgregarTareaModal({
         body: JSON.stringify({
           ...payload,
           miembros: miembrosSeleccionados.map(m => ({
-            usuarioId: m.usuarioId,
-            horas: m.horas,
-            observaciones: m.observaciones
+            usuarioId: m.usuarioId
           }))
         })
       })
@@ -271,7 +251,6 @@ export function AgregarTareaModal({
     }
   }
 
-  const totalHoras = miembrosSeleccionados.reduce((sum, m) => sum + m.horas, 0)
   const tareaSeleccionada = tareas.find(t => t.id === tareaId)
   const extraExistenteSeleccionada = tareasExtra.find(t => t.id === extraSeleccion)
 
@@ -393,34 +372,12 @@ export function AgregarTareaModal({
             </TabsContent>
           </Tabs>
 
-          {/* Miembros y horas */}
+          {/* Miembros */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between flex-wrap gap-1">
-              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
-                <Users className="h-3.5 w-3.5" />
-                Miembros ({miembrosSeleccionados.length})
-              </Label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="number"
-                  min="0.5"
-                  max="24"
-                  step="0.5"
-                  value={horasBase}
-                  onChange={e => setHorasBase(parseFloat(e.target.value) || 9.5)}
-                  className="w-[4.5rem] h-7 text-xs text-center"
-                />
-                <span className="text-[11px] text-gray-400">h</span>
-                <button
-                  type="button"
-                  onClick={aplicarHorasBase}
-                  disabled={miembrosSeleccionados.length === 0}
-                  className="text-[11px] text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
-                >
-                  Aplicar
-                </button>
-              </div>
-            </div>
+            <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+              <Users className="h-3.5 w-3.5" />
+              Miembros ({miembrosSeleccionados.length})
+            </Label>
 
             <button
               type="button"
@@ -449,20 +406,6 @@ export function AgregarTareaModal({
                         <span className="flex-1 min-w-0 text-sm truncate">
                           {p.nombre}
                         </span>
-                        {seleccionado && (
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <Input
-                              type="number"
-                              min="0.5"
-                              max="24"
-                              step="0.5"
-                              value={seleccionado.horas}
-                              onChange={e => actualizarHorasMiembro(p.userId, parseFloat(e.target.value) || 0)}
-                              className="w-[4.5rem] h-7 text-xs text-center"
-                            />
-                            <span className="text-[11px] text-gray-400">h</span>
-                          </div>
-                        )}
                       </label>
                     )
                   })}
@@ -477,15 +420,9 @@ export function AgregarTareaModal({
               <span className="text-xs text-blue-800 truncate mr-2">
                 {getNombreResumen()}
               </span>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
-                  {miembrosSeleccionados.length} pers.
-                </Badge>
-                <Badge className="bg-blue-600 text-[11px] px-1.5 py-0">
-                  <Clock className="h-3 w-3 mr-0.5" />
-                  {totalHoras}h
-                </Badge>
-              </div>
+              <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
+                {miembrosSeleccionados.length} pers.
+              </Badge>
             </div>
           )}
 

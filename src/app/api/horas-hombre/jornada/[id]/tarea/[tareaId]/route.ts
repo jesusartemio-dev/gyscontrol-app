@@ -16,7 +16,7 @@ interface RouteContext {
 
 interface MiembroUpdate {
   usuarioId: string
-  horas: number
+  horas?: number
   observaciones?: string
 }
 
@@ -155,17 +155,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    // Validar horas de cada miembro
+    // Validar usuarioId de cada miembro
     for (const miembro of miembros) {
       if (!miembro.usuarioId) {
         return NextResponse.json(
           { error: 'Cada miembro debe tener un usuarioId' },
-          { status: 400 }
-        )
-      }
-      if (!miembro.horas || miembro.horas <= 0 || miembro.horas > 24) {
-        return NextResponse.json(
-          { error: 'Las horas de cada miembro deben estar entre 0.5 y 24' },
           { status: 400 }
         )
       }
@@ -202,7 +196,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         data: miembros.map(m => ({
           registroCampoTareaId: tareaId,
           usuarioId: m.usuarioId,
-          horas: m.horas,
+          horas: m.horas ?? 0,
           observaciones: m.observaciones || null
         }))
       })
@@ -227,13 +221,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     })
 
-    const totalHoras = miembros.reduce((sum, m) => sum + m.horas, 0)
-
-    console.log(`✅ JORNADA CAMPO: Actualizada tarea ${tareaId} con ${miembros.length} miembros (${totalHoras}h)`)
+    console.log(`✅ JORNADA CAMPO: Actualizada tarea ${tareaId} con ${miembros.length} miembros`)
 
     return NextResponse.json({
       success: true,
-      message: `Tarea actualizada con ${miembros.length} miembro(s) (${totalHoras}h)`,
+      message: `Tarea actualizada con ${miembros.length} miembro(s)`,
       data: tareaActualizada
     })
 

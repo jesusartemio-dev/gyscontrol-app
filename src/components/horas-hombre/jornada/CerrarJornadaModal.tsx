@@ -4,13 +4,14 @@
  * CerrarJornadaModal - Modal para cerrar una jornada de campo
  *
  * Permite registrar:
+ * - Horas por tarea/miembro (requerido)
  * - Progreso de tareas (slider %)
  * - Avance del día (requerido)
  * - Bloqueos encontrados (opcional, compactos)
  * - Plan para el día siguiente (opcional)
  */
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,13 +40,19 @@ interface Bloqueo {
   accion: string
 }
 
-interface TareaResumen {
+interface MiembroCierre {
+  id: string
+  usuarioId: string
+  nombre: string
+  horas: number
+}
+
+interface TareaCierre {
   id: string
   nombre: string
-  miembros: number
-  horas: number
   proyectoTareaId?: string | null
   porcentajeActual?: number
+  miembros: MiembroCierre[]
 }
 
 interface CerrarJornadaModalProps {
@@ -55,9 +62,7 @@ interface CerrarJornadaModalProps {
   proyecto: { codigo: string; nombre: string }
   fechaTrabajo: string
   objetivosDia?: string | null
-  tareasResumen: TareaResumen[]
-  totalHoras: number
-  totalMiembros: number
+  tareas: TareaCierre[]
   onSuccess: () => void
 }
 
@@ -68,9 +73,7 @@ export function CerrarJornadaModal({
   proyecto,
   fechaTrabajo,
   objetivosDia,
-  tareasResumen,
-  totalHoras,
-  totalMiembros,
+  tareas,
   onSuccess
 }: CerrarJornadaModalProps) {
   const { toast } = useToast()
@@ -81,9 +84,32 @@ export function CerrarJornadaModal({
   const [bloqueos, setBloqueos] = useState<Bloqueo[]>([])
   const [planSiguiente, setPlanSiguiente] = useState('')
   const [progresoTareas, setProgresoTareas] = useState<Record<string, number>>({})
+  const [horasMiembros, setHorasMiembros] = useState<Record<string, number>>({})
 
   // Tareas vinculadas a cronograma (solo esas tienen progreso)
-  const tareasConProgreso = tareasResumen.filter(t => t.proyectoTareaId)
+  const tareasConProgreso = tareas.filter(t => t.proyectoTareaId)
+
+  // Calcular totales por persona
+  const totalesPorPersona = useMemo(() => {
+    const totales: Record<string, { nombre: string; total: number }> = {}
+    for (const tarea of tareas) {
+      for (const m of tarea.miembros) {
+        if (!totales[m.usuarioId]) {
+          totales[m.usuarioId] = { nombre: m.nombre, total: 0 }
+        }
+        totales[m.usuarioId].total += horasMiembros[m.id] ?? 0
+      }
+    }
+    return totales
+  }, [tareas, horasMiembros])
+
+  const totalHoras = Object.values(totalesPorPersona).reduce((sum, p) => sum + p.total, 0)
+  const totalMiembros = Object.keys(totalesPorPersona).length
+
+  // Verificar que todas las horas estén asignadas (> 0)
+  const todasHorasAsignadas = useMemo(() => {
+    return tareas.every(t => t.miembros.every(m => (horasMiembros[m.id] ?? 0) > 0))
+  }, [tareas, horasMiembros])
 
   // Reset al abrir
   React.useEffect(() => {
@@ -91,15 +117,30 @@ export function CerrarJornadaModal({
       setAvanceDia('')
       setBloqueos([])
       setPlanSiguiente('')
+
+      // Inicializar progreso
       const inicial: Record<string, number> = {}
-      tareasResumen.forEach(t => {
+      tareas.forEach(t => {
         if (t.proyectoTareaId) {
           inicial[t.proyectoTareaId] = t.porcentajeActual ?? 0
         }
       })
       setProgresoTareas(inicial)
+
+      // Inicializar horas con defaults inteligentes
+      const horasIniciales: Record<string, number> = {}
+      const cantTareas = tareas.length
+      const defaultHoras = cantTareas === 1 ? 9.5 : Math.round(9.5 / cantTareas * 2) / 2
+
+      for (const tarea of tareas) {
+        for (const m of tarea.miembros) {
+          // Si el miembro ya tiene horas > 0 (editado previamente), usar ese valor
+          horasIniciales[m.id] = m.horas > 0 ? m.horas : defaultHoras
+        }
+      }
+      setHorasMiembros(horasIniciales)
     }
-  }, [open])
+  }, [open, tareas])
 
   const agregarBloqueo = () => {
     setBloqueos(prev => [...prev, { descripcion: '', impacto: '', accion: '' }])
@@ -113,9 +154,18 @@ export function CerrarJornadaModal({
     setBloqueos(prev => prev.filter((_, i) => i !== index))
   }
 
+  const actualizarHoras = (miembroId: string, horas: number) => {
+    setHorasMiembros(prev => ({ ...prev, [miembroId]: horas }))
+  }
+
   const handleSubmit = async () => {
     if (!avanceDia.trim()) {
       toast({ variant: 'destructive', title: 'Error', description: 'El avance del día es requerido' })
+      return
+    }
+
+    if (!todasHorasAsignadas) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Todas las horas deben ser mayores a 0' })
       return
     }
 
@@ -137,6 +187,10 @@ export function CerrarJornadaModal({
           progresoTareas: Object.entries(progresoTareas).map(([proyectoTareaId, porcentaje]) => ({
             proyectoTareaId,
             porcentaje
+          })),
+          horasMiembros: Object.entries(horasMiembros).map(([miembroId, horas]) => ({
+            miembroId,
+            horas
           }))
         })
       })
@@ -202,15 +256,67 @@ export function CerrarJornadaModal({
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <Badge variant="secondary" className="text-xs gap-1 px-1.5">
-                <ListTodo className="h-3 w-3" />{tareasResumen.length}
+                <ListTodo className="h-3 w-3" />{tareas.length}
               </Badge>
               <Badge variant="secondary" className="text-xs gap-1 px-1.5">
                 <Users className="h-3 w-3" />{totalMiembros}
               </Badge>
-              <Badge variant="secondary" className="text-xs gap-1 px-1.5 font-semibold">
-                <Clock className="h-3 w-3" />{totalHoras}h
-              </Badge>
+              {totalHoras > 0 && (
+                <Badge variant="secondary" className="text-xs gap-1 px-1.5 font-semibold">
+                  <Clock className="h-3 w-3" />{totalHoras}h
+                </Badge>
+              )}
             </div>
+          </div>
+
+          {/* Horas por tarea */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <Clock className="h-4 w-4 text-orange-600" />
+              Horas por tarea <span className="text-red-500">*</span>
+            </Label>
+            <div className="space-y-2">
+              {tareas.map(tarea => (
+                <div key={tarea.id} className="rounded-lg border px-3 py-2.5 space-y-2">
+                  <span className="text-sm font-medium truncate block">{tarea.nombre}</span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    {tarea.miembros.map(m => (
+                      <div key={m.id} className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-600 min-w-0 truncate max-w-[100px]">{m.nombre}</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="24"
+                          step="0.5"
+                          value={horasMiembros[m.id] ?? 0}
+                          onChange={e => actualizarHoras(m.id, parseFloat(e.target.value) || 0)}
+                          className="w-[4.5rem] h-7 text-xs text-center"
+                        />
+                        <span className="text-[11px] text-gray-400">h</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Totales por persona */}
+            {Object.keys(totalesPorPersona).length > 0 && (
+              <div className="flex flex-wrap gap-x-3 gap-y-1 px-1">
+                {Object.values(totalesPorPersona).map(p => (
+                  <span
+                    key={p.nombre}
+                    className={`text-[11px] flex items-center gap-1 ${
+                      p.total > 9.5 ? 'text-amber-600 font-medium' : 'text-gray-500'
+                    }`}
+                  >
+                    {p.nombre}: {p.total}h
+                    {p.total > 0 && p.total <= 9.5 && <CheckCircle className="h-3 w-3 text-green-500" />}
+                    {p.total > 9.5 && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Progreso de tareas - integrado */}
@@ -363,7 +469,7 @@ export function CerrarJornadaModal({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !avanceDia.trim() || tareasResumen.length === 0}
+              disabled={submitting || !avanceDia.trim() || tareas.length === 0 || !todasHorasAsignadas}
               size="sm"
               className="bg-orange-600 hover:bg-orange-700"
             >

@@ -22,11 +22,17 @@ interface ProgresoTarea {
   porcentaje: number
 }
 
+interface HorasMiembro {
+  miembroId: string
+  horas: number
+}
+
 interface CerrarJornadaPayload {
   avanceDia: string
   bloqueos?: Bloqueo[]
   planSiguiente?: string
   progresoTareas?: ProgresoTarea[]
+  horasMiembros?: HorasMiembro[]
 }
 
 interface RouteContext {
@@ -47,10 +53,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const { id: jornadaId } = await context.params
     const body: CerrarJornadaPayload = await request.json()
 
-    const { avanceDia, bloqueos, planSiguiente, progresoTareas } = body
+    const { avanceDia, bloqueos, planSiguiente, progresoTareas, horasMiembros } = body
 
     // Verificar que la jornada existe
-    const jornada = await prisma.registroHorasCampo.findUnique({
+    let jornada = await prisma.registroHorasCampo.findUnique({
       where: { id: jornadaId },
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
@@ -120,6 +126,31 @@ export async function PUT(request: NextRequest, context: RouteContext) {
           )
         }
       }
+    }
+
+    // Actualizar horas de miembros (enviadas desde el modal de cierre)
+    if (horasMiembros && horasMiembros.length > 0) {
+      for (const { miembroId, horas } of horasMiembros) {
+        if (horas > 0 && horas <= 24) {
+          await prisma.registroHorasCampoMiembro.update({
+            where: { id: miembroId },
+            data: { horas }
+          })
+        }
+      }
+
+      // Re-fetch jornada con horas actualizadas para cálculos correctos
+      jornada = await prisma.registroHorasCampo.findUnique({
+        where: { id: jornadaId },
+        include: {
+          proyecto: { select: { id: true, codigo: true, nombre: true } },
+          tareas: {
+            include: {
+              miembros: true
+            }
+          }
+        }
+      }) as typeof jornada
     }
 
     // Calcular estadísticas

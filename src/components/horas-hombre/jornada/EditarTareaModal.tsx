@@ -5,7 +5,7 @@
  *
  * Permite:
  * - Cambiar la tarea (del cronograma o tarea extra)
- * - Modificar miembros y horas
+ * - Modificar miembros (horas se registran al cerrar)
  * - Eliminar la tarea
  */
 
@@ -26,7 +26,6 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  Clock,
   Users,
   Loader2,
   Pencil,
@@ -80,8 +79,6 @@ interface PersonalPlanificado {
 interface MiembroEditable {
   usuarioId: string
   nombre: string
-  horas: number
-  observaciones?: string
 }
 
 interface TareaDelCronograma {
@@ -120,7 +117,6 @@ export function EditarTareaModal({
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [horasBase, setHorasBase] = useState(8)
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroEditable[]>([])
 
   // Task selection state
@@ -139,9 +135,7 @@ export function EditarTareaModal({
       // Initialize members
       const miembrosIniciales = tarea.miembros.map(m => ({
         usuarioId: m.usuario.id,
-        nombre: m.usuario.name || m.usuario.email.split('@')[0],
-        horas: m.horas,
-        observaciones: m.observaciones || undefined
+        nombre: m.usuario.name || m.usuario.email.split('@')[0]
       }))
       setMiembrosSeleccionados(miembrosIniciales)
 
@@ -207,20 +201,8 @@ export function EditarTareaModal({
       if (existe) {
         return prev.filter(m => m.usuarioId !== userId)
       }
-      return [...prev, { usuarioId: userId, nombre, horas: horasBase }]
+      return [...prev, { usuarioId: userId, nombre }]
     })
-  }
-
-  const actualizarHorasMiembro = (userId: string, horas: number) => {
-    setMiembrosSeleccionados(prev =>
-      prev.map(m => m.usuarioId === userId ? { ...m, horas } : m)
-    )
-  }
-
-  const aplicarHorasBase = () => {
-    setMiembrosSeleccionados(prev =>
-      prev.map(m => ({ ...m, horas: horasBase }))
-    )
   }
 
   const handleSubmit = async () => {
@@ -248,9 +230,7 @@ export function EditarTareaModal({
           nombreTareaExtra: tipoTarea === 'extra' ? nombreTareaExtra.trim() : null,
           descripcion: descripcion.trim() || null,
           miembros: miembrosSeleccionados.map(m => ({
-            usuarioId: m.usuarioId,
-            horas: m.horas,
-            observaciones: m.observaciones
+            usuarioId: m.usuarioId
           }))
         })
       })
@@ -315,7 +295,6 @@ export function EditarTareaModal({
     }
   }
 
-  const totalHoras = miembrosSeleccionados.reduce((sum, m) => sum + m.horas, 0)
   const tareaSeleccionadaCronograma = tareasDisponibles.find(t => t.id === tareaId)
   const nombreResumen = tipoTarea === 'cronograma' && tareaSeleccionadaCronograma
     ? tareaSeleccionadaCronograma.nombre
@@ -417,35 +396,12 @@ export function EditarTareaModal({
               />
             </div>
 
-            {/* Horas base y miembros */}
+            {/* Miembros */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Miembros y horas ({miembrosSeleccionados.length} seleccionados)
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm text-gray-600">Horas base:</Label>
-                  <Input
-                    type="number"
-                    min="0.5"
-                    max="24"
-                    step="0.5"
-                    value={horasBase}
-                    onChange={e => setHorasBase(parseFloat(e.target.value) || 8)}
-                    className="w-16 h-8 text-sm"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={aplicarHorasBase}
-                    disabled={miembrosSeleccionados.length === 0}
-                  >
-                    Aplicar
-                  </Button>
-                </div>
-              </div>
+              <Label className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Miembros ({miembrosSeleccionados.length} seleccionados)
+              </Label>
 
               {/* Lista de personal planificado */}
               <div className="border rounded-lg max-h-48 overflow-y-auto">
@@ -468,20 +424,6 @@ export function EditarTareaModal({
                               {p.nombre}
                             </div>
                           </div>
-                          {seleccionado && (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                type="number"
-                                min="0.5"
-                                max="24"
-                                step="0.5"
-                                value={seleccionado.horas}
-                                onChange={e => actualizarHorasMiembro(p.userId, parseFloat(e.target.value) || 0)}
-                                className="w-16 h-8 text-sm text-center"
-                              />
-                              <span className="text-sm text-gray-500">h</span>
-                            </div>
-                          )}
                         </div>
                       )
                     })}
@@ -495,15 +437,9 @@ export function EditarTareaModal({
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-blue-800 font-medium">{nombreResumen}</span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">
-                      {miembrosSeleccionados.length} personas
-                    </Badge>
-                    <Badge className="bg-blue-600">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {totalHoras}h total
-                    </Badge>
-                  </div>
+                  <Badge variant="secondary">
+                    {miembrosSeleccionados.length} personas
+                  </Badge>
                 </div>
               </div>
             )}
