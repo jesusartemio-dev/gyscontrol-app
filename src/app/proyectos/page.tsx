@@ -60,6 +60,7 @@ export default function ProyectosPage() {
   const [clienteId, setClienteId] = useState('')
   const [comercialId, setComercialId] = useState('')
   const [gestorId, setGestorId] = useState('')
+  const [descripcion, setDescripcion] = useState('')
   const [fechaInicio, setFechaInicio] = useState('')
   const [loading, setLoading] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
@@ -141,6 +142,7 @@ export default function ProyectosPage() {
         comercialId,
         gestorId,
         nombre,
+        descripcion: descripcion.trim() || undefined,
         codigo,
         totalCliente: 0,
         totalInterno: 0,
@@ -156,6 +158,7 @@ export default function ProyectosPage() {
       if (nuevo) {
         setProyectos([...proyectos, nuevo])
         setNombre('')
+        setDescripcion('')
         setCodigo('')
         setClienteId('')
         setComercialId('')
@@ -267,6 +270,16 @@ export default function ProyectosPage() {
                     placeholder="Nombre del proyecto"
                     className="h-8 text-sm"
                     required
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium">Descripción</Label>
+                  <textarea
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    placeholder="Descripción detallada (opcional)"
+                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm resize-none h-16"
+                    rows={2}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">

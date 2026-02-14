@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
         gestorId,
         cotizacionId,
         nombre,
+        descripcion: nombre,
         codigo: generatedCodigo, // ✅ Use auto-generated code
         estado,
         fechaInicio: new Date(fechaInicio),

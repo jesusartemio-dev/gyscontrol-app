@@ -97,6 +97,7 @@ export async function POST(req: Request) {
         liderId: data.liderId || undefined,
         cotizacionId: data.cotizacionId || undefined,
         nombre: data.nombre,
+        descripcion: data.descripcion || undefined,
         codigo: codigoProyecto,
         totalEquiposInterno: data.totalEquiposInterno || 0,
         totalServiciosInterno: data.totalServiciosInterno || 0,

@@ -1048,6 +1048,7 @@ export interface Proyecto {
   cotizacionId?: string
 
   nombre: string
+  descripcion?: string | null
   totalEquiposInterno: number
   totalServiciosInterno: number
   totalGastosInterno: number

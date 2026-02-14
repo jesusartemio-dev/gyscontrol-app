@@ -421,6 +421,7 @@ export interface ProyectoPayload {
   cotizacionId?: string
 
   nombre: string
+  descripcion?: string
   totalEquiposInterno: number
   totalServiciosInterno: number
   totalGastosInterno: number

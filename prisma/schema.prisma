@@ -811,6 +811,7 @@ model Proyecto {
   liderId                  String?
   cotizacionId             String?
   nombre                   String
+  descripcion              String?
   totalEquiposInterno      Float                      @default(0)
   totalServiciosInterno    Float                      @default(0)
   totalGastosInterno       Float                      @default(0)

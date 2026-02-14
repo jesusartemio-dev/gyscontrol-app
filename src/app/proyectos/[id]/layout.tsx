@@ -79,11 +79,13 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   const [editingHeader, setEditingHeader] = useState(false)
   const [savingHeader, setSavingHeader] = useState(false)
   const [editCodigo, setEditCodigo] = useState('')
+  const [editNombre, setEditNombre] = useState('')
   const [editFechaInicio, setEditFechaInicio] = useState('')
 
   const startEditingHeader = () => {
     if (!proyecto) return
     setEditCodigo(proyecto.codigo || '')
+    setEditNombre(proyecto.nombre || '')
     setEditFechaInicio(proyecto.fechaInicio
       ? new Date(proyecto.fechaInicio).toISOString().split('T')[0]
       : '')
@@ -103,6 +105,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           codigo: editCodigo,
+          nombre: editNombre,
           fechaInicio: editFechaInicio ? new Date(editFechaInicio).toISOString() : proyecto.fechaInicio
         })
       })
@@ -111,9 +114,9 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         throw new Error(err.error || 'Error al actualizar')
       }
       const updated = await res.json()
-      handleDataUpdate({ ...proyecto, codigo: updated.codigo, fechaInicio: updated.fechaInicio })
+      handleDataUpdate({ ...proyecto, codigo: updated.codigo, nombre: updated.nombre, fechaInicio: updated.fechaInicio })
       setEditingHeader(false)
-      toast.success('Código y fecha actualizados')
+      toast.success('Datos del proyecto actualizados')
     } catch (err: any) {
       toast.error(err.message || 'Error al guardar cambios')
     } finally {
@@ -400,22 +403,39 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                       <span className="font-medium text-foreground">{currentSubPage}</span>
                     </>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      {editingHeader ? (
-                        <Input
-                          value={editCodigo}
-                          onChange={(e) => setEditCodigo(e.target.value)}
-                          className="h-7 w-36 font-mono text-sm"
-                          placeholder="Código"
-                        />
-                      ) : (
-                        <span className="font-mono bg-muted px-2 py-0.5 rounded border">
-                          {proyecto.codigo}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        {editingHeader ? (
+                          <>
+                            <Input
+                              value={editCodigo}
+                              onChange={(e) => setEditCodigo(e.target.value)}
+                              className="h-7 w-36 font-mono text-sm"
+                              placeholder="Código"
+                            />
+                            <Input
+                              value={editNombre}
+                              onChange={(e) => setEditNombre(e.target.value)}
+                              className="h-7 w-64 text-sm"
+                              placeholder="Nombre del proyecto"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-mono bg-muted px-2 py-0.5 rounded border">
+                              {proyecto.codigo}
+                            </span>
+                            <h1 className="text-lg sm:text-xl font-semibold text-gray-900" title={proyecto.nombre}>
+                              {proyecto.nombre}
+                            </h1>
+                          </>
+                        )}
+                      </div>
+                      {!editingHeader && proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
+                        <span className="text-xs text-muted-foreground ml-0.5 truncate max-w-[500px]" title={proyecto.descripcion}>
+                          {proyecto.descripcion}
                         </span>
                       )}
-                      <h1 className="text-lg sm:text-xl font-semibold text-gray-900" title={proyecto.nombre}>
-                        {proyecto.nombre}
-                      </h1>
                     </div>
                   )}
                 </div>
