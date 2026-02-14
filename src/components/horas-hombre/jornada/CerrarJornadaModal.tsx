@@ -154,6 +154,7 @@ export function CerrarJornadaModal({
       setPaso(1)
       setAvanceDia('')
       setBloqueos([])
+      setNuevoBloqueo({ tipoBloqueoId: '', descripcion: '', impacto: '' })
       setPlanSiguiente('')
 
       // Inicializar progreso
@@ -208,19 +209,19 @@ export function CerrarJornadaModal({
     }
   }, [open, tareas])
 
-  const agregarBloqueo = () => {
-    setBloqueos(prev => [...prev, { tipoBloqueoId: '', tipoBloqueoNombre: '', descripcion: '', impacto: '' }])
-  }
+  // Form para nuevo bloqueo
+  const [nuevoBloqueo, setNuevoBloqueo] = useState({ tipoBloqueoId: '', descripcion: '', impacto: '' })
 
-  const actualizarBloqueo = (index: number, campo: keyof Bloqueo, valor: string) => {
-    setBloqueos(prev => prev.map((b, i) => {
-      if (i !== index) return b
-      if (campo === 'tipoBloqueoId') {
-        const tipo = tiposBloqueo.find(t => t.id === valor)
-        return { ...b, tipoBloqueoId: valor, tipoBloqueoNombre: tipo?.nombre || '' }
-      }
-      return { ...b, [campo]: valor }
-    }))
+  const agregarBloqueo = () => {
+    if (!nuevoBloqueo.tipoBloqueoId || !nuevoBloqueo.descripcion.trim()) return
+    const tipo = tiposBloqueo.find(t => t.id === nuevoBloqueo.tipoBloqueoId)
+    setBloqueos(prev => [...prev, {
+      tipoBloqueoId: nuevoBloqueo.tipoBloqueoId,
+      tipoBloqueoNombre: tipo?.nombre || '',
+      descripcion: nuevoBloqueo.descripcion.trim(),
+      impacto: nuevoBloqueo.impacto.trim()
+    }])
+    setNuevoBloqueo({ tipoBloqueoId: '', descripcion: '', impacto: '' })
   }
 
   const eliminarBloqueo = (index: number) => {
@@ -255,14 +256,7 @@ export function CerrarJornadaModal({
       return
     }
 
-    // Validar bloqueos: cada uno debe tener tipo y descripción
     const bloqueosValidos = bloqueos.filter(b => b.tipoBloqueoId && b.descripcion.trim())
-    const bloqueosIncompletos = bloqueos.filter(b => b.tipoBloqueoId || b.descripcion.trim()).length - bloqueosValidos.length
-    if (bloqueosIncompletos > 0) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Cada bloqueo debe tener tipo y descripción' })
-      setPaso(2)
-      return
-    }
 
     try {
       setSubmitting(true)
@@ -489,95 +483,94 @@ export function CerrarJornadaModal({
           {/* ===== PASO 2: Bloqueos ===== */}
           {paso === 2 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2 text-sm">
-                  <ShieldAlert className="h-4 w-4 text-amber-500" />
-                  Bloqueos del dia
-                </Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={agregarBloqueo}
-                  className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Agregar
-                </Button>
-              </div>
+              <Label className="flex items-center gap-2 text-sm">
+                <ShieldAlert className="h-4 w-4 text-amber-500" />
+                Bloqueos del dia
+              </Label>
 
-              {bloqueos.length === 0 ? (
-                <div className="text-center py-6 border rounded-lg border-dashed">
-                  <ShieldAlert className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 mb-1">Sin bloqueos reportados</p>
-                  <p className="text-xs text-gray-400 mb-3">Si hubo problemas que impidieron avanzar, registralos aqui</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={agregarBloqueo}
-                    className="text-xs"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Reportar bloqueo
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
+              {/* Lista de bloqueos agregados */}
+              {bloqueos.length > 0 && (
+                <div className="space-y-1.5">
                   {bloqueos.map((bloqueo, index) => (
-                    <div key={index} className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2">
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 space-y-2">
-                          <Select
-                            value={bloqueo.tipoBloqueoId}
-                            onValueChange={val => actualizarBloqueo(index, 'tipoBloqueoId', val)}
-                          >
-                            <SelectTrigger className="h-8 text-sm bg-white">
-                              <SelectValue placeholder="Seleccionar tipo de bloqueo..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {tiposBloqueo.map(tipo => (
-                                <SelectItem key={tipo.id} value={tipo.id}>
-                                  <span className="font-medium">{tipo.nombre}</span>
-                                  {tipo.descripcion && (
-                                    <span className="text-gray-500"> — {tipo.descripcion}</span>
-                                  )}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Textarea
-                            placeholder="Describe el bloqueo con detalle..."
-                            value={bloqueo.descripcion}
-                            onChange={e => actualizarBloqueo(index, 'descripcion', e.target.value)}
-                            rows={2}
-                            className="text-sm bg-white resize-none"
-                          />
-                          <Input
-                            placeholder="Impacto (opcional) — Ej: 3h de trabajo perdidas"
-                            value={bloqueo.impacto}
-                            onChange={e => actualizarBloqueo(index, 'impacto', e.target.value)}
-                            className="h-7 text-xs bg-white"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => eliminarBloqueo(index)}
-                          className="h-8 w-8 p-0 text-gray-400 hover:text-red-500 flex-shrink-0 mt-0.5"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
+                    <div key={index} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-2.5 py-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[10px] font-semibold text-amber-800 bg-amber-200 rounded px-1.5 py-0.5">
+                          {bloqueo.tipoBloqueoNombre}
+                        </span>
+                        <p className="text-sm mt-1 leading-snug">{bloqueo.descripcion}</p>
+                        {bloqueo.impacto && (
+                          <p className="text-xs text-amber-600 mt-0.5">Impacto: {bloqueo.impacto}</p>
+                        )}
                       </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => eliminarBloqueo(index)}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 flex-shrink-0"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   ))}
                 </div>
               )}
 
-              <p className="text-[11px] text-gray-400 leading-tight px-1">
-                Los bloqueos ayudan a identificar causas de retrasos y sustentar adicionales.
-              </p>
+              {/* Formulario para agregar bloqueo */}
+              <div className="rounded-lg border border-dashed border-gray-300 p-3 space-y-2">
+                <Select
+                  value={nuevoBloqueo.tipoBloqueoId}
+                  onValueChange={val => setNuevoBloqueo(prev => ({ ...prev, tipoBloqueoId: val }))}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Seleccionar tipo de bloqueo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tiposBloqueo.map(tipo => (
+                      <SelectItem key={tipo.id} value={tipo.id}>
+                        <div className="flex flex-col py-0.5">
+                          <span className="font-medium text-sm">{tipo.nombre}</span>
+                          {tipo.descripcion && (
+                            <span className="text-xs text-gray-500 leading-tight">{tipo.descripcion}</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Textarea
+                  placeholder="Describe el bloqueo con detalle..."
+                  value={nuevoBloqueo.descripcion}
+                  onChange={e => setNuevoBloqueo(prev => ({ ...prev, descripcion: e.target.value }))}
+                  rows={2}
+                  className="text-sm resize-none"
+                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Impacto (opcional)"
+                    value={nuevoBloqueo.impacto}
+                    onChange={e => setNuevoBloqueo(prev => ({ ...prev, impacto: e.target.value }))}
+                    className="h-7 text-xs flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={agregarBloqueo}
+                    disabled={!nuevoBloqueo.tipoBloqueoId || !nuevoBloqueo.descripcion.trim()}
+                    className="h-7 text-xs px-3 text-amber-700 border-amber-300 hover:bg-amber-50"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Agregar
+                  </Button>
+                </div>
+              </div>
+
+              {bloqueos.length === 0 && (
+                <p className="text-[11px] text-gray-400 leading-tight px-1">
+                  Si no hubo bloqueos, puedes continuar al siguiente paso.
+                </p>
+              )}
             </div>
           )}
 
