@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { randomUUID } from 'crypto'
 
 interface MiembroTarea {
   usuarioId: string
@@ -162,11 +163,61 @@ export async function POST(request: NextRequest, context: RouteContext) {
       )
     }
 
+    // Resolver la tarea: si es extra nueva, crear ProyectoTarea con [EXTRA]
+    let resolvedProyectoTareaId = proyectoTareaId || null
+
+    if (!proyectoTareaId && nombreTareaExtra && jornada.proyectoEdtId) {
+      // Buscar el cronograma de ejecución del proyecto
+      const cronogramaEjecucion = await prisma.proyectoCronograma.findFirst({
+        where: { proyectoId: jornada.proyectoId, tipo: 'ejecucion' }
+      })
+
+      if (cronogramaEjecucion) {
+        // Buscar un EDT en ejecución con el mismo nombre que el EDT de la jornada
+        const edtJornada = await prisma.proyectoEdt.findUnique({
+          where: { id: jornada.proyectoEdtId },
+          select: { nombre: true }
+        })
+
+        let edtEjecucion = await prisma.proyectoEdt.findFirst({
+          where: {
+            proyectoId: jornada.proyectoId,
+            proyectoCronogramaId: cronogramaEjecucion.id,
+            nombre: edtJornada?.nombre || ''
+          }
+        })
+
+        // Si no hay EDT equivalente en ejecución, usar el de la jornada
+        const targetEdtId = edtEjecucion?.id || jornada.proyectoEdtId
+
+        // Crear ProyectoTarea con marcador [EXTRA]
+        const hoy = new Date()
+        const nuevaTareaExtra = await prisma.proyectoTarea.create({
+          data: {
+            id: randomUUID(),
+            proyectoEdtId: targetEdtId,
+            proyectoCronogramaId: cronogramaEjecucion.id,
+            nombre: nombreTareaExtra.trim(),
+            descripcion: '[EXTRA]',
+            fechaInicio: hoy,
+            fechaFin: hoy,
+            creadoPorId: session.user.id,
+            estado: 'en_progreso',
+            orden: 0,
+            updatedAt: new Date()
+          }
+        })
+
+        resolvedProyectoTareaId = nuevaTareaExtra.id
+        console.log(`✅ JORNADA CAMPO: Creada tarea extra "${nombreTareaExtra}" como ProyectoTarea ${nuevaTareaExtra.id}`)
+      }
+    }
+
     // Capturar porcentaje inicial de la tarea del cronograma
     let porcentajeInicial: number | null = null
-    if (proyectoTareaId) {
+    if (resolvedProyectoTareaId) {
       const tareaActual = await prisma.proyectoTarea.findUnique({
-        where: { id: proyectoTareaId },
+        where: { id: resolvedProyectoTareaId },
         select: { porcentajeCompletado: true }
       })
       porcentajeInicial = tareaActual?.porcentajeCompletado ?? 0
@@ -176,7 +227,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const tareaCampo = await prisma.registroHorasCampoTarea.create({
       data: {
         registroCampoId: jornadaId,
-        proyectoTareaId: proyectoTareaId || null,
+        proyectoTareaId: resolvedProyectoTareaId,
         nombreTareaExtra: nombreTareaExtra || null,
         descripcion: descripcion || null,
         porcentajeInicial,

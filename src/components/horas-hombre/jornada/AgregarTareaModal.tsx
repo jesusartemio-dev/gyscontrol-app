@@ -5,7 +5,7 @@
  *
  * Permite seleccionar:
  * - Actividad EDT (para filtrar tareas)
- * - Tarea del cronograma o tarea extra
+ * - Tarea del cronograma o tarea extra (existente o nueva)
  * - Miembros con sus horas individuales
  */
 
@@ -45,6 +45,14 @@ interface Actividad {
   tareas: TareaDelCronograma[]
 }
 
+interface TareaExtraExistente {
+  id: string
+  nombre: string
+  estado: string
+  porcentaje: number
+  edtNombre?: string
+}
+
 interface PersonalPlanificado {
   userId: string
   nombre: string
@@ -68,6 +76,8 @@ interface AgregarTareaModalProps {
   onSuccess: () => void
 }
 
+const CREAR_NUEVA = '__crear_nueva__'
+
 export function AgregarTareaModal({
   open,
   onOpenChange,
@@ -86,11 +96,14 @@ export function AgregarTareaModal({
   // Datos de selección
   const [actividades, setActividades] = useState<Actividad[]>([])
   const [tareas, setTareas] = useState<TareaDelCronograma[]>([])
+  const [tareasExtra, setTareasExtra] = useState<TareaExtraExistente[]>([])
 
   // Formulario
   const [tipoTarea, setTipoTarea] = useState<'cronograma' | 'extra'>('cronograma')
   const [actividadId, setActividadId] = useState('')
   const [tareaId, setTareaId] = useState('')
+  // Extra: selector de existente o crear nueva
+  const [extraSeleccion, setExtraSeleccion] = useState(CREAR_NUEVA)
   const [nombreTareaExtra, setNombreTareaExtra] = useState('')
   const [horasBase, setHorasBase] = useState(9.5)
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroSeleccionado[]>([])
@@ -101,12 +114,14 @@ export function AgregarTareaModal({
       setTipoTarea('cronograma')
       setActividadId('')
       setTareaId('')
+      setExtraSeleccion(CREAR_NUEVA)
       setNombreTareaExtra('')
       setHorasBase(9.5)
       setMiembrosSeleccionados([])
       if (proyectoEdtId) {
         cargarActividades()
       }
+      cargarTareasExtra()
     }
   }, [open, proyectoEdtId])
 
@@ -135,6 +150,18 @@ export function AgregarTareaModal({
       console.error('Error cargando actividades:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const cargarTareasExtra = async () => {
+    try {
+      const response = await fetch(`/api/horas-hombre/tareas-extra?proyectoId=${proyectoId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setTareasExtra(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error('Error cargando tareas extra:', error)
     }
   }
 
@@ -170,14 +197,31 @@ export function AgregarTareaModal({
     )
   }
 
+  // Determinar qué se envía al API
+  const getSubmitPayload = () => {
+    if (tipoTarea === 'cronograma') {
+      return { proyectoTareaId: tareaId }
+    }
+    // Extra: existente o nueva
+    if (extraSeleccion !== CREAR_NUEVA) {
+      return { proyectoTareaId: extraSeleccion }
+    }
+    return { nombreTareaExtra: nombreTareaExtra.trim() }
+  }
+
+  const isExtraValid = () => {
+    if (extraSeleccion !== CREAR_NUEVA) return true
+    return nombreTareaExtra.trim().length > 0
+  }
+
   const handleSubmit = async () => {
     // Validaciones
     if (tipoTarea === 'cronograma' && !tareaId) {
       toast({ variant: 'destructive', title: 'Error', description: 'Selecciona una tarea del cronograma' })
       return
     }
-    if (tipoTarea === 'extra' && !nombreTareaExtra.trim()) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Ingresa el nombre de la tarea extra' })
+    if (tipoTarea === 'extra' && !isExtraValid()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Selecciona una tarea extra o ingresa un nombre' })
       return
     }
     if (miembrosSeleccionados.length === 0) {
@@ -187,12 +231,12 @@ export function AgregarTareaModal({
 
     try {
       setSubmitting(true)
+      const payload = getSubmitPayload()
       const response = await fetch(`/api/horas-hombre/jornada/${jornadaId}/agregar-tarea`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          proyectoTareaId: tipoTarea === 'cronograma' ? tareaId : undefined,
-          nombreTareaExtra: tipoTarea === 'extra' ? nombreTareaExtra.trim() : undefined,
+          ...payload,
           miembros: miembrosSeleccionados.map(m => ({
             usuarioId: m.usuarioId,
             horas: m.horas,
@@ -229,6 +273,15 @@ export function AgregarTareaModal({
 
   const totalHoras = miembrosSeleccionados.reduce((sum, m) => sum + m.horas, 0)
   const tareaSeleccionada = tareas.find(t => t.id === tareaId)
+  const extraExistenteSeleccionada = tareasExtra.find(t => t.id === extraSeleccion)
+
+  // Nombre para el resumen
+  const getNombreResumen = () => {
+    if (tipoTarea === 'cronograma' && tareaSeleccionada) return tareaSeleccionada.nombre
+    if (tipoTarea === 'extra' && extraExistenteSeleccionada) return extraExistenteSeleccionada.nombre
+    if (tipoTarea === 'extra' && nombreTareaExtra) return nombreTareaExtra
+    return 'Selecciona una tarea'
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -300,16 +353,43 @@ export function AgregarTareaModal({
               )}
             </TabsContent>
 
-            <TabsContent value="extra" className="mt-3">
+            <TabsContent value="extra" className="space-y-2.5 mt-3">
+              {/* Selector de tarea extra existente o crear nueva */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
-                <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Nombre *</Label>
-                <Input
-                  placeholder="Ej: Limpieza de zona, Traslado de materiales"
-                  value={nombreTareaExtra}
-                  onChange={e => setNombreTareaExtra(e.target.value)}
-                  className="h-8 text-sm flex-1"
-                />
+                <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Extra</Label>
+                <Select value={extraSeleccion} onValueChange={(v) => { setExtraSeleccion(v); if (v !== CREAR_NUEVA) setNombreTareaExtra('') }}>
+                  <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
+                    <SelectValue placeholder="Seleccionar o crear" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
+                    <SelectItem value={CREAR_NUEVA}>
+                      <span className="flex items-center gap-1.5 text-blue-600 font-medium">
+                        <Plus className="h-3.5 w-3.5" />
+                        Crear nueva tarea extra
+                      </span>
+                    </SelectItem>
+                    {tareasExtra.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.nombre} <span className="text-gray-400 text-xs ml-1">({t.porcentaje}%)</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Input nombre solo si está creando nueva */}
+              {extraSeleccion === CREAR_NUEVA && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+                  <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Nombre *</Label>
+                  <Input
+                    placeholder="Ej: Limpieza de zona, Traslado de materiales"
+                    value={nombreTareaExtra}
+                    onChange={e => setNombreTareaExtra(e.target.value)}
+                    className="h-8 text-sm flex-1"
+                    autoFocus
+                  />
+                </div>
+              )}
             </TabsContent>
           </Tabs>
 
@@ -395,11 +475,7 @@ export function AgregarTareaModal({
           {miembrosSeleccionados.length > 0 && (
             <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
               <span className="text-xs text-blue-800 truncate mr-2">
-                {tipoTarea === 'cronograma' && tareaSeleccionada
-                  ? tareaSeleccionada.nombre
-                  : tipoTarea === 'extra' && nombreTareaExtra
-                    ? nombreTareaExtra
-                    : 'Selecciona una tarea'}
+                {getNombreResumen()}
               </span>
               <div className="flex items-center gap-1.5 shrink-0">
                 <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
@@ -430,7 +506,7 @@ export function AgregarTareaModal({
                 submitting ||
                 miembrosSeleccionados.length === 0 ||
                 (tipoTarea === 'cronograma' && !tareaId) ||
-                (tipoTarea === 'extra' && !nombreTareaExtra.trim())
+                (tipoTarea === 'extra' && !isExtraValid())
               }
               className="flex-1 sm:flex-none"
             >
