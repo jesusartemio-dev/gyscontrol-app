@@ -28,6 +28,7 @@ import {
   HardHat
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useSession } from 'next-auth/react'
 
 interface Proyecto {
   id: string
@@ -79,6 +80,8 @@ export function IniciarJornadaModal({
   onSuccess
 }: IniciarJornadaModalProps) {
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const sessionUserId = session?.user?.id
 
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -177,6 +180,14 @@ export function IniciarJornadaModal({
           ROLES_PERMITIDOS.includes(u.role)
         )
         setUsuarios(usuariosFiltrados)
+        // Auto-seleccionar al usuario actual como parte del equipo y supervisor
+        if (sessionUserId) {
+          const currentUser = usuariosFiltrados.find((u: Usuario) => u.id === sessionUserId)
+          if (currentUser) {
+            setPersonalSeleccionado([currentUser.id])
+            setSupervisorId(currentUser.id)
+          }
+        }
       }
     } catch (error) {
       console.error('Error cargando usuarios:', error)
@@ -184,11 +195,21 @@ export function IniciarJornadaModal({
   }
 
   const togglePersonal = (userId: string) => {
+    const isAdding = !personalSeleccionado.includes(userId)
     setPersonalSeleccionado(prev =>
       prev.includes(userId)
         ? prev.filter(id => id !== userId)
         : [...prev, userId]
     )
+    // Auto-asignar seguridad si se selecciona desde el tab "Seguridad"
+    if (isAdding && filtroRol === 'seguridad') {
+      setSeguridadId(userId)
+    }
+    // Si se deselecciona alguien que era supervisor o seguridad, limpiar
+    if (!isAdding) {
+      if (userId === supervisorId) setSupervisorId('')
+      if (userId === seguridadId) setSeguridadId('')
+    }
   }
 
   const seleccionarTodosFiltrados = () => {

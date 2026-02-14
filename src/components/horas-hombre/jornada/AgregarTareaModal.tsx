@@ -92,7 +92,7 @@ export function AgregarTareaModal({
   const [actividadId, setActividadId] = useState('')
   const [tareaId, setTareaId] = useState('')
   const [nombreTareaExtra, setNombreTareaExtra] = useState('')
-  const [horasBase, setHorasBase] = useState(8)
+  const [horasBase, setHorasBase] = useState(9.5)
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<MiembroSeleccionado[]>([])
 
   // Reset al abrir
@@ -102,7 +102,7 @@ export function AgregarTareaModal({
       setActividadId('')
       setTareaId('')
       setNombreTareaExtra('')
-      setHorasBase(8)
+      setHorasBase(9.5)
       setMiembrosSeleccionados([])
       if (proyectoEdtId) {
         cargarActividades()
@@ -327,8 +327,8 @@ export function AgregarTareaModal({
                   max="24"
                   step="0.5"
                   value={horasBase}
-                  onChange={e => setHorasBase(parseFloat(e.target.value) || 8)}
-                  className="w-14 h-7 text-xs text-center"
+                  onChange={e => setHorasBase(parseFloat(e.target.value) || 9.5)}
+                  className="w-[4.5rem] h-7 text-xs text-center"
                 />
                 <span className="text-[11px] text-gray-400">h</span>
                 <button
@@ -378,7 +378,7 @@ export function AgregarTareaModal({
                               step="0.5"
                               value={seleccionado.horas}
                               onChange={e => actualizarHorasMiembro(p.userId, parseFloat(e.target.value) || 0)}
-                              className="w-14 h-7 text-xs text-center"
+                              className="w-[4.5rem] h-7 text-xs text-center"
                             />
                             <span className="text-[11px] text-gray-400">h</span>
                           </div>
