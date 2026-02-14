@@ -149,6 +149,15 @@ export function ListaJornadas({
   const [supAsignadoFilter, setSupAsignadoFilter] = useState<string>('todos')
   const [miembroFilter, setMiembroFilter] = useState<string>('todos')
   const [busqueda, setBusqueda] = useState('')
+  const [personCols, setPersonCols] = useState<Set<string>>(() => new Set(['creador']))
+  const togglePersonCol = (col: string) => {
+    setPersonCols(prev => {
+      const next = new Set(prev)
+      if (next.has(col)) next.delete(col)
+      else next.add(col)
+      return next
+    })
+  }
 
   // Extraer proyectos unicos para el filtro
   const proyectosUnicos = Array.from(
@@ -249,13 +258,13 @@ export function ListaJornadas({
   const getEstadoBadge = (estado: EstadoJornada) => {
     switch (estado) {
       case 'iniciado':
-        return <Badge className="bg-green-100 text-green-800 border-green-200"><Clock className="h-3 w-3 mr-1" />En curso</Badge>
+        return <Badge className="bg-green-100 text-green-800 border-green-200 whitespace-nowrap py-0.5"><Clock className="h-3 w-3 mr-1" />En curso</Badge>
       case 'pendiente':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-200"><AlertCircle className="h-3 w-3 mr-1" />Pendiente</Badge>
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 whitespace-nowrap py-0.5"><AlertCircle className="h-3 w-3 mr-1" />Pendiente</Badge>
       case 'aprobado':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200"><CheckCircle className="h-3 w-3 mr-1" />Aprobado</Badge>
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200 whitespace-nowrap py-0.5"><CheckCircle className="h-3 w-3 mr-1" />Aprobado</Badge>
       case 'rechazado':
-        return <Badge className="bg-red-100 text-red-800 border-red-200"><XCircle className="h-3 w-3 mr-1" />Rechazado</Badge>
+        return <Badge className="bg-red-100 text-red-800 border-red-200 whitespace-nowrap py-0.5"><XCircle className="h-3 w-3 mr-1" />Rechazado</Badge>
       default:
         return <Badge variant="outline">{estado}</Badge>
     }
@@ -473,6 +482,32 @@ export function ListaJornadas({
               </Button>
             )}
           </div>
+
+          {/* Column visibility toggles (supervision view) */}
+          {showSupervisor && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] text-gray-400">Columnas:</span>
+              {([
+                { key: 'creador', label: 'Creador', Icon: UserCircle },
+                { key: 'aprobador', label: 'Aprobador', Icon: CheckCircle },
+                { key: 'supervisor', label: 'Supervisor', Icon: Shield },
+                { key: 'seguridad', label: 'Seguridad', Icon: HardHat },
+              ] as const).map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition-colors ${
+                    personCols.has(key)
+                      ? 'bg-blue-50 text-blue-700 border-blue-200 font-medium'
+                      : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:border-gray-300'
+                  }`}
+                  onClick={() => togglePersonCol(key)}
+                >
+                  <Icon className="h-3 w-3" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </CardHeader>
 
@@ -488,11 +523,14 @@ export function ListaJornadas({
                 <TableRow>
                   <TableHead className="w-24">Fecha</TableHead>
                   <TableHead>Proyecto / Objetivo</TableHead>
-                  {showSupervisor && <TableHead>Gestión</TableHead>}
-                  <TableHead>Sup / Seg</TableHead>
+                  {showSupervisor && personCols.has('creador') && <TableHead>Creado por</TableHead>}
+                  {showSupervisor && personCols.has('aprobador') && <TableHead>Aprobado por</TableHead>}
+                  {!showSupervisor && <TableHead>Sup / Seg</TableHead>}
+                  {showSupervisor && personCols.has('supervisor') && <TableHead>Supervisor</TableHead>}
+                  {showSupervisor && personCols.has('seguridad') && <TableHead>Seguridad</TableHead>}
                   <TableHead>Equipo</TableHead>
                   <TableHead>Estado / Avance</TableHead>
-                  <TableHead>Tareas</TableHead>
+                  <TableHead>Tareas / Avance</TableHead>
                   <TableHead className="text-center w-20">Horas</TableHead>
                   <TableHead className="text-right w-24">Acciones</TableHead>
                 </TableRow>
@@ -517,96 +555,139 @@ export function ListaJornadas({
                         </Tooltip>
                       )}
                     </TableCell>
-                    {showSupervisor && (
+                    {/* Creado por (toggleable) */}
+                    {showSupervisor && personCols.has('creador') && (
                       <TableCell>
-                        <div className="space-y-0.5">
-                          {jornada.supervisor && (
+                        {jornada.supervisor ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-xs text-gray-600 truncate max-w-[100px] block cursor-default">{getShortName(jornada.supervisor.name || jornada.supervisor.email)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p className="text-[11px]">{jornada.supervisor.name || jornada.supervisor.email}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : <span className="text-gray-400">-</span>}
+                      </TableCell>
+                    )}
+                    {/* Aprobado por (toggleable) */}
+                    {showSupervisor && personCols.has('aprobador') && (
+                      <TableCell>
+                        {jornada.aprobadoPor ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-xs text-gray-600 truncate max-w-[100px] block cursor-default">{getShortName(jornada.aprobadoPor.name || jornada.aprobadoPor.email)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p className="text-[11px]">{jornada.aprobadoPor.name || jornada.aprobadoPor.email}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : <span className="text-gray-400">-</span>}
+                      </TableCell>
+                    )}
+                    {/* Sup / Seg (non-supervision view) */}
+                    {!showSupervisor && (
+                      <TableCell>
+                        {(() => {
+                          const sup = getSupervisorAsignado(jornada.personalPlanificado)
+                          const seg = getSeguridadAsignado(jornada.personalPlanificado)
+                          if (!sup && !seg) return <span className="text-gray-400">-</span>
+                          return (
+                            <div className="space-y-0.5">
+                              {sup && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1 cursor-default">
+                                      <Shield className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                                      <span className="text-[11px] text-gray-600 truncate max-w-[100px]">{getShortName(sup.nombre)}</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    <p className="text-[11px]"><span className="opacity-60">Supervisor:</span> {sup.nombre}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              {seg && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1 cursor-default">
+                                      <HardHat className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                                      <span className="text-[11px] text-gray-600 truncate max-w-[100px]">{getShortName(seg.nombre)}</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    <p className="text-[11px]"><span className="opacity-60">Seguridad:</span> {seg.nombre}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </TableCell>
+                    )}
+                    {/* Supervisor (toggleable) */}
+                    {showSupervisor && personCols.has('supervisor') && (
+                      <TableCell>
+                        {(() => {
+                          const sup = getSupervisorAsignado(jornada.personalPlanificado)
+                          return sup ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 cursor-default">
-                                  <UserCircle className="h-3 w-3 text-violet-500 flex-shrink-0" />
-                                  <span className="text-[11px] text-gray-600 truncate max-w-[100px]">{getShortName(jornada.supervisor.name || jornada.supervisor.email)}</span>
-                                </div>
+                                <span className="text-xs text-gray-600 truncate max-w-[100px] block cursor-default">{getShortName(sup.nombre)}</span>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                <p className="text-[11px]"><span className="opacity-60">Creado por:</span> {jornada.supervisor.name || jornada.supervisor.email}</p>
+                                <p className="text-[11px]">{sup.nombre}</p>
                               </TooltipContent>
                             </Tooltip>
-                          )}
-                          {jornada.aprobadoPor && (
+                          ) : <span className="text-gray-400">-</span>
+                        })()}
+                      </TableCell>
+                    )}
+                    {/* Seguridad (toggleable) */}
+                    {showSupervisor && personCols.has('seguridad') && (
+                      <TableCell>
+                        {(() => {
+                          const seg = getSeguridadAsignado(jornada.personalPlanificado)
+                          return seg ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 cursor-default">
-                                  <CheckCircle className="h-3 w-3 text-emerald-500 flex-shrink-0" />
-                                  <span className="text-[11px] text-gray-600 truncate max-w-[100px]">{getShortName(jornada.aprobadoPor.name || jornada.aprobadoPor.email)}</span>
-                                </div>
+                                <span className="text-xs text-gray-600 truncate max-w-[100px] block cursor-default">{getShortName(seg.nombre)}</span>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                <p className="text-[11px]"><span className="opacity-60">Aprobado por:</span> {jornada.aprobadoPor.name || jornada.aprobadoPor.email}</p>
+                                <p className="text-[11px]">{seg.nombre}</p>
                               </TooltipContent>
                             </Tooltip>
-                          )}
-                          {!jornada.supervisor && !jornada.aprobadoPor && (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </div>
+                          ) : <span className="text-gray-400">-</span>
+                        })()}
                       </TableCell>
                     )}
                     <TableCell>
                       {(() => {
-                        const sup = getSupervisorAsignado(jornada.personalPlanificado)
-                        const seg = getSeguridadAsignado(jornada.personalPlanificado)
-                        if (!sup && !seg) return <span className="text-gray-400">-</span>
-                        return (
-                          <div className="space-y-0.5">
-                            {sup && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-1 cursor-default">
-                                    <Shield className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                                    <span className="text-[11px] text-gray-600 truncate max-w-[100px]">{getShortName(sup.nombre)}</span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  <p className="text-[11px]"><span className="opacity-60">Supervisor:</span> {sup.nombre}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                            {seg && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-1 cursor-default">
-                                    <HardHat className="h-3 w-3 text-amber-500 flex-shrink-0" />
-                                    <span className="text-[11px] text-gray-600 truncate max-w-[100px]">{getShortName(seg.nombre)}</span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  <p className="text-[11px]"><span className="opacity-60">Seguridad:</span> {seg.nombre}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const equipo = getEquipo(jornada.personalPlanificado)
-                        if (equipo.length === 0) return <span className="text-gray-400">-</span>
+                        const personal = jornada.personalPlanificado || []
+                        if (personal.length === 0) return <span className="text-gray-400">-</span>
+                        const sup = getSupervisorAsignado(personal)
+                        const seg = getSeguridadAsignado(personal)
+                        const equipo = getEquipo(personal)
                         return (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1.5 cursor-default">
                                 <Users className="h-3.5 w-3.5 text-orange-500" />
-                                <span className="text-sm font-medium">{equipo.length}</span>
+                                <span className="text-sm font-medium">{personal.length}</span>
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-[250px]">
                               <div className="space-y-0.5">
-                                <p className="font-medium text-[11px] opacity-70 mb-1">Equipo ({equipo.length})</p>
-                                {equipo.map((p, i) => (
-                                  <p key={i} className="text-[11px]">{p.nombre}</p>
-                                ))}
+                                {sup && <p className="text-[11px]"><span className="opacity-60">Sup:</span> {sup.nombre}</p>}
+                                {seg && <p className="text-[11px]"><span className="opacity-60">Seg:</span> {seg.nombre}</p>}
+                                {equipo.length > 0 && (
+                                  <>
+                                    <p className="font-medium text-[11px] opacity-70 mt-1">Equipo ({equipo.length})</p>
+                                    {equipo.map((p, i) => (
+                                      <p key={i} className="text-[11px]">{p.nombre}</p>
+                                    ))}
+                                  </>
+                                )}
                               </div>
                             </TooltipContent>
                           </Tooltip>
