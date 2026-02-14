@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
-        proyectoEdt: { select: { id: true, nombre: true } },
+        proyectoEdt: { select: { id: true, nombre: true, edt: { select: { id: true, nombre: true } } } },
         tareas: {
           include: {
             proyectoTarea: {

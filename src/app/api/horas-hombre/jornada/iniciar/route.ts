@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
       where: { id: jornadaCreada.id },
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
-        proyectoEdt: { select: { id: true, nombre: true } },
+        proyectoEdt: { select: { id: true, nombre: true, edt: { select: { id: true, nombre: true } } } },
         supervisor: { select: { id: true, name: true, email: true } }
       }
     })

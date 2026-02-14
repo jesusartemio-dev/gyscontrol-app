@@ -194,7 +194,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       where: { id: jornadaId },
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
-        proyectoEdt: { select: { id: true, nombre: true } },
+        proyectoEdt: { select: { id: true, nombre: true, edt: { select: { id: true, nombre: true } } } },
         supervisor: { select: { id: true, name: true, email: true } },
         tareas: {
           include: {

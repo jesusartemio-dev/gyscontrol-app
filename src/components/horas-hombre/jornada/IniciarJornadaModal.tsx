@@ -39,6 +39,10 @@ interface Proyecto {
 interface EdtProyecto {
   id: string
   nombre: string
+  edt?: {
+    id: string
+    nombre: string
+  }
 }
 
 interface Usuario {
@@ -343,7 +347,7 @@ export function IniciarJornadaModal({
                 <SelectContent position="popper" className="max-h-[250px]">
                   {edts.map(e => (
                     <SelectItem key={e.id} value={e.id}>
-                      {e.nombre}
+                      {e.edt?.nombre ? `${e.edt.nombre} - ${e.nombre}` : e.nombre}
                     </SelectItem>
                   ))}
                 </SelectContent>

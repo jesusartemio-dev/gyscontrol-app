@@ -52,6 +52,10 @@ interface Proyecto {
 interface Edt {
   id: string
   nombre: string
+  edt?: {
+    id: string
+    nombre: string
+  }
 }
 
 interface Usuario {
@@ -251,7 +255,7 @@ export function JornadaActiva({
                 {jornada.proyectoEdt && (
                   <span className="flex items-center gap-1">
                     <Target className="h-3.5 w-3.5" />
-                    {jornada.proyectoEdt.nombre}
+                    {jornada.proyectoEdt.edt?.nombre ? `${jornada.proyectoEdt.edt.nombre} - ${jornada.proyectoEdt.nombre}` : jornada.proyectoEdt.nombre}
                   </span>
                 )}
                 {jornada.ubicacion && (

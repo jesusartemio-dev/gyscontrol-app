@@ -67,6 +67,10 @@ interface Proyecto {
 interface Edt {
   id: string
   nombre: string
+  edt?: {
+    id: string
+    nombre: string
+  }
 }
 
 interface PersonalPlanificado {
