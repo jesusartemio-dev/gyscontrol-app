@@ -324,12 +324,12 @@ export default function GastoLineaTable({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-sm">Categoría</Label>
-                <Select value={categoriaGastoId} onValueChange={setCategoriaGastoId}>
+                <Select value={categoriaGastoId || '__none__'} onValueChange={(v) => setCategoriaGastoId(v === '__none__' ? '' : v)}>
                   <SelectTrigger className="h-9 text-sm">
                     <SelectValue placeholder="Seleccionar..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin categoría</SelectItem>
+                    <SelectItem value="__none__">Sin categoría</SelectItem>
                     {categorias.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>
                     ))}
@@ -338,12 +338,12 @@ export default function GastoLineaTable({
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm">Tipo comprobante</Label>
-                <Select value={tipoComprobante} onValueChange={setTipoComprobante}>
+                <Select value={tipoComprobante || '__none__'} onValueChange={(v) => setTipoComprobante(v === '__none__' ? '' : v)}>
                   <SelectTrigger className="h-9 text-sm">
                     <SelectValue placeholder="Seleccionar..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin especificar</SelectItem>
+                    <SelectItem value="__none__">Sin especificar</SelectItem>
                     {TIPOS_COMPROBANTE.map((t) => (
                       <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                     ))}
