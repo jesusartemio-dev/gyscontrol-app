@@ -356,7 +356,7 @@ export function ListaJornadas({
               <SelectContent>
                 <SelectItem value="todos">Todos los proyectos</SelectItem>
                 {proyectosUnicos.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.codigo}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
