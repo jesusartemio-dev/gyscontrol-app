@@ -149,7 +149,7 @@ export function ListaJornadas({
   const [supAsignadoFilter, setSupAsignadoFilter] = useState<string>('todos')
   const [miembroFilter, setMiembroFilter] = useState<string>('todos')
   const [busqueda, setBusqueda] = useState('')
-  const [personCols, setPersonCols] = useState<Set<string>>(() => new Set(['creador']))
+  const [personCols, setPersonCols] = useState<Set<string>>(() => new Set(showSupervisor ? ['creador'] : []))
   const togglePersonCol = (col: string) => {
     setPersonCols(prev => {
       const next = new Set(prev)
@@ -483,31 +483,31 @@ export function ListaJornadas({
             )}
           </div>
 
-          {/* Column visibility toggles (supervision view) */}
-          {showSupervisor && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] text-gray-400">Columnas:</span>
-              {([
+          {/* Column visibility toggles */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-gray-400">Columnas:</span>
+            {([
+              ...(showSupervisor ? [
                 { key: 'creador', label: 'Creador', Icon: UserCircle },
                 { key: 'aprobador', label: 'Aprobador', Icon: CheckCircle },
-                { key: 'supervisor', label: 'Supervisor', Icon: Shield },
-                { key: 'seguridad', label: 'Seguridad', Icon: HardHat },
-              ] as const).map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition-colors ${
-                    personCols.has(key)
-                      ? 'bg-blue-50 text-blue-700 border-blue-200 font-medium'
-                      : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:border-gray-300'
-                  }`}
-                  onClick={() => togglePersonCol(key)}
-                >
-                  <Icon className="h-3 w-3" />
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
+              ] : []),
+              { key: 'supervisor', label: 'Supervisor', Icon: Shield },
+              { key: 'seguridad', label: 'Seguridad', Icon: HardHat },
+            ] as { key: string; label: string; Icon: React.ComponentType<{ className?: string }> }[]).map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border transition-colors ${
+                  personCols.has(key)
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 font-medium'
+                    : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600 hover:border-gray-300'
+                }`}
+                onClick={() => togglePersonCol(key)}
+              >
+                <Icon className="h-3 w-3" />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </CardHeader>
 
@@ -525,9 +525,8 @@ export function ListaJornadas({
                   <TableHead>Proyecto / Objetivo</TableHead>
                   {showSupervisor && personCols.has('creador') && <TableHead>Creado por</TableHead>}
                   {showSupervisor && personCols.has('aprobador') && <TableHead>Aprobado por</TableHead>}
-                  {!showSupervisor && <TableHead>Sup / Seg</TableHead>}
-                  {showSupervisor && personCols.has('supervisor') && <TableHead>Supervisor</TableHead>}
-                  {showSupervisor && personCols.has('seguridad') && <TableHead>Seguridad</TableHead>}
+                  {personCols.has('supervisor') && <TableHead>Supervisor</TableHead>}
+                  {personCols.has('seguridad') && <TableHead>Seguridad</TableHead>}
                   <TableHead>Equipo</TableHead>
                   <TableHead>Estado / Avance</TableHead>
                   <TableHead>Tareas / Avance</TableHead>
@@ -585,48 +584,8 @@ export function ListaJornadas({
                         ) : <span className="text-gray-400">-</span>}
                       </TableCell>
                     )}
-                    {/* Sup / Seg (non-supervision view) */}
-                    {!showSupervisor && (
-                      <TableCell>
-                        {(() => {
-                          const sup = getSupervisorAsignado(jornada.personalPlanificado)
-                          const seg = getSeguridadAsignado(jornada.personalPlanificado)
-                          if (!sup && !seg) return <span className="text-gray-400">-</span>
-                          return (
-                            <div className="space-y-0.5">
-                              {sup && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-1 cursor-default">
-                                      <Shield className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                                      <span className="text-[11px] text-gray-600 truncate max-w-[100px]">{getShortName(sup.nombre)}</span>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">
-                                    <p className="text-[11px]"><span className="opacity-60">Supervisor:</span> {sup.nombre}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                              {seg && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-1 cursor-default">
-                                      <HardHat className="h-3 w-3 text-amber-500 flex-shrink-0" />
-                                      <span className="text-[11px] text-gray-600 truncate max-w-[100px]">{getShortName(seg.nombre)}</span>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">
-                                    <p className="text-[11px]"><span className="opacity-60">Seguridad:</span> {seg.nombre}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                            </div>
-                          )
-                        })()}
-                      </TableCell>
-                    )}
                     {/* Supervisor (toggleable) */}
-                    {showSupervisor && personCols.has('supervisor') && (
+                    {personCols.has('supervisor') && (
                       <TableCell>
                         {(() => {
                           const sup = getSupervisorAsignado(jornada.personalPlanificado)
@@ -644,7 +603,7 @@ export function ListaJornadas({
                       </TableCell>
                     )}
                     {/* Seguridad (toggleable) */}
-                    {showSupervisor && personCols.has('seguridad') && (
+                    {personCols.has('seguridad') && (
                       <TableCell>
                         {(() => {
                           const seg = getSeguridadAsignado(jornada.personalPlanificado)
