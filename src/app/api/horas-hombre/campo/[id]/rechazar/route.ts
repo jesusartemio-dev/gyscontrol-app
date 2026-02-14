@@ -61,9 +61,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    if (registro.estado !== 'pendiente') {
+    if (registro.estado !== 'pendiente' && registro.estado !== 'aprobado') {
       return NextResponse.json(
-        { error: 'Solo se pueden rechazar registros pendientes' },
+        { error: 'Solo se pueden rechazar registros pendientes o aprobados' },
         { status: 400 }
       )
     }

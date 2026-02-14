@@ -666,7 +666,7 @@ export function ListaJornadas({
                     <TableCell className="text-right">
                       {aprobando === jornada.id ? (
                         <Loader2 className="h-4 w-4 animate-spin text-gray-400 ml-auto" />
-                      ) : jornada.estado === 'pendiente' && onAprobar ? (
+                      ) : (jornada.estado === 'pendiente' || jornada.estado === 'aprobado') && onAprobar ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm">
@@ -678,15 +678,17 @@ export function ListaJornadas({
                               <Eye className="h-4 w-4 mr-2" />
                               Ver detalle
                             </DropdownMenuItem>
+                            {jornada.estado === 'pendiente' && (
+                              <DropdownMenuItem
+                                onClick={() => onAprobar(jornada.id)}
+                                className="text-green-600 focus:text-green-600"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Aprobar
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
-                              onClick={() => onAprobar(jornada.id)}
-                              className="text-green-600 focus:text-green-600"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Aprobar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => onRechazar?.(jornada.id)}
+                              onClick={() => setTimeout(() => onRechazar?.(jornada.id), 0)}
                               className="text-red-600 focus:text-red-600"
                             >
                               <XCircle className="h-4 w-4 mr-2" />
@@ -870,7 +872,7 @@ export function ListaJornadas({
                 )}
 
                 {/* Acciones de aprobación (cards) */}
-                {jornada.estado === 'pendiente' && onAprobar && (
+                {(jornada.estado === 'pendiente' || jornada.estado === 'aprobado') && onAprobar && (
                   <div className="flex gap-2 pt-1" onClick={e => e.stopPropagation()}>
                     {aprobando === jornada.id ? (
                       <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -879,14 +881,16 @@ export function ListaJornadas({
                       </div>
                     ) : (
                       <>
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-green-600 hover:bg-green-700 h-8 text-xs"
-                          onClick={() => onAprobar(jornada.id)}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                          Aprobar
-                        </Button>
+                        {jornada.estado === 'pendiente' && (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700 h-8 text-xs"
+                            onClick={() => onAprobar(jornada.id)}
+                          >
+                            <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                            Aprobar
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
