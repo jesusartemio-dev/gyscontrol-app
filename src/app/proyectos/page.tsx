@@ -469,6 +469,9 @@ export default function ProyectosPage() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-sm truncate">{proyecto.nombre}</h3>
+                      {proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
+                        <p className="text-[11px] text-muted-foreground line-clamp-2 leading-tight">{proyecto.descripcion}</p>
+                      )}
                       <p className="text-xs text-gray-500 font-mono">{proyecto.codigo}</p>
                     </div>
                     <Badge variant={getEstadoBadgeVariant(proyecto.estado)} className="text-[10px] ml-2">
@@ -567,11 +570,14 @@ export default function ProyectosPage() {
                         <td className="p-2 font-mono text-[10px] text-gray-500">{proyecto.codigo}</td>
                         <td className="p-2">
                           <button
-                            className="text-blue-600 hover:underline font-medium text-left line-clamp-2 leading-tight"
+                            className="text-blue-600 hover:underline font-medium text-left leading-tight"
                             onClick={() => router.push(`/proyectos/${proyecto.id}`)}
-                            title={proyecto.nombre}
+                            title={proyecto.descripcion && proyecto.descripcion !== proyecto.nombre ? proyecto.descripcion : proyecto.nombre}
                           >
-                            {proyecto.nombre}
+                            <span className="line-clamp-1">{proyecto.nombre}</span>
+                            {proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
+                              <span className="block text-[11px] text-muted-foreground font-normal line-clamp-2 leading-tight">{proyecto.descripcion}</span>
+                            )}
                           </button>
                         </td>
                         <td className="p-2 text-gray-600 truncate max-w-[100px] hidden md:table-cell" title={proyecto.cliente?.nombre}>
