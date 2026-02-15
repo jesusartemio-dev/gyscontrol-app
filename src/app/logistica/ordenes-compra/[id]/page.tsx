@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Building2, CreditCard, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
-import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra } from '@/lib/services/ordenCompra'
+import { Input } from '@/components/ui/input'
+import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC } from '@/lib/services/ordenCompra'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import dynamic from 'next/dynamic'
 import type { OrdenCompra } from '@/types'
@@ -40,6 +41,8 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showCancel, setShowCancel] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [recepcion, setRecepcion] = useState<Record<string, number>>({})
+  const [editingRecepcion, setEditingRecepcion] = useState(false)
 
   useEffect(() => { loadData() }, [id])
 
@@ -182,7 +185,22 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             className="bg-purple-600 hover:bg-purple-700"
           >
             {actionLoading === 'confirmada' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Package className="h-4 w-4 mr-1" />}
-            Confirmar Recepción
+            Confirmar OC
+          </Button>
+        )}
+        {['confirmada', 'parcial'].includes(oc.estado) && !editingRecepcion && (
+          <Button
+            size="sm"
+            onClick={() => {
+              const initial: Record<string, number> = {}
+              oc.items?.forEach(item => { initial[item.id] = item.cantidadRecibida })
+              setRecepcion(initial)
+              setEditingRecepcion(true)
+            }}
+            className="bg-teal-600 hover:bg-teal-700"
+          >
+            <Package className="h-4 w-4 mr-1" />
+            Registrar Recepción
           </Button>
         )}
         {['enviada', 'confirmada', 'parcial', 'completada'].includes(oc.estado) && (
@@ -297,7 +315,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 <TableHead className="w-[100px] text-right">P. Unit.</TableHead>
                 <TableHead className="w-[100px] text-right">Total</TableHead>
                 {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (
-                  <TableHead className="w-[80px] text-right">Recibido</TableHead>
+                  <TableHead className="w-[100px] text-right">Recibido</TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -312,8 +330,22 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                   <TableCell className="text-right font-mono text-sm">{formatCurrency(item.precioUnitario, oc.moneda)}</TableCell>
                   <TableCell className="text-right font-mono text-sm">{formatCurrency(item.costoTotal, oc.moneda)}</TableCell>
                   {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (
-                    <TableCell className={`text-right font-mono text-sm ${item.cantidadRecibida >= item.cantidad ? 'text-green-600' : item.cantidadRecibida > 0 ? 'text-orange-600' : ''}`}>
-                      {item.cantidadRecibida}
+                    <TableCell className="text-right">
+                      {editingRecepcion ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={item.cantidad}
+                          step={1}
+                          value={recepcion[item.id] ?? 0}
+                          onChange={(e) => setRecepcion(prev => ({ ...prev, [item.id]: Math.min(parseFloat(e.target.value) || 0, item.cantidad) }))}
+                          className="h-8 w-20 text-xs text-right font-mono ml-auto"
+                        />
+                      ) : (
+                        <span className={`font-mono text-sm ${item.cantidadRecibida >= item.cantidad ? 'text-green-600 font-medium' : item.cantidadRecibida > 0 ? 'text-orange-600' : ''}`}>
+                          {item.cantidadRecibida} / {item.cantidad}
+                        </span>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>
@@ -322,6 +354,48 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           </Table>
         </CardContent>
       </Card>
+
+      {/* Recepción Actions */}
+      {editingRecepcion && (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditingRecepcion(false)}
+            disabled={!!actionLoading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            className="bg-teal-600 hover:bg-teal-700"
+            disabled={!!actionLoading}
+            onClick={async () => {
+              const items = Object.entries(recepcion)
+                .map(([itemId, cantidadRecibida]) => ({ itemId, cantidadRecibida }))
+                .filter(r => r.cantidadRecibida > 0)
+              if (items.length === 0) {
+                toast.error('Ingresa al menos una cantidad recibida')
+                return
+              }
+              try {
+                setActionLoading('recepcion')
+                const updated = await registrarRecepcionOC(oc.id, items)
+                setOC(updated)
+                setEditingRecepcion(false)
+                toast.success('Recepción registrada exitosamente')
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : 'Error al registrar recepción')
+              } finally {
+                setActionLoading(null)
+              }
+            }}
+          >
+            {actionLoading === 'recepcion' ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+            Guardar Recepción
+          </Button>
+        </div>
+      )}
 
       {/* Observations */}
       {oc.observaciones && (

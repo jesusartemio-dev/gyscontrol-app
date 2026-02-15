@@ -86,3 +86,5 @@ export const confirmarOC = (id: string, fechaEntregaEstimada?: string) =>
   postAction(id, 'confirmar', { fechaEntregaEstimada })
 export const cancelarOC = (id: string, motivo?: string) =>
   postAction(id, 'cancelar', { motivo })
+export const registrarRecepcionOC = (id: string, items: { itemId: string; cantidadRecibida: number }[]) =>
+  postAction(id, 'recepcion', { items })
