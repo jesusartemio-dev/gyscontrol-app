@@ -454,6 +454,9 @@ export default function GastoLineaTable({
         lineas={lineas}
         currentIndex={previewIndex}
         onIndexChange={setPreviewIndex}
+        categorias={categorias}
+        editable={editable}
+        onChanged={onChanged}
       />
     </div>
   )
