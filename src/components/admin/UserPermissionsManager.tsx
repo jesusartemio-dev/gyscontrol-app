@@ -235,9 +235,21 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     title: 'Mis Gastos',
     icon: Receipt,
     color: 'text-amber-500',
-    roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico'],
+    roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico', 'administracion'],
     links: [
       { label: 'Mis Requerimientos', href: '/finanzas/requerimientos' },
+    ],
+  },
+  {
+    key: 'administracion',
+    title: 'Administración',
+    icon: CreditCard,
+    color: 'text-rose-500',
+    roles: ['admin', 'gerente', 'administracion'],
+    links: [
+      { label: 'Dashboard', href: '/administracion' },
+      { label: 'Gestión de Gastos', href: '/administracion/gastos' },
+      { label: 'Rendiciones', href: '/administracion/rendiciones' },
     ],
   },
   {
@@ -273,7 +285,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
 
 const ALL_ROLES_ORDERED: RolUsuario[] = [
   'admin', 'gerente', 'gestor', 'coordinador', 'proyectos',
-  'seguridad', 'comercial', 'presupuestos', 'logistico', 'colaborador',
+  'seguridad', 'comercial', 'presupuestos', 'logistico', 'administracion', 'colaborador',
 ];
 
 function AccessMapTab({ usuarios }: { usuarios: UsuarioModel[] }) {
