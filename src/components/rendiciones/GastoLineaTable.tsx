@@ -34,6 +34,7 @@ import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck } from 'luc
 import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
 import CargaMasivaComprobantes from './CargaMasivaComprobantes'
+import GastoLineaPreviewDrawer from './GastoLineaPreviewDrawer'
 import type { GastoLinea, CategoriaGasto } from '@/types'
 
 const TIPOS_COMPROBANTE = [
@@ -64,6 +65,7 @@ export default function GastoLineaTable({
   const [deleteTarget, setDeleteTarget] = useState<GastoLinea | null>(null)
   const [loading, setLoading] = useState(false)
   const [showCargaMasiva, setShowCargaMasiva] = useState(false)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
 
   // Form fields
   const [descripcion, setDescripcion] = useState('')
@@ -214,8 +216,12 @@ export default function GastoLineaTable({
                 </td>
               </tr>
             ) : (
-              lineas.map((linea) => (
-                <tr key={linea.id} className="border-t hover:bg-muted/30">
+              lineas.map((linea, idx) => (
+                <tr
+                  key={linea.id}
+                  className="border-t hover:bg-muted/30 cursor-pointer"
+                  onClick={() => setPreviewIndex(idx)}
+                >
                   <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
                     {formatDate(linea.fecha)}
                   </td>
@@ -244,7 +250,7 @@ export default function GastoLineaTable({
                   <td className="p-2 text-right font-mono text-xs">
                     {formatCurrency(linea.monto)}
                   </td>
-                  <td className="p-2">
+                  <td className="p-2" onClick={(e) => e.stopPropagation()}>
                     <GastoAdjuntoUpload
                       gastoLineaId={linea.id}
                       adjuntos={linea.adjuntos || []}
@@ -253,7 +259,7 @@ export default function GastoLineaTable({
                     />
                   </td>
                   {editable && (
-                    <td className="p-2">
+                    <td className="p-2" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1">
                         <button
                           onClick={() => openEdit(linea)}
@@ -441,6 +447,13 @@ export default function GastoLineaTable({
         hojaDeGastosId={hojaDeGastosId}
         categorias={categorias}
         onSuccess={onChanged}
+      />
+
+      {/* Preview drawer */}
+      <GastoLineaPreviewDrawer
+        lineas={lineas}
+        currentIndex={previewIndex}
+        onIndexChange={setPreviewIndex}
       />
     </div>
   )
