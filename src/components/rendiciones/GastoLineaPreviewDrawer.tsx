@@ -103,7 +103,7 @@ export default function GastoLineaPreviewDrawer({
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
-        className="sm:max-w-2xl w-[90vw] p-0 flex flex-col"
+        className="sm:max-w-5xl w-[95vw] p-0 flex flex-col"
       >
         {linea && (
           <>
@@ -188,66 +188,79 @@ export default function GastoLineaPreviewDrawer({
               )}
             </SheetHeader>
 
-            {/* Preview Area */}
-            <div className="flex-1 min-h-0 overflow-hidden bg-muted/30">
-              {!adjunto ? (
-                <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
-                  <FileText className="h-10 w-10" />
-                  <p className="text-sm">Sin documento adjunto</p>
-                </div>
-              ) : !contentUrl ? (
-                <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
-                  <FileText className="h-10 w-10" />
-                  <p className="text-sm">Vista previa no disponible</p>
-                  {adjunto.urlArchivo && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => window.open(adjunto.urlArchivo, '_blank')}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                      Abrir en Drive
-                    </Button>
-                  )}
-                </div>
-              ) : adjunto.tipoArchivo && isImage(adjunto.tipoArchivo) ? (
-                <div className="w-full h-full flex items-center justify-center p-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={contentUrl}
-                    alt={adjunto.nombreArchivo}
-                    className="max-w-full max-h-full object-contain rounded shadow-sm"
+            {/* Content: Data left, Preview right */}
+            <div className="flex-1 min-h-0 flex">
+              {/* Data Panel (left) */}
+              <div className="w-[320px] shrink-0 border-r bg-background px-4 py-4 overflow-y-auto">
+                {/* Adjunto info */}
+                {adjunto && (
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-4 pb-3 border-b">
+                    {adjunto.tipoArchivo?.startsWith('image/') ? (
+                      <ImageIcon className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <FileText className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="truncate">{adjunto.nombreArchivo}</span>
+                    {adjunto.tamano && <span className="shrink-0">{formatSize(adjunto.tamano)}</span>}
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <DataField label="Fecha" value={formatDate(linea.fecha)} />
+                  <DataField
+                    label="Monto"
+                    value={formatCurrency(linea.monto, linea.moneda)}
+                    className="font-mono text-base"
                   />
-                </div>
-              ) : adjunto.tipoArchivo && isPdf(adjunto.tipoArchivo) ? (
-                <div className="w-full h-full relative">
-                  {iframeLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <div className="border-t pt-3">
+                    <DataField
+                      label="Tipo comprobante"
+                      value={
+                        linea.tipoComprobante
+                          ? TIPOS_COMPROBANTE[linea.tipoComprobante] || linea.tipoComprobante
+                          : '-'
+                      }
+                    />
+                  </div>
+                  <DataField label="N° comprobante" value={linea.numeroComprobante || '-'} />
+                  <div className="border-t pt-3">
+                    <DataField label="Proveedor" value={linea.proveedorNombre || '-'} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block mb-0.5">RUC</span>
+                    <span className="text-sm font-medium flex items-center gap-1">
+                      {linea.proveedorRuc || '-'}
+                      {linea.sunatVerificado === true && (
+                        <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
+                      )}
+                    </span>
+                  </div>
+                  <div className="border-t pt-3">
+                    <DataField label="Categoria" value={linea.categoriaGasto?.nombre || '-'} />
+                  </div>
+                  <DataField label="Descripcion" value={linea.descripcion} />
+                  {linea.observaciones && (
+                    <div className="border-t pt-3">
+                      <span className="text-[10px] text-muted-foreground block mb-0.5">
+                        Observaciones
+                      </span>
+                      <span className="text-xs text-muted-foreground">{linea.observaciones}</span>
                     </div>
                   )}
-                  <iframe
-                    src={`${contentUrl}#navpanes=0&zoom=page-width`}
-                    className="w-full h-full border-0"
-                    title={adjunto.nombreArchivo}
-                    onLoad={() => setIframeLoading(false)}
-                  />
                 </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
-                  <FileText className="h-10 w-10" />
-                  <p className="text-sm">Vista previa no disponible para este tipo de archivo</p>
-                  <div className="flex gap-2">
-                    {downloadUrl && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => window.open(downloadUrl, '_blank')}
-                      >
-                        <Download className="h-3.5 w-3.5 mr-1.5" />
-                        Descargar
-                      </Button>
-                    )}
+              </div>
+
+              {/* Preview Area (right, takes remaining space) */}
+              <div className="flex-1 min-w-0 overflow-hidden bg-muted/30">
+                {!adjunto ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+                    <FileText className="h-12 w-12" />
+                    <p className="text-sm">Sin documento adjunto</p>
+                  </div>
+                ) : !contentUrl ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+                    <FileText className="h-12 w-12" />
+                    <p className="text-sm">Vista previa no disponible</p>
                     {adjunto.urlArchivo && (
                       <Button
                         size="sm"
@@ -259,63 +272,58 @@ export default function GastoLineaPreviewDrawer({
                       </Button>
                     )}
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Data Panel */}
-            <div className="shrink-0 border-t bg-background px-4 py-3 overflow-y-auto max-h-[40%]">
-              {/* Adjunto info */}
-              {adjunto && (
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-3">
-                  {adjunto.tipoArchivo?.startsWith('image/') ? (
-                    <ImageIcon className="h-3 w-3" />
-                  ) : (
-                    <FileText className="h-3 w-3" />
-                  )}
-                  <span className="truncate">{adjunto.nombreArchivo}</span>
-                  {adjunto.tamano && <span>{formatSize(adjunto.tamano)}</span>}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
-                <DataField label="Fecha" value={formatDate(linea.fecha)} />
-                <DataField
-                  label="Monto"
-                  value={formatCurrency(linea.monto, linea.moneda)}
-                  className="font-mono"
-                />
-                <DataField
-                  label="Tipo comprobante"
-                  value={
-                    linea.tipoComprobante
-                      ? TIPOS_COMPROBANTE[linea.tipoComprobante] || linea.tipoComprobante
-                      : '-'
-                  }
-                />
-                <DataField label="N° comprobante" value={linea.numeroComprobante || '-'} />
-                <DataField label="Proveedor" value={linea.proveedorNombre || '-'} />
-                <div>
-                  <span className="text-[10px] text-muted-foreground block mb-0.5">RUC</span>
-                  <span className="text-sm font-medium flex items-center gap-1">
-                    {linea.proveedorRuc || '-'}
-                    {linea.sunatVerificado === true && (
-                      <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
+                ) : adjunto.tipoArchivo && isImage(adjunto.tipoArchivo) ? (
+                  <div className="w-full h-full flex items-center justify-center p-4">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={contentUrl}
+                      alt={adjunto.nombreArchivo}
+                      className="max-w-full max-h-full object-contain rounded shadow-sm"
+                    />
+                  </div>
+                ) : adjunto.tipoArchivo && isPdf(adjunto.tipoArchivo) ? (
+                  <div className="w-full h-full relative">
+                    {iframeLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
                     )}
-                  </span>
-                </div>
-                <DataField label="Categoria" value={linea.categoriaGasto?.nombre || '-'} />
-                <DataField label="Descripcion" value={linea.descripcion} />
+                    <iframe
+                      src={`${contentUrl}#navpanes=0&zoom=page-width`}
+                      className="w-full h-full border-0"
+                      title={adjunto.nombreArchivo}
+                      onLoad={() => setIframeLoading(false)}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
+                    <FileText className="h-12 w-12" />
+                    <p className="text-sm">Vista previa no disponible para este tipo de archivo</p>
+                    <div className="flex gap-2">
+                      {downloadUrl && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(downloadUrl, '_blank')}
+                        >
+                          <Download className="h-3.5 w-3.5 mr-1.5" />
+                          Descargar
+                        </Button>
+                      )}
+                      {adjunto.urlArchivo && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(adjunto.urlArchivo, '_blank')}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                          Abrir en Drive
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {linea.observaciones && (
-                <div className="mt-2.5">
-                  <span className="text-[10px] text-muted-foreground block mb-0.5">
-                    Observaciones
-                  </span>
-                  <span className="text-xs text-muted-foreground">{linea.observaciones}</span>
-                </div>
-              )}
             </div>
           </>
         )}
