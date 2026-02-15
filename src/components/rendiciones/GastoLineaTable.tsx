@@ -30,9 +30,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Edit, Receipt } from 'lucide-react'
+import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine } from 'lucide-react'
 import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
+import CargaMasivaComprobantes from './CargaMasivaComprobantes'
 import type { GastoLinea, CategoriaGasto } from '@/types'
 
 const TIPOS_COMPROBANTE = [
@@ -62,6 +63,7 @@ export default function GastoLineaTable({
   const [editLinea, setEditLinea] = useState<GastoLinea | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<GastoLinea | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showCargaMasiva, setShowCargaMasiva] = useState(false)
 
   // Form fields
   const [descripcion, setDescripcion] = useState('')
@@ -177,10 +179,16 @@ export default function GastoLineaTable({
           <span className="text-xs font-normal text-muted-foreground">({lineas.length})</span>
         </h3>
         {editable && (
-          <Button size="sm" className="h-7 text-xs bg-orange-600 hover:bg-orange-700" onClick={openCreate}>
-            <Plus className="h-3 w-3 mr-1" />
-            Agregar Gasto
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowCargaMasiva(true)}>
+              <ScanLine className="h-3 w-3 mr-1" />
+              Carga Masiva
+            </Button>
+            <Button size="sm" className="h-7 text-xs bg-orange-600 hover:bg-orange-700" onClick={openCreate}>
+              <Plus className="h-3 w-3 mr-1" />
+              Agregar Gasto
+            </Button>
+          </div>
         )}
       </div>
 
@@ -420,6 +428,15 @@ export default function GastoLineaTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk upload dialog */}
+      <CargaMasivaComprobantes
+        open={showCargaMasiva}
+        onOpenChange={setShowCargaMasiva}
+        hojaDeGastosId={hojaDeGastosId}
+        categorias={categorias}
+        onSuccess={onChanged}
+      />
     </div>
   )
 }
