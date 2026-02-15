@@ -101,44 +101,64 @@ type SunatResult = {
 
 // ── Throttle para PeruAPI (plan free tiene rate limit) ──
 // Serializa las consultas SUNAT con 500ms de delay entre cada una.
-// Las requests concurrentes al mismo serverless instance comparten este módulo.
+// Funciona dentro de una misma instancia serverless.
 let sunatQueue: Promise<void> = Promise.resolve()
 const SUNAT_DELAY_MS = 500
 
 function consultarSunatThrottled(ruc: string): Promise<SunatResult> {
   return new Promise<SunatResult>((resolve) => {
     sunatQueue = sunatQueue.then(async () => {
-      const result = await consultarSunatInternal(ruc)
+      const result = await consultarSunat(ruc)
       await new Promise((r) => setTimeout(r, SUNAT_DELAY_MS))
       resolve(result)
     })
   })
 }
 
-async function consultarSunatInternal(ruc: string): Promise<SunatResult> {
-  const apiKey = process.env.PERU_API_KEY
-  if (!apiKey) {
+// ── Proveedores SUNAT ───────────────────────────────────
+// 1. PeruAPI.com: api_token como query param (tiene restricción de IPs en plan free)
+// 2. apis.net.pe: Bearer token en header (sin restricción de IP — ideal para serverless)
+// Si PeruAPI falla con 401/403, intenta apis.net.pe como fallback automático.
+
+async function consultarSunat(ruc: string): Promise<SunatResult> {
+  const peruApiKey = process.env.PERU_API_KEY
+  const apisNetPeToken = process.env.APIS_NET_PE_TOKEN
+
+  if (!peruApiKey && !apisNetPeToken) {
     return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
   }
 
+  // Intentar PeruAPI primero (si tiene key configurada)
+  if (peruApiKey) {
+    const result = await consultarViaPeruApi(ruc, peruApiKey)
+    if (result) return result
+    // Si falló, intentar apis.net.pe como fallback
+  }
+
+  // apis.net.pe — Bearer token, sin restricción de IP
+  if (apisNetPeToken) {
+    const result = await consultarViaApisNetPe(ruc, apisNetPeToken)
+    if (result) return result
+  }
+
+  return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
+}
+
+async function consultarViaPeruApi(ruc: string, apiKey: string): Promise<SunatResult | null> {
   try {
-    // Intentar endpoint REST primero, luego legacy si falla con 401
-    let res = await fetch(
+    const res = await fetch(
       `https://peruapi.com/api/ruc/${ruc}?api_token=${apiKey}`,
       { signal: AbortSignal.timeout(10000) }
     )
 
-    if (res.status === 401) {
-      // Intentar formato legacy como fallback
-      res = await fetch(
-        `https://peruapi.com/api.php?json=ruc&id=${ruc}&api_token=${apiKey}`,
-        { signal: AbortSignal.timeout(10000) }
-      )
+    if (res.status === 401 || res.status === 403) {
+      console.warn(`PeruAPI auth error: HTTP ${res.status} for RUC ${ruc} (likely IP not whitelisted)`)
+      return null // fallback a apis.net.pe
     }
 
     if (!res.ok) {
       console.warn(`PeruAPI error: HTTP ${res.status} for RUC ${ruc}`)
-      return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
+      return null
     }
 
     const data = await res.json()
@@ -147,31 +167,68 @@ async function consultarSunatInternal(ruc: string): Promise<SunatResult> {
       return { sunat: null, sunatAlerta: data.mensaje || 'RUC no encontrado en SUNAT', sunatAlertaTipo: 'info' }
     }
 
-    const sunat: SunatInfo = {
+    return buildSunatResult({
       razonSocial: data.razon_social || '',
       estado: data.estado || '',
       condicion: data.condicion || '',
       direccion: data.direccion || '',
-    }
-
-    // Solo alertas reales (NOT HABIDO, NOT ACTIVO) son warnings
-    let sunatAlerta: string | null = null
-    let sunatAlertaTipo: 'warning' | 'info' | null = null
-    if (sunat.condicion !== 'HABIDO') {
-      sunatAlerta = `Proveedor NO HABIDO (condición: ${sunat.condicion})`
-      sunatAlertaTipo = 'warning'
-    }
-    if (sunat.estado !== 'ACTIVO') {
-      sunatAlerta = `Proveedor NO ACTIVO (estado: ${sunat.estado})${sunatAlerta ? `. ${sunatAlerta}` : ''}`
-      sunatAlertaTipo = 'warning'
-    }
-
-    return { sunat, sunatAlerta, sunatAlertaTipo }
+    })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error desconocido'
-    console.warn(`PeruAPI error for RUC ${ruc}:`, message)
-    return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
+    console.warn(`PeruAPI error for RUC ${ruc}:`, error instanceof Error ? error.message : error)
+    return null
   }
+}
+
+async function consultarViaApisNetPe(ruc: string, token: string): Promise<SunatResult | null> {
+  try {
+    const res = await fetch(
+      `https://api.apis.net.pe/v2/sunat/ruc?numero=${ruc}`,
+      {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(10000),
+      }
+    )
+
+    if (!res.ok) {
+      console.warn(`apis.net.pe error: HTTP ${res.status} for RUC ${ruc}`)
+      return null
+    }
+
+    const data = await res.json()
+
+    if (!data.nombre && !data.razonSocial) {
+      return { sunat: null, sunatAlerta: 'RUC no encontrado en SUNAT', sunatAlertaTipo: 'info' }
+    }
+
+    return buildSunatResult({
+      razonSocial: data.razonSocial || data.nombre || '',
+      estado: data.estado || '',
+      condicion: data.condicion || '',
+      direccion: data.direccion || '',
+    })
+  } catch (error) {
+    console.warn(`apis.net.pe error for RUC ${ruc}:`, error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+function buildSunatResult(sunat: SunatInfo): SunatResult {
+  let sunatAlerta: string | null = null
+  let sunatAlertaTipo: 'warning' | 'info' | null = null
+
+  if (sunat.condicion && sunat.condicion !== 'HABIDO') {
+    sunatAlerta = `Proveedor NO HABIDO (condición: ${sunat.condicion})`
+    sunatAlertaTipo = 'warning'
+  }
+  if (sunat.estado && sunat.estado !== 'ACTIVO') {
+    sunatAlerta = `Proveedor NO ACTIVO (estado: ${sunat.estado})${sunatAlerta ? `. ${sunatAlerta}` : ''}`
+    sunatAlertaTipo = 'warning'
+  }
+
+  return { sunat, sunatAlerta, sunatAlertaTipo }
 }
 
 function parseOcrResponse(text: string): OcrResult {
