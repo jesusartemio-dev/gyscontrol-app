@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Search, X, Loader2, CreditCard, ChevronRight } from 'lucide-react'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Plus, Search, X, Loader2, CreditCard, ChevronRight, Edit, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getHojasDeGastos } from '@/lib/services/hojaDeGastos'
+import { getHojasDeGastos, deleteHojaDeGastos } from '@/lib/services/hojaDeGastos'
 import EstadoStepper from '@/components/finanzas/EstadoStepper'
 import type { HojaDeGastos } from '@/types'
 
@@ -49,6 +50,7 @@ export default function RequerimientosPage() {
   const [loading, setLoading] = useState(true)
   const [filterEstado, setFilterEstado] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<HojaDeGastos | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -61,6 +63,18 @@ export default function RequerimientosPage() {
       toast.error('Error al cargar requerimientos')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await deleteHojaDeGastos(deleteTarget.id)
+      toast.success(`Requerimiento ${deleteTarget.numero} eliminado`)
+      setDeleteTarget(null)
+      loadData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar')
     }
   }
 
@@ -147,7 +161,7 @@ export default function RequerimientosPage() {
                   <TableHead className="text-right">Gastado</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
                   <TableHead>Fecha</TableHead>
-                  <TableHead className="w-[40px]"></TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -177,7 +191,27 @@ export default function RequerimientosPage() {
                       {formatDate(hoja.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1">
+                        {['borrador', 'rechazado'].includes(hoja.estado) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); router.push(`/finanzas/requerimientos/${hoja.id}`) }}
+                            className="p-1 rounded hover:bg-muted"
+                            title="Editar"
+                          >
+                            <Edit className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        )}
+                        {hoja.estado === 'borrador' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteTarget(hoja) }}
+                            className="p-1 rounded hover:bg-red-50"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          </button>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -186,6 +220,24 @@ export default function RequerimientosPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar Requerimiento</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Eliminar el requerimiento &quot;{deleteTarget?.numero}&quot;? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
