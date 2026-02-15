@@ -635,7 +635,7 @@ model PedidoEquipoItem {
   listaEquipoItem             ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?      @relation(fields: [listaId], references: [id])
   pedidoEquipo                PedidoEquipo      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  proveedor                   Proveedor?        @relation(fields: [proveedorId], references: [id])
+  // proveedor FK pendiente de migración de datos (proveedorId era texto libre)
   user                        User              @relation(fields: [responsableId], references: [id])
   comentarioLogisticaPor      User?             @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
   ordenCompraItems            OrdenCompraItem[]
@@ -811,7 +811,6 @@ model Proveedor {
   updatedAt           DateTime              @updatedAt
   cotizacionProveedor CotizacionProveedor[]
   listaEquipoItem     ListaEquipoItem[]
-  pedidoEquipoItems   PedidoEquipoItem[]
   ordenesCompra       OrdenCompra[]
 
   @@map("proveedor")
