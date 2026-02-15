@@ -39,7 +39,9 @@ import {
   Clock,
   Truck,
   PackageCheck,
-  BarChart3
+  BarChart3,
+  Receipt,
+  CreditCard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -228,6 +230,16 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     ],
   },
   {
+    key: 'finanzas',
+    title: 'Mis Gastos',
+    icon: Receipt,
+    color: 'text-amber-500',
+    roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico'],
+    links: [
+      { label: 'Mis Requerimientos', href: '/finanzas/requerimientos' },
+    ],
+  },
+  {
     key: 'gestion',
     title: 'Gestión',
     icon: BarChart3,
@@ -252,6 +264,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
       { label: 'Permisos', href: '/admin/permisos' },
       { label: 'Notificaciones', href: '/configuracion/notificaciones' },
       { label: 'Catálogos', href: '/catalogo/equipos' },
+      { label: 'Centros de Costo', href: '/configuracion/centros-costo' },
       { label: 'Personal (RRHH)', href: '/admin/personal' },
     ],
   },
