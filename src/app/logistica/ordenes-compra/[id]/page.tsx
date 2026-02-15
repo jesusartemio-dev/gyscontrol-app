@@ -11,7 +11,13 @@ import { ArrowLeft, Loader2, CheckCircle, Send, Package, XCircle, FileDown, Buil
 import { toast } from 'sonner'
 import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra } from '@/lib/services/ordenCompra'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
+import dynamic from 'next/dynamic'
 import type { OrdenCompra } from '@/types'
+
+const DescargarOCPDFButton = dynamic(
+  () => import('@/components/pdf/OrdenCompraPDF').then(mod => mod.DescargarOCPDFButton),
+  { ssr: false, loading: () => <span className="text-xs text-muted-foreground">Cargando PDF...</span> }
+)
 
 const formatCurrency = (amount: number, moneda = 'PEN') =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
@@ -180,13 +186,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           </Button>
         )}
         {['enviada', 'confirmada', 'parcial', 'completada'].includes(oc.estado) && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => window.open(`/api/orden-compra/${oc.id}/pdf`, '_blank')}
-          >
-            <FileDown className="h-4 w-4 mr-1" /> Descargar PDF
-          </Button>
+          <DescargarOCPDFButton oc={oc} />
         )}
       </div>
 
