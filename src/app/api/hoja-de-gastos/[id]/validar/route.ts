@@ -23,6 +23,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Solo se puede validar desde estado rendido' }, { status: 400 })
     }
 
+    // Verificar que todas las líneas tengan conformidad = 'conforme'
+    const lineas = await prisma.gastoLinea.findMany({
+      where: { hojaDeGastosId: id },
+      select: { id: true, conformidad: true },
+    })
+    if (lineas.length > 0) {
+      const pendientes = lineas.filter(l => l.conformidad !== 'conforme')
+      if (pendientes.length > 0) {
+        return NextResponse.json({
+          error: `${pendientes.length} línea(s) sin conformidad. Revise todas las líneas antes de validar.`,
+        }, { status: 400 })
+      }
+    }
+
     const data = await prisma.hojaDeGastos.update({
       where: { id },
       data: {

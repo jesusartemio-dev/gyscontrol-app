@@ -53,3 +53,20 @@ export async function deleteGastoLinea(id: string): Promise<void> {
     throw new Error(error || 'Error al eliminar línea de gasto')
   }
 }
+
+export async function marcarConformidad(
+  id: string,
+  conformidad: 'conforme' | 'observado',
+  comentario?: string
+): Promise<GastoLinea> {
+  const res = await fetch(`${BASE_URL}/${id}/conformidad`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conformidad, comentario }),
+  })
+  if (!res.ok) {
+    const { error } = await res.json()
+    throw new Error(error || 'Error al marcar conformidad')
+  }
+  return await res.json()
+}

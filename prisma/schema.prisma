@@ -2983,9 +2983,12 @@ model GastoLinea {
   proveedorNombre   String?
   proveedorRuc      String?
   observaciones     String?
-  sunatVerificado   Boolean?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime
+  sunatVerificado       Boolean?
+  conformidad           String?
+  comentarioConformidad String?
+  conformadoEn          DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime
 
   hojaDeGastos   HojaDeGastos    @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
   categoriaGasto CategoriaGasto? @relation(fields: [categoriaGastoId], references: [id])

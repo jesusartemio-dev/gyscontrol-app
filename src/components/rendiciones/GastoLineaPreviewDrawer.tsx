@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
 import {
   ChevronLeft,
   ChevronRight,
@@ -32,10 +34,13 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  CheckCircle2,
+  AlertCircle,
+  Circle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { isImage, isPdf } from '@/types/drive'
-import { updateGastoLinea } from '@/lib/services/gastoLinea'
+import { updateGastoLinea, marcarConformidad } from '@/lib/services/gastoLinea'
 import type { GastoLinea, CategoriaGasto } from '@/types'
 
 const TIPOS_COMPROBANTE_OPTIONS = [
@@ -57,6 +62,7 @@ interface GastoLineaPreviewDrawerProps {
   categorias: CategoriaGasto[]
   editable: boolean
   onChanged: () => void
+  showConformidad?: boolean
 }
 
 // ── Zoom/Pan Image Viewer ────────────────────────────
@@ -179,11 +185,15 @@ export default function GastoLineaPreviewDrawer({
   categorias,
   editable,
   onChanged,
+  showConformidad = false,
 }: GastoLineaPreviewDrawerProps) {
   const [iframeLoading, setIframeLoading] = useState(true)
   const [activeAdjuntoIdx, setActiveAdjuntoIdx] = useState(0)
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [conformidadLoading, setConformidadLoading] = useState(false)
+  const [showObservacionInput, setShowObservacionInput] = useState(false)
+  const [observacionText, setObservacionText] = useState('')
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -208,6 +218,24 @@ export default function GastoLineaPreviewDrawer({
       onIndexChange(null)
       setActiveAdjuntoIdx(0)
       setIsEditing(false)
+      setShowObservacionInput(false)
+      setObservacionText('')
+    }
+  }
+
+  const handleConformidad = async (estado: 'conforme' | 'observado', comentario?: string) => {
+    if (!linea) return
+    try {
+      setConformidadLoading(true)
+      await marcarConformidad(linea.id, estado, comentario)
+      toast.success(estado === 'conforme' ? 'Marcado como conforme' : 'Marcado como observado')
+      setShowObservacionInput(false)
+      setObservacionText('')
+      onChanged()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al marcar conformidad')
+    } finally {
+      setConformidadLoading(false)
     }
   }
 
@@ -266,6 +294,8 @@ export default function GastoLineaPreviewDrawer({
       setActiveAdjuntoIdx(0)
       setIframeLoading(true)
       setIsEditing(false)
+      setShowObservacionInput(false)
+      setObservacionText('')
     }
   }
 
@@ -275,6 +305,8 @@ export default function GastoLineaPreviewDrawer({
       setActiveAdjuntoIdx(0)
       setIframeLoading(true)
       setIsEditing(false)
+      setShowObservacionInput(false)
+      setObservacionText('')
     }
   }
 
@@ -607,6 +639,120 @@ export default function GastoLineaPreviewDrawer({
                           <span className="text-xs text-muted-foreground">
                             {linea.observaciones}
                           </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Conformidad section */}
+                  {showConformidad && !isEditing && (
+                    <div className="border-t mt-4 pt-3">
+                      <span className="text-[10px] text-muted-foreground block mb-2">
+                        Conformidad
+                      </span>
+                      <div className="mb-2">
+                        {linea.conformidad === 'conforme' ? (
+                          <Badge className="bg-green-100 text-green-700 text-[10px]">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Conforme
+                          </Badge>
+                        ) : linea.conformidad === 'observado' ? (
+                          <Badge className="bg-orange-100 text-orange-700 text-[10px]">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Observado
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            <Circle className="h-3 w-3 mr-1" />
+                            Pendiente
+                          </Badge>
+                        )}
+                      </div>
+                      {linea.conformidad === 'observado' && linea.comentarioConformidad && (
+                        <p className="text-xs text-orange-700 bg-orange-50 rounded p-2 mb-2">
+                          {linea.comentarioConformidad}
+                        </p>
+                      )}
+                      {showObservacionInput ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={observacionText}
+                            onChange={(e) => setObservacionText(e.target.value)}
+                            placeholder="Motivo de la observacion..."
+                            rows={2}
+                            className="text-xs"
+                            disabled={conformidadLoading}
+                          />
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px] flex-1"
+                              onClick={() => { setShowObservacionInput(false); setObservacionText('') }}
+                              disabled={conformidadLoading}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 text-[11px] flex-1 bg-orange-600 hover:bg-orange-700"
+                              onClick={() => handleConformidad('observado', observacionText)}
+                              disabled={conformidadLoading || !observacionText.trim()}
+                            >
+                              {conformidadLoading && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                              Observar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1">
+                          {linea.conformidad !== 'conforme' && (
+                            <Button
+                              size="sm"
+                              className="h-7 text-[11px] flex-1 bg-green-600 hover:bg-green-700"
+                              onClick={() => handleConformidad('conforme')}
+                              disabled={conformidadLoading}
+                            >
+                              {conformidadLoading && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Conforme
+                            </Button>
+                          )}
+                          {linea.conformidad === 'conforme' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px] flex-1 border-orange-300 text-orange-700 hover:bg-orange-50"
+                              onClick={() => setShowObservacionInput(true)}
+                              disabled={conformidadLoading}
+                            >
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Observar
+                            </Button>
+                          ) : linea.conformidad !== 'observado' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px] flex-1 border-orange-300 text-orange-700 hover:bg-orange-50"
+                              onClick={() => setShowObservacionInput(true)}
+                              disabled={conformidadLoading}
+                            >
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Observar
+                            </Button>
+                          ) : null}
+                          {linea.conformidad === 'observado' && (
+                            <Button
+                              size="sm"
+                              className="h-7 text-[11px] flex-1 bg-green-600 hover:bg-green-700"
+                              onClick={() => handleConformidad('conforme')}
+                              disabled={conformidadLoading}
+                            >
+                              {conformidadLoading && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Conforme
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
