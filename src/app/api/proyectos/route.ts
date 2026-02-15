@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const estado = searchParams.get('estado')
     const estadosActivos = searchParams.get('estadosActivos') === 'true'
+    const lightweight = searchParams.get('fields') === 'id,codigo,nombre'
 
     // Construir filtro
     const where: any = {}
@@ -24,6 +25,16 @@ export async function GET(request: NextRequest) {
       where.estado = {
         notIn: ['cerrado', 'cancelado']
       }
+    }
+
+    // Lightweight mode for dropdowns: only return id, codigo, nombre, totalCliente
+    if (lightweight) {
+      const proyectos = await prisma.proyecto.findMany({
+        where,
+        select: { id: true, codigo: true, nombre: true, totalCliente: true, clienteId: true, moneda: true },
+        orderBy: { createdAt: 'desc' },
+      })
+      return NextResponse.json(proyectos)
     }
 
     const proyectos = await prisma.proyecto.findMany({

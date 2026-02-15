@@ -9,8 +9,8 @@ import { toast } from 'sonner'
 import { getHojasDeGastos } from '@/lib/services/hojaDeGastos'
 import type { HojaDeGastos } from '@/types'
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
+const formatCurrency = (amount: number, moneda = 'PEN') =>
+  new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -28,6 +28,8 @@ const estadoColor: Record<string, string> = {
 
 interface DashboardFinanciero {
   cuentasPorCobrar: {
+    pendientePEN: number
+    pendienteUSD: number
     totalPendiente: number
     countPendiente: number
     vencidas: Array<{
@@ -41,8 +43,12 @@ interface DashboardFinanciero {
     }>
   }
   cuentasPorPagar: {
+    pendientePEN: number
+    pendienteUSD: number
     totalPendiente: number
     countPendiente: number
+    vencidoPEN: number
+    vencidoUSD: number
     totalVencido: number
     countVencido: number
     proximasVencer: Array<{
@@ -63,6 +69,14 @@ interface DashboardFinanciero {
     moneda: string
     tipo: string
   }>
+}
+
+const renderMonedaTotals = (pen: number, usd: number) => {
+  const parts: string[] = []
+  if (pen > 0) parts.push(`PEN: ${formatCurrency(pen, 'PEN')}`)
+  if (usd > 0) parts.push(`USD: ${formatCurrency(usd, 'USD')}`)
+  if (parts.length === 0) return formatCurrency(0, 'PEN')
+  return parts.join(' | ')
 }
 
 export default function AdministracionDashboard() {
@@ -96,8 +110,7 @@ export default function AdministracionDashboard() {
     const porDepositar = hojas.filter(h => h.estado === 'aprobado' && h.requiereAnticipo).length
     const porValidar = hojas.filter(h => h.estado === 'rendido').length
     const porCerrar = hojas.filter(h => h.estado === 'validado').length
-    const totalPendiente = porAprobar + porDepositar + porValidar + porCerrar
-    return { porAprobar, porDepositar, porValidar, porCerrar, totalPendiente }
+    return { porAprobar, porDepositar, porValidar, porCerrar }
   }, [hojas])
 
   const recientes = useMemo(() => {
@@ -158,7 +171,6 @@ export default function AdministracionDashboard() {
 
   const cxc = financiero?.cuentasPorCobrar
   const cxp = financiero?.cuentasPorPagar
-  const balance = (cxc?.totalPendiente || 0) - (cxp?.totalPendiente || 0)
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-6">
@@ -187,8 +199,8 @@ export default function AdministracionDashboard() {
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(cxc?.totalPendiente || 0)}
+              <div className="text-lg font-bold text-green-600">
+                {renderMonedaTotals(cxc?.pendientePEN || 0, cxc?.pendienteUSD || 0)}
               </div>
               <div className="text-xs text-muted-foreground">
                 Por cobrar ({cxc?.countPendiente || 0})
@@ -210,8 +222,8 @@ export default function AdministracionDashboard() {
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(cxp?.totalPendiente || 0)}
+              <div className="text-lg font-bold text-red-600">
+                {renderMonedaTotals(cxp?.pendientePEN || 0, cxp?.pendienteUSD || 0)}
               </div>
               <div className="text-xs text-muted-foreground">
                 Por pagar ({cxp?.countPendiente || 0})
@@ -222,15 +234,33 @@ export default function AdministracionDashboard() {
             </CardContent>
           </Card>
 
-          <Card className={`${balance >= 0 ? 'border-emerald-200' : 'border-orange-200'}`}>
+          <Card className="border-indigo-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <div className={`p-2 rounded-lg ${balance >= 0 ? 'bg-emerald-50' : 'bg-orange-50'}`}>
-                  <Landmark className={`h-4 w-4 ${balance >= 0 ? 'text-emerald-600' : 'text-orange-600'}`} />
+                <div className="p-2 rounded-lg bg-indigo-50">
+                  <Landmark className="h-4 w-4 text-indigo-600" />
                 </div>
               </div>
-              <div className={`text-2xl font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
-                {formatCurrency(balance)}
+              <div className="space-y-1">
+                {((cxc?.pendientePEN || 0) > 0 || (cxp?.pendientePEN || 0) > 0) && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">PEN:</span>
+                    <span className={`font-mono font-bold ${(cxc?.pendientePEN || 0) - (cxp?.pendientePEN || 0) >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                      {formatCurrency((cxc?.pendientePEN || 0) - (cxp?.pendientePEN || 0), 'PEN')}
+                    </span>
+                  </div>
+                )}
+                {((cxc?.pendienteUSD || 0) > 0 || (cxp?.pendienteUSD || 0) > 0) && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">USD:</span>
+                    <span className={`font-mono font-bold ${(cxc?.pendienteUSD || 0) - (cxp?.pendienteUSD || 0) >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                      {formatCurrency((cxc?.pendienteUSD || 0) - (cxp?.pendienteUSD || 0), 'USD')}
+                    </span>
+                  </div>
+                )}
+                {(cxc?.pendientePEN || 0) === 0 && (cxp?.pendientePEN || 0) === 0 && (cxc?.pendienteUSD || 0) === 0 && (cxp?.pendienteUSD || 0) === 0 && (
+                  <div className="text-lg font-bold text-emerald-600">{formatCurrency(0, 'PEN')}</div>
+                )}
               </div>
               <div className="text-xs text-muted-foreground">Balance (CxC − CxP)</div>
             </CardContent>
@@ -269,7 +299,7 @@ export default function AdministracionDashboard() {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div className="font-mono text-sm font-semibold text-red-600">
-                            {formatCurrency(v.monto)}
+                            {formatCurrency(v.monto, v.moneda)}
                           </div>
                           <div className="text-[10px] text-red-500">
                             Venció {formatDate(v.fechaVencimiento)}
@@ -311,7 +341,7 @@ export default function AdministracionDashboard() {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div className="font-mono text-sm font-semibold">
-                            {formatCurrency(v.monto)}
+                            {formatCurrency(v.monto, v.moneda)}
                           </div>
                           <div className="text-[10px] text-orange-600">
                             Vence {formatDate(v.fechaVencimiento)}

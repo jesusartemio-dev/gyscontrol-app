@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle } from 'lucide-react'
+import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface CuentaBancaria {
@@ -28,6 +28,23 @@ interface PagoPagar {
   cuentaBancaria: CuentaBancaria | null
 }
 
+interface Proveedor {
+  id: string
+  nombre: string
+  ruc: string | null
+}
+
+interface Proyecto {
+  id: string
+  codigo: string
+  nombre: string
+}
+
+interface OrdenCompra {
+  id: string
+  numero: string
+}
+
 interface CuentaPorPagar {
   id: string
   proveedorId: string
@@ -44,9 +61,9 @@ interface CuentaPorPagar {
   condicionPago: string
   estado: string
   observaciones: string | null
-  proveedor?: { id: string; nombre: string; ruc: string | null }
-  proyecto?: { id: string; codigo: string; nombre: string } | null
-  ordenCompra?: { id: string; numero: string } | null
+  proveedor?: Proveedor
+  proyecto?: Proyecto | null
+  ordenCompra?: OrdenCompra | null
   pagos?: PagoPagar[]
 }
 
@@ -56,6 +73,15 @@ const ESTADOS_CXP = [
   { value: 'pagada', label: 'Pagada', color: 'bg-green-100 text-green-700' },
   { value: 'vencida', label: 'Vencida', color: 'bg-red-100 text-red-700' },
   { value: 'anulada', label: 'Anulada', color: 'bg-gray-100 text-gray-700' },
+]
+
+const CONDICIONES_PAGO = [
+  { value: 'contado', label: 'Contado' },
+  { value: 'credito_15', label: 'Crédito 15 días' },
+  { value: 'credito_30', label: 'Crédito 30 días' },
+  { value: 'credito_45', label: 'Crédito 45 días' },
+  { value: 'credito_60', label: 'Crédito 60 días' },
+  { value: 'credito_90', label: 'Crédito 90 días' },
 ]
 
 const getEstadoColor = (estado: string) =>
@@ -75,10 +101,29 @@ const isVencida = (fecha: string, estado: string) => {
 export default function CuentasPagarPage() {
   const [items, setItems] = useState<CuentaPorPagar[]>([])
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
+  const [proveedores, setProveedores] = useState<Proveedor[]>([])
+  const [proyectos, setProyectos] = useState<Proyecto[]>([])
+  const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstado, setFilterEstado] = useState<string>('all')
+
+  // Create dialog
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    proveedorId: '',
+    numeroFactura: '',
+    monto: '',
+    moneda: 'PEN',
+    fechaRecepcion: new Date().toISOString().split('T')[0],
+    fechaVencimiento: '',
+    condicionPago: 'contado',
+    proyectoId: '',
+    ordenCompraId: '',
+    descripcion: '',
+    observaciones: '',
+  })
 
   // Pago dialog
   const [showPagoDialog, setShowPagoDialog] = useState(false)
@@ -87,7 +132,7 @@ export default function CuentasPagarPage() {
   const [pagoFecha, setPagoFecha] = useState(new Date().toISOString().split('T')[0])
   const [pagoMedio, setPagoMedio] = useState('transferencia')
   const [pagoOperacion, setPagoOperacion] = useState('')
-  const [pagoBancoId, setPagoBancoId] = useState('')
+  const [pagoBancoId, setPagoBancoId] = useState('none')
   const [pagoObs, setPagoObs] = useState('')
 
   // Detail dialog
@@ -98,15 +143,24 @@ export default function CuentasPagarPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [cxpRes, bancoRes] = await Promise.all([
+      const [cxpRes, bancoRes, provRes, proyRes, ocRes] = await Promise.all([
         fetch('/api/administracion/cuentas-pagar'),
         fetch('/api/administracion/cuentas-bancarias'),
+        fetch('/api/proveedores'),
+        fetch('/api/proyectos?fields=id,codigo,nombre'),
+        fetch('/api/orden-compra'),
       ])
       if (cxpRes.ok) setItems(await cxpRes.json())
       if (bancoRes.ok) {
         const bancos = await bancoRes.json()
         setCuentasBancarias(bancos.filter((b: any) => b.activa))
       }
+      if (provRes.ok) {
+        const provData = await provRes.json()
+        setProveedores(provData.data || provData)
+      }
+      if (proyRes.ok) setProyectos(await proyRes.json())
+      if (ocRes.ok) setOrdenesCompra(await ocRes.json())
     } catch {
       toast.error('Error al cargar datos')
     } finally {
@@ -116,12 +170,22 @@ export default function CuentasPagarPage() {
 
   const resumen = useMemo(() => {
     const pendientes = items.filter(i => i.estado === 'pendiente' || i.estado === 'parcial')
-    const totalPendiente = pendientes.reduce((s, i) => s + i.saldoPendiente, 0)
     const vencidas = pendientes.filter(i => isVencida(i.fechaVencimiento, i.estado))
-    const totalVencido = vencidas.reduce((s, i) => s + i.saldoPendiente, 0)
     const pagadas = items.filter(i => i.estado === 'pagada')
-    const totalPagado = pagadas.reduce((s, i) => s + i.monto, 0)
-    return { totalPendiente, countPendiente: pendientes.length, totalVencido, countVencido: vencidas.length, totalPagado }
+
+    const byMoneda = (arr: CuentaPorPagar[], field: 'saldoPendiente' | 'monto') => {
+      const pen = arr.filter(i => i.moneda === 'PEN').reduce((s, i) => s + i[field], 0)
+      const usd = arr.filter(i => i.moneda === 'USD').reduce((s, i) => s + i[field], 0)
+      return { pen, usd }
+    }
+
+    return {
+      pendiente: byMoneda(pendientes, 'saldoPendiente'),
+      countPendiente: pendientes.length,
+      vencido: byMoneda(vencidas, 'saldoPendiente'),
+      countVencido: vencidas.length,
+      pagado: byMoneda(pagadas, 'monto'),
+    }
   }, [items])
 
   const filtered = useMemo(() => {
@@ -140,13 +204,103 @@ export default function CuentasPagarPage() {
     return result
   }, [items, filterEstado, searchTerm])
 
+  // --- Create ---
+  const resetCreateForm = () => {
+    setCreateForm({
+      proveedorId: '',
+      numeroFactura: '',
+      monto: '',
+      moneda: 'PEN',
+      fechaRecepcion: new Date().toISOString().split('T')[0],
+      fechaVencimiento: '',
+      condicionPago: 'contado',
+      proyectoId: '',
+      ordenCompraId: '',
+      descripcion: '',
+      observaciones: '',
+    })
+  }
+
+  const handleCreate = async () => {
+    if (!createForm.proveedorId || !createForm.monto || !createForm.fechaRecepcion || !createForm.fechaVencimiento) {
+      toast.error('Proveedor, monto, fecha recepción y fecha vencimiento son requeridos')
+      return
+    }
+    const monto = parseFloat(createForm.monto)
+    if (isNaN(monto) || monto <= 0) {
+      toast.error('El monto debe ser mayor a 0')
+      return
+    }
+    if (new Date(createForm.fechaVencimiento) < new Date(createForm.fechaRecepcion)) {
+      toast.error('La fecha de vencimiento debe ser posterior a la de recepción')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/administracion/cuentas-pagar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proveedorId: createForm.proveedorId,
+          numeroFactura: createForm.numeroFactura || null,
+          monto,
+          moneda: createForm.moneda,
+          fechaRecepcion: createForm.fechaRecepcion,
+          fechaVencimiento: createForm.fechaVencimiento,
+          condicionPago: createForm.condicionPago,
+          proyectoId: createForm.proyectoId || null,
+          ordenCompraId: createForm.ordenCompraId || null,
+          descripcion: createForm.descripcion || null,
+          observaciones: createForm.observaciones || null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Cuenta por pagar creada')
+      setShowCreateDialog(false)
+      resetCreateForm()
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al crear cuenta')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // --- Anular ---
+  const handleAnular = async (cuenta: CuentaPorPagar) => {
+    if (!confirm(`¿Anular la cuenta ${cuenta.numeroFactura || cuenta.id.slice(0, 8)}?`)) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-pagar/${cuenta.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'anulada' }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error')
+      }
+      toast.success('Cuenta anulada')
+      setShowDetail(null)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al anular')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // --- Pago ---
   const openPago = (cuenta: CuentaPorPagar) => {
     setPagoCuenta(cuenta)
     setPagoMonto(cuenta.saldoPendiente.toFixed(2))
     setPagoFecha(new Date().toISOString().split('T')[0])
     setPagoMedio('transferencia')
     setPagoOperacion('')
-    setPagoBancoId('')
+    setPagoBancoId('none')
     setPagoObs('')
     setShowPagoDialog(true)
   }
@@ -156,17 +310,26 @@ export default function CuentasPagarPage() {
       toast.error('Monto y fecha son requeridos')
       return
     }
+    const monto = parseFloat(pagoMonto)
+    if (isNaN(monto) || monto <= 0) {
+      toast.error('El monto debe ser mayor a 0')
+      return
+    }
+    if (monto > pagoCuenta.saldoPendiente) {
+      toast.error(`El monto no puede ser mayor al saldo pendiente (${formatCurrency(pagoCuenta.saldoPendiente, pagoCuenta.moneda)})`)
+      return
+    }
     setSaving(true)
     try {
       const res = await fetch(`/api/administracion/cuentas-pagar/${pagoCuenta.id}/pagos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          monto: parseFloat(pagoMonto),
+          monto,
           fechaPago: pagoFecha,
           medioPago: pagoMedio,
           numeroOperacion: pagoOperacion || null,
-          cuentaBancariaId: pagoBancoId || null,
+          cuentaBancariaId: pagoBancoId === 'none' ? null : pagoBancoId,
           observaciones: pagoObs || null,
         }),
       })
@@ -184,6 +347,14 @@ export default function CuentasPagarPage() {
     }
   }
 
+  const renderMonedaTotals = (pen: number, usd: number) => {
+    const parts: string[] = []
+    if (pen > 0) parts.push(`PEN: ${formatCurrency(pen, 'PEN')}`)
+    if (usd > 0) parts.push(`USD: ${formatCurrency(usd, 'USD')}`)
+    if (parts.length === 0) return formatCurrency(0, 'PEN')
+    return parts.join(' | ')
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -194,9 +365,15 @@ export default function CuentasPagarPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">Cuentas por Pagar</h1>
-        <p className="text-muted-foreground">Gestión de facturas y pagos a proveedores</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Cuentas por Pagar</h1>
+          <p className="text-muted-foreground">Gestión de facturas y pagos a proveedores</p>
+        </div>
+        <Button onClick={() => { resetCreateForm(); setShowCreateDialog(true) }}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nueva Cuenta por Pagar
+        </Button>
       </div>
 
       {/* Resumen cards */}
@@ -208,7 +385,7 @@ export default function CuentasPagarPage() {
                 <Clock className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">{formatCurrency(resumen.totalPendiente)}</div>
+                <div className="text-lg font-bold">{renderMonedaTotals(resumen.pendiente.pen, resumen.pendiente.usd)}</div>
                 <div className="text-xs text-muted-foreground">{resumen.countPendiente} pendientes</div>
               </div>
             </div>
@@ -221,7 +398,7 @@ export default function CuentasPagarPage() {
                 <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-600">{formatCurrency(resumen.totalVencido)}</div>
+                <div className="text-lg font-bold text-red-600">{renderMonedaTotals(resumen.vencido.pen, resumen.vencido.usd)}</div>
                 <div className="text-xs text-muted-foreground">{resumen.countVencido} vencidas</div>
               </div>
             </div>
@@ -234,7 +411,7 @@ export default function CuentasPagarPage() {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-600">{formatCurrency(resumen.totalPagado)}</div>
+                <div className="text-lg font-bold text-green-600">{renderMonedaTotals(resumen.pagado.pen, resumen.pagado.usd)}</div>
                 <div className="text-xs text-muted-foreground">pagado total</div>
               </div>
             </div>
@@ -321,10 +498,15 @@ export default function CuentasPagarPage() {
                             Ver
                           </Button>
                           {(item.estado === 'pendiente' || item.estado === 'parcial') && (
-                            <Button variant="outline" size="sm" onClick={() => openPago(item)}>
-                              <ArrowUpCircle className="h-3 w-3 mr-1" />
-                              Pago
-                            </Button>
+                            <>
+                              <Button variant="outline" size="sm" onClick={() => openPago(item)}>
+                                <ArrowUpCircle className="h-3 w-3 mr-1" />
+                                Pago
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleAnular(item)}>
+                                <Ban className="h-3 w-3" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -337,6 +519,109 @@ export default function CuentasPagarPage() {
         </CardContent>
       </Card>
 
+      {/* Dialog crear cuenta por pagar */}
+      <Dialog open={showCreateDialog} onOpenChange={open => { if (!open) setShowCreateDialog(false) }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nueva Cuenta por Pagar</DialogTitle>
+            <DialogDescription>Registrar una factura o cuenta pendiente de pago a proveedor</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Proveedor *</Label>
+              <Select value={createForm.proveedorId} onValueChange={v => setCreateForm(f => ({ ...f, proveedorId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
+                <SelectContent>
+                  {proveedores.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.nombre}{p.ruc ? ` (${p.ruc})` : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>N° Factura</Label>
+              <Input placeholder="F001-00123" value={createForm.numeroFactura} onChange={e => setCreateForm(f => ({ ...f, numeroFactura: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Monto *</Label>
+                <Input type="number" step="0.01" placeholder="0.00" value={createForm.monto} onChange={e => setCreateForm(f => ({ ...f, monto: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Moneda</Label>
+                <Select value={createForm.moneda} onValueChange={v => setCreateForm(f => ({ ...f, moneda: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PEN">PEN (S/)</SelectItem>
+                    <SelectItem value="USD">USD ($)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Fecha Recepción *</Label>
+                <Input type="date" value={createForm.fechaRecepcion} onChange={e => setCreateForm(f => ({ ...f, fechaRecepcion: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Fecha Vencimiento *</Label>
+                <Input type="date" value={createForm.fechaVencimiento} onChange={e => setCreateForm(f => ({ ...f, fechaVencimiento: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label>Condición de Pago</Label>
+              <Select value={createForm.condicionPago} onValueChange={v => setCreateForm(f => ({ ...f, condicionPago: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CONDICIONES_PAGO.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Proyecto (opcional)</Label>
+              <Select value={createForm.proyectoId || 'none'} onValueChange={v => setCreateForm(f => ({ ...f, proyectoId: v === 'none' ? '' : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin proyecto" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin proyecto</SelectItem>
+                  {proyectos.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Orden de Compra (opcional)</Label>
+              <Select value={createForm.ordenCompraId || 'none'} onValueChange={v => setCreateForm(f => ({ ...f, ordenCompraId: v === 'none' ? '' : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin OC" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin OC</SelectItem>
+                  {ordenesCompra.map(oc => (
+                    <SelectItem key={oc.id} value={oc.id}>{oc.numero}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Descripción</Label>
+              <Input placeholder="Descripción del gasto o servicio" value={createForm.descripcion} onChange={e => setCreateForm(f => ({ ...f, descripcion: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Observaciones</Label>
+              <Input placeholder="Notas adicionales" value={createForm.observaciones} onChange={e => setCreateForm(f => ({ ...f, observaciones: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
+            <Button onClick={handleCreate} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Crear Cuenta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog registrar pago */}
       <Dialog open={showPagoDialog} onOpenChange={open => { if (!open) setShowPagoDialog(false) }}>
         <DialogContent>
@@ -348,8 +633,8 @@ export default function CuentasPagarPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Monto *</Label>
-              <Input type="number" step="0.01" value={pagoMonto} onChange={e => setPagoMonto(e.target.value)} />
+              <Label>Monto * (máx: {pagoCuenta ? formatCurrency(pagoCuenta.saldoPendiente, pagoCuenta.moneda) : ''})</Label>
+              <Input type="number" step="0.01" value={pagoMonto} onChange={e => setPagoMonto(e.target.value)} max={pagoCuenta?.saldoPendiente} />
             </div>
             <div>
               <Label>Fecha de Pago *</Label>
@@ -377,7 +662,7 @@ export default function CuentasPagarPage() {
               <Select value={pagoBancoId} onValueChange={setPagoBancoId}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin especificar</SelectItem>
+                  <SelectItem value="none">Sin especificar</SelectItem>
                   {cuentasBancarias.map(b => (
                     <SelectItem key={b.id} value={b.id}>{b.nombreBanco} - {b.numeroCuenta}</SelectItem>
                   ))}
@@ -443,7 +728,7 @@ export default function CuentasPagarPage() {
                         <CardContent className="p-3">
                           <div className="flex justify-between items-start">
                             <div>
-                              <div className="font-mono font-medium">{formatCurrency(p.monto)}</div>
+                              <div className="font-mono font-medium">{formatCurrency(p.monto, showDetail.moneda)}</div>
                               <div className="text-xs text-muted-foreground">{formatDate(p.fechaPago)} · {p.medioPago}</div>
                               {p.numeroOperacion && <div className="text-xs text-muted-foreground">Op: {p.numeroOperacion}</div>}
                               {p.cuentaBancaria && <div className="text-xs text-muted-foreground">{p.cuentaBancaria.nombreBanco}</div>}
@@ -458,6 +743,13 @@ export default function CuentasPagarPage() {
             </div>
           )}
           <DialogFooter>
+            {showDetail && (showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
+              <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
+                <Ban className="h-4 w-4 mr-1" />
+                Anular
+              </Button>
+            )}
+            <div className="flex-1" />
             <Button variant="outline" onClick={() => setShowDetail(null)}>Cerrar</Button>
             {showDetail && (showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
               <Button onClick={() => { setShowDetail(null); openPago(showDetail) }}>

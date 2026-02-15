@@ -18,16 +18,22 @@ export async function GET() {
     const now = new Date()
     const en7Dias = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
-    // CxC totales
-    const [cxcPendiente, cxcVencido, cxpPendiente, cxpVencido, cxpProximaVencer, cuentasBancarias] = await Promise.all([
-      // Total CxC pendiente
+    const [cxcPendientePEN, cxcPendienteUSD, cxcVencido, cxpPendientePEN, cxpPendienteUSD, cxpVencidoPEN, cxpVencidoUSD, cxpProximaVencer, cuentasBancarias] = await Promise.all([
+      // CxC pendiente PEN
       prisma.cuentaPorCobrar.aggregate({
-        where: { estado: { in: ['pendiente', 'parcial'] } },
+        where: { estado: { in: ['pendiente', 'parcial'] }, moneda: 'PEN' },
         _sum: { saldoPendiente: true },
         _count: true,
       }),
 
-      // CxC vencidas
+      // CxC pendiente USD
+      prisma.cuentaPorCobrar.aggregate({
+        where: { estado: { in: ['pendiente', 'parcial'] }, moneda: 'USD' },
+        _sum: { saldoPendiente: true },
+        _count: true,
+      }),
+
+      // CxC vencidas (all currencies)
       prisma.cuentaPorCobrar.findMany({
         where: {
           estado: { in: ['pendiente', 'parcial'] },
@@ -41,18 +47,37 @@ export async function GET() {
         take: 10,
       }),
 
-      // Total CxP pendiente
+      // CxP pendiente PEN
       prisma.cuentaPorPagar.aggregate({
-        where: { estado: { in: ['pendiente', 'parcial'] } },
+        where: { estado: { in: ['pendiente', 'parcial'] }, moneda: 'PEN' },
         _sum: { saldoPendiente: true },
         _count: true,
       }),
 
-      // CxP vencidas
+      // CxP pendiente USD
+      prisma.cuentaPorPagar.aggregate({
+        where: { estado: { in: ['pendiente', 'parcial'] }, moneda: 'USD' },
+        _sum: { saldoPendiente: true },
+        _count: true,
+      }),
+
+      // CxP vencidas PEN
       prisma.cuentaPorPagar.aggregate({
         where: {
           estado: { in: ['pendiente', 'parcial'] },
           fechaVencimiento: { lt: now },
+          moneda: 'PEN',
+        },
+        _sum: { saldoPendiente: true },
+        _count: true,
+      }),
+
+      // CxP vencidas USD
+      prisma.cuentaPorPagar.aggregate({
+        where: {
+          estado: { in: ['pendiente', 'parcial'] },
+          fechaVencimiento: { lt: now },
+          moneda: 'USD',
         },
         _sum: { saldoPendiente: true },
         _count: true,
@@ -72,17 +97,21 @@ export async function GET() {
         take: 10,
       }),
 
-      // Saldos por cuenta bancaria (solo activas)
+      // Cuentas bancarias activas
       prisma.cuentaBancaria.findMany({
         where: { activa: true },
         orderBy: [{ moneda: 'asc' }, { nombreBanco: 'asc' }],
       }),
     ])
 
+    const round = (n: number) => Math.round((n || 0) * 100) / 100
+
     return NextResponse.json({
       cuentasPorCobrar: {
-        totalPendiente: Math.round((cxcPendiente._sum.saldoPendiente || 0) * 100) / 100,
-        countPendiente: cxcPendiente._count,
+        pendientePEN: round(cxcPendientePEN._sum.saldoPendiente || 0),
+        pendienteUSD: round(cxcPendienteUSD._sum.saldoPendiente || 0),
+        totalPendiente: round((cxcPendientePEN._sum.saldoPendiente || 0) + (cxcPendienteUSD._sum.saldoPendiente || 0)),
+        countPendiente: cxcPendientePEN._count + cxcPendienteUSD._count,
         vencidas: cxcVencido.map(c => ({
           id: c.id,
           monto: c.saldoPendiente,
@@ -94,10 +123,14 @@ export async function GET() {
         })),
       },
       cuentasPorPagar: {
-        totalPendiente: Math.round((cxpPendiente._sum.saldoPendiente || 0) * 100) / 100,
-        countPendiente: cxpPendiente._count,
-        totalVencido: Math.round((cxpVencido._sum.saldoPendiente || 0) * 100) / 100,
-        countVencido: cxpVencido._count,
+        pendientePEN: round(cxpPendientePEN._sum.saldoPendiente || 0),
+        pendienteUSD: round(cxpPendienteUSD._sum.saldoPendiente || 0),
+        totalPendiente: round((cxpPendientePEN._sum.saldoPendiente || 0) + (cxpPendienteUSD._sum.saldoPendiente || 0)),
+        countPendiente: cxpPendientePEN._count + cxpPendienteUSD._count,
+        vencidoPEN: round(cxpVencidoPEN._sum.saldoPendiente || 0),
+        vencidoUSD: round(cxpVencidoUSD._sum.saldoPendiente || 0),
+        totalVencido: round((cxpVencidoPEN._sum.saldoPendiente || 0) + (cxpVencidoUSD._sum.saldoPendiente || 0)),
+        countVencido: cxpVencidoPEN._count + cxpVencidoUSD._count,
         proximasVencer: cxpProximaVencer.map(c => ({
           id: c.id,
           monto: c.saldoPendiente,
