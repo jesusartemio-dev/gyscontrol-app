@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 import {
   Upload,
@@ -279,12 +278,16 @@ export default function CargaMasivaComprobantes({
   // ── Reset al cerrar ─────────────────────────────────
 
   const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen && !isProcessing && !isSaving) {
-      setItems([])
-    }
-    if (!isProcessing && !isSaving) {
-      onOpenChange(isOpen)
-    }
+    // No cerrar si está procesando o guardando
+    if (!isOpen && (isProcessing || isSaving)) return
+    // Solo limpiar items al cerrar con el botón Cancelar (no en click afuera)
+    onOpenChange(isOpen)
+  }
+
+  const handleCancel = () => {
+    if (isProcessing || isSaving) return
+    setItems([])
+    onOpenChange(false)
   }
 
   // ── Contadores ───────────────────────────────────────
@@ -302,7 +305,11 @@ export default function CargaMasivaComprobantes({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent
+        className="sm:max-w-[95vw] lg:max-w-6xl max-h-[90vh] flex flex-col"
+        onInteractOutside={(e) => { if (items.length > 0) e.preventDefault() }}
+        onEscapeKeyDown={(e) => { if (items.length > 0) e.preventDefault() }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div className="p-1.5 rounded-md bg-blue-100">
@@ -392,20 +399,20 @@ export default function CargaMasivaComprobantes({
               </div>
 
               {/* ─── Tabla de resultados ──────────────── */}
-              <ScrollArea className="flex-1 border rounded-lg" style={{ maxHeight: 'calc(90vh - 320px)' }}>
-                <table className="w-full text-xs">
+              <div className="flex-1 border rounded-lg overflow-auto" style={{ maxHeight: 'calc(90vh - 320px)' }}>
+                <table className="w-full text-[11px] min-w-[900px]">
                   <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10">
                     <tr>
-                      <th className="text-left p-2 font-medium w-[40px]">#</th>
-                      <th className="text-left p-2 font-medium">Archivo</th>
-                      <th className="text-left p-2 font-medium">Tipo</th>
-                      <th className="text-left p-2 font-medium">N° Comprobante</th>
-                      <th className="text-left p-2 font-medium">RUC</th>
-                      <th className="text-left p-2 font-medium">Proveedor</th>
-                      <th className="text-left p-2 font-medium">Fecha</th>
-                      <th className="text-right p-2 font-medium">Monto</th>
-                      <th className="text-left p-2 font-medium">Categoría</th>
-                      <th className="w-[40px]"></th>
+                      <th className="text-left px-1.5 py-1.5 font-medium w-[32px]">#</th>
+                      <th className="text-left px-1.5 py-1.5 font-medium min-w-[140px]">Archivo</th>
+                      <th className="text-left px-1.5 py-1.5 font-medium">Tipo</th>
+                      <th className="text-left px-1.5 py-1.5 font-medium">N° Comprobante</th>
+                      <th className="text-left px-1.5 py-1.5 font-medium">RUC</th>
+                      <th className="text-left px-1.5 py-1.5 font-medium">Proveedor</th>
+                      <th className="text-left px-1.5 py-1.5 font-medium">Fecha</th>
+                      <th className="text-right px-1.5 py-1.5 font-medium">Monto</th>
+                      <th className="text-left px-1.5 py-1.5 font-medium">Categoría</th>
+                      <th className="w-[28px]"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -422,7 +429,7 @@ export default function CargaMasivaComprobantes({
                     ))}
                   </tbody>
                 </table>
-              </ScrollArea>
+              </div>
             </>
           )}
         </div>
@@ -439,7 +446,7 @@ export default function CargaMasivaComprobantes({
         <DialogFooter className="pt-2 gap-2">
           <Button
             variant="outline"
-            onClick={() => handleOpenChange(false)}
+            onClick={handleCancel}
             disabled={isProcessing || isSaving}
             className="h-9"
           >
@@ -503,10 +510,10 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
   if (item.status === 'pending' || item.status === 'processing') {
     return (
       <tr className={`border-t ${rowBg}`}>
-        <td className="p-2 text-center">{StatusIcon}</td>
-        <td className="p-2" colSpan={8}>
+        <td className="px-1.5 py-1.5 text-center">{StatusIcon}</td>
+        <td className="px-1.5 py-1" colSpan={8}>
           <div className="flex items-center gap-2">
-            <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <FileIcon className="h-3 w-3 text-muted-foreground shrink-0" />
             <span className="truncate max-w-[200px]">{item.file.name}</span>
             <span className="text-muted-foreground">
               ({(item.file.size / 1024).toFixed(0)} KB)
@@ -516,7 +523,7 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
             )}
           </div>
         </td>
-        <td className="p-2">
+        <td className="px-1 py-1">
           {!disabled && item.status === 'pending' && (
             <button onClick={() => onRemove(item.id)} className="p-0.5 rounded hover:bg-red-50">
               <X className="h-3 w-3 text-muted-foreground hover:text-red-500" />
@@ -530,15 +537,15 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
   if (item.status === 'error') {
     return (
       <tr className={`border-t ${rowBg}`}>
-        <td className="p-2 text-center">{StatusIcon}</td>
-        <td className="p-2" colSpan={8}>
+        <td className="px-1.5 py-1.5 text-center">{StatusIcon}</td>
+        <td className="px-1.5 py-1" colSpan={8}>
           <div className="flex items-center gap-2">
-            <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <FileIcon className="h-3 w-3 text-muted-foreground shrink-0" />
             <span className="truncate max-w-[200px]">{item.file.name}</span>
             <span className="text-red-600">{item.error}</span>
           </div>
         </td>
-        <td className="p-2">
+        <td className="px-1 py-1">
           <button onClick={() => onRemove(item.id)} className="p-0.5 rounded hover:bg-red-50">
             <X className="h-3 w-3 text-muted-foreground hover:text-red-500" />
           </button>
@@ -551,11 +558,11 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
   return (
     <>
       <tr className={`border-t ${rowBg}`}>
-        <td className="p-2 text-center">{StatusIcon}</td>
-        <td className="p-2">
-          <div className="flex items-center gap-1.5">
-            <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="truncate max-w-[120px]" title={item.file.name}>
+        <td className="px-1.5 py-1.5 text-center">{StatusIcon}</td>
+        <td className="px-1.5 py-1">
+          <div className="flex items-center gap-1">
+            <FileIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span className="truncate max-w-[100px]" title={item.file.name}>
               {item.file.name}
             </span>
             {item.confianza && (
@@ -567,20 +574,20 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
                       ? 'secondary'
                       : 'destructive'
                 }
-                className="text-[9px] px-1 py-0 h-4"
+                className="text-[8px] px-1 py-0 h-3.5 leading-none"
               >
                 {item.confianza}
               </Badge>
             )}
           </div>
         </td>
-        <td className="p-2">
+        <td className="px-1.5 py-1">
           <Select
             value={item.tipoComprobante || '__none__'}
             onValueChange={(v) => onUpdate(item.id, { tipoComprobante: v === '__none__' ? '' : v })}
             disabled={disabled}
           >
-            <SelectTrigger className="h-7 text-xs w-[100px]">
+            <SelectTrigger className="h-6 text-[11px] w-[85px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -593,68 +600,68 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
             </SelectContent>
           </Select>
         </td>
-        <td className="p-2">
+        <td className="px-1.5 py-1">
           <Input
             value={item.numeroComprobante}
             onChange={(e) => onUpdate(item.id, { numeroComprobante: e.target.value })}
-            className="h-7 text-xs w-[130px]"
+            className="h-6 text-[11px] w-[115px]"
             placeholder="F001-00123"
             disabled={disabled}
           />
         </td>
-        <td className="p-2">
+        <td className="px-1.5 py-1">
           <div className="flex items-center gap-1">
             <Input
               value={item.proveedorRuc}
               onChange={(e) => onUpdate(item.id, { proveedorRuc: e.target.value })}
-              className="h-7 text-xs w-[100px]"
+              className="h-6 text-[11px] w-[95px]"
               placeholder="20123456789"
               disabled={disabled}
             />
             {item.sunatAlerta && (
               <span title={item.sunatAlerta}>
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
               </span>
             )}
           </div>
         </td>
-        <td className="p-2">
+        <td className="px-1.5 py-1">
           <Input
             value={item.proveedorNombre}
             onChange={(e) => onUpdate(item.id, { proveedorNombre: e.target.value })}
-            className="h-7 text-xs w-[150px]"
-            placeholder="Nombre proveedor"
+            className="h-6 text-[11px] w-[130px]"
+            placeholder="Proveedor"
             disabled={disabled}
           />
         </td>
-        <td className="p-2">
+        <td className="px-1.5 py-1">
           <Input
             type="date"
             value={item.fechaEmision}
             onChange={(e) => onUpdate(item.id, { fechaEmision: e.target.value })}
-            className="h-7 text-xs w-[130px]"
+            className="h-6 text-[11px] w-[115px]"
             disabled={disabled}
           />
         </td>
-        <td className="p-2">
+        <td className="px-1.5 py-1">
           <Input
             type="number"
             step="0.01"
             min="0"
             value={item.montoTotal}
             onChange={(e) => onUpdate(item.id, { montoTotal: e.target.value })}
-            className="h-7 text-xs w-[90px] text-right font-mono"
+            className="h-6 text-[11px] w-[80px] text-right font-mono"
             placeholder="0.00"
             disabled={disabled}
           />
         </td>
-        <td className="p-2">
+        <td className="px-1.5 py-1">
           <Select
             value={item.categoriaGastoId || '__none__'}
             onValueChange={(v) => onUpdate(item.id, { categoriaGastoId: v === '__none__' ? '' : v })}
             disabled={disabled}
           >
-            <SelectTrigger className="h-7 text-xs w-[110px]">
+            <SelectTrigger className="h-6 text-[11px] w-[95px]">
               <SelectValue placeholder="-" />
             </SelectTrigger>
             <SelectContent>
@@ -667,7 +674,7 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
             </SelectContent>
           </Select>
         </td>
-        <td className="p-2">
+        <td className="px-1 py-1">
           {!disabled && (
             <button onClick={() => onRemove(item.id)} className="p-0.5 rounded hover:bg-red-50">
               <Trash2 className="h-3 w-3 text-muted-foreground hover:text-red-500" />
@@ -679,7 +686,7 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
       {(item.sunatAlerta || item.observaciones) && (
         <tr className={rowBg}>
           <td></td>
-          <td colSpan={9} className="px-2 pb-2">
+          <td colSpan={9} className="px-1.5 pb-1.5">
             {item.sunatAlerta && (
               <div className="flex items-center gap-1.5 text-[10px] text-amber-700">
                 <AlertTriangle className="h-3 w-3 shrink-0" />
