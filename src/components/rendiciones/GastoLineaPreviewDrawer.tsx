@@ -313,7 +313,7 @@ export default function GastoLineaPreviewDrawer({
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
-        className="sm:max-w-5xl w-[95vw] p-0 flex flex-col"
+        className="sm:max-w-5xl w-[95vw] p-0 flex flex-col [&>button[class*='absolute']]:hidden"
       >
         {linea && (
           <>
