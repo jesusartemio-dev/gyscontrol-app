@@ -2908,6 +2908,7 @@ model GastoLinea {
   proveedorNombre   String?
   proveedorRuc      String?
   observaciones     String?
+  sunatVerificado   Boolean?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime
 

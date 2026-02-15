@@ -2517,6 +2517,7 @@ export interface GastoLinea {
   proveedorNombre?: string | null
   proveedorRuc?: string | null
   observaciones?: string | null
+  sunatVerificado?: boolean | null
   createdAt: string
   updatedAt: string
   // Relations

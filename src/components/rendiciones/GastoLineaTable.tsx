@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine } from 'lucide-react'
+import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck } from 'lucide-react'
 import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
 import CargaMasivaComprobantes from './CargaMasivaComprobantes'
@@ -229,12 +229,17 @@ export default function GastoLineaTable({
                     {linea.categoriaGasto?.nombre || '-'}
                   </td>
                   <td className="p-2 text-xs text-muted-foreground">
-                    {linea.tipoComprobante ? (
-                      <span>
-                        {TIPOS_COMPROBANTE.find(t => t.value === linea.tipoComprobante)?.label || linea.tipoComprobante}
-                        {linea.numeroComprobante && ` #${linea.numeroComprobante}`}
-                      </span>
-                    ) : '-'}
+                    <span className="flex items-center gap-1">
+                      {linea.sunatVerificado === true && (
+                        <ShieldCheck className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                      )}
+                      {linea.tipoComprobante ? (
+                        <span>
+                          {TIPOS_COMPROBANTE.find(t => t.value === linea.tipoComprobante)?.label || linea.tipoComprobante}
+                          {linea.numeroComprobante && ` #${linea.numeroComprobante}`}
+                        </span>
+                      ) : '-'}
+                    </span>
                   </td>
                   <td className="p-2 text-right font-mono text-xs">
                     {formatCurrency(linea.monto)}

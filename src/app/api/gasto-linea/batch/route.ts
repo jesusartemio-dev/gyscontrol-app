@@ -14,6 +14,7 @@ interface BatchLineaPayload {
   proveedorNombre?: string | null
   proveedorRuc?: string | null
   observaciones?: string | null
+  sunatVerificado?: boolean | null
 }
 
 interface BatchRequest {
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
             proveedorNombre: l.proveedorNombre || null,
             proveedorRuc: l.proveedorRuc || null,
             observaciones: l.observaciones || null,
+            sunatVerificado: l.sunatVerificado ?? null,
             updatedAt: new Date(),
           },
           include: { adjuntos: true, categoriaGasto: true },

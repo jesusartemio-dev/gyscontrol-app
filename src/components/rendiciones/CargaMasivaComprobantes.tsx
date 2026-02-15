@@ -33,8 +33,10 @@ import {
   X,
 } from 'lucide-react'
 import { procesarComprobante, createGastoLineasBatch } from '@/lib/services/comprobanteOcr'
+import { uploadGastoAdjunto } from '@/lib/services/gastoAdjunto'
 import type { ComprobanteOcrResponse } from '@/lib/services/comprobanteOcr'
 import type { CategoriaGasto } from '@/types'
+import { cn } from '@/lib/utils'
 
 // ── Tipos internos ───────────────────────────────────────
 
@@ -62,8 +64,11 @@ interface ComprobanteItem {
   sunatAlertaTipo: 'warning' | 'info' | null
   sunatRazonSocial: string | null
   sunatCondicion: string | null
+  sunatVerificado: boolean | null
   // Categoría
   categoriaGastoId: string
+  // Upload a Drive
+  uploadStatus: 'uploading' | 'uploaded' | 'upload_error' | null
 }
 
 interface CargaMasivaComprobantesProps {
@@ -88,6 +93,24 @@ const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'a
 
 let itemIdCounter = 0
 
+// ── Validación ───────────────────────────────────────────
+
+interface ValidationErrors {
+  fechaEmision?: string
+  montoTotal?: string
+}
+
+function validateItem(item: ComprobanteItem): ValidationErrors {
+  const errors: ValidationErrors = {}
+  if (!item.fechaEmision) errors.fechaEmision = 'Requerida'
+  if (!item.montoTotal || parseFloat(item.montoTotal) <= 0) errors.montoTotal = 'Debe ser > 0'
+  return errors
+}
+
+function hasErrors(item: ComprobanteItem): boolean {
+  return Object.keys(validateItem(item)).length > 0
+}
+
 // ── Componente ───────────────────────────────────────────
 
 export default function CargaMasivaComprobantes({
@@ -100,7 +123,12 @@ export default function CargaMasivaComprobantes({
   const [items, setItems] = useState<ComprobanteItem[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, errors: 0 })
+  const [showValidation, setShowValidation] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const isBusy = isProcessing || isSaving || isUploading
 
   // ── Helpers ──────────────────────────────────────────
 
@@ -123,7 +151,9 @@ export default function CargaMasivaComprobantes({
     sunatAlertaTipo: null,
     sunatRazonSocial: null,
     sunatCondicion: null,
+    sunatVerificado: null,
     categoriaGastoId: '',
+    uploadStatus: null,
   })
 
   const updateItem = useCallback((id: string, updates: Partial<ComprobanteItem>) => {
@@ -149,6 +179,7 @@ export default function CargaMasivaComprobantes({
       sunatAlertaTipo: d.sunatAlertaTipo || null,
       sunatRazonSocial: d.sunat?.razonSocial || null,
       sunatCondicion: d.sunat?.condicion || null,
+      sunatVerificado: d.sunat ? true : (d.proveedorRuc ? false : null),
     })
   }
 
@@ -223,32 +254,25 @@ export default function CargaMasivaComprobantes({
     }
   }
 
-  // ── Guardar batch ────────────────────────────────────
+  // ── Guardar batch + upload a Drive ─────────────────
 
   const handleConfirm = async () => {
+    setShowValidation(true)
+
     const doneItems = items.filter((i) => i.status === 'done')
     if (doneItems.length === 0) {
       toast.error('No hay comprobantes procesados para guardar')
       return
     }
 
-    // Validar campos requeridos
-    for (let i = 0; i < doneItems.length; i++) {
-      const item = doneItems[i]
-      if (!item.descripcion.trim()) {
-        toast.error(`Comprobante ${i + 1}: falta descripción`)
-        return
-      }
-      if (!item.fechaEmision) {
-        toast.error(`Comprobante ${i + 1}: falta fecha`)
-        return
-      }
-      if (!item.montoTotal || parseFloat(item.montoTotal) <= 0) {
-        toast.error(`Comprobante ${i + 1}: monto debe ser mayor a 0`)
-        return
-      }
+    // Validar campos requeridos (inline errors ya visibles)
+    const invalidCount = doneItems.filter((item) => hasErrors(item)).length
+    if (invalidCount > 0) {
+      toast.error(`${invalidCount} comprobante(s) con errores. Corrija los campos marcados en rojo.`)
+      return
     }
 
+    // ── Fase 1: Crear líneas de gasto ──
     setIsSaving(true)
     try {
       const lineas = doneItems.map((item) => ({
@@ -262,18 +286,59 @@ export default function CargaMasivaComprobantes({
         proveedorRuc: item.proveedorRuc || null,
         categoriaGastoId: item.categoriaGastoId || null,
         observaciones: item.observaciones || null,
+        sunatVerificado: item.sunatVerificado,
       }))
 
-      await createGastoLineasBatch(hojaDeGastosId, lineas)
+      const result = await createGastoLineasBatch(hojaDeGastosId, lineas)
+      const createdLineas = result.data
+
       toast.success(`${lineas.length} línea(s) de gasto creadas`)
+      setIsSaving(false)
+
+      // ── Fase 2: Subir archivos a Google Drive ──
+      setIsUploading(true)
+      setUploadProgress({ current: 0, total: doneItems.length, errors: 0 })
+
+      let uploadErrors = 0
+      for (let i = 0; i < doneItems.length; i++) {
+        const item = doneItems[i]
+        const gastoLineaId = createdLineas[i]?.id
+        if (!gastoLineaId) {
+          uploadErrors++
+          continue
+        }
+
+        updateItem(item.id, { uploadStatus: 'uploading' })
+        setUploadProgress((prev) => ({ ...prev, current: i + 1 }))
+
+        try {
+          await uploadGastoAdjunto(gastoLineaId, item.file)
+          updateItem(item.id, { uploadStatus: 'uploaded' })
+        } catch (error) {
+          console.error(`Error uploading ${item.file.name}:`, error)
+          updateItem(item.id, { uploadStatus: 'upload_error' })
+          uploadErrors++
+        }
+      }
+
+      setIsUploading(false)
+
+      if (uploadErrors > 0) {
+        toast.warning(
+          `${doneItems.length - uploadErrors} archivo(s) subidos a Drive. ${uploadErrors} fallaron.`,
+          { duration: 6000 }
+        )
+      } else {
+        toast.success(`${doneItems.length} archivo(s) adjuntados a Drive`)
+      }
 
       // Limpiar y cerrar
       setItems([])
+      setShowValidation(false)
       onOpenChange(false)
       onSuccess()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al guardar')
-    } finally {
       setIsSaving(false)
     }
   }
@@ -281,15 +346,14 @@ export default function CargaMasivaComprobantes({
   // ── Reset al cerrar ─────────────────────────────────
 
   const handleOpenChange = (isOpen: boolean) => {
-    // No cerrar si está procesando o guardando
-    if (!isOpen && (isProcessing || isSaving)) return
-    // Solo limpiar items al cerrar con el botón Cancelar (no en click afuera)
+    if (!isOpen && isBusy) return
     onOpenChange(isOpen)
   }
 
   const handleCancel = () => {
-    if (isProcessing || isSaving) return
+    if (isBusy) return
     setItems([])
+    setShowValidation(false)
     onOpenChange(false)
   }
 
@@ -352,7 +416,7 @@ export default function CargaMasivaComprobantes({
                     variant="outline"
                     className="h-7 text-xs"
                     onClick={() => inputRef.current?.click()}
-                    disabled={isProcessing || isSaving}
+                    disabled={isBusy}
                   >
                     <Upload className="h-3 w-3 mr-1" />
                     Agregar más
@@ -362,7 +426,7 @@ export default function CargaMasivaComprobantes({
                       size="sm"
                       className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
                       onClick={processAll}
-                      disabled={isProcessing || isSaving}
+                      disabled={isBusy}
                     >
                       {isProcessing ? (
                         <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -427,7 +491,8 @@ export default function CargaMasivaComprobantes({
                         categorias={categorias}
                         onUpdate={updateItem}
                         onRemove={removeItem}
-                        disabled={isProcessing || isSaving}
+                        disabled={isBusy}
+                        showValidation={showValidation}
                       />
                     ))}
                   </tbody>
@@ -450,23 +515,36 @@ export default function CargaMasivaComprobantes({
           <Button
             variant="outline"
             onClick={handleCancel}
-            disabled={isProcessing || isSaving}
+            disabled={isBusy}
             className="h-9"
           >
             Cancelar
           </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={doneCount === 0 || isProcessing || isSaving}
-            className="h-9 bg-orange-600 hover:bg-orange-700"
-          >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4 mr-1" />
-            )}
-            {isSaving ? 'Guardando...' : `Crear ${doneCount} línea(s) de gasto`}
-          </Button>
+
+          {isUploading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground px-3">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+              <span>
+                Subiendo archivos a Drive ({uploadProgress.current}/{uploadProgress.total})
+                {uploadProgress.errors > 0 && (
+                  <span className="text-red-500 ml-1">({uploadProgress.errors} error(es))</span>
+                )}
+              </span>
+            </div>
+          ) : (
+            <Button
+              onClick={handleConfirm}
+              disabled={doneCount === 0 || isBusy}
+              className="h-9 bg-orange-600 hover:bg-orange-700"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+              )}
+              {isSaving ? 'Guardando...' : `Crear ${doneCount} línea(s) de gasto`}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -482,15 +560,23 @@ interface ComprobanteRowProps {
   onUpdate: (id: string, updates: Partial<ComprobanteItem>) => void
   onRemove: (id: string) => void
   disabled: boolean
+  showValidation: boolean
 }
 
-function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled }: ComprobanteRowProps) {
+function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled, showValidation }: ComprobanteRowProps) {
   const isImage = item.file.type.startsWith('image/')
   const FileIcon = isImage ? ImageIcon : FileText
+  const errors = item.status === 'done' ? validateItem(item) : {}
 
-  // Status indicator
+  // Status indicator — upload states take priority over OCR status
   const StatusIcon =
-    item.status === 'processing' ? (
+    item.uploadStatus === 'uploading' ? (
+      <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+    ) : item.uploadStatus === 'uploaded' ? (
+      <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+    ) : item.uploadStatus === 'upload_error' ? (
+      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+    ) : item.status === 'processing' ? (
       <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
     ) : item.status === 'done' ? (
       <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
@@ -638,25 +724,41 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
           />
         </td>
         <td className="px-1.5 py-1">
-          <Input
-            type="date"
-            value={item.fechaEmision}
-            onChange={(e) => onUpdate(item.id, { fechaEmision: e.target.value })}
-            className="h-6 text-[11px] w-[115px]"
-            disabled={disabled}
-          />
+          <div>
+            <Input
+              type="date"
+              value={item.fechaEmision}
+              onChange={(e) => onUpdate(item.id, { fechaEmision: e.target.value })}
+              className={cn(
+                'h-6 text-[11px] w-[115px]',
+                showValidation && errors.fechaEmision && 'border-red-500 bg-red-50'
+              )}
+              disabled={disabled}
+            />
+            {showValidation && errors.fechaEmision && (
+              <span className="text-[9px] text-red-600">{errors.fechaEmision}</span>
+            )}
+          </div>
         </td>
         <td className="px-1.5 py-1">
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={item.montoTotal}
-            onChange={(e) => onUpdate(item.id, { montoTotal: e.target.value })}
-            className="h-6 text-[11px] w-[80px] text-right font-mono"
-            placeholder="0.00"
-            disabled={disabled}
-          />
+          <div>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={item.montoTotal}
+              onChange={(e) => onUpdate(item.id, { montoTotal: e.target.value })}
+              className={cn(
+                'h-6 text-[11px] w-[80px] text-right font-mono',
+                showValidation && errors.montoTotal && 'border-red-500 bg-red-50'
+              )}
+              placeholder="0.00"
+              disabled={disabled}
+            />
+            {showValidation && errors.montoTotal && (
+              <span className="text-[9px] text-red-600">{errors.montoTotal}</span>
+            )}
+          </div>
         </td>
         <td className="px-1.5 py-1">
           <Select

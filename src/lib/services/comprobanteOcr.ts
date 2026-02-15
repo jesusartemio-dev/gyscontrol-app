@@ -30,12 +30,13 @@ export interface BatchLineaPayload {
   proveedorNombre?: string | null
   proveedorRuc?: string | null
   observaciones?: string | null
+  sunatVerificado?: boolean | null
 }
 
 export async function createGastoLineasBatch(
   hojaDeGastosId: string,
   lineas: BatchLineaPayload[]
-): Promise<{ ok: boolean; data: unknown[]; count: number }> {
+): Promise<{ ok: boolean; data: Array<{ id: string }>; count: number }> {
   const res = await fetch('/api/gasto-linea/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
