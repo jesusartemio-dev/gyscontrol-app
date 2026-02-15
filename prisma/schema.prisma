@@ -556,6 +556,7 @@ model ListaEquipoItem {
   user                                  User                         @relation(fields: [responsableId], references: [id])
   verificadoPor                         User?                        @relation("ListaEquipoItemVerificador", fields: [verificadoPorId], references: [id])
   pedidoEquipoItem                      PedidoEquipoItem[]
+  ordenCompraItems                      OrdenCompraItem[]
   listaEquipoItemSeleccionados          ProyectoEquipoCotizadoItem[] @relation("proyectoEquipoCotizadoItemListaEquipoSeleccionado")
   catalogoEquipo                        CatalogoEquipo?              @relation(fields: [catalogoEquipoId], references: [id])
 
@@ -584,10 +585,13 @@ model PedidoEquipo {
   esUrgente            Boolean            @default(false)
   presupuestoTotal     Float              @default(0)
   prioridad            String?            @default("media")
+  centroCostoId        String?
   listaEquipo          ListaEquipo?       @relation(fields: [listaId], references: [id])
   proyecto             Proyecto           @relation(fields: [proyectoId], references: [id])
   user                 User               @relation(fields: [responsableId], references: [id])
+  centroCosto          CentroCosto?       @relation(fields: [centroCostoId], references: [id])
   pedidoEquipoItem     PedidoEquipoItem[]
+  ordenesCompra        OrdenCompra[]
 
   @@index([estado, prioridad, createdAt(sort: Desc)], map: "idx_pedido_estado_prioridad_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_pedido_proyecto_estado_fecha")
@@ -631,8 +635,10 @@ model PedidoEquipoItem {
   listaEquipoItem             ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?      @relation(fields: [listaId], references: [id])
   pedidoEquipo                PedidoEquipo      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  proveedor                   Proveedor?        @relation(fields: [proveedorId], references: [id])
   user                        User              @relation(fields: [responsableId], references: [id])
   comentarioLogisticaPor      User?             @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
+  ordenCompraItems            OrdenCompraItem[]
 
   @@map("pedido_equipo_item")
 }
@@ -794,10 +800,19 @@ model Proveedor {
   direccion           String?
   telefono            String?
   correo              String?
+  contactoNombre      String?
+  contactoTelefono    String?
+  contactoCorreo      String?
+  banco               String?
+  numeroCuenta        String?
+  cci                 String?
+  tipoCuenta          String?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   cotizacionProveedor CotizacionProveedor[]
   listaEquipoItem     ListaEquipoItem[]
+  pedidoEquipoItems   PedidoEquipoItem[]
+  ordenesCompra       OrdenCompra[]
 
   @@map("proveedor")
 }
@@ -859,7 +874,8 @@ model Proyecto {
   proyectoCondicion        ProyectoCondicion[]
   proyectoExclusion        ProyectoExclusion[]
   // Centro de costo y hojas de gastos
-  centroCosto              CentroCosto?
+  centroCosto              CentroCosto[]
+  ordenesCompra            OrdenCompra[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1269,6 +1285,9 @@ model User {
   // Hojas de gastos
   hojasComoEmpleado                     HojaDeGastos[]               @relation("HojaEmpleado")
   hojasComoAprobador                    HojaDeGastos[]               @relation("HojaAprobador")
+  // Órdenes de compra
+  ordenesCompraSolicitante              OrdenCompra[]                @relation("OCsolicitante")
+  ordenesCompraAprobador                OrdenCompra[]                @relation("OCaprobador")
 
   @@map("user")
 }
@@ -2823,18 +2842,21 @@ model RoleSectionAccess {
 
 model CentroCosto {
   id          String   @id @default(cuid())
-  nombre      String   @unique
+  nombre      String
   tipo        String   // "proyecto" | "departamento" | "administrativo"
   descripcion String?
   activo      Boolean  @default(true)
-  proyectoId  String?  @unique
+  proyectoId  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime
 
-  proyecto Proyecto?      @relation(fields: [proyectoId], references: [id])
-  hojas    HojaDeGastos[]
+  proyecto      Proyecto?      @relation(fields: [proyectoId], references: [id])
+  hojas         HojaDeGastos[]
+  ordenesCompra OrdenCompra[]
+  pedidosEquipo PedidoEquipo[]
 
   @@index([tipo, activo])
+  @@index([proyectoId])
   @@map("centro_costo")
 }
 
@@ -2911,4 +2933,81 @@ model GastoAdjunto {
 
   @@index([gastoLineaId])
   @@map("gasto_adjunto")
+}
+
+// ======================
+// 📋 Órdenes de Compra
+// ======================
+
+enum EstadoOrdenCompra {
+  borrador
+  aprobada
+  enviada
+  confirmada
+  parcial
+  completada
+  cancelada
+}
+
+model OrdenCompra {
+  id                   String            @id @default(cuid())
+  numero               String            @unique
+  proveedorId          String
+  centroCostoId        String?
+  pedidoEquipoId       String?
+  proyectoId           String?
+  solicitanteId        String
+  aprobadorId          String?
+  estado               EstadoOrdenCompra @default(borrador)
+  condicionPago        String            @default("contado")
+  moneda               String            @default("PEN")
+  subtotal             Float             @default(0)
+  igv                  Float             @default(0)
+  total                Float             @default(0)
+  lugarEntrega         String?
+  contactoEntrega      String?
+  observaciones        String?
+  fechaEmision         DateTime          @default(now())
+  fechaAprobacion      DateTime?
+  fechaEnvio           DateTime?
+  fechaConfirmacion    DateTime?
+  fechaEntregaEstimada DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime
+
+  proveedor    Proveedor        @relation(fields: [proveedorId], references: [id])
+  centroCosto  CentroCosto?     @relation(fields: [centroCostoId], references: [id])
+  pedidoEquipo PedidoEquipo?    @relation(fields: [pedidoEquipoId], references: [id])
+  proyecto     Proyecto?        @relation(fields: [proyectoId], references: [id])
+  solicitante  User             @relation("OCsolicitante", fields: [solicitanteId], references: [id])
+  aprobador    User?            @relation("OCaprobador", fields: [aprobadorId], references: [id])
+  items        OrdenCompraItem[]
+
+  @@index([proveedorId, estado])
+  @@index([centroCostoId, estado])
+  @@index([estado, createdAt(sort: Desc)])
+  @@map("orden_compra")
+}
+
+model OrdenCompraItem {
+  id                 String   @id @default(cuid())
+  ordenCompraId      String
+  pedidoEquipoItemId String?
+  listaEquipoItemId  String?
+  codigo             String
+  descripcion        String
+  unidad             String
+  cantidad           Float
+  precioUnitario     Float
+  costoTotal         Float
+  cantidadRecibida   Float    @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+
+  ordenCompra      OrdenCompra       @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id])
+  listaEquipoItem  ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
+
+  @@index([ordenCompraId])
+  @@map("orden_compra_item")
 }

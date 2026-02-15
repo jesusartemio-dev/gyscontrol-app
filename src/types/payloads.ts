@@ -632,6 +632,13 @@ export interface ProveedorPayload {
   direccion?: string
   telefono?: string
   correo?: string
+  contactoNombre?: string
+  contactoTelefono?: string
+  contactoCorreo?: string
+  banco?: string
+  numeroCuenta?: string
+  cci?: string
+  tipoCuenta?: string
 }
 export interface ProveedorUpdatePayload extends Partial<ProveedorPayload> {}
 
@@ -1372,5 +1379,43 @@ export interface GastoLineaUpdatePayload {
   proveedorNombre?: string | null
   proveedorRuc?: string | null
   observaciones?: string | null
+}
+
+// ======================
+// Orden de Compra
+// ======================
+
+export interface OrdenCompraItemPayload {
+  pedidoEquipoItemId?: string
+  listaEquipoItemId?: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  precioUnitario: number
+}
+
+export interface OrdenCompraPayload {
+  proveedorId: string
+  centroCostoId?: string
+  pedidoEquipoId?: string
+  proyectoId?: string
+  condicionPago?: string
+  moneda?: string
+  lugarEntrega?: string
+  contactoEntrega?: string
+  observaciones?: string
+  fechaEntregaEstimada?: string
+  items: OrdenCompraItemPayload[]
+}
+
+export interface OrdenCompraUpdatePayload {
+  condicionPago?: string
+  moneda?: string
+  lugarEntrega?: string | null
+  contactoEntrega?: string | null
+  observaciones?: string | null
+  fechaEntregaEstimada?: string | null
+  items?: OrdenCompraItemPayload[]
 }
 

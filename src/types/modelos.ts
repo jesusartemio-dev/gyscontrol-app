@@ -1372,6 +1372,13 @@ export interface Proveedor {
   direccion?: string
   telefono?: string
   correo?: string
+  contactoNombre?: string | null
+  contactoTelefono?: string | null
+  contactoCorreo?: string | null
+  banco?: string | null
+  numeroCuenta?: string | null
+  cci?: string | null
+  tipoCuenta?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2524,4 +2531,68 @@ export interface GastoAdjunto {
   tipoArchivo?: string | null
   tamano?: number | null
   createdAt: string
+}
+
+// ======================
+// Orden de Compra
+// ======================
+
+export type EstadoOrdenCompra =
+  | 'borrador'
+  | 'aprobada'
+  | 'enviada'
+  | 'confirmada'
+  | 'parcial'
+  | 'completada'
+  | 'cancelada'
+
+export interface OrdenCompra {
+  id: string
+  numero: string
+  proveedorId: string
+  centroCostoId?: string | null
+  pedidoEquipoId?: string | null
+  proyectoId?: string | null
+  solicitanteId: string
+  aprobadorId?: string | null
+  estado: EstadoOrdenCompra
+  condicionPago: string
+  moneda: string
+  subtotal: number
+  igv: number
+  total: number
+  lugarEntrega?: string | null
+  contactoEntrega?: string | null
+  observaciones?: string | null
+  fechaEmision: string
+  fechaAprobacion?: string | null
+  fechaEnvio?: string | null
+  fechaConfirmacion?: string | null
+  fechaEntregaEstimada?: string | null
+  createdAt: string
+  updatedAt: string
+  // Relations
+  proveedor?: Proveedor
+  centroCosto?: CentroCosto | null
+  pedidoEquipo?: PedidoEquipo | null
+  proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'> | null
+  solicitante?: Pick<User, 'id' | 'name' | 'email'>
+  aprobador?: Pick<User, 'id' | 'name' | 'email'> | null
+  items: OrdenCompraItem[]
+}
+
+export interface OrdenCompraItem {
+  id: string
+  ordenCompraId: string
+  pedidoEquipoItemId?: string | null
+  listaEquipoItemId?: string | null
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  precioUnitario: number
+  costoTotal: number
+  cantidadRecibida: number
+  createdAt: string
+  updatedAt: string
 }

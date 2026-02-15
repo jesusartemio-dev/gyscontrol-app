@@ -225,6 +225,7 @@ export default function Sidebar() {
       links: [
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
+        { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
         { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
