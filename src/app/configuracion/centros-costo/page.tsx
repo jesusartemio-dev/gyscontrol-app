@@ -10,13 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Plus, Edit, Trash2, CreditCard, Loader2, Search, X, FolderOpen } from 'lucide-react'
+import { Plus, Edit, Trash2, CreditCard, Loader2, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCentrosCosto, createCentroCosto, updateCentroCosto, deleteCentroCosto } from '@/lib/services/centroCosto'
 import type { CentroCosto } from '@/types'
 
 const TIPOS = [
-  { value: 'proyecto', label: 'Proyecto' },
   { value: 'departamento', label: 'Departamento' },
   { value: 'administrativo', label: 'Administrativo' },
 ]
@@ -32,7 +31,7 @@ export default function CentrosCostoPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const [nombre, setNombre] = useState('')
-  const [tipo, setTipo] = useState<'proyecto' | 'departamento' | 'administrativo'>('administrativo')
+  const [tipo, setTipo] = useState<'departamento' | 'administrativo'>('administrativo')
   const [descripcion, setDescripcion] = useState('')
 
   useEffect(() => { loadData() }, [])
@@ -186,7 +185,6 @@ export default function CentrosCostoPage() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Descripción</TableHead>
-                  <TableHead>Proyecto</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
@@ -202,14 +200,6 @@ export default function CentrosCostoPage() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                       {item.descripcion || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {item.proyecto ? (
-                        <span className="flex items-center gap-1 text-purple-600">
-                          <FolderOpen className="h-3 w-3" />
-                          {item.proyecto.codigo}
-                        </span>
-                      ) : '-'}
                     </TableCell>
                     <TableCell>
                       <Badge variant={item.activo ? 'default' : 'secondary'} className="text-xs">
@@ -260,7 +250,7 @@ export default function CentrosCostoPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Select value={tipo} onValueChange={(v) => setTipo(v as 'proyecto' | 'departamento' | 'administrativo')} disabled={saving}>
+              <Select value={tipo} onValueChange={(v) => setTipo(v as 'departamento' | 'administrativo')} disabled={saving}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

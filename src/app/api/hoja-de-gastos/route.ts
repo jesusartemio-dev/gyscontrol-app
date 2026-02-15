@@ -25,7 +25,8 @@ async function generarNumero(): Promise<string> {
 }
 
 const includeRelations = {
-  centroCosto: { select: { id: true, nombre: true, tipo: true, proyectoId: true } },
+  proyecto: { select: { id: true, codigo: true, nombre: true } },
+  centroCosto: { select: { id: true, nombre: true, tipo: true } },
   empleado: { select: { id: true, name: true, email: true } },
   aprobador: { select: { id: true, name: true, email: true } },
   lineas: {
@@ -43,11 +44,13 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url)
     const centroCostoId = searchParams.get('centroCostoId')
+    const proyectoId = searchParams.get('proyectoId')
     const estado = searchParams.get('estado')
     const empleadoId = searchParams.get('empleadoId')
 
     const where: any = {}
     if (centroCostoId) where.centroCostoId = centroCostoId
+    if (proyectoId) where.proyectoId = proyectoId
     if (estado) where.estado = estado
     if (empleadoId) where.empleadoId = empleadoId
 
@@ -56,9 +59,11 @@ export async function GET(req: Request) {
     if (!['admin', 'gerente'].includes(role)) {
       where.OR = [
         { empleadoId: session.user.id },
-        { centroCosto: { proyecto: { gestorId: session.user.id } } },
-        { centroCosto: { proyecto: { supervisorId: session.user.id } } },
-        { centroCosto: { proyecto: { liderId: session.user.id } } },
+        // Hojas de proyecto: visible si eres gestor/supervisor/lider
+        { proyecto: { gestorId: session.user.id } },
+        { proyecto: { supervisorId: session.user.id } },
+        { proyecto: { liderId: session.user.id } },
+        // Hojas de centro de costo: visible si eres el empleado (ya cubierto arriba)
       ]
     }
 
@@ -84,13 +89,31 @@ export async function POST(req: Request) {
 
     const payload = await req.json()
 
-    // Validar centro de costo
-    const centroCosto = await prisma.centroCosto.findUnique({ where: { id: payload.centroCostoId } })
-    if (!centroCosto) {
-      return NextResponse.json({ error: 'Centro de costo no encontrado' }, { status: 404 })
+    // Mutual exclusivity: proyectoId XOR centroCostoId
+    const hasProyecto = !!payload.proyectoId
+    const hasCentroCosto = !!payload.centroCostoId
+    if (hasProyecto && hasCentroCosto) {
+      return NextResponse.json({ error: 'Debe imputar a proyecto O centro de costo, no ambos' }, { status: 400 })
     }
-    if (!centroCosto.activo) {
-      return NextResponse.json({ error: 'Centro de costo inactivo' }, { status: 400 })
+    if (!hasProyecto && !hasCentroCosto) {
+      return NextResponse.json({ error: 'Debe seleccionar un proyecto o centro de costo' }, { status: 400 })
+    }
+
+    // Validate proyecto or centro de costo
+    if (hasProyecto) {
+      const proyecto = await prisma.proyecto.findUnique({ where: { id: payload.proyectoId } })
+      if (!proyecto) {
+        return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
+      }
+    }
+    if (hasCentroCosto) {
+      const centroCosto = await prisma.centroCosto.findUnique({ where: { id: payload.centroCostoId } })
+      if (!centroCosto) {
+        return NextResponse.json({ error: 'Centro de costo no encontrado' }, { status: 404 })
+      }
+      if (!centroCosto.activo) {
+        return NextResponse.json({ error: 'Centro de costo inactivo' }, { status: 400 })
+      }
     }
 
     if (!payload.motivo?.trim()) {
@@ -102,7 +125,9 @@ export async function POST(req: Request) {
     const data = await prisma.hojaDeGastos.create({
       data: {
         numero,
-        centroCostoId: payload.centroCostoId,
+        proyectoId: payload.proyectoId || null,
+        centroCostoId: payload.centroCostoId || null,
+        categoriaCosto: payload.categoriaCosto || 'gastos',
         empleadoId: payload.empleadoId || session.user.id,
         motivo: payload.motivo.trim(),
         observaciones: payload.observaciones || null,

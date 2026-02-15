@@ -585,11 +585,9 @@ model PedidoEquipo {
   esUrgente            Boolean            @default(false)
   presupuestoTotal     Float              @default(0)
   prioridad            String?            @default("media")
-  centroCostoId        String?
   listaEquipo          ListaEquipo?       @relation(fields: [listaId], references: [id])
   proyecto             Proyecto           @relation(fields: [proyectoId], references: [id])
   user                 User               @relation(fields: [responsableId], references: [id])
-  centroCosto          CentroCosto?       @relation(fields: [centroCostoId], references: [id])
   pedidoEquipoItem     PedidoEquipoItem[]
   ordenesCompra        OrdenCompra[]
 
@@ -872,8 +870,8 @@ model Proyecto {
   registrosCampo           RegistroHorasCampo[]
   proyectoCondicion        ProyectoCondicion[]
   proyectoExclusion        ProyectoExclusion[]
-  // Centro de costo y hojas de gastos
-  centroCosto              CentroCosto[]
+  // Documentos financieros imputados al proyecto
+  hojasDeGastos            HojaDeGastos[]
   ordenesCompra            OrdenCompra[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
@@ -2842,27 +2840,28 @@ model RoleSectionAccess {
 model CentroCosto {
   id          String   @id @default(cuid())
   nombre      String
-  tipo        String   // "proyecto" | "departamento" | "administrativo"
+  tipo        String   // "departamento" | "administrativo"
   descripcion String?
   activo      Boolean  @default(true)
-  proyectoId  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime
 
-  proyecto      Proyecto?      @relation(fields: [proyectoId], references: [id])
   hojas         HojaDeGastos[]
   ordenesCompra OrdenCompra[]
-  pedidosEquipo PedidoEquipo[]
 
   @@index([tipo, activo])
-  @@index([proyectoId])
   @@map("centro_costo")
 }
 
+// Imputación: proyectoId y centroCostoId son mutuamente excluyentes.
+// Exactamente UNO debe estar presente: proyecto (para gastos de proyecto)
+// o centroCosto (para gastos administrativos/departamento). Validación en API.
 model HojaDeGastos {
   id                String    @id @default(cuid())
   numero            String    @unique
-  centroCostoId     String
+  proyectoId        String?
+  centroCostoId     String?
+  categoriaCosto    CategoriaCosto @default(gastos)
   empleadoId        String
   aprobadorId       String?
   motivo            String
@@ -2884,11 +2883,13 @@ model HojaDeGastos {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime
 
-  centroCosto CentroCosto @relation(fields: [centroCostoId], references: [id])
-  empleado    User        @relation("HojaEmpleado", fields: [empleadoId], references: [id])
-  aprobador   User?       @relation("HojaAprobador", fields: [aprobadorId], references: [id])
+  proyecto    Proyecto?    @relation(fields: [proyectoId], references: [id])
+  centroCosto CentroCosto? @relation(fields: [centroCostoId], references: [id])
+  empleado    User         @relation("HojaEmpleado", fields: [empleadoId], references: [id])
+  aprobador   User?        @relation("HojaAprobador", fields: [aprobadorId], references: [id])
   lineas      GastoLinea[]
 
+  @@index([proyectoId, estado])
   @@index([centroCostoId, estado])
   @@index([empleadoId, estado])
   @@map("hoja_de_gastos")
@@ -2938,6 +2939,12 @@ model GastoAdjunto {
 // 📋 Órdenes de Compra
 // ======================
 
+enum CategoriaCosto {
+  equipos
+  servicios
+  gastos
+}
+
 enum EstadoOrdenCompra {
   borrador
   aprobada
@@ -2948,6 +2955,8 @@ enum EstadoOrdenCompra {
   cancelada
 }
 
+// Imputación: proyectoId y centroCostoId son mutuamente excluyentes.
+// Exactamente UNO debe estar presente. Validación en API.
 model OrdenCompra {
   id                   String            @id @default(cuid())
   numero               String            @unique
@@ -2957,6 +2966,7 @@ model OrdenCompra {
   proyectoId           String?
   solicitanteId        String
   aprobadorId          String?
+  categoriaCosto       CategoriaCosto    @default(equipos)
   estado               EstadoOrdenCompra @default(borrador)
   condicionPago        String            @default("contado")
   moneda               String            @default("PEN")

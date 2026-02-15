@@ -12,7 +12,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Search, X, Loader2, CreditCard, ChevronRight, Edit, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getHojasDeGastos, deleteHojaDeGastos } from '@/lib/services/hojaDeGastos'
-import EstadoStepper from '@/components/finanzas/EstadoStepper'
 import type { HojaDeGastos } from '@/types'
 
 const ESTADOS = [
@@ -25,6 +24,13 @@ const ESTADOS = [
   { value: 'validado', label: 'Validado' },
   { value: 'cerrado', label: 'Cerrado' },
   { value: 'rechazado', label: 'Rechazado' },
+]
+
+const CATEGORIAS = [
+  { value: 'all', label: 'Todas' },
+  { value: 'gastos', label: 'Gastos' },
+  { value: 'equipos', label: 'Equipos' },
+  { value: 'servicios', label: 'Servicios' },
 ]
 
 const formatCurrency = (amount: number) =>
@@ -44,11 +50,24 @@ const estadoColor: Record<string, string> = {
   rechazado: 'bg-red-100 text-red-700',
 }
 
+const categoriaLabel: Record<string, string> = {
+  gastos: 'Gastos',
+  equipos: 'Equipos',
+  servicios: 'Servicios',
+}
+
+function getAsignadoA(hoja: HojaDeGastos): string {
+  if (hoja.proyecto) return `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
+  if (hoja.centroCosto) return hoja.centroCosto.nombre
+  return '-'
+}
+
 export default function RequerimientosPage() {
   const router = useRouter()
   const [hojas, setHojas] = useState<HojaDeGastos[]>([])
   const [loading, setLoading] = useState(true)
   const [filterEstado, setFilterEstado] = useState('all')
+  const [filterCategoria, setFilterCategoria] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<HojaDeGastos | null>(null)
 
@@ -81,17 +100,20 @@ export default function RequerimientosPage() {
   const filtered = useMemo(() => {
     let result = hojas
     if (filterEstado !== 'all') result = result.filter(h => h.estado === filterEstado)
+    if (filterCategoria !== 'all') result = result.filter(h => h.categoriaCosto === filterCategoria)
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(h =>
         h.numero.toLowerCase().includes(term) ||
         h.motivo.toLowerCase().includes(term) ||
+        h.proyecto?.codigo?.toLowerCase().includes(term) ||
+        h.proyecto?.nombre?.toLowerCase().includes(term) ||
         h.centroCosto?.nombre?.toLowerCase().includes(term) ||
         h.empleado?.name?.toLowerCase().includes(term)
       )
     }
     return result
-  }, [hojas, filterEstado, searchTerm])
+  }, [hojas, filterEstado, filterCategoria, searchTerm])
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4">
@@ -116,7 +138,7 @@ export default function RequerimientosPage() {
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por número, motivo, centro..."
+            placeholder="Buscar por número, motivo, proyecto..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-8 h-9"
@@ -134,6 +156,16 @@ export default function RequerimientosPage() {
           <SelectContent>
             {ESTADOS.map(e => (
               <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterCategoria} onValueChange={setFilterCategoria}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            {CATEGORIAS.map(c => (
+              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -156,7 +188,8 @@ export default function RequerimientosPage() {
                 <TableRow>
                   <TableHead>Número</TableHead>
                   <TableHead>Motivo</TableHead>
-                  <TableHead>Centro de Costo</TableHead>
+                  <TableHead>Asignado a</TableHead>
+                  <TableHead>Categoría</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Solicitado</TableHead>
                   <TableHead className="text-right">Gastado</TableHead>
@@ -173,9 +206,14 @@ export default function RequerimientosPage() {
                     onClick={() => router.push(`/finanzas/requerimientos/${hoja.id}`)}
                   >
                     <TableCell className="font-mono text-sm font-medium">{hoja.numero}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{hoja.motivo}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {hoja.centroCosto?.nombre || '-'}
+                    <TableCell className="max-w-[180px] truncate">{hoja.motivo}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                      {getAsignadoA(hoja)}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {categoriaLabel[hoja.categoriaCosto] || hoja.categoriaCosto}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Badge className={`text-xs ${estadoColor[hoja.estado] || ''}`}>

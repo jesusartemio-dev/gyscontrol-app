@@ -169,7 +169,9 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         <span className="text-muted-foreground">/</span>
         <span className="font-mono font-semibold">{hoja.numero}</span>
         <Badge className="capitalize ml-auto text-xs" variant="outline">
-          {hoja.centroCosto?.nombre || 'Sin centro'}
+          {hoja.proyecto
+            ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
+            : hoja.centroCosto?.nombre || 'Sin asignación'}
         </Badge>
       </div>
 
@@ -210,6 +212,20 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       <Card>
         <CardContent className="p-4 space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Asignado a:</span>
+              <span className="font-medium">
+                {hoja.proyecto
+                  ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
+                  : hoja.centroCosto?.nombre || '-'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Categoría:</span>
+              <span className="capitalize">{hoja.categoriaCosto || 'gastos'}</span>
+            </div>
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Motivo:</span>

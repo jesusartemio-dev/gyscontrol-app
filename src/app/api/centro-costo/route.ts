@@ -20,9 +20,6 @@ export async function GET(req: Request) {
 
     const data = await prisma.centroCosto.findMany({
       where,
-      include: {
-        proyecto: { select: { id: true, nombre: true, codigo: true } },
-      },
       orderBy: { nombre: 'asc' },
     })
 
@@ -50,17 +47,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Nombre y tipo son requeridos' }, { status: 400 })
     }
 
+    const tiposValidos = ['departamento', 'administrativo']
+    if (!tiposValidos.includes(payload.tipo)) {
+      return NextResponse.json({ error: `Tipo inválido. Valores permitidos: ${tiposValidos.join(', ')}` }, { status: 400 })
+    }
+
     const data = await prisma.centroCosto.create({
       data: {
         nombre: payload.nombre.trim(),
         tipo: payload.tipo,
         descripcion: payload.descripcion || null,
         activo: payload.activo !== false,
-        proyectoId: payload.proyectoId || null,
         updatedAt: new Date(),
-      },
-      include: {
-        proyecto: { select: { id: true, nombre: true, codigo: true } },
       },
     })
 

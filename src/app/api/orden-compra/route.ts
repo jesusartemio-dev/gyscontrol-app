@@ -26,7 +26,7 @@ async function generarNumeroOC(): Promise<string> {
 
 const includeRelations = {
   proveedor: true,
-  centroCosto: { select: { id: true, nombre: true, tipo: true, proyectoId: true } },
+  centroCosto: { select: { id: true, nombre: true, tipo: true } },
   pedidoEquipo: { select: { id: true, codigo: true, estado: true } },
   proyecto: { select: { id: true, codigo: true, nombre: true } },
   solicitante: { select: { id: true, name: true, email: true } },
@@ -102,10 +102,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Debe incluir al menos un item' }, { status: 400 })
     }
 
+    // Mutual exclusivity: proyectoId XOR centroCostoId
+    const hasProyecto = !!payload.proyectoId
+    const hasCentroCosto = !!payload.centroCostoId
+    if (hasProyecto && hasCentroCosto) {
+      return NextResponse.json({ error: 'Debe imputar a proyecto O centro de costo, no ambos' }, { status: 400 })
+    }
+    if (!hasProyecto && !hasCentroCosto) {
+      return NextResponse.json({ error: 'Debe seleccionar un proyecto o centro de costo' }, { status: 400 })
+    }
+
     // Validate proveedor exists
     const proveedor = await prisma.proveedor.findUnique({ where: { id: payload.proveedorId } })
     if (!proveedor) {
       return NextResponse.json({ error: 'Proveedor no encontrado' }, { status: 404 })
+    }
+
+    // Validate proyecto or centro de costo
+    if (hasProyecto) {
+      const proyecto = await prisma.proyecto.findUnique({ where: { id: payload.proyectoId } })
+      if (!proyecto) {
+        return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
+      }
+    }
+    if (hasCentroCosto) {
+      const centroCosto = await prisma.centroCosto.findUnique({ where: { id: payload.centroCostoId } })
+      if (!centroCosto) {
+        return NextResponse.json({ error: 'Centro de costo no encontrado' }, { status: 404 })
+      }
+      if (!centroCosto.activo) {
+        return NextResponse.json({ error: 'Centro de costo inactivo' }, { status: 400 })
+      }
     }
 
     const numero = await generarNumeroOC()
@@ -134,6 +161,7 @@ export async function POST(req: Request) {
         centroCostoId: payload.centroCostoId || null,
         pedidoEquipoId: payload.pedidoEquipoId || null,
         proyectoId: payload.proyectoId || null,
+        categoriaCosto: payload.categoriaCosto || 'equipos',
         solicitanteId: session.user.id,
         condicionPago: payload.condicionPago || 'contado',
         moneda: payload.moneda || 'PEN',

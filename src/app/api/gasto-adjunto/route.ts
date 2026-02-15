@@ -5,16 +5,19 @@ import { authOptions } from '@/lib/auth'
 import { uploadFile, createFolder, getSharedDriveId } from '@/lib/services/googleDrive'
 
 // Buscar o crear carpeta de comprobantes
-async function getOrCreateComprobantesFolder(centroCostoId: string): Promise<string> {
-  const centroCosto = await prisma.centroCosto.findUnique({
-    where: { id: centroCostoId },
-    include: { proyecto: { select: { codigo: true, nombre: true } } },
+async function getOrCreateComprobantesFolder(hojaId: string): Promise<string> {
+  const hoja = await prisma.hojaDeGastos.findUnique({
+    where: { id: hojaId },
+    include: {
+      proyecto: { select: { codigo: true } },
+      centroCosto: { select: { nombre: true } },
+    },
   })
 
   const parentId = getSharedDriveId()
-  const folderName = centroCosto?.proyecto
-    ? `Comprobantes_${centroCosto.proyecto.codigo}`
-    : `Comprobantes_${centroCosto?.nombre || centroCostoId}`
+  const folderName = hoja?.proyecto
+    ? `Comprobantes_${hoja.proyecto.codigo}`
+    : `Comprobantes_${hoja?.centroCosto?.nombre || hojaId}`
 
   const folder = await createFolder({ parentId, folderName })
   return folder.id!
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Validar que la línea existe y la hoja está en estado editable
     const linea = await prisma.gastoLinea.findUnique({
       where: { id: gastoLineaId },
-      include: { hojaDeGastos: { select: { estado: true, centroCostoId: true } } },
+      include: { hojaDeGastos: { select: { id: true, estado: true } } },
     })
     if (!linea) {
       return NextResponse.json({ error: 'Línea de gasto no encontrada' }, { status: 404 })
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Subir a Google Drive
-    const folderId = await getOrCreateComprobantesFolder(linea.hojaDeGastos.centroCostoId)
+    const folderId = await getOrCreateComprobantesFolder(linea.hojaDeGastos.id)
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 

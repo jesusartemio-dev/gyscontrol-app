@@ -4,7 +4,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 const includeRelations = {
-  centroCosto: { select: { id: true, nombre: true, tipo: true, proyectoId: true } },
+  proyecto: { select: { id: true, codigo: true, nombre: true } },
+  centroCosto: { select: { id: true, nombre: true, tipo: true } },
   empleado: { select: { id: true, name: true, email: true } },
   aprobador: { select: { id: true, name: true, email: true } },
   lineas: {

@@ -8,9 +8,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const data = await prisma.centroCosto.findUnique({
       where: { id },
-      include: {
-        proyecto: { select: { id: true, nombre: true, codigo: true } },
-      },
     })
     if (!data) {
       return NextResponse.json({ error: 'Centro de costo no encontrado' }, { status: 404 })
@@ -32,19 +29,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const payload = await req.json()
 
+    if (payload.tipo !== undefined) {
+      const tiposValidos = ['departamento', 'administrativo']
+      if (!tiposValidos.includes(payload.tipo)) {
+        return NextResponse.json({ error: `Tipo inválido. Valores permitidos: ${tiposValidos.join(', ')}` }, { status: 400 })
+      }
+    }
+
     const updateData: any = { updatedAt: new Date() }
     if (payload.nombre !== undefined) updateData.nombre = payload.nombre.trim()
     if (payload.tipo !== undefined) updateData.tipo = payload.tipo
     if (payload.descripcion !== undefined) updateData.descripcion = payload.descripcion
     if (payload.activo !== undefined) updateData.activo = payload.activo
-    if (payload.proyectoId !== undefined) updateData.proyectoId = payload.proyectoId
 
     const data = await prisma.centroCosto.update({
       where: { id },
       data: updateData,
-      include: {
-        proyecto: { select: { id: true, nombre: true, codigo: true } },
-      },
     })
 
     return NextResponse.json(data)

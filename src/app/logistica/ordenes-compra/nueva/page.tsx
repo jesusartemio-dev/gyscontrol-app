@@ -13,7 +13,8 @@ import { ArrowLeft, Plus, Trash2, Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { createOrdenCompra } from '@/lib/services/ordenCompra'
 import { getProveedores } from '@/lib/services/proveedor'
-import type { Proveedor, CentroCosto, OrdenCompraItemPayload } from '@/types'
+import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
+import type { Proveedor, OrdenCompraItemPayload } from '@/types'
 
 const CONDICIONES_PAGO = [
   { value: 'contado', label: 'Contado' },
@@ -25,6 +26,12 @@ const CONDICIONES_PAGO = [
 const MONEDAS = [
   { value: 'PEN', label: 'Soles (PEN)' },
   { value: 'USD', label: 'Dólares (USD)' },
+]
+
+const CATEGORIAS = [
+  { value: 'equipos', label: 'Equipos' },
+  { value: 'servicios', label: 'Servicios' },
+  { value: 'gastos', label: 'Gastos' },
 ]
 
 interface ItemForm {
@@ -41,12 +48,12 @@ export default function NuevaOrdenCompraPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
-  const [centrosCosto, setCentrosCosto] = useState<CentroCosto[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
   // Form state
   const [proveedorId, setProveedorId] = useState('')
-  const [centroCostoId, setCentroCostoId] = useState('')
+  const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
+  const [categoriaCosto, setCategoriaCosto] = useState('equipos')
   const [condicionPago, setCondicionPago] = useState('contado')
   const [moneda, setMoneda] = useState('PEN')
   const [lugarEntrega, setLugarEntrega] = useState('')
@@ -54,16 +61,13 @@ export default function NuevaOrdenCompraPage() {
   const [observaciones, setObservaciones] = useState('')
   const [items, setItems] = useState<ItemForm[]>([{ ...emptyItem }])
 
+  const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
+
   useEffect(() => {
-    Promise.all([
-      getProveedores(),
-      fetch('/api/centro-costo').then(r => r.json()),
-    ]).then(([provs, cc]) => {
-      setProveedores(provs)
-      setCentrosCosto(Array.isArray(cc) ? cc : cc.data || [])
-    }).catch(() => {
-      toast.error('Error al cargar datos')
-    }).finally(() => setLoadingData(false))
+    getProveedores()
+      .then(setProveedores)
+      .catch(() => toast.error('Error al cargar proveedores'))
+      .finally(() => setLoadingData(false))
   }, [])
 
   const updateItem = (index: number, field: keyof ItemForm, value: string | number) => {
@@ -86,6 +90,7 @@ export default function NuevaOrdenCompraPage() {
 
   const handleSubmit = async () => {
     if (!proveedorId) return toast.error('Selecciona un proveedor')
+    if (!hasAsignacion) return toast.error('Selecciona un proyecto o centro de costo')
     const validItems = items.filter(i => i.codigo && i.descripcion && i.cantidad > 0 && i.precioUnitario > 0)
     if (validItems.length === 0) return toast.error('Agrega al menos un item válido')
 
@@ -93,7 +98,9 @@ export default function NuevaOrdenCompraPage() {
       setSaving(true)
       const payload = {
         proveedorId,
-        centroCostoId: centroCostoId || undefined,
+        proyectoId: asignacion.proyectoId || undefined,
+        centroCostoId: asignacion.centroCostoId || undefined,
+        categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
         condicionPago,
         moneda,
         lugarEntrega: lugarEntrega || undefined,
@@ -137,7 +144,7 @@ export default function NuevaOrdenCompraPage() {
         </div>
       </div>
 
-      {/* Proveedor & Centro de Costo */}
+      {/* Proveedor & Asignar a */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-3">
@@ -161,19 +168,27 @@ export default function NuevaOrdenCompraPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Centro de Costo</CardTitle>
+            <CardTitle className="text-sm font-medium">Asignar a <span className="text-red-500">*</span></CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Select value={centroCostoId} onValueChange={setCentroCostoId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar centro (opcional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {centrosCosto.filter((c: CentroCosto) => c.activo).map((c: CentroCosto) => (
-                  <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SelectorAsignacion
+              value={asignacion}
+              onChange={setAsignacion}
+              placeholder="Seleccionar proyecto o centro de costo"
+            />
+            <div>
+              <Label className="text-xs">Categoría</Label>
+              <Select value={categoriaCosto} onValueChange={setCategoriaCosto}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
       </div>

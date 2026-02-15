@@ -64,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data: { estado: nuevoEstado, updatedAt: new Date() },
       include: {
         proveedor: true,
-        centroCosto: { select: { id: true, nombre: true, tipo: true, proyectoId: true } },
+        centroCosto: { select: { id: true, nombre: true, tipo: true } },
         pedidoEquipo: { select: { id: true, codigo: true, estado: true } },
         proyecto: { select: { id: true, codigo: true, nombre: true } },
         solicitante: { select: { id: true, name: true, email: true } },

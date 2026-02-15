@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,32 +11,31 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Loader2, CreditCard } from 'lucide-react'
 import { toast } from 'sonner'
-import { getCentrosCosto } from '@/lib/services/centroCosto'
 import { createHojaDeGastos } from '@/lib/services/hojaDeGastos'
-import type { CentroCosto } from '@/types'
+import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
+
+const CATEGORIAS = [
+  { value: 'gastos', label: 'Gastos' },
+  { value: 'equipos', label: 'Equipos' },
+  { value: 'servicios', label: 'Servicios' },
+]
 
 export default function NuevoRequerimientoPage() {
   const router = useRouter()
-  const [centros, setCentros] = useState<CentroCosto[]>([])
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const [centroCostoId, setCentroCostoId] = useState('')
+  const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
+  const [categoriaCosto, setCategoriaCosto] = useState('gastos')
   const [motivo, setMotivo] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [requiereAnticipo, setRequiereAnticipo] = useState(false)
   const [montoAnticipo, setMontoAnticipo] = useState('')
 
-  useEffect(() => {
-    getCentrosCosto({ activo: true })
-      .then(setCentros)
-      .catch(() => toast.error('Error al cargar centros de costo'))
-      .finally(() => setLoading(false))
-  }, [])
+  const hasAsignacion = !!(asignacion.proyectoId || asignacion.centroCostoId)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!centroCostoId || !motivo.trim()) {
+    if (!hasAsignacion || !motivo.trim()) {
       toast.error('Complete los campos obligatorios')
       return
     }
@@ -44,7 +43,9 @@ export default function NuevoRequerimientoPage() {
     try {
       setSaving(true)
       const hoja = await createHojaDeGastos({
-        centroCostoId,
+        proyectoId: asignacion.proyectoId || undefined,
+        centroCostoId: asignacion.centroCostoId || undefined,
+        categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
         motivo: motivo.trim(),
         observaciones: observaciones.trim() || undefined,
         requiereAnticipo,
@@ -76,19 +77,24 @@ export default function NuevoRequerimientoPage() {
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Centro de Costo <span className="text-red-500">*</span></Label>
-              <Select value={centroCostoId} onValueChange={setCentroCostoId} disabled={loading || saving}>
+              <Label>Asignar a <span className="text-red-500">*</span></Label>
+              <SelectorAsignacion
+                value={asignacion}
+                onChange={setAsignacion}
+                disabled={saving}
+                placeholder="Seleccionar proyecto o centro de costo"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Categoría</Label>
+              <Select value={categoriaCosto} onValueChange={setCategoriaCosto} disabled={saving}>
                 <SelectTrigger>
-                  <SelectValue placeholder={loading ? 'Cargando...' : 'Seleccionar centro de costo'} />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {centros.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <span className="flex items-center gap-2">
-                        {c.nombre}
-                        <span className="text-xs text-muted-foreground capitalize">({c.tipo})</span>
-                      </span>
-                    </SelectItem>
+                  {CATEGORIAS.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -146,7 +152,7 @@ export default function NuevoRequerimientoPage() {
               <Button type="button" variant="outline" onClick={() => router.back()} disabled={saving}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={saving || !centroCostoId || !motivo.trim()} className="bg-amber-600 hover:bg-amber-700">
+              <Button type="submit" disabled={saving || !hasAsignacion || !motivo.trim()} className="bg-amber-600 hover:bg-amber-700">
                 {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                 Crear Requerimiento
               </Button>

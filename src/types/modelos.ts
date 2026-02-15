@@ -2440,7 +2440,9 @@ export interface CalendarioLaboral {
 // Centro de Costo
 // ======================
 
-export type CentroCostoTipo = 'proyecto' | 'departamento' | 'administrativo'
+export type CentroCostoTipo = 'departamento' | 'administrativo'
+
+export type CategoriaCosto = 'equipos' | 'servicios' | 'gastos'
 
 export interface CentroCosto {
   id: string
@@ -2448,11 +2450,8 @@ export interface CentroCosto {
   tipo: CentroCostoTipo
   descripcion?: string | null
   activo: boolean
-  proyectoId?: string | null
   createdAt: string
   updatedAt: string
-  // Relations
-  proyecto?: Proyecto | null
 }
 
 // ======================
@@ -2474,7 +2473,9 @@ export type RechazoEtapa = 'aprobacion' | 'validacion' | 'cierre'
 export interface HojaDeGastos {
   id: string
   numero: string
-  centroCostoId: string
+  proyectoId?: string | null
+  centroCostoId?: string | null
+  categoriaCosto: CategoriaCosto
   empleadoId: string
   aprobadorId?: string | null
   motivo: string
@@ -2496,7 +2497,8 @@ export interface HojaDeGastos {
   createdAt: string
   updatedAt: string
   // Relations
-  centroCosto?: CentroCosto
+  proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'> | null
+  centroCosto?: CentroCosto | null
   empleado?: { id: string; name: string | null; email: string }
   aprobador?: { id: string; name: string | null; email: string } | null
   lineas?: GastoLinea[]
@@ -2555,6 +2557,7 @@ export interface OrdenCompra {
   proyectoId?: string | null
   solicitanteId: string
   aprobadorId?: string | null
+  categoriaCosto: CategoriaCosto
   estado: EstadoOrdenCompra
   condicionPago: string
   moneda: string

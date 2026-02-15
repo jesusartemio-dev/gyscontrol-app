@@ -1320,10 +1320,9 @@ export interface CreateProyectoEdtPayload {
 
 export interface CentroCostoPayload {
   nombre: string
-  tipo: 'proyecto' | 'departamento' | 'administrativo'
+  tipo: 'departamento' | 'administrativo'
   descripcion?: string
   activo?: boolean
-  proyectoId?: string
 }
 
 export interface CentroCostoUpdatePayload {
@@ -1331,7 +1330,6 @@ export interface CentroCostoUpdatePayload {
   tipo?: string
   descripcion?: string | null
   activo?: boolean
-  proyectoId?: string | null
 }
 
 // ======================
@@ -1339,7 +1337,9 @@ export interface CentroCostoUpdatePayload {
 // ======================
 
 export interface HojaDeGastosPayload {
-  centroCostoId: string
+  proyectoId?: string
+  centroCostoId?: string
+  categoriaCosto?: 'equipos' | 'servicios' | 'gastos'
   empleadoId?: string
   motivo: string
   observaciones?: string
@@ -1400,6 +1400,7 @@ export interface OrdenCompraPayload {
   centroCostoId?: string
   pedidoEquipoId?: string
   proyectoId?: string
+  categoriaCosto?: 'equipos' | 'servicios' | 'gastos'
   condicionPago?: string
   moneda?: string
   lugarEntrega?: string

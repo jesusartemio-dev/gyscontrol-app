@@ -4,11 +4,13 @@ const BASE_URL = '/api/hoja-de-gastos'
 
 export async function getHojasDeGastos(params?: {
   centroCostoId?: string
+  proyectoId?: string
   estado?: string
   empleadoId?: string
 }): Promise<HojaDeGastos[]> {
   const searchParams = new URLSearchParams()
   if (params?.centroCostoId) searchParams.set('centroCostoId', params.centroCostoId)
+  if (params?.proyectoId) searchParams.set('proyectoId', params.proyectoId)
   if (params?.estado) searchParams.set('estado', params.estado)
   if (params?.empleadoId) searchParams.set('empleadoId', params.empleadoId)
   const query = searchParams.toString()

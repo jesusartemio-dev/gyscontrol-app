@@ -32,6 +32,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     })
 
+    // Recalcular totalRealGastos del proyecto si aplica
+    if (hoja.proyectoId) {
+      const agg = await prisma.hojaDeGastos.aggregate({
+        where: {
+          proyectoId: hoja.proyectoId,
+          estado: { in: ['validado', 'cerrado'] },
+        },
+        _sum: { montoGastado: true },
+      })
+      await prisma.proyecto.update({
+        where: { id: hoja.proyectoId },
+        data: { totalRealGastos: agg._sum.montoGastado || 0 },
+      })
+    }
+
     return NextResponse.json(data)
   } catch (error) {
     console.error('Error al validar:', error)

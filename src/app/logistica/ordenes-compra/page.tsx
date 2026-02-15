@@ -12,7 +12,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Search, X, Loader2, FileText, ChevronRight, Edit, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getOrdenesCompra, deleteOrdenCompra } from '@/lib/services/ordenCompra'
-import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import type { OrdenCompra } from '@/types'
 
 const ESTADOS = [
@@ -24,6 +23,13 @@ const ESTADOS = [
   { value: 'parcial', label: 'Parcial' },
   { value: 'completada', label: 'Completada' },
   { value: 'cancelada', label: 'Cancelada' },
+]
+
+const CATEGORIAS = [
+  { value: 'all', label: 'Todas' },
+  { value: 'equipos', label: 'Equipos' },
+  { value: 'servicios', label: 'Servicios' },
+  { value: 'gastos', label: 'Gastos' },
 ]
 
 const formatCurrency = (amount: number, moneda = 'PEN') =>
@@ -42,11 +48,24 @@ const estadoColor: Record<string, string> = {
   cancelada: 'bg-red-100 text-red-700',
 }
 
+const categoriaLabel: Record<string, string> = {
+  equipos: 'Equipos',
+  servicios: 'Servicios',
+  gastos: 'Gastos',
+}
+
+function getAsignadoA(oc: OrdenCompra): string {
+  if (oc.proyecto) return `${oc.proyecto.codigo} - ${oc.proyecto.nombre}`
+  if (oc.centroCosto) return oc.centroCosto.nombre
+  return '-'
+}
+
 export default function OrdenesCompraPage() {
   const router = useRouter()
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([])
   const [loading, setLoading] = useState(true)
   const [filterEstado, setFilterEstado] = useState('all')
+  const [filterCategoria, setFilterCategoria] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<OrdenCompra | null>(null)
 
@@ -79,17 +98,20 @@ export default function OrdenesCompraPage() {
   const filtered = useMemo(() => {
     let result = ordenes
     if (filterEstado !== 'all') result = result.filter(o => o.estado === filterEstado)
+    if (filterCategoria !== 'all') result = result.filter(o => o.categoriaCosto === filterCategoria)
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       result = result.filter(o =>
         o.numero.toLowerCase().includes(term) ||
         o.proveedor?.nombre?.toLowerCase().includes(term) ||
+        o.proyecto?.codigo?.toLowerCase().includes(term) ||
+        o.proyecto?.nombre?.toLowerCase().includes(term) ||
         o.centroCosto?.nombre?.toLowerCase().includes(term) ||
         o.observaciones?.toLowerCase().includes(term)
       )
     }
     return result
-  }, [ordenes, filterEstado, searchTerm])
+  }, [ordenes, filterEstado, filterCategoria, searchTerm])
 
   // Stats
   const stats = useMemo(() => {
@@ -124,7 +146,7 @@ export default function OrdenesCompraPage() {
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por número, proveedor..."
+            placeholder="Buscar por número, proveedor, proyecto..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-8 h-9"
@@ -142,6 +164,16 @@ export default function OrdenesCompraPage() {
           <SelectContent>
             {ESTADOS.map(e => (
               <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterCategoria} onValueChange={setFilterCategoria}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            {CATEGORIAS.map(c => (
+              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -164,7 +196,8 @@ export default function OrdenesCompraPage() {
                 <TableRow>
                   <TableHead>Número</TableHead>
                   <TableHead>Proveedor</TableHead>
-                  <TableHead>Centro de Costo</TableHead>
+                  <TableHead>Asignado a</TableHead>
+                  <TableHead>Categoría</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -180,9 +213,14 @@ export default function OrdenesCompraPage() {
                     onClick={() => router.push(`/logistica/ordenes-compra/${oc.id}`)}
                   >
                     <TableCell className="font-mono text-sm font-medium">{oc.numero}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{oc.proveedor?.nombre || '-'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {oc.centroCosto?.nombre || '-'}
+                    <TableCell className="max-w-[180px] truncate">{oc.proveedor?.nombre || '-'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                      {getAsignadoA(oc)}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {categoriaLabel[oc.categoriaCosto] || oc.categoriaCosto}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Badge className={`text-xs ${estadoColor[oc.estado] || ''}`}>
