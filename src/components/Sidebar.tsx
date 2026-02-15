@@ -48,7 +48,8 @@ import {
   HardHat,
   ClipboardList,
   HardDrive,
-  ShieldAlert
+  ShieldAlert,
+  LayoutDashboard
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -75,6 +76,7 @@ export default function Sidebar() {
     logistica: false,
     aprovisionamiento: false,
     finanzas: false,
+    administracion: false,
     gestion: false,
   })
 
@@ -252,9 +254,22 @@ export default function Sidebar() {
       title: 'Mis Gastos',
       icon: Receipt,
       color: 'text-amber-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico', 'administracion'],
       links: [
         { href: '/finanzas/requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
+      ],
+    },
+    // 4.2. Administración - Gestión financiera y administrativa
+    {
+      key: 'administracion',
+      title: 'Administración',
+      icon: Building2,
+      color: 'text-rose-400',
+      roles: ['admin', 'gerente', 'administracion'],
+      links: [
+        { href: '/administracion', label: 'Dashboard', icon: LayoutDashboard },
+        { href: '/administracion/gastos', label: 'Gestión de Gastos', icon: Receipt },
+        { href: '/administracion/rendiciones', label: 'Rendiciones', icon: FileCheck },
       ],
     },
     // 5. Gestión - Análisis y control

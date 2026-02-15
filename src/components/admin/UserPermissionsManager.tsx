@@ -104,6 +104,7 @@ const roleDisplayMap: Record<RolUsuario, { label: string; color: string }> = {
   gerente: { label: 'Gerente', color: 'bg-pink-100 text-pink-800' },
   seguridad: { label: 'Seguridad', color: 'bg-teal-100 text-teal-800' },
   colaborador: { label: 'Colaborador', color: 'bg-gray-100 text-gray-800' },
+  administracion: { label: 'Administración', color: 'bg-rose-100 text-rose-800' },
 };
 
 // Variantes de animación

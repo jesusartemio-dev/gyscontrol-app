@@ -52,6 +52,7 @@ import {
   ClipboardList,
   HardDrive,
   HardHat,
+  LayoutDashboard,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -198,9 +199,21 @@ export default function MobileSidebar() {
       title: 'Mis Gastos',
       icon: Receipt,
       color: 'text-amber-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico', 'administracion'],
       links: [
         { href: '/finanzas/requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
+      ],
+    },
+    {
+      key: 'administracion',
+      title: 'Administración',
+      icon: Building2,
+      color: 'text-rose-400',
+      roles: ['admin', 'gerente', 'administracion'],
+      links: [
+        { href: '/administracion', label: 'Dashboard', icon: LayoutDashboard },
+        { href: '/administracion/gastos', label: 'Gestión de Gastos', icon: Receipt },
+        { href: '/administracion/rendiciones', label: 'Rendiciones', icon: FileCheck },
       ],
     },
     {

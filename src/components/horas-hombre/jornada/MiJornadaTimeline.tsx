@@ -297,13 +297,13 @@ export function MiJornadaTimeline({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onVerDetalle(jornada.id)}>
+                          <DropdownMenuItem onSelect={() => setTimeout(() => onVerDetalle(jornada.id), 0)}>
                             <Eye className="h-4 w-4 mr-2" />
                             Ver detalle
                           </DropdownMenuItem>
                           {onReabrir && (
                             <DropdownMenuItem
-                              onClick={() => onReabrir(jornada.id)}
+                              onSelect={() => setTimeout(() => onReabrir(jornada.id), 0)}
                               className="text-blue-600 focus:text-blue-600"
                             >
                               <RefreshCcw className="h-4 w-4 mr-2" />
@@ -312,7 +312,7 @@ export function MiJornadaTimeline({
                           )}
                           {onEliminar && (
                             <DropdownMenuItem
-                              onClick={() => onEliminar(jornada.id)}
+                              onSelect={() => setTimeout(() => onEliminar(jornada.id), 0)}
                               className="text-red-600 focus:text-red-600"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />

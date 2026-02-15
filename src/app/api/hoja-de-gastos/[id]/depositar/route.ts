@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente'].includes(session.user.role)) {
+    if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
       return NextResponse.json({ error: 'Sin permisos para registrar depósito' }, { status: 403 })
     }
 

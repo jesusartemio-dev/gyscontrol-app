@@ -81,6 +81,7 @@ const roles: RolUsuario[] = [
   'gestor',
   'gerente',
   'seguridad',
+  'administracion',
   'colaborador',
 ]
 
@@ -156,6 +157,12 @@ const roleDisplayMap: Record<RolUsuario, { label: string; color: string; bgColor
     bgColor: 'bg-teal-50 border-teal-200',
     description: 'Control de seguridad y accesos'
   },
+  administracion: {
+    label: 'Administración',
+    color: 'text-rose-700',
+    bgColor: 'bg-rose-50 border-rose-200',
+    description: 'Gestión financiera, depósitos y rendiciones'
+  },
   colaborador: {
     label: 'Colaborador',
     color: 'text-gray-700',
@@ -186,6 +193,7 @@ function getAvatarColor(role: RolUsuario): string {
     gestor: 'bg-indigo-500',
     gerente: 'bg-pink-500',
     seguridad: 'bg-teal-500',
+    administracion: 'bg-rose-500',
     colaborador: 'bg-gray-500',
   }
   return colors[role] || 'bg-gray-500'

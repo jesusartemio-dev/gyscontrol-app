@@ -313,12 +313,12 @@ export function JornadaActiva({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setEditarJornadaOpen(true)}>
+                  <DropdownMenuItem onSelect={() => setTimeout(() => setEditarJornadaOpen(true), 0)}>
                     <Settings className="h-4 w-4 mr-2" />
                     Editar jornada
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => setEliminarJornadaOpen(true)}
+                    onSelect={() => setTimeout(() => setEliminarJornadaOpen(true), 0)}
                     className="text-red-600 focus:text-red-600"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />

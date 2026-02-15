@@ -56,7 +56,7 @@ export async function GET(req: Request) {
 
     // Filtrar por permisos
     const role = session.user.role
-    if (!['admin', 'gerente'].includes(role)) {
+    if (!['admin', 'gerente', 'administracion'].includes(role)) {
       where.OR = [
         { empleadoId: session.user.id },
         // Hojas de proyecto: visible si eres gestor/supervisor/lider

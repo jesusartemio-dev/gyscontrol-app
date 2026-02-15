@@ -151,12 +151,12 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   const isEditable = ['borrador', 'rechazado', 'aprobado', 'depositado'].includes(hoja.estado)
   const canEnviar = ['borrador', 'rechazado'].includes(hoja.estado)
-  const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador'].includes(role || '')
-  const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente'].includes(role || '')
+  const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
+  const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
-  const canValidar = hoja.estado === 'rendido' && ['admin', 'gerente'].includes(role || '')
-  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador'].includes(role || '')
-  const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador'].includes(role || '')
+  const canValidar = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canCerrar = hoja.estado === 'validado' && ['admin', 'gerente', 'coordinador', 'administracion'].includes(role || '')
+  const canRechazar = ['enviado', 'rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-4xl">

@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!['admin', 'gerente', 'gestor', 'coordinador'].includes(session.user.role)) {
+    if (!['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(session.user.role)) {
       return NextResponse.json({ error: 'Sin permisos para rechazar' }, { status: 403 })
     }
 

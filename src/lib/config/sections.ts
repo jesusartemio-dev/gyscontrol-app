@@ -13,6 +13,7 @@ export const SECTION_KEYS = [
   'logistica',
   'aprovisionamiento',
   'finanzas',
+  'administracion',
   'gestion',
   'configuracion',
 ] as const
@@ -29,6 +30,7 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   logistica: 'Logística',
   aprovisionamiento: 'Aprovisionamiento',
   finanzas: 'Mis Gastos',
+  administracion: 'Administración',
   gestion: 'Gestión',
   configuracion: 'Configuración',
 }
@@ -43,6 +45,7 @@ export const ALL_ROLES = [
   'comercial',
   'presupuestos',
   'logistico',
+  'administracion',
   'colaborador',
 ] as const
 
@@ -50,8 +53,8 @@ export type RoleKey = (typeof ALL_ROLES)[number]
 
 // Mapeo por defecto (fallback) basado en la config hardcodeada actual del Sidebar
 export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
-  admin: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'finanzas', 'gestion', 'configuracion'],
-  gerente: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'finanzas', 'gestion', 'configuracion'],
+  admin: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'finanzas', 'administracion', 'gestion', 'configuracion'],
+  gerente: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'finanzas', 'administracion', 'gestion', 'configuracion'],
   gestor: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'aprovisionamiento', 'finanzas', 'gestion'],
   coordinador: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'finanzas'],
   proyectos: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'finanzas'],
@@ -59,6 +62,7 @@ export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
   comercial: ['comercial', 'crm', 'documentos', 'mi-trabajo'],
   presupuestos: ['comercial', 'mi-trabajo'],
   logistico: ['logistica', 'documentos', 'mi-trabajo', 'finanzas'],
+  administracion: ['mi-trabajo', 'finanzas', 'administracion'],
   colaborador: ['mi-trabajo', 'finanzas'],
 }
 
@@ -74,6 +78,7 @@ export const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   '/finanzas/aprovisionamiento': 'aprovisionamiento',
   '/finanzas/requerimientos': 'finanzas',
   '/finanzas/dashboard': 'aprovisionamiento',
+  '/administracion': 'administracion',
   '/gestion': 'gestion',
   '/configuracion': 'configuracion',
   '/catalogo': 'configuracion',
