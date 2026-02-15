@@ -56,8 +56,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const montoPagado = totalPagado._sum.monto || 0
     const saldoPendiente = Math.round((cuenta.monto - montoPagado) * 100) / 100
 
-    const nuevoEstado = saldoPendiente <= 0 ? 'pagada' as const
-      : montoPagado > 0 ? 'parcial' as const
+    const nuevoEstado: typeof cuenta.estado = saldoPendiente <= 0 ? 'pagada'
+      : montoPagado > 0 ? 'parcial'
       : cuenta.estado
 
     await prisma.cuentaPorPagar.update({

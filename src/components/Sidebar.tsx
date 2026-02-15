@@ -49,7 +49,11 @@ import {
   ClipboardList,
   HardDrive,
   ShieldAlert,
-  LayoutDashboard
+  LayoutDashboard,
+  FileSpreadsheet,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Landmark
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -270,6 +274,9 @@ export default function Sidebar() {
         { href: '/administracion', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/administracion/gastos', label: 'Gestión de Gastos', icon: Receipt },
         { href: '/administracion/rendiciones', label: 'Rendiciones', icon: FileCheck },
+        { href: '/administracion/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: ArrowDownCircle },
+        { href: '/administracion/cuentas-pagar', label: 'Cuentas por Pagar', icon: ArrowUpCircle },
+        { href: '/administracion/cuentas-bancarias', label: 'Cuentas Bancarias', icon: Landmark },
       ],
     },
     // 5. Gestión - Análisis y control
@@ -281,6 +288,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'gestor'],
       links: [
         { href: '/gestion', label: 'KPIs', icon: PieChart },
+        { href: '/gestion/valorizaciones', label: 'Valorizaciones', icon: FileSpreadsheet },
         { href: '/gestion/reportes', label: 'Reportes', icon: BarChart3 },
         { href: '/gestion/reportes/pedidos', label: 'Pedidos', icon: Package },
       ],

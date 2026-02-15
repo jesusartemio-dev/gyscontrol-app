@@ -250,6 +250,9 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
       { label: 'Dashboard', href: '/administracion' },
       { label: 'Gestión de Gastos', href: '/administracion/gastos' },
       { label: 'Rendiciones', href: '/administracion/rendiciones' },
+      { label: 'Cuentas por Cobrar', href: '/administracion/cuentas-cobrar' },
+      { label: 'Cuentas por Pagar', href: '/administracion/cuentas-pagar' },
+      { label: 'Cuentas Bancarias', href: '/administracion/cuentas-bancarias' },
     ],
   },
   {
@@ -259,6 +262,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     color: 'text-cyan-500',
     roles: ['admin', 'gerente', 'gestor'],
     links: [
+      { label: 'Valorizaciones', href: '/gestion/valorizaciones' },
       { label: 'Reportes', href: '/gestion/reportes' },
       { label: 'Pedidos', href: '/gestion/reportes/pedidos' },
       { label: 'Performance', href: '/gestion/reportes/performance' },

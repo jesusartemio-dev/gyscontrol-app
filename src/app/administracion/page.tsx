@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Building2, Clock, Banknote, FileCheck, CheckCircle, Loader2, ChevronRight, ArrowRight } from 'lucide-react'
+import { Building2, Clock, Banknote, FileCheck, CheckCircle, Loader2, ChevronRight, ArrowRight, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Landmark } from 'lucide-react'
 import { toast } from 'sonner'
 import { getHojasDeGastos } from '@/lib/services/hojaDeGastos'
 import type { HojaDeGastos } from '@/types'
@@ -26,9 +26,49 @@ const estadoColor: Record<string, string> = {
   rechazado: 'bg-red-100 text-red-700',
 }
 
+interface DashboardFinanciero {
+  cuentasPorCobrar: {
+    totalPendiente: number
+    countPendiente: number
+    vencidas: Array<{
+      id: string
+      monto: number
+      moneda: string
+      fechaVencimiento: string
+      cliente: { id: string; nombre: string }
+      proyecto: { id: string; codigo: string; nombre: string }
+      numeroDocumento: string | null
+    }>
+  }
+  cuentasPorPagar: {
+    totalPendiente: number
+    countPendiente: number
+    totalVencido: number
+    countVencido: number
+    proximasVencer: Array<{
+      id: string
+      monto: number
+      moneda: string
+      fechaVencimiento: string
+      proveedor: { id: string; nombre: string }
+      proyecto: { id: string; codigo: string; nombre: string } | null
+      numeroFactura: string | null
+      condicionPago: string
+    }>
+  }
+  cuentasBancarias: Array<{
+    id: string
+    nombreBanco: string
+    numeroCuenta: string
+    moneda: string
+    tipo: string
+  }>
+}
+
 export default function AdministracionDashboard() {
   const router = useRouter()
   const [hojas, setHojas] = useState<HojaDeGastos[]>([])
+  const [financiero, setFinanciero] = useState<DashboardFinanciero | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -38,8 +78,12 @@ export default function AdministracionDashboard() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const data = await getHojasDeGastos()
-      setHojas(data)
+      const [hojasData, finRes] = await Promise.all([
+        getHojasDeGastos(),
+        fetch('/api/administracion/dashboard'),
+      ])
+      setHojas(hojasData)
+      if (finRes.ok) setFinanciero(await finRes.json())
     } catch {
       toast.error('Error al cargar datos')
     } finally {
@@ -112,6 +156,10 @@ export default function AdministracionDashboard() {
     )
   }
 
+  const cxc = financiero?.cuentasPorCobrar
+  const cxp = financiero?.cuentasPorPagar
+  const balance = (cxc?.totalPendiente || 0) - (cxp?.totalPendiente || 0)
+
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
@@ -121,43 +169,231 @@ export default function AdministracionDashboard() {
           Administración
         </h1>
         <p className="text-sm text-muted-foreground">
-          {counts.totalPendiente > 0
-            ? `${counts.totalPendiente} requerimientos pendientes de acción`
-            : 'Todo al día'}
+          Panel de control financiero y administrativo
         </p>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {summaryCards.map(card => {
-          const Icon = card.icon
-          return (
-            <Card
-              key={card.estado}
-              className={`${card.border} cursor-pointer hover:shadow-md transition-shadow`}
-              onClick={() => router.push(`/administracion/gastos?estado=${card.estado}`)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className={`p-2 rounded-lg ${card.bg}`}>
-                    <Icon className={`h-4 w-4 ${card.color}`} />
-                  </div>
-                  {card.count > 0 && (
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  )}
+      {/* CxC / CxP / Balance cards */}
+      {financiero && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card
+            className="border-green-200 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => router.push('/administracion/cuentas-cobrar')}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-2 rounded-lg bg-green-50">
+                  <ArrowDownCircle className="h-4 w-4 text-green-600" />
                 </div>
-                <div className="text-2xl font-bold">{card.count}</div>
-                <div className="text-xs text-muted-foreground">{card.label}</div>
-              </CardContent>
-            </Card>
-          )
-        })}
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(cxc?.totalPendiente || 0)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Por cobrar ({cxc?.countPendiente || 0})
+                {(cxc?.vencidas?.length || 0) > 0 && (
+                  <span className="text-red-600 ml-1">· {cxc!.vencidas.length} vencidas</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="border-red-200 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => router.push('/administracion/cuentas-pagar')}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-2 rounded-lg bg-red-50">
+                  <ArrowUpCircle className="h-4 w-4 text-red-600" />
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="text-2xl font-bold text-red-600">
+                {formatCurrency(cxp?.totalPendiente || 0)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Por pagar ({cxp?.countPendiente || 0})
+                {(cxp?.countVencido || 0) > 0 && (
+                  <span className="text-red-600 ml-1">· {cxp!.countVencido} vencidas</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`${balance >= 0 ? 'border-emerald-200' : 'border-orange-200'}`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className={`p-2 rounded-lg ${balance >= 0 ? 'bg-emerald-50' : 'bg-orange-50'}`}>
+                  <Landmark className={`h-4 w-4 ${balance >= 0 ? 'text-emerald-600' : 'text-orange-600'}`} />
+                </div>
+              </div>
+              <div className={`text-2xl font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                {formatCurrency(balance)}
+              </div>
+              <div className="text-xs text-muted-foreground">Balance (CxC − CxP)</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* CxC vencidas + CxP próximas a vencer */}
+      {financiero && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* CxC vencidas */}
+          {(cxc?.vencidas?.length || 0) > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold text-red-700 flex items-center gap-1">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  CxC Vencidas
+                </h2>
+                <button
+                  onClick={() => router.push('/administracion/cuentas-cobrar?estado=pendiente')}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Ver todas
+                </button>
+              </div>
+              <Card>
+                <CardContent className="p-0">
+                  <div className="divide-y">
+                    {cxc!.vencidas.map(v => (
+                      <div key={v.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{v.cliente.nombre}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {v.proyecto.codigo} · {v.numeroDocumento || 'Sin doc.'}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-mono text-sm font-semibold text-red-600">
+                            {formatCurrency(v.monto)}
+                          </div>
+                          <div className="text-[10px] text-red-500">
+                            Venció {formatDate(v.fechaVencimiento)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* CxP próximas a vencer */}
+          {(cxp?.proximasVencer?.length || 0) > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold text-orange-700 flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  CxP Próximas a Vencer (7 días)
+                </h2>
+                <button
+                  onClick={() => router.push('/administracion/cuentas-pagar')}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Ver todas
+                </button>
+              </div>
+              <Card>
+                <CardContent className="p-0">
+                  <div className="divide-y">
+                    {cxp!.proximasVencer.map(v => (
+                      <div key={v.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{v.proveedor.nombre}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {v.proyecto?.codigo || '—'} · {v.numeroFactura || 'Sin factura'}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-mono text-sm font-semibold">
+                            {formatCurrency(v.monto)}
+                          </div>
+                          <div className="text-[10px] text-orange-600">
+                            Vence {formatDate(v.fechaVencimiento)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Cuentas bancarias activas */}
+      {financiero && financiero.cuentasBancarias.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+              <Landmark className="h-3.5 w-3.5" />
+              Cuentas Bancarias Activas
+            </h2>
+            <button
+              onClick={() => router.push('/administracion/cuentas-bancarias')}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              Gestionar
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {financiero.cuentasBancarias.map(cb => (
+              <Card key={cb.id}>
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium">{cb.nombreBanco}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{cb.numeroCuenta}</div>
+                    </div>
+                    <Badge variant={cb.moneda === 'USD' ? 'default' : 'secondary'}>{cb.moneda}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Gastos - Summary cards */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">Gestión de Gastos</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {summaryCards.map(card => {
+            const Icon = card.icon
+            return (
+              <Card
+                key={card.estado}
+                className={`${card.border} cursor-pointer hover:shadow-md transition-shadow`}
+                onClick={() => router.push(`/administracion/gastos?estado=${card.estado}`)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`p-2 rounded-lg ${card.bg}`}>
+                      <Icon className={`h-4 w-4 ${card.color}`} />
+                    </div>
+                    {card.count > 0 && (
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="text-2xl font-bold">{card.count}</div>
+                  <div className="text-xs text-muted-foreground">{card.label}</div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
       </div>
 
       {/* Actividad reciente */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-700">Actividad Reciente</h2>
+          <h2 className="text-sm font-semibold text-gray-700">Actividad Reciente (Gastos)</h2>
           <button
             onClick={() => router.push('/administracion/gastos')}
             className="text-xs text-blue-600 hover:underline flex items-center gap-1"

@@ -53,6 +53,10 @@ import {
   HardDrive,
   HardHat,
   LayoutDashboard,
+  FileSpreadsheet,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Landmark,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -76,6 +80,7 @@ export default function MobileSidebar() {
     logistica: false,
     aprovisionamiento: false,
     finanzas: false,
+    administracion: false,
     gestion: false,
   })
 
@@ -214,6 +219,9 @@ export default function MobileSidebar() {
         { href: '/administracion', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/administracion/gastos', label: 'Gestión de Gastos', icon: Receipt },
         { href: '/administracion/rendiciones', label: 'Rendiciones', icon: FileCheck },
+        { href: '/administracion/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: ArrowDownCircle },
+        { href: '/administracion/cuentas-pagar', label: 'Cuentas por Pagar', icon: ArrowUpCircle },
+        { href: '/administracion/cuentas-bancarias', label: 'Cuentas Bancarias', icon: Landmark },
       ],
     },
     {
@@ -223,6 +231,7 @@ export default function MobileSidebar() {
       color: 'text-cyan-400',
       roles: ['admin', 'gerente', 'gestor'],
       links: [
+        { href: '/gestion/valorizaciones', label: 'Valorizaciones', icon: FileSpreadsheet },
         { href: '/gestion/reportes', label: 'Reportes', icon: BarChart3 },
         { href: '/gestion/reportes/pedidos', label: 'Pedidos', icon: Package },
         { href: '/gestion/reportes/performance', label: 'Performance', icon: TrendingUp },
