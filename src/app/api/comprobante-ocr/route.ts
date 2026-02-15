@@ -127,12 +127,12 @@ async function consultarSunat(ruc: string): Promise<SunatResult> {
 
     const data = await res.json()
 
-    if (!data.nombre && !data.razonSocial) {
+    if (!data.razon_social) {
       return { sunat: null, sunatAlerta: 'RUC no encontrado en SUNAT', sunatAlertaTipo: 'info' }
     }
 
     const sunat: SunatInfo = {
-      razonSocial: data.razonSocial || data.nombre || '',
+      razonSocial: data.razon_social,
       estado: data.estado || '',
       condicion: data.condicion || '',
       direccion: data.direccion || '',
