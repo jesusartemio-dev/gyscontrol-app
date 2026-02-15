@@ -99,7 +99,23 @@ type SunatResult = {
   sunatAlertaTipo: 'warning' | 'info' | null
 }
 
-async function consultarSunat(ruc: string): Promise<SunatResult> {
+// ── Throttle para PeruAPI (plan free tiene rate limit) ──
+// Serializa las consultas SUNAT con 500ms de delay entre cada una.
+// Las requests concurrentes al mismo serverless instance comparten este módulo.
+let sunatQueue: Promise<void> = Promise.resolve()
+const SUNAT_DELAY_MS = 500
+
+function consultarSunatThrottled(ruc: string): Promise<SunatResult> {
+  return new Promise<SunatResult>((resolve) => {
+    sunatQueue = sunatQueue.then(async () => {
+      const result = await consultarSunatInternal(ruc)
+      await new Promise((r) => setTimeout(r, SUNAT_DELAY_MS))
+      resolve(result)
+    })
+  })
+}
+
+async function consultarSunatInternal(ruc: string): Promise<SunatResult> {
   const apiKey = process.env.PERU_API_KEY
   if (!apiKey) {
     return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
@@ -290,7 +306,7 @@ export async function POST(request: NextRequest) {
     let sunatAlertaTipo: 'warning' | 'info' | null = null
 
     if (ocrResult.proveedorRuc && /^\d{11}$/.test(ocrResult.proveedorRuc)) {
-      const sunatResult = await consultarSunat(ocrResult.proveedorRuc)
+      const sunatResult = await consultarSunatThrottled(ocrResult.proveedorRuc)
       sunat = sunatResult.sunat
       sunatAlerta = sunatResult.sunatAlerta
       sunatAlertaTipo = sunatResult.sunatAlertaTipo
