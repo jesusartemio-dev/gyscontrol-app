@@ -158,6 +158,7 @@ export default function RequerimientosPage() {
                   <TableHead>Motivo</TableHead>
                   <TableHead>Centro de Costo</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Solicitado</TableHead>
                   <TableHead className="text-right">Gastado</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
                   <TableHead>Fecha</TableHead>
@@ -180,6 +181,9 @@ export default function RequerimientosPage() {
                       <Badge className={`text-xs ${estadoColor[hoja.estado] || ''}`}>
                         {hoja.estado}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {hoja.requiereAnticipo ? formatCurrency(hoja.montoAnticipo) : '-'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
                       {formatCurrency(hoja.montoGastado)}
