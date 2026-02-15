@@ -59,6 +59,7 @@ interface ComprobanteItem {
   observaciones: string
   // SUNAT
   sunatAlerta: string | null
+  sunatAlertaTipo: 'warning' | 'info' | null
   sunatRazonSocial: string | null
   sunatCondicion: string | null
   // Categoría
@@ -119,6 +120,7 @@ export default function CargaMasivaComprobantes({
     confianza: '',
     observaciones: '',
     sunatAlerta: null,
+    sunatAlertaTipo: null,
     sunatRazonSocial: null,
     sunatCondicion: null,
     categoriaGastoId: '',
@@ -144,6 +146,7 @@ export default function CargaMasivaComprobantes({
       confianza: d.confianza || 'baja',
       observaciones: d.observaciones || '',
       sunatAlerta: d.sunatAlerta || null,
+      sunatAlertaTipo: d.sunatAlertaTipo || null,
       sunatRazonSocial: d.sunat?.razonSocial || null,
       sunatCondicion: d.sunat?.condicion || null,
     })
@@ -497,11 +500,11 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
       <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30" />
     )
 
-  // Row background based on status/alerts
+  // Row background based on status/alerts (only amber for real SUNAT warnings, not API errors)
   const rowBg =
     item.status === 'error'
       ? 'bg-red-50'
-      : item.sunatAlerta
+      : item.sunatAlertaTipo === 'warning'
         ? 'bg-amber-50'
         : item.confianza === 'baja'
           ? 'bg-yellow-50'
@@ -618,7 +621,7 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
               placeholder="20123456789"
               disabled={disabled}
             />
-            {item.sunatAlerta && (
+            {item.sunatAlertaTipo === 'warning' && item.sunatAlerta && (
               <span title={item.sunatAlerta}>
                 <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
               </span>
@@ -687,10 +690,15 @@ function ComprobanteRow({ item, index, categorias, onUpdate, onRemove, disabled 
         <tr className={rowBg}>
           <td></td>
           <td colSpan={9} className="px-1.5 pb-1.5">
-            {item.sunatAlerta && (
+            {item.sunatAlerta && item.sunatAlertaTipo === 'warning' && (
               <div className="flex items-center gap-1.5 text-[10px] text-amber-700">
                 <AlertTriangle className="h-3 w-3 shrink-0" />
                 SUNAT: {item.sunatAlerta}
+              </div>
+            )}
+            {item.sunatAlerta && item.sunatAlertaTipo === 'info' && (
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                {item.sunatAlerta}
               </div>
             )}
             {item.observaciones && (

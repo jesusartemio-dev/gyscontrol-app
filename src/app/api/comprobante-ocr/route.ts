@@ -31,6 +31,7 @@ export interface ComprobanteOcrResponse {
   data: OcrResult & {
     sunat: SunatInfo | null
     sunatAlerta: string | null
+    sunatAlertaTipo: 'warning' | 'info' | null
   }
 }
 
@@ -92,26 +93,42 @@ function getOcrModel(): string {
   return process.env.OCR_MODEL || 'claude-haiku-4-5-20251001'
 }
 
-async function consultarSunat(ruc: string): Promise<{ sunat: SunatInfo | null; sunatAlerta: string | null }> {
+type SunatResult = {
+  sunat: SunatInfo | null
+  sunatAlerta: string | null
+  sunatAlertaTipo: 'warning' | 'info' | null
+}
+
+async function consultarSunat(ruc: string): Promise<SunatResult> {
   const apiKey = process.env.PERU_API_KEY
   if (!apiKey) {
-    return { sunat: null, sunatAlerta: 'PERU_API_KEY no configurada — validación SUNAT omitida' }
+    return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
   }
 
   try {
-    const res = await fetch(
+    // Intentar endpoint REST primero, luego legacy si falla con 401
+    let res = await fetch(
       `https://peruapi.com/api/ruc/${ruc}?api_token=${apiKey}`,
       { signal: AbortSignal.timeout(10000) }
     )
 
+    if (res.status === 401) {
+      // Intentar formato legacy como fallback
+      res = await fetch(
+        `https://peruapi.com/api.php?json=ruc&id=${ruc}&api_token=${apiKey}`,
+        { signal: AbortSignal.timeout(10000) }
+      )
+    }
+
     if (!res.ok) {
-      return { sunat: null, sunatAlerta: `Error consultando SUNAT (HTTP ${res.status})` }
+      console.warn(`PeruAPI error: HTTP ${res.status} for RUC ${ruc}`)
+      return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
     }
 
     const data = await res.json()
 
     if (data.code !== '200' && data.code !== 200) {
-      return { sunat: null, sunatAlerta: data.mensaje || 'RUC no encontrado en SUNAT' }
+      return { sunat: null, sunatAlerta: data.mensaje || 'RUC no encontrado en SUNAT', sunatAlertaTipo: 'info' }
     }
 
     const sunat: SunatInfo = {
@@ -121,18 +138,23 @@ async function consultarSunat(ruc: string): Promise<{ sunat: SunatInfo | null; s
       direccion: data.direccion || '',
     }
 
+    // Solo alertas reales (NOT HABIDO, NOT ACTIVO) son warnings
     let sunatAlerta: string | null = null
+    let sunatAlertaTipo: 'warning' | 'info' | null = null
     if (sunat.condicion !== 'HABIDO') {
       sunatAlerta = `Proveedor NO HABIDO (condición: ${sunat.condicion})`
+      sunatAlertaTipo = 'warning'
     }
     if (sunat.estado !== 'ACTIVO') {
       sunatAlerta = `Proveedor NO ACTIVO (estado: ${sunat.estado})${sunatAlerta ? `. ${sunatAlerta}` : ''}`
+      sunatAlertaTipo = 'warning'
     }
 
-    return { sunat, sunatAlerta }
+    return { sunat, sunatAlerta, sunatAlertaTipo }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error desconocido'
-    return { sunat: null, sunatAlerta: `Error consultando SUNAT: ${message}` }
+    console.warn(`PeruAPI error for RUC ${ruc}:`, message)
+    return { sunat: null, sunatAlerta: 'No se pudo verificar RUC en SUNAT', sunatAlertaTipo: 'info' }
   }
 }
 
@@ -265,11 +287,13 @@ export async function POST(request: NextRequest) {
     // Consultar SUNAT si hay RUC válido
     let sunat: SunatInfo | null = null
     let sunatAlerta: string | null = null
+    let sunatAlertaTipo: 'warning' | 'info' | null = null
 
     if (ocrResult.proveedorRuc && /^\d{11}$/.test(ocrResult.proveedorRuc)) {
       const sunatResult = await consultarSunat(ocrResult.proveedorRuc)
       sunat = sunatResult.sunat
       sunatAlerta = sunatResult.sunatAlerta
+      sunatAlertaTipo = sunatResult.sunatAlertaTipo
 
       // Si SUNAT devuelve razón social y Claude no la extrajo (o es diferente), preferir SUNAT
       if (sunat?.razonSocial && !ocrResult.proveedorNombre) {
@@ -283,6 +307,7 @@ export async function POST(request: NextRequest) {
         ...ocrResult,
         sunat,
         sunatAlerta,
+        sunatAlertaTipo,
       },
     }
 
