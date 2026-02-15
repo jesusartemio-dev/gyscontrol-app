@@ -165,8 +165,9 @@ async function getGerenteWidgets() {
     prisma.proyecto.count({ where: { estado: { in: ['en_planificacion', 'en_ejecucion'] } } }),
     prisma.cotizacion.count({ where: { estado: 'enviada' } }),
     prisma.valorizacion.aggregate({
-      _sum: { montoTotal: true },
+      _sum: { netoARecibir: true },
       where: {
+        estado: { notIn: ['anulada', 'borrador'] },
         periodoFin: {
           gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
           lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
@@ -198,7 +199,7 @@ async function getGerenteWidgets() {
     {
       type: 'kpi',
       title: 'Ingresos del Mes',
-      value: `$${monthlyRevenue._sum.montoTotal || 0}`,
+      value: `$${monthlyRevenue._sum.netoARecibir || 0}`,
       icon: 'DollarSign',
       color: 'green'
     },
@@ -518,7 +519,7 @@ async function getGestorWidgets() {
     overdueReports,
     alerts
   ] = await Promise.all([
-    prisma.valorizacion.count({ where: { estado: 'pendiente' } }),
+    prisma.valorizacion.count({ where: { estado: 'borrador' } }),
     // Mock reports count
     Promise.resolve(15),
     Promise.resolve(2),

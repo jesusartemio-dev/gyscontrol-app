@@ -1508,19 +1508,57 @@ export interface PedidoEquipoItem {
 // 📊 Valorización de Proyectos
 // ============================
 
+export type EstadoValorizacion = 'borrador' | 'enviada' | 'aprobada_cliente' | 'facturada' | 'pagada' | 'anulada'
+
 export interface Valorizacion {
   id: string
   proyectoId: string
-  nombre: string
-  descripcion?: string
+  numero: number
+  codigo: string
   periodoInicio: string
   periodoFin: string
-  estado: string // 'pendiente' | 'aprobada' | 'observada' | 'enviada'
-  montoTotal: number
+  moneda: string
+  tipoCambio?: number | null
+  // Montos de avance
+  presupuestoContractual: number
+  acumuladoAnterior: number
+  montoValorizacion: number
+  acumuladoActual: number
+  saldoPorValorizar: number
+  porcentajeAvance: number
+  // Montos financieros
+  descuentoComercialPorcentaje: number
+  descuentoComercialMonto: number
+  adelantoPorcentaje: number
+  adelantoMonto: number
+  subtotal: number
+  igvPorcentaje: number
+  igvMonto: number
+  fondoGarantiaPorcentaje: number
+  fondoGarantiaMonto: number
+  netoARecibir: number
+  // Estado y fechas
+  estado: EstadoValorizacion
+  fechaEnvio?: string | null
+  fechaAprobacion?: string | null
+  observaciones?: string | null
   createdAt: string
   updatedAt: string
 
-  proyecto: Proyecto
+  proyecto?: Proyecto
+  adjuntos?: ValorizacionAdjunto[]
+  cuentasPorCobrar?: CuentaPorCobrar[]
+}
+
+export interface ValorizacionAdjunto {
+  id: string
+  valorizacionId: string
+  nombreArchivo: string
+  urlArchivo: string
+  driveFileId?: string | null
+  tipoArchivo?: string | null
+  tamano?: number | null
+  createdAt: string
 }
 
 // ============================
@@ -2600,4 +2638,106 @@ export interface OrdenCompraItem {
   cantidadRecibida: number
   createdAt: string
   updatedAt: string
+}
+
+// ============================
+// 🏦 Cuentas Bancarias, CxC, CxP
+// ============================
+
+export interface CuentaBancaria {
+  id: string
+  nombreBanco: string
+  numeroCuenta: string
+  cci?: string | null
+  tipo: string // 'corriente' | 'ahorro'
+  moneda: string // 'PEN' | 'USD'
+  activa: boolean
+  descripcion?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type EstadoCuentaCobrar = 'pendiente' | 'parcial' | 'pagada' | 'vencida' | 'anulada'
+
+export interface CuentaPorCobrar {
+  id: string
+  proyectoId: string
+  clienteId: string
+  valorizacionId?: string | null
+  numeroDocumento?: string | null
+  descripcion?: string | null
+  monto: number
+  moneda: string
+  tipoCambio?: number | null
+  montoPagado: number
+  saldoPendiente: number
+  fechaEmision: string
+  fechaVencimiento: string
+  estado: EstadoCuentaCobrar
+  observaciones?: string | null
+  createdAt: string
+  updatedAt: string
+
+  proyecto?: Proyecto
+  cliente?: Cliente
+  valorizacion?: Valorizacion | null
+  pagos?: PagoCobro[]
+}
+
+export interface PagoCobro {
+  id: string
+  cuentaPorCobrarId: string
+  cuentaBancariaId?: string | null
+  monto: number
+  fechaPago: string
+  medioPago: string // 'transferencia' | 'cheque' | 'efectivo' | 'detraccion'
+  numeroOperacion?: string | null
+  observaciones?: string | null
+  createdAt: string
+  updatedAt: string
+
+  cuentaBancaria?: CuentaBancaria | null
+}
+
+export type EstadoCuentaPagar = 'pendiente' | 'parcial' | 'pagada' | 'vencida' | 'anulada'
+
+export interface CuentaPorPagar {
+  id: string
+  proveedorId: string
+  proyectoId?: string | null
+  ordenCompraId?: string | null
+  numeroFactura?: string | null
+  descripcion?: string | null
+  monto: number
+  moneda: string
+  tipoCambio?: number | null
+  montoPagado: number
+  saldoPendiente: number
+  fechaRecepcion: string
+  fechaVencimiento: string
+  condicionPago: string // 'contado' | '15 dias' | '30 dias' | '60 dias'
+  estado: EstadoCuentaPagar
+  observaciones?: string | null
+  createdAt: string
+  updatedAt: string
+
+  proveedor?: Proveedor
+  proyecto?: Proyecto | null
+  ordenCompra?: OrdenCompra | null
+  pagos?: PagoPagar[]
+}
+
+export interface PagoPagar {
+  id: string
+  cuentaPorPagarId: string
+  cuentaBancariaId?: string | null
+  monto: number
+  fechaPago: string
+  medioPago: string // 'transferencia' | 'cheque' | 'efectivo'
+  numeroOperacion?: string | null
+  observaciones?: string | null
+  createdAt: string
+  updatedAt: string
+
+  cuentaBancaria?: CuentaBancaria | null
 }

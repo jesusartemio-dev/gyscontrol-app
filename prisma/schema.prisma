@@ -174,6 +174,7 @@ model Cliente {
   crmContactoCliente       CrmContactoCliente[]
   crmHistorialProyecto     CrmHistorialProyecto[]
   crmOportunidad           CrmOportunidad[]
+  cuentasPorCobrar         CuentaPorCobrar[]
 
   @@map("cliente")
 }
@@ -810,6 +811,7 @@ model Proveedor {
   cotizacionProveedor CotizacionProveedor[]
   listaEquipoItem     ListaEquipoItem[]
   ordenesCompra       OrdenCompra[]
+  cuentasPorPagar     CuentaPorPagar[]
 
   @@map("proveedor")
 }
@@ -873,6 +875,8 @@ model Proyecto {
   // Documentos financieros imputados al proyecto
   hojasDeGastos            HojaDeGastos[]
   ordenesCompra            OrdenCompra[]
+  cuentasPorCobrar         CuentaPorCobrar[]
+  cuentasPorPagar          CuentaPorPagar[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1368,19 +1372,64 @@ model RecursoComposicion {
 }
 
 model Valorizacion {
-  id            String   @id
-  proyectoId    String
-  nombre        String
-  descripcion   String?
-  periodoInicio DateTime
-  periodoFin    DateTime
-  estado        String   @default("pendiente")
-  montoTotal    Float
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime
-  proyecto      Proyecto @relation(fields: [proyectoId], references: [id])
+  id                          String              @id @default(cuid())
+  proyectoId                  String
+  numero                      Int                 // secuencial por proyecto: 1, 2, 3...
+  codigo                      String              @unique // "{codigoProyecto}-VAL-{numero}"
+  periodoInicio               DateTime
+  periodoFin                  DateTime
+  moneda                      String              @default("PEN")
+  tipoCambio                  Float?
+  // Montos de avance
+  presupuestoContractual      Float               // monto total del contrato
+  acumuladoAnterior           Float               @default(0) // calculado: SUM valorizaciones anteriores
+  montoValorizacion           Float               // monto de esta valorización
+  acumuladoActual             Float               @default(0) // calculado: acumuladoAnterior + montoValorizacion
+  saldoPorValorizar           Float               @default(0) // calculado: presupuestoContractual - acumuladoActual
+  porcentajeAvance            Float               @default(0) // calculado: acumuladoActual / presupuestoContractual * 100
+  // Montos financieros
+  descuentoComercialPorcentaje Float              @default(0)
+  descuentoComercialMonto     Float               @default(0) // calculado
+  adelantoPorcentaje          Float               @default(0)
+  adelantoMonto               Float               @default(0) // calculado
+  subtotal                    Float               @default(0) // calculado: montoValorizacion - descuento - adelanto
+  igvPorcentaje               Float               @default(18)
+  igvMonto                    Float               @default(0) // calculado
+  fondoGarantiaPorcentaje     Float               @default(0)
+  fondoGarantiaMonto          Float               @default(0) // calculado
+  netoARecibir                Float               @default(0) // calculado: subtotal + IGV - fondoGarantia
+  // Estado y fechas
+  estado                      EstadoValorizacion  @default(borrador)
+  fechaEnvio                  DateTime?
+  fechaAprobacion             DateTime?
+  observaciones               String?
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime
 
+  proyecto  Proyecto              @relation(fields: [proyectoId], references: [id])
+  adjuntos  ValorizacionAdjunto[]
+  cuentasPorCobrar CuentaPorCobrar[]
+
+  @@unique([proyectoId, numero])
+  @@index([proyectoId, estado])
+  @@index([estado, createdAt(sort: Desc)])
   @@map("valorizacion")
+}
+
+model ValorizacionAdjunto {
+  id              String   @id @default(cuid())
+  valorizacionId  String
+  nombreArchivo   String
+  urlArchivo      String
+  driveFileId     String?
+  tipoArchivo     String?  // "excel", "pdf"
+  tamano          Int?
+  createdAt       DateTime @default(now())
+
+  valorizacion Valorizacion @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
+
+  @@index([valorizacionId])
+  @@map("valorizacion_adjunto")
 }
 
 model VerificationToken {
@@ -2820,6 +2869,31 @@ enum TipoRecurso {
   cuadrilla
 }
 
+enum EstadoValorizacion {
+  borrador
+  enviada
+  aprobada_cliente
+  facturada
+  pagada
+  anulada
+}
+
+enum EstadoCuentaCobrar {
+  pendiente
+  parcial
+  pagada
+  vencida
+  anulada
+}
+
+enum EstadoCuentaPagar {
+  pendiente
+  parcial
+  pagada
+  vencida
+  anulada
+}
+
 model RoleSectionAccess {
   id         String   @id @default(cuid())
   role       Role
@@ -2990,9 +3064,10 @@ model OrdenCompra {
   centroCosto  CentroCosto?     @relation(fields: [centroCostoId], references: [id])
   pedidoEquipo PedidoEquipo?    @relation(fields: [pedidoEquipoId], references: [id])
   proyecto     Proyecto?        @relation(fields: [proyectoId], references: [id])
-  solicitante  User             @relation("OCsolicitante", fields: [solicitanteId], references: [id])
-  aprobador    User?            @relation("OCaprobador", fields: [aprobadorId], references: [id])
-  items        OrdenCompraItem[]
+  solicitante     User              @relation("OCsolicitante", fields: [solicitanteId], references: [id])
+  aprobador       User?             @relation("OCaprobador", fields: [aprobadorId], references: [id])
+  items           OrdenCompraItem[]
+  cuentasPorPagar CuentaPorPagar[]
 
   @@index([proveedorId, estado])
   @@index([centroCostoId, estado])
@@ -3021,4 +3096,128 @@ model OrdenCompraItem {
 
   @@index([ordenCompraId])
   @@map("orden_compra_item")
+}
+
+// ======================
+// 🏦 Cuentas Bancarias, CxC, CxP
+// ======================
+
+model CuentaBancaria {
+  id            String   @id @default(cuid())
+  nombreBanco   String
+  numeroCuenta  String
+  cci           String?
+  tipo          String   @default("corriente") // corriente, ahorro
+  moneda        String   @default("PEN")       // PEN, USD
+  activa        Boolean  @default(true)
+  descripcion   String?                        // alias: "BCP Soles Operaciones"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+
+  pagosCobro PagoCobro[]
+  pagosPagar PagoPagar[]
+
+  @@index([activa, moneda])
+  @@map("cuenta_bancaria")
+}
+
+model CuentaPorCobrar {
+  id                String             @id @default(cuid())
+  proyectoId        String
+  clienteId         String
+  valorizacionId    String?
+  numeroDocumento   String?            // número de factura emitida
+  descripcion       String?
+  monto             Float
+  moneda            String             @default("PEN")
+  tipoCambio        Float?
+  montoPagado       Float              @default(0) // calculado: SUM(pagosCobro.monto)
+  saldoPendiente    Float              @default(0) // calculado: monto - montoPagado
+  fechaEmision      DateTime
+  fechaVencimiento  DateTime
+  estado            EstadoCuentaCobrar @default(pendiente)
+  observaciones     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime
+
+  proyecto     Proyecto      @relation(fields: [proyectoId], references: [id])
+  cliente      Cliente       @relation(fields: [clienteId], references: [id])
+  valorizacion Valorizacion? @relation(fields: [valorizacionId], references: [id])
+  pagos        PagoCobro[]
+
+  @@index([proyectoId, estado])
+  @@index([clienteId, estado])
+  @@index([estado, fechaVencimiento])
+  @@map("cuenta_por_cobrar")
+}
+
+model PagoCobro {
+  id                 String   @id @default(cuid())
+  cuentaPorCobrarId  String
+  cuentaBancariaId   String?
+  monto              Float
+  fechaPago          DateTime
+  medioPago          String   @default("transferencia") // transferencia, cheque, efectivo, detraccion
+  numeroOperacion    String?
+  observaciones      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+
+  cuentaPorCobrar CuentaPorCobrar @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
+  cuentaBancaria  CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+
+  @@index([cuentaPorCobrarId])
+  @@index([fechaPago])
+  @@map("pago_cobro")
+}
+
+model CuentaPorPagar {
+  id                String             @id @default(cuid())
+  proveedorId       String
+  proyectoId        String?
+  ordenCompraId     String?
+  numeroFactura     String?            // número de factura del proveedor
+  descripcion       String?
+  monto             Float
+  moneda            String             @default("PEN")
+  tipoCambio        Float?
+  montoPagado       Float              @default(0) // calculado: SUM(pagosPagar.monto)
+  saldoPendiente    Float              @default(0) // calculado: monto - montoPagado
+  fechaRecepcion    DateTime
+  fechaVencimiento  DateTime
+  condicionPago     String             @default("contado") // contado, 15 dias, 30 dias, 60 dias
+  estado            EstadoCuentaPagar  @default(pendiente)
+  observaciones     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime
+
+  proveedor   Proveedor    @relation(fields: [proveedorId], references: [id])
+  proyecto    Proyecto?    @relation(fields: [proyectoId], references: [id])
+  ordenCompra OrdenCompra? @relation(fields: [ordenCompraId], references: [id])
+  pagos       PagoPagar[]
+
+  @@index([proveedorId, estado])
+  @@index([proyectoId, estado])
+  @@index([estado, fechaVencimiento])
+  @@map("cuenta_por_pagar")
+}
+
+model PagoPagar {
+  id                String   @id @default(cuid())
+  cuentaPorPagarId  String
+  cuentaBancariaId  String?
+  monto             Float
+  fechaPago         DateTime
+  medioPago         String   @default("transferencia") // transferencia, cheque, efectivo
+  numeroOperacion   String?
+  observaciones     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+
+  cuentaPorPagar CuentaPorPagar  @relation(fields: [cuentaPorPagarId], references: [id], onDelete: Cascade)
+  cuentaBancaria CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+
+  @@index([cuentaPorPagarId])
+  @@index([fechaPago])
+  @@map("pago_pagar")
 }
