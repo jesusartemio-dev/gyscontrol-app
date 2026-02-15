@@ -858,9 +858,8 @@ model Proyecto {
   registrosCampo           RegistroHorasCampo[]
   proyectoCondicion        ProyectoCondicion[]
   proyectoExclusion        ProyectoExclusion[]
-  // Anticipos y rendiciones
-  solicitudesAnticipo      SolicitudAnticipo[]
-  rendicionesGasto         RendicionGasto[]
+  // Centro de costo y hojas de gastos
+  centroCosto              CentroCosto?
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1267,11 +1266,9 @@ model User {
   // Descuentos cotización
   cotizacionDescuentosSolicitados       Cotizacion[]                 @relation("CotizacionDescuentoSolicitante")
   cotizacionDescuentosAprobados         Cotizacion[]                 @relation("CotizacionDescuentoAprobador")
-  // Anticipos y rendiciones
-  anticiposSolicitados                  SolicitudAnticipo[]          @relation("AnticipoSolicitante")
-  anticiposAprobados                    SolicitudAnticipo[]          @relation("AnticipoAprobador")
-  rendicionesComoEmpleado               RendicionGasto[]             @relation("RendicionEmpleado")
-  rendicionesComoAprobador              RendicionGasto[]             @relation("RendicionAprobador")
+  // Hojas de gastos
+  hojasComoEmpleado                     HojaDeGastos[]               @relation("HojaEmpleado")
+  hojasComoAprobador                    HojaDeGastos[]               @relation("HojaAprobador")
 
   @@map("user")
 }
@@ -2821,71 +2818,64 @@ model RoleSectionAccess {
 }
 
 // ======================
-// 💰 Anticipos y Rendiciones de Gastos
+// 💰 Centro de Costo y Hojas de Gastos
 // ======================
 
-model SolicitudAnticipo {
+model CentroCosto {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  tipo        String   // "proyecto" | "departamento" | "administrativo"
+  descripcion String?
+  activo      Boolean  @default(true)
+  proyectoId  String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  proyecto Proyecto?      @relation(fields: [proyectoId], references: [id])
+  hojas    HojaDeGastos[]
+
+  @@index([tipo, activo])
+  @@map("centro_costo")
+}
+
+model HojaDeGastos {
   id                String    @id @default(cuid())
   numero            String    @unique
-  proyectoId        String
-  solicitanteId     String
+  centroCostoId     String
+  empleadoId        String
   aprobadorId       String?
-  monto             Float
-  moneda            String    @default("PEN")
   motivo            String
-  fechaInicio       DateTime?
-  fechaFin          DateTime?
+  observaciones     String?
+  requiereAnticipo  Boolean   @default(false)
   estado            String    @default("borrador")
+  rechazadoEn       String?
   comentarioRechazo String?
-  fechaSolicitud    DateTime  @default(now())
+  montoAnticipo     Float     @default(0)
+  montoDepositado   Float     @default(0)
+  montoGastado      Float     @default(0)
+  saldo             Float     @default(0)
+  fechaEnvio        DateTime?
   fechaAprobacion   DateTime?
-  fechaPago         DateTime?
-  montoLiquidado    Float     @default(0)
-  montoPendiente    Float     @default(0)
+  fechaDeposito     DateTime?
+  fechaRendicion    DateTime?
+  fechaValidacion   DateTime?
+  fechaCierre       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime
 
-  proyecto    Proyecto         @relation(fields: [proyectoId], references: [id])
-  solicitante User             @relation("AnticipoSolicitante", fields: [solicitanteId], references: [id])
-  aprobador   User?            @relation("AnticipoAprobador", fields: [aprobadorId], references: [id])
-  rendiciones RendicionGasto[]
+  centroCosto CentroCosto @relation(fields: [centroCostoId], references: [id])
+  empleado    User        @relation("HojaEmpleado", fields: [empleadoId], references: [id])
+  aprobador   User?       @relation("HojaAprobador", fields: [aprobadorId], references: [id])
+  lineas      GastoLinea[]
 
-  @@index([proyectoId, estado])
-  @@index([solicitanteId, estado])
-  @@map("solicitud_anticipo")
-}
-
-model RendicionGasto {
-  id                  String             @id @default(cuid())
-  numero              String             @unique
-  solicitudAnticipoId String?
-  proyectoId          String
-  empleadoId          String
-  aprobadorId         String?
-  estado              String             @default("borrador")
-  montoTotal          Float              @default(0)
-  comentarioRechazo   String?
-  observaciones       String?
-  fechaEnvio          DateTime?
-  fechaAprobacion     DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime
-
-  solicitudAnticipo SolicitudAnticipo? @relation(fields: [solicitudAnticipoId], references: [id])
-  proyecto          Proyecto           @relation(fields: [proyectoId], references: [id])
-  empleado          User               @relation("RendicionEmpleado", fields: [empleadoId], references: [id])
-  aprobador         User?              @relation("RendicionAprobador", fields: [aprobadorId], references: [id])
-  lineas            GastoLinea[]
-
-  @@index([proyectoId, estado])
+  @@index([centroCostoId, estado])
   @@index([empleadoId, estado])
-  @@index([solicitudAnticipoId])
-  @@map("rendicion_gasto")
+  @@map("hoja_de_gastos")
 }
 
 model GastoLinea {
   id                String          @id @default(cuid())
-  rendicionGastoId  String
+  hojaDeGastosId    String
   categoriaGastoId  String?
   descripcion       String
   fecha             DateTime
@@ -2899,11 +2889,11 @@ model GastoLinea {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime
 
-  rendicionGasto RendicionGasto  @relation(fields: [rendicionGastoId], references: [id], onDelete: Cascade)
+  hojaDeGastos   HojaDeGastos    @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
   categoriaGasto CategoriaGasto? @relation(fields: [categoriaGastoId], references: [id])
   adjuntos       GastoAdjunto[]
 
-  @@index([rendicionGastoId])
+  @@index([hojaDeGastosId])
   @@map("gasto_linea")
 }
 

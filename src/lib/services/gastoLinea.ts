@@ -6,9 +6,9 @@ import type {
 
 const BASE_URL = '/api/gasto-linea'
 
-export async function getGastoLineas(rendicionGastoId: string): Promise<GastoLinea[]> {
+export async function getGastoLineas(hojaDeGastosId: string): Promise<GastoLinea[]> {
   try {
-    const res = await fetch(`${BASE_URL}?rendicionGastoId=${rendicionGastoId}`)
+    const res = await fetch(`${BASE_URL}?hojaDeGastosId=${hojaDeGastosId}`)
     if (!res.ok) {
       const { error } = await res.json()
       throw new Error(error || 'Error al obtener líneas de gasto')

@@ -12,6 +12,7 @@ export const SECTION_KEYS = [
   'supervision',
   'logistica',
   'aprovisionamiento',
+  'finanzas',
   'gestion',
   'configuracion',
 ] as const
@@ -27,6 +28,7 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   supervision: 'Supervisión',
   logistica: 'Logística',
   aprovisionamiento: 'Aprovisionamiento',
+  finanzas: 'Mis Gastos',
   gestion: 'Gestión',
   configuracion: 'Configuración',
 }
@@ -48,16 +50,16 @@ export type RoleKey = (typeof ALL_ROLES)[number]
 
 // Mapeo por defecto (fallback) basado en la config hardcodeada actual del Sidebar
 export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
-  admin: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gestion', 'configuracion'],
-  gerente: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gestion', 'configuracion'],
-  gestor: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'aprovisionamiento', 'gestion'],
-  coordinador: ['proyectos', 'documentos', 'mi-trabajo', 'supervision'],
-  proyectos: ['proyectos', 'documentos', 'mi-trabajo', 'supervision'],
+  admin: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'finanzas', 'gestion', 'configuracion'],
+  gerente: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'finanzas', 'gestion', 'configuracion'],
+  gestor: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'aprovisionamiento', 'finanzas', 'gestion'],
+  coordinador: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'finanzas'],
+  proyectos: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'finanzas'],
   seguridad: ['mi-trabajo'],
   comercial: ['comercial', 'crm', 'documentos', 'mi-trabajo'],
   presupuestos: ['comercial', 'mi-trabajo'],
-  logistico: ['logistica', 'documentos', 'mi-trabajo'],
-  colaborador: ['mi-trabajo'],
+  logistico: ['logistica', 'documentos', 'mi-trabajo', 'finanzas'],
+  colaborador: ['mi-trabajo', 'finanzas'],
 }
 
 // Mapeo de prefijos de ruta a sectionKey (para middleware)
@@ -69,7 +71,9 @@ export const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   '/mi-trabajo': 'mi-trabajo',
   '/supervision': 'supervision',
   '/logistica': 'logistica',
-  '/finanzas': 'aprovisionamiento',
+  '/finanzas/aprovisionamiento': 'aprovisionamiento',
+  '/finanzas/requerimientos': 'finanzas',
+  '/finanzas/dashboard': 'aprovisionamiento',
   '/gestion': 'gestion',
   '/configuracion': 'configuracion',
   '/catalogo': 'configuracion',

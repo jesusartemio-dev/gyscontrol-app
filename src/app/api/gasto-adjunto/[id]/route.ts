@@ -15,7 +15,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       where: { id },
       include: {
         gastoLinea: {
-          include: { rendicionGasto: { select: { estado: true } } },
+          include: { hojaDeGastos: { select: { estado: true } } },
         },
       },
     })
@@ -24,8 +24,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: 'Adjunto no encontrado' }, { status: 404 })
     }
 
-    if (!['borrador', 'rechazado'].includes(existing.gastoLinea.rendicionGasto.estado)) {
-      return NextResponse.json({ error: 'Solo se pueden eliminar adjuntos de una rendición en estado borrador o rechazado' }, { status: 400 })
+    if (!['borrador', 'rechazado', 'aprobado', 'depositado'].includes(existing.gastoLinea.hojaDeGastos.estado)) {
+      return NextResponse.json({ error: 'No se pueden eliminar adjuntos en este estado' }, { status: 400 })
     }
 
     await prisma.gastoAdjunto.delete({ where: { id } })

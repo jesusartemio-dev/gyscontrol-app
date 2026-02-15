@@ -19,8 +19,6 @@ import {
   CheckSquare,
   CheckCircle,
   FileWarning,
-  Banknote,
-  FileCheck2,
 } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -292,31 +290,6 @@ export default function ProyectoHubPage() {
         { label: 'Completadas', value: cronogramaStats.tareasCompletadas },
       ],
       cobertura: progresoTareas,
-    },
-    // Row 4 — Financiero
-    {
-      id: 'anticipos',
-      title: 'Anticipos',
-      description: 'Solicitudes de anticipo de dinero',
-      icon: Banknote,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      hoverBg: 'hover:bg-blue-50',
-      borderColor: 'border-blue-200',
-      href: `${baseUrl}/anticipos`,
-      stats: [],
-    },
-    {
-      id: 'rendiciones',
-      title: 'Rendiciones',
-      description: 'Rendición de gastos y comprobantes',
-      icon: FileCheck2,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-      hoverBg: 'hover:bg-orange-50',
-      borderColor: 'border-orange-200',
-      href: `${baseUrl}/rendiciones`,
-      stats: [],
     },
   ]
 

@@ -1308,40 +1308,47 @@ export interface CreateProyectoEdtPayload {
 }
 
 // ======================
-// Anticipos y Rendiciones
+// Centro de Costo
 // ======================
 
-export interface SolicitudAnticipoPayload {
-  proyectoId: string
-  solicitanteId: string
-  monto: number
-  moneda?: string
+export interface CentroCostoPayload {
+  nombre: string
+  tipo: 'proyecto' | 'departamento' | 'administrativo'
+  descripcion?: string
+  activo?: boolean
+  proyectoId?: string
+}
+
+export interface CentroCostoUpdatePayload {
+  nombre?: string
+  tipo?: string
+  descripcion?: string | null
+  activo?: boolean
+  proyectoId?: string | null
+}
+
+// ======================
+// Hoja de Gastos
+// ======================
+
+export interface HojaDeGastosPayload {
+  centroCostoId: string
+  empleadoId?: string
   motivo: string
-  fechaInicio?: string
-  fechaFin?: string
+  observaciones?: string
+  requiereAnticipo?: boolean
+  montoAnticipo?: number
 }
 
-export interface SolicitudAnticipoUpdatePayload {
-  monto?: number
-  moneda?: string
+export interface HojaDeGastosUpdatePayload {
   motivo?: string
-  fechaInicio?: string | null
-  fechaFin?: string | null
-}
-
-export interface RendicionGastoPayload {
-  solicitudAnticipoId?: string
-  proyectoId: string
-  empleadoId: string
-  observaciones?: string
-}
-
-export interface RendicionGastoUpdatePayload {
-  observaciones?: string
+  observaciones?: string | null
+  requiereAnticipo?: boolean
+  montoAnticipo?: number
 }
 
 export interface GastoLineaPayload {
-  rendicionGastoId: string
+  hojaDeGastosId: string
   categoriaGastoId?: string
   descripcion: string
   fecha: string

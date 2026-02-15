@@ -44,7 +44,7 @@ const TIPOS_COMPROBANTE = [
 ]
 
 interface GastoLineaTableProps {
-  rendicionGastoId: string
+  hojaDeGastosId: string
   lineas: GastoLinea[]
   categorias: CategoriaGasto[]
   editable: boolean
@@ -52,7 +52,7 @@ interface GastoLineaTableProps {
 }
 
 export default function GastoLineaTable({
-  rendicionGastoId,
+  hojaDeGastosId,
   lineas,
   categorias,
   editable,
@@ -126,7 +126,7 @@ export default function GastoLineaTable({
         toast.success('Línea actualizada')
       } else {
         await createGastoLinea({
-          rendicionGastoId,
+          hojaDeGastosId,
           descripcion: descripcion.trim(),
           fecha,
           monto: parseFloat(monto),

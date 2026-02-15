@@ -2430,54 +2430,66 @@ export interface CalendarioLaboral {
 }
 
 // ======================
-// Anticipos y Rendiciones
+// Centro de Costo
 // ======================
 
-export interface SolicitudAnticipo {
+export type CentroCostoTipo = 'proyecto' | 'departamento' | 'administrativo'
+
+export interface CentroCosto {
   id: string
-  numero: string
-  proyectoId: string
-  solicitanteId: string
-  aprobadorId?: string | null
-  monto: number
-  moneda: string
-  motivo: string
-  fechaInicio?: string | null
-  fechaFin?: string | null
-  estado: string
-  comentarioRechazo?: string | null
-  fechaSolicitud: string
-  fechaAprobacion?: string | null
-  fechaPago?: string | null
-  montoLiquidado: number
-  montoPendiente: number
+  nombre: string
+  tipo: CentroCostoTipo
+  descripcion?: string | null
+  activo: boolean
+  proyectoId?: string | null
   createdAt: string
   updatedAt: string
   // Relations
-  proyecto?: Proyecto
-  solicitante?: { id: string; name: string | null; email: string }
-  aprobador?: { id: string; name: string | null; email: string } | null
-  rendiciones?: RendicionGasto[]
+  proyecto?: Proyecto | null
 }
 
-export interface RendicionGasto {
+// ======================
+// Hoja de Gastos
+// ======================
+
+export type HojaDeGastosEstado =
+  | 'borrador'
+  | 'enviado'
+  | 'aprobado'
+  | 'depositado'
+  | 'rendido'
+  | 'validado'
+  | 'cerrado'
+  | 'rechazado'
+
+export type RechazoEtapa = 'aprobacion' | 'validacion' | 'cierre'
+
+export interface HojaDeGastos {
   id: string
   numero: string
-  solicitudAnticipoId?: string | null
-  proyectoId: string
+  centroCostoId: string
   empleadoId: string
   aprobadorId?: string | null
-  estado: string
-  montoTotal: number
-  comentarioRechazo?: string | null
+  motivo: string
   observaciones?: string | null
+  requiereAnticipo: boolean
+  estado: HojaDeGastosEstado
+  rechazadoEn?: RechazoEtapa | null
+  comentarioRechazo?: string | null
+  montoAnticipo: number
+  montoDepositado: number
+  montoGastado: number
+  saldo: number
   fechaEnvio?: string | null
   fechaAprobacion?: string | null
+  fechaDeposito?: string | null
+  fechaRendicion?: string | null
+  fechaValidacion?: string | null
+  fechaCierre?: string | null
   createdAt: string
   updatedAt: string
   // Relations
-  solicitudAnticipo?: SolicitudAnticipo | null
-  proyecto?: Proyecto
+  centroCosto?: CentroCosto
   empleado?: { id: string; name: string | null; email: string }
   aprobador?: { id: string; name: string | null; email: string } | null
   lineas?: GastoLinea[]
@@ -2485,7 +2497,7 @@ export interface RendicionGasto {
 
 export interface GastoLinea {
   id: string
-  rendicionGastoId: string
+  hojaDeGastosId: string
   categoriaGastoId?: string | null
   descripcion: string
   fecha: string

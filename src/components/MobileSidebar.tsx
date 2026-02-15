@@ -32,6 +32,7 @@ import {
   Calculator,
   User,
   LogOut,
+  CreditCard,
   DollarSign,
   TrendingUp,
   PackageCheck,
@@ -73,6 +74,7 @@ export default function MobileSidebar() {
     supervision: false,
     logistica: false,
     aprovisionamiento: false,
+    finanzas: false,
     gestion: false,
   })
 
@@ -191,6 +193,16 @@ export default function MobileSidebar() {
       ],
     },
     {
+      key: 'finanzas',
+      title: 'Mis Gastos',
+      icon: Receipt,
+      color: 'text-amber-400',
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico'],
+      links: [
+        { href: '/finanzas/requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
+      ],
+    },
+    {
       key: 'gestion',
       title: 'Gestión',
       icon: BarChart3,
@@ -232,6 +244,7 @@ export default function MobileSidebar() {
         { href: '/configuracion/fases', label: 'Fases por Defecto', icon: GitBranch },
         { href: '/configuracion/duraciones-cronograma', label: 'Duraciones Cronograma', icon: Calendar },
         { href: '/configuracion/calendario-laboral', label: 'Calendarios Laborales', icon: Calendar },
+        { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
       ],
     },
   ]

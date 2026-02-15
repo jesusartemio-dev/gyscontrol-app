@@ -4,15 +4,17 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { uploadFile, createFolder, getSharedDriveId } from '@/lib/services/googleDrive'
 
-// Buscar o crear carpeta de comprobantes para el proyecto
-async function getOrCreateComprobantesFolder(proyectoId: string): Promise<string> {
-  const proyecto = await prisma.proyecto.findUnique({
-    where: { id: proyectoId },
-    select: { codigo: true, nombre: true },
+// Buscar o crear carpeta de comprobantes
+async function getOrCreateComprobantesFolder(centroCostoId: string): Promise<string> {
+  const centroCosto = await prisma.centroCosto.findUnique({
+    where: { id: centroCostoId },
+    include: { proyecto: { select: { codigo: true, nombre: true } } },
   })
 
   const parentId = getSharedDriveId()
-  const folderName = `Comprobantes_${proyecto?.codigo || proyectoId}`
+  const folderName = centroCosto?.proyecto
+    ? `Comprobantes_${centroCosto.proyecto.codigo}`
+    : `Comprobantes_${centroCosto?.nombre || centroCostoId}`
 
   const folder = await createFolder({ parentId, folderName })
   return folder.id!
@@ -36,20 +38,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'gastoLineaId requerido' }, { status: 400 })
     }
 
-    // Validar que la línea existe y la rendición está en estado editable
+    // Validar que la línea existe y la hoja está en estado editable
     const linea = await prisma.gastoLinea.findUnique({
       where: { id: gastoLineaId },
-      include: { rendicionGasto: { select: { estado: true, proyectoId: true } } },
+      include: { hojaDeGastos: { select: { estado: true, centroCostoId: true } } },
     })
     if (!linea) {
       return NextResponse.json({ error: 'Línea de gasto no encontrada' }, { status: 404 })
     }
-    if (!['borrador', 'rechazado'].includes(linea.rendicionGasto.estado)) {
-      return NextResponse.json({ error: 'Solo se pueden agregar adjuntos a una rendición en estado borrador o rechazado' }, { status: 400 })
+    if (!['borrador', 'rechazado', 'aprobado', 'depositado'].includes(linea.hojaDeGastos.estado)) {
+      return NextResponse.json({ error: 'No se pueden agregar adjuntos en este estado' }, { status: 400 })
     }
 
     // Subir a Google Drive
-    const folderId = await getOrCreateComprobantesFolder(linea.rendicionGasto.proyectoId)
+    const folderId = await getOrCreateComprobantesFolder(linea.hojaDeGastos.centroCostoId)
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 

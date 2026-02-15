@@ -74,6 +74,7 @@ export default function Sidebar() {
     supervision: false,
     logistica: false,
     aprovisionamiento: false,
+    finanzas: false,
     gestion: false,
   })
 
@@ -244,6 +245,17 @@ export default function Sidebar() {
         { href: '/finanzas/aprovisionamiento/timeline', label: 'Timeline', icon: Clock },
       ],
     },
+    // 4.1. Mis Gastos - Requerimientos de dinero
+    {
+      key: 'finanzas',
+      title: 'Mis Gastos',
+      icon: Receipt,
+      color: 'text-amber-400',
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'logistico'],
+      links: [
+        { href: '/finanzas/requerimientos', label: 'Mis Requerimientos', icon: CreditCard },
+      ],
+    },
     // 5. Gestión - Análisis y control
     {
       key: 'gestion',
@@ -299,6 +311,8 @@ export default function Sidebar() {
         { href: '/configuracion/calendario-laboral', label: 'Calendarios Laborales', icon: Calendar },
         // ⚠️ Tipos de bloqueo para jornadas de campo
         { href: '/configuracion/tipos-bloqueo', label: 'Tipos de Bloqueo', icon: ShieldAlert },
+        // 💰 Centros de costo
+        { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
       ],
     },
   ]

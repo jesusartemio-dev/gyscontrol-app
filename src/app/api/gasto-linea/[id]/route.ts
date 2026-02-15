@@ -32,13 +32,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const existing = await prisma.gastoLinea.findUnique({
       where: { id },
-      include: { rendicionGasto: true },
+      include: { hojaDeGastos: true },
     })
     if (!existing) {
       return NextResponse.json({ error: 'Línea de gasto no encontrada' }, { status: 404 })
     }
-    if (!['borrador', 'rechazado'].includes(existing.rendicionGasto.estado)) {
-      return NextResponse.json({ error: 'Solo se pueden editar líneas de una rendición en estado borrador o rechazado' }, { status: 400 })
+    if (!['borrador', 'rechazado', 'aprobado', 'depositado'].includes(existing.hojaDeGastos.estado)) {
+      return NextResponse.json({ error: 'No se pueden editar líneas en este estado' }, { status: 400 })
     }
 
     const updateData: any = { updatedAt: new Date() }
@@ -59,16 +59,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       include: { adjuntos: true, categoriaGasto: true },
     })
 
-    // Recalcular montoTotal si cambió el monto
+    // Recalcular montoGastado si cambió el monto
     if (payload.monto !== undefined) {
       const totalResult = await prisma.gastoLinea.aggregate({
-        where: { rendicionGastoId: existing.rendicionGastoId },
+        where: { hojaDeGastosId: existing.hojaDeGastosId },
         _sum: { monto: true },
       })
-      await prisma.rendicionGasto.update({
-        where: { id: existing.rendicionGastoId },
+      const montoGastado = totalResult._sum.monto || 0
+      await prisma.hojaDeGastos.update({
+        where: { id: existing.hojaDeGastosId },
         data: {
-          montoTotal: totalResult._sum.monto || 0,
+          montoGastado,
+          saldo: existing.hojaDeGastos.montoDepositado - montoGastado,
           updatedAt: new Date(),
         },
       })
@@ -91,26 +93,28 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const { id } = await params
     const existing = await prisma.gastoLinea.findUnique({
       where: { id },
-      include: { rendicionGasto: true },
+      include: { hojaDeGastos: true },
     })
     if (!existing) {
       return NextResponse.json({ error: 'Línea de gasto no encontrada' }, { status: 404 })
     }
-    if (!['borrador', 'rechazado'].includes(existing.rendicionGasto.estado)) {
-      return NextResponse.json({ error: 'Solo se pueden eliminar líneas de una rendición en estado borrador o rechazado' }, { status: 400 })
+    if (!['borrador', 'rechazado', 'aprobado', 'depositado'].includes(existing.hojaDeGastos.estado)) {
+      return NextResponse.json({ error: 'No se pueden eliminar líneas en este estado' }, { status: 400 })
     }
 
     await prisma.gastoLinea.delete({ where: { id } })
 
-    // Recalcular montoTotal
+    // Recalcular montoGastado
     const totalResult = await prisma.gastoLinea.aggregate({
-      where: { rendicionGastoId: existing.rendicionGastoId },
+      where: { hojaDeGastosId: existing.hojaDeGastosId },
       _sum: { monto: true },
     })
-    await prisma.rendicionGasto.update({
-      where: { id: existing.rendicionGastoId },
+    const montoGastado = totalResult._sum.monto || 0
+    await prisma.hojaDeGastos.update({
+      where: { id: existing.hojaDeGastosId },
       data: {
-        montoTotal: totalResult._sum.monto || 0,
+        montoGastado,
+        saldo: existing.hojaDeGastos.montoDepositado - montoGastado,
         updatedAt: new Date(),
       },
     })
