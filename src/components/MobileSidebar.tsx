@@ -57,7 +57,6 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Landmark,
-  List,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
 
@@ -150,7 +149,6 @@ export default function MobileSidebar() {
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
       links: [
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
-        { href: '/mi-trabajo/registros', label: 'Mis Registros', icon: List },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
         { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
