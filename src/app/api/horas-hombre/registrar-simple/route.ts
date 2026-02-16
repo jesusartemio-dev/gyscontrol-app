@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { randomUUID } from 'crypto';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot';
 
 export async function POST(request: NextRequest) {
   try {
@@ -116,6 +117,9 @@ export async function POST(request: NextRequest) {
                            proyectoServicio.edt?.nombre ||
                            'general';
 
+    // Snapshot del costo hora actual del empleado (PEN)
+    const costoHora = await obtenerCostoHoraPEN(usuarioId)
+
     const registroHoras = await prisma.registroHoras.create({
       data: {
         id: randomUUID(),
@@ -133,6 +137,7 @@ export async function POST(request: NextRequest) {
         proyectoEdtId: proyectoEdtId || undefined,
         edtId: proyectoEdt?.edtId || undefined,
         origen: 'oficina',
+        costoHora: costoHora || null,
         updatedAt: new Date()
       }
     });

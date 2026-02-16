@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot'
 
 export class ProgresoService {
 
@@ -294,6 +295,9 @@ export class ProgresoService {
       const edtId = await this.obtenerCategoriaServicioIdDesdeElemento(nivel, elementoId)
       const edtCatalogo = edtId ? await prisma.edt.findUnique({ where: { id: edtId } }) : null
 
+      // Snapshot del costo hora actual del empleado (PEN)
+      const costoHora = await obtenerCostoHoraPEN(usuarioId)
+
       // Crear registro de horas
       const registro = await prisma.registroHoras.create({
         data: {
@@ -312,6 +316,7 @@ export class ProgresoService {
           horasTrabajadas: horas,
           descripcion,
           aprobado: false, // Requiere aprobación
+          costoHora: costoHora || null,
           updatedAt: new Date()
         }
       })

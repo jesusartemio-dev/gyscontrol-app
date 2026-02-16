@@ -15,6 +15,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 import { ProgresoService } from '@/lib/services/progresoService'
+import { obtenerCostosHoraPENBatch } from '@/lib/utils/costoHoraSnapshot'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -127,6 +128,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
                           proyectoServicio.edt?.nombre ||
                           'campo'
 
+    // Snapshot del costo hora de todos los miembros de la cuadrilla
+    const todosUsuarioIds = [...new Set(
+      registro.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
+    )]
+    const costosHoraMap = await obtenerCostosHoraPENBatch(todosUsuarioIds)
+
     // Ejecutar transacción
     const resultado = await prisma.$transaction(async (tx) => {
       const registrosHorasCreados: string[] = []
@@ -165,6 +172,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
               proyectoTareaId: tarea.proyectoTareaId,
               origen: 'campo',
               ubicacion: registro.ubicacion,
+              costoHora: costosHoraMap.get(miembro.usuarioId) || null,
               updatedAt: new Date()
             }
           })

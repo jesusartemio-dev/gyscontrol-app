@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { z } from 'zod'
+import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot'
 
 const registrarHorasEstructuradoSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -166,6 +167,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Snapshot del costo hora actual del empleado (PEN)
+    const costoHora = await obtenerCostoHoraPEN(session.user.id)
+
     // Crear registro de horas estructurado
     const registroHoras = await prisma.registroHoras.create({
       data: {
@@ -186,6 +190,7 @@ export async function POST(request: NextRequest) {
         edtId: proyectoEdt.edtId, // Para análisis transversal
         origen: 'oficina',
         aprobado: false,
+        costoHora: costoHora || null,
         updatedAt: new Date()
       },
       include: {

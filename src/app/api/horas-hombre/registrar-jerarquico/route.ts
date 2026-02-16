@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
+import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot'
 
 const registrarJerarquicoSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -150,6 +151,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Snapshot del costo hora actual del empleado (PEN)
+    const costoHora = await obtenerCostoHoraPEN(session.user.id)
+
     // Crear registro de horas con información jerárquica
     const registroHoras = await prisma.registroHoras.create({
       data: {
@@ -165,6 +169,7 @@ export async function POST(request: NextRequest) {
         horasTrabajadas: horas,
         descripcion: `[EDT: ${edt.nombre}] [${elementoTipo.toUpperCase()}: ${elemento.nombre}] ${descripcion}`,
         origen: 'oficina', // Usar un valor válido existente
+        costoHora: costoHora || null,
         updatedAt: new Date()
       },
       include: {

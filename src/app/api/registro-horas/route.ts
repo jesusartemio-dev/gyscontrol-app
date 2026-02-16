@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { CreateRegistroHorasPayload } from '@/types/payloads';
 import { logger } from '@/lib/logger';
 import { validarRegistroHorasEdt } from '@/lib/validators/cronograma';
+import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot';
 
 // ✅ GET - Listar registros de horas con filtros EDT
 export async function GET(request: NextRequest) {
@@ -300,6 +301,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Snapshot del costo hora actual del empleado (PEN)
+    const costoHora = await obtenerCostoHoraPEN(data.usuarioId)
+
     // 🏗️ Crear registro de horas
     const nuevoRegistro = await prisma.registroHoras.create({
       data: {
@@ -320,6 +324,7 @@ export async function POST(request: NextRequest) {
         observaciones: data.observaciones,
         origen: 'oficina',
         ubicacion: 'Oficina',
+        costoHora: costoHora || null,
         updatedAt: new Date()
       },
       include: {

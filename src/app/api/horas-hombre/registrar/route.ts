@@ -11,6 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import { ProgresoService } from '@/lib/services/progresoService'
+import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot'
 
 const registrarHorasSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -142,6 +143,9 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
     }
 
     try {
+      // Snapshot del costo hora actual del empleado (PEN)
+      const costoHora = await obtenerCostoHoraPEN(session.user.id)
+
       // Crear registro de horas
       const registroHoras = await prisma.registroHoras.create({
         data: {
@@ -160,6 +164,7 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
           proyectoTareaId: tareaId || null,
           edtId: edtCatalogoId || null,
           origen: 'oficina',
+          costoHora: costoHora || null,
           updatedAt: new Date()
         },
         include: {
