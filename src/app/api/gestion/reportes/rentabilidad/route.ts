@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor']
 
@@ -16,6 +17,20 @@ function convertir(amount: number, fromMoneda: string, toMoneda: string, tipoCam
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
+// Calculate real hourly cost in PEN for an employee from their payroll data
+function costoHoraPEN(
+  emp: { sueldoPlanilla: number | null; sueldoHonorarios: number | null; asignacionFamiliar: number; emo: number },
+  horasMensuales: number
+): number {
+  const costos = calcularCostosLaborales({
+    sueldoPlanilla: emp.sueldoPlanilla || 0,
+    sueldoHonorarios: emp.sueldoHonorarios || 0,
+    asignacionFamiliar: emp.asignacionFamiliar || 0,
+    emo: emp.emo || 25,
+  })
+  return horasMensuales > 0 ? costos.totalMensual / horasMensuales : 0
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -29,22 +44,23 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const proyectoId = searchParams.get('proyectoId')
 
-    // Fallback exchange rate from system config
+    // System config: exchange rate + working hours
     const config = await prisma.configuracionGeneral.findFirst()
     const tcDefault = config ? Number(config.tipoCambio) : 3.75
+    const horasMes = config?.horasMensuales || 192
 
     if (proyectoId) {
-      return await getProyectoDetalle(proyectoId, tcDefault)
+      return await getProyectoDetalle(proyectoId, tcDefault, horasMes)
     }
-    return await getResumenTodos(tcDefault)
+    return await getResumenTodos(tcDefault, horasMes)
   } catch (error) {
     console.error('Error en reporte rentabilidad:', error)
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }
 
-async function getProyectoDetalle(proyectoId: string, tcDefault: number) {
-  const [proyecto, ocsByCurrency, serviciosRaw, gastosByCurrency] = await Promise.all([
+async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMes: number) {
+  const [proyecto, ocsByCurrency, horasPorUsuario, gastosByCurrency] = await Promise.all([
     prisma.proyecto.findUnique({
       where: { id: proyectoId },
       select: {
@@ -67,13 +83,12 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number) {
       where: { proyectoId, estado: { not: 'cancelada' } },
       _sum: { total: true },
     }),
-    // Servicios: costoHora assumed PEN (local labor)
-    prisma.$queryRaw<{ total: number }[]>`
-      SELECT COALESCE(SUM(rh."horasTrabajadas" * r."costoHora"), 0) as "total"
-      FROM registro_horas rh
-      JOIN recurso r ON rh."recursoId" = r."id"
-      WHERE rh."proyectoId" = ${proyectoId}
-    `,
+    // Hours grouped by user (to calculate per-employee cost)
+    prisma.registroHoras.groupBy({
+      by: ['usuarioId'],
+      where: { proyectoId },
+      _sum: { horasTrabajadas: true },
+    }),
     // Gastos grouped by GastoLinea.moneda
     prisma.$queryRaw<{ moneda: string; total: number }[]>`
       SELECT gl."moneda", COALESCE(SUM(gl."monto"), 0) as "total"
@@ -98,9 +113,8 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number) {
     costoEquipos += convertir(oc._sum.total || 0, oc.moneda, monedaProy, tc)
   }
 
-  // Servicios (costoHora in PEN) → convert to project currency
-  const serviciosRawTotal = Number(serviciosRaw[0]?.total || 0)
-  const costoServicios = convertir(serviciosRawTotal, 'PEN', monedaProy, tc)
+  // Calculate real service cost from employee payroll data
+  const costoServicios = await calcularCostoServiciosReal(horasPorUsuario, horasMes, monedaProy, tc)
 
   // Convert gastos by currency
   let costoGastos = 0
@@ -156,8 +170,8 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number) {
   })
 }
 
-async function getResumenTodos(tcDefault: number) {
-  const [proyectos, ocsByProyectoMoneda, serviciosPorProyecto, gastosByProyectoMoneda] = await Promise.all([
+async function getResumenTodos(tcDefault: number, horasMes: number) {
+  const [proyectos, ocsByProyectoMoneda, horasPorProyectoUsuario, gastosByProyectoMoneda] = await Promise.all([
     prisma.proyecto.findMany({
       where: { estado: { notIn: ['cancelado'] } },
       select: {
@@ -181,13 +195,11 @@ async function getResumenTodos(tcDefault: number) {
       where: { estado: { not: 'cancelada' }, proyectoId: { not: null } },
       _sum: { total: true },
     }),
-    // Servicios by project (costoHora in PEN)
-    prisma.$queryRaw<{ proyectoId: string; total: number }[]>`
-      SELECT rh."proyectoId", COALESCE(SUM(rh."horasTrabajadas" * r."costoHora"), 0) as "total"
-      FROM registro_horas rh
-      JOIN recurso r ON rh."recursoId" = r."id"
-      GROUP BY rh."proyectoId"
-    `,
+    // Hours grouped by proyectoId + usuarioId
+    prisma.registroHoras.groupBy({
+      by: ['proyectoId', 'usuarioId'],
+      _sum: { horasTrabajadas: true },
+    }),
     // Gastos grouped by proyectoId + moneda (from GastoLinea)
     prisma.$queryRaw<{ proyectoId: string; moneda: string; total: number }[]>`
       SELECT hdg."proyectoId", gl."moneda", COALESCE(SUM(gl."monto"), 0) as "total"
@@ -199,7 +211,29 @@ async function getResumenTodos(tcDefault: number) {
     `,
   ])
 
-  // Build maps: proyectoId → [{ moneda, total }]
+  // Fetch all empleado data for users with hours
+  const allUserIds = [...new Set(horasPorProyectoUsuario.map(h => h.usuarioId))]
+  const empleados = await prisma.empleado.findMany({
+    where: { userId: { in: allUserIds } },
+    select: {
+      userId: true,
+      sueldoPlanilla: true,
+      sueldoHonorarios: true,
+      asignacionFamiliar: true,
+      emo: true,
+    },
+  })
+  const empMap = new Map(empleados.map(e => [e.userId, e]))
+
+  // Build hours map: proyectoId → [{ usuarioId, horas }]
+  const horasMap = new Map<string, { usuarioId: string; horas: number }[]>()
+  for (const h of horasPorProyectoUsuario) {
+    const arr = horasMap.get(h.proyectoId) || []
+    arr.push({ usuarioId: h.usuarioId, horas: h._sum.horasTrabajadas || 0 })
+    horasMap.set(h.proyectoId, arr)
+  }
+
+  // Build OC map
   const ocMap = new Map<string, { moneda: string; total: number }[]>()
   for (const oc of ocsByProyectoMoneda) {
     if (!oc.proyectoId) continue
@@ -208,8 +242,7 @@ async function getResumenTodos(tcDefault: number) {
     ocMap.set(oc.proyectoId, arr)
   }
 
-  const serviciosMap = new Map(serviciosPorProyecto.map(s => [s.proyectoId, Number(s.total)]))
-
+  // Build gastos map
   const gastosMap = new Map<string, { moneda: string; total: number }[]>()
   for (const g of gastosByProyectoMoneda) {
     const arr = gastosMap.get(g.proyectoId) || []
@@ -228,9 +261,16 @@ async function getResumenTodos(tcDefault: number) {
       costoEquipos += convertir(oc.total, oc.moneda, monedaProy, tc)
     }
 
-    // Servicios (PEN) → project currency
-    const serviciosRaw = serviciosMap.get(p.id) || 0
-    const costoServicios = convertir(serviciosRaw, 'PEN', monedaProy, tc)
+    // Calculate real service cost per employee
+    let costoServicios = 0
+    for (const h of horasMap.get(p.id) || []) {
+      const emp = empMap.get(h.usuarioId)
+      if (emp) {
+        const costoPEN = costoHoraPEN(emp, horasMes)
+        costoServicios += h.horas * convertir(costoPEN, 'PEN', monedaProy, tc)
+      }
+      // Employees without payroll data → 0 cost (no fallback to avoid mixing)
+    }
 
     // Convert gastos
     let costoGastos = 0
@@ -265,4 +305,37 @@ async function getResumenTodos(tcDefault: number) {
   })
 
   return NextResponse.json({ proyectos: resumen })
+}
+
+// Shared helper: calculate real service cost from employee hours
+async function calcularCostoServiciosReal(
+  horasPorUsuario: { usuarioId: string; _sum: { horasTrabajadas: number | null } }[],
+  horasMes: number,
+  monedaProy: string,
+  tc: number
+): Promise<number> {
+  if (horasPorUsuario.length === 0) return 0
+
+  const userIds = horasPorUsuario.map(h => h.usuarioId)
+  const empleados = await prisma.empleado.findMany({
+    where: { userId: { in: userIds } },
+    select: {
+      userId: true,
+      sueldoPlanilla: true,
+      sueldoHonorarios: true,
+      asignacionFamiliar: true,
+      emo: true,
+    },
+  })
+  const empMap = new Map(empleados.map(e => [e.userId, e]))
+
+  let total = 0
+  for (const h of horasPorUsuario) {
+    const emp = empMap.get(h.usuarioId)
+    if (emp) {
+      const costoPEN = costoHoraPEN(emp, horasMes)
+      total += (h._sum.horasTrabajadas || 0) * convertir(costoPEN, 'PEN', monedaProy, tc)
+    }
+  }
+  return total
 }
