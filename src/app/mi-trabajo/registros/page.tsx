@@ -90,6 +90,9 @@ export default function MisRegistrosPage() {
   // Approval status map: semana → estado
   const [aprobacionesMapa, setAprobacionesMapa] = useState<Record<string, string>>({})
 
+  // Role check: supervisors can see cost
+  const esSupervisor = session?.user?.role && ['admin', 'gerente', 'gestor', 'coordinador'].includes(session.user.role)
+
   // Project list for filter
   const [proyectos, setProyectos] = useState<{ id: string; nombre: string; codigo: string }[]>([])
 
@@ -152,6 +155,7 @@ export default function MisRegistrosPage() {
       const params = new URLSearchParams()
       params.set('page', String(page))
       params.set('limit', '20')
+      params.set('soloMio', 'true')
       if (proyectoFiltro) params.set('proyectoId', proyectoFiltro)
       if (fechaDesde) params.set('fechaDesde', fechaDesde)
       if (fechaHasta) params.set('fechaHasta', fechaHasta)
@@ -248,7 +252,9 @@ export default function MisRegistrosPage() {
       return
     }
 
-    const headers = 'Fecha,Proyecto,EDT,Tarea,Horas,Descripción,Costo Hora (PEN),Origen'
+    const headers = esSupervisor
+      ? 'Fecha,Proyecto,EDT,Tarea,Horas,Descripción,Costo Hora (PEN),Origen'
+      : 'Fecha,Proyecto,EDT,Tarea,Horas,Descripción,Origen'
     const rows = registrosFiltrados.map(r => {
       const fecha = format(new Date(r.fechaTrabajo), 'dd/MM/yyyy')
       const proyecto = r.proyecto ? `${r.proyecto.codigo} - ${r.proyecto.nombre}` : ''
@@ -256,9 +262,12 @@ export default function MisRegistrosPage() {
       const tarea = r.proyectoTarea?.nombre || ''
       const horas = r.horasTrabajadas
       const desc = (r.descripcion || '').replace(/"/g, '""')
-      const costo = r.costoHora ? r.costoHora.toFixed(2) : ''
       const origen = r.origen || ''
-      return `"${fecha}","${proyecto}","${edt}","${tarea}",${horas},"${desc}",${costo},"${origen}"`
+      if (esSupervisor) {
+        const costo = r.costoHora ? r.costoHora.toFixed(2) : ''
+        return `"${fecha}","${proyecto}","${edt}","${tarea}",${horas},"${desc}",${costo},"${origen}"`
+      }
+      return `"${fecha}","${proyecto}","${edt}","${tarea}",${horas},"${desc}","${origen}"`
     })
 
     const BOM = '\uFEFF'
@@ -414,7 +423,7 @@ export default function MisRegistrosPage() {
                 <TableHead>Tarea</TableHead>
                 <TableHead className="text-right">Horas</TableHead>
                 <TableHead className="hidden md:table-cell">Descripción</TableHead>
-                <TableHead className="text-right hidden lg:table-cell">Costo/h</TableHead>
+                {esSupervisor && <TableHead className="text-right hidden lg:table-cell">Costo/h</TableHead>}
                 <TableHead className="hidden sm:table-cell">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -422,13 +431,13 @@ export default function MisRegistrosPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={esSupervisor ? 9 : 8} className="text-center py-8 text-muted-foreground">
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : registrosFiltrados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={esSupervisor ? 9 : 8} className="text-center py-8">
                     <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">
                       {tieneFiltros ? 'No se encontraron registros con los filtros aplicados' : 'No hay registros de horas'}
@@ -457,9 +466,11 @@ export default function MisRegistrosPage() {
                     <TableCell className="py-2 text-sm text-muted-foreground hidden md:table-cell max-w-[200px] truncate">
                       {r.descripcion || '-'}
                     </TableCell>
-                    <TableCell className="py-2 text-sm text-right text-muted-foreground hidden lg:table-cell">
-                      {r.costoHora ? `S/${r.costoHora.toFixed(2)}` : '-'}
-                    </TableCell>
+                    {esSupervisor && (
+                      <TableCell className="py-2 text-sm text-right text-muted-foreground hidden lg:table-cell">
+                        {r.costoHora ? `S/${r.costoHora.toFixed(2)}` : '-'}
+                      </TableCell>
+                    )}
                     <TableCell className="py-2 hidden sm:table-cell">
                       {getEstadoBadge(r.fechaTrabajo, r.origen)}
                     </TableCell>

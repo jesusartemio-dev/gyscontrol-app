@@ -52,8 +52,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 🔒 Restricciones por rol
-    if (!['admin', 'gerente'].includes(session.user.role)) {
-      // Los usuarios solo ven sus propios registros
+    // Si se pide "soloMio", siempre filtrar por el usuario logueado (para /mi-trabajo/registros)
+    if (searchParams.get('soloMio') === 'true') {
+      whereClause.usuarioId = session.user.id;
+    } else if (!['admin', 'gerente'].includes(session.user.role)) {
+      // Los usuarios normales solo ven sus propios registros
       whereClause.usuarioId = session.user.id;
     }
 
