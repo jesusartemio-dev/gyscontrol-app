@@ -73,6 +73,7 @@ const roles: RolUsuario[] = [
   'presupuestos',
   'logistico',
   'seguridad',
+  'administracion',
   'colaborador',
 ];
 
