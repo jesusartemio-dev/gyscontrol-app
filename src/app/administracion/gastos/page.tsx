@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Receipt, Search, X, Loader2, ChevronRight, Check, Banknote, FileCheck, XCircle, Lock,
+  Upload, Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -26,6 +27,8 @@ import {
   cerrarHoja,
   rechazarHoja,
 } from '@/lib/services/hojaDeGastos'
+import { exportarRendicionesAExcel } from '@/lib/utils/rendicionExcel'
+import RendicionImportExcelModal from '@/components/administracion/RendicionImportExcelModal'
 import type { HojaDeGastos } from '@/types'
 
 type TabFilter = 'todas' | 'enviado' | 'aprobado' | 'rendido' | 'validado' | 'cerrado' | 'rechazado'
@@ -95,13 +98,27 @@ function GestionGastosContent() {
   const [rechazoTarget, setRechazoTarget] = useState<HojaDeGastos | null>(null)
   const [comentarioRechazo, setComentarioRechazo] = useState('')
 
+  // Import/export state
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [proyectos, setProyectos] = useState<{ id: string; codigo: string; nombre: string }[]>([])
+  const [centrosCosto, setCentrosCosto] = useState<{ id: string; nombre: string; activo: boolean }[]>([])
+  const [empleados, setEmpleados] = useState<{ id: string; name: string | null; email: string }[]>([])
+
   useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
     try {
       setLoading(true)
-      const data = await getHojasDeGastos()
+      const [data, proyRes, ccRes, empRes] = await Promise.all([
+        getHojasDeGastos(),
+        fetch('/api/proyectos?fields=id,codigo,nombre').then(r => r.json()),
+        fetch('/api/centro-costo').then(r => r.json()),
+        fetch('/api/admin/usuarios').then(r => r.json()),
+      ])
       setHojas(data)
+      setProyectos(Array.isArray(proyRes) ? proyRes : proyRes.data || [])
+      setCentrosCosto(Array.isArray(ccRes) ? ccRes : ccRes.data || [])
+      setEmpleados(Array.isArray(empRes) ? empRes : empRes.data || [])
     } catch {
       toast.error('Error al cargar datos')
     } finally {
@@ -312,14 +329,36 @@ function GestionGastosContent() {
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <Receipt className="h-5 w-5 text-rose-600" />
-          Gestión de Gastos
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Administra todos los requerimientos de dinero
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-rose-600" />
+            Gestión de Gastos
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Administra todos los requerimientos de dinero
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => exportarRendicionesAExcel(hojas as any[])}
+            disabled={hojas.length === 0}
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Exportar
+          </Button>
+          <Button
+            size="sm"
+            className="h-8 text-xs bg-rose-600 hover:bg-rose-700"
+            onClick={() => setShowImportDialog(true)}
+          >
+            <Upload className="h-3.5 w-3.5 mr-1" />
+            Importar
+          </Button>
+        </div>
       </div>
 
       {/* Tab pills */}
@@ -524,6 +563,16 @@ function GestionGastosContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import Excel modal */}
+      <RendicionImportExcelModal
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        proyectos={proyectos}
+        centrosCosto={centrosCosto}
+        empleados={empleados}
+        onImported={loadData}
+      />
     </div>
   )
 }

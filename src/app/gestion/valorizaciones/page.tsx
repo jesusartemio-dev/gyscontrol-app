@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Check } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Check, Upload, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
+import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
+import { exportarValAExcel } from '@/lib/utils/valorizacionExcel'
 
 interface Proyecto {
   id: string
@@ -104,6 +106,8 @@ export default function ValorizacionesPage() {
   const [formTipoCambio, setFormTipoCambio] = useState('')
   const [showTipoCambio, setShowTipoCambio] = useState(false)
   const [formObservaciones, setFormObservaciones] = useState('')
+
+  const [showImportDialog, setShowImportDialog] = useState(false)
 
   // Estado transition dialog
   const [showEstadoDialog, setShowEstadoDialog] = useState(false)
@@ -291,10 +295,28 @@ export default function ValorizacionesPage() {
           <h1 className="text-2xl font-bold">Valorizaciones</h1>
           <p className="text-muted-foreground">Gestión de valorizaciones de todos los proyectos</p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Valorización
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportarValAExcel(filtered as any)}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Exportar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImportDialog(true)}
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            Importar
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Valorización
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -676,6 +698,13 @@ export default function ValorizacionesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ValorizacionImportExcelModal
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        proyectos={proyectos}
+        onImported={loadData}
+      />
     </div>
   )
 }
