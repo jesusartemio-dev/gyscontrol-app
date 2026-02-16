@@ -52,6 +52,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         costoInterno: true,
         costoCliente: true,
         nivelDificultad: true,
+        modoCalculo: true,
         orden: true,
         createdAt: true,
         updatedAt: true

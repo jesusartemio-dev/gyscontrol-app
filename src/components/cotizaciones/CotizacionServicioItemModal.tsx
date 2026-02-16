@@ -104,7 +104,7 @@ export default function CotizacionServicioItemModal({
     setFactorSeguridad(item.factorSeguridad ?? 1)
     setMargen(item.margen ?? 1.35)
     setNivelDificultad(item.nivelDificultad ?? 1)
-    setModoInverso(false)
+    setModoInverso(item.modoCalculo === 'inverso')
     setPrecioClienteInput(item.costoCliente ?? 0)
   }
 
@@ -173,6 +173,7 @@ export default function CotizacionServicioItemModal({
         horaTotal: calculados.horaTotal,
         costoInterno: calculados.costoInterno,
         costoCliente: calculados.costoCliente,
+        modoCalculo: modoInverso ? 'inverso' : 'normal',
       })
 
       toast.success('Servicio actualizado')

@@ -382,6 +382,7 @@ export interface CotizacionServicioItemPayload {
   costoInterno: number
   costoCliente: number
   nivelDificultad?: number
+  modoCalculo?: string
   orden?: number
 }
 

@@ -421,6 +421,7 @@ model CotizacionServicioItem {
   updatedAt            DateTime
   orden                Int?               @default(0)
   nivelDificultad      Int?               @default(1)
+  modoCalculo          String?            @default("normal")
   catalogoServicio     CatalogoServicio?  @relation(fields: [catalogoServicioId], references: [id])
   cotizacionServicio   CotizacionServicio @relation(fields: [cotizacionServicioId], references: [id], onDelete: Cascade)
   edt                  Edt                @relation("CotizacionServicioItemEdt", fields: [edtId], references: [id])

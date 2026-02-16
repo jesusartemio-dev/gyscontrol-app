@@ -921,6 +921,7 @@ export interface CotizacionServicioItem {
   costoInterno: number
   costoCliente: number
   nivelDificultad?: number
+  modoCalculo?: string
   orden?: number
   // Auditoría
   createdAt: string

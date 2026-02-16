@@ -198,7 +198,8 @@ export default function CotizacionServicioItemCreateModal({
         margen,
         costoInterno: calculados.costoInterno,
         costoCliente: calculados.costoCliente,
-        nivelDificultad
+        nivelDificultad,
+        modoCalculo: modoInverso ? 'inverso' : 'normal'
       }
 
       const createdItem = await createCotizacionServicioItem(payload)

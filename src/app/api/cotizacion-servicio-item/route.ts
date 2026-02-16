@@ -69,6 +69,7 @@ export async function POST(req: Request) {
         costoCliente: data.costoCliente,
         orden: data.orden ?? 0,
         nivelDificultad: data.nivelDificultad ?? 1,
+        modoCalculo: data.modoCalculo ?? 'normal',
         updatedAt: new Date(),
       }
     })
