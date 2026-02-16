@@ -199,9 +199,9 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
       links: [
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
+        { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
         { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
-        { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
       ]
     },
     // 2.2. Supervisión - Vista de equipo y análisis (solo supervisores)
@@ -212,15 +212,15 @@ export default function Sidebar() {
       color: 'text-red-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'],
       links: [
-        { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
-        { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
-        { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
+        { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
+        { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
+        { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
+        { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
+        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: MapPin },
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
-        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: MapPin },
-        { href: '/supervision/timesheet', label: 'Aprobar Horas', icon: ClipboardList },
       ]
     },
     // 3. Logística - Gestión completa de la cadena logística

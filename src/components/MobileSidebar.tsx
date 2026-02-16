@@ -48,7 +48,6 @@ import {
   Shield,
   UserCheck,
   MapPin,
-  ClipboardCheck,
   ClipboardList,
   HardDrive,
   HardHat,
@@ -149,9 +148,9 @@ export default function MobileSidebar() {
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico'],
       links: [
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar },
+        { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare },
         { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
-        { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
       ]
     },
     {
@@ -161,16 +160,15 @@ export default function MobileSidebar() {
       color: 'text-red-400',
       roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'],
       links: [
-        { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
-        { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
-        { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
+        { href: '/supervision/timesheet', label: 'Timesheet', icon: ClipboardList },
         { href: '/supervision/jornada-campo', label: 'Jornada Campo', icon: MapPin },
-        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: ClipboardCheck },
+        { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
+        { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
+        { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
+        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: MapPin },
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
-        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: MapPin },
-        { href: '/supervision/timesheet', label: 'Aprobar Horas', icon: ClipboardList },
       ]
     },
     {
