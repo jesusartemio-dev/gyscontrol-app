@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban } from 'lucide-react'
+import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface CuentaBancaria {
@@ -43,6 +43,14 @@ interface Proyecto {
 interface OrdenCompra {
   id: string
   numero: string
+  proveedorId: string
+  proyectoId: string | null
+  moneda: string
+  total: number
+  condicionPago: string
+  estado: string
+  proveedor?: { id: string; nombre: string }
+  proyecto?: { id: string; codigo: string; nombre: string } | null
 }
 
 interface CuentaPorPagar {
@@ -187,6 +195,14 @@ export default function CuentasPagarPage() {
       pagado: byMoneda(pagadas, 'monto'),
     }
   }, [items])
+
+  // OCs confirmadas/completadas sin CxP vinculada
+  const ocsSinFactura = useMemo(() => {
+    const ocIdsConCxP = new Set(items.filter(i => i.ordenCompraId && i.estado !== 'anulada').map(i => i.ordenCompraId))
+    return ordenesCompra.filter(oc =>
+      ['confirmada', 'completada'].includes(oc.estado) && !ocIdsConCxP.has(oc.id)
+    )
+  }, [items, ordenesCompra])
 
   const filtered = useMemo(() => {
     let result = items
@@ -419,6 +435,57 @@ export default function CuentasPagarPage() {
         </Card>
       </div>
 
+      {/* OCs sin factura registrada */}
+      {ocsSinFactura.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Package className="h-5 w-5 text-orange-600" />
+              <span className="font-medium text-orange-800">OCs sin factura registrada ({ocsSinFactura.length})</span>
+            </div>
+            <div className="space-y-2">
+              {ocsSinFactura.slice(0, 5).map(oc => (
+                <div key={oc.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-orange-100">
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="font-mono font-medium">{oc.numero}</span>
+                    <span className="text-muted-foreground">{oc.proveedor?.nombre}</span>
+                    {oc.proyecto && <Badge variant="outline" className="text-xs">{oc.proyecto.codigo}</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-medium">{formatCurrency(oc.total, oc.moneda)}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-orange-700 hover:text-orange-900 hover:bg-orange-100"
+                      onClick={() => {
+                        resetCreateForm()
+                        setCreateForm(f => ({
+                          ...f,
+                          ordenCompraId: oc.id,
+                          proveedorId: oc.proveedorId,
+                          monto: oc.total.toFixed(2),
+                          moneda: oc.moneda,
+                          proyectoId: oc.proyectoId || '',
+                          condicionPago: oc.condicionPago || 'contado',
+                          descripcion: `OC ${oc.numero}`,
+                        }))
+                        setShowCreateDialog(true)
+                      }}
+                    >
+                      Registrar factura
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {ocsSinFactura.length > 5 && (
+                <p className="text-xs text-orange-600 text-center">y {ocsSinFactura.length - 5} más...</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filtros */}
       <div className="flex gap-3 items-center flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -528,6 +595,42 @@ export default function CuentasPagarPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
+              <Label>Orden de Compra (opcional)</Label>
+              <Select value={createForm.ordenCompraId || 'none'} onValueChange={v => {
+                const ocId = v === 'none' ? '' : v
+                if (ocId) {
+                  const oc = ordenesCompra.find(o => o.id === ocId)
+                  if (oc) {
+                    setCreateForm(f => ({
+                      ...f,
+                      ordenCompraId: ocId,
+                      proveedorId: oc.proveedorId,
+                      monto: oc.total.toFixed(2),
+                      moneda: oc.moneda,
+                      proyectoId: oc.proyectoId || '',
+                      condicionPago: oc.condicionPago || 'contado',
+                      descripcion: f.descripcion || `OC ${oc.numero}`,
+                    }))
+                  }
+                } else {
+                  setCreateForm(f => ({ ...f, ordenCompraId: '' }))
+                }
+              }}>
+                <SelectTrigger><SelectValue placeholder="Sin OC" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin OC</SelectItem>
+                  {ordenesCompra.map(oc => (
+                    <SelectItem key={oc.id} value={oc.id}>
+                      {oc.numero} — {oc.proveedor?.nombre || 'Proveedor'} — {formatCurrency(oc.total, oc.moneda)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {createForm.ordenCompraId && (
+                <p className="text-xs text-blue-600 mt-1">Proveedor, monto, moneda y proyecto pre-llenados desde la OC. Puedes ajustarlos si la factura difiere.</p>
+              )}
+            </div>
+            <div>
               <Label>Proveedor *</Label>
               <Select value={createForm.proveedorId} onValueChange={v => setCreateForm(f => ({ ...f, proveedorId: v }))}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
@@ -587,18 +690,6 @@ export default function CuentasPagarPage() {
                   <SelectItem value="none">Sin proyecto</SelectItem>
                   {proyectos.map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.codigo} - {p.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Orden de Compra (opcional)</Label>
-              <Select value={createForm.ordenCompraId || 'none'} onValueChange={v => setCreateForm(f => ({ ...f, ordenCompraId: v === 'none' ? '' : v }))}>
-                <SelectTrigger><SelectValue placeholder="Sin OC" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin OC</SelectItem>
-                  {ordenesCompra.map(oc => (
-                    <SelectItem key={oc.id} value={oc.id}>{oc.numero}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
