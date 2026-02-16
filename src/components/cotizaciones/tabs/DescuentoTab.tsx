@@ -103,7 +103,7 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
                   Proponga un descuento porcentual sobre el total cliente. Requiere aprobación de gerencia.
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="porcentaje" className="flex items-center gap-2">
                       <Percent className="h-4 w-4" />
@@ -122,17 +122,28 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground text-sm">Vista previa del descuento</Label>
-                    <div className="h-9 flex items-center px-3 rounded-md border bg-muted text-sm font-mono">
+                    <Label className="text-muted-foreground text-sm">Descuento</Label>
+                    <div className="h-9 flex items-center px-3 rounded-md border bg-muted text-sm font-mono text-red-600">
                       {porcentaje > 0 ? (
                         <>
-                          {formatCurrency(montoPreview)}
+                          -{formatCurrency(montoPreview)}
                           <span className="text-muted-foreground ml-2">
-                            ({porcentaje}% de {formatCurrency(cotizacion.totalCliente)})
+                            ({porcentaje}%)
                           </span>
                         </>
                       ) : (
-                        <span className="text-muted-foreground">Ingrese un porcentaje</span>
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-sm">Total Final al Cliente</Label>
+                    <div className="h-9 flex items-center px-3 rounded-md border bg-green-50 border-green-200 text-sm font-mono font-semibold text-green-700">
+                      {porcentaje > 0 ? (
+                        formatCurrency(cotizacion.totalCliente - montoPreview)
+                      ) : (
+                        <span className="text-muted-foreground font-normal">{formatCurrency(cotizacion.totalCliente)}</span>
                       )}
                     </div>
                   </div>
@@ -348,7 +359,7 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
               <p className="text-sm text-muted-foreground">
                 Puede proponer un nuevo descuento con un porcentaje diferente.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="nuevoPorcentaje" className="flex items-center gap-2">
                     <Percent className="h-4 w-4" />
@@ -365,9 +376,15 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground text-sm">Vista previa</Label>
-                  <div className="h-9 flex items-center px-3 rounded-md border bg-muted text-sm font-mono">
-                    {porcentaje > 0 ? formatCurrency((cotizacion.totalCliente * porcentaje) / 100) : '-'}
+                  <Label className="text-muted-foreground text-sm">Descuento</Label>
+                  <div className="h-9 flex items-center px-3 rounded-md border bg-muted text-sm font-mono text-red-600">
+                    {porcentaje > 0 ? <>-{formatCurrency((cotizacion.totalCliente * porcentaje) / 100)} <span className="text-muted-foreground ml-2">({porcentaje}%)</span></> : <span className="text-muted-foreground">—</span>}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground text-sm">Total Final al Cliente</Label>
+                  <div className="h-9 flex items-center px-3 rounded-md border bg-green-50 border-green-200 text-sm font-mono font-semibold text-green-700">
+                    {porcentaje > 0 ? formatCurrency(cotizacion.totalCliente - (cotizacion.totalCliente * porcentaje) / 100) : <span className="text-muted-foreground font-normal">{formatCurrency(cotizacion.totalCliente)}</span>}
                   </div>
                 </div>
               </div>
