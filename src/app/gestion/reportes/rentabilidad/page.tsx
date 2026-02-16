@@ -19,7 +19,9 @@ import {
   Users,
   Receipt,
   AlertCircle,
+  Download,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 const fmt = (amount: number, moneda: string = 'USD') =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda === 'USD' ? 'USD' : 'PEN' }).format(amount)
@@ -210,7 +212,7 @@ export default function RentabilidadPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : detalle ? (
-          <DetalleProyecto detalle={detalle} />
+          <DetalleProyecto detalle={detalle} proyectoId={selectedProyectoId} />
         ) : (
           <Card>
             <CardContent className="p-8 text-center">
@@ -363,9 +365,35 @@ export default function RentabilidadPage() {
 
 /* ==================== DETALLE PROYECTO ==================== */
 
-function DetalleProyecto({ detalle }: { detalle: ProyectoDetalle }) {
+function DetalleProyecto({ detalle, proyectoId }: { detalle: ProyectoDetalle; proyectoId: string }) {
   const { proyecto, ingreso, costos, margen, margenPorcentaje } = detalle
   const moneda = proyecto.moneda || 'USD'
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const res = await fetch(`/api/gestion/reportes/rentabilidad/exportar?proyectoId=${proyectoId}`)
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al exportar')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `PL_${proyecto.codigo}_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      toast.success('Reporte P&L exportado')
+    } catch (error: any) {
+      toast.error(error.message || 'Error al exportar')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const categorias = [
     { label: 'Equipos', icon: Package, data: costos.equipos, color: 'text-blue-500' },
@@ -376,15 +404,31 @@ function DetalleProyecto({ detalle }: { detalle: ProyectoDetalle }) {
   return (
     <div className="space-y-4">
       {/* Project Info */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Badge variant="outline" className="text-xs">{proyecto.codigo}</Badge>
-        <span className="text-sm font-medium">{proyecto.nombre}</span>
-        {proyecto.cliente && (
-          <span className="text-xs text-muted-foreground">| {proyecto.cliente}</span>
-        )}
-        <Badge variant="outline" className="text-[10px]">
-          {ESTADO_LABELS[proyecto.estado] || proyecto.estado}
-        </Badge>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-xs">{proyecto.codigo}</Badge>
+          <span className="text-sm font-medium">{proyecto.nombre}</span>
+          {proyecto.cliente && (
+            <span className="text-xs text-muted-foreground">| {proyecto.cliente}</span>
+          )}
+          <Badge variant="outline" className="text-[10px]">
+            {ESTADO_LABELS[proyecto.estado] || proyecto.estado}
+          </Badge>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs"
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          {exporting ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5 mr-1" />
+          )}
+          Exportar Excel
+        </Button>
       </div>
 
       {/* Summary Cards */}
