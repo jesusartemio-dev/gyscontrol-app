@@ -101,6 +101,7 @@ export default function ValorizacionesPage() {
   const [formFondoGarantia, setFormFondoGarantia] = useState('0')
   const [formMoneda, setFormMoneda] = useState('USD')
   const [formTipoCambio, setFormTipoCambio] = useState('')
+  const [showTipoCambio, setShowTipoCambio] = useState(false)
   const [formObservaciones, setFormObservaciones] = useState('')
 
   // Estado transition dialog
@@ -158,6 +159,7 @@ export default function ValorizacionesPage() {
     setFormFondoGarantia('0')
     setFormMoneda('USD')
     setFormTipoCambio('')
+    setShowTipoCambio(false)
     setFormObservaciones('')
   }
 
@@ -175,6 +177,7 @@ export default function ValorizacionesPage() {
     setFormFondoGarantia(val.fondoGarantiaPorcentaje.toString())
     setFormMoneda(val.moneda)
     setFormTipoCambio(val.tipoCambio?.toString() || '')
+    setShowTipoCambio(!!val.tipoCambio)
     setFormObservaciones(val.observaciones || '')
     setShowForm(true)
   }
@@ -476,21 +479,29 @@ export default function ValorizacionesPage() {
                 <Input type="date" value={formPeriodoFin} onChange={e => setFormPeriodoFin(e.target.value)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Moneda</Label>
-                <Select value={formMoneda} onValueChange={setFormMoneda}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">Dólares (USD)</SelectItem>
-                    <SelectItem value="PEN">Soles (PEN)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Tipo de Cambio</Label>
-                <Input type="number" step="0.001" placeholder="Ej: 3.75" value={formTipoCambio} onChange={e => setFormTipoCambio(e.target.value)} />
-              </div>
+            <div>
+              <Label>Moneda</Label>
+              <Select value={formMoneda} onValueChange={setFormMoneda}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">Dólares (USD)</SelectItem>
+                  <SelectItem value="PEN">Soles (PEN)</SelectItem>
+                </SelectContent>
+              </Select>
+              {!showTipoCambio ? (
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:underline mt-1"
+                  onClick={() => setShowTipoCambio(true)}
+                >
+                  ¿Registrar tipo de cambio?
+                </button>
+              ) : (
+                <div className="mt-2">
+                  <Label>Tipo de Cambio</Label>
+                  <Input type="number" step="0.001" placeholder="Ej: 3.75" value={formTipoCambio} onChange={e => setFormTipoCambio(e.target.value)} />
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
