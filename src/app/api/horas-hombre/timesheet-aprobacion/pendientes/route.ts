@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const estadoParam = searchParams.get('estado') || 'enviado'
     const usuarioId = searchParams.get('usuarioId')
+    const semanaDesde = searchParams.get('semanaDesde') // e.g. "2026-W05"
+    const semanaHasta = searchParams.get('semanaHasta') // e.g. "2026-W08"
 
     // Build where clause
     const where: Record<string, unknown> = {}
@@ -28,6 +30,11 @@ export async function GET(request: NextRequest) {
     }
     if (usuarioId) {
       where.usuarioId = usuarioId
+    }
+    if (semanaDesde || semanaHasta) {
+      where.semana = {}
+      if (semanaDesde) (where.semana as Record<string, string>).gte = semanaDesde
+      if (semanaHasta) (where.semana as Record<string, string>).lte = semanaHasta
     }
 
     const aprobaciones = await prisma.timesheetAprobacion.findMany({
