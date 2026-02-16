@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight } from 'lucide-react'
+import { Loader2, Search, ArrowUpCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Package, ChevronRight, FileSpreadsheet, Upload, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
+import CxPImportExcelModal from '@/components/administracion/CxPImportExcelModal'
+import { exportarCxPAExcel } from '@/lib/utils/cuentasPagarExcel'
 
 interface CuentaBancaria {
   id: string
@@ -145,6 +147,9 @@ export default function CuentasPagarPage() {
 
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorPagar | null>(null)
+
+  // Import dialog
+  const [showImportDialog, setShowImportDialog] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -386,10 +391,20 @@ export default function CuentasPagarPage() {
           <h1 className="text-2xl font-bold">Cuentas por Pagar</h1>
           <p className="text-muted-foreground">Gestión de facturas y pagos a proveedores</p>
         </div>
-        <Button onClick={() => { resetCreateForm(); setShowCreateDialog(true) }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Cuenta por Pagar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportarCxPAExcel(filtered)}>
+            <Download className="h-4 w-4 mr-1" />
+            Exportar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
+            <Upload className="h-4 w-4 mr-1" />
+            Importar
+          </Button>
+          <Button onClick={() => { resetCreateForm(); setShowCreateDialog(true) }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Cuenta por Pagar
+          </Button>
+        </div>
       </div>
 
       {/* Resumen cards */}
@@ -774,6 +789,15 @@ export default function CuentasPagarPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import modal */}
+      <CxPImportExcelModal
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        proveedores={proveedores}
+        proyectos={proyectos}
+        onImported={loadData}
+      />
 
       {/* Dialog detalle */}
       <Dialog open={!!showDetail} onOpenChange={open => { if (!open) setShowDetail(null) }}>
