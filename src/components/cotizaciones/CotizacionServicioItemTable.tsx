@@ -71,7 +71,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
           })
 
           const recurso = recursos.find(r => r.id === merged.recursoId)
-          const costoHora = recurso?.costoHora ?? 0
+          const costoHora = recurso?.costoHora ?? merged.costoHora ?? 0
           const dificultadMultiplier = (() => {
             const dificultad = merged.nivelDificultad ?? 1
             switch (dificultad) {
@@ -116,7 +116,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
     })
 
     const recurso = recursos.find(r => r.id === updated.recursoId)
-    const costoHora = recurso?.costoHora ?? 0
+    const costoHora = recurso?.costoHora ?? updated.costoHora ?? 0
     const dificultadMultiplier = (() => {
       const dificultad = updated.nivelDificultad ?? 1
       switch (dificultad) {
@@ -145,9 +145,11 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
     try {
       await updateCotizacionServicioItem(editandoId, {
         recursoId: finalUpdated.recursoId,
+        recursoNombre: finalUpdated.recursoNombre,
         cantidad: finalUpdated.cantidad,
         factorSeguridad: finalUpdated.factorSeguridad,
         margen: finalUpdated.margen,
+        nivelDificultad: finalUpdated.nivelDificultad,
         horaTotal: finalUpdated.horaTotal,
         costoInterno: finalUpdated.costoInterno,
         costoCliente: finalUpdated.costoCliente,
