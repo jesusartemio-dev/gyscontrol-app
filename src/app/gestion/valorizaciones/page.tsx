@@ -18,6 +18,7 @@ interface Proyecto {
   nombre: string
   totalCliente: number | null
   moneda: string | null
+  tipoCambio: number | null
 }
 
 interface Valorizacion {
@@ -455,7 +456,20 @@ export default function ValorizacionesPage() {
             {!editingVal && (
               <div>
                 <Label>Proyecto *</Label>
-                <Select value={formProyectoId} onValueChange={setFormProyectoId}>
+                <Select value={formProyectoId} onValueChange={id => {
+                  setFormProyectoId(id)
+                  const proy = proyectos.find(p => p.id === id)
+                  if (proy) {
+                    setFormMoneda(proy.moneda || 'USD')
+                    if (proy.tipoCambio) {
+                      setFormTipoCambio(proy.tipoCambio.toString())
+                      setShowTipoCambio(true)
+                    } else {
+                      setFormTipoCambio('')
+                      setShowTipoCambio(false)
+                    }
+                  }
+                }}>
                   <SelectTrigger><SelectValue placeholder="Selecciona un proyecto" /></SelectTrigger>
                   <SelectContent>
                     {proyectos.map(p => (
