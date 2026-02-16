@@ -439,7 +439,7 @@ export default function TimesheetPage() {
                   <div className="flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 text-gray-500" />
                     <span className="text-sm text-gray-700">
-                      Semana con <strong>{totalHoras}h</strong> registradas. Envía para aprobación cuando estés listo.
+                      Semana con <strong>{resumenSemana?.horasOficina || totalHoras}h</strong> de oficina registradas. Envía para aprobación cuando estés listo.
                     </span>
                   </div>
                   <Button size="sm" onClick={enviarParaAprobacion} disabled={enviando}>
@@ -529,6 +529,20 @@ export default function TimesheetPage() {
                 <span className="font-bold text-blue-700">{(resumenSemana || datosDefault).totalHoras}h</span>
                 <span className="text-xs text-blue-600">Total</span>
               </div>
+              {(resumenSemana?.horasOficina > 0 || resumenSemana?.horasCampo > 0) && (
+                <>
+                  <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-lg">
+                    <Briefcase className="h-4 w-4 text-indigo-600" />
+                    <span className="font-bold text-indigo-700">{resumenSemana?.horasOficina || 0}h</span>
+                    <span className="text-xs text-indigo-600">Oficina</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-lg">
+                    <TrendingUp className="h-4 w-4 text-orange-600" />
+                    <span className="font-bold text-orange-700">{resumenSemana?.horasCampo || 0}h</span>
+                    <span className="text-xs text-orange-600">Campo</span>
+                  </div>
+                </>
+              )}
               <div className="flex items-center gap-1.5 bg-green-50 px-3 py-1.5 rounded-lg">
                 <Calendar className="h-4 w-4 text-green-600" />
                 <span className="font-bold text-green-700">{(resumenSemana || datosDefault).diasTrabajados}</span>
@@ -691,6 +705,7 @@ export default function TimesheetPage() {
                     <TableHead className="text-right">Horas</TableHead>
                     <TableHead className="hidden md:table-cell">Descripción</TableHead>
                     {esSupervisor && <TableHead className="text-right hidden lg:table-cell">Costo/h</TableHead>}
+                    <TableHead className="hidden sm:table-cell">Origen</TableHead>
                     <TableHead className="hidden sm:table-cell">Estado</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
@@ -698,13 +713,13 @@ export default function TimesheetPage() {
                 <TableBody>
                   {loadingHistorial ? (
                     <TableRow>
-                      <TableCell colSpan={esSupervisor ? 9 : 8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={esSupervisor ? 10 : 9} className="text-center py-8 text-muted-foreground">
                         Cargando...
                       </TableCell>
                     </TableRow>
                   ) : registrosFiltrados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={esSupervisor ? 9 : 8} className="text-center py-8">
+                      <TableCell colSpan={esSupervisor ? 10 : 9} className="text-center py-8">
                         <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm text-muted-foreground">
                           {tieneFiltros ? 'No se encontraron registros con los filtros aplicados' : 'No hay registros de horas'}
@@ -738,6 +753,13 @@ export default function TimesheetPage() {
                             {r.costoHora ? `S/${r.costoHora.toFixed(2)}` : '-'}
                           </TableCell>
                         )}
+                        <TableCell className="py-2 hidden sm:table-cell">
+                          {r.origen === 'campo' ? (
+                            <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-300">Campo</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-300">Oficina</Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="py-2 hidden sm:table-cell">
                           {getEstadoBadge(r.fechaTrabajo, r.origen)}
                         </TableCell>

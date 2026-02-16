@@ -171,6 +171,7 @@ export async function GET(request: NextRequest) {
         tareaTipo: 'registro',
         aprobado: registro.aprobado,
         fecha: registro.fechaTrabajo,
+        origen: registro.origen,
         recursoNombre: registro.recurso?.nombre || 'Sin recurso'
       }))
 
@@ -186,6 +187,13 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. CALCULAR MÉTRICAS DE LA SEMANA
+    const horasOficina = registrosHoras
+      .filter(r => r.origen === 'oficina')
+      .reduce((sum, r) => sum + r.horasTrabajadas, 0)
+    const horasCampo = registrosHoras
+      .filter(r => r.origen === 'campo')
+      .reduce((sum, r) => sum + r.horasTrabajadas, 0)
+
     const promedioDiario = diasTrabajados > 0 ? Math.round((totalHorasSemana / diasTrabajados) * 10) / 10 : 0
 
     // Calcular vs semana anterior (buscar registros de la semana anterior)
@@ -212,6 +220,8 @@ export async function GET(request: NextRequest) {
       semanaInicio: format(inicioSemana, 'yyyy-MM-dd'),
       semanaFin: format(finSemana, 'yyyy-MM-dd'),
       totalHoras: Math.round(totalHorasSemana * 10) / 10,
+      horasOficina: Math.round(horasOficina * 10) / 10,
+      horasCampo: Math.round(horasCampo * 10) / 10,
       diasTrabajados,
       promedioDiario,
       vsSemanaAnterior

@@ -6,7 +6,7 @@ import { CreateRegistroHorasPayload } from '@/types/payloads';
 import { logger } from '@/lib/logger';
 import { validarRegistroHorasEdt } from '@/lib/validators/cronograma';
 import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot';
-import { verificarSemanaEditable } from '@/lib/utils/timesheetAprobacion';
+import { verificarSemanaEditable, getISOWeek, getWeekRange } from '@/lib/utils/timesheetAprobacion';
 
 // ✅ GET - Listar registros de horas con filtros EDT
 export async function GET(request: NextRequest) {
@@ -576,6 +576,29 @@ export async function DELETE(request: NextRequest) {
       });
 
       logger.info(`🔄 EDT actualizado: ${registro.proyectoEdtId} - ${horasReales}h (${porcentajeAvance}%)`);
+    }
+
+    // 🧹 Si era de oficina, verificar si la semana quedó sin horas → limpiar TimesheetAprobacion
+    if (registro.origen === 'oficina') {
+      const semana = getISOWeek(new Date(registro.fechaTrabajo))
+      const { inicio, fin } = getWeekRange(semana)
+
+      const horasRestantes = await prisma.registroHoras.aggregate({
+        where: {
+          usuarioId: registro.usuarioId,
+          origen: 'oficina',
+          fechaTrabajo: { gte: inicio, lte: fin },
+        },
+        _sum: { horasTrabajadas: true },
+      })
+
+      const totalRestante = Number(horasRestantes._sum.horasTrabajadas || 0)
+      if (totalRestante === 0) {
+        await prisma.timesheetAprobacion.deleteMany({
+          where: { usuarioId: registro.usuarioId, semana },
+        })
+        logger.info(`🧹 TimesheetAprobacion eliminado para ${registro.usuarioId} semana ${semana} (0 horas oficina)`)
+      }
     }
 
     logger.info(`✅ Registro de horas eliminado: ${registroId}`);

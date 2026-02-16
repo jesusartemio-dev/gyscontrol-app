@@ -43,6 +43,7 @@ interface RegistroHoras {
   tareaNombre: string | null
   tareaTipo: string
   aprobado: boolean
+  origen: string | null
 }
 
 interface ResumenDia {
@@ -283,8 +284,8 @@ export function TimesheetSemanal({
                 {dia.registros.slice(0, 3).map((registro) => (
                   <div
                     key={registro.id}
-                    className="text-xs bg-white/80 rounded px-2 py-1 truncate"
-                    title={`${getTextoJerarquico(registro)}: ${registro.descripcion}`}
+                    className={`text-xs rounded px-2 py-1 truncate ${registro.origen === 'campo' ? 'bg-orange-100/80 border-l-2 border-orange-400' : 'bg-white/80'}`}
+                    title={`${getTextoJerarquico(registro)}: ${registro.descripcion}${registro.origen === 'campo' ? ' (Campo)' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation()
                       editarRegistro(registro)
@@ -292,6 +293,7 @@ export function TimesheetSemanal({
                   >
                     <div className="flex items-center justify-between">
                       <span className="truncate flex-1" title={getTextoJerarquico(registro)}>
+                        {registro.origen === 'campo' && <span className="text-orange-600 mr-0.5">C</span>}
                         {getTextoJerarquico(registro)}
                       </span>
                       <div className="flex items-center gap-1 ml-1">
@@ -371,11 +373,14 @@ export function TimesheetSemanal({
                   {dia.registros.map((registro) => (
                     <div
                       key={registro.id}
-                      className="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                      className={`px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${registro.origen === 'campo' ? 'border-l-3 border-orange-400 bg-orange-50/50' : ''}`}
                       onClick={() => editarRegistro(registro)}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">
+                          {registro.origen === 'campo' && (
+                            <span className="text-xs font-semibold text-orange-600 mr-1.5">CAMPO</span>
+                          )}
                           {registro.proyectoNombre.split(' - ')[0]}
                           {registro.edtNombre && registro.edtNombre !== 'Sin EDT' && (
                             <span className="text-gray-500"> · {registro.edtNombre}</span>
