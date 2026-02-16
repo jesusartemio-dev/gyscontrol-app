@@ -9,10 +9,16 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Plus, Search, X, Loader2, FileText, ChevronRight, Edit, Trash2 } from 'lucide-react'
+import { Plus, Search, X, Loader2, FileText, ChevronRight, Edit, Trash2, Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { getOrdenesCompra, deleteOrdenCompra } from '@/lib/services/ordenCompra'
+import OCImportExcelModal from '@/components/logistica/OCImportExcelModal'
+import { exportarOCAExcel } from '@/lib/utils/ordenCompraExcel'
 import type { OrdenCompra } from '@/types'
+
+interface ProveedorRef { id: string; nombre: string; ruc: string | null }
+interface ProyectoRef { id: string; codigo: string; nombre: string }
+interface CentroCostoRef { id: string; nombre: string; activo: boolean }
 
 const ESTADOS = [
   { value: 'all', label: 'Todos' },
@@ -68,14 +74,26 @@ export default function OrdenesCompraPage() {
   const [filterCategoria, setFilterCategoria] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<OrdenCompra | null>(null)
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [proveedores, setProveedores] = useState<ProveedorRef[]>([])
+  const [proyectos, setProyectos] = useState<ProyectoRef[]>([])
+  const [centrosCosto, setCentrosCosto] = useState<CentroCostoRef[]>([])
 
   useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
     try {
       setLoading(true)
-      const data = await getOrdenesCompra()
-      setOrdenes(data)
+      const [ocData, provRes, proyRes, ccRes] = await Promise.all([
+        getOrdenesCompra(),
+        fetch('/api/proveedores').then(r => r.json()),
+        fetch('/api/proyectos?fields=id,codigo,nombre').then(r => r.json()),
+        fetch('/api/centro-costo').then(r => r.json()),
+      ])
+      setOrdenes(ocData)
+      setProveedores(provRes.data || provRes || [])
+      setProyectos(Array.isArray(proyRes) ? proyRes : proyRes.data || [])
+      setCentrosCosto(Array.isArray(ccRes) ? ccRes : ccRes.data || [])
     } catch {
       toast.error('Error al cargar órdenes de compra')
     } finally {
@@ -135,10 +153,30 @@ export default function OrdenesCompraPage() {
             {ordenes.length} órdenes | {stats.pendAprobacion} por aprobar | {stats.enviadas} enviadas | Comprometido: {formatCurrency(stats.totalComprometido)}
           </p>
         </div>
-        <Button onClick={() => router.push('/logistica/ordenes-compra/nueva')} className="bg-orange-600 hover:bg-orange-700">
-          <Plus className="h-4 w-4 mr-1" />
-          Nueva OC
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => exportarOCAExcel(filtered as any)}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Exportar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => setShowImportDialog(true)}
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            Importar
+          </Button>
+          <Button onClick={() => router.push('/logistica/ordenes-compra/nueva')} className="bg-orange-600 hover:bg-orange-700">
+            <Plus className="h-4 w-4 mr-1" />
+            Nueva OC
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -282,6 +320,15 @@ export default function OrdenesCompraPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <OCImportExcelModal
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        proveedores={proveedores}
+        proyectos={proyectos}
+        centrosCosto={centrosCosto}
+        onImported={loadData}
+      />
     </div>
   )
 }
