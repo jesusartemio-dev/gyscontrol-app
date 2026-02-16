@@ -291,6 +291,7 @@ export default function Sidebar() {
         { href: '/gestion', label: 'KPIs', icon: PieChart },
         { href: '/gestion/valorizaciones', label: 'Valorizaciones', icon: FileSpreadsheet },
         { href: '/gestion/reportes', label: 'Reportes', icon: BarChart3 },
+        { href: '/gestion/reportes/rentabilidad', label: 'Rentabilidad', icon: TrendingUp },
         { href: '/gestion/reportes/pedidos', label: 'Pedidos', icon: Package },
       ],
     },

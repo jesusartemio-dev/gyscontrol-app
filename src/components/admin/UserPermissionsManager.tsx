@@ -265,6 +265,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     links: [
       { label: 'Valorizaciones', href: '/gestion/valorizaciones' },
       { label: 'Reportes', href: '/gestion/reportes' },
+      { label: 'Rentabilidad', href: '/gestion/reportes/rentabilidad' },
       { label: 'Pedidos', href: '/gestion/reportes/pedidos' },
       { label: 'Performance', href: '/gestion/reportes/performance' },
       { label: 'Financiero', href: '/gestion/reportes/financiero' },

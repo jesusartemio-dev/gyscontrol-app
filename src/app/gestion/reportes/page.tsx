@@ -11,6 +11,7 @@ import {
   BarChart3,
   Package,
   PieChart,
+  TrendingUp,
   ArrowRight,
 } from 'lucide-react'
 
@@ -29,6 +30,14 @@ const reportes = [
     href: '/gestion/reportes/pedidos',
     color: 'bg-blue-100 text-blue-600',
     roles: ['admin', 'gerente', 'comercial', 'proyectos', 'logistica', 'logistico', 'gestor'],
+  },
+  {
+    titulo: 'Rentabilidad por Proyecto',
+    descripcion: 'Análisis P&L (Ganancia/Pérdida): ingresos vs costos reales, margen bruto y comparativa presupuesto vs real por proyecto.',
+    icono: TrendingUp,
+    href: '/gestion/reportes/rentabilidad',
+    color: 'bg-emerald-100 text-emerald-600',
+    roles: ['admin', 'gerente', 'gestor'],
   },
   {
     titulo: 'KPIs de Gestión',
