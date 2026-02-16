@@ -133,7 +133,7 @@ function AprovisionamientoContent() {
   const hasFilters = search || estado !== 'all'
 
   const formatMonto = (monto: number) =>
-    new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', maximumFractionDigits: 0 }).format(monto)
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(monto)
 
   if (loading) {
     return (
