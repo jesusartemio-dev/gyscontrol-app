@@ -132,8 +132,12 @@ function AprovisionamientoContent() {
 
   const hasFilters = search || estado !== 'all'
 
-  const formatMonto = (monto: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(monto)
+  const formatMonto = (monto: number, moneda: string = 'USD') =>
+    new Intl.NumberFormat(moneda === 'PEN' ? 'es-PE' : 'en-US', {
+      style: 'currency',
+      currency: moneda,
+      maximumFractionDigits: 0,
+    }).format(monto)
 
   if (loading) {
     return (
@@ -367,11 +371,11 @@ function AprovisionamientoContent() {
                         </Badge>
                       </TableCell>
                       <TableCell className="py-2 text-right">
-                        <span className="text-xs font-medium">{formatMonto(proy.listas.montoTotal)}</span>
+                        <span className="text-xs font-medium">{formatMonto(proy.listas.montoTotal, proy.moneda)}</span>
                       </TableCell>
                       <TableCell className="py-2 text-right">
                         <div>
-                          <span className="text-xs font-medium">{formatMonto(proy.pedidos.montoTotal)}</span>
+                          <span className="text-xs font-medium">{formatMonto(proy.pedidos.montoTotal, proy.moneda)}</span>
                           {devProy !== 0 && (
                             <span className={`text-[10px] ml-1 ${devProy > 5 ? 'text-red-500' : devProy < -5 ? 'text-amber-500' : 'text-green-500'}`}>
                               {devProy > 0 ? '+' : ''}{devProy}%
