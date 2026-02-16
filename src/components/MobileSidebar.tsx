@@ -165,7 +165,6 @@ export default function MobileSidebar() {
         { href: '/supervision/tareas', label: 'Gestión de Tareas', icon: CheckSquare },
         { href: '/supervision/equipo', label: 'Vista de Equipo', icon: Users },
         { href: '/supervision/edts', label: 'Gestión de EDTs', icon: GitBranch },
-        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: MapPin },
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
