@@ -98,6 +98,13 @@ export async function GET(request: NextRequest) {
               estado: true
             }
           },
+          proyecto: {
+            select: {
+              id: true,
+              codigo: true,
+              estado: true,
+            }
+          },
           _count: {
             select: {
               cotizacionEquipo: true,

@@ -17,7 +17,8 @@ import {
   Search,
   Filter,
   Trash2,
-  Pencil
+  Pencil,
+  FolderOpen
 } from 'lucide-react'
 import { deleteCotizacion, updateCotizacion } from '@/lib/services/cotizacion'
 import { Button } from '@/components/ui/button'
@@ -348,17 +349,18 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
       {/* Content based on view mode */}
       {viewMode === 'table' ? (
         <div className="bg-white border rounded-lg overflow-x-auto">
-          <table className="w-full table-fixed min-w-[850px]">
+          <table className="w-full table-fixed min-w-[950px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="w-[8%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                <th className="w-[25%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                <th className="w-[11%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th className="w-[9%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Comercial</th>
+                <th className="w-[7%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                <th className="w-[22%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                <th className="w-[10%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th className="w-[8%] px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider">Comercial</th>
                 <th className="w-[7%] px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                <th className="w-[8%] px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider">Proyecto</th>
                 <th className="w-[10%] px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider">Venta</th>
-                <th className="w-[10%] px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider">Costo</th>
-                <th className="w-[10%] px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider">Margen</th>
+                <th className="w-[9%] px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                <th className="w-[9%] px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase tracking-wider">Margen</th>
                 <th className="w-[10%] px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
@@ -428,6 +430,20 @@ export default function CotizacionList({ cotizaciones, onDelete, onUpdated, load
                       <Badge variant={getStatusVariant(cotizacion.estado ?? 'borrador')} className="text-[10px]">
                         {cotizacion.estado ?? 'borrador'}
                       </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {(cotizacion as any).proyecto?.length > 0 ? (
+                        <Link
+                          href={`/proyectos/${(cotizacion as any).proyecto[0].id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 px-1.5 py-0.5 rounded transition-colors"
+                        >
+                          <FolderOpen size={10} />
+                          {(cotizacion as any).proyecto[0].codigo}
+                        </Link>
+                      ) : (
+                        <span className="text-[10px] text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <span className="text-xs font-medium text-gray-900">
