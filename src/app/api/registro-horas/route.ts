@@ -6,6 +6,7 @@ import { CreateRegistroHorasPayload } from '@/types/payloads';
 import { logger } from '@/lib/logger';
 import { validarRegistroHorasEdt } from '@/lib/validators/cronograma';
 import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot';
+import { verificarSemanaEditable } from '@/lib/utils/timesheetAprobacion';
 
 // ✅ GET - Listar registros de horas con filtros EDT
 export async function GET(request: NextRequest) {
@@ -301,6 +302,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 🔒 Verificar que la semana no esté bloqueada (enviada/aprobada)
+    const semanaEditable = await verificarSemanaEditable(data.usuarioId, new Date(data.fecha))
+    if (!semanaEditable) {
+      return NextResponse.json(
+        { error: 'No se pueden registrar horas en una semana enviada o aprobada' },
+        { status: 403 }
+      );
+    }
+
     // Snapshot del costo hora actual del empleado (PEN)
     const costoHora = await obtenerCostoHoraPEN(data.usuarioId)
 
@@ -505,7 +515,10 @@ export async function DELETE(request: NextRequest) {
       where: { id: registroId },
       select: {
         id: true,
-        proyectoEdtId: true
+        proyectoEdtId: true,
+        usuarioId: true,
+        fechaTrabajo: true,
+        origen: true,
       }
     });
 
@@ -514,6 +527,17 @@ export async function DELETE(request: NextRequest) {
         { error: 'Registro de horas no encontrado' },
         { status: 404 }
       );
+    }
+
+    // 🔒 Verificar que la semana no esté bloqueada (solo para horas de oficina)
+    if (registro.origen === 'oficina') {
+      const semanaEditable = await verificarSemanaEditable(registro.usuarioId, registro.fechaTrabajo);
+      if (!semanaEditable) {
+        return NextResponse.json(
+          { error: 'No se pueden eliminar horas de una semana enviada o aprobada' },
+          { status: 403 }
+        );
+      }
     }
 
     // 🗑️ Eliminar registro

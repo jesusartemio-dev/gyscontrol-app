@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
-import { format } from 'date-fns'
+import { format, getISOWeek, getISOWeekYear } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   List,
@@ -87,8 +87,49 @@ export default function MisRegistrosPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Approval status map: semana → estado
+  const [aprobacionesMapa, setAprobacionesMapa] = useState<Record<string, string>>({})
+
   // Project list for filter
   const [proyectos, setProyectos] = useState<{ id: string; nombre: string; codigo: string }[]>([])
+
+  // Helper: get ISO week string from a date
+  const getWeekKey = (fecha: string) => {
+    const d = new Date(fecha)
+    const week = getISOWeek(d)
+    const year = getISOWeekYear(d)
+    return `${year}-W${String(week).padStart(2, '0')}`
+  }
+
+  // Check if a record's week is locked (enviado or aprobado)
+  const semanaLocked = (fecha: string, origen: string | null) => {
+    if (origen !== 'oficina') return false
+    const key = getWeekKey(fecha)
+    const estado = aprobacionesMapa[key]
+    return estado === 'enviado' || estado === 'aprobado'
+  }
+
+  // Get approval badge for a record
+  const getEstadoBadge = (fecha: string, origen: string | null) => {
+    if (origen !== 'oficina') return null
+    const key = getWeekKey(fecha)
+    const estado = aprobacionesMapa[key]
+    if (!estado || estado === 'borrador') return null
+    if (estado === 'enviado') return <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300">Pendiente</Badge>
+    if (estado === 'aprobado') return <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">Aprobado</Badge>
+    if (estado === 'rechazado') return <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-300">Rechazado</Badge>
+    return null
+  }
+
+  const cargarAprobaciones = useCallback(async () => {
+    try {
+      const res = await fetch('/api/horas-hombre/timesheet-aprobacion/estado?todas=true')
+      if (res.ok) {
+        const data = await res.json()
+        setAprobacionesMapa(data.aprobaciones || {})
+      }
+    } catch { /* silent */ }
+  }, [])
 
   const cargarProyectos = useCallback(async () => {
     try {
@@ -148,7 +189,8 @@ export default function MisRegistrosPage() {
     if (status === 'loading') return
     if (!session?.user) return
     cargarProyectos()
-  }, [status, session, cargarProyectos])
+    cargarAprobaciones()
+  }, [status, session, cargarProyectos, cargarAprobaciones])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -373,19 +415,20 @@ export default function MisRegistrosPage() {
                 <TableHead className="text-right">Horas</TableHead>
                 <TableHead className="hidden md:table-cell">Descripción</TableHead>
                 <TableHead className="text-right hidden lg:table-cell">Costo/h</TableHead>
+                <TableHead className="hidden sm:table-cell">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : registrosFiltrados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">
                       {tieneFiltros ? 'No se encontraron registros con los filtros aplicados' : 'No hay registros de horas'}
@@ -417,15 +460,20 @@ export default function MisRegistrosPage() {
                     <TableCell className="py-2 text-sm text-right text-muted-foreground hidden lg:table-cell">
                       {r.costoHora ? `S/${r.costoHora.toFixed(2)}` : '-'}
                     </TableCell>
+                    <TableCell className="py-2 hidden sm:table-cell">
+                      {getEstadoBadge(r.fechaTrabajo, r.origen)}
+                    </TableCell>
                     <TableCell className="py-2" onClick={e => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={() => setDeleteId(r.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                      </Button>
+                      {!semanaLocked(r.fechaTrabajo, r.origen) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => setDeleteId(r.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

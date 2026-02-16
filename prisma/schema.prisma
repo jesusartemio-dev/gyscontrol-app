@@ -1290,6 +1290,9 @@ model User {
   // Órdenes de compra
   ordenesCompraSolicitante              OrdenCompra[]                @relation("OCsolicitante")
   ordenesCompraAprobador                OrdenCompra[]                @relation("OCaprobador")
+  // Timesheet aprobación
+  timesheetsEnviados                    TimesheetAprobacion[]        @relation("TimesheetUsuario")
+  timesheetsAprobados                   TimesheetAprobacion[]        @relation("TimesheetAprobador")
 
   @@map("user")
 }
@@ -3224,4 +3227,36 @@ model PagoPagar {
   @@index([cuentaPorPagarId])
   @@index([fechaPago])
   @@map("pago_pagar")
+}
+
+// ======================
+// ⏱️ Timesheet Aprobación
+// ======================
+
+enum EstadoTimesheet {
+  borrador
+  enviado
+  aprobado
+  rechazado
+}
+
+model TimesheetAprobacion {
+  id              String          @id @default(cuid())
+  usuarioId       String
+  semana          String          // "2026-W07" ISO week
+  estado          EstadoTimesheet @default(borrador)
+  totalHoras      Float           @default(0)
+  aprobadoPorId   String?
+  motivoRechazo   String?
+  fechaEnvio      DateTime?
+  fechaResolucion DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+
+  usuario     User  @relation("TimesheetUsuario", fields: [usuarioId], references: [id])
+  aprobadoPor User? @relation("TimesheetAprobador", fields: [aprobadoPorId], references: [id])
+
+  @@unique([usuarioId, semana])
+  @@index([estado])
+  @@map("timesheet_aprobacion")
 }

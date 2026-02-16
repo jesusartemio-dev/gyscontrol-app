@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot'
+import { verificarSemanaEditable } from '@/lib/utils/timesheetAprobacion'
 
 export class ProgresoService {
 
@@ -288,6 +289,12 @@ export class ProgresoService {
      fecha: Date
    ) {
     try {
+      // 🔒 Verificar que la semana no esté bloqueada (enviada/aprobada)
+      const semanaEditable = await verificarSemanaEditable(usuarioId, fecha)
+      if (!semanaEditable) {
+        throw new Error('No se pueden registrar horas en una semana enviada o aprobada')
+      }
+
       // Obtener información necesaria para el registro
       const proyectoId = await this.obtenerProyectoIdDesdeElemento(nivel, elementoId)
       const recursoId = await this.obtenerRecursoIdDesdeUsuario(usuarioId)

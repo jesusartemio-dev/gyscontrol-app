@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot';
+import { verificarSemanaEditable } from '@/lib/utils/timesheetAprobacion';
 
 export async function POST(request: NextRequest) {
   try {
@@ -116,6 +117,15 @@ export async function POST(request: NextRequest) {
                            proyectoEdt?.edt?.nombre ||
                            proyectoServicio.edt?.nombre ||
                            'general';
+
+    // 🔒 Verificar que la semana no esté bloqueada (enviada/aprobada)
+    const semanaEditable = await verificarSemanaEditable(usuarioId, fechaLocal);
+    if (!semanaEditable) {
+      return NextResponse.json(
+        { error: 'No se pueden registrar horas en una semana enviada o aprobada' },
+        { status: 403 }
+      );
+    }
 
     // Snapshot del costo hora actual del empleado (PEN)
     const costoHora = await obtenerCostoHoraPEN(usuarioId)

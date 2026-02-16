@@ -12,6 +12,7 @@ import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import { ProgresoService } from '@/lib/services/progresoService'
 import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot'
+import { verificarSemanaEditable } from '@/lib/utils/timesheetAprobacion'
 
 const registrarHorasSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -140,6 +141,15 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
         select: { edtId: true }
       })
       edtCatalogoId = edt?.edtId || null
+    }
+
+    // 🔒 Verificar que la semana no esté bloqueada (enviada/aprobada)
+    const semanaEditable = await verificarSemanaEditable(session.user.id, fechaCorregida)
+    if (!semanaEditable) {
+      return NextResponse.json(
+        { error: 'No se pueden registrar horas en una semana enviada o aprobada' },
+        { status: 403 }
+      )
     }
 
     try {
@@ -386,7 +396,7 @@ export async function DELETE(request: NextRequest) {
     // Verificar que el registro existe y pertenece al usuario
     const registroExistente = await prisma.registroHoras.findUnique({
       where: { id },
-      select: { id: true, usuarioId: true }
+      select: { id: true, usuarioId: true, fechaTrabajo: true, origen: true }
     })
 
     if (!registroExistente || registroExistente.usuarioId !== session.user.id) {
@@ -394,6 +404,17 @@ export async function DELETE(request: NextRequest) {
         { error: 'Registro no encontrado' },
         { status: 404 }
       )
+    }
+
+    // 🔒 Verificar que la semana no esté bloqueada (solo para horas de oficina)
+    if (registroExistente.origen === 'oficina') {
+      const semanaEditable = await verificarSemanaEditable(registroExistente.usuarioId, registroExistente.fechaTrabajo)
+      if (!semanaEditable) {
+        return NextResponse.json(
+          { error: 'No se pueden eliminar horas de una semana enviada o aprobada' },
+          { status: 403 }
+        )
+      }
     }
 
     // Eliminar registro

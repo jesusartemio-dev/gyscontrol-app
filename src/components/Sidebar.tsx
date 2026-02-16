@@ -221,6 +221,8 @@ export default function Sidebar() {
         { href: '/supervision/listas-equipo', label: 'Listas Equipo', icon: ClipboardList },
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
+        { href: '/supervision/aprobar-campo', label: 'Aprobar Campo', icon: MapPin },
+        { href: '/supervision/timesheet', label: 'Aprobar Horas', icon: ClipboardList },
       ]
     },
     // 3. Logística - Gestión completa de la cadena logística

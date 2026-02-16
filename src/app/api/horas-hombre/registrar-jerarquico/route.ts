@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
 import { obtenerCostoHoraPEN } from '@/lib/utils/costoHoraSnapshot'
+import { verificarSemanaEditable } from '@/lib/utils/timesheetAprobacion'
 
 const registrarJerarquicoSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -148,6 +149,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'No se encontró un servicio asociado al proyecto' },
         { status: 404 }
+      )
+    }
+
+    // 🔒 Verificar que la semana no esté bloqueada (enviada/aprobada)
+    const semanaEditable = await verificarSemanaEditable(session.user.id, new Date(fecha))
+    if (!semanaEditable) {
+      return NextResponse.json(
+        { error: 'No se pueden registrar horas en una semana enviada o aprobada' },
+        { status: 403 }
       )
     }
 

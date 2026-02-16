@@ -1,14 +1,20 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Clock, TrendingUp, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns'
+import { Calendar, Clock, TrendingUp, ChevronLeft, ChevronRight, Plus, Send, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, getISOWeek, getISOWeekYear } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { TimesheetSemanal } from '@/components/horas-hombre/TimesheetSemanal'
 import { RegistroHorasWizard } from '@/components/horas-hombre/RegistroHorasWizard'
+
+function getISOWeekString(date: Date): string {
+  const week = getISOWeek(date)
+  const year = getISOWeekYear(date)
+  return `${year}-W${String(week).padStart(2, '0')}`
+}
 
 export default function TimesheetPage() {
   const [semanaActual, setSemanaActual] = useState(new Date())
@@ -16,32 +22,49 @@ export default function TimesheetPage() {
   const [resumenSemana, setResumenSemana] = useState<any>(null)
   const [proyectosTrabajados, setProyectosTrabajados] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [estadoAprobacion, setEstadoAprobacion] = useState<any>(null)
+  const [enviando, setEnviando] = useState(false)
 
   // Calcular semana actual (lunes a domingo)
   const inicioSemana = startOfWeek(semanaActual, { weekStartsOn: 1 })
   const finSemana = endOfWeek(semanaActual, { weekStartsOn: 1 })
   const semanaISO = format(semanaActual, 'yyyy-\'W\'ww')
+  const semanaISOReal = getISOWeekString(semanaActual)
+
+  // Cargar estado de aprobación
+  const cargarEstadoAprobacion = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/horas-hombre/timesheet-aprobacion/estado?semana=${semanaISOReal}`)
+      if (res.ok) {
+        const data = await res.json()
+        setEstadoAprobacion(data)
+      }
+    } catch (error) {
+      console.error('Error cargando estado de aprobación:', error)
+    }
+  }, [semanaISOReal])
 
   // Cargar datos de la semana
-  useEffect(() => {
-    const cargarDatosSemana = async () => {
-      try {
-        setLoading(true)
-        const response = await fetch(`/api/horas-hombre/timesheet-semanal?semana=${semanaISO}`)
-        if (response.ok) {
-          const data = await response.json()
-          setResumenSemana(data.data.resumenSemana)
-          setProyectosTrabajados(data.data.proyectosTrabajados)
-        }
-      } catch (error) {
-        console.error('Error cargando datos de la semana:', error)
-      } finally {
-        setLoading(false)
+  const cargarDatosSemana = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/horas-hombre/timesheet-semanal?semana=${semanaISO}`)
+      if (response.ok) {
+        const data = await response.json()
+        setResumenSemana(data.data.resumenSemana)
+        setProyectosTrabajados(data.data.proyectosTrabajados)
       }
+    } catch (error) {
+      console.error('Error cargando datos de la semana:', error)
+    } finally {
+      setLoading(false)
     }
-
-    cargarDatosSemana()
   }, [semanaISO])
+
+  useEffect(() => {
+    cargarDatosSemana()
+    cargarEstadoAprobacion()
+  }, [cargarDatosSemana, cargarEstadoAprobacion])
 
   // Datos por defecto mientras se cargan
   const datosDefault = {
@@ -61,21 +84,34 @@ export default function TimesheetPage() {
 
   const handleRegistroExitoso = () => {
     setShowWizard(false)
-    // Recargar datos del timesheet
-    const cargarDatosSemana = async () => {
-      try {
-        const response = await fetch(`/api/horas-hombre/timesheet-semanal?semana=${semanaISO}`)
-        if (response.ok) {
-          const data = await response.json()
-          setResumenSemana(data.data.resumenSemana)
-          setProyectosTrabajados(data.data.proyectosTrabajados)
-        }
-      } catch (error) {
-        console.error('Error recargando datos:', error)
-      }
-    }
     cargarDatosSemana()
+    cargarEstadoAprobacion()
   }
+
+  const enviarParaAprobacion = async () => {
+    try {
+      setEnviando(true)
+      const res = await fetch('/api/horas-hombre/timesheet-aprobacion/enviar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ semana: semanaISOReal }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || 'Error al enviar')
+        return
+      }
+      await cargarEstadoAprobacion()
+    } catch (error) {
+      console.error('Error enviando timesheet:', error)
+      alert('Error al enviar la semana para aprobación')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const semanaBloqueada = estadoAprobacion?.estado === 'enviado' || estadoAprobacion?.estado === 'aprobado'
+  const totalHoras = (resumenSemana || datosDefault).totalHoras
 
   return (
     <div className="container mx-auto py-4 space-y-4">
@@ -85,14 +121,93 @@ export default function TimesheetPage() {
           <Clock className="h-6 w-6 text-blue-600" />
           <div>
             <h1 className="text-xl font-bold text-gray-900">Mi Timesheet</h1>
-            <p className="text-xs text-gray-500">{format(inicioSemana, 'yyyy')} - Semana {semanaISO.split('-W')[1]}</p>
+            <p className="text-xs text-gray-500">{format(inicioSemana, 'yyyy')} - Semana {semanaISOReal.split('-W')[1]}</p>
           </div>
         </div>
-        <Button onClick={() => setShowWizard(true)} size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Registrar
-        </Button>
+        {!semanaBloqueada && (
+          <Button onClick={() => setShowWizard(true)} size="sm">
+            <Plus className="h-4 w-4 mr-1" />
+            Registrar
+          </Button>
+        )}
       </div>
+
+      {/* Banner de estado de aprobación */}
+      {estadoAprobacion && (
+        <>
+          {estadoAprobacion.estado === 'borrador' && totalHoras > 0 && (
+            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-700">
+                  Semana con <strong>{totalHoras}h</strong> registradas. Envía para aprobación cuando estés listo.
+                </span>
+              </div>
+              <Button
+                size="sm"
+                onClick={enviarParaAprobacion}
+                disabled={enviando}
+              >
+                <Send className="h-4 w-4 mr-1" />
+                {enviando ? 'Enviando...' : 'Enviar para aprobación'}
+              </Button>
+            </div>
+          )}
+
+          {estadoAprobacion.estado === 'enviado' && (
+            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+              <Clock className="h-4 w-4 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                <strong>Semana enviada</strong> — Pendiente de aprobación.
+                {estadoAprobacion.fechaEnvio && (
+                  <span className="text-yellow-600 ml-1">
+                    Enviado el {format(new Date(estadoAprobacion.fechaEnvio), 'dd/MM/yyyy HH:mm')}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {estadoAprobacion.estado === 'aprobado' && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-800">
+                <strong>Semana aprobada</strong>
+                {estadoAprobacion.aprobadoPor && (
+                  <span className="text-green-600 ml-1">
+                    por {estadoAprobacion.aprobadoPor}
+                    {estadoAprobacion.fechaResolucion && ` el ${format(new Date(estadoAprobacion.fechaResolucion), 'dd/MM/yyyy')}`}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {estadoAprobacion.estado === 'rechazado' && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <div className="text-sm text-red-800">
+                  <strong>Semana rechazada</strong>
+                  {estadoAprobacion.motivoRechazo && (
+                    <span className="text-red-600 ml-1">— {estadoAprobacion.motivoRechazo}</span>
+                  )}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-100"
+                onClick={enviarParaAprobacion}
+                disabled={enviando}
+              >
+                <Send className="h-4 w-4 mr-1" />
+                {enviando ? 'Reenviando...' : 'Reenviar'}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Navegación de semanas + Stats en una fila */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-3">
@@ -169,11 +284,13 @@ export default function TimesheetPage() {
       )}
 
       {/* Wizard de registro de horas */}
-      <RegistroHorasWizard
-        open={showWizard}
-        onOpenChange={setShowWizard}
-        onSuccess={handleRegistroExitoso}
-      />
+      {!semanaBloqueada && (
+        <RegistroHorasWizard
+          open={showWizard}
+          onOpenChange={setShowWizard}
+          onSuccess={handleRegistroExitoso}
+        />
+      )}
     </div>
   )
 }
