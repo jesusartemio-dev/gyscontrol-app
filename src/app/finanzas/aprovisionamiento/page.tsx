@@ -7,7 +7,6 @@ import {
   Package,
   FileText,
   ShoppingCart,
-  Truck,
   DollarSign,
   AlertTriangle,
   TrendingUp,
@@ -18,9 +17,7 @@ import {
   Calendar,
   Loader2,
   Eye,
-  Building2,
   CheckCircle,
-  Clock,
   Filter
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -136,17 +133,14 @@ function AprovisionamientoContent() {
   const hasFilters = search || estado !== 'all'
 
   const formatMonto = (monto: number) =>
-    `$${monto.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', maximumFractionDigits: 0 }).format(monto)
 
   if (loading) {
     return (
       <div className="p-4 space-y-4">
         <Skeleton className="h-10 w-48" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20" />)}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
         </div>
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-96 w-full" />
@@ -193,167 +187,83 @@ function AprovisionamientoContent() {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* KPIs principales */}
+        {/* KPIs + navegacion consolidados */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card className="border-l-4 border-l-blue-400">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-blue-500" />
-                <div>
-                  <div className="text-lg font-bold text-blue-600">{kpis?.totalProyectos || 0}</div>
-                  <div className="text-[11px] text-muted-foreground">Proyectos</div>
-                  <div className="text-[10px] text-muted-foreground">{kpis?.proyectosActivos || 0} activos</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-emerald-400">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-emerald-500" />
-                <div>
-                  <div className="text-lg font-bold text-emerald-600">{kpis?.totalListas || 0}</div>
-                  <div className="text-[11px] text-muted-foreground">Listas</div>
-                  <div className="text-[10px] text-muted-foreground">{formatMonto(kpis?.montoTotalListas || 0)}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-purple-400">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-4 w-4 text-purple-500" />
-                <div>
-                  <div className="text-lg font-bold text-purple-600">{kpis?.totalPedidos || 0}</div>
-                  <div className="text-[11px] text-muted-foreground">Pedidos</div>
-                  <div className="text-[10px] text-muted-foreground">{formatMonto(kpis?.montoTotalPedidos || 0)}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className={`border-l-4 ${(kpis?.totalAlertas || 0) > 0 ? 'border-l-red-400' : 'border-l-green-400'}`}>
-            <CardContent className="p-3">
-              <div className="flex items-center gap-2">
-                {(kpis?.totalAlertas || 0) > 0
-                  ? <AlertTriangle className="h-4 w-4 text-red-500" />
-                  : <CheckCircle className="h-4 w-4 text-green-500" />
-                }
-                <div>
-                  <div className={`text-lg font-bold ${(kpis?.totalAlertas || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {kpis?.totalAlertas || 0}
+          {/* Listas Tecnicas */}
+          <Link href="/finanzas/aprovisionamiento/listas">
+            <Card className="border-l-4 border-l-emerald-400 hover:shadow-md transition-shadow cursor-pointer h-full">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="text-[11px] font-medium text-muted-foreground">Listas</span>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">Alertas</div>
-                  <div className="text-[10px] text-muted-foreground">
-                    {desviacion !== 0 ? `${desviacion > 0 ? '+' : ''}${desviacion}% desviación` : 'Sin desviación'}
-                  </div>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
                 </div>
+                <div className="text-lg font-bold text-emerald-600">{formatMonto(kpis?.montoTotalListas || 0)}</div>
+                <div className="text-[10px] text-muted-foreground">{kpis?.totalListas || 0} listas en {kpis?.totalProyectos || 0} proyectos</div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Pedidos */}
+          <Link href="/finanzas/aprovisionamiento/pedidos">
+            <Card className="border-l-4 border-l-purple-400 hover:shadow-md transition-shadow cursor-pointer h-full">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <ShoppingCart className="h-3.5 w-3.5 text-purple-500" />
+                    <span className="text-[11px] font-medium text-muted-foreground">Pedidos</span>
+                  </div>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+                <div className="text-lg font-bold text-purple-600">{formatMonto(kpis?.montoTotalPedidos || 0)}</div>
+                <div className="text-[10px] text-muted-foreground">{kpis?.totalPedidos || 0} pedidos</div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Desviacion (Listas vs Pedidos) */}
+          <Card className={`border-l-4 ${desviacion > 5 ? 'border-l-red-400' : desviacion < -5 ? 'border-l-amber-400' : 'border-l-green-400'}`}>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <TrendingUp className={`h-3.5 w-3.5 ${desviacion > 5 ? 'text-red-500' : desviacion < -5 ? 'text-amber-500' : 'text-green-500'}`} />
+                <span className="text-[11px] font-medium text-muted-foreground">Desviacion</span>
+              </div>
+              <div className={`text-lg font-bold ${desviacion > 5 ? 'text-red-600' : desviacion < -5 ? 'text-amber-600' : 'text-green-600'}`}>
+                {desviacion !== 0 ? `${desviacion > 0 ? '+' : ''}${desviacion}%` : '0%'}
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                {formatMonto(Math.abs((kpis?.montoTotalPedidos || 0) - (kpis?.montoTotalListas || 0)))} diferencia
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Resumen financiero */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white rounded-lg border p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Presupuesto Listas</span>
-              <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
-            </div>
-            <p className="text-base font-bold mt-1">{formatMonto(kpis?.montoTotalListas || 0)}</p>
-          </div>
-          <div className="bg-white rounded-lg border p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Monto Pedidos</span>
-              <DollarSign className="h-3.5 w-3.5 text-purple-500" />
-            </div>
-            <p className="text-base font-bold mt-1">{formatMonto(kpis?.montoTotalPedidos || 0)}</p>
-          </div>
-          <div className="bg-white rounded-lg border p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Diferencia</span>
-              <TrendingUp className={`h-3.5 w-3.5 ${desviacion > 5 ? 'text-red-500' : desviacion < -5 ? 'text-amber-500' : 'text-green-500'}`} />
-            </div>
-            <p className={`text-base font-bold mt-1 ${desviacion > 5 ? 'text-red-600' : desviacion < -5 ? 'text-amber-600' : 'text-green-600'}`}>
-              {formatMonto(Math.abs((kpis?.montoTotalPedidos || 0) - (kpis?.montoTotalListas || 0)))}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg border p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Progreso Promedio</span>
-              <Clock className="h-3.5 w-3.5 text-blue-500" />
-            </div>
-            <p className="text-base font-bold mt-1 text-blue-600">{kpis?.progresoPromedio || 0}%</p>
-          </div>
-        </div>
-
-        {/* Secciones rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          {[
-            {
-              title: 'Proyectos',
-              href: '/finanzas/aprovisionamiento/proyectos',
-              icon: Building2,
-              color: 'bg-blue-100 text-blue-600',
-              borderColor: 'border-l-blue-400',
-              stat: kpis?.totalProyectos || 0,
-              sub: `${kpis?.proyectosActivos || 0} activos`,
-            },
-            {
-              title: 'Listas Técnicas',
-              href: '/finanzas/aprovisionamiento/listas',
-              icon: FileText,
-              color: 'bg-emerald-100 text-emerald-600',
-              borderColor: 'border-l-emerald-400',
-              stat: kpis?.totalListas || 0,
-              sub: formatMonto(kpis?.montoTotalListas || 0),
-            },
-            {
-              title: 'Pedidos',
-              href: '/finanzas/aprovisionamiento/pedidos',
-              icon: ShoppingCart,
-              color: 'bg-purple-100 text-purple-600',
-              borderColor: 'border-l-purple-400',
-              stat: kpis?.totalPedidos || 0,
-              sub: formatMonto(kpis?.montoTotalPedidos || 0),
-            },
-            {
-              title: 'Timeline',
-              href: '/finanzas/aprovisionamiento/timeline',
-              icon: Calendar,
-              color: 'bg-amber-100 text-amber-600',
-              borderColor: 'border-l-amber-400',
-              stat: kpis?.progresoPromedio || 0,
-              sub: 'progreso promedio',
-              isStat: true,
-            },
-          ].map(section => {
-            const Icon = section.icon
-            return (
-              <Link key={section.href} href={section.href}>
-                <Card className={`border-l-4 ${section.borderColor} hover:shadow-md transition-shadow cursor-pointer h-full`}>
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-7 w-7 rounded-lg ${section.color} flex items-center justify-center flex-shrink-0`}>
-                          <Icon className="h-3.5 w-3.5" />
-                        </div>
-                        <div>
-                          <h3 className="text-xs font-semibold">{section.title}</h3>
-                          <p className="text-[10px] text-muted-foreground">{section.sub}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-lg font-bold text-muted-foreground">
-                          {section.isStat ? `${section.stat}%` : section.stat}
-                        </span>
-                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            )
-          })}
+          {/* Alertas + Progreso */}
+          <Link href="/finanzas/aprovisionamiento/timeline">
+            <Card className={`border-l-4 ${(kpis?.totalAlertas || 0) > 0 ? 'border-l-red-400' : 'border-l-green-400'} hover:shadow-md transition-shadow cursor-pointer h-full`}>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    {(kpis?.totalAlertas || 0) > 0
+                      ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                      : <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                    }
+                    <span className="text-[11px] font-medium text-muted-foreground">Estado</span>
+                  </div>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-lg font-bold ${(kpis?.totalAlertas || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {kpis?.totalAlertas || 0} alerta{(kpis?.totalAlertas || 0) !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {kpis?.progresoPromedio || 0}% progreso promedio
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Filtros */}
