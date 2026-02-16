@@ -250,6 +250,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
       { label: 'Dashboard', href: '/administracion' },
       { label: 'Gestión de Gastos', href: '/administracion/gastos' },
       { label: 'Rendiciones', href: '/administracion/rendiciones' },
+      { label: 'Facturación', href: '/administracion/facturacion' },
       { label: 'Cuentas por Cobrar', href: '/administracion/cuentas-cobrar' },
       { label: 'Cuentas por Pagar', href: '/administracion/cuentas-pagar' },
       { label: 'Cuentas Bancarias', href: '/administracion/cuentas-bancarias' },

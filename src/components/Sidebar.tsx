@@ -274,6 +274,7 @@ export default function Sidebar() {
         { href: '/administracion', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/administracion/gastos', label: 'Gestión de Gastos', icon: Receipt },
         { href: '/administracion/rendiciones', label: 'Rendiciones', icon: FileCheck },
+        { href: '/administracion/facturacion', label: 'Facturación', icon: FileSpreadsheet },
         { href: '/administracion/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: ArrowDownCircle },
         { href: '/administracion/cuentas-pagar', label: 'Cuentas por Pagar', icon: ArrowUpCircle },
         { href: '/administracion/cuentas-bancarias', label: 'Cuentas Bancarias', icon: Landmark },

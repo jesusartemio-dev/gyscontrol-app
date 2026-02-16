@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Receipt, Edit, Ban, DollarSign } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Send, CheckCircle, Edit, Ban, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Proyecto {
@@ -108,9 +108,6 @@ export default function ValorizacionesPage() {
   // Estado transition dialog
   const [showEstadoDialog, setShowEstadoDialog] = useState(false)
   const [estadoTarget, setEstadoTarget] = useState<{ val: Valorizacion; estado: string } | null>(null)
-  const [crearCxC, setCrearCxC] = useState(true)
-  const [fechaVencCxC, setFechaVencCxC] = useState('')
-  const [numDocCxC, setNumDocCxC] = useState('')
 
   useEffect(() => { loadData() }, [])
 
@@ -242,13 +239,6 @@ export default function ValorizacionesPage() {
 
   const openEstadoTransition = (val: Valorizacion, nuevoEstado: string) => {
     setEstadoTarget({ val, estado: nuevoEstado })
-    if (nuevoEstado === 'facturada') {
-      setCrearCxC(true)
-      const venc = new Date()
-      venc.setDate(venc.getDate() + 30)
-      setFechaVencCxC(venc.toISOString().split('T')[0])
-      setNumDocCxC('')
-    }
     setShowEstadoDialog(true)
   }
 
@@ -257,11 +247,6 @@ export default function ValorizacionesPage() {
     setSaving(true)
     try {
       const body: any = { estado: estadoTarget.estado }
-      if (estadoTarget.estado === 'facturada' && crearCxC) {
-        body.crearCuentaCobrar = true
-        body.fechaVencimiento = fechaVencCxC
-        body.numeroDocumento = numDocCxC || null
-      }
       const res = await fetch(`/api/proyectos/${estadoTarget.val.proyectoId}/valorizaciones/${estadoTarget.val.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -418,17 +403,7 @@ export default function ValorizacionesPage() {
                             <CheckCircle className="h-4 w-4 text-emerald-600" />
                           </Button>
                         )}
-                        {item.estado === 'aprobada_cliente' && (
-                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'facturada')} title="Facturar">
-                            <Receipt className="h-4 w-4 text-purple-600" />
-                          </Button>
-                        )}
-                        {item.estado === 'facturada' && (
-                          <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'pagada')} title="Marcar pagada">
-                            <DollarSign className="h-4 w-4 text-green-600" />
-                          </Button>
-                        )}
-                        {item.estado !== 'anulada' && item.estado !== 'pagada' && (
+                        {!['anulada', 'pagada', 'facturada', 'aprobada_cliente'].includes(item.estado) && (
                           <Button variant="ghost" size="icon" onClick={() => openEstadoTransition(item, 'anulada')} title="Anular">
                             <Ban className="h-3.5 w-3.5 text-red-500" />
                           </Button>
@@ -606,8 +581,10 @@ export default function ValorizacionesPage() {
           </DialogHeader>
           {showDetail && (
             <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
+              {/* Banner de flujo de estados */}
+              <ValorizacionFlowBanner estado={showDetail.estado} />
+
               <div className="flex items-center gap-2">
-                <Badge className={getEstadoColor(showDetail.estado)}>{getEstadoLabel(showDetail.estado)}</Badge>
                 <Badge variant="outline">{showDetail.moneda}</Badge>
                 {showDetail.tipoCambio && <span className="text-xs text-muted-foreground">TC: {showDetail.tipoCambio}</span>}
                 <span className="text-muted-foreground">{formatPeriod(showDetail.periodoInicio, showDetail.periodoFin)}</span>
@@ -676,35 +653,12 @@ export default function ValorizacionesPage() {
               {estadoTarget && `${estadoTarget.val.codigo} → ${getEstadoLabel(estadoTarget.estado)}`}
             </DialogDescription>
           </DialogHeader>
-          {estadoTarget?.estado === 'facturada' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="crearCxC" checked={crearCxC} onChange={e => setCrearCxC(e.target.checked)} className="h-4 w-4" />
-                <Label htmlFor="crearCxC">Crear Cuenta por Cobrar automáticamente</Label>
-              </div>
-              {crearCxC && (
-                <>
-                  <div>
-                    <Label>N° Documento / Factura</Label>
-                    <Input placeholder="F001-00123" value={numDocCxC} onChange={e => setNumDocCxC(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Fecha Vencimiento CxC</Label>
-                    <Input type="date" value={fechaVencCxC} onChange={e => setFechaVencCxC(e.target.value)} />
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Monto: <span className="font-mono font-medium">{estadoTarget && formatCurrency(estadoTarget.val.netoARecibir, estadoTarget.val.moneda)}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
           {estadoTarget?.estado === 'anulada' && (
             <p className="text-sm text-red-600">
               Esta acción anulará la valorización. Las valorizaciones anuladas no se incluyen en el cálculo del acumulado.
             </p>
           )}
-          {estadoTarget?.estado !== 'facturada' && estadoTarget?.estado !== 'anulada' && (
+          {estadoTarget?.estado !== 'anulada' && (
             <p className="text-sm text-muted-foreground">
               ¿Confirmar cambio de estado a <strong>{estadoTarget && getEstadoLabel(estadoTarget.estado)}</strong>?
             </p>
@@ -722,6 +676,56 @@ export default function ValorizacionesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+const FLOW_STEPS = [
+  { value: 'borrador', label: 'Borrador' },
+  { value: 'enviada', label: 'Enviada' },
+  { value: 'aprobada_cliente', label: 'Aprobada Cliente' },
+  { value: 'facturada', label: 'Facturada' },
+  { value: 'pagada', label: 'Pagada' },
+]
+
+function ValorizacionFlowBanner({ estado }: { estado: string }) {
+  if (estado === 'anulada') {
+    return (
+      <div className="flex items-center justify-center py-2">
+        <Badge className="bg-red-100 text-red-700 text-sm px-4 py-1">Anulada</Badge>
+      </div>
+    )
+  }
+
+  const currentIdx = FLOW_STEPS.findIndex(s => s.value === estado)
+
+  return (
+    <div className="flex items-center gap-1 py-2 overflow-x-auto">
+      {FLOW_STEPS.map((step, idx) => {
+        const isPast = idx < currentIdx
+        const isCurrent = idx === currentIdx
+        const isFuture = idx > currentIdx
+
+        return (
+          <React.Fragment key={step.value}>
+            {idx > 0 && (
+              <div className={`h-0.5 w-4 flex-shrink-0 ${isPast || isCurrent ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+            )}
+            <div
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 ${
+                isCurrent
+                  ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-400'
+                  : isPast
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'bg-gray-100 text-gray-400'
+              }`}
+            >
+              {(isPast || isCurrent) && <Check className="h-3 w-3" />}
+              {step.label}
+            </div>
+          </React.Fragment>
+        )
+      })}
     </div>
   )
 }
