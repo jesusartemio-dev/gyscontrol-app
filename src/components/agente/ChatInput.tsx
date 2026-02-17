@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { ArrowUp, Paperclip, X, FileText } from 'lucide-react'
+import { SendHorizontal, Paperclip, X, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ChatAttachment } from '@/lib/agente/types'
 
@@ -85,18 +85,18 @@ export function ChatInput({ onSend, disabled, placeholder }: Props) {
   }, [])
 
   return (
-    <div className="p-3 bg-slate-50/80">
-      {/* Card container */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition-shadow focus-within:shadow-md focus-within:border-blue-300">
+    <div className="px-3 pb-3 pt-2 bg-[#f8fafc]">
+      {/* Floating card */}
+      <div className="bg-white rounded-xl border border-[#e2e8f0] shadow-md overflow-hidden transition-shadow focus-within:shadow-lg focus-within:border-[#2563eb]/40">
         {/* Attachment previews */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-3 pt-3">
             {attachments.map((att, i) => (
               <div
                 key={i}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-100 px-2.5 py-1.5 text-xs text-blue-700"
+                className="flex items-center gap-1.5 rounded-lg bg-[#eff6ff] border border-blue-100 px-2.5 py-1.5 text-xs text-[#1d4ed8]"
               >
-                <FileText className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                <FileText className="h-3.5 w-3.5 shrink-0 text-[#3b82f6]" />
                 <span className="max-w-[130px] truncate">{att.name}</span>
                 <button
                   onClick={() => removeAttachment(i)}
@@ -116,10 +116,10 @@ export function ChatInput({ onSend, disabled, placeholder }: Props) {
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
             className={cn(
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors',
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors',
               disabled
-                ? 'text-gray-300 cursor-not-allowed'
-                : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                ? 'text-[#cbd5e1] cursor-not-allowed'
+                : 'text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#64748b]'
             )}
             title="Adjuntar PDF o imagen"
           >
@@ -140,12 +140,12 @@ export function ChatInput({ onSend, disabled, placeholder }: Props) {
             value={text}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder || 'Describe lo que necesitas cotizar...'}
+            placeholder={placeholder || 'Describe qué necesitas cotizar...'}
             disabled={disabled}
             rows={1}
             className={cn(
-              'flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none',
-              'placeholder:text-gray-400',
+              'flex-1 resize-none bg-transparent px-2 py-2 text-sm text-[#1e293b] outline-none',
+              'placeholder:text-[#94a3b8]',
               'disabled:cursor-not-allowed disabled:opacity-50',
               'scrollbar-thin'
             )}
@@ -156,16 +156,21 @@ export function ChatInput({ onSend, disabled, placeholder }: Props) {
             onClick={handleSend}
             disabled={!canSend}
             className={cn(
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-200',
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all duration-200',
               canSend
-                ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:shadow-md active:scale-95'
-                : 'bg-gray-100 text-gray-400'
+                ? 'bg-[#2563eb] text-white shadow-sm hover:bg-[#1d4ed8] hover:shadow-md hover:scale-105 active:scale-95'
+                : 'bg-[#f1f5f9] text-[#cbd5e1]'
             )}
           >
-            <ArrowUp className="h-4 w-4" />
+            <SendHorizontal className="h-4 w-4" />
           </button>
         </div>
       </div>
+
+      {/* Keyboard hint */}
+      <p className="text-center text-[10px] text-[#94a3b8] mt-1.5">
+        Enter para enviar · Shift+Enter para nueva línea
+      </p>
     </div>
   )
 }

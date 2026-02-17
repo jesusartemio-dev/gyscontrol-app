@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Sparkles, Trash2, Package, FileEdit, FileSearch, Search } from 'lucide-react'
+import { Sparkles, Trash2, X, Package, FileEdit, FileSearch, BarChart3, ShieldCheck } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -23,10 +23,10 @@ interface Props {
 }
 
 const SUGGESTIONS = [
-  { icon: Package, label: 'Buscar equipos en catálogo', color: 'text-blue-600 bg-blue-50 border-blue-100' },
-  { icon: FileEdit, label: 'Crear nueva cotización', color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-  { icon: FileSearch, label: 'Analizar un TDR', color: 'text-violet-600 bg-violet-50 border-violet-100' },
-  { icon: Search, label: 'Buscar cotización anterior', color: 'text-amber-600 bg-amber-50 border-amber-100' },
+  { icon: Package, label: 'Buscar equipos', color: 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100' },
+  { icon: FileEdit, label: 'Nueva cotización', color: 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' },
+  { icon: FileSearch, label: 'Analizar TDR', color: 'text-violet-700 bg-violet-50 border-violet-200 hover:bg-violet-100' },
+  { icon: BarChart3, label: 'Ver mi pipeline', color: 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100' },
 ]
 
 export function ChatPanel({ open, onOpenChange }: Props) {
@@ -207,68 +207,83 @@ export function ChatPanel({ open, onOpenChange }: Props) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col p-0 sm:max-w-[520px]"
+        className="flex w-full flex-col p-0 sm:max-w-[520px] [&>button:first-child]:hidden"
       >
-        {/* Header with gradient */}
-        <SheetHeader className="flex-row items-center justify-between bg-gradient-to-r from-[#1e3a5f] to-blue-600 px-5 py-4 space-y-0">
+        {/* ── Header ── */}
+        <SheetHeader className="flex-row items-center justify-between bg-gradient-to-r from-[#1e3a5f] to-[#2563eb] px-5 py-4 space-y-0">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
-              <SheetTitle className="text-sm font-semibold text-white">
+              <SheetTitle className="text-sm font-semibold text-white leading-tight">
                 Asistente GYS
               </SheetTitle>
-              <SheetDescription className="text-xs text-blue-200">
-                IA Comercial
+              <SheetDescription className="flex items-center gap-1.5 text-[11px] text-blue-200 mt-0.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                En línea
               </SheetDescription>
             </div>
           </div>
-          {messages.length > 0 && (
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <button
+                onClick={handleClear}
+                className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                title="Limpiar conversación"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
             <button
-              onClick={handleClear}
-              className="rounded-lg p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-              title="Limpiar conversación"
+              onClick={() => onOpenChange(false)}
+              className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+              title="Cerrar"
             >
-              <Trash2 className="h-4 w-4" />
+              <X className="h-4 w-4" />
             </button>
-          )}
+          </div>
         </SheetHeader>
 
-        {/* Messages area */}
+        {/* ── Messages area ── */}
         <div
           ref={scrollRef}
           className="flex-1 overflow-y-auto bg-[#f8fafc]"
           style={{
             backgroundImage:
-              'radial-gradient(circle, #e2e8f0 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
+              'radial-gradient(circle, #e2e8f0 0.5px, transparent 0.5px)',
+            backgroundSize: '20px 20px',
           }}
         >
           {messages.length === 0 ? (
-            /* Welcome state */
+            /* ── Welcome state ── */
             <div className="flex h-full flex-col items-center justify-center px-8">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg shadow-blue-500/20 mb-5">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#1d4ed8] shadow-lg shadow-blue-500/25 mb-5">
                 <Sparkles className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-base font-semibold text-gray-800 mb-1">
-                ¿En qué puedo ayudarte?
+              <h3 className="text-base font-semibold text-[#1e293b] mb-1">
+                ¡Hola! Soy tu asistente comercial
               </h3>
-              <p className="text-xs text-gray-500 mb-6 text-center max-w-[280px]">
-                Busco equipos, creo cotizaciones, analizo TDRs y más.
+              <p className="text-xs text-[#64748b] mb-6 text-center max-w-[300px]">
+                Puedo ayudarte con:
               </p>
 
-              <div className="grid grid-cols-2 gap-2.5 w-full max-w-[360px]">
+              <div className="grid grid-cols-2 gap-2.5 w-full max-w-[340px]">
                 {SUGGESTIONS.map((s) => (
                   <button
                     key={s.label}
                     onClick={() => handleSuggestion(s.label)}
-                    className={`flex items-start gap-2.5 rounded-xl border p-3 text-left transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] ${s.color}`}
+                    className={`flex items-center gap-2.5 rounded-xl border p-3 text-left transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] ${s.color}`}
                   >
-                    <s.icon className="h-4 w-4 shrink-0 mt-0.5" />
+                    <s.icon className="h-4 w-4 shrink-0" />
                     <span className="text-xs font-medium leading-tight">{s.label}</span>
                   </button>
                 ))}
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-8 text-[10px] text-[#94a3b8]">
+                <ShieldCheck className="h-3 w-3" />
+                <span>Powered by AI · Los datos no salen de tu empresa</span>
               </div>
             </div>
           ) : (
@@ -280,7 +295,7 @@ export function ChatPanel({ open, onOpenChange }: Props) {
           )}
         </div>
 
-        {/* Input */}
+        {/* ── Input ── */}
         <ChatInput
           onSend={handleSend}
           disabled={isStreaming}
