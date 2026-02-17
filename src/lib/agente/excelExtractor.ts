@@ -4,7 +4,7 @@
 
 import * as XLSX from 'xlsx'
 import Anthropic from '@anthropic-ai/sdk'
-import { getModelForTask } from './models'
+import { getModelForTask, MODELS } from './models'
 
 // ── Tipos de datos extraídos ──────────────────────────────
 
@@ -219,19 +219,72 @@ function repairTruncatedJson(text: string): string {
   return result
 }
 
-function parseJsonRobust(rawText: string): unknown {
-  let text = rawText.trim()
+function extractJsonSubstring(text: string): string {
+  // Step A: Strip markdown code fences (```json ... ``` or ``` ... ```)
+  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
+  if (fenceMatch) return fenceMatch[1].trim()
 
-  // Strip markdown code fences
-  if (text.startsWith('```')) {
-    text = text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')
+  // Step B: Strip BOM and leading non-JSON characters
+  let cleaned = text.replace(/^\uFEFF/, '').trim()
+
+  // Step C: Find the first { or [ and last } or ]
+  const firstOpen = findFirstJsonChar(cleaned)
+  const lastClose = findLastJsonChar(cleaned)
+
+  if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+    cleaned = cleaned.substring(firstOpen, lastClose + 1)
   }
+
+  return cleaned
+}
+
+function findFirstJsonChar(text: string): number {
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{' || text[i] === '[') return i
+  }
+  return -1
+}
+
+function findLastJsonChar(text: string): number {
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (text[i] === '}' || text[i] === ']') return i
+  }
+  return -1
+}
+
+function findLargestJsonBlock(text: string): string | null {
+  // Try to find the largest parseable JSON block line by line
+  const lines = text.split('\n')
+  let bestJson: string | null = null
+  let bestLength = 0
+
+  for (let start = 0; start < lines.length; start++) {
+    const line = lines[start].trim()
+    if (!line.startsWith('{') && !line.startsWith('[')) continue
+
+    for (let end = lines.length; end > start; end--) {
+      const candidate = lines.slice(start, end).join('\n').trim()
+      if (candidate.length <= bestLength) continue
+      if (tryParseJson(candidate) !== null) {
+        bestJson = candidate
+        bestLength = candidate.length
+        break // Found largest block starting at this line
+      }
+    }
+  }
+
+  return bestJson
+}
+
+function parseJsonRobust(rawText: string): unknown {
+  // Step 0: Clean and extract JSON substring
+  const text = extractJsonSubstring(rawText)
 
   // Step 1: Direct parse
   const direct = tryParseJson(text)
   if (direct !== null) return direct
 
-  // Step 2: Repair truncated JSON
+  // Step 2: Repair truncated JSON (bracket stack)
   const repaired = repairTruncatedJson(text)
   const repairedResult = tryParseJson(repaired)
   if (repairedResult !== null) {
@@ -240,7 +293,7 @@ function parseJsonRobust(rawText: string): unknown {
   }
 
   // Step 3: Aggressive truncation to last complete structure
-  const lastClose = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'))
+  const lastClose = findLastJsonChar(text)
   if (lastClose > text.length * 0.3) {
     const truncated = text.substring(0, lastClose + 1)
     const truncatedRepaired = repairTruncatedJson(truncated)
@@ -251,30 +304,46 @@ function parseJsonRobust(rawText: string): unknown {
     }
   }
 
-  // Step 4: Give up — log raw for debugging
-  console.error('[excelExtractor] Unparseable response:', rawText.substring(0, 500))
+  // Step 4: Line-by-line search for largest JSON block
+  const blockJson = findLargestJsonBlock(rawText)
+  if (blockJson) {
+    const blockResult = tryParseJson(blockJson)
+    if (blockResult !== null) {
+      console.warn('[excelExtractor] JSON extracted from largest block')
+      return blockResult
+    }
+  }
+
+  // Step 5: Give up — log diagnostic info
+  const len = rawText.length
+  const first200 = rawText.substring(0, 200)
+  const last200 = len > 200 ? rawText.substring(len - 200) : ''
+  console.error(`[excelExtractor] Unparseable response (${len} chars)`)
+  console.error(`[excelExtractor] First 200 chars: ${first200}`)
+  if (last200) console.error(`[excelExtractor] Last 200 chars: ${last200}`)
   throw new Error('Error al interpretar la respuesta del modelo (JSON inválido)')
 }
 
 // ── System prompt (shared across all calls) ──────────────
 
-const SYSTEM_PROMPT = `Eres un experto en análisis de cotizaciones de automatización industrial de GYS Control Industrial (Perú).
-Extraes datos estructurados de archivos Excel de cotización interna.
+const SYSTEM_PROMPT = `You are a JSON extraction API. You ONLY respond with valid JSON. Never include explanations, markdown formatting, code fences, or any text outside the JSON object.
 
-CONTEXTO DEL FORMATO:
-- Hojas de EQUIPOS (MAT. ELECTRICOS, MAT. TABLEROS, SOFTWARE): items con código, descripción, unidad, marca, cantidad, precio lista, factores
-- Columnas "GYS CONTROL" o "INTEGRADOR" = precioInterno. Columna "CLIENTE" = precioCliente
+You are an expert in industrial automation quotations from GYS Control Industrial (Peru). You extract structured data from internal quotation Excel files.
+
+FORMAT CONTEXT:
+- EQUIPOS sheets (MAT. ELECTRICOS, MAT. TABLEROS, SOFTWARE): items with código, descripción, unidad, marca, cantidad, precio lista, factors
+- Columns "GYS CONTROL" or "INTEGRADOR" = precioInterno. Column "CLIENTE" = precioCliente
 - factorCosto = precioInterno / precioLista. factorVenta = precioCliente / precioInterno
-- Hojas de SERVICIOS (SERV. ING., SERV. CON, SERV. PRO): matrices de horas×recurso
-- Recursos: Senior A/B, Semisenior A/B, Junior A/B con tarifas OFICINA y CAMPO
-- Hojas de GASTOS (COVID, MOVIL., OPERAT.): items con cantidad, precio unitario, totales
+- SERVICIOS sheets (SERV. ING., SERV. CON, SERV. PRO): hours×resource matrices
+- Resources: Senior A/B, Semisenior A/B, Junior A/B with OFICINA and CAMPO rates
+- GASTOS sheets (COVID, MOVIL., OPERAT.): items with cantidad, precio unitario, totals
 
-REGLAS:
-- Extrae TODOS los items, no omitas filas
-- Si un campo no tiene datos claros, usa null
+RULES:
+- Extract ALL items, do not omit rows
+- If a field has no clear data, use null
 - Defaults: factorCosto=1.00, factorVenta=1.25
-- Conserva nombres de recursos tal cual aparecen
-- Responde SOLO con JSON válido, sin markdown, sin backticks, sin texto adicional`
+- Preserve resource names exactly as they appear
+- CRITICAL: Respond ONLY with the raw JSON object. No text before or after. No markdown. No code fences. Just the JSON.`
 
 // ── Per-type prompt builders ─────────────────────────────
 
@@ -284,7 +353,7 @@ function buildResumenPrompt(sheet: SheetTextData): string {
 --- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
 ${sheet.csv}
 
-Devuelve JSON:
+Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses markdown. Solo el JSON puro:
 {"resumen":{"totalInterno":0,"totalCliente":0,"moneda":"USD","margenGlobal":null,"nombreProyecto":"nombre o null","clienteNombre":"nombre o null"}}`
 }
 
@@ -294,7 +363,7 @@ ${resumenCtx}
 --- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
 ${sheet.csv}
 
-Devuelve JSON con TODOS los items:
+Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses markdown. Solo el JSON puro con TODOS los items:
 {"equipos":[{"grupo":"nombre descriptivo","hoja":"${sheet.name}","items":[{"descripcion":"...","codigo":"...o null","categoria":"...","unidad":"Und","marca":"...","cantidad":1,"precioLista":100,"precioInterno":100,"precioCliente":125,"factorCosto":1.00,"factorVenta":1.25}]}]}`
 }
 
@@ -304,7 +373,7 @@ ${resumenCtx}
 --- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
 ${sheet.csv}
 
-Devuelve JSON:
+Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses markdown. Solo el JSON puro:
 {"servicios":[{"grupo":"nombre descriptivo","hoja":"${sheet.name}","edtSugerido":"EDT sugerido","factorSeguridad":1.0,"margen":1.35,"actividades":[{"nombre":"...","descripcion":"...","recursos":[{"recursoNombre":"Senior A","tipo":"oficina","costoHora":30,"horas":40}],"horasTotal":40,"costoInterno":1200,"costoCliente":1620}]}]}`
 }
 
@@ -314,11 +383,11 @@ ${resumenCtx}
 --- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
 ${sheet.csv}
 
-Devuelve JSON:
+Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses markdown. Solo el JSON puro:
 {"gastos":[{"grupo":"nombre descriptivo","hoja":"${sheet.name}","items":[{"nombre":"...","descripcion":"...o null","cantidad":1,"precioUnitario":50,"costoInterno":50,"costoCliente":67.50}]}]}`
 }
 
-// ── Claude API call with retry ───────────────────────────
+// ── Claude API call with retry + parse validation + Sonnet fallback ──
 
 function getClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -326,37 +395,76 @@ function getClient(): Anthropic {
   return new Anthropic({ apiKey, timeout: 90_000 })
 }
 
-async function callClaude(
+const RETRY_JSON_PREFIX = `CRITICAL: Your previous response was not valid JSON. Respond with ONLY a JSON object, nothing else. No explanations, no markdown, no code fences.\n\n`
+
+async function callClaudeRaw(
+  client: Anthropic,
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number
+): Promise<string> {
+  const response = await client.messages.create({
+    model,
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+  })
+
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+}
+
+/**
+ * Call Claude and parse JSON with up to 3 attempts:
+ * 1. Normal call with Haiku
+ * 2. Retry with stronger JSON prompt (Haiku)
+ * 3. Fallback to Sonnet (more reliable with JSON)
+ */
+async function callClaudeJson(
   client: Anthropic,
   model: string,
   userPrompt: string,
-  maxTokens: number = 8192
-): Promise<string> {
-  let lastError: unknown
+  maxTokens: number = 8192,
+  sheetName?: string
+): Promise<unknown> {
+  const label = sheetName ? ` [${sheetName}]` : ''
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Attempt 1: Normal call
+  try {
+    const raw = await callClaudeRaw(client, model, SYSTEM_PROMPT, userPrompt, maxTokens)
+    return parseJsonRobust(raw)
+  } catch (err) {
+    console.warn(`[excelExtractor]${label} Attempt 1 failed:`, err instanceof Error ? err.message : err)
+  }
+
+  // Attempt 2: Retry with stronger JSON prefix
+  await new Promise((r) => setTimeout(r, 2000))
+  console.log(`[excelExtractor]${label} Retry attempt 2 (enhanced prompt)`)
+  try {
+    const raw = await callClaudeRaw(client, model, SYSTEM_PROMPT, RETRY_JSON_PREFIX + userPrompt, maxTokens)
+    return parseJsonRobust(raw)
+  } catch (err) {
+    console.warn(`[excelExtractor]${label} Attempt 2 failed:`, err instanceof Error ? err.message : err)
+  }
+
+  // Attempt 3: Fallback to Sonnet (more expensive but more reliable)
+  const sonnetModel = MODELS.sonnet
+  if (model !== sonnetModel) {
+    await new Promise((r) => setTimeout(r, 1000))
+    console.log(`[excelExtractor]${label} Retry attempt 3 (Sonnet fallback)`)
     try {
-      const response = await client.messages.create({
-        model,
-        max_tokens: maxTokens,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-      })
-
-      return response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-        .map((b) => b.text)
-        .join('')
+      const raw = await callClaudeRaw(client, sonnetModel, SYSTEM_PROMPT, userPrompt, maxTokens)
+      return parseJsonRobust(raw)
     } catch (err) {
-      lastError = err
-      if (attempt === 0) {
-        console.warn('[excelExtractor] Retry after error:', err instanceof Error ? err.message : err)
-        await new Promise((r) => setTimeout(r, 2000))
-      }
+      console.error(`[excelExtractor]${label} Sonnet fallback also failed:`, err instanceof Error ? err.message : err)
+      throw err
     }
   }
 
-  throw lastError
+  throw new Error(`Error al interpretar la respuesta del modelo para hoja${label}`)
 }
 
 // ── Per-type parsers ─────────────────────────────────────
@@ -467,8 +575,7 @@ export async function extractWithClaude(
   let resumen: ExcelResumen = { totalInterno: 0, totalCliente: 0, moneda: 'USD' }
   if (groups.resumen.length > 0) {
     onProgress?.('Extrayendo resumen...')
-    const text = await callClaude(client, model, buildResumenPrompt(groups.resumen[0]), 2048)
-    const raw = parseJsonRobust(text) as Record<string, unknown>
+    const raw = await callClaudeJson(client, model, buildResumenPrompt(groups.resumen[0]), 2048, 'RESUMEN') as Record<string, unknown>
     resumen = parseResumen((raw.resumen as Record<string, unknown>) || raw)
   }
 
@@ -480,8 +587,7 @@ export async function extractWithClaude(
       const chunk = chunks[ci]
       const part = chunks.length > 1 ? ` (${ci + 1}/${chunks.length})` : ''
       onProgress?.(`Analizando equipos: ${sheet.name}${part}...`)
-      const text = await callClaude(client, model, buildEquipoPrompt(chunk, resumenCtx), 8192)
-      const raw = parseJsonRobust(text) as Record<string, unknown>
+      const raw = await callClaudeJson(client, model, buildEquipoPrompt(chunk, resumenCtx), 8192, sheet.name) as Record<string, unknown>
       const parsed = parseEquipoGroups((raw.equipos as Record<string, unknown>[]) || [])
       allEquipos.push(...parsed)
     }
@@ -493,8 +599,7 @@ export async function extractWithClaude(
   const edtsSet = new Set<string>()
   for (const sheet of groups.servicios) {
     onProgress?.(`Analizando servicios: ${sheet.name}...`)
-    const text = await callClaude(client, model, buildServicioPrompt(sheet, resumenCtx), 8192)
-    const raw = parseJsonRobust(text) as Record<string, unknown>
+    const raw = await callClaudeJson(client, model, buildServicioPrompt(sheet, resumenCtx), 8192, sheet.name) as Record<string, unknown>
     const parsed = parseServicioGroups(
       (raw.servicios as Record<string, unknown>[]) || [],
       recursosSet,
@@ -507,8 +612,7 @@ export async function extractWithClaude(
   const allGastos: ExcelGastoGrupo[] = []
   for (const sheet of groups.gastos) {
     onProgress?.(`Analizando gastos: ${sheet.name}...`)
-    const text = await callClaude(client, model, buildGastoPrompt(sheet, resumenCtx), 8192)
-    const raw = parseJsonRobust(text) as Record<string, unknown>
+    const raw = await callClaudeJson(client, model, buildGastoPrompt(sheet, resumenCtx), 8192, sheet.name) as Record<string, unknown>
     const parsed = parseGastoGroups((raw.gastos as Record<string, unknown>[]) || [])
     allGastos.push(...parsed)
   }
