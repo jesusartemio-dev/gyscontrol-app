@@ -9,7 +9,8 @@ import {
   Loader2,
   CheckCircle2,
   Clock,
-  Send
+  Send,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,8 +19,8 @@ import CotizacionModal from '@/components/cotizaciones/CotizacionModal'
 import CotizacionList from '@/components/cotizaciones/CotizacionList'
 import { getCotizaciones } from '@/lib/services/cotizacion'
 import type { Cotizacion } from '@/types'
-import { getMonedaSymbol } from '@/lib/utils/currency'
 import { penToUSD } from '@/lib/costos'
+import { ExcelImportWizard } from '@/components/agente/ExcelImportWizard'
 
 const formatCurrencyKPI = (amount: number): string => {
   if (amount >= 1000000) {
@@ -35,6 +36,7 @@ export default function CotizacionesPage() {
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     getCotizaciones()
@@ -111,6 +113,10 @@ export default function CotizacionesPage() {
             </div>
           </div>
 
+          <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
+            <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
+            Importar Excel
+          </Button>
           <Button variant="outline" size="sm" className="h-8">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Exportar
@@ -187,6 +193,8 @@ export default function CotizacionesPage() {
           onUpdated={handleUpdated}
         />
       )}
+
+      <ExcelImportWizard open={importOpen} onOpenChange={setImportOpen} />
     </div>
   )
 }

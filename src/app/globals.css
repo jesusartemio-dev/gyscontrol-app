@@ -184,3 +184,110 @@ body {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
+
+/* Chat assistant markdown prose */
+.prose-chat {
+  font-size: 0.875rem;
+  line-height: 1.625;
+  color: #1e293b;
+}
+.prose-chat p {
+  margin: 0.25em 0;
+}
+.prose-chat p:first-child {
+  margin-top: 0;
+}
+.prose-chat p:last-child {
+  margin-bottom: 0;
+}
+.prose-chat strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+.prose-chat em {
+  font-style: italic;
+  color: #475569;
+}
+.prose-chat ul, .prose-chat ol {
+  margin: 0.5em 0;
+  padding-left: 1.25em;
+}
+.prose-chat li {
+  margin: 0.15em 0;
+}
+.prose-chat ul li {
+  list-style-type: disc;
+}
+.prose-chat ol li {
+  list-style-type: decimal;
+}
+.prose-chat h1, .prose-chat h2, .prose-chat h3 {
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0.75em 0 0.25em;
+}
+.prose-chat h1 { font-size: 1.1em; }
+.prose-chat h2 { font-size: 1em; }
+.prose-chat h3 { font-size: 0.95em; }
+.prose-chat code {
+  font-size: 0.85em;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  color: #334155;
+}
+.prose-chat pre {
+  margin: 0.5em 0;
+  padding: 0.75em;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.prose-chat pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+.prose-chat table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.85em;
+}
+.prose-chat th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.4em 0.6em;
+  border-bottom: 2px solid #e2e8f0;
+  color: #475569;
+}
+.prose-chat td {
+  padding: 0.35em 0.6em;
+  border-bottom: 1px solid #f1f5f9;
+}
+.prose-chat tr:hover td {
+  background: #f8fafc;
+}
+.prose-chat blockquote {
+  margin: 0.5em 0;
+  padding: 0.5em 0.75em;
+  border-left: 3px solid #3b82f6;
+  background: #eff6ff;
+  border-radius: 0 6px 6px 0;
+  color: #1e40af;
+}
+.prose-chat hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 0.75em 0;
+}
+.prose-chat a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-chat a:hover {
+  color: #1d4ed8;
+}

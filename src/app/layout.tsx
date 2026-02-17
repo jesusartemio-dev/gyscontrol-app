@@ -5,6 +5,7 @@ import MobileNav from '@/components/MobileNav'
 import MobileSidebar from '@/components/MobileSidebar'
 import { Toaster } from 'react-hot-toast'
 import Providers from '@/components/Providers'
+import { ChatButton } from '@/components/agente/ChatButton'
 
 export const metadata = {
   title: 'Sistema GYS',
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </main>
           </div>
+          <ChatButton />
           <Toaster
             position="top-right"
             key="toaster-main"
