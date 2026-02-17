@@ -146,7 +146,7 @@ export async function deleteCotizacion(id: string): Promise<void> {
 // Acciones de descuento (proponer, aprobar, rechazar, eliminar)
 export async function descuentoAction(
   cotizacionId: string,
-  data: { action: string; porcentaje?: number; motivo?: string; comentario?: string }
+  data: { action: string; porcentaje?: number; monto?: number; motivo?: string; comentario?: string }
 ) {
   try {
     const res = await fetch(buildApiUrl(`/api/cotizacion/${cotizacionId}/descuento`), {

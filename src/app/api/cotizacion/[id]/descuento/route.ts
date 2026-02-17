@@ -34,7 +34,7 @@ export async function POST(
 
     switch (action) {
       case 'proponer': {
-        const { porcentaje, motivo } = body
+        const { porcentaje, monto, motivo } = body
 
         if (!porcentaje || porcentaje <= 0 || porcentaje > 100) {
           return NextResponse.json(
@@ -43,7 +43,10 @@ export async function POST(
           )
         }
 
-        const montoDescuento = (cotizacion.totalCliente * porcentaje) / 100
+        // Si se envía monto directo, usarlo (permite montos redondeados por el usuario)
+        const montoDescuento = (monto && monto > 0)
+          ? monto
+          : (cotizacion.totalCliente * porcentaje) / 100
         const grandTotal = cotizacion.totalCliente - montoDescuento
 
         const updated = await prisma.cotizacion.update({

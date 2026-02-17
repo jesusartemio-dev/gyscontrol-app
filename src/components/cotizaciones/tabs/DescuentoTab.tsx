@@ -14,7 +14,8 @@ import {
   Clock,
   User,
   MessageSquare,
-  Lock
+  Lock,
+  DollarSign
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -41,6 +42,11 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
 
   // Form state for proposing
   const [porcentaje, setPorcentaje] = useState<number>(cotizacion.descuentoPorcentaje || 0)
+  const [monto, setMonto] = useState<number>(
+    cotizacion.descuentoPorcentaje
+      ? (cotizacion.totalCliente * (cotizacion.descuentoPorcentaje || 0)) / 100
+      : 0
+  )
   const [motivo, setMotivo] = useState(cotizacion.descuentoMotivo || '')
   const [comentario, setComentario] = useState('')
 
@@ -48,21 +54,33 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
   const canApprove = ['admin', 'gerente'].includes(userRole)
   const estado = cotizacion.descuentoEstado
 
-  const montoPreview = (cotizacion.totalCliente * (porcentaje || 0)) / 100
+  const totalFinal = cotizacion.totalCliente - monto
+
+  const handlePorcentajeChange = (value: number) => {
+    setPorcentaje(value)
+    setMonto(+((cotizacion.totalCliente * value) / 100).toFixed(2))
+  }
+
+  const handleMontoChange = (value: number) => {
+    setMonto(value)
+    setPorcentaje(
+      cotizacion.totalCliente > 0
+        ? +((value / cotizacion.totalCliente) * 100).toFixed(4)
+        : 0
+    )
+  }
+
+  const monedaSymbol = cotizacion.moneda === 'PEN' ? 'S/.' : '$'
 
   const handleAction = async (action: string, extra?: Record<string, any>) => {
     setLoading(true)
     setError(null)
     try {
       await descuentoAction(cotizacion.id, { action, ...extra })
-      // Refresh cotizacion data by fetching it again
       const res = await fetch(`/api/cotizacion/${cotizacion.id}`, { credentials: 'include' })
       if (res.ok) {
         const updated = await res.json()
         onUpdated(updated)
-        if (action === 'proponer') {
-          // Keep form values after propose
-        }
       }
     } catch (err: any) {
       setError(err.message || 'Error al procesar la acción')
@@ -70,6 +88,97 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
       setLoading(false)
     }
   }
+
+  // Shared discount form used in both "new" and "re-propose" sections
+  const renderDiscountForm = () => (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <Percent className="h-4 w-4" />
+            Porcentaje
+          </Label>
+          <Input
+            type="number"
+            min="0.01"
+            max="100"
+            step="0.01"
+            value={porcentaje || ''}
+            onChange={(e) => handlePorcentajeChange(parseFloat(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
+            placeholder="Ej: 6"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Monto ({monedaSymbol})
+          </Label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={monto || ''}
+            onChange={(e) => handleMontoChange(parseFloat(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
+            placeholder="Ej: 500"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-muted-foreground text-sm">Descuento</Label>
+          <div className="h-9 flex items-center px-3 rounded-md border bg-muted text-sm font-mono text-red-600">
+            {monto > 0 ? (
+              <>
+                -{formatCurrency(monto)}
+                <span className="text-muted-foreground ml-2">
+                  ({porcentaje}%)
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-muted-foreground text-sm">Total Final</Label>
+          <div className="h-9 flex items-center px-3 rounded-md border bg-green-50 border-green-200 text-sm font-mono font-semibold text-green-700">
+            {monto > 0 ? (
+              formatCurrency(totalFinal)
+            ) : (
+              <span className="text-muted-foreground font-normal">{formatCurrency(cotizacion.totalCliente)}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="flex items-center gap-2">
+          <MessageSquare className="h-4 w-4" />
+          Motivo del Descuento
+        </Label>
+        <Textarea
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Ej: Cliente estratégico, proyecto recurrente, competencia..."
+          rows={3}
+        />
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => handleAction('proponer', { porcentaje, monto, motivo })}
+          disabled={loading || monto <= 0}
+          className="gap-2"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Proponer Descuento
+        </Button>
+      </div>
+    </>
+  )
 
   // No discount proposed yet
   if (!estado || estado === 'sin_descuento') {
@@ -100,79 +209,9 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
             {!isLocked && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Proponga un descuento porcentual sobre el total cliente. Requiere aprobación de gerencia.
+                  Proponga un descuento ingresando porcentaje o monto. Requiere aprobación de gerencia.
                 </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="porcentaje" className="flex items-center gap-2">
-                      <Percent className="h-4 w-4" />
-                      Porcentaje de Descuento
-                    </Label>
-                    <Input
-                      id="porcentaje"
-                      type="number"
-                      min="0.01"
-                      max="100"
-                      step="0.01"
-                      value={porcentaje || ''}
-                      onChange={(e) => setPorcentaje(parseFloat(e.target.value) || 0)}
-                      placeholder="Ej: 6"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-sm">Descuento</Label>
-                    <div className="h-9 flex items-center px-3 rounded-md border bg-muted text-sm font-mono text-red-600">
-                      {porcentaje > 0 ? (
-                        <>
-                          -{formatCurrency(montoPreview)}
-                          <span className="text-muted-foreground ml-2">
-                            ({porcentaje}%)
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-sm">Total Final al Cliente</Label>
-                    <div className="h-9 flex items-center px-3 rounded-md border bg-green-50 border-green-200 text-sm font-mono font-semibold text-green-700">
-                      {porcentaje > 0 ? (
-                        formatCurrency(cotizacion.totalCliente - montoPreview)
-                      ) : (
-                        <span className="text-muted-foreground font-normal">{formatCurrency(cotizacion.totalCliente)}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="motivo" className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Motivo del Descuento
-                  </Label>
-                  <Textarea
-                    id="motivo"
-                    value={motivo}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Ej: Cliente estratégico, proyecto recurrente, competencia..."
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    onClick={() => handleAction('proponer', { porcentaje, motivo })}
-                    disabled={loading || porcentaje <= 0}
-                    className="gap-2"
-                  >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    Proponer Descuento
-                  </Button>
-                </div>
+                {renderDiscountForm()}
               </div>
             )}
 
@@ -357,57 +396,9 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
           {estado === 'rechazado' && !isLocked && (
             <div className="space-y-4 pt-2 border-t">
               <p className="text-sm text-muted-foreground">
-                Puede proponer un nuevo descuento con un porcentaje diferente.
+                Puede proponer un nuevo descuento con un porcentaje o monto diferente.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nuevoPorcentaje" className="flex items-center gap-2">
-                    <Percent className="h-4 w-4" />
-                    Nuevo Porcentaje
-                  </Label>
-                  <Input
-                    id="nuevoPorcentaje"
-                    type="number"
-                    min="0.01"
-                    max="100"
-                    step="0.01"
-                    value={porcentaje || ''}
-                    onChange={(e) => setPorcentaje(parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground text-sm">Descuento</Label>
-                  <div className="h-9 flex items-center px-3 rounded-md border bg-muted text-sm font-mono text-red-600">
-                    {porcentaje > 0 ? <>-{formatCurrency((cotizacion.totalCliente * porcentaje) / 100)} <span className="text-muted-foreground ml-2">({porcentaje}%)</span></> : <span className="text-muted-foreground">—</span>}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground text-sm">Total Final al Cliente</Label>
-                  <div className="h-9 flex items-center px-3 rounded-md border bg-green-50 border-green-200 text-sm font-mono font-semibold text-green-700">
-                    {porcentaje > 0 ? formatCurrency(cotizacion.totalCliente - (cotizacion.totalCliente * porcentaje) / 100) : <span className="text-muted-foreground font-normal">{formatCurrency(cotizacion.totalCliente)}</span>}
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nuevoMotivo">Motivo</Label>
-                <Textarea
-                  id="nuevoMotivo"
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  placeholder="Motivo del nuevo descuento..."
-                  rows={2}
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  onClick={() => handleAction('proponer', { porcentaje, motivo })}
-                  disabled={loading || porcentaje <= 0}
-                  className="gap-2"
-                >
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Proponer Nuevo Descuento
-                </Button>
-              </div>
+              {renderDiscountForm()}
             </div>
           )}
         </CardContent>
