@@ -30,6 +30,8 @@ import {
   User,
   Calendar,
   MessageSquare,
+  Upload,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -46,7 +48,8 @@ import { getGastoLineas } from '@/lib/services/gastoLinea'
 import EstadoStepper from '@/components/finanzas/EstadoStepper'
 import ResumenFinanciero from '@/components/finanzas/ResumenFinanciero'
 import GastoLineaTable from '@/components/rendiciones/GastoLineaTable'
-import type { HojaDeGastos, GastoLinea, CategoriaGasto } from '@/types'
+import { uploadHojaAdjunto, deleteHojaAdjunto } from '@/lib/services/hojaDeGastosAdjunto'
+import type { HojaDeGastos, GastoLinea, CategoriaGasto, HojaDeGastosAdjunto } from '@/types'
 
 const formatDate = (date: string | null | undefined) =>
   date ? new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
@@ -68,6 +71,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   // Depositar dialog
   const [showDeposito, setShowDeposito] = useState(false)
   const [montoDeposito, setMontoDeposito] = useState('')
+  const [depositoAdjuntos, setDepositoAdjuntos] = useState<HojaDeGastosAdjunto[]>([])
+  const [uploadingFile, setUploadingFile] = useState(false)
 
   const role = session?.user?.role
 
@@ -127,6 +132,30 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     await executeAction(() => depositarHoja(id, monto), 'Depósito registrado')
     setShowDeposito(false)
     setMontoDeposito('')
+    setDepositoAdjuntos([])
+  }
+
+  const handleUploadConstancia = async (file: File) => {
+    try {
+      setUploadingFile(true)
+      const adjunto = await uploadHojaAdjunto(id, file)
+      setDepositoAdjuntos(prev => [...prev, adjunto])
+      toast.success('Constancia subida')
+    } catch (e: any) {
+      toast.error(e.message || 'Error al subir constancia')
+    } finally {
+      setUploadingFile(false)
+    }
+  }
+
+  const handleDeleteConstancia = async (adjuntoId: string) => {
+    try {
+      await deleteHojaAdjunto(adjuntoId)
+      setDepositoAdjuntos(prev => prev.filter(a => a.id !== adjuntoId))
+      toast.success('Constancia eliminada')
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar')
+    }
   }
 
   const handleRechazar = async () => {
@@ -207,6 +236,23 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
         saldo={hoja.saldo}
         requiereAnticipo={hoja.requiereAnticipo}
       />
+
+      {/* Constancias de depósito */}
+      {hoja.adjuntos && hoja.adjuntos.length > 0 && (
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm font-medium">Constancias de Depósito</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 space-y-1">
+            {hoja.adjuntos.map(adj => (
+              <div key={adj.id} className="flex items-center justify-between text-sm bg-green-50 border border-green-200 rounded px-3 py-1.5">
+                <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                <span className="text-xs text-muted-foreground ml-2">{new Date(adj.createdAt).toLocaleDateString('es-PE')}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Info */}
       <Card>
@@ -363,15 +409,50 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 pt-2">
-            <Label>Monto depositado (PEN) <span className="text-red-500">*</span></Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={montoDeposito}
-              onChange={(e) => setMontoDeposito(e.target.value)}
-              placeholder="0.00"
-            />
+            <div>
+              <Label>Monto depositado (PEN) <span className="text-red-500">*</span></Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={montoDeposito}
+                onChange={(e) => setMontoDeposito(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label>Constancia de depósito</Label>
+              <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  id="constancia-upload-detail"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleUploadConstancia(file)
+                    e.target.value = ''
+                  }}
+                />
+                <label htmlFor="constancia-upload-detail" className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  {uploadingFile ? (
+                    <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2"><Upload className="h-4 w-4" /> Subir constancia (PDF, JPG, PNG)</span>
+                  )}
+                </label>
+              </div>
+              {depositoAdjuntos.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {depositoAdjuntos.map(adj => (
+                    <div key={adj.id} className="flex items-center justify-between text-xs bg-green-50 border border-green-200 rounded px-2 py-1">
+                      <a href={adj.urlArchivo} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:underline truncate">{adj.nombreArchivo}</a>
+                      <button onClick={() => handleDeleteConstancia(adj.id)} className="text-red-500 hover:text-red-700 ml-2"><X className="h-3 w-3" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeposito(false)}>Cancelar</Button>

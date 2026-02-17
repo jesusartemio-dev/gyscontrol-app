@@ -12,6 +12,7 @@ const includeRelations = {
     include: { adjuntos: true, categoriaGasto: true },
     orderBy: { fecha: 'asc' as const },
   },
+  adjuntos: { orderBy: { createdAt: 'asc' as const } },
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
