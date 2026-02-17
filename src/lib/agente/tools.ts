@@ -501,6 +501,134 @@ export const creationTools: AnthropicTool[] = [
   },
 ]
 
+// ── Project read-only tools ──────────────────────────────
+
+export const projectTools: AnthropicTool[] = [
+  {
+    name: 'buscar_proyectos',
+    description:
+      'Busca proyectos ejecutados de GYS Control. Útil para encontrar proyectos similares al que se quiere cotizar y comparar costos cotizados vs reales. Devuelve código, nombre, cliente, estado, progreso, costos internos cotizados y costos reales de ejecución.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Texto de búsqueda en nombre o código del proyecto',
+        },
+        clienteNombre: {
+          type: 'string',
+          description: 'Filtrar por nombre de cliente',
+        },
+        estado: {
+          type: 'string',
+          enum: [
+            'creado',
+            'en_planificacion',
+            'listas_pendientes',
+            'listas_aprobadas',
+            'pedidos_creados',
+            'en_ejecucion',
+            'en_cierre',
+            'cerrado',
+          ],
+          description: 'Filtrar por estado del proyecto',
+        },
+        limit: {
+          type: 'number',
+          description: 'Cantidad máxima de resultados (default: 10)',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'obtener_detalle_proyecto',
+    description:
+      'Obtiene el detalle completo de un proyecto: datos generales, equipos cotizados vs reales, servicios cotizados vs horas ejecutadas, gastos cotizados vs reales, y un resumen de desviación de costos. Ideal para analizar qué tan precisas fueron las cotizaciones anteriores.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        proyectoId: {
+          type: 'string',
+          description: 'ID del proyecto',
+        },
+      },
+      required: ['proyectoId'],
+    },
+  },
+  {
+    name: 'buscar_listas_equipo',
+    description:
+      'Busca listas de equipo de proyectos. Las listas contienen los equipos que realmente se necesitaron en un proyecto, con precios elegidos de proveedores reales. Útil para saber qué equipos se usaron y a qué precio real se compraron.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        proyectoId: {
+          type: 'string',
+          description: 'Filtrar por ID de proyecto',
+        },
+        query: {
+          type: 'string',
+          description: 'Buscar por nombre de la lista',
+        },
+        estado: {
+          type: 'string',
+          enum: ['borrador', 'enviada', 'por_revisar', 'por_cotizar', 'por_validar', 'por_aprobar', 'aprobada', 'completada'],
+          description: 'Filtrar por estado de la lista',
+        },
+        limit: {
+          type: 'number',
+          description: 'Cantidad máxima de resultados (default: 10)',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'obtener_cronograma_proyecto',
+    description:
+      'Obtiene las fases del cronograma de un proyecto con fechas planificadas vs reales y porcentaje de avance. Útil para estimar plazos de ejecución basados en proyectos reales similares.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        proyectoId: {
+          type: 'string',
+          description: 'ID del proyecto',
+        },
+      },
+      required: ['proyectoId'],
+    },
+  },
+  {
+    name: 'buscar_ordenes_compra',
+    description:
+      'Busca órdenes de compra de un proyecto. Las OC contienen los precios reales de compra a proveedores. Esta es la mejor referencia de precios para cotizar equipos porque refleja lo que realmente se pagó.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        proyectoId: {
+          type: 'string',
+          description: 'Filtrar por ID de proyecto',
+        },
+        proveedorNombre: {
+          type: 'string',
+          description: 'Filtrar por nombre de proveedor',
+        },
+        estado: {
+          type: 'string',
+          enum: ['borrador', 'aprobada', 'enviada', 'confirmada', 'recibida_parcial', 'recibida', 'cancelada'],
+          description: 'Filtrar por estado de la OC',
+        },
+        limit: {
+          type: 'number',
+          description: 'Cantidad máxima de resultados (default: 10)',
+        },
+      },
+      required: [],
+    },
+  },
+]
+
 // ── Analysis tools ────────────────────────────────────────
 
 export const analysisTools: AnthropicTool[] = [
@@ -574,4 +702,9 @@ export const analysisTools: AnthropicTool[] = [
 
 // ── All tools combined ────────────────────────────────────
 
-export const allTools: AnthropicTool[] = [...searchTools, ...creationTools, ...analysisTools]
+export const allTools: AnthropicTool[] = [
+  ...searchTools,
+  ...projectTools,
+  ...creationTools,
+  ...analysisTools,
+]

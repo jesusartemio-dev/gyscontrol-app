@@ -274,6 +274,340 @@ export const toolHandlers: ToolHandlerMap = {
   },
 
   // ════════════════════════════════════════════════════════
+  // PROJECT READ-ONLY TOOLS
+  // ════════════════════════════════════════════════════════
+
+  buscar_proyectos: async (input) => {
+    const query = input.query as string | undefined
+    const clienteNombre = input.clienteNombre as string | undefined
+    const estado = input.estado as string | undefined
+    const limit = (input.limit as number) || 10
+
+    const where: Record<string, unknown> = { deletedAt: null }
+
+    if (query) {
+      where.OR = [
+        { nombre: { contains: query, mode: 'insensitive' } },
+        { codigo: { contains: query, mode: 'insensitive' } },
+      ]
+    }
+    if (clienteNombre) {
+      where.cliente = { nombre: { contains: clienteNombre, mode: 'insensitive' } }
+    }
+    if (estado) {
+      where.estado = estado
+    }
+
+    const proyectos = await prisma.proyecto.findMany({
+      where,
+      include: {
+        cliente: { select: { nombre: true } },
+        comercial: { select: { name: true } },
+      },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return proyectos.map((p) => ({
+      id: p.id,
+      codigo: p.codigo,
+      nombre: p.nombre,
+      cliente: p.cliente.nombre,
+      estado: p.estado,
+      moneda: p.moneda,
+      comercial: p.comercial.name,
+      fechaInicio: p.fechaInicio,
+      fechaFin: p.fechaFin,
+      progresoGeneral: p.progresoGeneral,
+      // Cotizado
+      totalInterno: p.totalInterno,
+      totalCliente: p.totalCliente,
+      grandTotal: p.grandTotal,
+      // Real
+      totalReal: p.totalReal,
+      totalRealEquipos: p.totalRealEquipos,
+      totalRealServicios: p.totalRealServicios,
+      totalRealGastos: p.totalRealGastos,
+      // Desviación
+      desviacionPorcentaje:
+        p.totalInterno > 0
+          ? +((p.totalReal / p.totalInterno - 1) * 100).toFixed(1)
+          : null,
+    }))
+  },
+
+  obtener_detalle_proyecto: async (input) => {
+    const proyectoId = input.proyectoId as string
+
+    const p = await prisma.proyecto.findUnique({
+      where: { id: proyectoId },
+      include: {
+        cliente: { select: { nombre: true, ruc: true } },
+        comercial: { select: { name: true } },
+        gestor: { select: { name: true } },
+        proyectoEquipoCotizado: {
+          include: {
+            proyectoEquipoCotizadoItem: {
+              select: {
+                descripcion: true,
+                codigo: true,
+                categoria: true,
+                marca: true,
+                unidad: true,
+                cantidad: true,
+                precioInterno: true,
+                precioCliente: true,
+                costoInterno: true,
+                costoCliente: true,
+                precioReal: true,
+                cantidadReal: true,
+                costoReal: true,
+                estado: true,
+              },
+            },
+          },
+        },
+        proyectoServicioCotizado: {
+          include: {
+            edt: { select: { nombre: true } },
+            proyectoServicioCotizadoItem: {
+              select: {
+                nombre: true,
+                cantidadHoras: true,
+                costoInterno: true,
+                costoCliente: true,
+                costoReal: true,
+                horasEjecutadas: true,
+              },
+            },
+          },
+        },
+        proyectoGastoCotizado: {
+          include: {
+            proyectoGastoCotizadoItem: {
+              select: {
+                nombre: true,
+                cantidad: true,
+                precioUnitario: true,
+                costoInterno: true,
+                costoCliente: true,
+                costoReal: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!p) throw new Error(`Proyecto ${proyectoId} no encontrado`)
+
+    return {
+      id: p.id,
+      codigo: p.codigo,
+      nombre: p.nombre,
+      cliente: p.cliente.nombre,
+      clienteRuc: p.cliente.ruc,
+      comercial: p.comercial.name,
+      gestor: p.gestor.name,
+      estado: p.estado,
+      moneda: p.moneda,
+      fechaInicio: p.fechaInicio,
+      fechaFin: p.fechaFin,
+      progresoGeneral: p.progresoGeneral,
+      // Totales cotizados
+      totalInterno: p.totalInterno,
+      totalCliente: p.totalCliente,
+      grandTotal: p.grandTotal,
+      // Totales reales
+      totalReal: p.totalReal,
+      totalRealEquipos: p.totalRealEquipos,
+      totalRealServicios: p.totalRealServicios,
+      totalRealGastos: p.totalRealGastos,
+      // Detalle por categoría
+      equipos: p.proyectoEquipoCotizado.map((g) => ({
+        grupo: g.nombre,
+        subtotalInterno: g.subtotalInterno,
+        subtotalReal: g.subtotalReal,
+        items: g.proyectoEquipoCotizadoItem,
+      })),
+      servicios: p.proyectoServicioCotizado.map((g) => ({
+        grupo: g.nombre,
+        edt: g.edt.nombre,
+        subtotalInterno: g.subtotalInterno,
+        subtotalReal: g.subtotalReal,
+        items: g.proyectoServicioCotizadoItem,
+      })),
+      gastos: p.proyectoGastoCotizado.map((g) => ({
+        grupo: g.nombre,
+        subtotalInterno: g.subtotalInterno,
+        subtotalReal: g.subtotalReal,
+        items: g.proyectoGastoCotizadoItem,
+      })),
+      // Resumen desviación
+      desviacion: {
+        equipos: p.totalRealEquipos > 0
+          ? +((p.totalRealEquipos / p.totalEquiposInterno - 1) * 100).toFixed(1)
+          : null,
+        servicios: p.totalRealServicios > 0
+          ? +((p.totalRealServicios / p.totalServiciosInterno - 1) * 100).toFixed(1)
+          : null,
+        gastos: p.totalRealGastos > 0
+          ? +((p.totalRealGastos / p.totalGastosInterno - 1) * 100).toFixed(1)
+          : null,
+        total: p.totalReal > 0
+          ? +((p.totalReal / p.totalInterno - 1) * 100).toFixed(1)
+          : null,
+      },
+    }
+  },
+
+  buscar_listas_equipo: async (input) => {
+    const proyectoId = input.proyectoId as string | undefined
+    const query = input.query as string | undefined
+    const estado = input.estado as string | undefined
+    const limit = (input.limit as number) || 10
+
+    const where: Record<string, unknown> = {}
+
+    if (proyectoId) where.proyectoId = proyectoId
+    if (query) {
+      where.nombre = { contains: query, mode: 'insensitive' }
+    }
+    if (estado) where.estado = estado
+
+    const listas = await prisma.listaEquipo.findMany({
+      where,
+      include: {
+        proyecto: { select: { nombre: true, codigo: true } },
+        listaEquipoItem: {
+          select: {
+            descripcion: true,
+            codigo: true,
+            categoria: true,
+            unidad: true,
+            marca: true,
+            cantidad: true,
+            presupuesto: true,
+            precioElegido: true,
+            costoElegido: true,
+            costoReal: true,
+            estado: true,
+          },
+          take: 50,
+        },
+      },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return listas.map((l) => ({
+      id: l.id,
+      codigo: l.codigo,
+      nombre: l.nombre,
+      estado: l.estado,
+      proyecto: l.proyecto.nombre,
+      proyectoCodigo: l.proyecto.codigo,
+      totalItems: l.listaEquipoItem.length,
+      items: l.listaEquipoItem,
+    }))
+  },
+
+  obtener_cronograma_proyecto: async (input) => {
+    const proyectoId = input.proyectoId as string
+
+    const fases = await prisma.proyectoFase.findMany({
+      where: { proyectoId },
+      orderBy: { orden: 'asc' },
+      include: {
+        proyectoEdt: {
+          select: {
+            nombre: true,
+            porcentajeAvance: true,
+            estado: true,
+          },
+          orderBy: { orden: 'asc' },
+        },
+      },
+    })
+
+    if (fases.length === 0) {
+      return { message: 'Este proyecto no tiene cronograma definido', fases: [] }
+    }
+
+    return {
+      totalFases: fases.length,
+      fases: fases.map((f) => ({
+        nombre: f.nombre,
+        estado: f.estado,
+        porcentajeAvance: f.porcentajeAvance,
+        fechaInicioPlan: f.fechaInicioPlan,
+        fechaFinPlan: f.fechaFinPlan,
+        fechaInicioReal: f.fechaInicioReal,
+        fechaFinReal: f.fechaFinReal,
+        edts: f.proyectoEdt.map((e) => ({
+          nombre: e.nombre,
+          avance: e.porcentajeAvance,
+          estado: e.estado,
+        })),
+      })),
+    }
+  },
+
+  buscar_ordenes_compra: async (input) => {
+    const proyectoId = input.proyectoId as string | undefined
+    const proveedorNombre = input.proveedorNombre as string | undefined
+    const estado = input.estado as string | undefined
+    const limit = (input.limit as number) || 10
+
+    const where: Record<string, unknown> = {}
+
+    if (proyectoId) where.proyectoId = proyectoId
+    if (proveedorNombre) {
+      where.proveedor = { nombre: { contains: proveedorNombre, mode: 'insensitive' } }
+    }
+    if (estado) where.estado = estado
+
+    const ordenes = await prisma.ordenCompra.findMany({
+      where,
+      include: {
+        proveedor: { select: { nombre: true, ruc: true } },
+        proyecto: { select: { nombre: true, codigo: true } },
+        items: {
+          select: {
+            codigo: true,
+            descripcion: true,
+            unidad: true,
+            cantidad: true,
+            precioUnitario: true,
+            costoTotal: true,
+            cantidadRecibida: true,
+          },
+        },
+      },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return ordenes.map((oc) => ({
+      id: oc.id,
+      numero: oc.numero,
+      estado: oc.estado,
+      moneda: oc.moneda,
+      subtotal: oc.subtotal,
+      igv: oc.igv,
+      total: oc.total,
+      proveedor: oc.proveedor.nombre,
+      proveedorRuc: oc.proveedor.ruc,
+      proyecto: oc.proyecto?.nombre || null,
+      proyectoCodigo: oc.proyecto?.codigo || null,
+      condicionPago: oc.condicionPago,
+      fechaEmision: oc.fechaEmision,
+      fechaEntregaEstimada: oc.fechaEntregaEstimada,
+      items: oc.items,
+    }))
+  },
+
+  // ════════════════════════════════════════════════════════
   // CREATION TOOLS (Phase 2)
   // ════════════════════════════════════════════════════════
 
