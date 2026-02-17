@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -19,10 +18,9 @@ import { toast } from 'sonner'
 import { getRecursos } from '@/lib/services/recurso'
 import { getUnidadesServicio } from '@/lib/services/unidadServicio'
 import { updateCotizacionServicioItem } from '@/lib/services/cotizacionServicioItem'
-import { calcularHoras } from '@/lib/utils/formulas'
 import { formatCurrency } from '@/lib/utils/plantilla-utils'
 import { cn } from '@/lib/utils'
-import type { CotizacionServicioItem, Recurso, UnidadServicio, TipoFormula } from '@/types'
+import type { CotizacionServicioItem, Recurso, UnidadServicio } from '@/types'
 
 interface Props {
   item: CotizacionServicioItem | null
@@ -52,14 +50,11 @@ export default function CotizacionServicioItemModal({
   // Modo de cálculo
   const [modoInverso, setModoInverso] = useState(false)
 
-  // Form state
-  const [formula, setFormula] = useState<TipoFormula>('Escalonada')
+  // Form state (siempre Escalonada: HH = horaBase + (cantidad-1) * horaRepetido)
   const [recursoId, setRecursoId] = useState('')
   const [unidadId, setUnidadId] = useState('')
   const [horaBase, setHoraBase] = useState(0)
   const [horaRepetido, setHoraRepetido] = useState(0)
-  const [horaUnidad, setHoraUnidad] = useState(0)
-  const [horaFijo, setHoraFijo] = useState(0)
   const [cantidad, setCantidad] = useState(1)
   const [factorSeguridad, setFactorSeguridad] = useState(1.0)
   const [margen, setMargen] = useState(1.35)
@@ -93,13 +88,10 @@ export default function CotizacionServicioItemModal({
   }
 
   const populateForm = (item: CotizacionServicioItem) => {
-    setFormula(item.formula as TipoFormula)
     setRecursoId(item.recursoId)
     setUnidadId(item.unidadServicioId)
     setHoraBase(item.horaBase ?? 0)
     setHoraRepetido(item.horaRepetido ?? 0)
-    setHoraUnidad(item.horaUnidad ?? 0)
-    setHoraFijo(item.horaFijo ?? 0)
     setCantidad(item.cantidad ?? 1)
     setFactorSeguridad(item.factorSeguridad ?? 1)
     setMargen(item.margen ?? 1.35)
@@ -115,6 +107,7 @@ export default function CotizacionServicioItemModal({
     const costoHora = recurso?.costoHora ?? item?.costoHora ?? 0
 
     if (modoInverso && precioClienteInput > 0) {
+      // MODO INVERSO: Precio → Horas
       const divisor = costoHora * factorSeguridad * dificultadMultiplier
       const horaTotal = divisor > 0 ? precioClienteInput / divisor : 0
       const costoInterno = precioClienteInput / margen
@@ -126,26 +119,22 @@ export default function CotizacionServicioItemModal({
         costoCliente: precioClienteInput
       }
     } else {
-      const horas = calcularHoras({
-        formula,
-        cantidad,
-        horaBase,
-        horaRepetido,
-        horaUnidad,
-        horaFijo
-      })
+      // MODO NORMAL: Horas → Precio (fórmula Escalonada)
+      // HH = horaBase + (cantidad - 1) * horaRepetido
+      const horas = horaBase + Math.max(0, cantidad - 1) * horaRepetido
+      const horaTotal = horas * dificultadMultiplier
 
-      const costoCliente = horas * costoHora * factorSeguridad * dificultadMultiplier
+      const costoCliente = horaTotal * costoHora * factorSeguridad
       const costoInterno = costoCliente / margen
 
       return {
-        horaTotal: +horas.toFixed(2),
+        horaTotal: +horaTotal.toFixed(2),
         costoHora,
         costoInterno: +costoInterno.toFixed(2),
         costoCliente: +costoCliente.toFixed(2)
       }
     }
-  }, [recursoId, recursos, item, formula, cantidad, horaBase, horaRepetido, horaUnidad, horaFijo, factorSeguridad, margen, nivelDificultad, dificultadMultiplier, modoInverso, precioClienteInput])
+  }, [recursoId, recursos, item, cantidad, horaBase, horaRepetido, factorSeguridad, margen, nivelDificultad, dificultadMultiplier, modoInverso, precioClienteInput])
 
   const handleSave = async () => {
     if (!item) return
@@ -160,11 +149,9 @@ export default function CotizacionServicioItemModal({
         recursoNombre: recurso?.nombre ?? item.recursoNombre,
         unidadServicioId: unidadId,
         unidadServicioNombre: unidad?.nombre ?? item.unidadServicioNombre,
-        formula,
+        formula: 'Escalonada',
         horaBase: modoInverso ? calculados.horaTotal : horaBase,
         horaRepetido: modoInverso ? 0 : horaRepetido,
-        horaUnidad: modoInverso ? 0 : horaUnidad,
-        horaFijo: modoInverso ? 0 : horaFijo,
         cantidad: modoInverso ? 1 : cantidad,
         factorSeguridad,
         margen,
@@ -184,117 +171,6 @@ export default function CotizacionServicioItemModal({
       toast.error('Error al actualizar el servicio')
     } finally {
       setSaving(false)
-    }
-  }
-
-  // Campos de hora a mostrar según tipo de fórmula
-  const showHoraFields = () => {
-    switch (formula) {
-      case 'Fijo':
-        return (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-[10px] text-muted-foreground">HH Fijo</Label>
-              <Input
-                type="number" min={0} step={0.5}
-                value={horaFijo}
-                onChange={(e) => setHoraFijo(parseFloat(e.target.value) || 0)}
-                onFocus={(e) => e.target.select()}
-                className="h-7 text-xs"
-              />
-            </div>
-            <div className="flex items-end">
-              <p className="text-[10px] text-muted-foreground italic pb-1.5">
-                Horas fijas, cantidad no afecta
-              </p>
-            </div>
-          </div>
-        )
-      case 'Proporcional':
-        return (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-[10px] text-muted-foreground">HH por Unidad</Label>
-              <Input
-                type="number" min={0} step={0.5}
-                value={horaUnidad}
-                onChange={(e) => setHoraUnidad(parseFloat(e.target.value) || 0)}
-                onFocus={(e) => e.target.select()}
-                className="h-7 text-xs"
-              />
-            </div>
-            <div>
-              <Label className="text-[10px] text-muted-foreground">Cantidad</Label>
-              <Input
-                type="number" min={1}
-                value={cantidad}
-                onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
-                onFocus={(e) => e.target.select()}
-                className="h-7 text-xs"
-              />
-            </div>
-          </div>
-        )
-      case 'Escalonada':
-      default:
-        return (
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <Label className="text-[10px] text-muted-foreground">HH Base</Label>
-                <Input
-                  type="number" min={0} step={0.5}
-                  value={horaBase}
-                  onChange={(e) => setHoraBase(parseFloat(e.target.value) || 0)}
-                  onFocus={(e) => e.target.select()}
-                  className="h-7 text-xs"
-                />
-              </div>
-              <div>
-                <Label className="text-[10px] text-muted-foreground">HH Repetido</Label>
-                <Input
-                  type="number" min={0} step={0.5}
-                  value={horaRepetido}
-                  onChange={(e) => setHoraRepetido(parseFloat(e.target.value) || 0)}
-                  onFocus={(e) => e.target.select()}
-                  className="h-7 text-xs"
-                />
-              </div>
-              <div>
-                <Label className="text-[10px] text-muted-foreground">Cantidad</Label>
-                <Input
-                  type="number" min={1}
-                  value={cantidad}
-                  onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
-                  onFocus={(e) => e.target.select()}
-                  className="h-7 text-xs"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-[10px] text-muted-foreground">HH por Unidad</Label>
-                <Input
-                  type="number" min={0} step={0.5}
-                  value={horaUnidad}
-                  onChange={(e) => setHoraUnidad(parseFloat(e.target.value) || 0)}
-                  onFocus={(e) => e.target.select()}
-                  className="h-7 text-xs"
-                />
-              </div>
-              <div>
-                <Label className="text-[10px] text-muted-foreground">HH Fijo</Label>
-                <Input
-                  type="number" min={0} step={0.5}
-                  value={horaFijo}
-                  onChange={(e) => setHoraFijo(parseFloat(e.target.value) || 0)}
-                  onFocus={(e) => e.target.select()}
-                  className="h-7 text-xs"
-                />
-              </div>
-            </div>
-          </div>
-        )
     }
   }
 
@@ -434,23 +310,39 @@ export default function CotizacionServicioItemModal({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* Tipo de fórmula */}
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Tipo de Fórmula</Label>
-                    <Select value={formula} onValueChange={(v) => setFormula(v as TipoFormula)}>
-                      <SelectTrigger className="h-7 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Fijo" className="text-xs">Fijo (horas fijas)</SelectItem>
-                        <SelectItem value="Proporcional" className="text-xs">Proporcional (HH × cantidad)</SelectItem>
-                        <SelectItem value="Escalonada" className="text-xs">Escalonada (base + repetido)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  {/* Parámetros de hora (Escalonada) */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">HH Base</Label>
+                      <Input
+                        type="number" min={0} step={0.5}
+                        value={horaBase}
+                        onChange={(e) => setHoraBase(parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">HH Repetido</Label>
+                      <Input
+                        type="number" min={0} step={0.5}
+                        value={horaRepetido}
+                        onChange={(e) => setHoraRepetido(parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Cantidad</Label>
+                      <Input
+                        type="number" min={1}
+                        value={cantidad}
+                        onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
+                        className="h-7 text-xs"
+                      />
+                    </div>
                   </div>
-
-                  {/* Parámetros de hora según fórmula */}
-                  {showHoraFields()}
 
                   {/* Factores */}
                   <div className="grid grid-cols-3 gap-2 pt-1">

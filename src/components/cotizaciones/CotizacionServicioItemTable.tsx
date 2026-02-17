@@ -27,10 +27,13 @@ const dificultadColors: Record<number, string> = {
   4: 'bg-red-100 text-red-700'
 }
 
-const formulaColors: Record<string, string> = {
-  'Fijo': 'bg-gray-100 text-gray-600',
-  'Proporcional': 'bg-blue-100 text-blue-600',
-  'Escalonada': 'bg-purple-100 text-purple-600',
+const modoLabels: Record<string, string> = {
+  'normal': 'HH→$',
+  'inverso': '$→HH',
+}
+const modoColors: Record<string, string> = {
+  'normal': 'bg-gray-100 text-gray-600',
+  'inverso': 'bg-blue-100 text-blue-600',
 }
 
 export default function CotizacionServicioItemTable({ items, onUpdated, onDeleted, isLocked = false }: Props) {
@@ -62,7 +65,7 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
             <tr className="bg-gray-50/80 border-b">
               <th className="px-2 py-1.5 text-left font-semibold text-gray-700">Servicio</th>
               <th className="px-2 py-1.5 text-left font-semibold text-gray-700 w-20">Recurso</th>
-              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16">Fórmula</th>
+              <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-16">Modo</th>
               <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Cant.</th>
               <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Horas</th>
               <th className="px-2 py-1.5 text-center font-semibold text-gray-700 w-14">Factor</th>
@@ -110,10 +113,10 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                   </div>
                 </td>
 
-                {/* Fórmula */}
+                {/* Modo de cálculo */}
                 <td className="px-2 py-1.5 text-center">
-                  <Badge variant="outline" className={cn('text-[10px] px-1 py-0', formulaColors[item.formula] || '')}>
-                    {item.formula}
+                  <Badge variant="outline" className={cn('text-[10px] px-1 py-0', modoColors[item.modoCalculo || 'normal'])}>
+                    {modoLabels[item.modoCalculo || 'normal']}
                   </Badge>
                 </td>
 
