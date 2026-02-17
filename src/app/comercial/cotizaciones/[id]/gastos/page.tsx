@@ -127,7 +127,10 @@ export default function CotizacionGastosPage() {
                 onUpdated={async (item) => {
                   try {
                     await updateCotizacionGastoItem(item.id, {
+                      nombre: item.nombre,
+                      descripcion: item.descripcion || '',
                       cantidad: item.cantidad,
+                      precioUnitario: item.precioUnitario,
                       factorSeguridad: item.factorSeguridad,
                       margen: item.margen,
                       costoInterno: item.costoInterno,
