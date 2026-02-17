@@ -97,6 +97,9 @@ export interface SheetTextData {
  * Lee un buffer de Excel y convierte cada hoja a texto CSV.
  * Esto produce un formato que Claude puede interpretar fácilmente.
  */
+const MAX_SHEETS = 10
+const MAX_TOTAL_CHARS = 60_000 // ~15K tokens total para el prompt
+
 export function readExcelSheets(buffer: Buffer): SheetTextData[] {
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false })
   const sheets: SheetTextData[] = []
@@ -109,13 +112,15 @@ export function readExcelSheets(buffer: Buffer): SheetTextData[] {
     const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false })
     const rowCount = csv.split('\n').filter((line) => line.trim()).length
 
-    // Omitir hojas vacías
+    // Omitir hojas vacías o muy pequeñas (solo encabezado)
     if (rowCount <= 1) continue
 
     sheets.push({ name, csv, rowCount })
   }
 
-  return sheets
+  // Priorizar hojas más grandes (más datos útiles), limitar cantidad
+  sheets.sort((a, b) => b.rowCount - a.rowCount)
+  return sheets.slice(0, MAX_SHEETS)
 }
 
 // ── Prompt de extracción para Claude ──────────────────────
@@ -152,13 +157,14 @@ function buildExtractionUserPrompt(sheets: SheetTextData[]): string {
 
 Contiene ${sheets.length} hojas:\n`
 
+  // Distribute character budget evenly across sheets
+  const perSheetBudget = Math.floor(MAX_TOTAL_CHARS / sheets.length)
+
   for (const sheet of sheets) {
     prompt += `\n--- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---\n`
-    // Limitar contenido por hoja para no exceder el contexto
-    const maxChars = 12000
-    if (sheet.csv.length > maxChars) {
-      prompt += sheet.csv.substring(0, maxChars)
-      prompt += `\n... (contenido truncado, ${sheet.csv.length} caracteres total)\n`
+    if (sheet.csv.length > perSheetBudget) {
+      prompt += sheet.csv.substring(0, perSheetBudget)
+      prompt += `\n... (truncado, ${sheet.csv.length} chars total)\n`
     } else {
       prompt += sheet.csv
     }
@@ -268,7 +274,7 @@ export async function extractWithClaude(
 
   const response = await client.messages.create({
     model,
-    max_tokens: 8192,
+    max_tokens: 4096,
     system: EXTRACTION_SYSTEM_PROMPT,
     messages: [
       {

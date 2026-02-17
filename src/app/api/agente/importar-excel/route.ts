@@ -9,8 +9,8 @@ import { extractExcelData } from '@/lib/agente/excelExtractor'
 import { extractPdfProposal } from '@/lib/agente/pdfProposalExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
 
-// Allow up to 120 seconds for Claude API processing of large Excel files
-export const maxDuration = 120
+// Allow up to 300 seconds for Claude API processing of large Excel files
+export const maxDuration = 300
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 
