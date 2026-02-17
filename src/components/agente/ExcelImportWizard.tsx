@@ -47,6 +47,62 @@ interface ExtractResponse {
   }
 }
 
+// ── SSE stream parser ─────────────────────────────────────
+
+async function parseSSEStream(
+  response: Response,
+  onProgress: (message: string) => void
+): Promise<ExtractResponse> {
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let result: ExtractResponse | null = null
+  let sseError: string | null = null
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+
+    // Parse complete SSE events (separated by double newline)
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop()! // Keep incomplete event
+
+    for (const part of parts) {
+      if (!part.trim()) continue
+
+      let eventType = ''
+      let data = ''
+
+      for (const line of part.split('\n')) {
+        if (line.startsWith('event: ')) eventType = line.slice(7)
+        if (line.startsWith('data: ')) data = line.slice(6)
+      }
+
+      if (!eventType || !data) continue
+
+      try {
+        const parsed = JSON.parse(data)
+        if (eventType === 'progress') {
+          onProgress(parsed.message)
+        } else if (eventType === 'result') {
+          result = parsed
+        } else if (eventType === 'error') {
+          sseError = parsed.error
+        }
+      } catch {
+        // Skip malformed events
+      }
+    }
+  }
+
+  if (sseError) throw new Error(sseError)
+  if (!result) throw new Error('No se recibió resultado del servidor')
+
+  return result
+}
+
 // ── Component ─────────────────────────────────────────────
 
 const STEPS = ['Archivos', 'Preview', 'Mapeo', 'Config', 'Confirmar'] as const
@@ -90,7 +146,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
 
     setLoading(true)
     setErrorMessage(null)
-    setLoadingMessage('Analizando Excel con IA...')
+    setLoadingMessage('Preparando análisis...')
 
     try {
       const formData = new FormData()
@@ -102,12 +158,14 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
         body: formData,
       })
 
+      // Validation errors return normal JSON (not SSE)
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `Error del servidor (${res.status})` }))
         throw new Error(err.error || `Error ${res.status}`)
       }
 
-      const data: ExtractResponse = await res.json()
+      // Parse SSE stream for progress + result
+      const data = await parseSSEStream(res, (msg) => setLoadingMessage(msg))
       setExtractData(data)
 
       // Auto-populate catalog selections using heuristic

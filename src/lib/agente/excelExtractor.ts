@@ -1,5 +1,6 @@
 // src/lib/agente/excelExtractor.ts
 // Lee Excel de cotización interna GYS con SheetJS y usa Claude para extraer datos estructurados
+// Extracción por hoja individual para manejar Excels grandes sin truncar respuestas
 
 import * as XLSX from 'xlsx'
 import Anthropic from '@anthropic-ai/sdk'
@@ -86,6 +87,10 @@ export interface ExcelExtraido {
   hojas: string[]
 }
 
+// ── Progress callback ────────────────────────────────────
+
+export type ProgressCallback = (message: string) => void
+
 // ── Lectura de Excel con SheetJS ──────────────────────────
 
 export interface SheetTextData {
@@ -94,12 +99,8 @@ export interface SheetTextData {
   rowCount: number
 }
 
-/**
- * Lee un buffer de Excel y convierte cada hoja a texto CSV.
- * Esto produce un formato que Claude puede interpretar fácilmente.
- */
-const MAX_SHEETS = 10
-const MAX_TOTAL_CHARS = 60_000 // ~15K tokens total para el prompt
+const MAX_SHEETS = 12
+const MAX_CHARS_PER_SHEET = 80_000
 
 export function readExcelSheets(buffer: Buffer): SheetTextData[] {
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false })
@@ -109,293 +110,413 @@ export function readExcelSheets(buffer: Buffer): SheetTextData[] {
     const sheet = workbook.Sheets[name]
     if (!sheet) continue
 
-    // Convertir a CSV — Claude entiende bien tablas en CSV
     const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false })
     const rowCount = csv.split('\n').filter((line) => line.trim()).length
 
-    // Omitir hojas vacías o muy pequeñas (solo encabezado)
     if (rowCount <= 1) continue
 
-    sheets.push({ name, csv, rowCount })
+    sheets.push({
+      name,
+      csv: csv.substring(0, MAX_CHARS_PER_SHEET),
+      rowCount,
+    })
   }
 
-  // Priorizar hojas más grandes (más datos útiles), limitar cantidad
   sheets.sort((a, b) => b.rowCount - a.rowCount)
   return sheets.slice(0, MAX_SHEETS)
 }
 
-// ── Prompt de extracción para Claude ──────────────────────
+// ── Sheet classification ─────────────────────────────────
 
-const EXTRACTION_SYSTEM_PROMPT = `Eres un experto en análisis de cotizaciones de automatización industrial. Tu tarea es extraer datos estructurados de un archivo Excel de cotización interna de GYS Control Industrial (empresa peruana).
+type SheetGroupType = 'equipos' | 'servicios' | 'gastos' | 'resumen'
 
-CONTEXTO DEL FORMATO EXCEL DE GYS:
-- Las hojas típicas son: RESUMEN, SOFTWARE, SERV. ING., MAT. ELECTRICOS, SERV. CON, SERV. PRO, MAT. TABLEROS, COVID, MOVIL., OPERAT.
-- Pero los nombres pueden variar ligeramente entre versiones
-- Las hojas de MATERIALES/EQUIPOS (MAT. ELECTRICOS, MAT. TABLEROS, SOFTWARE) tienen columnas de items con: código, descripción, unidad, marca, cantidad, precio lista
-- Tienen dos columnas clave de factores: "INTEGRADOR" o "GYS" (factorCosto, típicamente ~1.0) y "CLIENTE" (factorVenta, típicamente ~1.15-1.40)
-- Las hojas de SERVICIOS (SERV. ING., SERV. CON, SERV. PRO) tienen matrices de horas por recurso
-- Los recursos tienen nombres como: Senior A, Senior B, Semisenior A, Semisenior B, Junior A, Junior B
-- Cada recurso puede tener tarifa de OFICINA y tarifa de CAMPO (diferente costo/hora)
-- Las hojas de GASTOS (COVID, MOVIL., OPERAT.) tienen items de gastos operativos
-
-REGLAS DE EXTRACCIÓN:
-1. Identifica CADA hoja y clasifícala como: equipos, servicios, gastos, o resumen
-2. Para EQUIPOS: extrae cada item con sus precios. Si hay columna "GYS CONTROL" o "INTEGRADOR" ese es precioInterno. Si hay columna "CLIENTE" ese es precioCliente. factorCosto = precioInterno / precioLista. factorVenta = precioCliente / precioInterno
-3. Para SERVICIOS: extrae la matriz de horas×recurso. Identifica cada recurso único con su costo/hora y si es oficina o campo. Calcula horasTotal por actividad
-4. Para GASTOS: extrae items con cantidad, precio unitario, y totales
-5. En el RESUMEN: busca totales generales, nombre del proyecto, cliente
-6. Los precios pueden estar en USD o PEN (soles). Identifica la moneda
-
-IMPORTANTE:
-- Si una columna no tiene datos claros, usa valores razonables o null
-- factorCosto por defecto: 1.00 si no es distinguible
-- factorVenta por defecto: 1.25 si no es calculable
-- Extrae TODOS los items, no resumas ni omitas filas
-- Los nombres de recursos deben conservarse tal cual aparecen en el Excel`
-
-function buildExtractionUserPrompt(sheets: SheetTextData[]): string {
-  let prompt = `Analiza este Excel de cotización interna de GYS Control Industrial.
-
-Contiene ${sheets.length} hojas:\n`
-
-  // Distribute character budget evenly across sheets
-  const perSheetBudget = Math.floor(MAX_TOTAL_CHARS / sheets.length)
-
-  for (const sheet of sheets) {
-    prompt += `\n--- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---\n`
-    if (sheet.csv.length > perSheetBudget) {
-      prompt += sheet.csv.substring(0, perSheetBudget)
-      prompt += `\n... (truncado, ${sheet.csv.length} chars total)\n`
-    } else {
-      prompt += sheet.csv
-    }
-  }
-
-  prompt += `
-
-Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta (sin markdown, sin backticks, solo JSON):
-
-{
-  "equipos": [
-    {
-      "grupo": "nombre descriptivo del grupo (ej: 'Materiales Eléctricos')",
-      "hoja": "nombre exacto de la hoja de origen",
-      "items": [
-        {
-          "descripcion": "descripción del item",
-          "codigo": "código si existe o null",
-          "categoria": "categoría inferida (ej: 'PLC', 'HMI', 'Instrumentación')",
-          "unidad": "unidad de medida (Und, m, Glb, etc.)",
-          "marca": "marca del equipo",
-          "cantidad": 1,
-          "precioLista": 100.00,
-          "precioInterno": 100.00,
-          "precioCliente": 125.00,
-          "factorCosto": 1.00,
-          "factorVenta": 1.25
-        }
-      ]
-    }
-  ],
-  "servicios": [
-    {
-      "grupo": "nombre descriptivo (ej: 'Servicios de Ingeniería')",
-      "hoja": "nombre exacto de la hoja",
-      "edtSugerido": "EDT sugerido (ej: 'Ingeniería de Detalle', 'Programación PLC')",
-      "factorSeguridad": 1.0,
-      "margen": 1.35,
-      "actividades": [
-        {
-          "nombre": "nombre de la actividad",
-          "descripcion": "descripción si existe",
-          "recursos": [
-            {
-              "recursoNombre": "nombre tal cual aparece (ej: 'Senior A')",
-              "tipo": "oficina",
-              "costoHora": 30.00,
-              "horas": 40
-            }
-          ],
-          "horasTotal": 40,
-          "costoInterno": 1200.00,
-          "costoCliente": 1620.00
-        }
-      ]
-    }
-  ],
-  "gastos": [
-    {
-      "grupo": "nombre descriptivo (ej: 'Movilización')",
-      "hoja": "nombre exacto de la hoja",
-      "items": [
-        {
-          "nombre": "nombre del gasto",
-          "descripcion": "descripción si existe",
-          "cantidad": 1,
-          "precioUnitario": 50.00,
-          "costoInterno": 50.00,
-          "costoCliente": 67.50
-        }
-      ]
-    }
-  ],
-  "resumen": {
-    "totalInterno": 0,
-    "totalCliente": 0,
-    "moneda": "USD",
-    "margenGlobal": null,
-    "nombreProyecto": "nombre si se encuentra",
-    "clienteNombre": "nombre del cliente si se encuentra"
-  }
-}`
-
-  return prompt
+function classifySheet(name: string): SheetGroupType {
+  const upper = name.toUpperCase().trim()
+  if (upper.includes('RESUMEN')) return 'resumen'
+  if (upper.includes('MAT') || upper.includes('SOFTWARE')) return 'equipos'
+  if (upper.includes('SERV')) return 'servicios'
+  return 'gastos'
 }
 
-// ── Llamada a Claude API ──────────────────────────────────
+interface SheetGroups {
+  resumen: SheetTextData[]
+  equipos: SheetTextData[]
+  servicios: SheetTextData[]
+  gastos: SheetTextData[]
+}
+
+function groupSheets(sheets: SheetTextData[]): SheetGroups {
+  const groups: SheetGroups = { resumen: [], equipos: [], servicios: [], gastos: [] }
+  for (const sheet of sheets) {
+    groups[classifySheet(sheet.name)].push(sheet)
+  }
+  return groups
+}
+
+// ── Sheet chunking for large sheets ──────────────────────
+
+const CHUNK_MAX_ROWS = 120
+
+function chunkSheet(sheet: SheetTextData): SheetTextData[] {
+  const lines = sheet.csv.split('\n')
+  const header = lines[0] || ''
+  const dataLines = lines.slice(1).filter((l) => l.trim())
+
+  if (dataLines.length <= CHUNK_MAX_ROWS) return [sheet]
+
+  const chunks: SheetTextData[] = []
+  for (let i = 0; i < dataLines.length; i += CHUNK_MAX_ROWS) {
+    const slice = dataLines.slice(i, i + CHUNK_MAX_ROWS)
+    chunks.push({
+      name: sheet.name,
+      csv: [header, ...slice].join('\n'),
+      rowCount: slice.length + 1,
+    })
+  }
+  return chunks
+}
+
+// ── JSON repair utilities ────────────────────────────────
+
+function tryParseJson(text: string): unknown | null {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+function repairTruncatedJson(text: string): string {
+  let result = text.trim()
+  result = result.replace(/,\s*$/, '')
+
+  const stack: string[] = []
+  let inString = false
+  let escape = false
+
+  for (const ch of result) {
+    if (escape) { escape = false; continue }
+    if (ch === '\\' && inString) { escape = true; continue }
+    if (ch === '"') { inString = !inString; continue }
+    if (inString) continue
+    if (ch === '{' || ch === '[') stack.push(ch)
+    if (ch === '}' || ch === ']') stack.pop()
+  }
+
+  // Close open string
+  if (inString) result += '"'
+
+  // Remove trailing partial key-value pair
+  result = result.replace(/,?\s*"[^"]*"?\s*:?\s*("[^"]*)?$/, '')
+  result = result.replace(/,\s*$/, '')
+
+  // Close open brackets/braces in correct (reverse) order
+  while (stack.length > 0) {
+    const open = stack.pop()!
+    result += open === '{' ? '}' : ']'
+  }
+
+  return result
+}
+
+function parseJsonRobust(rawText: string): unknown {
+  let text = rawText.trim()
+
+  // Strip markdown code fences
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')
+  }
+
+  // Step 1: Direct parse
+  const direct = tryParseJson(text)
+  if (direct !== null) return direct
+
+  // Step 2: Repair truncated JSON
+  const repaired = repairTruncatedJson(text)
+  const repairedResult = tryParseJson(repaired)
+  if (repairedResult !== null) {
+    console.warn('[excelExtractor] JSON repaired (truncated response)')
+    return repairedResult
+  }
+
+  // Step 3: Aggressive truncation to last complete structure
+  const lastClose = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'))
+  if (lastClose > text.length * 0.3) {
+    const truncated = text.substring(0, lastClose + 1)
+    const truncatedRepaired = repairTruncatedJson(truncated)
+    const truncatedResult = tryParseJson(truncatedRepaired)
+    if (truncatedResult !== null) {
+      console.warn('[excelExtractor] JSON repaired by aggressive truncation')
+      return truncatedResult
+    }
+  }
+
+  // Step 4: Give up — log raw for debugging
+  console.error('[excelExtractor] Unparseable response:', rawText.substring(0, 500))
+  throw new Error('Error al interpretar la respuesta del modelo (JSON inválido)')
+}
+
+// ── System prompt (shared across all calls) ──────────────
+
+const SYSTEM_PROMPT = `Eres un experto en análisis de cotizaciones de automatización industrial de GYS Control Industrial (Perú).
+Extraes datos estructurados de archivos Excel de cotización interna.
+
+CONTEXTO DEL FORMATO:
+- Hojas de EQUIPOS (MAT. ELECTRICOS, MAT. TABLEROS, SOFTWARE): items con código, descripción, unidad, marca, cantidad, precio lista, factores
+- Columnas "GYS CONTROL" o "INTEGRADOR" = precioInterno. Columna "CLIENTE" = precioCliente
+- factorCosto = precioInterno / precioLista. factorVenta = precioCliente / precioInterno
+- Hojas de SERVICIOS (SERV. ING., SERV. CON, SERV. PRO): matrices de horas×recurso
+- Recursos: Senior A/B, Semisenior A/B, Junior A/B con tarifas OFICINA y CAMPO
+- Hojas de GASTOS (COVID, MOVIL., OPERAT.): items con cantidad, precio unitario, totales
+
+REGLAS:
+- Extrae TODOS los items, no omitas filas
+- Si un campo no tiene datos claros, usa null
+- Defaults: factorCosto=1.00, factorVenta=1.25
+- Conserva nombres de recursos tal cual aparecen
+- Responde SOLO con JSON válido, sin markdown, sin backticks, sin texto adicional`
+
+// ── Per-type prompt builders ─────────────────────────────
+
+function buildResumenPrompt(sheet: SheetTextData): string {
+  return `Extrae los datos del resumen de esta cotización:
+
+--- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
+${sheet.csv}
+
+Devuelve JSON:
+{"resumen":{"totalInterno":0,"totalCliente":0,"moneda":"USD","margenGlobal":null,"nombreProyecto":"nombre o null","clienteNombre":"nombre o null"}}`
+}
+
+function buildEquipoPrompt(sheet: SheetTextData, resumenCtx: string): string {
+  return `Extrae los EQUIPOS/MATERIALES de esta hoja. Extrae TODOS los items sin omitir ninguno.
+${resumenCtx}
+--- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
+${sheet.csv}
+
+Devuelve JSON con TODOS los items:
+{"equipos":[{"grupo":"nombre descriptivo","hoja":"${sheet.name}","items":[{"descripcion":"...","codigo":"...o null","categoria":"...","unidad":"Und","marca":"...","cantidad":1,"precioLista":100,"precioInterno":100,"precioCliente":125,"factorCosto":1.00,"factorVenta":1.25}]}]}`
+}
+
+function buildServicioPrompt(sheet: SheetTextData, resumenCtx: string): string {
+  return `Extrae los SERVICIOS de esta hoja. Identifica actividades con su matriz de horas×recurso.
+${resumenCtx}
+--- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
+${sheet.csv}
+
+Devuelve JSON:
+{"servicios":[{"grupo":"nombre descriptivo","hoja":"${sheet.name}","edtSugerido":"EDT sugerido","factorSeguridad":1.0,"margen":1.35,"actividades":[{"nombre":"...","descripcion":"...","recursos":[{"recursoNombre":"Senior A","tipo":"oficina","costoHora":30,"horas":40}],"horasTotal":40,"costoInterno":1200,"costoCliente":1620}]}]}`
+}
+
+function buildGastoPrompt(sheet: SheetTextData, resumenCtx: string): string {
+  return `Extrae los GASTOS de esta hoja. Extrae TODOS los items.
+${resumenCtx}
+--- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
+${sheet.csv}
+
+Devuelve JSON:
+{"gastos":[{"grupo":"nombre descriptivo","hoja":"${sheet.name}","items":[{"nombre":"...","descripcion":"...o null","cantidad":1,"precioUnitario":50,"costoInterno":50,"costoCliente":67.50}]}]}`
+}
+
+// ── Claude API call with retry ───────────────────────────
 
 function getClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY no configurada en las variables de entorno del servidor')
-  return new Anthropic({ apiKey, timeout: 90_000 }) // 90s timeout
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY no configurada')
+  return new Anthropic({ apiKey, timeout: 90_000 })
 }
 
-/**
- * Envía las hojas del Excel a Claude y obtiene datos estructurados.
- */
-export async function extractWithClaude(
-  sheets: SheetTextData[]
-): Promise<ExcelExtraido> {
-  const client = getClient()
-  const model = getModelForTask('excel-extraction')
+async function callClaude(
+  client: Anthropic,
+  model: string,
+  userPrompt: string,
+  maxTokens: number = 8192
+): Promise<string> {
+  let lastError: unknown
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: 4096,
-    system: EXTRACTION_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: buildExtractionUserPrompt(sheets),
-      },
-    ],
-  })
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await client.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
 
-  // Extraer texto de la respuesta
-  const responseText = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('')
-
-  // Parsear JSON
-  const parsed = parseExtractionResponse(responseText)
-  return parsed
-}
-
-function parseExtractionResponse(text: string): ExcelExtraido {
-  // Limpiar posible markdown wrapping
-  let cleaned = text.trim()
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')
+      return response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+        .map((b) => b.text)
+        .join('')
+    } catch (err) {
+      lastError = err
+      if (attempt === 0) {
+        console.warn('[excelExtractor] Retry after error:', err instanceof Error ? err.message : err)
+        await new Promise((r) => setTimeout(r, 2000))
+      }
+    }
   }
 
-  const raw = JSON.parse(cleaned)
+  throw lastError
+}
 
-  // Extraer recursos y EDTs únicos
-  const recursosSet = new Set<string>()
-  const edtsSet = new Set<string>()
+// ── Per-type parsers ─────────────────────────────────────
 
-  const equipos: ExcelEquipoGrupo[] = (raw.equipos || []).map(
-    (g: Record<string, unknown>) => ({
-      grupo: g.grupo as string,
-      hoja: g.hoja as string,
-      items: ((g.items as Record<string, unknown>[]) || []).map(
-        (item: Record<string, unknown>) => ({
-          descripcion: item.descripcion as string,
-          codigo: (item.codigo as string) || undefined,
-          categoria: (item.categoria as string) || undefined,
-          unidad: (item.unidad as string) || 'Und',
-          marca: (item.marca as string) || '',
-          cantidad: Number(item.cantidad) || 1,
-          precioLista: Number(item.precioLista) || 0,
-          precioInterno: Number(item.precioInterno) || 0,
-          precioCliente: Number(item.precioCliente) || 0,
-          factorCosto: Number(item.factorCosto) || 1.0,
-          factorVenta: Number(item.factorVenta) || 1.25,
-        })
-      ),
-    })
-  )
+function parseEquipoGroups(rawGroups: Record<string, unknown>[]): ExcelEquipoGrupo[] {
+  return rawGroups.map((g) => ({
+    grupo: (g.grupo as string) || '',
+    hoja: (g.hoja as string) || '',
+    items: ((g.items as Record<string, unknown>[]) || []).map((item) => ({
+      descripcion: (item.descripcion as string) || '',
+      codigo: (item.codigo as string) || undefined,
+      categoria: (item.categoria as string) || undefined,
+      unidad: (item.unidad as string) || 'Und',
+      marca: (item.marca as string) || '',
+      cantidad: Number(item.cantidad) || 1,
+      precioLista: Number(item.precioLista) || 0,
+      precioInterno: Number(item.precioInterno) || 0,
+      precioCliente: Number(item.precioCliente) || 0,
+      factorCosto: Number(item.factorCosto) || 1.0,
+      factorVenta: Number(item.factorVenta) || 1.25,
+    })),
+  }))
+}
 
-  const servicios: ExcelServicioGrupo[] = (raw.servicios || []).map(
-    (g: Record<string, unknown>) => {
-      if (g.edtSugerido) edtsSet.add(g.edtSugerido as string)
-
-      return {
-        grupo: g.grupo as string,
-        hoja: g.hoja as string,
-        edtSugerido: (g.edtSugerido as string) || undefined,
-        factorSeguridad: Number(g.factorSeguridad) || 1.0,
-        margen: Number(g.margen) || 1.35,
-        actividades: (
-          (g.actividades as Record<string, unknown>[]) || []
-        ).map((act: Record<string, unknown>) => {
-          const recursos = (
-            (act.recursos as Record<string, unknown>[]) || []
-          ).map((r: Record<string, unknown>) => {
-            recursosSet.add(r.recursoNombre as string)
-            return {
-              recursoNombre: r.recursoNombre as string,
-              tipo: (r.tipo as 'oficina' | 'campo') || 'oficina',
-              costoHora: Number(r.costoHora) || 0,
-              horas: Number(r.horas) || 0,
+function parseServicioGroups(
+  rawGroups: Record<string, unknown>[],
+  recursosSet: Set<string>,
+  edtsSet: Set<string>
+): ExcelServicioGrupo[] {
+  return rawGroups.map((g) => {
+    if (g.edtSugerido) edtsSet.add(g.edtSugerido as string)
+    return {
+      grupo: (g.grupo as string) || '',
+      hoja: (g.hoja as string) || '',
+      edtSugerido: (g.edtSugerido as string) || undefined,
+      factorSeguridad: Number(g.factorSeguridad) || 1.0,
+      margen: Number(g.margen) || 1.35,
+      actividades: ((g.actividades as Record<string, unknown>[]) || []).map(
+        (act: Record<string, unknown>) => {
+          const recursos = ((act.recursos as Record<string, unknown>[]) || []).map(
+            (r: Record<string, unknown>) => {
+              if (r.recursoNombre) recursosSet.add(r.recursoNombre as string)
+              return {
+                recursoNombre: (r.recursoNombre as string) || '',
+                tipo: (r.tipo as 'oficina' | 'campo') || 'oficina',
+                costoHora: Number(r.costoHora) || 0,
+                horas: Number(r.horas) || 0,
+              }
             }
-          })
+          )
           return {
-            nombre: act.nombre as string,
+            nombre: (act.nombre as string) || '',
             descripcion: (act.descripcion as string) || undefined,
             recursos,
             horasTotal: Number(act.horasTotal) || 0,
             costoInterno: Number(act.costoInterno) || 0,
             costoCliente: Number(act.costoCliente) || 0,
           }
-        }),
-      }
-    }
-  )
-
-  const gastos: ExcelGastoGrupo[] = (raw.gastos || []).map(
-    (g: Record<string, unknown>) => ({
-      grupo: g.grupo as string,
-      hoja: g.hoja as string,
-      items: ((g.items as Record<string, unknown>[]) || []).map(
-        (item: Record<string, unknown>) => ({
-          nombre: item.nombre as string,
-          descripcion: (item.descripcion as string) || undefined,
-          cantidad: Number(item.cantidad) || 1,
-          precioUnitario: Number(item.precioUnitario) || 0,
-          costoInterno: Number(item.costoInterno) || 0,
-          costoCliente: Number(item.costoCliente) || 0,
-        })
+        }
       ),
-    })
-  )
+    }
+  })
+}
 
-  const resumen: ExcelResumen = {
-    totalInterno: Number(raw.resumen?.totalInterno) || 0,
-    totalCliente: Number(raw.resumen?.totalCliente) || 0,
-    moneda: (raw.resumen?.moneda as string) || 'USD',
-    margenGlobal: raw.resumen?.margenGlobal
-      ? Number(raw.resumen.margenGlobal)
-      : undefined,
-    nombreProyecto: (raw.resumen?.nombreProyecto as string) || undefined,
-    clienteNombre: (raw.resumen?.clienteNombre as string) || undefined,
+function parseGastoGroups(rawGroups: Record<string, unknown>[]): ExcelGastoGrupo[] {
+  return rawGroups.map((g) => ({
+    grupo: (g.grupo as string) || '',
+    hoja: (g.hoja as string) || '',
+    items: ((g.items as Record<string, unknown>[]) || []).map((item) => ({
+      nombre: (item.nombre as string) || '',
+      descripcion: (item.descripcion as string) || undefined,
+      cantidad: Number(item.cantidad) || 1,
+      precioUnitario: Number(item.precioUnitario) || 0,
+      costoInterno: Number(item.costoInterno) || 0,
+      costoCliente: Number(item.costoCliente) || 0,
+    })),
+  }))
+}
+
+function parseResumen(raw: Record<string, unknown>): ExcelResumen {
+  return {
+    totalInterno: Number(raw?.totalInterno) || 0,
+    totalCliente: Number(raw?.totalCliente) || 0,
+    moneda: (raw?.moneda as string) || 'USD',
+    margenGlobal: raw?.margenGlobal ? Number(raw.margenGlobal) : undefined,
+    nombreProyecto: (raw?.nombreProyecto as string) || undefined,
+    clienteNombre: (raw?.clienteNombre as string) || undefined,
+  }
+}
+
+// ── Main extraction (per-sheet with chunking) ────────────
+
+export async function extractWithClaude(
+  sheets: SheetTextData[],
+  onProgress?: ProgressCallback
+): Promise<ExcelExtraido> {
+  const client = getClient()
+  const model = getModelForTask('excel-extraction')
+  const groups = groupSheets(sheets)
+
+  // Build resumen context (shared across calls, truncated to 5K)
+  const resumenCsv = groups.resumen[0]?.csv || ''
+  const resumenCtx = resumenCsv
+    ? `\n--- CONTEXTO: HOJA "RESUMEN" ---\n${resumenCsv.substring(0, 5000)}\n`
+    : ''
+
+  // 1. Extract resumen
+  let resumen: ExcelResumen = { totalInterno: 0, totalCliente: 0, moneda: 'USD' }
+  if (groups.resumen.length > 0) {
+    onProgress?.('Extrayendo resumen...')
+    const text = await callClaude(client, model, buildResumenPrompt(groups.resumen[0]), 2048)
+    const raw = parseJsonRobust(text) as Record<string, unknown>
+    resumen = parseResumen((raw.resumen as Record<string, unknown>) || raw)
+  }
+
+  // 2. Extract equipos (per sheet, with chunking for large sheets)
+  const allEquipos: ExcelEquipoGrupo[] = []
+  for (const sheet of groups.equipos) {
+    const chunks = chunkSheet(sheet)
+    for (let ci = 0; ci < chunks.length; ci++) {
+      const chunk = chunks[ci]
+      const part = chunks.length > 1 ? ` (${ci + 1}/${chunks.length})` : ''
+      onProgress?.(`Analizando equipos: ${sheet.name}${part}...`)
+      const text = await callClaude(client, model, buildEquipoPrompt(chunk, resumenCtx), 8192)
+      const raw = parseJsonRobust(text) as Record<string, unknown>
+      const parsed = parseEquipoGroups((raw.equipos as Record<string, unknown>[]) || [])
+      allEquipos.push(...parsed)
+    }
+  }
+
+  // 3. Extract servicios (per sheet)
+  const allServicios: ExcelServicioGrupo[] = []
+  const recursosSet = new Set<string>()
+  const edtsSet = new Set<string>()
+  for (const sheet of groups.servicios) {
+    onProgress?.(`Analizando servicios: ${sheet.name}...`)
+    const text = await callClaude(client, model, buildServicioPrompt(sheet, resumenCtx), 8192)
+    const raw = parseJsonRobust(text) as Record<string, unknown>
+    const parsed = parseServicioGroups(
+      (raw.servicios as Record<string, unknown>[]) || [],
+      recursosSet,
+      edtsSet
+    )
+    allServicios.push(...parsed)
+  }
+
+  // 4. Extract gastos (per sheet)
+  const allGastos: ExcelGastoGrupo[] = []
+  for (const sheet of groups.gastos) {
+    onProgress?.(`Analizando gastos: ${sheet.name}...`)
+    const text = await callClaude(client, model, buildGastoPrompt(sheet, resumenCtx), 8192)
+    const raw = parseJsonRobust(text) as Record<string, unknown>
+    const parsed = parseGastoGroups((raw.gastos as Record<string, unknown>[]) || [])
+    allGastos.push(...parsed)
   }
 
   return {
-    equipos,
-    servicios,
-    gastos,
+    equipos: allEquipos,
+    servicios: allServicios,
+    gastos: allGastos,
     resumen,
     recursosUnicos: Array.from(recursosSet).sort(),
     edtsUnicos: Array.from(edtsSet).sort(),
@@ -403,21 +524,20 @@ function parseExtractionResponse(text: string): ExcelExtraido {
   }
 }
 
-// ── Función principal ─────────────────────────────────────
+// ── Pipeline principal ───────────────────────────────────
 
-/**
- * Pipeline completo: lee Excel → convierte a texto → Claude extrae datos.
- */
 export async function extractExcelData(
-  buffer: Buffer
+  buffer: Buffer,
+  onProgress?: ProgressCallback
 ): Promise<{ data: ExcelExtraido; sheets: SheetTextData[] }> {
+  onProgress?.('Leyendo hojas del Excel...')
   const sheets = readExcelSheets(buffer)
 
   if (sheets.length === 0) {
     throw new Error('El archivo Excel no contiene hojas con datos')
   }
 
-  const data = await extractWithClaude(sheets)
+  const data = await extractWithClaude(sheets, onProgress)
   data.hojas = sheets.map((s) => s.name)
 
   return { data, sheets }
