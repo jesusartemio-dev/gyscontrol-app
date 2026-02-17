@@ -92,8 +92,8 @@ No incluyas markdown, backticks, ni texto adicional. Solo el JSON.`
 
 function getClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY no configurada')
-  return new Anthropic({ apiKey })
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY no configurada en las variables de entorno del servidor')
+  return new Anthropic({ apiKey, timeout: 90_000 }) // 90s timeout
 }
 
 /**

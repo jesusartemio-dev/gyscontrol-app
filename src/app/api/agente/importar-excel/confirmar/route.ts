@@ -14,6 +14,8 @@ import type {
   ExcelGastoGrupo,
 } from '@/lib/agente/excelExtractor'
 
+export const maxDuration = 60
+
 // ── Request types ─────────────────────────────────────────
 
 interface RecursoMapping {
@@ -438,10 +440,15 @@ export async function POST(request: NextRequest) {
       codigo: result.codigo,
     })
   } catch (error) {
-    console.error('Error en confirmar importación:', error)
+    console.error('Error confirmar-importacion:', error)
     const message = error instanceof Error ? error.message : 'Error desconocido'
     return NextResponse.json(
-      { error: `Error creando cotización: ${message}` },
+      {
+        error: `Error creando cotización: ${message}`,
+        ...(process.env.NODE_ENV === 'development' && error instanceof Error
+          ? { stack: error.stack }
+          : {}),
+      },
       { status: 500 }
     )
   }

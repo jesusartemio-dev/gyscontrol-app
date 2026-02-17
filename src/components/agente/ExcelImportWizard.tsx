@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Loader2, ChevronLeft, ChevronRight, Check, FileSpreadsheet } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, Check, FileSpreadsheet, AlertTriangle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -80,12 +80,16 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   const [moneda, setMoneda] = useState('USD')
   const [notas, setNotas] = useState('')
 
+  // Error state
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
   // ── Handlers ──────────────────────────────────────────
 
   const handleExtract = useCallback(async () => {
     if (!excelFile) return
 
     setLoading(true)
+    setErrorMessage(null)
     setLoadingMessage('Analizando Excel con IA...')
 
     try {
@@ -99,7 +103,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Error de servidor' }))
+        const err = await res.json().catch(() => ({ error: `Error del servidor (${res.status})` }))
         throw new Error(err.error || `Error ${res.status}`)
       }
 
@@ -149,7 +153,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       setStep(1)
       toast.success('Datos extraídos correctamente')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al procesar archivos')
+      const msg = err instanceof Error ? err.message : 'Error al procesar archivos'
+      setErrorMessage(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
       setLoadingMessage('')
@@ -160,6 +166,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     if (!extractData) return
 
     setLoading(true)
+    setErrorMessage(null)
     setLoadingMessage('Creando cotización...')
 
     try {
@@ -208,7 +215,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       onOpenChange(false)
       router.push(`/comercial/cotizaciones/${result.cotizacionId}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al crear cotización')
+      const msg = err instanceof Error ? err.message : 'Error al crear cotización'
+      setErrorMessage(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
       setLoadingMessage('')
@@ -298,6 +307,23 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {/* Error banner */}
+          {errorMessage && !loading && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 mb-4">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-red-800">Error</p>
+                <p className="text-xs text-red-600 mt-0.5">{errorMessage}</p>
+              </div>
+              <button
+                onClick={() => setErrorMessage(null)}
+                className="text-xs text-red-400 hover:text-red-600 shrink-0"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-3" />

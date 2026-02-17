@@ -8,7 +8,9 @@ import { prisma } from '@/lib/prisma'
 import { extractExcelData } from '@/lib/agente/excelExtractor'
 import { extractPdfProposal } from '@/lib/agente/pdfProposalExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
-import type { ExcelExtraido } from '@/lib/agente/excelExtractor'
+
+// Allow up to 120 seconds for Claude API processing of large Excel files
+export const maxDuration = 120
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 
@@ -188,11 +190,45 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error en importar-excel:', error)
-    const message = error instanceof Error ? error.message : 'Error desconocido'
+    console.error('Error importar-excel:', error)
+
+    let message = 'Error desconocido al procesar archivos'
+    let status = 500
+
+    if (error instanceof Error) {
+      message = error.message
+
+      // Anthropic API errors
+      if (error.name === 'APIError' || error.message.includes('API')) {
+        const apiErr = error as Error & { status?: number }
+        if (apiErr.status === 429) {
+          message = 'Límite de API excedido. Espera un momento e intenta de nuevo.'
+          status = 429
+        } else if (apiErr.status === 401) {
+          message = 'Error de autenticación con el servicio de IA. Contacta al administrador.'
+        }
+      }
+
+      // Timeout
+      if (error.name === 'AbortError' || error.message.includes('timeout') || error.message.includes('timed out')) {
+        message = 'El análisis tomó demasiado tiempo. Intenta con un archivo Excel más pequeño.'
+        status = 504
+      }
+
+      // SheetJS / parse errors
+      if (error.message.includes('JSON') || error.message.includes('parse')) {
+        message = 'Error al interpretar la respuesta del modelo. Intenta de nuevo.'
+      }
+    }
+
     return NextResponse.json(
-      { error: `Error procesando archivos: ${message}` },
-      { status: 500 }
+      {
+        error: message,
+        ...(process.env.NODE_ENV === 'development' && error instanceof Error
+          ? { stack: error.stack }
+          : {}),
+      },
+      { status }
     )
   }
 }
