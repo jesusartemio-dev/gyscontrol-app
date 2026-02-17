@@ -110,10 +110,10 @@ export default function CotizacionGastoItemModal({
   })
 
   const watchedValues = form.watch()
-  // Fórmula: precioUnitario va al costoInterno, luego se multiplica por margen para costoCliente
-  const costoInterno = (watchedValues.cantidad || 0) * (watchedValues.precioUnitario || 0) * (watchedValues.factorSeguridad || 1)
+  // Fórmula: costoCliente = cantidad * precioUnitario * factor, costoInterno = costoCliente / margen
   const margenValue = watchedValues.margen || 1.25
-  const costoCliente = costoInterno * margenValue
+  const costoCliente = (watchedValues.cantidad || 0) * (watchedValues.precioUnitario || 0) * (watchedValues.factorSeguridad || 1)
+  const costoInterno = margenValue > 0 ? costoCliente / margenValue : 0
   const rentabilidad = costoInterno > 0 ? ((costoCliente - costoInterno) / costoInterno) * 100 : 0
 
   // Reset form when modal closes

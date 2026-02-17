@@ -57,8 +57,8 @@ export default function CotizacionGastoItemEditModal({ item, isOpen, onClose, on
 
   // Real-time cost calculation
   const costos = useMemo(() => {
-    const costoInterno = +(cantidad * precioUnitario * factorSeguridad).toFixed(2)
-    const costoCliente = +(costoInterno * margen).toFixed(2)
+    const costoCliente = +(cantidad * precioUnitario * factorSeguridad).toFixed(2)
+    const costoInterno = +(costoCliente / margen).toFixed(2)
     const rentabilidad = costoInterno > 0
       ? ((costoCliente - costoInterno) / costoInterno) * 100
       : 0

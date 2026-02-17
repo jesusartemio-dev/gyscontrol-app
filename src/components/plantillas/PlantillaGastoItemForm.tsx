@@ -30,9 +30,9 @@ export default function PlantillaGastoItemForm({ gastoId, onCreated }: Props) {
     try {
       setLoading(true)
 
-      // Fórmula: precioUnitario va al costoInterno, luego se multiplica por margen para costoCliente
-      const costoInterno = cantidad * precioUnitario * factorSeguridad
-      const costoCliente = costoInterno * (margen || 1.25)
+      // Fórmula: costoCliente = cantidad * precioUnitario * factor, costoInterno = costoCliente / margen
+      const costoCliente = cantidad * precioUnitario * factorSeguridad
+      const costoInterno = costoCliente / (margen || 1.25)
 
       const payload: PlantillaGastoItemPayload = {
         gastoId,
