@@ -80,6 +80,6 @@ export type ToolHandlerMap = Record<string, ToolHandler>
 
 // ── Configuración ─────────────────────────────────────────
 
-export const AGENT_MODEL = process.env.AI_CHAT_MODEL || 'claude-sonnet-4-5-20250929'
+export { getModelForTask } from './models'
 export const AGENT_MAX_TOKENS = 4096
 export const AGENT_MAX_TOOL_ROUNDS = 10

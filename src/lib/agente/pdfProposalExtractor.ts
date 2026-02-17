@@ -3,6 +3,7 @@
 // Reutiliza patrón de comprobante-ocr/route.ts
 
 import Anthropic from '@anthropic-ai/sdk'
+import { getModelForTask } from './models'
 
 // ── Tipos ─────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ export async function extractPdfProposal(
   pdfBase64: string
 ): Promise<PropuestaExtraida> {
   const client = getClient()
-  const model = process.env.AI_EXTRACTION_MODEL || 'claude-sonnet-4-5-20250929'
+  const model = getModelForTask('pdf-extraction')
 
   const response = await client.messages.create({
     model,

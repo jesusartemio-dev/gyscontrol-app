@@ -9,7 +9,7 @@ import { buildSystemPrompt } from '@/lib/agente/systemPrompt'
 import { allTools } from '@/lib/agente/tools'
 import { toolHandlers } from '@/lib/agente/toolHandlers'
 import {
-  AGENT_MODEL,
+  getModelForTask,
   AGENT_MAX_TOKENS,
   AGENT_MAX_TOOL_ROUNDS,
 } from '@/lib/agente/types'
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
   const client = getClient()
   const systemPrompt = buildSystemPrompt({ cotizacionId })
   const tools = allTools
-  const model = AGENT_MODEL
+  const model = getModelForTask('chat')
 
   const encoder = new TextEncoder()
 

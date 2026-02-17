@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
+import { getModelForTask } from '@/lib/agente/models'
 
 // ── Tipos ────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ function getAnthropicClient(): Anthropic {
 }
 
 function getOcrModel(): string {
-  return process.env.OCR_MODEL || 'claude-haiku-4-5-20251001'
+  return getModelForTask('ocr')
 }
 
 type SunatResult = {

@@ -3,6 +3,7 @@
 
 import * as XLSX from 'xlsx'
 import Anthropic from '@anthropic-ai/sdk'
+import { getModelForTask } from './models'
 
 // ── Tipos de datos extraídos ──────────────────────────────
 
@@ -259,10 +260,6 @@ function getClient(): Anthropic {
   return new Anthropic({ apiKey, timeout: 90_000 }) // 90s timeout
 }
 
-function getExtractionModel(): string {
-  return process.env.AI_EXTRACTION_MODEL || 'claude-sonnet-4-5-20250929'
-}
-
 /**
  * Envía las hojas del Excel a Claude y obtiene datos estructurados.
  */
@@ -270,7 +267,7 @@ export async function extractWithClaude(
   sheets: SheetTextData[]
 ): Promise<ExcelExtraido> {
   const client = getClient()
-  const model = getExtractionModel()
+  const model = getModelForTask('excel-extraction')
 
   const response = await client.messages.create({
     model,
