@@ -164,6 +164,7 @@ export async function POST(req: Request) {
         categoriaCosto: payload.categoriaCosto || 'equipos',
         solicitanteId: session.user.id,
         condicionPago: payload.condicionPago || 'contado',
+        diasCredito: payload.diasCredito ? Number(payload.diasCredito) : null,
         moneda: payload.moneda || 'PEN',
         subtotal,
         igv,

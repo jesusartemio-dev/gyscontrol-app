@@ -123,6 +123,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
               fechaVencimiento: body.fechaVencimiento
                 ? new Date(body.fechaVencimiento)
                 : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 días default
+              condicionPago: body.condicionPago || null,
+              diasCredito: body.diasCredito ? Number(body.diasCredito) : null,
+              metodoPago: body.metodoPago || null,
+              bancoFinanciera: body.bancoFinanciera || null,
               updatedAt: new Date(),
             },
           })

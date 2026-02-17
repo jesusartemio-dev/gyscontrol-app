@@ -142,6 +142,10 @@ export default function FacturacionPage() {
   const [facturarTarget, setFacturarTarget] = useState<Valorizacion | null>(null)
   const [numFactura, setNumFactura] = useState('')
   const [fechaVencimiento, setFechaVencimiento] = useState('')
+  const [factCondicionPago, setFactCondicionPago] = useState('contado')
+  const [factDiasCredito, setFactDiasCredito] = useState<number | ''>('')
+  const [factMetodoPago, setFactMetodoPago] = useState('')
+  const [factBancoFinanciera, setFactBancoFinanciera] = useState('')
 
   // Generic estado dialog (pagada, anulada)
   const [showEstadoDialog, setShowEstadoDialog] = useState(false)
@@ -215,6 +219,10 @@ export default function FacturacionPage() {
           crearCuentaCobrar: true,
           numeroDocumento: numFactura.trim(),
           fechaVencimiento,
+          condicionPago: factCondicionPago,
+          diasCredito: factCondicionPago === 'credito' && factDiasCredito ? Number(factDiasCredito) : undefined,
+          metodoPago: factMetodoPago || undefined,
+          bancoFinanciera: factBancoFinanciera || undefined,
         }),
       })
       if (!res.ok) throw new Error()
@@ -509,6 +517,42 @@ export default function FacturacionPage() {
               <div>
                 <Label>Fecha Vencimiento CxC</Label>
                 <Input type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Condición de Pago</Label>
+                  <Select value={factCondicionPago} onValueChange={(v) => { setFactCondicionPago(v); if (v === 'contado') setFactDiasCredito('') }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contado">Contado</SelectItem>
+                      <SelectItem value="credito">Crédito</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {factCondicionPago === 'credito' && (
+                  <div>
+                    <Label>Días de crédito</Label>
+                    <Input type="number" min={1} placeholder="30" value={factDiasCredito} onChange={e => setFactDiasCredito(e.target.value ? Number(e.target.value) : '')} />
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Método de Pago</Label>
+                  <Select value={factMetodoPago} onValueChange={setFactMetodoPago}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="transferencia">Transferencia</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="letra">Letra</SelectItem>
+                      <SelectItem value="factura_negociable">Factura Negociable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Banco / Financiera</Label>
+                  <Input placeholder="Ej: BCP, BBVA..." value={factBancoFinanciera} onChange={e => setFactBancoFinanciera(e.target.value)} />
+                </div>
               </div>
             </div>
           )}

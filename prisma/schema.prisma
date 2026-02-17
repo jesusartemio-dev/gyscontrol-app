@@ -2968,11 +2968,29 @@ model HojaDeGastos {
   empleado    User         @relation("HojaEmpleado", fields: [empleadoId], references: [id])
   aprobador   User?        @relation("HojaAprobador", fields: [aprobadorId], references: [id])
   lineas      GastoLinea[]
+  adjuntos    HojaDeGastosAdjunto[]
 
   @@index([proyectoId, estado])
   @@index([centroCostoId, estado])
   @@index([empleadoId, estado])
   @@map("hoja_de_gastos")
+}
+
+model HojaDeGastosAdjunto {
+  id              String   @id @default(cuid())
+  hojaDeGastosId  String
+  nombreArchivo   String
+  urlArchivo      String
+  driveFileId     String?
+  tipoArchivo     String?
+  tamano          Int?
+  tipo            String   @default("constancia_deposito")
+  createdAt       DateTime @default(now())
+
+  hojaDeGastos HojaDeGastos @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
+
+  @@index([hojaDeGastosId])
+  @@map("hoja_de_gastos_adjunto")
 }
 
 model GastoLinea {
@@ -3053,6 +3071,7 @@ model OrdenCompra {
   categoriaCosto       CategoriaCosto    @default(equipos)
   estado               EstadoOrdenCompra @default(borrador)
   condicionPago        String            @default("contado")
+  diasCredito          Int?
   moneda               String            @default("PEN")
   subtotal             Float             @default(0)
   igv                  Float             @default(0)
@@ -3143,6 +3162,10 @@ model CuentaPorCobrar {
   saldoPendiente    Float              @default(0) // calculado: monto - montoPagado
   fechaEmision      DateTime
   fechaVencimiento  DateTime
+  condicionPago     String?
+  diasCredito       Int?
+  metodoPago        String?
+  bancoFinanciera   String?
   estado            EstadoCuentaCobrar @default(pendiente)
   observaciones     String?
   createdAt         DateTime           @default(now())
@@ -3168,6 +3191,11 @@ model PagoCobro {
   medioPago          String   @default("transferencia") // transferencia, cheque, efectivo, detraccion
   numeroOperacion    String?
   observaciones      String?
+  esDetraccion          Boolean   @default(false)
+  detraccionPorcentaje  Float?
+  detraccionCodigo      String?
+  detraccionMonto       Float?
+  detraccionFechaPago   DateTime?
   createdAt          DateTime @default(now())
   updatedAt          DateTime
 
@@ -3193,7 +3221,8 @@ model CuentaPorPagar {
   saldoPendiente    Float              @default(0) // calculado: monto - montoPagado
   fechaRecepcion    DateTime
   fechaVencimiento  DateTime
-  condicionPago     String             @default("contado") // contado, 15 dias, 30 dias, 60 dias
+  condicionPago     String             @default("contado") // contado, credito
+  diasCredito       Int?
   estado            EstadoCuentaPagar  @default(pendiente)
   observaciones     String?
   createdAt         DateTime           @default(now())
@@ -3219,6 +3248,11 @@ model PagoPagar {
   medioPago         String   @default("transferencia") // transferencia, cheque, efectivo
   numeroOperacion   String?
   observaciones     String?
+  esDetraccion          Boolean   @default(false)
+  detraccionPorcentaje  Float?
+  detraccionCodigo      String?
+  detraccionMonto       Float?
+  detraccionFechaPago   DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime
 

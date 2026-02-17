@@ -2542,6 +2542,19 @@ export interface HojaDeGastos {
   empleado?: { id: string; name: string | null; email: string }
   aprobador?: { id: string; name: string | null; email: string } | null
   lineas?: GastoLinea[]
+  adjuntos?: HojaDeGastosAdjunto[]
+}
+
+export interface HojaDeGastosAdjunto {
+  id: string
+  hojaDeGastosId: string
+  nombreArchivo: string
+  urlArchivo: string
+  driveFileId?: string | null
+  tipoArchivo?: string | null
+  tamano?: number | null
+  tipo: string
+  createdAt: string
 }
 
 export interface GastoLinea {
@@ -2604,6 +2617,7 @@ export interface OrdenCompra {
   categoriaCosto: CategoriaCosto
   estado: EstadoOrdenCompra
   condicionPago: string
+  diasCredito?: number | null
   moneda: string
   subtotal: number
   igv: number
@@ -2677,6 +2691,10 @@ export interface CuentaPorCobrar {
   saldoPendiente: number
   fechaEmision: string
   fechaVencimiento: string
+  condicionPago?: string | null
+  diasCredito?: number | null
+  metodoPago?: string | null
+  bancoFinanciera?: string | null
   estado: EstadoCuentaCobrar
   observaciones?: string | null
   createdAt: string
@@ -2697,6 +2715,11 @@ export interface PagoCobro {
   medioPago: string // 'transferencia' | 'cheque' | 'efectivo' | 'detraccion'
   numeroOperacion?: string | null
   observaciones?: string | null
+  esDetraccion?: boolean
+  detraccionPorcentaje?: number | null
+  detraccionCodigo?: string | null
+  detraccionMonto?: number | null
+  detraccionFechaPago?: string | null
   createdAt: string
   updatedAt: string
 
@@ -2719,7 +2742,8 @@ export interface CuentaPorPagar {
   saldoPendiente: number
   fechaRecepcion: string
   fechaVencimiento: string
-  condicionPago: string // 'contado' | '15 dias' | '30 dias' | '60 dias'
+  condicionPago: string // 'contado' | 'credito'
+  diasCredito?: number | null
   estado: EstadoCuentaPagar
   observaciones?: string | null
   createdAt: string
@@ -2740,6 +2764,11 @@ export interface PagoPagar {
   medioPago: string // 'transferencia' | 'cheque' | 'efectivo'
   numeroOperacion?: string | null
   observaciones?: string | null
+  esDetraccion?: boolean
+  detraccionPorcentaje?: number | null
+  detraccionCodigo?: string | null
+  detraccionMonto?: number | null
+  detraccionFechaPago?: string | null
   createdAt: string
   updatedAt: string
 

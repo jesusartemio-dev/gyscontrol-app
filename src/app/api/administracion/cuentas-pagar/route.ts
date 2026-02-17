@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { proveedorId, proyectoId, ordenCompraId, numeroFactura, descripcion, monto, moneda, tipoCambio, fechaRecepcion, fechaVencimiento, condicionPago, observaciones } = body
+    const { proveedorId, proyectoId, ordenCompraId, numeroFactura, descripcion, monto, moneda, tipoCambio, fechaRecepcion, fechaVencimiento, condicionPago, diasCredito, observaciones } = body
 
     if (!proveedorId || !monto || !fechaRecepcion || !fechaVencimiento) {
       return NextResponse.json({ error: 'proveedorId, monto, fechaRecepcion y fechaVencimiento son requeridos' }, { status: 400 })
@@ -79,6 +79,7 @@ export async function POST(req: Request) {
         fechaRecepcion: new Date(fechaRecepcion),
         fechaVencimiento: new Date(fechaVencimiento),
         condicionPago: condicionPago || 'contado',
+        diasCredito: diasCredito ? Number(diasCredito) : null,
         observaciones: observaciones || null,
         updatedAt: new Date(),
       },

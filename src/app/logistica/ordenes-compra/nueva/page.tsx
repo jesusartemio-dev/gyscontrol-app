@@ -16,13 +16,6 @@ import { getProveedores } from '@/lib/services/proveedor'
 import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
 import type { Proveedor, OrdenCompraItemPayload } from '@/types'
 
-const CONDICIONES_PAGO = [
-  { value: 'contado', label: 'Contado' },
-  { value: 'credito_15', label: 'Crédito 15 días' },
-  { value: 'credito_30', label: 'Crédito 30 días' },
-  { value: 'credito_60', label: 'Crédito 60 días' },
-]
-
 const MONEDAS = [
   { value: 'PEN', label: 'Soles (PEN)' },
   { value: 'USD', label: 'Dólares (USD)' },
@@ -55,6 +48,7 @@ export default function NuevaOrdenCompraPage() {
   const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
   const [categoriaCosto, setCategoriaCosto] = useState('equipos')
   const [condicionPago, setCondicionPago] = useState('contado')
+  const [diasCredito, setDiasCredito] = useState<number | ''>('')
   const [moneda, setMoneda] = useState('PEN')
   const [lugarEntrega, setLugarEntrega] = useState('')
   const [contactoEntrega, setContactoEntrega] = useState('')
@@ -102,6 +96,7 @@ export default function NuevaOrdenCompraPage() {
         centroCostoId: asignacion.centroCostoId || undefined,
         categoriaCosto: categoriaCosto as 'equipos' | 'servicios' | 'gastos',
         condicionPago,
+        diasCredito: condicionPago === 'credito' && diasCredito ? Number(diasCredito) : undefined,
         moneda,
         lugarEntrega: lugarEntrega || undefined,
         contactoEntrega: contactoEntrega || undefined,
@@ -202,17 +197,29 @@ export default function NuevaOrdenCompraPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <Label className="text-xs">Condición de Pago</Label>
-              <Select value={condicionPago} onValueChange={setCondicionPago}>
+              <Select value={condicionPago} onValueChange={(v) => { setCondicionPago(v); if (v === 'contado') setDiasCredito('') }}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CONDICIONES_PAGO.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
+                  <SelectItem value="contado">Contado</SelectItem>
+                  <SelectItem value="credito">Crédito</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {condicionPago === 'credito' && (
+              <div>
+                <Label className="text-xs">Días de crédito</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  className="h-9"
+                  placeholder="Ej: 30"
+                  value={diasCredito}
+                  onChange={(e) => setDiasCredito(e.target.value ? Number(e.target.value) : '')}
+                />
+              </div>
+            )}
             <div>
               <Label className="text-xs">Moneda</Label>
               <Select value={moneda} onValueChange={setMoneda}>

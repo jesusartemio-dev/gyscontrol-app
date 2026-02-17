@@ -26,6 +26,13 @@ const formatCurrency = (amount: number, moneda = 'PEN') =>
 const formatDate = (date: string | null | undefined) =>
   date ? new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
 
+function displayCondicionPago(condicionPago: string, diasCredito?: number | null): string {
+  if (condicionPago === 'contado') return 'Contado'
+  if (condicionPago === 'credito' && diasCredito) return `Crédito ${diasCredito} días`
+  if (condicionPago.startsWith('credito_')) return `Crédito ${condicionPago.split('_')[1]} días`
+  return condicionPago
+}
+
 const condicionLabel: Record<string, string> = {
   contado: 'Contado',
   credito_15: 'Crédito 15 días',
@@ -258,7 +265,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             <div className="border-t pt-1 mt-1 space-y-0.5">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Condición:</span>
-                <span>{condicionLabel[oc.condicionPago] || oc.condicionPago}</span>
+                <span>{displayCondicionPago(oc.condicionPago, oc.diasCredito)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Moneda:</span>

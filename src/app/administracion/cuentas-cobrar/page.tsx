@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -126,6 +127,11 @@ export default function CuentasCobrarPage() {
   const [pagoOperacion, setPagoOperacion] = useState('')
   const [pagoBancoId, setPagoBancoId] = useState('none')
   const [pagoObs, setPagoObs] = useState('')
+  const [conDetraccion, setConDetraccion] = useState(false)
+  const [detraccionPorcentaje, setDetraccionPorcentaje] = useState('12')
+  const [detraccionCodigo, setDetraccionCodigo] = useState('')
+  const [detraccionFechaPago, setDetraccionFechaPago] = useState('')
+  const [cuentaBNId, setCuentaBNId] = useState('none')
 
   // Detail dialog
   const [showDetail, setShowDetail] = useState<CuentaPorCobrar | null>(null)
@@ -322,6 +328,11 @@ export default function CuentasCobrarPage() {
           numeroOperacion: pagoOperacion || null,
           cuentaBancariaId: pagoBancoId === 'none' ? null : pagoBancoId,
           observaciones: pagoObs || null,
+          conDetraccion,
+          detraccionPorcentaje: conDetraccion ? parseFloat(detraccionPorcentaje) : undefined,
+          detraccionCodigo: conDetraccion ? detraccionCodigo || undefined : undefined,
+          detraccionFechaPago: conDetraccion ? detraccionFechaPago || undefined : undefined,
+          cuentaBNId: conDetraccion && cuentaBNId !== 'none' ? cuentaBNId : undefined,
         }),
       })
       if (!res.ok) {
@@ -654,12 +665,64 @@ export default function CuentasCobrarPage() {
               <Label>Observaciones</Label>
               <Input placeholder="Observaciones del pago" value={pagoObs} onChange={e => setPagoObs(e.target.value)} />
             </div>
+
+            {/* Detracción */}
+            <div className="flex items-center space-x-2 pt-2 border-t">
+              <Checkbox id="conDetraccion" checked={conDetraccion} onCheckedChange={(v) => setConDetraccion(!!v)} />
+              <Label htmlFor="conDetraccion" className="text-sm font-medium cursor-pointer">¿Incluye detracción?</Label>
+            </div>
+            {conDetraccion && (
+              <div className="space-y-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Porcentaje detracción (%)</Label>
+                    <Input type="number" step="0.01" min={0} max={100} value={detraccionPorcentaje} onChange={e => setDetraccionPorcentaje(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Código SUNAT</Label>
+                    <Input placeholder="Ej: 012" value={detraccionCodigo} onChange={e => setDetraccionCodigo(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs">Fecha depósito BN</Label>
+                  <Input type="date" value={detraccionFechaPago} onChange={e => setDetraccionFechaPago(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Cuenta Banco de la Nación</Label>
+                  <Select value={cuentaBNId} onValueChange={setCuentaBNId}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar cuenta BN" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin especificar</SelectItem>
+                      {cuentasBancarias.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.nombreBanco} - {b.numeroCuenta}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {pagoMonto && detraccionPorcentaje && (
+                  <div className="text-xs space-y-1 pt-2 border-t border-amber-300">
+                    <div className="flex justify-between">
+                      <span>Monto total:</span>
+                      <span className="font-mono">{pagoCuenta ? formatCurrency(parseFloat(pagoMonto), pagoCuenta.moneda) : pagoMonto}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-700">
+                      <span>Detracción ({detraccionPorcentaje}%):</span>
+                      <span className="font-mono">{pagoCuenta ? formatCurrency(Math.round(parseFloat(pagoMonto) * parseFloat(detraccionPorcentaje) / 100 * 100) / 100, pagoCuenta.moneda) : ''}</span>
+                    </div>
+                    <div className="flex justify-between font-bold">
+                      <span>Neto a cuenta comercial:</span>
+                      <span className="font-mono">{pagoCuenta ? formatCurrency(Math.round((parseFloat(pagoMonto) - parseFloat(pagoMonto) * parseFloat(detraccionPorcentaje) / 100) * 100) / 100, pagoCuenta.moneda) : ''}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPagoDialog(false)}>Cancelar</Button>
             <Button onClick={handlePago} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Registrar Cobro
+              {conDetraccion ? 'Registrar con Detracción' : 'Registrar Cobro'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -17,7 +17,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const { id: cuentaPorPagarId } = await params
     const body = await req.json()
-    const { monto, fechaPago, medioPago, numeroOperacion, cuentaBancariaId, observaciones } = body
+    const { monto, fechaPago, medioPago, numeroOperacion, cuentaBancariaId, observaciones,
+      conDetraccion, detraccionPorcentaje, detraccionCodigo, detraccionFechaPago, cuentaBNId } = body
 
     if (!monto || !fechaPago) {
       return NextResponse.json({ error: 'monto y fechaPago son requeridos' }, { status: 400 })
@@ -31,21 +32,63 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'No se puede registrar pago en cuenta anulada' }, { status: 400 })
     }
 
-    const pago = await prisma.pagoPagar.create({
-      data: {
-        cuentaPorPagarId,
-        cuentaBancariaId: cuentaBancariaId || null,
-        monto,
-        fechaPago: new Date(fechaPago),
-        medioPago: medioPago || 'transferencia',
-        numeroOperacion: numeroOperacion || null,
-        observaciones: observaciones || null,
-        updatedAt: new Date(),
-      },
-      include: {
-        cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } },
-      },
-    })
+    let pagos: any[]
+
+    if (conDetraccion && detraccionPorcentaje > 0) {
+      // Split: detracción + neto
+      const detraccionMonto = Math.round(monto * detraccionPorcentaje / 100 * 100) / 100
+      const montoNeto = Math.round((monto - detraccionMonto) * 100) / 100
+
+      pagos = await prisma.$transaction([
+        prisma.pagoPagar.create({
+          data: {
+            cuentaPorPagarId,
+            cuentaBancariaId: cuentaBNId || null,
+            monto: detraccionMonto,
+            fechaPago: detraccionFechaPago ? new Date(detraccionFechaPago) : new Date(fechaPago),
+            medioPago: 'detraccion',
+            numeroOperacion: numeroOperacion || null,
+            observaciones: `Detracción ${detraccionPorcentaje}%${detraccionCodigo ? ` (${detraccionCodigo})` : ''}`,
+            esDetraccion: true,
+            detraccionPorcentaje,
+            detraccionCodigo: detraccionCodigo || null,
+            detraccionMonto,
+            detraccionFechaPago: detraccionFechaPago ? new Date(detraccionFechaPago) : null,
+            updatedAt: new Date(),
+          },
+        }),
+        prisma.pagoPagar.create({
+          data: {
+            cuentaPorPagarId,
+            cuentaBancariaId: cuentaBancariaId || null,
+            monto: montoNeto,
+            fechaPago: new Date(fechaPago),
+            medioPago: medioPago || 'transferencia',
+            numeroOperacion: numeroOperacion || null,
+            observaciones: observaciones || null,
+            esDetraccion: false,
+            updatedAt: new Date(),
+          },
+        }),
+      ])
+    } else {
+      const pago = await prisma.pagoPagar.create({
+        data: {
+          cuentaPorPagarId,
+          cuentaBancariaId: cuentaBancariaId || null,
+          monto,
+          fechaPago: new Date(fechaPago),
+          medioPago: medioPago || 'transferencia',
+          numeroOperacion: numeroOperacion || null,
+          observaciones: observaciones || null,
+          updatedAt: new Date(),
+        },
+        include: {
+          cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } },
+        },
+      })
+      pagos = [pago]
+    }
 
     // Recalcular saldo
     const totalPagado = await prisma.pagoPagar.aggregate({
@@ -70,7 +113,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     })
 
-    return NextResponse.json(pago, { status: 201 })
+    return NextResponse.json(pagos.length === 1 ? pagos[0] : pagos, { status: 201 })
   } catch (error) {
     console.error('Error al registrar pago CxP:', error)
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
