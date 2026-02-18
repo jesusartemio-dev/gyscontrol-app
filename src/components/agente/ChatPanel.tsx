@@ -161,12 +161,29 @@ export function ChatPanel({ open, onOpenChange }: Props) {
   const [conversacionTitulo, setConversacionTitulo] = useState<string | null>(null)
   const [conversaciones, setConversaciones] = useState<ConversacionListItem[]>([])
   const [showConversaciones, setShowConversaciones] = useState(false)
+  const [isLoadingConversacion, setIsLoadingConversacion] = useState(false)
+  const hasAutoLoadedRef = useRef(false)
 
-  // Fetch conversations when panel opens
+  // Fetch conversations and auto-load last one when panel opens
   useEffect(() => {
-    if (open) {
-      fetchConversaciones()
+    if (!open) return
+    const init = async () => {
+      try {
+        const res = await fetch('/api/agente/conversaciones?limit=10')
+        if (!res.ok) return
+        const convs: ConversacionListItem[] = await res.json()
+        setConversaciones(convs)
+        // Auto-load the most recent conversation if panel has no active chat
+        if (convs.length > 0 && !hasAutoLoadedRef.current && !conversacionId) {
+          hasAutoLoadedRef.current = true
+          await doLoadConversacion(convs[0].id)
+        }
+      } catch {
+        // Silently fail
+      }
     }
+    init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const fetchConversaciones = async () => {
@@ -181,25 +198,44 @@ export function ChatPanel({ open, onOpenChange }: Props) {
     }
   }
 
-  const loadConversacion = async (id: string) => {
+  const doLoadConversacion = async (id: string) => {
+    setIsLoadingConversacion(true)
     try {
       const res = await fetch(`/api/agente/conversaciones/${id}`)
-      if (!res.ok) return
+      if (!res.ok) {
+        console.error('[ChatPanel] Failed to load conversation:', res.status)
+        return
+      }
       const data: ConversacionFull = await res.json()
       setConversacionId(data.id)
       setConversacionTitulo(data.titulo)
-      setMessages(data.mensajes.map(dbMessageToChatMessage))
+      const msgs = Array.isArray(data.mensajes)
+        ? data.mensajes.map(dbMessageToChatMessage)
+        : []
+      setMessages(msgs)
       setShowConversaciones(false)
+      // Scroll to bottom after DOM update
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: 'auto',
+        })
+      })
     } catch (err) {
-      console.error('Error loading conversation:', err)
+      console.error('[ChatPanel] Error loading conversation:', err)
+    } finally {
+      setIsLoadingConversacion(false)
     }
   }
+
+  const loadConversacion = (id: string) => doLoadConversacion(id)
 
   const handleNewConversacion = () => {
     setConversacionId(null)
     setConversacionTitulo(null)
     setMessages([])
     setShowConversaciones(false)
+    hasAutoLoadedRef.current = true // Don't auto-load again after clearing
   }
 
   const handleArchive = async (id: string, e: React.MouseEvent) => {
@@ -526,7 +562,13 @@ export function ChatPanel({ open, onOpenChange }: Props) {
             backgroundSize: '20px 20px',
           }}
         >
-          {messages.length === 0 ? (
+          {isLoadingConversacion ? (
+            /* ── Loading conversation state ── */
+            <div className="flex h-full flex-col items-center justify-center px-8">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-3" />
+              <p className="text-sm text-muted-foreground">Cargando conversacion...</p>
+            </div>
+          ) : messages.length === 0 ? (
             /* ── Welcome state ── */
             <div className="flex h-full flex-col items-center justify-center px-8">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#1d4ed8] shadow-lg shadow-blue-500/25 mb-5">

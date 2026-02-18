@@ -62,10 +62,12 @@ function buildAnthropicMessages(
     .filter((m) => m.content.trim() || (m.attachments && m.attachments.length > 0))
     .map((m) => {
       // If user message has attachments, build multi-part content
+      // Skip attachments with empty base64 (loaded from DB without file data)
       if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
         const contentParts: Anthropic.Messages.ContentBlockParam[] = []
 
         for (const att of m.attachments) {
+          if (!att.base64) continue // Skip DB-loaded attachments (no base64 data)
           if (att.mimeType === 'application/pdf') {
             contentParts.push({
               type: 'document',
@@ -87,11 +89,14 @@ function buildAnthropicMessages(
           }
         }
 
-        if (m.content.trim()) {
-          contentParts.push({ type: 'text', text: m.content })
+        // Only use multi-part format if we have actual attachment data
+        if (contentParts.length > 0) {
+          if (m.content.trim()) {
+            contentParts.push({ type: 'text', text: m.content })
+          }
+          return { role: 'user' as const, content: contentParts }
         }
-
-        return { role: 'user' as const, content: contentParts }
+        // Fall through to plain text if all attachments were DB-loaded (no base64)
       }
 
       return {

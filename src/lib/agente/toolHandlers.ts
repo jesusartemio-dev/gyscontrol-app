@@ -694,13 +694,19 @@ export const toolHandlers: ToolHandlerMap = {
       const costoInterno = +(precioInterno * cantidad).toFixed(2)
       const costoCliente = +(precioCliente * cantidad).toFixed(2)
 
+      const origenPrecio = item.origenPrecio as string | undefined
+      let descripcionFinal = item.descripcion as string
+      if (origenPrecio) {
+        descripcionFinal += ` [${origenPrecio}]`
+      }
+
       await prisma.cotizacionEquipoItem.create({
         data: {
           id: genId('cot-eqi'),
           cotizacionEquipoId: grupoId,
           catalogoEquipoId: (item.catalogoEquipoId as string) || null,
           codigo: (item.codigo as string) || `EQ-${(++itemCount).toString().padStart(3, '0')}`,
-          descripcion: item.descripcion as string,
+          descripcion: descripcionFinal,
           categoria: (item.categoria as string) || 'General',
           unidad: (item.unidad as string) || 'Und',
           marca: (item.marca as string) || '',
@@ -809,12 +815,18 @@ export const toolHandlers: ToolHandlerMap = {
       const costoCliente = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
       const costoInterno = margen > 0 ? +(costoCliente / margen).toFixed(2) : costoCliente
 
+      const origenPrecio = item.origenPrecio as string | undefined
+      let descripcionServicio = (item.descripcion as string) || (item.nombre as string)
+      if (origenPrecio) {
+        descripcionServicio += ` [${origenPrecio}]`
+      }
+
       await prisma.cotizacionServicioItem.create({
         data: {
           id: genId('cot-svi'),
           cotizacionServicioId: grupoId,
           nombre: item.nombre as string,
-          descripcion: (item.descripcion as string) || (item.nombre as string),
+          descripcion: descripcionServicio,
           edtId,
           recursoId,
           recursoNombre: recurso.nombre,
@@ -876,12 +888,18 @@ export const toolHandlers: ToolHandlerMap = {
       const costoCliente = +(cantidad * precioUnitario * factorSeguridad).toFixed(2)
       const costoInterno = margen > 0 ? +(costoCliente / margen).toFixed(2) : costoCliente
 
+      const origenPrecio = item.origenPrecio as string | undefined
+      let descripcionGasto = (item.descripcion as string) || null
+      if (origenPrecio) {
+        descripcionGasto = (descripcionGasto ? descripcionGasto + ' ' : '') + `[${origenPrecio}]`
+      }
+
       await prisma.cotizacionGastoItem.create({
         data: {
           id: genId('cot-gsi'),
           gastoId: grupoId,
           nombre: item.nombre as string,
-          descripcion: (item.descripcion as string) || null,
+          descripcion: descripcionGasto,
           cantidad,
           precioUnitario,
           factorSeguridad,

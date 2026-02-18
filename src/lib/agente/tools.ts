@@ -264,6 +264,10 @@ export const creationTools: AnthropicTool[] = [
                 type: 'number',
                 description: 'Cantidad de unidades (default: 1)',
               },
+              origenPrecio: {
+                type: 'string',
+                description: 'Origen del precio: "CATALOGO", "OC: [proyecto/proveedor]", o "ESTIMADO: [razón]"',
+              },
             },
             required: ['descripcion', 'precioLista'],
           },
@@ -346,6 +350,10 @@ export const creationTools: AnthropicTool[] = [
                 type: 'number',
                 description: 'Margen sobre el costo (default: 1.35 = 35% de margen). costoInterno = costoCliente / margen',
               },
+              origenPrecio: {
+                type: 'string',
+                description: 'Origen del precio: "CATALOGO", "OC: [proyecto/proveedor]", o "ESTIMADO: [razón]"',
+              },
             },
             required: ['nombre', 'recursoId', 'horaBase'],
           },
@@ -398,6 +406,10 @@ export const creationTools: AnthropicTool[] = [
               margen: {
                 type: 'number',
                 description: 'Margen (default: 1.0). costoInterno = costoCliente / margen',
+              },
+              origenPrecio: {
+                type: 'string',
+                description: 'Origen del precio: "CATALOGO", "OC: [proyecto/proveedor]", o "ESTIMADO: [razón]"',
               },
             },
             required: ['nombre', 'precioUnitario'],

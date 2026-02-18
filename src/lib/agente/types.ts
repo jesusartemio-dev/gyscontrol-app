@@ -97,15 +97,35 @@ export interface ConversacionFull {
 
 /** Convierte un mensaje de DB al formato ChatMessage del frontend */
 export function dbMessageToChatMessage(dbMsg: ConversacionMensajeDB): ChatMessage {
+  // Defensive: Prisma Json? fields can return any JsonValue, not just the expected type
+  let toolCalls: ToolCallInfo[] | undefined
+  if (Array.isArray(dbMsg.toolCalls)) {
+    toolCalls = (dbMsg.toolCalls as ToolCallInfo[]).map((tc) => ({
+      id: tc.id || '',
+      name: tc.name || '',
+      input: tc.input || {},
+      result: tc.result,
+      status: tc.status || 'completed',
+    }))
+  }
+
+  let attachments: ChatAttachment[] | undefined
+  if (Array.isArray(dbMsg.attachments)) {
+    attachments = (dbMsg.attachments as { name: string; type: string; mimeType: string }[]).map((a) => ({
+      name: a.name || '',
+      type: 'pdf' as const,
+      mimeType: a.mimeType || 'application/pdf',
+      base64: '', // Never stored in DB
+    }))
+  }
+
   return {
     id: dbMsg.id,
     role: dbMsg.role,
-    content: dbMsg.content,
+    content: dbMsg.content || '',
     timestamp: new Date(dbMsg.createdAt).getTime(),
-    attachments: dbMsg.attachments
-      ? dbMsg.attachments.map((a) => ({ ...a, base64: '' } as ChatAttachment))
-      : undefined,
-    toolCalls: dbMsg.toolCalls ?? undefined,
+    attachments,
+    toolCalls,
   }
 }
 
