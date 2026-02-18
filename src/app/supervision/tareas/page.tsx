@@ -60,6 +60,7 @@ interface Tarea {
   proyectoCodigo: string
   proyectoNombre: string
   edtNombre: string
+  actividadNombre: string | null
   esExtra: boolean
   responsableId: string | null
   responsableNombre: string | null
@@ -847,6 +848,9 @@ export default function SupervisionTareasPage() {
                           <div>
                             <p className="font-medium">{tarea.proyectoCodigo}</p>
                             <p className="text-xs text-gray-500">{tarea.edtNombre}</p>
+                            {tarea.actividadNombre && (
+                              <p className="text-xs text-purple-500 truncate max-w-[150px]" title={tarea.actividadNombre}>{tarea.actividadNombre}</p>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>

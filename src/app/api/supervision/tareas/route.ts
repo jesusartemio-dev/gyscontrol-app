@@ -88,6 +88,12 @@ export async function GET(request: NextRequest) {
               }
             }
           }
+        },
+        proyectoActividad: {
+          select: {
+            id: true,
+            nombre: true
+          }
         }
       },
       orderBy: [
@@ -194,6 +200,7 @@ export async function GET(request: NextRequest) {
         proyectoCodigo: t.proyectoEdt?.proyecto?.codigo || 'Sin proyecto',
         proyectoNombre: t.proyectoEdt?.proyecto?.nombre || 'Sin proyecto',
         edtNombre,
+        actividadNombre: t.proyectoActividad?.nombre || null,
         esExtra,
         responsableId: t.responsableId,
         responsableNombre: t.user?.name || null,
@@ -221,6 +228,7 @@ export async function GET(request: NextRequest) {
       proyectoCodigo: t.proyectoServicioCotizado?.proyecto?.codigo || 'Sin proyecto',
       proyectoNombre: t.proyectoServicioCotizado?.proyecto?.nombre || 'Sin proyecto',
       edtNombre: 'Tarea simple',
+      actividadNombre: null as string | null,
       esExtra: false,
       responsableId: t.responsableId,
       responsableNombre: t.user?.name || null,
