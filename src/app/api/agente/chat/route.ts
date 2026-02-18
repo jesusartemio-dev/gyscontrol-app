@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
+import { prisma } from '@/lib/prisma'
 import { buildSystemPrompt } from '@/lib/agente/systemPrompt'
 import { allTools } from '@/lib/agente/tools'
 import { toolHandlers } from '@/lib/agente/toolHandlers'
@@ -13,7 +14,7 @@ import {
   AGENT_MAX_TOKENS,
   AGENT_MAX_TOOL_ROUNDS,
 } from '@/lib/agente/types'
-import type { ChatRequest, ChatMessage, ToolContext } from '@/lib/agente/types'
+import type { ChatRequest, ChatMessage, ToolContext, ToolCallInfo } from '@/lib/agente/types'
 
 const MAX_HISTORY_MESSAGES = 10
 const RETRY_DELAY_MS = 15_000
@@ -115,6 +116,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/** Genera título para la conversación a partir del primer mensaje */
+function generateTitle(content: string, maxLen = 60): string {
+  const cleaned = content.replace(/\n/g, ' ').trim()
+  if (cleaned.length <= maxLen) return cleaned
+  const truncated = cleaned.substring(0, maxLen)
+  const lastSpace = truncated.lastIndexOf(' ')
+  return (lastSpace > 20 ? truncated.substring(0, lastSpace) : truncated) + '...'
+}
+
 /** Llama a Claude con reintentos automáticos en caso de rate limit */
 async function callClaudeWithRetry(
   client: Anthropic,
@@ -171,7 +181,7 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const { messages, cotizacionId } = body
+  const { messages, cotizacionId, conversacionId: requestConversacionId } = body
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return new Response(JSON.stringify({ error: 'Se requiere al menos un mensaje' }), {
@@ -193,6 +203,21 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // ── Resolve or create conversation ──
+        let activeConversacionId = requestConversacionId || null
+        if (!activeConversacionId) {
+          const firstUserMsg = messages.find((m) => m.role === 'user')
+          const titulo = generateTitle(firstUserMsg?.content || 'Nueva conversación')
+          const conv = await prisma.agenteConversacion.create({
+            data: { userId, titulo },
+          })
+          activeConversacionId = conv.id
+          writeSSE(controller, encoder, 'conversation_info', {
+            conversacionId: conv.id,
+            titulo,
+          })
+        }
+
         // Check for large PDFs in the last message and warn
         const lastMsg = messages[messages.length - 1]
         if (lastMsg?.attachments) {
@@ -214,6 +239,10 @@ export async function POST(request: NextRequest) {
           buildAnthropicMessages(trimmedMessages)
         let toolRound = 0
 
+        // Accumulate assistant response for persistence
+        let accumulatedText = ''
+        const accumulatedToolCalls: ToolCallInfo[] = []
+
         // Tool-use loop: Claude puede pedir tools, las ejecutamos y reenviamos
         while (toolRound < AGENT_MAX_TOOL_ROUNDS) {
           // Llamada a Claude con retry automático en rate limit
@@ -231,6 +260,7 @@ export async function POST(request: NextRequest) {
           for (const block of response.content) {
             if (block.type === 'text') {
               writeSSE(controller, encoder, 'text_delta', { text: block.text })
+              accumulatedText += block.text
             } else if (block.type === 'tool_use') {
               hasToolUse = true
               const toolBlock = block as Anthropic.Messages.ToolUseBlock
@@ -264,6 +294,14 @@ export async function POST(request: NextRequest) {
                 status: isError ? 'error' : 'completed',
               })
 
+              accumulatedToolCalls.push({
+                id: toolBlock.id,
+                name: toolBlock.name,
+                input: toolBlock.input as Record<string, unknown>,
+                result,
+                status: isError ? 'error' : 'completed',
+              })
+
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: toolBlock.id,
@@ -286,6 +324,42 @@ export async function POST(request: NextRequest) {
             { role: 'user' as const, content: toolResults },
           ]
           toolRound++
+        }
+
+        // ── Persist messages to DB ──
+        try {
+          const currentUserMsg = messages[messages.length - 1]
+          await prisma.$transaction([
+            prisma.agenteConversacionMensaje.create({
+              data: {
+                conversacionId: activeConversacionId,
+                role: 'user',
+                content: currentUserMsg.content,
+                attachments: currentUserMsg.attachments
+                  ? currentUserMsg.attachments.map((a) => ({
+                      name: a.name,
+                      type: a.type,
+                      mimeType: a.mimeType,
+                    }))
+                  : undefined,
+              },
+            }),
+            prisma.agenteConversacionMensaje.create({
+              data: {
+                conversacionId: activeConversacionId,
+                role: 'assistant',
+                content: accumulatedText,
+                toolCalls:
+                  accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
+              },
+            }),
+            prisma.agenteConversacion.update({
+              where: { id: activeConversacionId },
+              data: { updatedAt: new Date() },
+            }),
+          ])
+        } catch (dbErr) {
+          console.error('[chat] Failed to persist conversation:', dbErr)
         }
 
         writeSSE(controller, encoder, 'done', {})

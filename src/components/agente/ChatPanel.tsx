@@ -1,7 +1,20 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Sparkles, Trash2, X, Package, FileEdit, FileSearch, BarChart3, ShieldCheck } from 'lucide-react'
+import {
+  Sparkles,
+  Trash2,
+  X,
+  Package,
+  FileEdit,
+  FileSearch,
+  BarChart3,
+  ShieldCheck,
+  Plus,
+  ChevronDown,
+  MessageSquare,
+  Clock,
+} from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -9,12 +22,22 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
+import {
+  dbMessageToChatMessage,
+} from '@/lib/agente/types'
 import type {
   ChatMessage as ChatMessageType,
   ChatAttachment,
   ToolCallInfo,
+  ConversacionListItem,
+  ConversacionFull,
 } from '@/lib/agente/types'
 
 interface Props {
@@ -29,11 +52,78 @@ const SUGGESTIONS = [
   { icon: BarChart3, label: 'Ver mi pipeline', color: 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100' },
 ]
 
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'ahora'
+  if (mins < 60) return `hace ${mins}m`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `hace ${hours}h`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `hace ${days}d`
+  return new Date(dateStr).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+}
+
 export function ChatPanel({ open, onOpenChange }: Props) {
   const [messages, setMessages] = useState<ChatMessageType[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // ── Conversation state ──
+  const [conversacionId, setConversacionId] = useState<string | null>(null)
+  const [conversacionTitulo, setConversacionTitulo] = useState<string | null>(null)
+  const [conversaciones, setConversaciones] = useState<ConversacionListItem[]>([])
+  const [showConversaciones, setShowConversaciones] = useState(false)
+
+  // Fetch conversations when panel opens
+  useEffect(() => {
+    if (open) {
+      fetchConversaciones()
+    }
+  }, [open])
+
+  const fetchConversaciones = async () => {
+    try {
+      const res = await fetch('/api/agente/conversaciones?limit=10')
+      if (res.ok) {
+        const data = await res.json()
+        setConversaciones(data)
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
+  const loadConversacion = async (id: string) => {
+    try {
+      const res = await fetch(`/api/agente/conversaciones/${id}`)
+      if (!res.ok) return
+      const data: ConversacionFull = await res.json()
+      setConversacionId(data.id)
+      setConversacionTitulo(data.titulo)
+      setMessages(data.mensajes.map(dbMessageToChatMessage))
+      setShowConversaciones(false)
+    } catch (err) {
+      console.error('Error loading conversation:', err)
+    }
+  }
+
+  const handleNewConversacion = () => {
+    setConversacionId(null)
+    setConversacionTitulo(null)
+    setMessages([])
+    setShowConversaciones(false)
+  }
+
+  const handleArchive = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    await fetch(`/api/agente/conversaciones/${id}`, { method: 'DELETE' })
+    setConversaciones((prev) => prev.filter((c) => c.id !== id))
+    if (conversacionId === id) {
+      handleNewConversacion()
+    }
+  }
 
   // Smooth auto-scroll
   useEffect(() => {
@@ -77,7 +167,10 @@ export function ChatPanel({ open, onOpenChange }: Props) {
         const response = await fetch('/api/agente/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: updatedMessages }),
+          body: JSON.stringify({
+            messages: updatedMessages,
+            conversacionId,
+          }),
           signal: controller.signal,
         })
 
@@ -125,9 +218,10 @@ export function ChatPanel({ open, onOpenChange }: Props) {
       } finally {
         setIsStreaming(false)
         abortRef.current = null
+        fetchConversaciones()
       }
     },
-    [messages, isStreaming]
+    [messages, isStreaming, conversacionId]
   )
 
   function processSSEEvent(event: string, data: unknown, assistantId: string) {
@@ -177,6 +271,12 @@ export function ChatPanel({ open, onOpenChange }: Props) {
         )
         break
       }
+      case 'conversation_info': {
+        const info = d as { conversacionId: string; titulo: string }
+        setConversacionId(info.conversacionId)
+        setConversacionTitulo(info.titulo)
+        break
+      }
       case 'error': {
         const error = d.error as string
         setMessages((prev) =>
@@ -196,12 +296,16 @@ export function ChatPanel({ open, onOpenChange }: Props) {
       abortRef.current.abort()
     }
     setMessages([])
+    setConversacionId(null)
+    setConversacionTitulo(null)
     setIsStreaming(false)
   }
 
   const handleSuggestion = (label: string) => {
     handleSend(label)
   }
+
+  const displayTitle = conversacionTitulo || 'Asistente GYS'
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -211,28 +315,82 @@ export function ChatPanel({ open, onOpenChange }: Props) {
       >
         {/* ── Header ── */}
         <SheetHeader className="flex-row items-center justify-between bg-gradient-to-r from-[#1e3a5f] to-[#2563eb] px-5 py-4 space-y-0">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm shrink-0">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <div>
-              <SheetTitle className="text-sm font-semibold text-white leading-tight">
-                Asistente GYS
-              </SheetTitle>
-              <SheetDescription className="flex items-center gap-1.5 text-[11px] text-blue-200 mt-0.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                En línea
-              </SheetDescription>
-            </div>
+            <Popover open={showConversaciones} onOpenChange={setShowConversaciones}>
+              <PopoverTrigger asChild>
+                <button className="flex items-center gap-1 text-left group min-w-0">
+                  <div className="min-w-0">
+                    <SheetTitle className="text-sm font-semibold text-white leading-tight truncate max-w-[250px]">
+                      {displayTitle}
+                    </SheetTitle>
+                    <SheetDescription className="flex items-center gap-1.5 text-[11px] text-blue-200 mt-0.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      En línea
+                      <ChevronDown className="h-3 w-3 ml-0.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                    </SheetDescription>
+                  </div>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-0" align="start" sideOffset={8}>
+                {/* New conversation */}
+                <button
+                  onClick={handleNewConversacion}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nueva conversación
+                </button>
+                <div className="border-t" />
+                {/* Conversation list */}
+                <div className="max-h-64 overflow-y-auto">
+                  {conversaciones.length === 0 ? (
+                    <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                      No hay conversaciones anteriores
+                    </div>
+                  ) : (
+                    conversaciones.map((conv) => (
+                      <button
+                        key={conv.id}
+                        onClick={() => loadConversacion(conv.id)}
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent transition-colors group/item ${
+                          conversacionId === conv.id ? 'bg-accent' : ''
+                        }`}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate">{conv.titulo || 'Sin título'}</p>
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <Clock className="h-2.5 w-2.5" />
+                            {timeAgo(conv.updatedAt)}
+                            <span className="mx-0.5">·</span>
+                            {conv._count.mensajes} msgs
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => handleArchive(conv.id, e)}
+                          className="opacity-0 group-hover/item:opacity-100 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
+                          title="Archivar"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             {messages.length > 0 && (
               <button
                 onClick={handleClear}
                 className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
-                title="Limpiar conversación"
+                title="Nueva conversación"
               >
-                <Trash2 className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
               </button>
             )}
             <button

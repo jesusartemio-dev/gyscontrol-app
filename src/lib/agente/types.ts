@@ -41,6 +41,8 @@ export interface ChatRequest {
   messages: ChatMessage[]
   /** Si el chat está en contexto de una cotización específica */
   cotizacionId?: string
+  /** Conversación existente para continuar */
+  conversacionId?: string
 }
 
 // Eventos SSE que el frontend recibe
@@ -50,10 +52,53 @@ export type SSEEventType =
   | 'tool_call_end'
   | 'error'
   | 'done'
+  | 'conversation_info'
 
 export interface SSEEvent {
   type: SSEEventType
   data: string | ToolCallInfo | { error: string }
+}
+
+// ── Conversaciones persistidas ───────────────────────────
+
+export interface ConversacionListItem {
+  id: string
+  titulo: string | null
+  updatedAt: string
+  createdAt: string
+  _count: { mensajes: number }
+}
+
+export interface ConversacionMensajeDB {
+  id: string
+  conversacionId: string
+  role: MessageRole
+  content: string
+  attachments?: { name: string; type: string; mimeType: string }[] | null
+  toolCalls?: ToolCallInfo[] | null
+  createdAt: string
+}
+
+export interface ConversacionFull {
+  id: string
+  titulo: string | null
+  createdAt: string
+  updatedAt: string
+  mensajes: ConversacionMensajeDB[]
+}
+
+/** Convierte un mensaje de DB al formato ChatMessage del frontend */
+export function dbMessageToChatMessage(dbMsg: ConversacionMensajeDB): ChatMessage {
+  return {
+    id: dbMsg.id,
+    role: dbMsg.role,
+    content: dbMsg.content,
+    timestamp: new Date(dbMsg.createdAt).getTime(),
+    attachments: dbMsg.attachments
+      ? dbMsg.attachments.map((a) => ({ ...a, base64: '' } as ChatAttachment))
+      : undefined,
+    toolCalls: dbMsg.toolCalls ?? undefined,
+  }
 }
 
 // ── Tipos de Claude API (re-exports útiles) ───────────────
