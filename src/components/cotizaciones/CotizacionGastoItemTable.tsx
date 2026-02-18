@@ -83,6 +83,11 @@ export default function CotizacionGastoItemTable({ items, onUpdate, onDelete, is
                       <td className="px-2 py-1.5">
                         <span className="font-medium text-gray-900 line-clamp-1" title={item.nombre}>
                           {item.nombre}
+                          {!item.catalogoGastoId && (
+                            <span className="ml-1 px-1 py-0.5 text-[8px] font-medium bg-amber-100 text-amber-700 rounded align-middle">
+                              Temp
+                            </span>
+                          )}
                         </span>
                       </td>
                       <td className="px-2 py-1.5">

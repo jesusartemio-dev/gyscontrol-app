@@ -25,7 +25,13 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         cliente: true,
         user: true,
         plantilla: true,
-        cotizacionEquipo: { include: { cotizacionEquipoItem: true } },
+        cotizacionEquipo: {
+          include: {
+            cotizacionEquipoItem: {
+              include: { catalogoEquipo: { select: { updatedAt: true } } }
+            }
+          }
+        },
         cotizacionServicio: {
           include: {
             cotizacionServicioItem: {
@@ -39,7 +45,9 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         },
         cotizacionGasto: {
           include: {
-            cotizacionGastoItem: true
+            cotizacionGastoItem: {
+              include: { catalogoGasto: { select: { updatedAt: true } } }
+            }
           }
         },
         // ✅ Nuevas relaciones para exclusiones y condiciones

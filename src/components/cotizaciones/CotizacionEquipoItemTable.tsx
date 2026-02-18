@@ -12,15 +12,30 @@ import {
 } from '@/components/ui/tooltip'
 import type { CotizacionEquipoItem } from '@/types'
 import { cn } from '@/lib/utils'
+
+function monthsAgo(date: string): number {
+  return Math.floor((Date.now() - new Date(date).getTime()) / (30.44 * 24 * 60 * 60 * 1000))
+}
+
+function priceFreshness(updatedAt?: string): { text: string; color: string } | null {
+  if (!updatedAt) return null
+  const m = monthsAgo(updatedAt)
+  const d = new Date(updatedAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+  if (m < 3) return { text: `Act. ${d}`, color: 'text-green-600' }
+  if (m <= 6) return { text: `Act. ${d}`, color: 'text-gray-400' }
+  return { text: `Desact. (${m}m)`, color: 'text-amber-600' }
+}
+
 interface Props {
   items: CotizacionEquipoItem[]
   onUpdated?: (item: CotizacionEquipoItem) => void
   onDeleted?: (id: string) => void
   onEdit?: (item: CotizacionEquipoItem) => void
+  onVincular?: (item: CotizacionEquipoItem) => void
   isLocked?: boolean
 }
 
-export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, isLocked = false }: Props) {
+export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, onVincular, isLocked = false }: Props) {
   const formatCompact = (amount: number) => amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const [filter, setFilter] = useState('')
   const [showReferencia, setShowReferencia] = useState(false)
@@ -115,6 +130,10 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, is
                     ? ((item.costoCliente - item.costoInterno) / item.costoInterno) * 100
                     : 0)
 
+                const freshness = item.catalogoEquipoId
+                  ? priceFreshness(item.catalogoEquipo?.updatedAt)
+                  : null
+
                 return (
                   <tr
                     key={`equipo-item-${item.id}-${item.codigo}-${idx}`}
@@ -128,12 +147,37 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, is
                     </td>
                     <td className="px-1.5 py-1">
                       <div className="flex items-center gap-1">
-                        <span className="font-mono text-[10px] text-gray-600">{item.codigo}</span>
-                        {!item.catalogoEquipoId && (
-                          <span className="px-1 py-0.5 text-[8px] font-medium bg-amber-100 text-amber-700 rounded" title="Item temporal: solo existe en esta cotización, no está en el catálogo">
+                        <span className={cn(
+                          "font-mono text-[10px]",
+                          item.catalogoEquipoId ? "text-green-700" : "text-amber-700"
+                        )}>
+                          {item.codigo}
+                        </span>
+                        {!item.catalogoEquipoId ? (
+                          <span
+                            className={cn(
+                              "px-1 py-0.5 text-[8px] font-medium bg-amber-100 text-amber-700 rounded",
+                              onVincular && !isLocked && "cursor-pointer hover:bg-amber-200"
+                            )}
+                            title={onVincular && !isLocked ? "Clic para vincular al catálogo" : "Item temporal: solo existe en esta cotización"}
+                            onClick={onVincular && !isLocked ? () => onVincular(item) : undefined}
+                          >
                             Temp
                           </span>
-                        )}
+                        ) : freshness && monthsAgo(item.catalogoEquipo!.updatedAt) > 6 ? (
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="px-1 py-0.5 text-[8px] font-medium bg-amber-100 text-amber-700 rounded">
+                                  Desact.
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                Precio desactualizado ({monthsAgo(item.catalogoEquipo!.updatedAt)} meses)
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-1.5 py-1 max-w-[250px]">
@@ -163,8 +207,20 @@ export default function CotizacionEquipoItemTable({ items, onDeleted, onEdit, is
                       {formatCompact(item.costoCliente)}
                     </td>
                     {/* GYS CONTROL */}
-                    <td className="px-1 py-1 text-right font-mono text-[10px] text-blue-600 bg-blue-50/30">
-                      {formatCompact(item.precioInterno)}
+                    <td className="px-1 py-1 text-right bg-blue-50/30">
+                      <div className="font-mono text-[10px] text-blue-600">
+                        {formatCompact(item.precioInterno)}
+                      </div>
+                      {/* Price freshness indicator */}
+                      {item.catalogoEquipoId && freshness ? (
+                        <div className={cn("text-[8px] leading-tight", freshness.color)}>
+                          {freshness.text}
+                        </div>
+                      ) : !item.catalogoEquipoId ? (
+                        <div className="text-[8px] leading-tight text-amber-600">
+                          Precio estimado
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-1 py-1 text-right font-mono text-[10px] font-medium text-blue-700 bg-blue-50/30">
                       {formatCompact(item.costoInterno)}

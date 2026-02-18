@@ -685,7 +685,28 @@ export const toolHandlers: ToolHandlerMap = {
 
     let itemCount = 0
     for (const item of items) {
-      const precioLista = Number(item.precioLista) || 0
+      // ── Auto-search catalog ──
+      let catalogMatch: { id: string; codigo: string; precioLista: number } | null = null
+      const codigoInput = item.codigo as string | undefined
+      if (codigoInput) {
+        catalogMatch = await prisma.catalogoEquipo.findFirst({
+          where: { codigo: { equals: codigoInput, mode: 'insensitive' } },
+          select: { id: true, codigo: true, precioLista: true },
+        })
+      }
+      if (!catalogMatch) {
+        const desc = (item.descripcion as string) || ''
+        if (desc.length >= 5) {
+          catalogMatch = await prisma.catalogoEquipo.findFirst({
+            where: { descripcion: { contains: desc.substring(0, 40), mode: 'insensitive' } },
+            select: { id: true, codigo: true, precioLista: true },
+          })
+        }
+      }
+
+      const catalogoEquipoId = catalogMatch?.id || (item.catalogoEquipoId as string) || null
+      const codigo = catalogMatch?.codigo || codigoInput || `EQ-${(++itemCount).toString().padStart(3, '0')}`
+      const precioLista = catalogMatch ? catalogMatch.precioLista : (Number(item.precioLista) || 0)
       const factorCosto = Number(item.factorCosto) || 1.0
       const factorVenta = Number(item.factorVenta) || 1.25
       const cantidad = Number(item.cantidad) || 1
@@ -698,14 +719,18 @@ export const toolHandlers: ToolHandlerMap = {
       let descripcionFinal = item.descripcion as string
       if (origenPrecio) {
         descripcionFinal += ` [${origenPrecio}]`
+      } else if (catalogMatch) {
+        descripcionFinal += ' [CATALOGO]'
+      } else {
+        descripcionFinal += ' [ESTIMADO: verificar con proveedor]'
       }
 
       await prisma.cotizacionEquipoItem.create({
         data: {
           id: genId('cot-eqi'),
           cotizacionEquipoId: grupoId,
-          catalogoEquipoId: (item.catalogoEquipoId as string) || null,
-          codigo: (item.codigo as string) || `EQ-${(++itemCount).toString().padStart(3, '0')}`,
+          catalogoEquipoId,
+          codigo,
           descripcion: descripcionFinal,
           categoria: (item.categoria as string) || 'General',
           unidad: (item.unidad as string) || 'Und',
@@ -815,16 +840,32 @@ export const toolHandlers: ToolHandlerMap = {
       const costoCliente = +(horaTotal * costoHora * factorSeguridad).toFixed(2)
       const costoInterno = margen > 0 ? +(costoCliente / margen).toFixed(2) : costoCliente
 
+      // ── Auto-search catalog ──
+      let catalogMatchSvc: { id: string } | null = null
+      const nombreServicio = item.nombre as string
+      if (nombreServicio.length >= 5) {
+        catalogMatchSvc = await prisma.catalogoServicio.findFirst({
+          where: { nombre: { contains: nombreServicio.substring(0, 40), mode: 'insensitive' } },
+          select: { id: true },
+        })
+      }
+      const catalogoServicioId = catalogMatchSvc?.id || null
+
       const origenPrecio = item.origenPrecio as string | undefined
       let descripcionServicio = (item.descripcion as string) || (item.nombre as string)
       if (origenPrecio) {
         descripcionServicio += ` [${origenPrecio}]`
+      } else if (catalogMatchSvc) {
+        descripcionServicio += ' [CATALOGO]'
+      } else {
+        descripcionServicio += ' [ESTIMADO: verificar con proveedor]'
       }
 
       await prisma.cotizacionServicioItem.create({
         data: {
           id: genId('cot-svi'),
           cotizacionServicioId: grupoId,
+          catalogoServicioId,
           nombre: item.nombre as string,
           descripcion: descripcionServicio,
           edtId,
@@ -880,8 +921,24 @@ export const toolHandlers: ToolHandlerMap = {
     })
 
     for (const item of items) {
+      // ── Auto-search catalog ──
+      let catalogMatchGasto: { id: string; precioInterno: number } | null = null
+      const nombreGasto = item.nombre as string
+      if (nombreGasto.length >= 4) {
+        catalogMatchGasto = await prisma.catalogoGasto.findFirst({
+          where: {
+            OR: [
+              { descripcion: { contains: nombreGasto.substring(0, 40), mode: 'insensitive' } },
+              { codigo: { contains: nombreGasto.substring(0, 20), mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true, precioInterno: true },
+        })
+      }
+      const catalogoGastoId = catalogMatchGasto?.id || null
+
       const cantidad = Number(item.cantidad) || 1
-      const precioUnitario = Number(item.precioUnitario) || 0
+      const precioUnitario = catalogMatchGasto ? catalogMatchGasto.precioInterno : (Number(item.precioUnitario) || 0)
       const factorSeguridad = Number(item.factorSeguridad) || 1.0
       const margen = Number(item.margen) || 1.0
 
@@ -892,12 +949,17 @@ export const toolHandlers: ToolHandlerMap = {
       let descripcionGasto = (item.descripcion as string) || null
       if (origenPrecio) {
         descripcionGasto = (descripcionGasto ? descripcionGasto + ' ' : '') + `[${origenPrecio}]`
+      } else if (catalogMatchGasto) {
+        descripcionGasto = (descripcionGasto ? descripcionGasto + ' ' : '') + '[CATALOGO]'
+      } else {
+        descripcionGasto = (descripcionGasto ? descripcionGasto + ' ' : '') + '[ESTIMADO: verificar con proveedor]'
       }
 
       await prisma.cotizacionGastoItem.create({
         data: {
           id: genId('cot-gsi'),
           gastoId: grupoId,
+          catalogoGastoId,
           nombre: item.nombre as string,
           descripcion: descripcionGasto,
           cantidad,

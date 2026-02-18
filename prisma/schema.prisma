@@ -142,7 +142,8 @@ model CatalogoGasto {
   estado        String         @default("activo")
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  categoria     CategoriaGasto @relation(fields: [categoriaId], references: [id])
+  categoria          CategoriaGasto      @relation(fields: [categoriaId], references: [id])
+  cotizacionGastoItem CotizacionGastoItem[]
 
   @@map("catalogo_gasto")
 }
@@ -318,6 +319,7 @@ model CotizacionGasto {
 model CotizacionGastoItem {
   id              String          @id
   gastoId         String
+  catalogoGastoId String?
   nombre          String
   descripcion     String?
   cantidad        Float
@@ -329,6 +331,7 @@ model CotizacionGastoItem {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime
   cotizacionGasto CotizacionGasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  catalogoGasto   CatalogoGasto?  @relation(fields: [catalogoGastoId], references: [id])
 
   @@map("cotizacion_gasto_item")
 }

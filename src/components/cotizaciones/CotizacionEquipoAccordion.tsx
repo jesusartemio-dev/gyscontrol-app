@@ -8,6 +8,7 @@ import CotizacionEquipoItemTable from './CotizacionEquipoItemTable'
 import CotizacionEquipoMultiAddModal from './CotizacionEquipoMultiAddModal'
 import CotizacionEquipoItemImportExcelModal from './CotizacionEquipoItemImportExcelModal'
 import CotizacionEquipoItemCreateModal from './CotizacionEquipoItemCreateModal'
+import VincularCatalogoModal from './VincularCatalogoModal'
 import type { CotizacionEquipo, CotizacionEquipoItem } from '@/types'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { cn } from '@/lib/utils'
@@ -69,6 +70,7 @@ export default function CotizacionEquipoAccordion({
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingItem, setEditingItem] = useState<CotizacionEquipoItem | undefined>(undefined)
   const [createFromCatalog, setCreateFromCatalog] = useState(false)
+  const [vincularItem, setVincularItem] = useState<CotizacionEquipoItem | null>(null)
 
   useEffect(() => {
     setNuevoNombre(equipo.nombre)
@@ -369,6 +371,7 @@ export default function CotizacionEquipoAccordion({
                     onDeleted={onDeleted}
                     onUpdated={onUpdated}
                     onEdit={handleOpenEditModal}
+                    onVincular={setVincularItem}
                     isLocked={isLocked}
                   />
                 )}
@@ -432,6 +435,17 @@ export default function CotizacionEquipoAccordion({
         }}
         title="¿Eliminar grupo de equipos?"
         description="Esta acción eliminará permanentemente el grupo y todos sus items."
+      />
+
+      {/* Modal para vincular item temporal al catálogo */}
+      <VincularCatalogoModal
+        item={vincularItem}
+        isOpen={!!vincularItem}
+        onClose={() => setVincularItem(null)}
+        onVinculado={(updatedItem) => {
+          onUpdated(updatedItem)
+          setVincularItem(null)
+        }}
       />
     </>
   )

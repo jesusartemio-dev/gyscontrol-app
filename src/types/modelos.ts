@@ -878,6 +878,7 @@ export interface CotizacionEquipoItem {
     marca: string
     precioInterno: number
     precioCliente: number
+    updatedAt: string
   }
 }
 
@@ -940,6 +941,7 @@ export interface CotizacionServicioItem {
     id: string
     nombre: string
     descripcion: string
+    updatedAt?: string
   }
 }
 
@@ -958,6 +960,7 @@ export interface CotizacionGasto {
 export interface CotizacionGastoItem {
   id: string
   gastoId: string
+  catalogoGastoId?: string
   nombre: string
   descripcion?: string | null
   cantidad: number
@@ -968,6 +971,9 @@ export interface CotizacionGastoItem {
   costoCliente: number
   createdAt: string
   updatedAt: string
+  catalogoGasto?: {
+    updatedAt: string
+  }
 }
 
 // ✅ Nuevos modelos para exclusiones y condiciones de cotización

@@ -93,6 +93,11 @@ export default function CotizacionServicioItemTable({ items, onUpdated, onDelete
                         <div className="cursor-help">
                           <span className="font-medium text-gray-900 block leading-tight">
                             {item.nombre}
+                            {!item.catalogoServicioId && (
+                              <span className="ml-1 px-1 py-0.5 text-[8px] font-medium bg-amber-100 text-amber-700 rounded align-middle">
+                                Temp
+                              </span>
+                            )}
                           </span>
                         </div>
                       </TooltipTrigger>
