@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getUsageStats } from '@/lib/agente/usageTracker'
+import { getUsageStats, getCompanyMonthlyUsage } from '@/lib/agente/usageTracker'
 import type { UsagePeriod } from '@/lib/agente/usageTracker'
 
 // GET /api/agente/usage?periodo=mes&userId=optional
@@ -22,9 +22,16 @@ export async function GET(request: NextRequest) {
   const userId = url.searchParams.get('userId') || undefined
 
   if (!['hoy', 'semana', 'mes'].includes(periodo)) {
-    return NextResponse.json({ error: 'Periodo inválido. Usar: hoy, semana, mes' }, { status: 400 })
+    return NextResponse.json({ error: 'Periodo invalido. Usar: hoy, semana, mes' }, { status: 400 })
   }
 
-  const stats = await getUsageStats(periodo, userId)
-  return NextResponse.json(stats)
+  const [stats, monthlyUsage] = await Promise.all([
+    getUsageStats(periodo, userId),
+    getCompanyMonthlyUsage(),
+  ])
+
+  return NextResponse.json({
+    ...stats,
+    limite: monthlyUsage,
+  })
 }

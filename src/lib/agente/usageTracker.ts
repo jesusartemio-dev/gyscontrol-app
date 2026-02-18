@@ -57,6 +57,101 @@ export function trackUsage(params: TrackUsageParams): void {
     })
 }
 
+// ── Monthly usage limit check ────────────────────────────
+
+const DEFAULT_MONTHLY_LIMIT_USD = 25
+
+async function getMonthlyLimit(): Promise<number> {
+  try {
+    const config = await prisma.configuracionGeneral.findUnique({
+      where: { id: 'default' },
+      select: { agenteLimiteMensualUsd: true },
+    })
+    if (config?.agenteLimiteMensualUsd && config.agenteLimiteMensualUsd > 0) {
+      return config.agenteLimiteMensualUsd
+    }
+  } catch {
+    // Fallback to env var or default
+  }
+  const envLimit = process.env.AGENTE_LIMITE_MENSUAL_USD
+  if (envLimit) {
+    const parsed = parseFloat(envLimit)
+    if (!isNaN(parsed) && parsed > 0) return parsed
+  }
+  return DEFAULT_MONTHLY_LIMIT_USD
+}
+
+export interface MonthlyUsage {
+  costoTotal: number
+  llamadasTotal: number
+  limiteMensual: number
+  porcentajeUsado: number
+}
+
+/**
+ * Gets the current month's chat usage cost for a specific user.
+ * Only counts chat types (not ocr, excel).
+ */
+export async function getMonthlyUsage(userId: string): Promise<MonthlyUsage> {
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const [result, limiteMensual] = await Promise.all([
+    prisma.agenteUsage.aggregate({
+      where: {
+        userId,
+        tipo: { in: ['chat', 'chat-simple', 'pdf-preprocess'] },
+        createdAt: { gte: monthStart },
+      },
+      _sum: { costoEstimado: true },
+      _count: true,
+    }),
+    getMonthlyLimit(),
+  ])
+
+  const costoTotal = result._sum.costoEstimado ?? 0
+
+  return {
+    costoTotal: Math.round(costoTotal * 1000) / 1000,
+    llamadasTotal: result._count,
+    limiteMensual,
+    porcentajeUsado: limiteMensual > 0
+      ? Math.round((costoTotal / limiteMensual) * 1000) / 10
+      : 0,
+  }
+}
+
+/**
+ * Gets total monthly usage across ALL users (company-wide limit).
+ */
+export async function getCompanyMonthlyUsage(): Promise<MonthlyUsage> {
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const [result, limiteMensual] = await Promise.all([
+    prisma.agenteUsage.aggregate({
+      where: {
+        tipo: { in: ['chat', 'chat-simple', 'pdf-preprocess'] },
+        createdAt: { gte: monthStart },
+      },
+      _sum: { costoEstimado: true },
+      _count: true,
+    }),
+    getMonthlyLimit(),
+  ])
+
+  const costoTotal = result._sum.costoEstimado ?? 0
+
+  return {
+    costoTotal: Math.round(costoTotal * 1000) / 1000,
+    llamadasTotal: result._count,
+    limiteMensual,
+    porcentajeUsado: limiteMensual > 0
+      ? Math.round((costoTotal / limiteMensual) * 1000) / 10
+      : 0,
+  }
+}
+
 // ── Query usage stats ────────────────────────────────────
 
 export type UsagePeriod = 'hoy' | 'semana' | 'mes'

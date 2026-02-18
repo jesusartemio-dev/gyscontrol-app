@@ -9,6 +9,8 @@ import {
   TrendingUp,
   BarChart3,
   RefreshCw,
+  AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react'
 import {
   BarChart,
@@ -19,6 +21,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+
+interface MonthlyUsage {
+  costoTotal: number
+  llamadasTotal: number
+  limiteMensual: number
+  porcentajeUsado: number
+}
 
 interface UsageStats {
   resumen: {
@@ -31,15 +40,37 @@ interface UsageStats {
   porTipo: Array<{ tipo: string; costo: number; llamadas: number }>
   porModelo: Array<{ modelo: string; costo: number; llamadas: number }>
   porUsuario: Array<{ userId: string; nombre: string; costo: number; llamadas: number }>
+  limite: MonthlyUsage
 }
 
 type Periodo = 'hoy' | 'semana' | 'mes'
+
+function getProgressColor(pct: number): string {
+  if (pct < 60) return 'bg-emerald-500'
+  if (pct < 80) return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
+function getProgressBgColor(pct: number): string {
+  if (pct < 60) return 'bg-emerald-100'
+  if (pct < 80) return 'bg-amber-100'
+  return 'bg-red-100'
+}
+
+function getProgressTextColor(pct: number): string {
+  if (pct < 60) return 'text-emerald-700'
+  if (pct < 80) return 'text-amber-700'
+  return 'text-red-700'
+}
 
 export default function UsoIAPage() {
   const [periodo, setPeriodo] = useState<Periodo>('mes')
   const [stats, setStats] = useState<UsageStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [limitInput, setLimitInput] = useState('')
+  const [savingLimit, setSavingLimit] = useState(false)
+  const [limitMsg, setLimitMsg] = useState<string | null>(null)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -50,7 +81,9 @@ export default function UsoIAPage() {
         const data = await res.json()
         throw new Error(data.error || `Error ${res.status}`)
       }
-      setStats(await res.json())
+      const data = await res.json()
+      setStats(data)
+      setLimitInput(String(data.limite?.limiteMensual ?? 25))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
@@ -62,6 +95,33 @@ export default function UsoIAPage() {
     fetchStats()
   }, [fetchStats])
 
+  const handleSaveLimit = async () => {
+    const value = parseFloat(limitInput)
+    if (isNaN(value) || value <= 0) {
+      setLimitMsg('Ingresa un valor valido mayor a 0')
+      return
+    }
+    setSavingLimit(true)
+    setLimitMsg(null)
+    try {
+      const res = await fetch('/api/agente/usage/limit', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limite: value }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error guardando limite')
+      }
+      setLimitMsg('Limite actualizado')
+      fetchStats()
+    } catch (err) {
+      setLimitMsg(err instanceof Error ? err.message : 'Error')
+    } finally {
+      setSavingLimit(false)
+    }
+  }
+
   const promedioDiario = stats && stats.porDia.length > 0
     ? stats.resumen.costoTotal / stats.porDia.length
     : 0
@@ -69,6 +129,15 @@ export default function UsoIAPage() {
   const costoHoy = stats?.porDia.find(
     (d) => d.fecha === new Date().toISOString().split('T')[0]
   )?.costo ?? 0
+
+  // Projection: at current daily average, estimated month-end cost
+  const now = new Date()
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const dayOfMonth = now.getDate()
+  const projection = promedioDiario > 0 ? promedioDiario * daysInMonth : 0
+
+  const limite = stats?.limite
+  const pctUsado = limite?.porcentajeUsado ?? 0
 
   return (
     <div className="space-y-6 p-6">
@@ -107,6 +176,92 @@ export default function UsoIAPage() {
         </div>
       )}
 
+      {/* ── Monthly Limit Card ── */}
+      {limite && (
+        <Card className={pctUsado >= 80 ? 'border-red-200 bg-red-50/30' : pctUsado >= 60 ? 'border-amber-200 bg-amber-50/30' : ''}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                {pctUsado >= 80 ? (
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                )}
+                Limite mensual de uso (empresa)
+              </CardTitle>
+              <span className={`text-sm font-bold ${getProgressTextColor(pctUsado)}`}>
+                {pctUsado.toFixed(1)}%
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Progress bar */}
+            <div>
+              <div className={`h-3 w-full rounded-full ${getProgressBgColor(pctUsado)} overflow-hidden`}>
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${getProgressColor(pctUsado)}`}
+                  style={{ width: `${Math.min(pctUsado, 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-1.5 text-xs text-muted-foreground">
+                <span>${limite.costoTotal.toFixed(2)} usado</span>
+                <span>${limite.limiteMensual.toFixed(2)} limite</span>
+              </div>
+            </div>
+
+            {/* Projection + Limit editor */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Projection */}
+              <div className="rounded-lg border bg-white p-3">
+                <p className="text-xs text-muted-foreground mb-1">Proyeccion fin de mes</p>
+                <p className="text-lg font-bold">
+                  ${projection.toFixed(2)}
+                  <span className="text-xs font-normal text-muted-foreground ml-1">
+                    ({dayOfMonth}/{daysInMonth} dias)
+                  </span>
+                </p>
+                {projection > limite.limiteMensual && (
+                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Al ritmo actual, excederas el limite
+                  </p>
+                )}
+              </div>
+
+              {/* Limit editor */}
+              <div className="rounded-lg border bg-white p-3">
+                <p className="text-xs text-muted-foreground mb-1">Limite mensual USD</p>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={limitInput}
+                      onChange={(e) => { setLimitInput(e.target.value); setLimitMsg(null) }}
+                      className="w-full rounded-md border px-2 py-1.5 pl-6 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSaveLimit}
+                    disabled={savingLimit}
+                    className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shrink-0"
+                  >
+                    {savingLimit ? '...' : 'Guardar'}
+                  </button>
+                </div>
+                {limitMsg && (
+                  <p className={`text-xs mt-1 ${limitMsg.includes('actualizado') ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {limitMsg}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -118,7 +273,7 @@ export default function UsoIAPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${stats?.resumen.costoTotal.toFixed(2) ?? '—'}
+              ${stats?.resumen.costoTotal.toFixed(2) ?? '--'}
             </div>
           </CardContent>
         </Card>
@@ -132,7 +287,7 @@ export default function UsoIAPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats?.resumen.llamadasTotal ?? '—'}
+              {stats?.resumen.llamadasTotal ?? '--'}
             </div>
           </CardContent>
         </Card>
@@ -170,7 +325,7 @@ export default function UsoIAPage() {
       {stats && stats.porDia.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Costo por día (USD)</CardTitle>
+            <CardTitle className="text-base">Costo por dia (USD)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -203,7 +358,7 @@ export default function UsoIAPage() {
         {/* By type */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Por tipo de operación</CardTitle>
+            <CardTitle className="text-base">Por tipo de operacion</CardTitle>
           </CardHeader>
           <CardContent>
             <table className="w-full text-sm">

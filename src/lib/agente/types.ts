@@ -53,6 +53,14 @@ export type SSEEventType =
   | 'error'
   | 'done'
   | 'conversation_info'
+  | 'status'
+
+/** Status phases emitted via SSE for UX feedback */
+export type AgentStatusPhase =
+  | 'analyzing_pdf'
+  | 'executing_tools'
+  | 'generating'
+  | 'idle'
 
 export interface SSEEvent {
   type: SSEEventType

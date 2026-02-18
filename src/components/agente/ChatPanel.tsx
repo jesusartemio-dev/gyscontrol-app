@@ -14,6 +14,10 @@ import {
   ChevronDown,
   MessageSquare,
   Clock,
+  FileText,
+  Search,
+  Loader2,
+  PenLine,
 } from 'lucide-react'
 import {
   Sheet,
@@ -38,6 +42,7 @@ import type {
   ToolCallInfo,
   ConversacionListItem,
   ConversacionFull,
+  AgentStatusPhase,
 } from '@/lib/agente/types'
 
 interface Props {
@@ -52,6 +57,65 @@ const SUGGESTIONS = [
   { icon: BarChart3, label: 'Ver mi pipeline', color: 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100' },
 ]
 
+// ── Tool display names for status banner ──
+const TOOL_STATUS_LABELS: Record<string, string> = {
+  buscar_equipos_catalogo: 'Buscando equipos...',
+  buscar_servicios_catalogo: 'Buscando servicios...',
+  buscar_gastos_catalogo: 'Buscando gastos...',
+  buscar_clientes: 'Buscando clientes...',
+  buscar_recursos: 'Buscando recursos...',
+  buscar_cotizaciones_similares: 'Buscando cotizaciones...',
+  buscar_proyectos: 'Buscando proyectos...',
+  obtener_edts: 'Consultando EDTs...',
+  obtener_unidades: 'Consultando unidades...',
+  obtener_detalle_proyecto: 'Cargando proyecto...',
+  buscar_listas_equipo: 'Buscando listas...',
+  obtener_cronograma_proyecto: 'Consultando cronograma...',
+  buscar_ordenes_compra: 'Buscando órdenes...',
+  crear_cotizacion: 'Creando cotización...',
+  agregar_equipos: 'Agregando equipos...',
+  agregar_servicios: 'Agregando servicios...',
+  agregar_gastos: 'Agregando gastos...',
+  agregar_condiciones: 'Agregando condiciones...',
+  agregar_exclusiones: 'Agregando exclusiones...',
+  recalcular_cotizacion: 'Recalculando totales...',
+  obtener_resumen_cotizacion: 'Obteniendo resumen...',
+  generar_consultas_tdr: 'Analizando documento...',
+}
+
+function getStatusConfig(phase: AgentStatusPhase, detail?: string): { icon: typeof Loader2; text: string; color: string } | null {
+  switch (phase) {
+    case 'analyzing_pdf':
+      return {
+        icon: FileText,
+        text: detail
+          ? `Analizando "${detail}"... (puede tomar hasta 1 min)`
+          : 'Analizando documento... (puede tomar hasta 1 min)',
+        color: 'text-violet-700 bg-violet-50 border-violet-200',
+      }
+    case 'executing_tools':
+      return {
+        icon: Search,
+        text: detail
+          ? (TOOL_STATUS_LABELS[detail] || `Ejecutando ${detail}...`)
+          : 'Consultando datos...',
+        color: 'text-blue-700 bg-blue-50 border-blue-200',
+      }
+    case 'generating':
+      return {
+        icon: PenLine,
+        text: detail === 'rate_limit_wait'
+          ? 'Procesando cotizacion... esto puede tomar unos minutos por la cantidad de items.'
+          : 'Generando respuesta...',
+        color: detail === 'rate_limit_wait'
+          ? 'text-amber-700 bg-amber-50 border-amber-200'
+          : 'text-emerald-700 bg-emerald-50 border-emerald-200',
+      }
+    default:
+      return null
+  }
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
@@ -64,9 +128,31 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
 }
 
+// ── Status Banner Component ──
+function StatusBanner({ phase, detail }: { phase: AgentStatusPhase; detail?: string }) {
+  const config = getStatusConfig(phase, detail)
+  if (!config) return null
+
+  const Icon = config.icon
+
+  return (
+    <div className={`flex items-center gap-2 px-4 py-2 border-t text-xs font-medium animate-in fade-in slide-in-from-bottom-1 duration-200 ${config.color}`}>
+      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{config.text}</span>
+      {/* Indeterminate progress bar */}
+      <div className="ml-auto h-1 w-16 rounded-full bg-current/10 overflow-hidden shrink-0">
+        <div className="h-full w-1/2 rounded-full bg-current/30 animate-[shimmer_1.5s_ease-in-out_infinite]" />
+      </div>
+    </div>
+  )
+}
+
 export function ChatPanel({ open, onOpenChange }: Props) {
   const [messages, setMessages] = useState<ChatMessageType[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [statusPhase, setStatusPhase] = useState<AgentStatusPhase>('idle')
+  const [statusDetail, setStatusDetail] = useState<string | undefined>()
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -159,6 +245,8 @@ export function ChatPanel({ open, onOpenChange }: Props) {
       const updatedMessages = [...messages, userMsg]
       setMessages([...updatedMessages, assistantMsg])
       setIsStreaming(true)
+      setStatusPhase('generating')
+      setStatusDetail(undefined)
 
       const controller = new AbortController()
       abortRef.current = controller
@@ -175,7 +263,7 @@ export function ChatPanel({ open, onOpenChange }: Props) {
         })
 
         if (!response.ok) {
-          const err = await response.json().catch(() => ({ error: 'Error de conexión' }))
+          const err = await response.json().catch(() => ({ error: 'Error de conexion' }))
           throw new Error(err.error || `Error ${response.status}`)
         }
 
@@ -217,6 +305,8 @@ export function ChatPanel({ open, onOpenChange }: Props) {
         )
       } finally {
         setIsStreaming(false)
+        setStatusPhase('idle')
+        setStatusDetail(undefined)
         abortRef.current = null
         fetchConversaciones()
       }
@@ -271,6 +361,13 @@ export function ChatPanel({ open, onOpenChange }: Props) {
         )
         break
       }
+      case 'status': {
+        const phase = d.phase as AgentStatusPhase
+        const detail = d.detail as string | undefined
+        setStatusPhase(phase)
+        setStatusDetail(detail)
+        break
+      }
       case 'conversation_info': {
         const info = d as { conversacionId: string; titulo: string }
         setConversacionId(info.conversacionId)
@@ -299,6 +396,8 @@ export function ChatPanel({ open, onOpenChange }: Props) {
     setConversacionId(null)
     setConversacionTitulo(null)
     setIsStreaming(false)
+    setStatusPhase('idle')
+    setStatusDetail(undefined)
   }
 
   const handleSuggestion = (label: string) => {
@@ -306,6 +405,11 @@ export function ChatPanel({ open, onOpenChange }: Props) {
   }
 
   const displayTitle = conversacionTitulo || 'Asistente GYS'
+
+  // Compute streaming assistant message ID for ChatMessage component
+  const streamingAssistantId = isStreaming
+    ? messages.find((m) => m.role === 'assistant' && m.id.startsWith('assistant-'))?.id ?? null
+    : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -327,8 +431,17 @@ export function ChatPanel({ open, onOpenChange }: Props) {
                       {displayTitle}
                     </SheetTitle>
                     <SheetDescription className="flex items-center gap-1.5 text-[11px] text-blue-200 mt-0.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      En línea
+                      {isStreaming ? (
+                        <>
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                          Procesando...
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          En linea
+                        </>
+                      )}
                       <ChevronDown className="h-3 w-3 ml-0.5 opacity-60 group-hover:opacity-100 transition-opacity" />
                     </SheetDescription>
                   </div>
@@ -341,7 +454,7 @@ export function ChatPanel({ open, onOpenChange }: Props) {
                   className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
-                  Nueva conversación
+                  Nueva conversacion
                 </button>
                 <div className="border-t" />
                 {/* Conversation list */}
@@ -361,7 +474,7 @@ export function ChatPanel({ open, onOpenChange }: Props) {
                       >
                         <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate">{conv.titulo || 'Sin título'}</p>
+                          <p className="text-sm truncate">{conv.titulo || 'Sin titulo'}</p>
                           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                             <Clock className="h-2.5 w-2.5" />
                             {timeAgo(conv.updatedAt)}
@@ -388,7 +501,7 @@ export function ChatPanel({ open, onOpenChange }: Props) {
               <button
                 onClick={handleClear}
                 className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
-                title="Nueva conversación"
+                title="Nueva conversacion"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -420,7 +533,7 @@ export function ChatPanel({ open, onOpenChange }: Props) {
                 <Sparkles className="h-8 w-8 text-white" />
               </div>
               <h3 className="text-base font-semibold text-[#1e293b] mb-1">
-                ¡Hola! Soy tu asistente comercial
+                Hola! Soy tu asistente comercial
               </h3>
               <p className="text-xs text-[#64748b] mb-6 text-center max-w-[300px]">
                 Puedo ayudarte con:
@@ -446,19 +559,29 @@ export function ChatPanel({ open, onOpenChange }: Props) {
             </div>
           ) : (
             <div className="py-3">
-              {messages.map((msg) => (
-                <ChatMessage key={msg.id} message={msg} />
+              {messages.map((msg, idx) => (
+                <ChatMessage
+                  key={msg.id}
+                  message={msg}
+                  isStreaming={msg.id === streamingAssistantId}
+                  isLastMessage={idx === messages.length - 1}
+                />
               ))}
             </div>
           )}
         </div>
+
+        {/* ── Status Banner ── */}
+        {isStreaming && statusPhase !== 'idle' && (
+          <StatusBanner phase={statusPhase} detail={statusDetail} />
+        )}
 
         {/* ── Input ── */}
         <ChatInput
           onSend={handleSend}
           disabled={isStreaming}
           placeholder={
-            isStreaming ? 'Procesando...' : undefined
+            isStreaming ? 'Esperando respuesta del asistente...' : undefined
           }
         />
       </SheetContent>

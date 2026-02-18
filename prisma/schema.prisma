@@ -2636,6 +2636,7 @@ model ConfiguracionGeneral {
   diasLaborables Int      @default(5) // Días laborables por semana (L-V)
   semanasxMes    Int      @default(4) // Semanas por mes para cálculo
   horasMensuales Int      @default(192) // Calculado: horasSemanales * semanasxMes
+  agenteLimiteMensualUsd Float @default(25) // Limite mensual de gasto del agente IA (USD)
   updatedAt      DateTime @updatedAt
   updatedBy      String?
   user           User?    @relation(fields: [updatedBy], references: [id])

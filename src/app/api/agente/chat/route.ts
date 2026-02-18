@@ -15,7 +15,7 @@ import {
   AGENT_MAX_TOOL_ROUNDS,
 } from '@/lib/agente/types'
 import type { ChatRequest, ChatMessage, ToolContext, ToolCallInfo, ChatAttachment } from '@/lib/agente/types'
-import { trackUsage } from '@/lib/agente/usageTracker'
+import { trackUsage, getCompanyMonthlyUsage } from '@/lib/agente/usageTracker'
 
 // Allow up to 5 minutes for PDF analysis + multi-tool loops
 export const maxDuration = 300
@@ -23,8 +23,8 @@ export const maxDuration = 300
 const MAX_HISTORY_MESSAGES = 10
 const MAX_BODY_SIZE = 4 * 1024 * 1024 // 4MB safety limit before Vercel's 4.5MB
 const AGENT_MAX_TOKENS_TDR = 8192 // Extended output for TDR/PDF analysis
-const RETRY_DELAY_MS = 15_000
-const MAX_RETRIES = 2
+const RETRY_DELAYS_MS = [15_000, 30_000, 60_000] // Exponential backoff: 15s, 30s, 60s
+const MAX_RETRIES = 3
 
 function getClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -321,6 +321,12 @@ async function preprocessPdfMessages(
 
   if (pdfAttachments.length === 0) return messages
 
+  // Notify frontend of PDF analysis phase
+  writeSSE(controller, encoder, 'status', {
+    phase: 'analyzing_pdf',
+    detail: pdfAttachments.length === 1 ? pdfAttachments[0].name : `${pdfAttachments.length} documentos`,
+  })
+
   // Notify user that we're analyzing the document
   writeSSE(controller, encoder, 'text_delta', {
     text: `📄 _Analizando ${pdfAttachments.length === 1 ? `"${pdfAttachments[0].name}"` : `${pdfAttachments.length} documentos`}..._\n\n`,
@@ -375,7 +381,7 @@ function generateTitle(content: string, maxLen = 60): string {
   return (lastSpace > 20 ? truncated.substring(0, lastSpace) : truncated) + '...'
 }
 
-/** Llama a Claude con reintentos automáticos en caso de rate limit */
+/** Llama a Claude con exponential backoff en caso de rate limit */
 async function callClaudeWithRetry(
   client: Anthropic,
   params: {
@@ -386,7 +392,8 @@ async function callClaudeWithRetry(
     messages: Anthropic.Messages.MessageParam[]
   },
   controller: ReadableStreamDefaultController,
-  encoder: TextEncoder
+  encoder: TextEncoder,
+  retryCtx: { notifiedUser: boolean } = { notifiedUser: false }
 ): Promise<Anthropic.Messages.Message> {
   let lastError: unknown
 
@@ -399,13 +406,18 @@ async function callClaudeWithRetry(
         throw err
       }
 
-      // Notify user about retry
-      const waitSecs = Math.round(RETRY_DELAY_MS / 1000)
-      writeSSE(controller, encoder, 'text_delta', {
-        text: `\n\n⏳ _Límite de velocidad alcanzado. Reintentando en ${waitSecs} segundos..._\n\n`,
-      })
+      // Show ONE friendly message on first retry only — no technical details
+      if (!retryCtx.notifiedUser) {
+        retryCtx.notifiedUser = true
+        writeSSE(controller, encoder, 'status', {
+          phase: 'generating',
+          detail: 'rate_limit_wait',
+        })
+      }
 
-      await sleep(RETRY_DELAY_MS)
+      const delayMs = RETRY_DELAYS_MS[attempt] ?? 60_000
+      console.info(`[chat] Rate limited, retry ${attempt + 1}/${MAX_RETRIES} in ${delayMs}ms`)
+      await sleep(delayMs)
     }
   }
 
@@ -452,6 +464,23 @@ export async function POST(request: NextRequest) {
 
   const userId = (session.user as { id: string }).id
   const toolContext: ToolContext = { userId }
+
+  // ── Monthly usage limit check (company-wide) ──
+  try {
+    const monthlyUsage = await getCompanyMonthlyUsage()
+    if (monthlyUsage.costoTotal >= monthlyUsage.limiteMensual) {
+      return new Response(
+        JSON.stringify({
+          error: 'Has alcanzado el límite de uso mensual del asistente. Contacta al administrador para más información.',
+          limitReached: true,
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+  } catch (err) {
+    // Don't block chat if usage check fails — just log
+    console.error('[chat] Failed to check monthly usage:', err)
+  }
 
   const client = getClient()
   const systemPrompt = buildSystemPrompt({ cotizacionId })
@@ -505,14 +534,23 @@ export async function POST(request: NextRequest) {
         let accumulatedText = ''
         const accumulatedToolCalls: ToolCallInfo[] = []
 
+        // Shared retry context across tool loop — only show rate limit message once
+        const retryCtx = { notifiedUser: false }
+
         // Tool-use loop: Claude puede pedir tools, las ejecutamos y reenviamos
         while (toolRound < AGENT_MAX_TOOL_ROUNDS) {
-          // Llamada a Claude con retry automático en rate limit
+          // Notify frontend we're generating
+          writeSSE(controller, encoder, 'status', {
+            phase: 'generating',
+          })
+
+          // Llamada a Claude con exponential backoff en rate limit
           const response = await callClaudeWithRetry(
             client,
             { model, max_tokens: maxTokens, system: systemPrompt, tools, messages: anthropicMessages },
             controller,
-            encoder
+            encoder,
+            retryCtx
           )
 
           // ── Usage logging + tracking ──
@@ -544,6 +582,12 @@ export async function POST(request: NextRequest) {
             } else if (block.type === 'tool_use') {
               hasToolUse = true
               const toolBlock = block as Anthropic.Messages.ToolUseBlock
+
+              // Notify frontend of tool execution phase
+              writeSSE(controller, encoder, 'status', {
+                phase: 'executing_tools',
+                detail: toolBlock.name,
+              })
 
               // Notificar al frontend que una tool se está ejecutando
               writeSSE(controller, encoder, 'tool_call_start', {
@@ -642,6 +686,19 @@ export async function POST(request: NextRequest) {
           console.error('[chat] Failed to persist conversation:', dbErr)
         }
 
+        // ── Check if approaching monthly limit and warn user ──
+        try {
+          const postUsage = await getCompanyMonthlyUsage()
+          if (postUsage.porcentajeUsado >= 80 && postUsage.porcentajeUsado < 100) {
+            writeSSE(controller, encoder, 'text_delta', {
+              text: `\n\n---\n_ℹ️ Has usado el ${Math.round(postUsage.porcentajeUsado)}% del límite mensual del asistente ($${postUsage.costoTotal.toFixed(2)} de $${postUsage.limiteMensual})._`,
+            })
+          }
+        } catch {
+          // Non-critical — don't fail the response
+        }
+
+        writeSSE(controller, encoder, 'status', { phase: 'idle' })
         writeSSE(controller, encoder, 'done', {})
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Error interno'

@@ -33,6 +33,28 @@ Cuando suban un PDF (TDR, bases, especificaciones):
 4. Generar consultas profesionales con generar_consultas_tdr
 5. Proponer cotización preliminar marcando supuestos
 
+## COTIZACIÓN DESDE TDR — FLUJO OPTIMIZADO
+Cuando crees una cotización a partir de un análisis de TDR, minimiza las tool calls:
+
+**IMPORTANTE: Los campos catalogoEquipoId, catalogoServicioId y catalogoGastoId son OPCIONALES.**
+Si los equipos/servicios/gastos del TDR no existen en el catálogo, NO busques repetidamente.
+Crea los ítems directamente con los datos del análisis (descripción, cantidad, precio estimado).
+
+**Flujo óptimo (máximo 8-10 tool calls):**
+1. buscar_clientes (1 sola búsqueda)
+2. crear_cotizacion (vacía, con datos generales)
+3. agregar_equipos EN LOTE — todos los equipos en UNA sola llamada, con o sin catalogoEquipoId
+4. agregar_servicios EN LOTE — todos los servicios en UNA sola llamada
+5. agregar_gastos EN LOTE — todos los gastos en UNA sola llamada
+6. agregar_condiciones y agregar_exclusiones (1 llamada cada una)
+7. recalcular_cotizacion
+8. obtener_resumen_cotizacion
+
+**NO hacer:**
+- Búsqueda individual por cada equipo (si el catálogo no tiene el equipo, crea el ítem sin vínculo)
+- Múltiples llamadas a agregar_equipos con 1-2 ítems cada una (enviar TODOS juntos)
+- Buscar equipos y luego no usarlos porque devuelve 0 resultados
+
 ## REGLAS DE NEGOCIO
 **Equipos**: precioInterno = precioLista × factorCosto (default 1.0). precioCliente = precioInterno × factorVenta (default 1.20)
 **Servicios**: Fórmulas de horas: Fijo / Escalonada (base + (cant-1)×repetido) / Proporcional (unidad×cant). costoCliente = horaTotal × costoHora × factorSeguridad. costoInterno = costoCliente / margen (default 1.35)

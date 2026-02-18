@@ -10,9 +10,13 @@ import { ToolCallIndicator } from './ToolCallIndicator'
 
 interface Props {
   message: ChatMessageType
+  /** Whether this message is currently being streamed */
+  isStreaming?: boolean
+  /** Whether this is the last message in the list */
+  isLastMessage?: boolean
 }
 
-/** Extract cotización code + ID from tool call results */
+/** Extract cotizacion code + ID from tool call results */
 function extractCotizacionLink(msg: ChatMessageType): { code: string; id: string } | null {
   if (!msg.toolCalls) return null
   for (const tc of msg.toolCalls) {
@@ -30,7 +34,7 @@ function getSuccessBanner(msg: ChatMessageType): string | null {
   for (const tc of msg.toolCalls) {
     if (tc.name === 'crear_cotizacion' && tc.status === 'completed' && tc.result) {
       const r = tc.result as Record<string, unknown>
-      if (r.codigo) return `Cotización ${r.codigo} creada exitosamente`
+      if (r.codigo) return `Cotizacion ${r.codigo} creada exitosamente`
     }
   }
   return null
@@ -53,15 +57,18 @@ function timeAgo(ts: number): string {
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-md bg-white border border-[#e2e8f0] px-4 py-3 shadow-sm w-fit">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8] animate-bounce [animation-delay:0ms]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8] animate-bounce [animation-delay:150ms]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8] animate-bounce [animation-delay:300ms]" />
+    <div className="flex items-center gap-2 rounded-2xl rounded-tl-md bg-white border border-[#e2e8f0] px-4 py-3 shadow-sm w-fit">
+      <div className="flex items-center gap-1">
+        <span className="h-2 w-2 rounded-full bg-[#2563eb]/60 animate-[typing_1.4s_ease-in-out_infinite]" />
+        <span className="h-2 w-2 rounded-full bg-[#2563eb]/60 animate-[typing_1.4s_ease-in-out_0.2s_infinite]" />
+        <span className="h-2 w-2 rounded-full bg-[#2563eb]/60 animate-[typing_1.4s_ease-in-out_0.4s_infinite]" />
+      </div>
+      <span className="text-[10px] text-[#64748b] ml-1">Asistente GYS esta escribiendo</span>
     </div>
   )
 }
 
-function ChatMessageComponent({ message }: Props) {
+function ChatMessageComponent({ message, isStreaming = false, isLastMessage = false }: Props) {
   const isUser = message.role === 'user'
   const timestamp = useMemo(() => timeAgo(message.timestamp), [message.timestamp])
 
@@ -77,7 +84,18 @@ function ChatMessageComponent({ message }: Props) {
 
   const errorOnly = !isUser && message.content ? isErrorOnly(message.content) : false
   const errorText = errorOnly ? message.content.replace(/^Error:\s*/m, '') : null
-  const isStreaming = !isUser && !message.content && (!message.toolCalls || message.toolCalls.length === 0)
+
+  // Show typing indicator when assistant message is empty and streaming
+  const showTyping = isStreaming && !isUser && !message.content && (!message.toolCalls || message.toolCalls.length === 0)
+
+  // Show "writing" indicator when assistant has tool calls done but text is still streaming
+  const showWritingIndicator = isStreaming && !isUser && !message.content && message.toolCalls && message.toolCalls.length > 0 && message.toolCalls.every((tc) => tc.status !== 'running')
+
+  // Show completion indicator for assistant messages that are done (not streaming, has content)
+  const showCompleted = !isStreaming && !isUser && isLastMessage && message.content && !errorOnly
+
+  // Tool call step numbering
+  const totalTools = message.toolCalls?.length || 0
 
   return (
     <div
@@ -113,17 +131,25 @@ function ChatMessageComponent({ message }: Props) {
           </div>
         )}
 
-        {/* Tool calls */}
+        {/* Tool calls with step numbers */}
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="flex flex-col gap-1.5 mb-1 w-full">
-            {message.toolCalls.map((tc) => (
-              <ToolCallIndicator key={tc.id} toolCall={tc} />
+            {message.toolCalls.map((tc, idx) => (
+              <ToolCallIndicator
+                key={tc.id}
+                toolCall={tc}
+                stepNumber={idx + 1}
+                totalSteps={totalTools}
+              />
             ))}
           </div>
         )}
 
-        {/* Typing indicator for empty streaming messages */}
-        {isStreaming && <TypingIndicator />}
+        {/* Typing indicator for empty streaming messages (waiting for first response) */}
+        {showTyping && <TypingIndicator />}
+
+        {/* Writing indicator when tools are done but text hasn't started */}
+        {showWritingIndicator && <TypingIndicator />}
 
         {/* Success banner */}
         {successBanner && (
@@ -137,7 +163,7 @@ function ChatMessageComponent({ message }: Props) {
         {errorOnly && errorText && (
           <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 w-full">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#dc2626]" />
-            <span>Algo salió mal. Intenta de nuevo.</span>
+            <span>Algo salio mal. Intenta de nuevo.</span>
           </div>
         )}
 
@@ -163,24 +189,29 @@ function ChatMessageComponent({ message }: Props) {
           </div>
         )}
 
-        {/* Cotización link button */}
+        {/* Cotizacion link button */}
         {cotizacionLink && (
           <a
             href={`/comercial/cotizaciones/${cotizacionLink.id}`}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-[#1d4ed8]"
           >
-            Ver cotización {cotizacionLink.code}
+            Ver cotizacion {cotizacionLink.code}
             <ExternalLink className="h-3 w-3" />
           </a>
         )}
 
-        {/* Timestamp */}
-        <span className={cn(
-          'text-[10px] text-[#94a3b8] mt-0.5 px-1',
-          isUser ? 'text-right' : 'text-left'
+        {/* Timestamp + completion indicator */}
+        <div className={cn(
+          'flex items-center gap-1.5 mt-0.5 px-1',
+          isUser ? 'justify-end' : 'justify-start'
         )}>
-          {timestamp}
-        </span>
+          <span className="text-[10px] text-[#94a3b8]">
+            {timestamp}
+          </span>
+          {showCompleted && (
+            <CheckCircle2 className="h-2.5 w-2.5 text-[#94a3b8]" />
+          )}
+        </div>
       </div>
     </div>
   )
