@@ -468,7 +468,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = (session.user as { id: string }).id
-  const toolContext: ToolContext = { userId }
+  const toolContext: ToolContext = { userId, cotizacionId: cotizacionId || undefined }
 
   // ── Monthly usage limit check (company-wide) ──
   try {

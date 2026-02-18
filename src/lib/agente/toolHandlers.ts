@@ -5,12 +5,24 @@ import { prisma } from '@/lib/prisma'
 import { generateNextCotizacionCode } from '@/lib/utils/cotizacionCodeGenerator'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 import { calcularHoras, type TipoFormula } from '@/lib/utils/formulas'
-import type { ToolHandlerMap } from './types'
+import type { ToolContext, ToolHandlerMap } from './types'
 
 // ── Helpers ───────────────────────────────────────────────
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+}
+
+/** Resolve cotizacionId: context takes priority over Claude's input */
+function resolveCotizacionId(input: Record<string, unknown>, context: ToolContext): string {
+  const fromContext = context.cotizacionId
+  const fromInput = input.cotizacionId as string | undefined
+  if (fromContext && fromInput && fromContext !== fromInput) {
+    console.warn(`[toolHandler] cotizacionId mismatch: context=${fromContext}, input=${fromInput} — using context`)
+  }
+  const id = fromContext || fromInput
+  if (!id) throw new Error('cotizacionId es requerido')
+  return id
 }
 
 const now = () => new Date()
@@ -662,8 +674,8 @@ export const toolHandlers: ToolHandlerMap = {
     }
   },
 
-  agregar_equipos: async (input) => {
-    const cotizacionId = input.cotizacionId as string
+  agregar_equipos: async (input, context) => {
+    const cotizacionId = resolveCotizacionId(input, context)
     const grupoNombre = input.grupoNombre as string
     const items = input.items as Array<Record<string, unknown>>
 
@@ -759,8 +771,8 @@ export const toolHandlers: ToolHandlerMap = {
     }
   },
 
-  agregar_servicios: async (input) => {
-    const cotizacionId = input.cotizacionId as string
+  agregar_servicios: async (input, context) => {
+    const cotizacionId = resolveCotizacionId(input, context)
     const grupoNombre = input.grupoNombre as string
     const edtId = input.edtId as string
     const items = input.items as Array<Record<string, unknown>>
@@ -900,8 +912,8 @@ export const toolHandlers: ToolHandlerMap = {
     }
   },
 
-  agregar_gastos: async (input) => {
-    const cotizacionId = input.cotizacionId as string
+  agregar_gastos: async (input, context) => {
+    const cotizacionId = resolveCotizacionId(input, context)
     const grupoNombre = input.grupoNombre as string
     const items = input.items as Array<Record<string, unknown>>
 
@@ -983,8 +995,8 @@ export const toolHandlers: ToolHandlerMap = {
     }
   },
 
-  agregar_condiciones: async (input) => {
-    const cotizacionId = input.cotizacionId as string
+  agregar_condiciones: async (input, context) => {
+    const cotizacionId = resolveCotizacionId(input, context)
     const condiciones = input.condiciones as Array<Record<string, unknown>>
 
     const cot = await prisma.cotizacion.findUnique({ where: { id: cotizacionId } })
@@ -1013,8 +1025,8 @@ export const toolHandlers: ToolHandlerMap = {
     return { condicionesAgregadas: condiciones.length, totalOrden: orden }
   },
 
-  agregar_exclusiones: async (input) => {
-    const cotizacionId = input.cotizacionId as string
+  agregar_exclusiones: async (input, context) => {
+    const cotizacionId = resolveCotizacionId(input, context)
     const exclusiones = input.exclusiones as Array<Record<string, unknown>>
 
     const cot = await prisma.cotizacion.findUnique({ where: { id: cotizacionId } })
@@ -1041,14 +1053,14 @@ export const toolHandlers: ToolHandlerMap = {
     return { exclusionesAgregadas: exclusiones.length, totalOrden: orden }
   },
 
-  recalcular_cotizacion: async (input) => {
-    const cotizacionId = input.cotizacionId as string
+  recalcular_cotizacion: async (input, context) => {
+    const cotizacionId = resolveCotizacionId(input, context)
     const totales = await recalcularTotalesCotizacion(cotizacionId)
     return totales
   },
 
-  obtener_resumen_cotizacion: async (input) => {
-    const cotizacionId = input.cotizacionId as string
+  obtener_resumen_cotizacion: async (input, context) => {
+    const cotizacionId = resolveCotizacionId(input, context)
 
     const cot = await prisma.cotizacion.findUnique({
       where: { id: cotizacionId },

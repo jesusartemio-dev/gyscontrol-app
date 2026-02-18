@@ -144,6 +144,8 @@ export type TextBlock = Anthropic.Messages.TextBlock
 
 export interface ToolContext {
   userId: string
+  /** cotizacionId from chat context — handlers MUST use this over Claude's input */
+  cotizacionId?: string
 }
 
 export type ToolHandler = (

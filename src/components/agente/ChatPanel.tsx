@@ -164,10 +164,21 @@ export function ChatPanel({ open, onOpenChange, cotizacionId }: Props) {
   const [showConversaciones, setShowConversaciones] = useState(false)
   const [isLoadingConversacion, setIsLoadingConversacion] = useState(false)
   const hasAutoLoadedRef = useRef(false)
+  const prevCotizacionIdRef = useRef(cotizacionId)
 
-  // Fetch conversations and auto-load last one when panel opens
+  // Fetch conversations and auto-load last one when panel opens or cotizacion changes
   useEffect(() => {
     if (!open) return
+
+    // If cotizacionId changed while open, reset state for the new cotización
+    if (prevCotizacionIdRef.current !== cotizacionId) {
+      prevCotizacionIdRef.current = cotizacionId
+      setMessages([])
+      setConversacionId(null)
+      setConversacionTitulo(null)
+      hasAutoLoadedRef.current = false
+    }
+
     const init = async () => {
       try {
         const qs = cotizacionId
@@ -188,7 +199,7 @@ export function ChatPanel({ open, onOpenChange, cotizacionId }: Props) {
     }
     init()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, cotizacionId])
 
   const fetchConversaciones = async () => {
     try {

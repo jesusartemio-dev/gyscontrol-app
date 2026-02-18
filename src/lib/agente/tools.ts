@@ -748,6 +748,11 @@ export function selectToolsByContext(message: string): AnthropicTool[] {
   const creationKeywords = [
     'cotiza', 'crear', 'crea', 'nueva cotización', 'agrega', 'agregar',
     'condicion', 'exclusion', 'recalcul', 'resumen cotización',
+    'pon', 'ponle', 'incluye', 'incluir', 'añade', 'añadir', 'anade', 'anadir',
+    'mete', 'meter', 'quita', 'quitar', 'elimina', 'eliminar',
+    'modifica', 'modificar', 'cambia', 'cambiar', 'actualiza', 'actualizar',
+    'edita', 'editar', 'reemplaza', 'reemplazar', 'sube', 'baja', 'ajusta',
+    'saca', 'sacar', 'dame',
   ]
   if (creationKeywords.some((k) => lower.includes(k))) {
     groups.add('creation')
