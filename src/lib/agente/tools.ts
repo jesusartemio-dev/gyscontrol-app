@@ -708,3 +708,60 @@ export const allTools: AnthropicTool[] = [
   ...creationTools,
   ...analysisTools,
 ]
+
+// ── Tool groups for context-based filtering ──────────────
+
+/** Tool group names for selective tool loading */
+export type ToolGroup = 'search' | 'project' | 'creation' | 'analysis'
+
+const TOOL_GROUPS: Record<ToolGroup, AnthropicTool[]> = {
+  search: searchTools,
+  project: projectTools,
+  creation: creationTools,
+  analysis: analysisTools,
+}
+
+/**
+ * Returns a subset of tools based on context keywords in the message.
+ * Reduces token usage by not sending irrelevant tool schemas to Claude.
+ */
+export function selectToolsByContext(message: string): AnthropicTool[] {
+  const lower = message.toLowerCase()
+  const groups = new Set<ToolGroup>()
+
+  // Search tools — always included as base capability
+  groups.add('search')
+
+  // Creation tools — only when user wants to create/modify cotizaciones
+  const creationKeywords = [
+    'cotiza', 'crear', 'crea', 'nueva cotización', 'agrega', 'agregar',
+    'condicion', 'exclusion', 'recalcul', 'resumen cotización',
+  ]
+  if (creationKeywords.some((k) => lower.includes(k))) {
+    groups.add('creation')
+  }
+
+  // Project tools — when asking about projects, execution, comparisons
+  const projectKeywords = [
+    'proyecto', 'ejecut', 'cronograma', 'orden de compra', 'lista de equipo',
+    'real vs', 'costo real', 'desviación', 'comparar', 'similar',
+  ]
+  if (projectKeywords.some((k) => lower.includes(k))) {
+    groups.add('project')
+  }
+
+  // Analysis tools — TDR analysis, document review
+  const analysisKeywords = [
+    'tdr', 'términos de referencia', 'analiz', 'consultas', 'observacion',
+    'ambigüedad', 'vacío', 'pdf', 'documento',
+  ]
+  if (analysisKeywords.some((k) => lower.includes(k))) {
+    groups.add('analysis')
+  }
+
+  const result: AnthropicTool[] = []
+  for (const g of groups) {
+    result.push(...TOOL_GROUPS[g])
+  }
+  return result
+}

@@ -4,6 +4,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { getModelForTask } from './models'
+import { trackUsage } from './usageTracker'
 
 // ── Tipos ─────────────────────────────────────────────────
 
@@ -101,10 +102,12 @@ function getClient(): Anthropic {
  * Extrae datos estructurados de un PDF de propuesta comercial GYS.
  */
 export async function extractPdfProposal(
-  pdfBase64: string
+  pdfBase64: string,
+  userId?: string
 ): Promise<PropuestaExtraida> {
   const client = getClient()
   const model = getModelForTask('pdf-extraction')
+  const start = Date.now()
 
   const response = await client.messages.create({
     model,
@@ -130,6 +133,18 @@ export async function extractPdfProposal(
       },
     ],
   })
+
+  // Track usage
+  if (userId) {
+    trackUsage({
+      userId,
+      tipo: 'pdf-extraction',
+      modelo: model,
+      tokensInput: response.usage?.input_tokens ?? 0,
+      tokensOutput: response.usage?.output_tokens ?? 0,
+      duracionMs: Date.now() - start,
+    })
+  }
 
   const responseText = response.content
     .filter((block): block is Anthropic.TextBlock => block.type === 'text')

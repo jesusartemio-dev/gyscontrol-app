@@ -9,13 +9,15 @@ export const MODELS = {
 } as const
 
 export type AITask =
-  | 'chat'              // Conversational chat with tool use
+  | 'chat'              // Complex chat: TDR analysis, cotización creation, multi-tool
+  | 'chat-simple'       // Simple chat: greetings, short questions, catalog lookups
   | 'excel-extraction'  // Excel CSV → JSON structured data
   | 'pdf-extraction'    // PDF proposal → JSON structured data
   | 'ocr'               // Receipt/invoice OCR → JSON
 
 const TASK_DEFAULTS: Record<AITask, string> = {
   'chat': MODELS.sonnet,
+  'chat-simple': MODELS.haiku,
   'excel-extraction': MODELS.haiku,
   'pdf-extraction': MODELS.haiku,
   'ocr': MODELS.haiku,
@@ -24,6 +26,7 @@ const TASK_DEFAULTS: Record<AITask, string> = {
 // Environment variable overrides (change model without redeploying)
 const ENV_OVERRIDES: Record<AITask, string | undefined> = {
   'chat': process.env.AI_CHAT_MODEL,
+  'chat-simple': process.env.AI_CHAT_SIMPLE_MODEL,
   'excel-extraction': process.env.AI_EXTRACT_MODEL,
   'pdf-extraction': process.env.AI_EXTRACT_MODEL,
   'ocr': process.env.AI_OCR_MODEL,

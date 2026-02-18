@@ -7,16 +7,22 @@ import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
 import { buildSystemPrompt } from '@/lib/agente/systemPrompt'
-import { allTools } from '@/lib/agente/tools'
+import { selectToolsByContext } from '@/lib/agente/tools'
 import { toolHandlers } from '@/lib/agente/toolHandlers'
 import {
   getModelForTask,
   AGENT_MAX_TOKENS,
   AGENT_MAX_TOOL_ROUNDS,
 } from '@/lib/agente/types'
-import type { ChatRequest, ChatMessage, ToolContext, ToolCallInfo } from '@/lib/agente/types'
+import type { ChatRequest, ChatMessage, ToolContext, ToolCallInfo, ChatAttachment } from '@/lib/agente/types'
+import { trackUsage } from '@/lib/agente/usageTracker'
+
+// Allow up to 5 minutes for PDF analysis + multi-tool loops
+export const maxDuration = 300
 
 const MAX_HISTORY_MESSAGES = 10
+const MAX_BODY_SIZE = 4 * 1024 * 1024 // 4MB safety limit before Vercel's 4.5MB
+const AGENT_MAX_TOKENS_TDR = 8192 // Extended output for TDR/PDF analysis
 const RETRY_DELAY_MS = 15_000
 const MAX_RETRIES = 2
 
@@ -116,6 +122,250 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/** Determina si el mensaje es simple (puede usar Haiku) o complejo (requiere Sonnet) */
+function isSimpleMessage(messages: ChatMessage[]): boolean {
+  const lastMsg = messages[messages.length - 1]
+  if (!lastMsg) return true
+
+  // Has attachments (PDF/image) → complex
+  if (lastMsg.attachments && lastMsg.attachments.length > 0) return false
+
+  const content = lastMsg.content.toLowerCase()
+  const wordCount = content.split(/\s+/).filter(Boolean).length
+
+  // Long messages → complex
+  if (wordCount > 50) return false
+
+  // Complex action keywords → Sonnet
+  const complexKeywords = [
+    'cotiza', 'crear cotización', 'nueva cotización', 'analiz', 'tdr',
+    'términos de referencia', 'compara', 'evalúa', 'recomiend',
+    'planifica', 'estructura', 'propuesta', 'cronograma',
+    'desviación', 'desglose', 'detalle completo',
+  ]
+  if (complexKeywords.some((k) => content.includes(k))) return false
+
+  // Previous assistant used tools → likely a follow-up needing same capability
+  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
+  if (lastAssistant?.toolCalls && lastAssistant.toolCalls.length > 2) return false
+
+  return true
+}
+
+/** Comprime el resultado de un tool call para reducir tokens en el context */
+const MAX_TOOL_RESULT_LENGTH = 3000
+const MAX_TOOL_RESULT_ITEMS = 10
+
+function compressToolResult(result: unknown): string {
+  const json = JSON.stringify(result)
+
+  // If already small, return as-is
+  if (json.length <= MAX_TOOL_RESULT_LENGTH) return json
+
+  // If it's an array, limit items
+  if (Array.isArray(result)) {
+    const truncated = result.slice(0, MAX_TOOL_RESULT_ITEMS)
+    const compressed = JSON.stringify({
+      items: truncated,
+      _meta: { total: result.length, shown: truncated.length, truncated: true },
+    })
+    if (compressed.length <= MAX_TOOL_RESULT_LENGTH) return compressed
+    // Still too large → hard truncate
+    return compressed.substring(0, MAX_TOOL_RESULT_LENGTH) + '..."}'
+  }
+
+  // If it's an object with arrays, compress each array
+  if (result && typeof result === 'object') {
+    const obj = result as Record<string, unknown>
+    const compressed: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(obj)) {
+      if (Array.isArray(val) && val.length > MAX_TOOL_RESULT_ITEMS) {
+        compressed[key] = val.slice(0, MAX_TOOL_RESULT_ITEMS)
+        compressed[`_${key}_total`] = val.length
+      } else {
+        compressed[key] = val
+      }
+    }
+    const compressedJson = JSON.stringify(compressed)
+    if (compressedJson.length <= MAX_TOOL_RESULT_LENGTH) return compressedJson
+  }
+
+  // Last resort: hard truncate
+  return json.substring(0, MAX_TOOL_RESULT_LENGTH) + '...[truncated]'
+}
+
+/**
+ * Pre-procesa un PDF adjunto: extrae un resumen estructurado con Haiku (barato)
+ * para que el tool loop trabaje con texto liviano en vez del PDF completo.
+ * Esto evita enviar el PDF N veces en cada round del tool loop.
+ */
+const PDF_EXTRACTION_PROMPT = `You are a document extraction assistant. Extract a comprehensive structured summary from this document.
+
+Output the following sections (in Spanish):
+
+## DATOS GENERALES
+- Título/referencia del documento
+- Cliente/entidad
+- Fecha, código de referencia
+
+## ALCANCE Y REQUERIMIENTOS TÉCNICOS
+- Lista detallada de todos los requerimientos técnicos
+- Sistemas solicitados (SCADA, PLC, instrumentación, etc.)
+- Equipos mencionados con modelos/marcas si los hay
+- Cantidades y especificaciones
+
+## SERVICIOS SOLICITADOS
+- Ingeniería, programación, comisionamiento, etc.
+- Entregables documentales (planos, manuales, protocolos)
+
+## CONDICIONES CONTRACTUALES
+- Plazos de ejecución
+- Garantías requeridas
+- Penalidades
+- Forma de pago
+
+## REQUISITOS ESPECIALES
+- Certificaciones, normas, estándares requeridos
+- Condiciones de sitio (altura, zona clasificada, etc.)
+- Personal requerido (certificaciones, experiencia mínima)
+
+## INFORMACIÓN FALTANTE O AMBIGUA
+- Puntos que no quedan claros
+- Especificaciones faltantes
+- Posibles contradicciones
+
+Be thorough. Include ALL technical details, part numbers, specifications, and quantities mentioned in the document. This summary will be used to prepare a commercial quotation.`
+
+async function preprocessPdfAttachment(
+  client: Anthropic,
+  base64: string,
+  fileName: string,
+  trackingCtx: { userId: string; conversacionId: string | null },
+): Promise<string> {
+  const model = getModelForTask('pdf-extraction') // Haiku
+  const pages = estimatePdfPages(base64)
+
+  console.info(`[chat:pdf-preprocess] Starting extraction: file="${fileName}" pages≈${pages} model=${model}`)
+  const start = Date.now()
+
+  const response = await client.messages.create({
+    model,
+    max_tokens: 4096,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: 'application/pdf',
+              data: base64,
+            },
+          } as Anthropic.Messages.DocumentBlockParam,
+          {
+            type: 'text',
+            text: PDF_EXTRACTION_PROMPT,
+          },
+        ],
+      },
+    ],
+  })
+
+  const elapsed = Date.now() - start
+  const usage = response.usage
+  console.info(
+    `[chat:pdf-preprocess] Done: file="${fileName}" elapsed=${elapsed}ms ` +
+    `input_tokens=${usage?.input_tokens ?? '?'} output_tokens=${usage?.output_tokens ?? '?'}`
+  )
+
+  // Track usage
+  trackUsage({
+    userId: trackingCtx.userId,
+    tipo: 'pdf-preprocessing',
+    modelo: model,
+    tokensInput: usage?.input_tokens ?? 0,
+    tokensOutput: usage?.output_tokens ?? 0,
+    conversacionId: trackingCtx.conversacionId,
+    duracionMs: elapsed,
+    metadata: { fileName, pages },
+  })
+
+  // Extract text from response
+  const textBlocks = response.content.filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
+  return textBlocks.map((b) => b.text).join('\n')
+}
+
+/**
+ * Checks if the last message has PDF attachments and pre-processes them.
+ * Returns modified messages where PDFs are replaced with text summaries.
+ */
+async function preprocessPdfMessages(
+  client: Anthropic,
+  messages: ChatMessage[],
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+  trackingCtx: { userId: string; conversacionId: string | null },
+): Promise<ChatMessage[]> {
+  const lastMsg = messages[messages.length - 1]
+  if (!lastMsg?.attachments?.some((a) => a.mimeType === 'application/pdf' && a.base64)) {
+    return messages
+  }
+
+  const pdfAttachments = lastMsg.attachments.filter(
+    (a) => a.mimeType === 'application/pdf' && a.base64
+  )
+  const nonPdfAttachments = lastMsg.attachments.filter(
+    (a) => a.mimeType !== 'application/pdf' || !a.base64
+  )
+
+  if (pdfAttachments.length === 0) return messages
+
+  // Notify user that we're analyzing the document
+  writeSSE(controller, encoder, 'text_delta', {
+    text: `📄 _Analizando ${pdfAttachments.length === 1 ? `"${pdfAttachments[0].name}"` : `${pdfAttachments.length} documentos`}..._\n\n`,
+  })
+
+  // Process each PDF
+  const summaries: string[] = []
+  for (const att of pdfAttachments) {
+    try {
+      const summary = await preprocessPdfAttachment(client, att.base64, att.name, trackingCtx)
+      summaries.push(`--- DOCUMENTO: ${att.name} ---\n${summary}`)
+    } catch (err) {
+      console.error(`[chat:pdf-preprocess] Failed for "${att.name}":`, err)
+      summaries.push(`--- DOCUMENTO: ${att.name} ---\n[Error al procesar: ${err instanceof Error ? err.message : 'desconocido'}]`)
+    }
+  }
+
+  // Build modified message: replace PDFs with text summaries
+  const summaryText = summaries.join('\n\n')
+  const modifiedContent = lastMsg.content
+    ? `${lastMsg.content}\n\n[Contenido extraído de documentos adjuntos:]\n${summaryText}`
+    : `(documento adjunto)\n\n[Contenido extraído de documentos adjuntos:]\n${summaryText}`
+
+  const modifiedMsg: ChatMessage = {
+    ...lastMsg,
+    content: modifiedContent,
+    // Keep non-PDF attachments (images), remove PDFs (already extracted)
+    attachments: nonPdfAttachments.length > 0 ? nonPdfAttachments as ChatAttachment[] : undefined,
+  }
+
+  return [...messages.slice(0, -1), modifiedMsg]
+}
+
+/** Determines if the request involves PDF/TDR analysis (needs more output tokens) */
+function needsExtendedTokens(messages: ChatMessage[]): boolean {
+  const lastMsg = messages[messages.length - 1]
+  if (!lastMsg) return false
+  // Has PDF attachments
+  if (lastMsg.attachments?.some((a) => a.mimeType === 'application/pdf')) return true
+  // TDR/analysis keywords
+  const content = lastMsg.content.toLowerCase()
+  const tdrKeywords = ['tdr', 'términos de referencia', 'analiz', 'documento', 'propuesta técnica']
+  return tdrKeywords.some((k) => content.includes(k))
+}
+
 /** Genera título para la conversación a partir del primer mensaje */
 function generateTitle(content: string, maxLen = 60): string {
   const cleaned = content.replace(/\n/g, ' ').trim()
@@ -171,6 +421,16 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // ── Body size validation ──
+  const contentLength = parseInt(request.headers.get('content-length') || '0')
+  if (contentLength > MAX_BODY_SIZE) {
+    console.info(`[chat] Request rejected: content-length=${contentLength} exceeds ${MAX_BODY_SIZE}`)
+    return new Response(
+      JSON.stringify({ error: `El archivo es demasiado grande. Máximo ${Math.round(MAX_BODY_SIZE / 1024 / 1024)}MB por request.` }),
+      { status: 413, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
   let body: ChatRequest
   try {
     body = await request.json()
@@ -195,8 +455,17 @@ export async function POST(request: NextRequest) {
 
   const client = getClient()
   const systemPrompt = buildSystemPrompt({ cotizacionId })
-  const tools = allTools
-  const model = getModelForTask('chat')
+
+  // Smart model selection: Haiku for simple messages, Sonnet for complex
+  const simple = isSimpleMessage(messages)
+  const model = getModelForTask(simple ? 'chat-simple' : 'chat')
+
+  // Dynamic max_tokens: more output for TDR/PDF analysis
+  const maxTokens = needsExtendedTokens(messages) ? AGENT_MAX_TOKENS_TDR : AGENT_MAX_TOKENS
+
+  // Context-based tool filtering: only send relevant tools
+  const lastUserContent = messages[messages.length - 1]?.content || ''
+  const tools = selectToolsByContext(lastUserContent)
 
   const encoder = new TextEncoder()
 
@@ -218,23 +487,16 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        // Check for large PDFs in the last message and warn
-        const lastMsg = messages[messages.length - 1]
-        if (lastMsg?.attachments) {
-          for (const att of lastMsg.attachments) {
-            if (att.mimeType === 'application/pdf') {
-              const pages = estimatePdfPages(att.base64)
-              if (pages > 20) {
-                writeSSE(controller, encoder, 'text_delta', {
-                  text: `⚠️ _El PDF "${att.name}" tiene aproximadamente ${pages} páginas. Documentos muy grandes pueden causar demoras o errores. Considera subir solo las secciones relevantes del TDR._\n\n`,
-                })
-              }
-            }
-          }
-        }
+        // ── PDF preprocessing: extract summaries ONCE with Haiku ──
+        // This replaces PDF base64 with text summaries so the tool loop
+        // works with lightweight text instead of re-sending the PDF each round
+        const processedMessages = await preprocessPdfMessages(
+          client, messages, controller, encoder,
+          { userId, conversacionId: activeConversacionId }
+        )
 
         // Trim history to last N messages to reduce token usage
-        const trimmedMessages = trimHistory(messages)
+        const trimmedMessages = trimHistory(processedMessages)
         let anthropicMessages: Anthropic.Messages.MessageParam[] =
           buildAnthropicMessages(trimmedMessages)
         let toolRound = 0
@@ -248,10 +510,28 @@ export async function POST(request: NextRequest) {
           // Llamada a Claude con retry automático en rate limit
           const response = await callClaudeWithRetry(
             client,
-            { model, max_tokens: AGENT_MAX_TOKENS, system: systemPrompt, tools, messages: anthropicMessages },
+            { model, max_tokens: maxTokens, system: systemPrompt, tools, messages: anthropicMessages },
             controller,
             encoder
           )
+
+          // ── Usage logging + tracking ──
+          const usage = response.usage
+          console.info(
+            `[chat] model=${model} round=${toolRound} ` +
+            `input_tokens=${usage?.input_tokens ?? '?'} output_tokens=${usage?.output_tokens ?? '?'} ` +
+            `tools=${tools.length} messages=${anthropicMessages.length} ` +
+            `simple=${simple} maxTokens=${maxTokens}`
+          )
+          trackUsage({
+            userId,
+            tipo: simple ? 'chat-simple' : 'chat',
+            modelo: model,
+            tokensInput: usage?.input_tokens ?? 0,
+            tokensOutput: usage?.output_tokens ?? 0,
+            conversacionId: activeConversacionId,
+            metadata: { round: toolRound, toolCount: tools.length },
+          })
 
           // Procesar content blocks
           let hasToolUse = false
@@ -305,7 +585,7 @@ export async function POST(request: NextRequest) {
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: toolBlock.id,
-                content: JSON.stringify(result),
+                content: isError ? JSON.stringify(result) : compressToolResult(result),
                 is_error: isError,
               })
             }

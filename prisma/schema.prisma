@@ -1296,6 +1296,7 @@ model User {
   timesheetsAprobados                   TimesheetAprobacion[]        @relation("TimesheetAprobador")
   // Agente IA conversaciones
   agenteConversaciones                  AgenteConversacion[]
+  agenteUsage                           AgenteUsage[]
 
   @@map("user")
 }
@@ -3330,4 +3331,25 @@ model AgenteConversacionMensaje {
 
   @@index([conversacionId, createdAt])
   @@map("agente_conversacion_mensaje")
+}
+
+model AgenteUsage {
+  id             String   @id @default(cuid())
+  userId         String
+  conversacionId String?
+  tipo           String   // 'chat', 'chat-simple', 'pdf-preprocessing', 'excel-extraction', 'pdf-extraction', 'ocr'
+  modelo         String   // model ID used
+  tokensInput    Int
+  tokensOutput   Int
+  costoEstimado  Float    // USD
+  duracionMs     Int?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([tipo])
+  @@map("agente_usage")
 }

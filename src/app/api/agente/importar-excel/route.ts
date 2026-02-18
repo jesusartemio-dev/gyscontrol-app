@@ -120,9 +120,10 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. Extract data with Claude (per-sheet, with progress)
+        const importUserId = (session.user as { id: string }).id
         const excelData = await extractWithClaude(sheets, (message) => {
           writeSSE(controller, encoder, 'progress', { message })
-        })
+        }, importUserId)
         excelData.hojas = sheets.map((s) => s.name)
 
         // 3. Process PDF if provided
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
         if (hasPdf && pdfBuffer) {
           writeSSE(controller, encoder, 'progress', { message: 'Analizando PDF de propuesta...' })
           const pdfBase64 = pdfBuffer.toString('base64')
-          pdfData = await extractPdfProposal(pdfBase64)
+          pdfData = await extractPdfProposal(pdfBase64, importUserId)
         }
 
         // 4. Query catalogs for mapping suggestions

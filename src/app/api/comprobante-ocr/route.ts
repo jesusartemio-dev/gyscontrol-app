@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getModelForTask } from '@/lib/agente/models'
+import { trackUsage } from '@/lib/agente/usageTracker'
 
 // ── Tipos ────────────────────────────────────────────────
 
@@ -257,6 +258,7 @@ export async function POST(request: NextRequest) {
           },
         }
 
+    const ocrStart = Date.now()
     const message = await client.messages.create({
       model,
       max_tokens: 1024,
@@ -273,6 +275,18 @@ export async function POST(request: NextRequest) {
           ],
         },
       ],
+    })
+
+    // Track usage
+    const ocrUserId = (session.user as { id: string }).id
+    trackUsage({
+      userId: ocrUserId,
+      tipo: 'ocr',
+      modelo: model,
+      tokensInput: message.usage?.input_tokens ?? 0,
+      tokensOutput: message.usage?.output_tokens ?? 0,
+      duracionMs: Date.now() - ocrStart,
+      metadata: { fileName: file.name, mimeType },
     })
 
     // Extraer texto de la respuesta

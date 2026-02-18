@@ -5,6 +5,7 @@
 import * as XLSX from 'xlsx'
 import Anthropic from '@anthropic-ai/sdk'
 import { getModelForTask, MODELS } from './models'
+import { trackUsage } from './usageTracker'
 
 // ── Tipos de datos extraídos ──────────────────────────────
 
@@ -397,13 +398,19 @@ function getClient(): Anthropic {
 
 const RETRY_JSON_PREFIX = `CRITICAL: Your previous response was not valid JSON. Respond with ONLY a JSON object, nothing else. No explanations, no markdown, no code fences.\n\n`
 
+interface ClaudeRawResult {
+  text: string
+  inputTokens: number
+  outputTokens: number
+}
+
 async function callClaudeRaw(
   client: Anthropic,
   model: string,
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number
-): Promise<string> {
+): Promise<ClaudeRawResult> {
   const response = await client.messages.create({
     model,
     max_tokens: maxTokens,
@@ -411,10 +418,16 @@ async function callClaudeRaw(
     messages: [{ role: 'user', content: userPrompt }],
   })
 
-  return response.content
+  const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
     .map((b) => b.text)
     .join('')
+
+  return {
+    text,
+    inputTokens: response.usage?.input_tokens ?? 0,
+    outputTokens: response.usage?.output_tokens ?? 0,
+  }
 }
 
 /**
@@ -428,24 +441,39 @@ async function callClaudeJson(
   model: string,
   userPrompt: string,
   maxTokens: number = 8192,
-  sheetName?: string
+  sheetName?: string,
+  userId?: string
 ): Promise<unknown> {
   const label = sheetName ? ` [${sheetName}]` : ''
 
+  const doTrack = (usedModel: string, result: ClaudeRawResult) => {
+    if (!userId) return
+    trackUsage({
+      userId,
+      tipo: 'excel-extraction',
+      modelo: usedModel,
+      tokensInput: result.inputTokens,
+      tokensOutput: result.outputTokens,
+      metadata: { sheet: sheetName },
+    })
+  }
+
   // Attempt 1: Normal call
   try {
-    const raw = await callClaudeRaw(client, model, SYSTEM_PROMPT, userPrompt, maxTokens)
-    return parseJsonRobust(raw)
+    const result = await callClaudeRaw(client, model, SYSTEM_PROMPT, userPrompt, maxTokens)
+    doTrack(model, result)
+    return parseJsonRobust(result.text)
   } catch (err) {
     console.warn(`[excelExtractor]${label} Attempt 1 failed:`, err instanceof Error ? err.message : err)
   }
 
   // Attempt 2: Retry with stronger JSON prefix
   await new Promise((r) => setTimeout(r, 2000))
-  console.log(`[excelExtractor]${label} Retry attempt 2 (enhanced prompt)`)
+  console.info(`[excelExtractor]${label} Retry attempt 2 (enhanced prompt)`)
   try {
-    const raw = await callClaudeRaw(client, model, SYSTEM_PROMPT, RETRY_JSON_PREFIX + userPrompt, maxTokens)
-    return parseJsonRobust(raw)
+    const result = await callClaudeRaw(client, model, SYSTEM_PROMPT, RETRY_JSON_PREFIX + userPrompt, maxTokens)
+    doTrack(model, result)
+    return parseJsonRobust(result.text)
   } catch (err) {
     console.warn(`[excelExtractor]${label} Attempt 2 failed:`, err instanceof Error ? err.message : err)
   }
@@ -454,10 +482,11 @@ async function callClaudeJson(
   const sonnetModel = MODELS.sonnet
   if (model !== sonnetModel) {
     await new Promise((r) => setTimeout(r, 1000))
-    console.log(`[excelExtractor]${label} Retry attempt 3 (Sonnet fallback)`)
+    console.info(`[excelExtractor]${label} Retry attempt 3 (Sonnet fallback)`)
     try {
-      const raw = await callClaudeRaw(client, sonnetModel, SYSTEM_PROMPT, userPrompt, maxTokens)
-      return parseJsonRobust(raw)
+      const result = await callClaudeRaw(client, sonnetModel, SYSTEM_PROMPT, userPrompt, maxTokens)
+      doTrack(sonnetModel, result)
+      return parseJsonRobust(result.text)
     } catch (err) {
       console.error(`[excelExtractor]${label} Sonnet fallback also failed:`, err instanceof Error ? err.message : err)
       throw err
@@ -559,7 +588,8 @@ function parseResumen(raw: Record<string, unknown>): ExcelResumen {
 
 export async function extractWithClaude(
   sheets: SheetTextData[],
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  userId?: string
 ): Promise<ExcelExtraido> {
   const client = getClient()
   const model = getModelForTask('excel-extraction')
@@ -575,7 +605,7 @@ export async function extractWithClaude(
   let resumen: ExcelResumen = { totalInterno: 0, totalCliente: 0, moneda: 'USD' }
   if (groups.resumen.length > 0) {
     onProgress?.('Extrayendo resumen...')
-    const raw = await callClaudeJson(client, model, buildResumenPrompt(groups.resumen[0]), 2048, 'RESUMEN') as Record<string, unknown>
+    const raw = await callClaudeJson(client, model, buildResumenPrompt(groups.resumen[0]), 2048, 'RESUMEN', userId) as Record<string, unknown>
     resumen = parseResumen((raw.resumen as Record<string, unknown>) || raw)
   }
 
@@ -587,7 +617,7 @@ export async function extractWithClaude(
       const chunk = chunks[ci]
       const part = chunks.length > 1 ? ` (${ci + 1}/${chunks.length})` : ''
       onProgress?.(`Analizando equipos: ${sheet.name}${part}...`)
-      const raw = await callClaudeJson(client, model, buildEquipoPrompt(chunk, resumenCtx), 8192, sheet.name) as Record<string, unknown>
+      const raw = await callClaudeJson(client, model, buildEquipoPrompt(chunk, resumenCtx), 8192, sheet.name, userId) as Record<string, unknown>
       const parsed = parseEquipoGroups((raw.equipos as Record<string, unknown>[]) || [])
       allEquipos.push(...parsed)
     }
@@ -599,7 +629,7 @@ export async function extractWithClaude(
   const edtsSet = new Set<string>()
   for (const sheet of groups.servicios) {
     onProgress?.(`Analizando servicios: ${sheet.name}...`)
-    const raw = await callClaudeJson(client, model, buildServicioPrompt(sheet, resumenCtx), 8192, sheet.name) as Record<string, unknown>
+    const raw = await callClaudeJson(client, model, buildServicioPrompt(sheet, resumenCtx), 8192, sheet.name, userId) as Record<string, unknown>
     const parsed = parseServicioGroups(
       (raw.servicios as Record<string, unknown>[]) || [],
       recursosSet,
@@ -612,7 +642,7 @@ export async function extractWithClaude(
   const allGastos: ExcelGastoGrupo[] = []
   for (const sheet of groups.gastos) {
     onProgress?.(`Analizando gastos: ${sheet.name}...`)
-    const raw = await callClaudeJson(client, model, buildGastoPrompt(sheet, resumenCtx), 8192, sheet.name) as Record<string, unknown>
+    const raw = await callClaudeJson(client, model, buildGastoPrompt(sheet, resumenCtx), 8192, sheet.name, userId) as Record<string, unknown>
     const parsed = parseGastoGroups((raw.gastos as Record<string, unknown>[]) || [])
     allGastos.push(...parsed)
   }
