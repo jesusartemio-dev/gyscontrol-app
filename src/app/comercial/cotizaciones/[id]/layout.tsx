@@ -73,6 +73,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
       'equipos': 'Equipos',
       'servicios': 'Servicios',
       'gastos': 'Gastos',
+      'tdr': 'Análisis TDR',
       'cronograma': 'Cronograma',
       'configuracion': 'Configuración',
       'preview': 'Vista Previa',

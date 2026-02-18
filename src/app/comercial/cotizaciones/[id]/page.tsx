@@ -11,6 +11,7 @@ import {
   Settings,
   ChevronRight,
   FileText,
+  FileSearch,
   AlertTriangle,
   CheckCircle,
   History
@@ -26,12 +27,26 @@ export default function CotizacionHubPage() {
   const router = useRouter()
   const { cotizacion } = useCotizacionContext()
   const [versionesCount, setVersionesCount] = useState(0)
+  const [tdrAnalisis, setTdrAnalisis] = useState<{ id: string; updatedAt: string; countReq: number; countConsultas: number } | null>(null)
 
   useEffect(() => {
     if (!cotizacion?.id) return
     fetch(`/api/cotizaciones/${cotizacion.id}/versions`)
       .then(r => r.ok ? r.json() : [])
       .then(data => { if (Array.isArray(data)) setVersionesCount(data.length) })
+      .catch(() => {})
+    fetch(`/api/cotizacion/${cotizacion.id}/tdr-analisis`)
+      .then(r => r.ok ? r.json() : { analisis: null })
+      .then(data => {
+        if (data.analisis) {
+          setTdrAnalisis({
+            id: data.analisis.id,
+            updatedAt: data.analisis.updatedAt,
+            countReq: Array.isArray(data.analisis.requerimientos) ? data.analisis.requerimientos.length : 0,
+            countConsultas: Array.isArray(data.analisis.consultasCliente) ? data.analisis.consultasCliente.length : 0,
+          })
+        }
+      })
       .catch(() => {})
   }, [cotizacion?.id])
 
@@ -97,6 +112,24 @@ export default function CotizacionHubPage() {
         { label: 'Items', value: totalGastosItems },
       ],
       total: cotizacion.totalGastosCliente || 0
+    },
+    {
+      id: 'tdr',
+      title: 'Análisis TDR',
+      description: 'Requerimientos, consultas y supuestos',
+      icon: FileSearch,
+      color: 'text-indigo-500',
+      bgColor: 'bg-indigo-50',
+      hoverBg: 'hover:bg-indigo-50',
+      borderColor: 'border-indigo-200',
+      href: `${baseUrl}/tdr`,
+      stats: tdrAnalisis
+        ? [
+            { label: 'Requerimientos', value: tdrAnalisis.countReq },
+            { label: 'Consultas', value: tdrAnalisis.countConsultas },
+          ]
+        : [],
+      badge: tdrAnalisis ? 'Analizado' : 'Sin análisis',
     },
     {
       id: 'cronograma',

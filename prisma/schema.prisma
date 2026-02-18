@@ -255,8 +255,39 @@ model Cotizacion {
   crmHistorialProyecto      CrmHistorialProyecto[]
   crmOportunidad            CrmOportunidad?
   agenteConversaciones      AgenteConversacion[]
+  cotizacionTdrAnalisis     CotizacionTdrAnalisis[]
 
   @@map("cotizacion")
+}
+
+model CotizacionTdrAnalisis {
+  id                   String     @id @default(cuid())
+  cotizacionId         String
+  cotizacion           Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+
+  resumenTdr           String     @db.Text
+  requerimientos       Json?
+  equiposIdentificados Json?
+  serviciosIdentificados Json?
+  ambiguedades         Json?
+  consultasCliente     Json?
+  supuestos            Json?
+  exclusiones          Json?
+
+  nombreArchivo        String?
+  paginasPdf           Int?
+  clienteDetectado     String?
+  proyectoDetectado    String?
+  ubicacionDetectada   String?
+  alcanceDetectado     String?    @db.Text
+
+  cronogramaEstimado   Json?
+  presupuestoEstimado  Json?
+
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@map("cotizacion_tdr_analisis")
 }
 
 model CotizacionEquipo {

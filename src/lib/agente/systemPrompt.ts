@@ -1,5 +1,19 @@
 // src/lib/agente/systemPrompt.ts
 
+export interface TdrResumenContexto {
+  analisisId: string
+  resumenCorto: string
+  countRequerimientos: number
+  countEquipos: number
+  countServicios: number
+  countConsultas: number
+  countSupuestos: number
+  clienteDetectado?: string | null
+  proyectoDetectado?: string | null
+  ubicacionDetectada?: string | null
+  updatedAt: string
+}
+
 export interface CotizacionContexto {
   cotizacionId: string
   codigo: string
@@ -19,6 +33,7 @@ export interface CotizacionContexto {
   countEquipos: number
   countServicios: number
   countGastos: number
+  tdrAnalisis?: TdrResumenContexto | null
 }
 
 export function buildSystemPrompt(context?: { cotizacionId?: string; cotizacionResumen?: CotizacionContexto }): string {
@@ -53,6 +68,7 @@ Cuando suban un PDF (TDR, bases, especificaciones):
 3. Identificar ambigüedades, vacíos y contradicciones
 4. Generar consultas profesionales con generar_consultas_tdr
 5. Proponer cotización preliminar marcando supuestos
+6. **IMPORTANTE: Después de analizar el TDR y crear la cotización, SIEMPRE usa guardar_tdr_analisis** para persistir el análisis completo (requerimientos, equipos, servicios, ambigüedades, consultas, supuestos, exclusiones). Esto permite que el comercial revise el análisis sin el chat y sirve de contexto en futuras conversaciones.
 
 ## COTIZACIÓN DESDE TDR — FLUJO OPTIMIZADO
 Cuando crees una cotización a partir de un análisis de TDR, minimiza las tool calls:
@@ -158,7 +174,17 @@ Total Interno: $${r.totalInterno.toFixed(2)} | Total Cliente: $${r.totalCliente.
 
 Estas trabajando en esta cotizacion (ID: ${r.cotizacionId}).
 Cuando el usuario pida agregar, quitar o modificar items, usa directamente este cotizacionId. No crees una nueva cotizacion.
-No necesitas llamar obtener_resumen_cotizacion al inicio — ya tienes los totales arriba.`
+No necesitas llamar obtener_resumen_cotizacion al inicio — ya tienes los totales arriba.${r.tdrAnalisis ? `
+
+## ANÁLISIS TDR PREVIO
+Ya existe un análisis de TDR guardado para esta cotización (ID: ${r.tdrAnalisis.analisisId}).
+${r.tdrAnalisis.clienteDetectado ? `Cliente TDR: ${r.tdrAnalisis.clienteDetectado}` : ''}
+${r.tdrAnalisis.proyectoDetectado ? `Proyecto: ${r.tdrAnalisis.proyectoDetectado}` : ''}
+${r.tdrAnalisis.ubicacionDetectada ? `Ubicación: ${r.tdrAnalisis.ubicacionDetectada}` : ''}
+Resumen: ${r.tdrAnalisis.resumenCorto}
+Datos: ${r.tdrAnalisis.countRequerimientos} requerimientos, ${r.tdrAnalisis.countEquipos} equipos, ${r.tdrAnalisis.countServicios} servicios, ${r.tdrAnalisis.countConsultas} consultas, ${r.tdrAnalisis.countSupuestos} supuestos.
+Última actualización: ${r.tdrAnalisis.updatedAt}
+Para ver el análisis completo usa obtener_tdr_analisis. Si el usuario sube un nuevo TDR, actualiza con guardar_tdr_analisis.` : ''}`
   }
 
   if (context?.cotizacionId) {

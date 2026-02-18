@@ -1272,4 +1272,115 @@ export const toolHandlers: ToolHandlerMap = {
       totalSupuestos: supuestos.length,
     }
   },
+
+  // ── TDR Analysis persistence ────────────────────────────
+
+  guardar_tdr_analisis: async (input: Record<string, unknown>, context: ToolContext) => {
+    const cotizacionId = resolveCotizacionId(input, context)
+
+    // Use undefined for missing JSON fields so Prisma skips them (avoids DbNull issue)
+    const data: Record<string, unknown> = {
+      resumenTdr: input.resumenTdr as string,
+    }
+    if (input.requerimientos) data.requerimientos = input.requerimientos
+    if (input.equiposIdentificados) data.equiposIdentificados = input.equiposIdentificados
+    if (input.serviciosIdentificados) data.serviciosIdentificados = input.serviciosIdentificados
+    if (input.ambiguedades) data.ambiguedades = input.ambiguedades
+    if (input.consultasCliente) data.consultasCliente = input.consultasCliente
+    if (input.supuestos) data.supuestos = input.supuestos
+    if (input.exclusiones) data.exclusiones = input.exclusiones
+    if (input.cronogramaEstimado) data.cronogramaEstimado = input.cronogramaEstimado
+    if (input.presupuestoEstimado) data.presupuestoEstimado = input.presupuestoEstimado
+    if (input.nombreArchivo) data.nombreArchivo = input.nombreArchivo as string
+    if (input.clienteDetectado) data.clienteDetectado = input.clienteDetectado as string
+    if (input.proyectoDetectado) data.proyectoDetectado = input.proyectoDetectado as string
+    if (input.ubicacionDetectada) data.ubicacionDetectada = input.ubicacionDetectada as string
+    if (input.alcanceDetectado) data.alcanceDetectado = input.alcanceDetectado as string
+
+    // Upsert: update if analysis exists for this cotización, create otherwise
+    const existing = await prisma.cotizacionTdrAnalisis.findFirst({
+      where: { cotizacionId },
+      select: { id: true },
+    })
+
+    let analisis
+    if (existing) {
+      analisis = await prisma.cotizacionTdrAnalisis.update({
+        where: { id: existing.id },
+        data: data as Parameters<typeof prisma.cotizacionTdrAnalisis.update>[0]['data'],
+      })
+    } else {
+      analisis = await prisma.cotizacionTdrAnalisis.create({
+        data: { cotizacionId, ...data } as Parameters<typeof prisma.cotizacionTdrAnalisis.create>[0]['data'],
+      })
+    }
+
+    const reqCount = Array.isArray(input.requerimientos) ? input.requerimientos.length : 0
+    const consultasCount = Array.isArray(input.consultasCliente) ? input.consultasCliente.length : 0
+    const equiposCount = Array.isArray(input.equiposIdentificados) ? input.equiposIdentificados.length : 0
+
+    return {
+      success: true,
+      analisisId: analisis.id,
+      modo: existing ? 'actualizado' : 'creado',
+      resumen: `Análisis TDR ${existing ? 'actualizado' : 'guardado'}: ${reqCount} requerimientos, ${equiposCount} equipos, ${consultasCount} consultas`,
+    }
+  },
+
+  obtener_tdr_analisis: async (input: Record<string, unknown>, context: ToolContext) => {
+    const cotizacionId = resolveCotizacionId(input, context)
+    const seccion = (input.seccion as string) || 'todo'
+
+    const analisis = await prisma.cotizacionTdrAnalisis.findFirst({
+      where: { cotizacionId },
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    if (!analisis) {
+      return { encontrado: false, mensaje: 'No hay análisis TDR guardado para esta cotización' }
+    }
+
+    const sectionMap: Record<string, () => unknown> = {
+      todo: () => ({
+        id: analisis.id,
+        resumenTdr: analisis.resumenTdr,
+        requerimientos: analisis.requerimientos,
+        equiposIdentificados: analisis.equiposIdentificados,
+        serviciosIdentificados: analisis.serviciosIdentificados,
+        ambiguedades: analisis.ambiguedades,
+        consultasCliente: analisis.consultasCliente,
+        supuestos: analisis.supuestos,
+        exclusiones: analisis.exclusiones,
+        clienteDetectado: analisis.clienteDetectado,
+        proyectoDetectado: analisis.proyectoDetectado,
+        ubicacionDetectada: analisis.ubicacionDetectada,
+        alcanceDetectado: analisis.alcanceDetectado,
+        cronogramaEstimado: analisis.cronogramaEstimado,
+        presupuestoEstimado: analisis.presupuestoEstimado,
+        nombreArchivo: analisis.nombreArchivo,
+        updatedAt: analisis.updatedAt,
+      }),
+      requerimientos: () => analisis.requerimientos,
+      equipos: () => analisis.equiposIdentificados,
+      servicios: () => analisis.serviciosIdentificados,
+      ambiguedades: () => analisis.ambiguedades,
+      consultas: () => analisis.consultasCliente,
+      supuestos: () => analisis.supuestos,
+      exclusiones: () => analisis.exclusiones,
+      cronograma: () => analisis.cronogramaEstimado,
+      presupuesto: () => analisis.presupuestoEstimado,
+    }
+
+    const getter = sectionMap[seccion]
+    if (!getter) {
+      return { error: `Sección desconocida: ${seccion}. Opciones: ${Object.keys(sectionMap).join(', ')}` }
+    }
+
+    return {
+      encontrado: true,
+      analisisId: analisis.id,
+      seccion,
+      data: getter(),
+    }
+  },
 }

@@ -710,6 +710,146 @@ export const analysisTools: AnthropicTool[] = [
       required: ['tituloTdr', 'clienteNombre', 'requerimientos', 'consultas'],
     },
   },
+  {
+    name: 'guardar_tdr_analisis',
+    description:
+      'Guarda o actualiza el análisis de un TDR vinculado a una cotización. Usa esta tool DESPUÉS de analizar un TDR y crear la cotización, para persistir el análisis completo. Si ya existe un análisis para esa cotización, lo actualiza.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        cotizacionId: { type: 'string', description: 'ID de la cotización a vincular' },
+        resumenTdr: { type: 'string', description: 'Resumen ejecutivo del TDR (1000-2000 palabras)' },
+        requerimientos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              descripcion: { type: 'string' },
+              cantidad: { type: 'number' },
+              especificacion: { type: 'string' },
+              criticidad: { type: 'string', enum: ['alta', 'media', 'baja'] },
+            },
+            required: ['descripcion'],
+          },
+          description: 'Requerimientos técnicos extraídos del TDR',
+        },
+        equiposIdentificados: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              nombre: { type: 'string' },
+              cantidad: { type: 'number' },
+              especificacion: { type: 'string' },
+              estimadoUsd: { type: 'number' },
+            },
+            required: ['nombre'],
+          },
+          description: 'Equipos identificados en el TDR',
+        },
+        serviciosIdentificados: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              nombre: { type: 'string' },
+              descripcion: { type: 'string' },
+              horasEstimadas: { type: 'number' },
+            },
+            required: ['nombre'],
+          },
+          description: 'Servicios identificados en el TDR',
+        },
+        ambiguedades: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              aspecto: { type: 'string' },
+              descripcion: { type: 'string' },
+              impacto: { type: 'string' },
+            },
+            required: ['aspecto', 'descripcion'],
+          },
+        },
+        consultasCliente: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              categoria: { type: 'string' },
+              pregunta: { type: 'string' },
+              prioridad: { type: 'string', enum: ['alta', 'media', 'baja'] },
+            },
+            required: ['pregunta'],
+          },
+        },
+        supuestos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              supuesto: { type: 'string' },
+              impactoSiIncorrecto: { type: 'string' },
+            },
+            required: ['supuesto'],
+          },
+        },
+        exclusiones: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { descripcion: { type: 'string' } },
+            required: ['descripcion'],
+          },
+        },
+        nombreArchivo: { type: 'string', description: 'Nombre del archivo PDF analizado' },
+        clienteDetectado: { type: 'string' },
+        proyectoDetectado: { type: 'string' },
+        ubicacionDetectada: { type: 'string' },
+        alcanceDetectado: { type: 'string', description: 'Alcance general del proyecto' },
+        cronogramaEstimado: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              fase: { type: 'string' },
+              duracion: { type: 'string' },
+              observaciones: { type: 'string' },
+            },
+            required: ['fase'],
+          },
+        },
+        presupuestoEstimado: {
+          type: 'object',
+          properties: {
+            equipos: { type: 'number' },
+            servicios: { type: 'number' },
+            gastos: { type: 'number' },
+            total: { type: 'number' },
+          },
+        },
+      },
+      required: ['cotizacionId', 'resumenTdr'],
+    },
+  },
+  {
+    name: 'obtener_tdr_analisis',
+    description:
+      'Obtiene el análisis de TDR guardado para una cotización. Permite consultar secciones específicas o el análisis completo.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        cotizacionId: { type: 'string', description: 'ID de la cotización' },
+        seccion: {
+          type: 'string',
+          enum: ['todo', 'requerimientos', 'equipos', 'servicios', 'ambiguedades', 'consultas', 'supuestos', 'exclusiones', 'cronograma', 'presupuesto'],
+          description: 'Sección a consultar. Default: todo',
+        },
+      },
+      required: ['cotizacionId'],
+    },
+  },
 ]
 
 // ── All tools combined ────────────────────────────────────

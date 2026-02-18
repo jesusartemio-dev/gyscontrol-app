@@ -506,6 +506,45 @@ export async function POST(request: NextRequest) {
         },
       })
       if (cot) {
+        // Fetch TDR analysis if exists (lightweight summary only)
+        let tdrAnalisis: CotizacionContexto['tdrAnalisis'] = null
+        try {
+          const tdr = await prisma.cotizacionTdrAnalisis.findFirst({
+            where: { cotizacionId },
+            orderBy: { updatedAt: 'desc' },
+            select: {
+              id: true,
+              resumenTdr: true,
+              requerimientos: true,
+              equiposIdentificados: true,
+              serviciosIdentificados: true,
+              consultasCliente: true,
+              supuestos: true,
+              clienteDetectado: true,
+              proyectoDetectado: true,
+              ubicacionDetectada: true,
+              updatedAt: true,
+            },
+          })
+          if (tdr) {
+            tdrAnalisis = {
+              analisisId: tdr.id,
+              resumenCorto: tdr.resumenTdr.substring(0, 500) + (tdr.resumenTdr.length > 500 ? '...' : ''),
+              countRequerimientos: Array.isArray(tdr.requerimientos) ? tdr.requerimientos.length : 0,
+              countEquipos: Array.isArray(tdr.equiposIdentificados) ? tdr.equiposIdentificados.length : 0,
+              countServicios: Array.isArray(tdr.serviciosIdentificados) ? tdr.serviciosIdentificados.length : 0,
+              countConsultas: Array.isArray(tdr.consultasCliente) ? tdr.consultasCliente.length : 0,
+              countSupuestos: Array.isArray(tdr.supuestos) ? tdr.supuestos.length : 0,
+              clienteDetectado: tdr.clienteDetectado,
+              proyectoDetectado: tdr.proyectoDetectado,
+              ubicacionDetectada: tdr.ubicacionDetectada,
+              updatedAt: tdr.updatedAt.toISOString(),
+            }
+          }
+        } catch (err) {
+          console.error('[chat] Failed to fetch TDR analysis:', err)
+        }
+
         cotizacionResumen = {
           cotizacionId: cot.id,
           codigo: cot.codigo,
@@ -525,6 +564,7 @@ export async function POST(request: NextRequest) {
           countEquipos: cot._count.cotizacionEquipo,
           countServicios: cot._count.cotizacionServicio,
           countGastos: cot._count.cotizacionGasto,
+          tdrAnalisis,
         }
       }
     } catch (err) {
