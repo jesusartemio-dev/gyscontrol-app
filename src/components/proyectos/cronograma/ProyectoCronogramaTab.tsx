@@ -144,10 +144,15 @@ export function ProyectoCronogramaTab({
         const response = await fetch(`/api/proyectos/${proyectoId}/cronograma`)
         if (response.ok) {
           const data = await response.json()
-          setCronogramas(data.data || [])
-          // Seleccionar el primero si no hay ninguno seleccionado
-          if (!selectedCronograma && data.data?.length > 0) {
-            setSelectedCronograma(data.data[0])
+          const lista = data.data || []
+          setCronogramas(lista)
+          // Seleccionar por prioridad: ejecución > planificación > comercial
+          if (!selectedCronograma && lista.length > 0) {
+            const preferido =
+              lista.find((c: ProyectoCronograma) => c.tipo === 'ejecucion') ||
+              lista.find((c: ProyectoCronograma) => c.tipo === 'planificacion') ||
+              lista[0]
+            setSelectedCronograma(preferido)
           }
         }
       } catch (error) {
@@ -684,7 +689,10 @@ export function ProyectoCronogramaTab({
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {cronogramas.map((cron) => {
+            {[...cronogramas].sort((a, b) => {
+              const orden: Record<string, number> = { ejecucion: 0, planificacion: 1, comercial: 2 }
+              return (orden[a.tipo] ?? 3) - (orden[b.tipo] ?? 3)
+            }).map((cron) => {
               const info = getTipoInfo(cron.tipo)
               const Icon = info.icon
               return (
