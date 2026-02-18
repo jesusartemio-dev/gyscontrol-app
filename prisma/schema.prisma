@@ -1331,6 +1331,7 @@ model User {
   timesheetsAprobados                   TimesheetAprobacion[]        @relation("TimesheetAprobador")
   // Agente IA conversaciones
   agenteConversaciones                  AgenteConversacion[]
+  agenteConversacionMensajes            AgenteConversacionMensaje[]
   agenteUsage                           AgenteUsage[]
 
   @@map("user")
@@ -3360,6 +3361,7 @@ model AgenteConversacion {
 model AgenteConversacionMensaje {
   id             String   @id @default(cuid())
   conversacionId String
+  userId         String?
   role           String   // 'user' | 'assistant'
   content        String   @db.Text
   attachments    Json?    // [{name, type, mimeType}] - sin base64
@@ -3367,8 +3369,10 @@ model AgenteConversacionMensaje {
   createdAt      DateTime @default(now())
 
   conversacion AgenteConversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  user         User?              @relation(fields: [userId], references: [id])
 
   @@index([conversacionId, createdAt])
+  @@index([userId])
   @@map("agente_conversacion_mensaje")
 }
 

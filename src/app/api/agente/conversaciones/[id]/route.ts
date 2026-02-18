@@ -17,15 +17,23 @@ export async function GET(
   const userId = (session.user as { id: string }).id
 
   const conversacion = await prisma.agenteConversacion.findFirst({
-    where: { id, userId },
+    where: { id },
     include: {
       mensajes: {
         orderBy: { createdAt: 'asc' },
+        include: {
+          user: { select: { id: true, name: true } },
+        },
       },
     },
   })
 
   if (!conversacion) {
+    return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
+  }
+
+  // Authorization: general conversations are private to the owner
+  if (!conversacion.cotizacionId && conversacion.userId !== userId) {
     return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
   }
 

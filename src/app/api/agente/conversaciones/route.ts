@@ -16,11 +16,14 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50)
   const cotizacionId = url.searchParams.get('cotizacionId')
 
-  const where: Record<string, unknown> = { userId, archivada: false }
+  const where: Record<string, unknown> = { archivada: false }
   if (cotizacionId) {
+    // Shared: all users see cotización conversations
     where.cotizacionId = cotizacionId
   } else {
-    where.cotizacionId = null // Solo conversaciones generales
+    // Private: only user's general conversations
+    where.userId = userId
+    where.cotizacionId = null
   }
 
   const conversaciones = await prisma.agenteConversacion.findMany({
@@ -33,6 +36,7 @@ export async function GET(request: NextRequest) {
       cotizacionId: true,
       updatedAt: true,
       createdAt: true,
+      user: { select: { id: true, name: true } },
       _count: { select: { mensajes: true } },
     },
   })

@@ -753,6 +753,7 @@ export async function POST(request: NextRequest) {
               data: {
                 conversacionId: activeConversacionId,
                 role: 'user',
+                userId,
                 content: currentUserMsg.content,
                 attachments: currentUserMsg.attachments
                   ? currentUserMsg.attachments.map((a) => ({

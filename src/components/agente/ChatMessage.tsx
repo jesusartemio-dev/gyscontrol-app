@@ -14,6 +14,8 @@ interface Props {
   isStreaming?: boolean
   /** Whether this is the last message in the list */
   isLastMessage?: boolean
+  /** Current user ID — used to show "Tú" vs sender name on user messages */
+  currentUserId?: string
 }
 
 /** Extract cotizacion code + ID from tool call results */
@@ -68,8 +70,16 @@ function TypingIndicator() {
   )
 }
 
-function ChatMessageComponent({ message, isStreaming = false, isLastMessage = false }: Props) {
+function ChatMessageComponent({ message, isStreaming = false, isLastMessage = false, currentUserId }: Props) {
   const isUser = message.role === 'user'
+
+  // Sender label for user messages in shared conversations
+  const senderLabel = useMemo(() => {
+    if (!isUser) return null
+    if (!message.userId) return null // legacy message without userId
+    if (message.userId === currentUserId) return 'Tú'
+    return message.userName || null
+  }, [isUser, message.userId, message.userName, currentUserId])
   const timestamp = useMemo(() => timeAgo(message.timestamp), [message.timestamp])
 
   const successBanner = useMemo(
@@ -116,6 +126,11 @@ function ChatMessageComponent({ message, isStreaming = false, isLastMessage = fa
       )}
 
       <div className={cn('flex flex-col gap-1', isUser ? 'items-end max-w-[80%]' : 'max-w-[85%]')}>
+        {/* Sender name for shared conversations */}
+        {senderLabel && (
+          <span className="text-[10px] text-muted-foreground px-1 -mb-0.5">{senderLabel}</span>
+        )}
+
         {/* User attachments */}
         {isUser && message.attachments && message.attachments.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-0.5">

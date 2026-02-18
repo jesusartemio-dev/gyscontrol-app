@@ -23,6 +23,10 @@ export interface ChatMessage {
   toolCalls?: ToolCallInfo[]
   /** Adjuntos enviados por el usuario */
   attachments?: ChatAttachment[]
+  /** ID del usuario que envió el mensaje (solo para role='user') */
+  userId?: string | null
+  /** Nombre del usuario que envió el mensaje */
+  userName?: string | null
 }
 
 // ── Tool calls ────────────────────────────────────────────
@@ -75,17 +79,20 @@ export interface ConversacionListItem {
   cotizacionId: string | null
   updatedAt: string
   createdAt: string
+  user?: { id: string; name: string | null }
   _count: { mensajes: number }
 }
 
 export interface ConversacionMensajeDB {
   id: string
   conversacionId: string
+  userId?: string | null
   role: MessageRole
   content: string
   attachments?: { name: string; type: string; mimeType: string }[] | null
   toolCalls?: ToolCallInfo[] | null
   createdAt: string
+  user?: { id: string; name: string | null } | null
 }
 
 export interface ConversacionFull {
@@ -128,6 +135,8 @@ export function dbMessageToChatMessage(dbMsg: ConversacionMensajeDB): ChatMessag
     timestamp: new Date(dbMsg.createdAt).getTime(),
     attachments,
     toolCalls,
+    userId: dbMsg.userId || null,
+    userName: dbMsg.user?.name || null,
   }
 }
 

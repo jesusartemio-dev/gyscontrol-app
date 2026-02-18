@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import {
   Building,
@@ -12,7 +13,9 @@ import {
   ArrowLeft,
   PanelRightClose,
   PanelRightOpen,
-  FolderOpen
+  FolderOpen,
+  MessageSquare,
+  BarChart3,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCotizacionById } from '@/lib/services/cotizacion'
@@ -28,11 +31,13 @@ import CrmIntegrationNotification from '@/components/crm/CrmIntegrationNotificat
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
 import EstadoCotizacionStepper from '@/components/cotizaciones/EstadoCotizacionStepper'
 import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
-import { CotizacionChatButton } from '@/components/agente/CotizacionChatButton'
+import { ChatPanelContent } from '@/components/agente/ChatPanelContent'
+import { ChatPanel } from '@/components/agente/ChatPanel'
 
 import type { Cotizacion, EstadoCotizacion } from '@/types'
 import { CotizacionContext } from './cotizacion-context'
 import { formatDisplayCurrency } from '@/lib/utils/currency'
+import { cn } from '@/lib/utils'
 
 interface CotizacionLayoutProps {
   children: React.ReactNode
@@ -47,6 +52,12 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
   const [loading, setLoading] = useState(true)
   const [showCrearOportunidad, setShowCrearOportunidad] = useState(false)
   const [showCrmNotification, setShowCrmNotification] = useState(false)
+
+  // Chat integration state
+  const { data: session } = useSession()
+  const [sidebarTab, setSidebarTab] = useState<'resumen' | 'chat'>('resumen')
+  const [mobileChatOpen, setMobileChatOpen] = useState(false)
+  const [chatHasActivity, setChatHasActivity] = useState(false)
 
   // Determinar si estamos en el hub o en una sub-página
   const isHubPage = pathname === `/comercial/cotizaciones/${id}`
@@ -224,7 +235,29 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
 
               {/* Acciones Principales */}
               <div className="flex items-center gap-2 flex-wrap">
-                <CotizacionChatButton cotizacionId={cotizacion.id} />
+                {/* Desktop: toggle sidebar to chat tab */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSidebarTab('chat'); setShowSidebar(true); setChatHasActivity(false) }}
+                  className="hidden xl:flex h-8 text-blue-700 border-blue-300 hover:bg-blue-50"
+                >
+                  <MessageSquare className="h-4 w-4 mr-1" />
+                  Asistente
+                  {chatHasActivity && (
+                    <span className="ml-1.5 h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                  )}
+                </Button>
+                {/* Mobile: open Sheet overlay */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMobileChatOpen(true)}
+                  className="xl:hidden h-8 text-blue-700 border-blue-300 hover:bg-blue-50"
+                >
+                  <MessageSquare className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Asistente</span>
+                </Button>
                 {puedeRenderizarPDF && (
                   <>
                     <Button
@@ -340,15 +373,18 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
               {children}
             </motion.div>
 
-            {/* Sidebar - Resumen Financiero y Estado */}
+            {/* Sidebar - Tabbed: Resumen / Chat (desktop) */}
             {showSidebar && (
               <motion.aside
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.4, delay: 0.2 }}
-                className="xl:w-80 xl:flex-shrink-0"
+                className={cn(
+                  'xl:flex-shrink-0 transition-[width] duration-300',
+                  sidebarTab === 'chat' ? 'xl:w-96' : 'xl:w-80'
+                )}
               >
-                <div className="xl:sticky xl:top-4 space-y-4">
+                <div className="xl:sticky xl:top-4 space-y-3">
                   {/* Botón para ocultar sidebar en páginas full-width */}
                   {needsFullWidth && (
                     <Button
@@ -362,8 +398,53 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                     </Button>
                   )}
 
-                  {/* Resumen Financiero */}
-                  <ResumenTotalesCotizacion cotizacion={cotizacion} />
+                  {/* Tab toggle (desktop only) */}
+                  <div className="hidden xl:flex bg-muted rounded-lg p-1 gap-1">
+                    <button
+                      onClick={() => setSidebarTab('resumen')}
+                      className={cn(
+                        'flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
+                        sidebarTab === 'resumen'
+                          ? 'bg-white text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Resumen
+                    </button>
+                    <button
+                      onClick={() => { setSidebarTab('chat'); setChatHasActivity(false) }}
+                      className={cn(
+                        'flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all relative',
+                        sidebarTab === 'chat'
+                          ? 'bg-white text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Asistente
+                      {chatHasActivity && sidebarTab !== 'chat' && (
+                        <span className="absolute top-1 right-2 h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Resumen: mobile=always visible, desktop=only when resumen tab */}
+                  <div className={cn(sidebarTab !== 'resumen' && 'xl:hidden')}>
+                    <ResumenTotalesCotizacion cotizacion={cotizacion} />
+                  </div>
+
+                  {/* Chat: mobile=hidden (uses Sheet), desktop=only when chat tab */}
+                  <div className={cn('hidden', sidebarTab === 'chat' && 'xl:block')}>
+                    <div className="h-[calc(100vh-180px)]">
+                      <ChatPanelContent
+                        cotizacionId={cotizacion.id}
+                        mode="sidebar"
+                        currentUserId={session?.user?.id}
+                        onNewActivity={() => { if (sidebarTab !== 'chat') setChatHasActivity(true) }}
+                      />
+                    </div>
+                  </div>
 
                   {/* Botón volver al hub si estamos en sub-página */}
                   {!isHubPage && (
@@ -425,6 +506,14 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
               onDismiss={() => setShowCrmNotification(false)}
             />
           )}
+
+          {/* Mobile Chat Sheet */}
+          <ChatPanel
+            open={mobileChatOpen}
+            onOpenChange={setMobileChatOpen}
+            cotizacionId={cotizacion.id}
+            currentUserId={session?.user?.id}
+          />
         </div>
       </div>
     </CotizacionContext.Provider>
