@@ -1,6 +1,27 @@
 // src/lib/agente/systemPrompt.ts
 
-export function buildSystemPrompt(context?: { cotizacionId?: string }): string {
+export interface CotizacionContexto {
+  cotizacionId: string
+  codigo: string
+  nombre: string
+  cliente: string
+  estado: string
+  moneda: string
+  totalEquiposInterno: number
+  totalEquiposCliente: number
+  totalServiciosInterno: number
+  totalServiciosCliente: number
+  totalGastosInterno: number
+  totalGastosCliente: number
+  totalInterno: number
+  totalCliente: number
+  grandTotal: number
+  countEquipos: number
+  countServicios: number
+  countGastos: number
+}
+
+export function buildSystemPrompt(context?: { cotizacionId?: string; cotizacionResumen?: CotizacionContexto }): string {
   const base = `Eres el asistente comercial de GYS Control Industrial SAC (automatización industrial, SCADA, instrumentación - Perú). Ayudas al equipo comercial a consultar datos y preparar cotizaciones.
 
 ## TOOLS DISPONIBLES
@@ -123,8 +144,25 @@ Cada precio que uses en una cotización DEBE indicar su origen. Esto es OBLIGATO
 - Resultados en tabla/lista. Si no hay resultados, sugerir alternativas
 - Mostrar precios con moneda. No inventar datos, usar tools`
 
+  if (context?.cotizacionResumen) {
+    const r = context.cotizacionResumen
+    return base + `\n\n## COTIZACION ACTIVA
+Codigo: ${r.codigo}
+Cliente: ${r.cliente}
+Estado: ${r.estado}
+Moneda: ${r.moneda}
+Equipos: ${r.countEquipos} grupos — Total interno: $${r.totalEquiposInterno.toFixed(2)} / Cliente: $${r.totalEquiposCliente.toFixed(2)}
+Servicios: ${r.countServicios} grupos — Total interno: $${r.totalServiciosInterno.toFixed(2)} / Cliente: $${r.totalServiciosCliente.toFixed(2)}
+Gastos: ${r.countGastos} grupos — Total interno: $${r.totalGastosInterno.toFixed(2)} / Cliente: $${r.totalGastosCliente.toFixed(2)}
+Total Interno: $${r.totalInterno.toFixed(2)} | Total Cliente: $${r.totalCliente.toFixed(2)} | Grand Total: $${r.grandTotal.toFixed(2)}
+
+Estas trabajando en esta cotizacion (ID: ${r.cotizacionId}).
+Cuando el usuario pida agregar, quitar o modificar items, usa directamente este cotizacionId. No crees una nueva cotizacion.
+No necesitas llamar obtener_resumen_cotizacion al inicio — ya tienes los totales arriba.`
+  }
+
   if (context?.cotizacionId) {
-    return base + `\n\n## CONTEXTO\nTrabajando en cotización ID: ${context.cotizacionId}. Usa este ID para agregar ítems o consultar resumen. No crees una nueva.`
+    return base + `\n\n## CONTEXTO\nTrabajando en cotizacion ID: ${context.cotizacionId}. Usa este ID para agregar items o consultar resumen. No crees una nueva.`
   }
 
   return base

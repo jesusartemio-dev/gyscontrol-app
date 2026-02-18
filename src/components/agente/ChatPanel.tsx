@@ -48,6 +48,7 @@ import type {
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  cotizacionId?: string
 }
 
 const SUGGESTIONS = [
@@ -148,7 +149,7 @@ function StatusBanner({ phase, detail }: { phase: AgentStatusPhase; detail?: str
   )
 }
 
-export function ChatPanel({ open, onOpenChange }: Props) {
+export function ChatPanel({ open, onOpenChange, cotizacionId }: Props) {
   const [messages, setMessages] = useState<ChatMessageType[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [statusPhase, setStatusPhase] = useState<AgentStatusPhase>('idle')
@@ -169,7 +170,10 @@ export function ChatPanel({ open, onOpenChange }: Props) {
     if (!open) return
     const init = async () => {
       try {
-        const res = await fetch('/api/agente/conversaciones?limit=10')
+        const qs = cotizacionId
+          ? `/api/agente/conversaciones?limit=10&cotizacionId=${cotizacionId}`
+          : '/api/agente/conversaciones?limit=10'
+        const res = await fetch(qs)
         if (!res.ok) return
         const convs: ConversacionListItem[] = await res.json()
         setConversaciones(convs)
@@ -188,7 +192,10 @@ export function ChatPanel({ open, onOpenChange }: Props) {
 
   const fetchConversaciones = async () => {
     try {
-      const res = await fetch('/api/agente/conversaciones?limit=10')
+      const qs = cotizacionId
+        ? `/api/agente/conversaciones?limit=10&cotizacionId=${cotizacionId}`
+        : '/api/agente/conversaciones?limit=10'
+      const res = await fetch(qs)
       if (res.ok) {
         const data = await res.json()
         setConversaciones(data)
@@ -294,6 +301,7 @@ export function ChatPanel({ open, onOpenChange }: Props) {
           body: JSON.stringify({
             messages: updatedMessages,
             conversacionId,
+            cotizacionId,
           }),
           signal: controller.signal,
         })
@@ -347,7 +355,7 @@ export function ChatPanel({ open, onOpenChange }: Props) {
         fetchConversaciones()
       }
     },
-    [messages, isStreaming, conversacionId]
+    [messages, isStreaming, conversacionId, cotizacionId]
   )
 
   function processSSEEvent(event: string, data: unknown, assistantId: string) {

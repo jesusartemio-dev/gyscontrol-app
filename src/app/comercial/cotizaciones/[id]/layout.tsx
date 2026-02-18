@@ -28,6 +28,7 @@ import CrmIntegrationNotification from '@/components/crm/CrmIntegrationNotificat
 import ResumenTotalesCotizacion from '@/components/cotizaciones/ResumenTotalesCotizacion'
 import EstadoCotizacionStepper from '@/components/cotizaciones/EstadoCotizacionStepper'
 import { DescargarPDFButton } from '@/components/pdf/CotizacionPDF'
+import { CotizacionChatButton } from '@/components/agente/CotizacionChatButton'
 
 import type { Cotizacion, EstadoCotizacion } from '@/types'
 import { CotizacionContext } from './cotizacion-context'
@@ -222,6 +223,7 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
 
               {/* Acciones Principales */}
               <div className="flex items-center gap-2 flex-wrap">
+                <CotizacionChatButton cotizacionId={cotizacion.id} />
                 {puedeRenderizarPDF && (
                   <>
                     <Button

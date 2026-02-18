@@ -72,6 +72,7 @@ export interface SSEEvent {
 export interface ConversacionListItem {
   id: string
   titulo: string | null
+  cotizacionId: string | null
   updatedAt: string
   createdAt: string
   _count: { mensajes: number }
@@ -90,6 +91,7 @@ export interface ConversacionMensajeDB {
 export interface ConversacionFull {
   id: string
   titulo: string | null
+  cotizacionId: string | null
   createdAt: string
   updatedAt: string
   mensajes: ConversacionMensajeDB[]

@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
-import { buildSystemPrompt } from '@/lib/agente/systemPrompt'
+import { buildSystemPrompt, type CotizacionContexto } from '@/lib/agente/systemPrompt'
 import { selectToolsByContext } from '@/lib/agente/tools'
 import { toolHandlers } from '@/lib/agente/toolHandlers'
 import {
@@ -488,7 +488,51 @@ export async function POST(request: NextRequest) {
   }
 
   const client = getClient()
-  const systemPrompt = buildSystemPrompt({ cotizacionId })
+
+  // ── Build rich cotización context if cotizacionId provided ──
+  let cotizacionResumen: CotizacionContexto | undefined
+  if (cotizacionId) {
+    try {
+      const cot = await prisma.cotizacion.findUnique({
+        where: { id: cotizacionId },
+        select: {
+          id: true, codigo: true, nombre: true, estado: true, moneda: true,
+          totalEquiposInterno: true, totalEquiposCliente: true,
+          totalServiciosInterno: true, totalServiciosCliente: true,
+          totalGastosInterno: true, totalGastosCliente: true,
+          totalInterno: true, totalCliente: true, grandTotal: true,
+          cliente: { select: { nombre: true } },
+          _count: { select: { cotizacionEquipo: true, cotizacionServicio: true, cotizacionGasto: true } },
+        },
+      })
+      if (cot) {
+        cotizacionResumen = {
+          cotizacionId: cot.id,
+          codigo: cot.codigo,
+          nombre: cot.nombre,
+          cliente: cot.cliente?.nombre || 'Sin cliente',
+          estado: cot.estado,
+          moneda: cot.moneda || 'USD',
+          totalEquiposInterno: cot.totalEquiposInterno,
+          totalEquiposCliente: cot.totalEquiposCliente,
+          totalServiciosInterno: cot.totalServiciosInterno,
+          totalServiciosCliente: cot.totalServiciosCliente,
+          totalGastosInterno: cot.totalGastosInterno,
+          totalGastosCliente: cot.totalGastosCliente,
+          totalInterno: cot.totalInterno,
+          totalCliente: cot.totalCliente,
+          grandTotal: cot.grandTotal,
+          countEquipos: cot._count.cotizacionEquipo,
+          countServicios: cot._count.cotizacionServicio,
+          countGastos: cot._count.cotizacionGasto,
+        }
+      }
+    } catch (err) {
+      console.error('[chat] Failed to fetch cotización context:', err)
+    }
+  }
+
+  const systemPrompt = buildSystemPrompt({ cotizacionId, cotizacionResumen })
 
   // Smart model selection: Haiku for simple messages, Sonnet for complex
   const simple = isSimpleMessage(messages)
@@ -510,9 +554,15 @@ export async function POST(request: NextRequest) {
         let activeConversacionId = requestConversacionId || null
         if (!activeConversacionId) {
           const firstUserMsg = messages.find((m) => m.role === 'user')
-          const titulo = generateTitle(firstUserMsg?.content || 'Nueva conversación')
+          const titulo = cotizacionResumen
+            ? cotizacionResumen.codigo
+            : generateTitle(firstUserMsg?.content || 'Nueva conversación')
           const conv = await prisma.agenteConversacion.create({
-            data: { userId, titulo },
+            data: {
+              userId,
+              titulo,
+              cotizacionId: cotizacionId || null,
+            },
           })
           activeConversacionId = conv.id
           writeSSE(controller, encoder, 'conversation_info', {
