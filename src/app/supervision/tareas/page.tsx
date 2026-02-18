@@ -912,7 +912,7 @@ export default function SupervisionTareasPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">
+                          <div className="text-sm" title={tarea.personasEstimadas > 1 ? `${Math.round(tarea.horasPlan / tarea.personasEstimadas)}h × ${tarea.personasEstimadas} personas = ${tarea.horasPlan}h total` : undefined}>
                             <span className={tarea.horasReales > 0 ? 'font-medium' : 'text-gray-400'}>
                               {tarea.horasReales}h
                             </span>

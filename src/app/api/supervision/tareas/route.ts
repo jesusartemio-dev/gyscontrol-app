@@ -202,7 +202,7 @@ export async function GET(request: NextRequest) {
         creadoPorNombre: t.creadoPor?.name || null,
         fechaInicio: t.fechaInicio,
         fechaFin: t.fechaFin,
-        horasPlan: t.horasEstimadas ? Number(t.horasEstimadas) : 0,
+        horasPlan: (t.horasEstimadas ? Number(t.horasEstimadas) : 0) * ((t as any).personasEstimadas || 1),
         horasReales: t.horasReales ? Number(t.horasReales) : 0,
         personasEstimadas: (t as any).personasEstimadas || 1,
         progreso: t.porcentajeCompletado || 0,

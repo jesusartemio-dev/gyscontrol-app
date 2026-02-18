@@ -357,12 +357,21 @@ export function TreeNodeForm({
           ? node.data.fechaFinPlan || node.data.fechaFinComercial || ''
           : node.data.fechaFinComercial || ''
 
-        // Asegurar formato YYYY-MM-DD consistente
-        if (fechaInicio && fechaInicio.includes('T')) {
-          fechaInicio = fechaInicio.split('T')[0]
+        // Convertir ISO string a YYYY-MM-DD en zona local del navegador
+        const toLocalDateString = (dateStr: string): string => {
+          if (!dateStr) return ''
+          const date = new Date(dateStr)
+          if (isNaN(date.getTime())) return ''
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
         }
-        if (fechaFin && fechaFin.includes('T')) {
-          fechaFin = fechaFin.split('T')[0]
+        if (fechaInicio) {
+          fechaInicio = toLocalDateString(fechaInicio)
+        }
+        if (fechaFin) {
+          fechaFin = toLocalDateString(fechaFin)
         }
 
         setFormData({
