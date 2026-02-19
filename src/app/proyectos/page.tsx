@@ -6,6 +6,14 @@ import { useSession } from 'next-auth/react'
 import { getProyectos, deleteProyecto, createProyecto } from '@/lib/services/proyecto'
 import type { Proyecto, ProyectoPayload } from '@/types'
 import { getMonedaSymbol } from '@/lib/utils/currency'
+import {
+  proyectoEstadoLabels,
+  proyectoEstadoColors,
+  proyectoEstadoPriority,
+  proyectoEstadoList,
+  type ProyectoEstado,
+} from '@/lib/utils/proyectoEstado'
+import { DataPagination, usePagination } from '@/components/ui/data-pagination'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,15 +45,17 @@ import {
   List,
   LayoutGrid,
   HardHat,
-  Settings
+  Settings,
+  ArrowUpDown
 } from 'lucide-react'
 import ConfirmDialog from '@/components/ConfirmDialog'
-import { buildApiUrl } from '@/lib/utils'
+import { buildApiUrl, cn } from '@/lib/utils'
 
 const ALLOWED_ROLES = ['proyectos', 'coordinador', 'gestor', 'gerente', 'admin']
 
 type ViewMode = 'cards' | 'table'
-type FilterStatus = 'all' | 'activo' | 'pausado' | 'cerrado' | 'cancelado'
+type FilterStatus = 'all' | ProyectoEstado
+type SortOption = 'status' | 'fechaInicio' | 'nombre' | 'totalCliente'
 
 interface ClienteOption { id: string; nombre: string; codigo: string }
 interface UsuarioOption { id: string; name: string; email: string; role: string }
@@ -71,7 +81,9 @@ export default function ProyectosPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
+  const [sortOption, setSortOption] = useState<SortOption>('status')
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; proyecto?: Proyecto }>({ show: false })
+  const { page, limit, handlePageChange, handleLimitChange, reset: resetPagination } = usePagination(1, 12)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -124,9 +136,29 @@ export default function ProyectosPage() {
     if (filterStatus !== 'all') {
       filtered = filtered.filter(p => p.estado === filterStatus)
     }
-    filtered.sort((a, b) => new Date(b.fechaInicio || 0).getTime() - new Date(a.fechaInicio || 0).getTime())
+
+    filtered.sort((a, b) => {
+      switch (sortOption) {
+        case 'status': {
+          const prioA = proyectoEstadoPriority[a.estado as ProyectoEstado] ?? 99
+          const prioB = proyectoEstadoPriority[b.estado as ProyectoEstado] ?? 99
+          if (prioA !== prioB) return prioA - prioB
+          return new Date(b.fechaInicio || 0).getTime() - new Date(a.fechaInicio || 0).getTime()
+        }
+        case 'fechaInicio':
+          return new Date(b.fechaInicio || 0).getTime() - new Date(a.fechaInicio || 0).getTime()
+        case 'nombre':
+          return a.nombre.localeCompare(b.nombre)
+        case 'totalCliente':
+          return (b.totalCliente || 0) - (a.totalCliente || 0)
+        default:
+          return 0
+      }
+    })
+
     setFilteredProyectos(filtered)
-  }, [proyectos, searchTerm, filterStatus])
+    resetPagination()
+  }, [proyectos, searchTerm, filterStatus, sortOption, resetPagination])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -186,17 +218,10 @@ export default function ProyectosPage() {
     }
   }
 
-  const getEstadoBadgeVariant = (estado: string) => {
-    switch (estado) {
-      case 'activo': return 'default'
-      default: return 'outline'
-    }
-  }
-
   // Stats
   const stats = {
     total: proyectos.length,
-    activos: proyectos.filter(p => p.estado === 'activo').length,
+    activos: proyectos.filter(p => !['cerrado', 'pausado', 'cancelado'].includes(p.estado)).length,
     cerrados: proyectos.filter(p => p.estado === 'cerrado').length,
     // Consolidate all projects to USD for KPI totals
     totalValor: proyectos.reduce((sum, p) => {
@@ -210,6 +235,19 @@ export default function ProyectosPage() {
     if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`
     if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`
     return `$${amount.toFixed(0)}`
+  }
+
+  // Paginación client-side
+  const totalFiltered = filteredProyectos.length
+  const totalPages = Math.ceil(totalFiltered / limit)
+  const paginatedProyectos = filteredProyectos.slice((page - 1) * limit, page * limit)
+  const paginationMeta = {
+    page,
+    limit,
+    total: totalFiltered,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
   }
 
   if (pageLoading) {
@@ -399,16 +437,32 @@ export default function ProyectosPage() {
           />
         </div>
 
-        <Select value={filterStatus} onValueChange={(value: FilterStatus) => setFilterStatus(value)}>
-          <SelectTrigger className="w-[150px] h-8 text-xs">
+        <Select value={filterStatus} onValueChange={(value: string) => setFilterStatus(value as FilterStatus)}>
+          <SelectTrigger className="w-[190px] h-8 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Estado: Todos</SelectItem>
-            <SelectItem value="activo">Estado: Activos</SelectItem>
-            <SelectItem value="pausado">Estado: Pausados</SelectItem>
-            <SelectItem value="cerrado">Estado: Cerrados</SelectItem>
-            <SelectItem value="cancelado">Estado: Cancelados</SelectItem>
+            {proyectoEstadoList.map(({ key, label }) => (
+              <SelectItem key={key} value={key}>
+                Estado: {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={sortOption} onValueChange={(value: string) => setSortOption(value as SortOption)}>
+          <SelectTrigger className="w-[170px] h-8 text-xs">
+            <div className="flex items-center gap-1">
+              <ArrowUpDown className="h-3 w-3" />
+              <SelectValue />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="status">Ordenar: Estado</SelectItem>
+            <SelectItem value="fechaInicio">Ordenar: Fecha</SelectItem>
+            <SelectItem value="nombre">Ordenar: Nombre</SelectItem>
+            <SelectItem value="totalCliente">Ordenar: Monto</SelectItem>
           </SelectContent>
         </Select>
 
@@ -463,19 +517,22 @@ export default function ProyectosPage() {
               </Card>
             </div>
           ) : (
-            filteredProyectos.map((proyecto) => (
+            paginatedProyectos.map((proyecto) => (
               <Card key={proyecto.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm truncate">{proyecto.nombre}</h3>
+                      <h3 className="font-semibold text-sm line-clamp-2 leading-tight">{proyecto.nombre}</h3>
                       {proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
                         <p className="text-[11px] text-muted-foreground line-clamp-2 leading-tight">{proyecto.descripcion}</p>
                       )}
                       <p className="text-xs text-gray-500 font-mono">{proyecto.codigo}</p>
                     </div>
-                    <Badge variant={getEstadoBadgeVariant(proyecto.estado)} className="text-[10px] ml-2">
-                      {proyecto.estado}
+                    <Badge
+                      variant="outline"
+                      className={cn("text-[10px] ml-2 shrink-0", proyectoEstadoColors[proyecto.estado as ProyectoEstado])}
+                    >
+                      {proyectoEstadoLabels[proyecto.estado as ProyectoEstado] || proyecto.estado}
                     </Badge>
                   </div>
 
@@ -565,7 +622,7 @@ export default function ProyectosPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredProyectos.map((proyecto) => (
+                    paginatedProyectos.map((proyecto) => (
                       <tr key={proyecto.id} className="border-b hover:bg-gray-50">
                         <td className="p-2 font-mono text-[10px] text-gray-500">{proyecto.codigo}</td>
                         <td className="p-2">
@@ -574,30 +631,33 @@ export default function ProyectosPage() {
                             onClick={() => router.push(`/proyectos/${proyecto.id}`)}
                             title={proyecto.descripcion && proyecto.descripcion !== proyecto.nombre ? proyecto.descripcion : proyecto.nombre}
                           >
-                            <span className="line-clamp-1">{proyecto.nombre}</span>
+                            <span className="line-clamp-2">{proyecto.nombre}</span>
                             {proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
                               <span className="block text-[11px] text-muted-foreground font-normal line-clamp-2 leading-tight">{proyecto.descripcion}</span>
                             )}
                           </button>
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[100px] hidden md:table-cell" title={proyecto.cliente?.nombre}>
+                        <td className="p-2 text-gray-600 truncate max-w-[140px] hidden md:table-cell" title={proyecto.cliente?.nombre}>
                           {proyecto.cliente?.nombre || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden lg:table-cell" title={proyecto.comercial?.name ?? undefined}>
+                        <td className="p-2 text-gray-600 truncate max-w-[120px] hidden lg:table-cell" title={proyecto.comercial?.name ?? undefined}>
                           {proyecto.comercial?.name || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden md:table-cell" title={proyecto.gestor?.name ?? undefined}>
+                        <td className="p-2 text-gray-600 truncate max-w-[120px] hidden md:table-cell" title={proyecto.gestor?.name ?? undefined}>
                           {proyecto.gestor?.name || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden xl:table-cell" title={(proyecto as any).supervisor?.name}>
+                        <td className="p-2 text-gray-600 truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).supervisor?.name}>
                           {(proyecto as any).supervisor?.name || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[80px] hidden xl:table-cell" title={(proyecto as any).lider?.name}>
+                        <td className="p-2 text-gray-600 truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).lider?.name}>
                           {(proyecto as any).lider?.name || '—'}
                         </td>
                         <td className="p-2">
-                          <Badge variant={getEstadoBadgeVariant(proyecto.estado)} className="text-[9px] px-1.5">
-                            {proyecto.estado}
+                          <Badge
+                            variant="outline"
+                            className={cn("text-[9px] px-1.5 whitespace-nowrap", proyectoEstadoColors[proyecto.estado as ProyectoEstado])}
+                          >
+                            {proyectoEstadoLabels[proyecto.estado as ProyectoEstado] || proyecto.estado}
                           </Badge>
                         </td>
                         <td className="p-2 text-right font-medium text-green-600 whitespace-nowrap">
@@ -631,6 +691,23 @@ export default function ProyectosPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Paginación */}
+      {totalFiltered > limit && (
+        <DataPagination
+          pagination={paginationMeta}
+          onPageChange={handlePageChange}
+          onLimitChange={handleLimitChange}
+          limitOptions={[12, 24, 48]}
+          showLimitSelector={true}
+          showItemsInfo={true}
+          showPageJump={false}
+          showQuickNavigation={false}
+          size="sm"
+          itemsLabel="proyectos"
+          className="rounded-lg border"
+        />
       )}
 
       <ConfirmDialog
