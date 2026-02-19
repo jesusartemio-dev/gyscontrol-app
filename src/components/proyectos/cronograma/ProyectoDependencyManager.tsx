@@ -6,8 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowRight, Plus, Trash2, AlertTriangle, Link2 } from 'lucide-react'
+import { ArrowRight, Plus, Trash2, AlertTriangle, Link2, X } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 
@@ -261,171 +260,127 @@ export function ProyectoDependencyManager({
           </Button>
         </DialogTrigger>
 
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Gestión de Dependencias - Proyecto</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-base">Dependencias del Proyecto</DialogTitle>
+              <Button
+                onClick={() => setShowCreateForm(v => !v)}
+                size="sm"
+                variant={showCreateForm ? 'secondary' : 'default'}
+                className="h-7 text-xs"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Nueva
+              </Button>
+            </div>
           </DialogHeader>
 
-          <div className="space-y-6">
-            {/* Lista de dependencias existentes */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Dependencias Existentes</h3>
-                <Button
-                  onClick={() => setShowCreateForm(true)}
-                  size="sm"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nueva Dependencia
-                </Button>
-              </div>
-
-              {dependencias.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <ArrowRight className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No hay dependencias configuradas</p>
-                  <p className="text-sm">Las tareas se ejecutan de forma independiente</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {dependencias.map((dep) => (
-                    <Card key={dep.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4 flex-wrap">
-                            {/* Tarea origen */}
-                            <Badge variant="outline" className="max-w-[200px] truncate">
-                              {dep.tareaOrigen?.nombre || 'Tarea no encontrada'}
-                            </Badge>
-
-                            {/* Tipo de dependencia */}
-                            <div className="flex items-center space-x-2">
-                              <span className="text-lg font-bold text-blue-600">
-                                {TIPOS_DEPENDENCIA[dep.tipo]?.icon || '→'}
-                              </span>
-                              <Badge variant="secondary">
-                                {TIPOS_DEPENDENCIA[dep.tipo]?.label || dep.tipo}
-                              </Badge>
-                            </div>
-
-                            {/* Tarea destino */}
-                            <Badge variant="outline" className="max-w-[200px] truncate">
-                              {dep.tareaDependiente?.nombre || 'Tarea no encontrada'}
-                            </Badge>
-                          </div>
-
-                          <Button
-                            onClick={() => handleDeleteClick(dep.id)}
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 ml-2"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-
-                        <div className="mt-2 text-sm text-gray-600">
-                          {TIPOS_DEPENDENCIA[dep.tipo]?.descripcion || 'Tipo de dependencia desconocido'}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Formulario de creación */}
+          <div className="space-y-3">
+            {/* Formulario de creación compacto */}
             {showCreateForm && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Crear Nueva Dependencia</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="tarea-origen">Tarea Origen (Predecesora)</Label>
-                      <Select value={tareaOrigenId} onValueChange={setTareaOrigenId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar tarea origen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tareasDisponibles.map((tarea) => (
-                            <SelectItem key={tarea.id} value={tarea.id}>
-                              {getTareaDisplayName(tarea)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="tarea-dependiente">Tarea Destino (Sucesora)</Label>
-                      <Select value={tareaDependienteId} onValueChange={setTareaDependienteId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar tarea destino" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tareasDisponibles.map((tarea) => (
-                            <SelectItem key={tarea.id} value={tarea.id}>
-                              {getTareaDisplayName(tarea)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="tipo">Tipo de Dependencia</Label>
-                      <Select value={tipo} onValueChange={(value: keyof typeof TIPOS_DEPENDENCIA) => setTipo(value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(TIPOS_DEPENDENCIA).map(([key, info]) => (
-                            <SelectItem key={key} value={key}>
-                              <div>
-                                <div className="font-medium">{info.label}</div>
-                                <div className="text-xs text-gray-500">{info.descripcion}</div>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+              <div className="border rounded-lg p-3 bg-muted/30 space-y-2.5">
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Origen (predecesora)</Label>
+                    <Select value={tareaOrigenId} onValueChange={setTareaOrigenId}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Seleccionar tarea..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tareasDisponibles.map((tarea) => (
+                          <SelectItem key={tarea.id} value={tarea.id} className="text-xs">
+                            {getTareaDisplayName(tarea)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  <div className="flex justify-end space-x-2 mt-6">
-                    <Button
-                      onClick={() => setShowCreateForm(false)}
-                      variant="outline"
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={crearDependencia} disabled={loading}>
-                      {loading ? 'Creando...' : 'Crear Dependencia'}
-                    </Button>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground mb-1.5" />
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Destino (sucesora)</Label>
+                    <Select value={tareaDependienteId} onValueChange={setTareaDependienteId}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Seleccionar tarea..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tareasDisponibles.map((tarea) => (
+                          <SelectItem key={tarea.id} value={tarea.id} className="text-xs">
+                            {getTareaDisplayName(tarea)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Label className="text-xs text-muted-foreground mb-1 block">Tipo</Label>
+                    <Select value={tipo} onValueChange={(value: keyof typeof TIPOS_DEPENDENCIA) => setTipo(value)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(TIPOS_DEPENDENCIA).map(([key, info]) => (
+                          <SelectItem key={key} value={key} className="text-xs">
+                            {info.icon} {info.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={crearDependencia} disabled={loading} size="sm" className="h-8 text-xs">
+                    {loading ? 'Creando...' : 'Crear'}
+                  </Button>
+                  <Button onClick={() => setShowCreateForm(false)} variant="ghost" size="sm" className="h-8 text-xs px-2">
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             )}
 
-            {/* Información de ayuda */}
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="p-4">
-                <div className="flex items-start space-x-3">
-                  <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-blue-900">Información sobre Dependencias</h4>
-                    <ul className="text-sm text-blue-800 mt-2 space-y-1">
-                      <li>• Las dependencias definen el orden de ejecución de las tareas</li>
-                      <li>• El tipo más común es "Termina-Inicia" (FS): la sucesora comienza cuando la predecesora termina</li>
-                      <li>• Las dependencias se visualizan en el diagrama de Gantt</li>
-                      <li>• No se pueden crear ciclos (dependencias circulares)</li>
-                    </ul>
-                  </div>
+            {/* Lista de dependencias como tabla compacta */}
+            {dependencias.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <Link2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">No hay dependencias configuradas</p>
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="grid grid-cols-[1fr_90px_1fr_32px] gap-2 px-3 py-1.5 bg-muted/50 border-b text-[11px] font-medium text-muted-foreground">
+                  <div>Origen</div>
+                  <div className="text-center">Tipo</div>
+                  <div>Destino</div>
+                  <div />
                 </div>
-              </CardContent>
-            </Card>
+                {dependencias.map((dep) => (
+                  <div
+                    key={dep.id}
+                    className="grid grid-cols-[1fr_90px_1fr_32px] gap-2 px-3 py-1.5 border-b last:border-0 hover:bg-muted/20 items-center text-xs"
+                  >
+                    <span className="truncate" title={dep.tareaOrigen?.nombre}>
+                      {dep.tareaOrigen?.nombre || 'No encontrada'}
+                    </span>
+                    <Badge variant="secondary" className="text-[10px] h-5 justify-center font-normal">
+                      {TIPOS_DEPENDENCIA[dep.tipo]?.label || dep.tipo}
+                    </Badge>
+                    <span className="truncate" title={dep.tareaDependiente?.nombre}>
+                      {dep.tareaDependiente?.nombre || 'No encontrada'}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteClick(dep.id)}
+                      className="h-6 w-6 flex items-center justify-center rounded hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[11px] text-muted-foreground">
+              FS = Termina-Inicia · SS = Inicia-Inicia · FF = Termina-Termina · SF = Inicia-Termina
+            </p>
           </div>
         </DialogContent>
       </Dialog>
@@ -436,11 +391,10 @@ export function ProyectoDependencyManager({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
-              Confirmar Eliminación
+              Eliminar dependencia
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Está seguro de que desea eliminar esta dependencia? Esta acción eliminará permanentemente
-              la relación entre las tareas y no se puede deshacer.
+              Se eliminará la relación entre las tareas. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -452,7 +406,7 @@ export function ProyectoDependencyManager({
               disabled={loading}
               className="bg-red-600 hover:bg-red-700"
             >
-              {loading ? 'Eliminando...' : 'Eliminar Dependencia'}
+              {loading ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

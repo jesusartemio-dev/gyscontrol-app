@@ -110,6 +110,8 @@
     "@tanstack/react-query-devtools": "^5.87.4",
     "@types/lodash": "^4.17.20",
     "@types/react-window": "^1.8.8",
+    "ag-grid-community": "^35.1.0",
+    "ag-grid-react": "^35.1.0",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

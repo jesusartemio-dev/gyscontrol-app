@@ -38,7 +38,8 @@ import {
   Upload,
   GitCompare,
   Lock,
-  Unlock
+  Unlock,
+  Table2
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
@@ -54,8 +55,10 @@ import { ProyectoGanttView } from './ProyectoGanttView'
 import { CronogramaGanttViewPro } from '@/components/comercial/cronograma/CronogramaGanttViewPro'
 import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { convertToMSProjectXML, downloadMSProjectXML } from '@/lib/utils/msProjectXmlExport'
+import { exportCronogramaToExcel } from '@/lib/utils/msProjectExcelExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
+import { CronogramaTableView } from './CronogramaTableView'
 import type { ProyectoCronograma } from '@/types/modelos'
 
 interface CronogramaStats {
@@ -508,6 +511,51 @@ export function ProyectoCronogramaTab({
     }
   }
 
+  const handleExportExcel = async () => {
+    try {
+      setIsLoading(true)
+      toast({ title: 'Generando Excel...', description: 'Obteniendo datos del cronograma.' })
+
+      const cronogramaId = selectedCronograma?.id
+
+      // Fetch tree + dependencies in parallel
+      const treeUrl = cronogramaId
+        ? `/api/proyectos/${proyectoId}/cronograma/tree?cronogramaId=${cronogramaId}`
+        : `/api/proyectos/${proyectoId}/cronograma/tree`
+
+      const [treeResponse, depsResponse] = await Promise.all([
+        fetch(treeUrl),
+        fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias`),
+      ])
+
+      if (!treeResponse.ok) throw new Error('Error al obtener estructura')
+      const treeData = await treeResponse.json()
+      const treeArray = treeData?.data?.tree || treeData?.tree || []
+
+      if (!Array.isArray(treeArray) || treeArray.length === 0) {
+        toast({ title: 'Sin datos', description: 'No hay elementos para exportar.', variant: 'destructive' })
+        return
+      }
+
+      const dependencias = depsResponse.ok
+        ? (await depsResponse.json()).data || []
+        : []
+
+      // Use 8 as default horasPorDia (could be fetched from calendar if needed)
+      exportCronogramaToExcel(treeArray, dependencias, proyectoNombre, 8)
+
+      toast({ title: 'Exportación completada', description: 'Archivo Excel descargado.' })
+    } catch (error) {
+      toast({
+        title: 'Error en exportación',
+        description: error instanceof Error ? error.message : 'No se pudo exportar.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Eliminar cronograma completo (no solo contenido)
   const handleEliminarCronogramaCompleto = async () => {
     if (!selectedCronograma) return
@@ -870,6 +918,14 @@ export function ProyectoCronogramaTab({
                 Exportar XML
               </DropdownMenuItem>
 
+              <DropdownMenuItem onSelect={() => {
+                setDropdownOpen(false)
+                setTimeout(() => handleExportExcel(), 100)
+              }} disabled={isLoading}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Excel (MS Project)
+              </DropdownMenuItem>
+
               {!esComercial && (
                 <>
                   <DropdownMenuSeparator />
@@ -1044,6 +1100,10 @@ export function ProyectoCronogramaTab({
             <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
             Gantt Pro
           </TabsTrigger>
+          <TabsTrigger value="tabla" className="text-xs px-3">
+            <Table2 className="h-3.5 w-3.5 mr-1.5" />
+            Tabla
+          </TabsTrigger>
           {tieneBaseline && tieneEjecucion && (
             <TabsTrigger value="varianza" className="text-xs px-3">
               <GitCompare className="h-3.5 w-3.5 mr-1.5" />
@@ -1080,6 +1140,15 @@ export function ProyectoCronogramaTab({
             cotizacionId={proyectoId}
             cronogramaId={selectedCronograma?.id}
             refreshKey={refreshKey}
+          />
+        </TabsContent>
+
+        <TabsContent value="tabla" className="mt-3">
+          <CronogramaTableView
+            proyectoId={proyectoId}
+            cronogramaId={selectedCronograma?.id}
+            refreshKey={refreshKey}
+            horasPorDia={calendarioAsignado?.horasPorDia}
           />
         </TabsContent>
 

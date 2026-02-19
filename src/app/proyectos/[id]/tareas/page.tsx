@@ -224,56 +224,32 @@ export default function ProyectoTareasPage() {
         </span>
       </div>
 
-      {/* KPIs compactos */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-l-4 border-l-purple-400">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4 text-purple-500" />
-              <div>
-                <div className="text-lg font-bold">{stats.cronograma}</div>
-                <div className="text-[11px] text-muted-foreground">Cronograma</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-amber-400">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-500" />
-              <div>
-                <div className="text-lg font-bold">{stats.extras}</div>
-                <div className="text-[11px] text-muted-foreground">Extras</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-emerald-400">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4 text-emerald-500" />
-              <div>
-                <div className="text-lg font-bold">
-                  {stats.total > 0 ? Math.round((stats.completadas / stats.total) * 100) : 0}%
-                </div>
-                <div className="text-[11px] text-muted-foreground">Avance</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-blue-400">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-blue-500" />
-              <div>
-                <div className="text-lg font-bold">
-                  {Math.round(stats.horasReales)}h <span className="text-xs font-normal text-muted-foreground">/ {Math.round(stats.horasPlan)}h</span>
-                </div>
-                <div className="text-[11px] text-muted-foreground">Horas</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPIs inline */}
+      <div className="flex items-center gap-4 text-xs flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <GitBranch className="h-3.5 w-3.5 text-purple-500" />
+          <span className="font-semibold">{stats.cronograma}</span>
+          <span className="text-muted-foreground">cronograma</span>
+        </div>
+        <div className="h-3.5 w-px bg-border" />
+        <div className="flex items-center gap-1.5">
+          <Zap className="h-3.5 w-3.5 text-amber-500" />
+          <span className="font-semibold">{stats.extras}</span>
+          <span className="text-muted-foreground">extras</span>
+        </div>
+        <div className="h-3.5 w-px bg-border" />
+        <div className="flex items-center gap-1.5">
+          <CheckSquare className="h-3.5 w-3.5 text-emerald-500" />
+          <span className="font-semibold">{stats.total > 0 ? Math.round((stats.completadas / stats.total) * 100) : 0}%</span>
+          <span className="text-muted-foreground">avance</span>
+          <Progress value={stats.total > 0 ? Math.round((stats.completadas / stats.total) * 100) : 0} className="h-1.5 w-16" />
+        </div>
+        <div className="h-3.5 w-px bg-border" />
+        <div className="flex items-center gap-1.5">
+          <Clock className="h-3.5 w-3.5 text-blue-500" />
+          <span className="font-semibold">{Math.round(stats.horasReales)}h</span>
+          <span className="text-muted-foreground">/ {Math.round(stats.horasPlan)}h plan</span>
+        </div>
       </div>
 
       {/* Filtros */}
