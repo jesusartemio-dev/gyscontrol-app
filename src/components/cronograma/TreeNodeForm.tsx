@@ -583,9 +583,12 @@ export function TreeNodeForm({
                   }
                 }}
               />
-              {recursoInfo && recursoInfo.tipo === 'cuadrilla' && (
+              {recursoInfo && (
                 <p className="text-xs text-muted-foreground -mt-2">
-                  Cuadrilla de {recursoInfo.totalPersonas} personas — el costo/hora ya incluye a todo el equipo
+                  {recursoInfo.tipo === 'cuadrilla'
+                    ? `Cuadrilla de ${recursoInfo.totalPersonas} personas — Costo = horas × costo/hora (ya incluye al equipo completo)`
+                    : `Individual — Costo = horas × personas × costo/hora`
+                  }
                 </p>
               )}
             </>
