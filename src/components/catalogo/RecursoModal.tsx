@@ -121,7 +121,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
     setOrigen('propio')
     setCostoHora(0)
     setCostoHoraProyecto(null)
-    setPorcentajeProyecto('')
+    setPorcentajeProyecto('35')
     setDescripcion('')
     setComposiciones([])
   }
