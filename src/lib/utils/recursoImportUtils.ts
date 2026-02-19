@@ -7,7 +7,9 @@ import * as XLSX from 'xlsx'
 export interface RecursoImportado {
   nombre: string
   tipo: 'individual' | 'cuadrilla'
+  origen: 'propio' | 'externo'
   costoHora: number
+  costoHoraProyecto?: number | null
   descripcion?: string
 }
 
@@ -50,6 +52,14 @@ export async function leerRecursosDesdeExcel(file: File): Promise<RecursoImporta
         ? 'cuadrilla'
         : 'individual'
 
+    // Origen
+    const origenRaw = getColumn(row, 'Origen', 'origen', 'ORIGEN', 'Origin', 'origin')
+    const origenStr = typeof origenRaw === 'string' ? origenRaw.toLowerCase().trim() : 'propio'
+    const origen: 'propio' | 'externo' =
+      origenStr === 'externo' || origenStr === 'external' || origenStr === 'tercero'
+        ? 'externo'
+        : 'propio'
+
     // Costo Hora - requerido
     const costoRaw = getColumn(row, 'Costo Hora', 'CostoHora', 'costo_hora', 'Costo', 'costo', 'Cost', 'cost', 'Precio', 'precio')
     const costoHora = parseFloat(String(costoRaw)) || 0
@@ -57,13 +67,19 @@ export async function leerRecursosDesdeExcel(file: File): Promise<RecursoImporta
       throw new Error(`Fila ${index + 2}: El costo por hora debe ser mayor a 0`)
     }
 
+    // Costo Hora Proyecto - opcional
+    const costoProyRaw = getColumn(row, 'Costo Hora Proyecto', 'CostoHoraProyecto', 'costo_hora_proyecto', 'Costo Proyecto', 'Project Cost')
+    const costoHoraProyecto = costoProyRaw ? (parseFloat(String(costoProyRaw)) || null) : null
+
     // Descripción - opcional
     const descripcion = getColumn(row, 'Descripción', 'Descripcion', 'descripcion', 'DESCRIPCION', 'Description', 'description')
 
     return {
       nombre: String(nombre).trim(),
       tipo,
+      origen,
       costoHora,
+      costoHoraProyecto,
       descripcion: descripcion ? String(descripcion).trim() : undefined
     }
   })

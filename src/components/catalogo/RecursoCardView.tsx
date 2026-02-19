@@ -16,9 +16,13 @@ import {
   Trash2,
   Users,
   Loader2,
-  MoreVertical
+  MoreVertical,
+  UserCheck,
+  Building2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 interface Props {
   data?: Recurso[]
@@ -128,6 +132,27 @@ export default function RecursoCardView({ data, onEdit, onDelete, loading = fals
               )}
             </div>
 
+            {/* Origen badge */}
+            <div className="mb-2">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[10px]",
+                  recurso.origen === 'externo'
+                    ? "border-orange-200 bg-orange-50 text-orange-700"
+                    : "border-sky-200 bg-sky-50 text-sky-700"
+                )}
+              >
+                <span className="flex items-center gap-1">
+                  {recurso.origen === 'externo' ? (
+                    <><Building2 className="h-2.5 w-2.5" /> Externo</>
+                  ) : (
+                    <><UserCheck className="h-2.5 w-2.5" /> GYS</>
+                  )}
+                </span>
+              </Badge>
+            </div>
+
             {/* Cost */}
             <div className="flex items-baseline gap-1">
               <span className="text-lg font-bold text-green-600 font-mono">
@@ -135,6 +160,14 @@ export default function RecursoCardView({ data, onEdit, onDelete, loading = fals
               </span>
               <span className="text-[10px] text-muted-foreground">/hora</span>
             </div>
+            {recurso.costoHoraProyecto != null && (
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-xs text-emerald-600 font-mono">
+                  {formatCurrency(recurso.costoHoraProyecto)}
+                </span>
+                <span className="text-[9px] text-muted-foreground">/hora proy.</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}

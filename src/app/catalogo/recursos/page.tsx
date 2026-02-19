@@ -32,6 +32,8 @@ import {
   Download,
   Power,
   PowerOff,
+  UserCheck,
+  Building2,
 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -56,6 +58,7 @@ export default function RecursosPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState<'all' | 'individual' | 'cuadrilla'>('all')
   const [filterEstado, setFilterEstado] = useState<'all' | 'activo' | 'inactivo'>('all')
+  const [filterOrigen, setFilterOrigen] = useState<'all' | 'propio' | 'externo'>('all')
 
   // Import preview modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -143,7 +146,8 @@ export default function RecursosPage() {
     const matchesSearch = recurso.nombre.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesTipo = filterTipo === 'all' || recurso.tipo === filterTipo
     const matchesEstado = filterEstado === 'all' || (filterEstado === 'activo' ? recurso.activo : !recurso.activo)
-    return matchesSearch && matchesTipo && matchesEstado
+    const matchesOrigen = filterOrigen === 'all' || recurso.origen === filterOrigen
+    return matchesSearch && matchesTipo && matchesEstado && matchesOrigen
   })
 
   const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,6 +208,8 @@ export default function RecursosPage() {
     total: recursos.length,
     individuales: recursos.filter(r => r.tipo === 'individual' || !r.tipo).length,
     cuadrillas: recursos.filter(r => r.tipo === 'cuadrilla').length,
+    propios: recursos.filter(r => r.origen !== 'externo').length,
+    externos: recursos.filter(r => r.origen === 'externo').length,
     promedio: recursos.length > 0
       ? recursos.reduce((sum, r) => sum + r.costoHora, 0) / recursos.length
       : 0,
@@ -377,7 +383,30 @@ export default function RecursosPage() {
             </SelectItem>
           </SelectContent>
         </Select>
-        {(searchTerm || filterTipo !== 'all' || filterEstado !== 'all') && (
+        <Select value={filterOrigen} onValueChange={(v) => setFilterOrigen(v as typeof filterOrigen)}>
+          <SelectTrigger className="w-[140px] h-9">
+            <Building2 className="h-3.5 w-3.5 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">
+              <span>Todos</span>
+            </SelectItem>
+            <SelectItem value="propio">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-3.5 w-3.5 text-sky-600" />
+                <span>GYS ({stats.propios})</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="externo">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-3.5 w-3.5 text-orange-600" />
+                <span>Externo ({stats.externos})</span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        {(searchTerm || filterTipo !== 'all' || filterEstado !== 'all' || filterOrigen !== 'all') && (
           <Badge variant="outline" className="text-xs">
             {filteredRecursos.length} resultado{filteredRecursos.length !== 1 ? 's' : ''}
           </Badge>
@@ -434,7 +463,7 @@ export default function RecursosPage() {
           onEdit={openEditModal}
           onDelete={handleDeleted}
           onToggleActivo={handleToggleActivo}
-          onReorder={!searchTerm && filterTipo === 'all' && filterEstado === 'all' ? handleReorder : undefined}
+          onReorder={!searchTerm && filterTipo === 'all' && filterEstado === 'all' && filterOrigen === 'all' ? handleReorder : undefined}
           loading={loading}
           error={error}
         />

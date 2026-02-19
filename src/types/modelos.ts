@@ -422,7 +422,9 @@ export interface Recurso {
   id: string
   nombre: string
   tipo: 'individual' | 'cuadrilla'
+  origen: 'propio' | 'externo'
   costoHora: number
+  costoHoraProyecto?: number | null
   descripcion?: string
   orden: number
   activo: boolean

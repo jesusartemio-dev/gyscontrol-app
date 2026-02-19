@@ -114,7 +114,9 @@ export function RecursoImportPreviewModal({
                     <TableRow className="bg-gray-50">
                       <TableHead className="text-xs py-2">Nombre</TableHead>
                       <TableHead className="text-xs py-2">Tipo</TableHead>
+                      <TableHead className="text-xs py-2">Origen</TableHead>
                       <TableHead className="text-xs py-2 text-right">Costo/Hora</TableHead>
+                      <TableHead className="text-xs py-2 text-right">Costo Proy.</TableHead>
                       <TableHead className="text-xs py-2">Descripción</TableHead>
                       <TableHead className="text-xs py-2 text-center">Acción</TableHead>
                     </TableRow>
@@ -131,8 +133,24 @@ export function RecursoImportPreviewModal({
                               {rec.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual'}
                             </Badge>
                           </TableCell>
+                          <TableCell className="py-1.5">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px]",
+                                rec.origen === 'externo'
+                                  ? "border-orange-200 bg-orange-50 text-orange-700"
+                                  : "border-sky-200 bg-sky-50 text-sky-700"
+                              )}
+                            >
+                              {rec.origen === 'externo' ? 'Externo' : 'GYS'}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="py-1.5 text-right font-mono">
-                            S/ {rec.costoHora.toFixed(2)}
+                            $ {rec.costoHora.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="py-1.5 text-right font-mono">
+                            {rec.costoHoraProyecto != null ? `$ ${rec.costoHoraProyecto.toFixed(2)}` : '–'}
                           </TableCell>
                           <TableCell className="py-1.5 truncate max-w-[150px]">
                             {rec.descripcion || '-'}

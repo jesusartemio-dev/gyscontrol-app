@@ -16,7 +16,9 @@ export function exportarRecursosAExcel(recursos: Recurso[]) {
     return {
       Nombre: r.nombre,
       Tipo: r.tipo === 'cuadrilla' ? 'Cuadrilla' : 'Individual',
+      Origen: r.origen === 'externo' ? 'Externo' : 'GYS',
       'Costo Hora': r.costoHora,
+      'Costo Hora Proyecto': r.costoHoraProyecto ?? '',
       Descripción: r.descripcion || '',
       Personal: personal || '(sin asignar)'
     }
@@ -27,7 +29,9 @@ export function exportarRecursosAExcel(recursos: Recurso[]) {
   const columnWidths = [
     { wch: 30 }, // Nombre
     { wch: 12 }, // Tipo
+    { wch: 10 }, // Origen
     { wch: 12 }, // Costo Hora
+    { wch: 18 }, // Costo Hora Proyecto
     { wch: 40 }, // Descripción
     { wch: 40 }, // Personal
   ]
@@ -48,14 +52,18 @@ export function generarPlantillaRecursos() {
     {
       Nombre: 'Técnico Senior',
       Tipo: 'Individual',
+      Origen: 'GYS',
       'Costo Hora': 25.00,
+      'Costo Hora Proyecto': 18.00,
       Descripción: 'Técnico con experiencia',
       Personal: '(se ignora en importación)'
     },
     {
       Nombre: 'Cuadrilla Instalación',
       Tipo: 'Cuadrilla',
+      Origen: 'Externo',
       'Costo Hora': 75.00,
+      'Costo Hora Proyecto': 55.00,
       Descripción: 'Equipo de instalación',
       Personal: '(se ignora en importación)'
     }
@@ -66,7 +74,9 @@ export function generarPlantillaRecursos() {
   const columnWidths = [
     { wch: 30 },
     { wch: 12 },
+    { wch: 10 },
     { wch: 12 },
+    { wch: 18 },
     { wch: 40 },
     { wch: 40 },
   ]

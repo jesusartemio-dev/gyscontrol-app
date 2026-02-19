@@ -1093,7 +1093,9 @@ model Recurso {
   id                                 String                               @id @default(cuid())
   nombre                             String                               @unique
   tipo                               TipoRecurso                          @default(individual)
+  origen                             OrigenRecurso                        @default(propio)
   costoHora                          Float
+  costoHoraProyecto                  Float?
   descripcion                        String?
   orden                              Int                                  @default(0)
   activo                             Boolean                              @default(true)
@@ -2914,6 +2916,11 @@ enum TipoNotificacion {
 enum TipoRecurso {
   individual
   cuadrilla
+}
+
+enum OrigenRecurso {
+  propio
+  externo
 }
 
 enum EstadoValorizacion {

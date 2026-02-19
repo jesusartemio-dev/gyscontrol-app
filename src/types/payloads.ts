@@ -128,7 +128,9 @@ export interface RecursoComposicionPayload {
 export interface RecursoPayload {
   nombre: string
   tipo?: 'individual' | 'cuadrilla'
+  origen?: 'propio' | 'externo'
   costoHora: number
+  costoHoraProyecto?: number | null
   descripcion?: string
   orden?: number
   composiciones?: RecursoComposicionPayload[]

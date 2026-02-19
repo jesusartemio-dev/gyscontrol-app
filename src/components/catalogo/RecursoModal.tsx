@@ -7,7 +7,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Calculator, Save, X, Plus, Trash2, User, UsersRound, Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Calculator, Save, X, Plus, Trash2, User, UsersRound, Loader2, TrendingUp, TrendingDown, Minus, UserCheck, Building2 } from 'lucide-react'
 import type { Recurso, Empleado } from '@/types'
 import { createRecurso, updateRecurso } from '@/lib/services/recurso'
 import { getEmpleados } from '@/lib/services/empleado'
@@ -55,7 +55,9 @@ interface Props {
 export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUpdated }: Props) {
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState<'individual' | 'cuadrilla'>('individual')
+  const [origen, setOrigen] = useState<'propio' | 'externo'>('propio')
   const [costoHora, setCostoHora] = useState<number>(0)
+  const [costoHoraProyecto, setCostoHoraProyecto] = useState<number | null>(null)
   const [descripcion, setDescripcion] = useState('')
   const [composiciones, setComposiciones] = useState<ComposicionItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -81,7 +83,9 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
         // Modo edición: cargar datos del recurso
         setNombre(recurso.nombre)
         setTipo(recurso.tipo || 'individual')
+        setOrigen(recurso.origen || 'propio')
         setCostoHora(recurso.costoHora)
+        setCostoHoraProyecto(recurso.costoHoraProyecto ?? null)
         setDescripcion(recurso.descripcion || '')
 
         // Cargar composiciones si existen
@@ -107,7 +111,9 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
   const resetForm = () => {
     setNombre('')
     setTipo('individual')
+    setOrigen('propio')
     setCostoHora(0)
+    setCostoHoraProyecto(null)
     setDescripcion('')
     setComposiciones([])
   }
@@ -174,7 +180,9 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
       const payload = {
         nombre: nombre.trim(),
         tipo,
+        origen,
         costoHora,
+        costoHoraProyecto: costoHoraProyecto || null,
         descripcion: descripcion.trim() || undefined,
         // Enviar composiciones para ambos tipos
         composiciones: composiciones.map(c => ({
@@ -289,21 +297,84 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
             </div>
           </div>
 
-          {/* Nombre y Costo */}
+          {/* Origen del Recurso */}
+          <div className="space-y-2">
+            <Label>Origen</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setOrigen('propio')}
+                className={cn(
+                  "flex items-center gap-3 p-3 rounded-lg border-2 transition-all",
+                  origen === 'propio'
+                    ? "border-sky-500 bg-sky-50"
+                    : "border-gray-200 hover:border-gray-300"
+                )}
+              >
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center",
+                  origen === 'propio' ? "bg-sky-100" : "bg-gray-100"
+                )}>
+                  <UserCheck className={cn(
+                    "h-4 w-4",
+                    origen === 'propio' ? "text-sky-600" : "text-gray-500"
+                  )} />
+                </div>
+                <div className="text-left">
+                  <p className={cn(
+                    "font-medium text-sm",
+                    origen === 'propio' ? "text-sky-700" : "text-gray-700"
+                  )}>GYS</p>
+                  <p className="text-xs text-muted-foreground">Recurso propio</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrigen('externo')}
+                className={cn(
+                  "flex items-center gap-3 p-3 rounded-lg border-2 transition-all",
+                  origen === 'externo'
+                    ? "border-orange-500 bg-orange-50"
+                    : "border-gray-200 hover:border-gray-300"
+                )}
+              >
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center",
+                  origen === 'externo' ? "bg-orange-100" : "bg-gray-100"
+                )}>
+                  <Building2 className={cn(
+                    "h-4 w-4",
+                    origen === 'externo' ? "text-orange-600" : "text-gray-500"
+                  )} />
+                </div>
+                <div className="text-left">
+                  <p className={cn(
+                    "font-medium text-sm",
+                    origen === 'externo' ? "text-orange-700" : "text-gray-700"
+                  )}>Externo</p>
+                  <p className="text-xs text-muted-foreground">Tercero</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Nombre */}
+          <div className="space-y-2">
+            <Label htmlFor="nombre">Nombre *</Label>
+            <Input
+              id="nombre"
+              placeholder={tipo === 'cuadrilla' ? "Ej: Cuadrilla A" : "Ej: Ingeniero Senior"}
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              required
+              disabled={loading}
+            />
+          </div>
+
+          {/* Costos */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="nombre">Nombre *</Label>
-              <Input
-                id="nombre"
-                placeholder={tipo === 'cuadrilla' ? "Ej: Cuadrilla A" : "Ej: Ingeniero Senior"}
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="costoHora">Costo/Hora (USD) *</Label>
+              <Label htmlFor="costoHora">Costo/Hora Comercial (USD) *</Label>
               <Input
                 id="costoHora"
                 type="number"
@@ -315,6 +386,24 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
                 required
                 disabled={loading}
               />
+              <p className="text-[10px] text-muted-foreground">Para cotizaciones al cliente</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="costoHoraProyecto">Costo/Hora Proyecto (USD)</Label>
+              <Input
+                id="costoHoraProyecto"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="45.00"
+                value={costoHoraProyecto ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setCostoHoraProyecto(val === '' ? null : (parseFloat(val) || 0))
+                }}
+                disabled={loading}
+              />
+              <p className="text-[10px] text-muted-foreground">Costo operativo para planificación</p>
             </div>
           </div>
 

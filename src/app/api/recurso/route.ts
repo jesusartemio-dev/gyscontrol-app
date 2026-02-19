@@ -7,8 +7,14 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const soloActivos = searchParams.get('activos') === 'true'
 
+    const origenFilter = searchParams.get('origen') as 'propio' | 'externo' | null
+
+    const where: Record<string, unknown> = {}
+    if (soloActivos) where.activo = true
+    if (origenFilter) where.origen = origenFilter
+
     const data = await prisma.recurso.findMany({
-      where: soloActivos ? { activo: true } : undefined,
+      where: Object.keys(where).length > 0 ? where : undefined,
       orderBy: { orden: 'asc' },
       include: {
         composiciones: {
@@ -62,7 +68,9 @@ export async function POST(req: Request) {
         updatedAt: new Date(),
         nombre: recursoData.nombre,
         tipo: recursoData.tipo || 'individual',
+        origen: recursoData.origen || 'propio',
         costoHora: recursoData.costoHora,
+        costoHoraProyecto: recursoData.costoHoraProyecto ?? null,
         descripcion: recursoData.descripcion,
         orden: recursoData.orden ?? 0,
         ...(composiciones?.length > 0 && {

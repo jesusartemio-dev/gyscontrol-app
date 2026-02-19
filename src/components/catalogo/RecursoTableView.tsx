@@ -22,6 +22,8 @@ import {
   Link,
   Power,
   PowerOff,
+  Building2,
+  UserCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -166,6 +168,25 @@ function SortableRow({
         </Badge>
       </TableCell>
       <TableCell className="px-3 py-1.5">
+        <Badge
+          variant="outline"
+          className={cn(
+            "text-[10px]",
+            recurso.origen === 'externo'
+              ? "border-orange-200 bg-orange-50 text-orange-700"
+              : "border-sky-200 bg-sky-50 text-sky-700"
+          )}
+        >
+          <span className="flex items-center gap-1">
+            {recurso.origen === 'externo' ? (
+              <><Building2 className="h-2.5 w-2.5" /> Externo</>
+            ) : (
+              <><UserCheck className="h-2.5 w-2.5" /> GYS</>
+            )}
+          </span>
+        </Badge>
+      </TableCell>
+      <TableCell className="px-3 py-1.5">
         {tienePersonal ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -233,6 +254,15 @@ function SortableRow({
         <span className="font-mono text-xs font-medium text-blue-600">
           {formatUSD(recurso.costoHora)}
         </span>
+      </TableCell>
+      <TableCell className="px-3 py-1.5">
+        {recurso.costoHoraProyecto != null ? (
+          <span className="font-mono text-xs font-medium text-emerald-600">
+            {formatUSD(recurso.costoHoraProyecto)}
+          </span>
+        ) : (
+          <span className="text-[10px] text-gray-400">–</span>
+        )}
       </TableCell>
       <TableCell className="px-3 py-1.5">
         {tienePersonal ? (
@@ -472,8 +502,10 @@ export default function RecursoTableView({ data, onEdit, onDelete, onToggleActiv
                   )}
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700">Nombre</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-24">Tipo</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-24">Origen</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-36">Personal</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo/Hora</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo Proy.</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo Real</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Diferencia</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-20">En uso</TableHead>

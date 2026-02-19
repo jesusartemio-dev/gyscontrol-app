@@ -5,7 +5,9 @@ import { randomUUID } from 'crypto'
 interface RecursoImportado {
   nombre: string
   tipo: 'individual' | 'cuadrilla'
+  origen: 'propio' | 'externo'
   costoHora: number
+  costoHoraProyecto?: number | null
   descripcion?: string
 }
 
@@ -53,7 +55,9 @@ export async function POST(request: Request) {
         const dataRecurso = {
           nombre: rec.nombre.trim(),
           tipo: rec.tipo || 'individual',
+          origen: rec.origen || 'propio',
           costoHora: rec.costoHora,
+          costoHoraProyecto: rec.costoHoraProyecto ?? null,
           descripcion: rec.descripcion?.trim() || null,
           updatedAt: new Date()
         }

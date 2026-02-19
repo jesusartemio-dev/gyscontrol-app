@@ -52,7 +52,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const updateData: Record<string, unknown> = {}
     if (recursoData.nombre !== undefined) updateData.nombre = recursoData.nombre
     if (recursoData.tipo !== undefined) updateData.tipo = recursoData.tipo
+    if (recursoData.origen !== undefined) updateData.origen = recursoData.origen
     if (recursoData.costoHora !== undefined) updateData.costoHora = recursoData.costoHora
+    if (recursoData.costoHoraProyecto !== undefined) updateData.costoHoraProyecto = recursoData.costoHoraProyecto
     if (recursoData.descripcion !== undefined) updateData.descripcion = recursoData.descripcion
     if (recursoData.orden !== undefined) updateData.orden = recursoData.orden
     if (recursoData.activo !== undefined) updateData.activo = recursoData.activo
