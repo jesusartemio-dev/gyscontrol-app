@@ -126,15 +126,16 @@ export function formatUSD(amount: number): string {
 }
 
 /**
- * Calcula el costo real de una cuadrilla (suma de costos)
- * Suma los costos/hora de todos los miembros
+ * Calcula el costo real de una cuadrilla (suma de costos × cantidad)
+ * Cada miembro se multiplica por su cantidad (nro de personas de ese perfil)
  */
 export function calcularCostoRealCuadrilla(
-  composiciones: Array<{ empleado?: Empleado | null }>,
+  composiciones: Array<{ empleado?: Empleado | null; cantidad?: number }>,
   config: Partial<ConfiguracionCostos> = {}
 ): number {
   return composiciones.reduce((sum, comp) => {
-    return sum + getCostoHoraUSD(comp.empleado, config)
+    const cant = comp.cantidad ?? 1
+    return sum + getCostoHoraUSD(comp.empleado, config) * cant
   }, 0)
 }
 

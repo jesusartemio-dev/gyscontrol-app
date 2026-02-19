@@ -40,7 +40,7 @@ import {
 interface ComposicionItem {
   empleadoId: string
   empleado?: Empleado
-  porcentaje: number
+  cantidad: number
   rol: string
 }
 
@@ -101,7 +101,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
             recurso.composiciones.map(comp => ({
               empleadoId: comp.empleadoId,
               empleado: comp.empleado,
-              porcentaje: comp.porcentaje || 100,
+              cantidad: comp.cantidad ?? 1,
               rol: comp.rol || ''
             }))
           )
@@ -148,7 +148,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
     if (empleado) {
       setComposiciones([
         ...composiciones,
-        { empleadoId, empleado, porcentaje: 100, rol: '' }
+        { empleadoId, empleado, cantidad: 1, rol: '' }
       ])
     }
   }
@@ -157,7 +157,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
     setComposiciones(composiciones.filter(c => c.empleadoId !== empleadoId))
   }
 
-  const handleUpdateMember = (empleadoId: string, field: 'porcentaje' | 'rol', value: number | string) => {
+  const handleUpdateMember = (empleadoId: string, field: 'cantidad' | 'rol', value: number | string) => {
     setComposiciones(composiciones.map(c =>
       c.empleadoId === empleadoId
         ? { ...c, [field]: value }
@@ -195,7 +195,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
         // Enviar composiciones para ambos tipos
         composiciones: composiciones.map(c => ({
           empleadoId: c.empleadoId,
-          porcentaje: tipo === 'cuadrilla' ? c.porcentaje : 100,
+          cantidad: tipo === 'cuadrilla' ? c.cantidad : 1,
           rol: tipo === 'cuadrilla' ? (c.rol || undefined) : undefined,
         }))
       }
@@ -565,12 +565,12 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
                           <Input
                             type="number"
                             min="1"
-                            max="100"
-                            value={comp.porcentaje}
-                            onChange={(e) => handleUpdateMember(comp.empleadoId, 'porcentaje', parseInt(e.target.value) || 100)}
-                            className="w-16 h-7 text-xs text-center"
+                            max="99"
+                            value={comp.cantidad}
+                            onChange={(e) => handleUpdateMember(comp.empleadoId, 'cantidad', parseInt(e.target.value) || 1)}
+                            className="w-14 h-7 text-xs text-center"
                           />
-                          <span className="text-xs text-muted-foreground">%</span>
+                          <span className="text-xs text-muted-foreground">pers.</span>
                         </>
                       )}
                       <Button

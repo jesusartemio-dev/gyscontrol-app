@@ -515,7 +515,7 @@ export interface RecursoComposicion {
   id: string
   recursoId: string
   empleadoId: string
-  porcentaje: number
+  cantidad: number
   horasAsignadas?: number
   rol?: string
   activo: boolean

@@ -120,7 +120,7 @@ export interface EdtUpdatePayload extends EdtPayload {}
 // ✅ Recurso
 export interface RecursoComposicionPayload {
   empleadoId: string
-  porcentaje?: number
+  cantidad?: number
   horasAsignadas?: number
   rol?: string
 }

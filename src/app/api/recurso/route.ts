@@ -75,9 +75,9 @@ export async function POST(req: Request) {
         orden: recursoData.orden ?? 0,
         ...(composiciones?.length > 0 && {
           composiciones: {
-            create: composiciones.map((comp: { empleadoId: string; porcentaje?: number; horasAsignadas?: number; rol?: string }) => ({
+            create: composiciones.map((comp: { empleadoId: string; cantidad?: number; horasAsignadas?: number; rol?: string }) => ({
               empleadoId: comp.empleadoId,
-              porcentaje: comp.porcentaje || 100,
+              cantidad: comp.cantidad || 1,
               horasAsignadas: comp.horasAsignadas,
               rol: comp.rol,
             }))

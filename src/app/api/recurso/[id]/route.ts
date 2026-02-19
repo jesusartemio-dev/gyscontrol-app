@@ -69,10 +69,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       // Crear nuevas composiciones si hay
       if (composiciones.length > 0) {
         await prisma.recursoComposicion.createMany({
-          data: composiciones.map((comp: { empleadoId: string; porcentaje?: number; horasAsignadas?: number; rol?: string }) => ({
+          data: composiciones.map((comp: { empleadoId: string; cantidad?: number; horasAsignadas?: number; rol?: string }) => ({
             recursoId: id,
             empleadoId: comp.empleadoId,
-            porcentaje: comp.porcentaje || 100,
+            cantidad: comp.cantidad || 1,
             horasAsignadas: comp.horasAsignadas,
             rol: comp.rol,
           }))

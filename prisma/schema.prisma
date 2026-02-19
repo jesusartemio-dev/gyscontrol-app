@@ -1406,7 +1406,7 @@ model RecursoComposicion {
   id             String   @id @default(cuid())
   recursoId      String
   empleadoId     String
-  porcentaje     Float    @default(100) // % de dedicación al recurso
+  cantidad       Int      @default(1)   // Número de personas de este perfil
   horasAsignadas Float? // Horas asignadas (opcional, alternativa a %)
   rol            String? // Rol dentro del recurso (ej: "Líder", "Ayudante")
   activo         Boolean  @default(true)

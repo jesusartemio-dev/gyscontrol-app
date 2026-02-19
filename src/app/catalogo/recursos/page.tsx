@@ -57,7 +57,7 @@ export default function RecursosPage() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState<'all' | 'individual' | 'cuadrilla'>('all')
-  const [filterEstado, setFilterEstado] = useState<'all' | 'activo' | 'inactivo'>('all')
+  const [filterEstado, setFilterEstado] = useState<'all' | 'activo' | 'inactivo'>('activo')
   const [filterOrigen, setFilterOrigen] = useState<'all' | 'propio' | 'externo'>('all')
 
   // Import preview modal state
