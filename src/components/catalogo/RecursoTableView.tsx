@@ -516,9 +516,9 @@ export default function RecursoTableView({ data, onEdit, onDelete, onToggleActiv
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-24">Tipo</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-24">Origen</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-36">Personal</TableHead>
-                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo/Hora</TableHead>
-                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo Proy.</TableHead>
-                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo Real</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo/Hora (Comercial)</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-32">Costo/Hora (Proyectos)</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo/Hora (RRHH)</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Diferencia</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-20">En uso</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-24 text-center">Acciones</TableHead>
