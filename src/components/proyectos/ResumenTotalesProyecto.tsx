@@ -120,10 +120,10 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
   const totalServiciosReal = proyecto.servicios?.reduce((acc, s) => acc + (s.subtotalReal || 0), 0) || 0
   const totalGastosReal = proyecto.gastos?.reduce((acc, g) => acc + (g.subtotalReal || 0), 0) || 0
 
-  // Calculate varianzas
-  const varianzaEquipos = calcularVarianza(totalEquiposCliente, totalEquiposReal)
-  const varianzaServicios = calcularVarianza(totalServiciosCliente, totalServiciosReal)
-  const varianzaGastos = calcularVarianza(totalGastosCliente, totalGastosReal)
+  // Calculate varianzas (Plan = Interno, el presupuesto real de ejecución)
+  const varianzaEquipos = calcularVarianza(totalEquiposInterno, totalEquiposReal)
+  const varianzaServicios = calcularVarianza(totalServiciosInterno, totalServiciosReal)
+  const varianzaGastos = calcularVarianza(totalGastosInterno, totalGastosReal)
 
   const categorias = [
     {
@@ -161,7 +161,7 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
   const totalInterno = proyecto.totalInterno || (totalEquiposInterno + totalServiciosInterno + totalGastosInterno)
   const totalCliente = proyecto.totalCliente || (totalEquiposCliente + totalServiciosCliente + totalGastosCliente)
   const totalReal = proyecto.totalReal || (totalEquiposReal + totalServiciosReal + totalGastosReal)
-  const varianzaTotal = calcularVarianza(totalCliente, totalReal)
+  const varianzaTotal = calcularVarianza(totalInterno, totalReal)
   const rentabilidadTotal = calcularRenta(totalCliente, totalInterno)
 
   return (
@@ -212,12 +212,12 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
                     </div>
 
                     {/* Plan vs Real progress */}
-                    {categoria.totalCliente > 0 && (
+                    {categoria.totalInterno > 0 && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px]">
                           <span className="text-gray-500 flex items-center gap-1">
                             <Target className="h-2.5 w-2.5" />
-                            Plan: {formatCurrency(categoria.totalCliente)}
+                            Plan: {formatCurrency(categoria.totalInterno)}
                           </span>
                           <span className={`font-medium flex items-center gap-1 ${getStatusColor(categoria.varianza.estado)}`}>
                             {categoria.varianza.estado === 'danger' ? (
@@ -264,22 +264,22 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
           >
             {/* Totales intermedios */}
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center gap-1">
-                  <Target className="h-3 w-3 text-gray-600" />
-                  <span className="text-xs font-medium text-gray-700">Interno</span>
+                  <Target className="h-3 w-3 text-blue-600" />
+                  <span className="text-xs font-medium text-blue-700">Presupuesto</span>
                 </div>
-                <span className="text-xs font-semibold text-gray-800">
+                <span className="text-xs font-semibold text-blue-800">
                   {formatCurrency(totalInterno)}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-1">
-                  <DollarSign className="h-3 w-3 text-blue-600" />
-                  <span className="text-xs font-medium text-blue-700">Cliente</span>
+                  <DollarSign className="h-3 w-3 text-gray-600" />
+                  <span className="text-xs font-medium text-gray-700">Cliente</span>
                 </div>
-                <span className="text-xs font-semibold text-blue-800">
+                <span className="text-xs font-semibold text-gray-800">
                   {formatCurrency(totalCliente)}
                 </span>
               </div>
@@ -308,7 +308,7 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-gray-600">Plan: {formatCurrency(totalCliente)}</span>
+                  <span className="text-gray-600">Plan: {formatCurrency(totalInterno)}</span>
                   <ArrowRight className="h-2.5 w-2.5 text-gray-400" />
                   <span className={`font-medium ${getStatusColor(varianzaTotal.estado)}`}>
                     Real: {formatCurrency(totalReal)}

@@ -524,9 +524,9 @@ export default function ProyectosPage() {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-sm line-clamp-2 leading-tight">{proyecto.nombre}</h3>
                       {proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
-                        <p className="text-[11px] text-muted-foreground line-clamp-2 leading-tight">{proyecto.descripcion}</p>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{proyecto.descripcion}</p>
                       )}
-                      <p className="text-xs text-gray-500 font-mono">{proyecto.codigo}</p>
+                      <p className="text-[10px] text-gray-500 font-mono">{proyecto.codigo}</p>
                     </div>
                     <Badge
                       variant="outline"
@@ -541,21 +541,21 @@ export default function ProyectosPage() {
                       <Building2 className="h-3 w-3 text-gray-400 flex-shrink-0" />
                       <span className="truncate">{proyecto.cliente?.nombre || 'Sin cliente'}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] text-gray-500">
                       <div className="flex items-center gap-1" title="Comercial">
-                        <Users className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <Users className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
                         <span className="truncate">{proyecto.comercial?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-1" title="Gestor">
-                        <UserCog className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <UserCog className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
                         <span className="truncate">{proyecto.gestor?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-1" title="Supervisor">
-                        <HardHat className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <HardHat className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
                         <span className="truncate">{(proyecto as any).supervisor?.name || '—'}</span>
                       </div>
                       <div className="flex items-center gap-1" title="Líder">
-                        <Settings className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <Settings className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
                         <span className="truncate">{(proyecto as any).lider?.name || '—'}</span>
                       </div>
                     </div>
@@ -633,23 +633,23 @@ export default function ProyectosPage() {
                           >
                             <span className="line-clamp-2">{proyecto.nombre}</span>
                             {proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
-                              <span className="block text-[11px] text-muted-foreground font-normal line-clamp-2 leading-tight">{proyecto.descripcion}</span>
+                              <span className="block text-[10px] text-muted-foreground font-normal line-clamp-1 leading-tight">{proyecto.descripcion}</span>
                             )}
                           </button>
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[140px] hidden md:table-cell" title={proyecto.cliente?.nombre}>
-                          {proyecto.cliente?.nombre || '—'}
+                        <td className="p-2 text-gray-600 max-w-[140px] hidden md:table-cell" title={proyecto.cliente?.nombre}>
+                          <span className="line-clamp-2 leading-tight">{proyecto.cliente?.nombre || '—'}</span>
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[120px] hidden lg:table-cell" title={proyecto.comercial?.name ?? undefined}>
+                        <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden lg:table-cell" title={proyecto.comercial?.name ?? undefined}>
                           {proyecto.comercial?.name || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[120px] hidden md:table-cell" title={proyecto.gestor?.name ?? undefined}>
+                        <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden md:table-cell" title={proyecto.gestor?.name ?? undefined}>
                           {proyecto.gestor?.name || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).supervisor?.name}>
+                        <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).supervisor?.name}>
                           {(proyecto as any).supervisor?.name || '—'}
                         </td>
-                        <td className="p-2 text-gray-600 truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).lider?.name}>
+                        <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).lider?.name}>
                           {(proyecto as any).lider?.name || '—'}
                         </td>
                         <td className="p-2">
