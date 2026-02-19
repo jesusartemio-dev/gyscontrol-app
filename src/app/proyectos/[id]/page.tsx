@@ -241,10 +241,15 @@ export default function ProyectoHubPage() {
         { label: 'Activas', value: cronogramaStats.fasesEnProgreso },
         { label: 'EDTs', value: cronogramaStats.edts },
       ],
+      total: cronogramaStats.costoPlanificado,
       progreso: progresoHoras,
       real: cronogramaStats.horasReales,
       plan: cronogramaStats.horasPlan,
       realLabel: `${Math.round(cronogramaStats.horasReales)}h / ${Math.round(cronogramaStats.horasPlan)}h`,
+      cobertura: cronogramaStats.tareas > 0
+        ? { porcentaje: (cronogramaStats.tareasConRecurso / cronogramaStats.tareas) * 100, estado: 'ok' as const }
+        : undefined,
+      coberturaLabel: `Recursos ${cronogramaStats.tareasConRecurso}/${cronogramaStats.tareas}`,
       badge: cronogramaStats.activeCronograma?.nombre || 'Cronograma'
     },
     {

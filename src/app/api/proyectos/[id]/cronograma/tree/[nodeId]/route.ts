@@ -30,6 +30,7 @@ const updateNodeSchema = z.object({
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).optional(),
   estado: z.enum(['pendiente', 'planificado', 'en_progreso', 'completada', 'cancelada', 'pausada']).optional(),
   personasEstimadas: z.number().int().min(1).optional(),
+  recursoId: z.string().nullable().optional(),
 })
 
 // ✅ PUT /api/proyectos/[id]/cronograma/tree/[nodeId] - Actualizar nodo específico
@@ -156,6 +157,7 @@ export async function PUT(
           prioridad: validatedData.prioridad,
           estado: validatedData.estado,
           personasEstimadas: validatedData.personasEstimadas,
+          recursoId: validatedData.recursoId,
         }
         console.log('🔍 [API TREE UPDATE] Tarea updateData:', updateData)
         console.log('🔍 [API TREE UPDATE] validatedData:', validatedData)

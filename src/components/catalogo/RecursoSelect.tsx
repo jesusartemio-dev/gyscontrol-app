@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label'
 
 interface Props {
   value?: string
-  onChange?: (id: string) => void
+  onChange?: (id: string, recurso?: Recurso) => void
   disabled?: boolean
 }
 
@@ -35,17 +35,27 @@ export default function RecursoSelect({ value, onChange, disabled }: Props) {
     getRecursos(true).then(setRecursos)
   }, [])
 
+  const handleChange = (v: string) => {
+    if (v === '__none__') {
+      onChange?.('', undefined)
+    } else {
+      const recurso = recursos.find(r => r.id === v)
+      onChange?.(v, recurso)
+    }
+  }
+
   return (
     <div className="space-y-1">
       <Label>Recurso</Label>
-      <Select value={value} onValueChange={onChange} disabled={disabled}>
+      <Select value={value || '__none__'} onValueChange={handleChange} disabled={disabled}>
         <SelectTrigger>
           <SelectValue placeholder="Selecciona recurso" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="__none__">— Sin recurso —</SelectItem>
           {recursos.map((r) => (
             <SelectItem key={r.id} value={r.id}>
-              {r.nombre}
+              {r.nombre} {r.tipo === 'cuadrilla' ? `(Cuadrilla)` : ''}
             </SelectItem>
           ))}
         </SelectContent>

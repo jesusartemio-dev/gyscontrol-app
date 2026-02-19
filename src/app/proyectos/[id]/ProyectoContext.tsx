@@ -13,6 +13,8 @@ export interface CronogramaStats {
   tareasEnProgreso: number
   horasPlan: number
   horasReales: number
+  costoPlanificado: number
+  tareasConRecurso: number
   activeCronograma: ProyectoCronograma | null
 }
 

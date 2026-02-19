@@ -1107,6 +1107,7 @@ model Recurso {
   registroHoras                      RegistroHoras[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
   composiciones                      RecursoComposicion[]
+  proyectoTareas                     ProyectoTarea[]
 
   @@map("recurso")
 }
@@ -2558,6 +2559,7 @@ model ProyectoTarea {
   responsableId               String?
   creadoPorId                 String?
   proyectoActividadId         String?
+  recursoId                   String?
   createdAt                   DateTime                    @default(now())
   updatedAt                   DateTime
   registroHoras               RegistroHoras[]
@@ -2571,9 +2573,11 @@ model ProyectoTarea {
   proyectoEdt                 ProyectoEdt                 @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
   user                        User?                       @relation("TareaResponsable", fields: [responsableId], references: [id])
   creadoPor                   User?                       @relation("TareaCreadaPor", fields: [creadoPorId], references: [id])
+  recurso                     Recurso?                    @relation(fields: [recursoId], references: [id], onDelete: SetNull)
   registrosCampoTarea         RegistroHorasCampoTarea[]
 
   @@index([creadoPorId])
+  @@index([recursoId])
   @@index([dependenciaId])
   @@index([proyectoActividadId])
   @@index([proyectoActividadId, orden])

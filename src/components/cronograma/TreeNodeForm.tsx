@@ -17,6 +17,8 @@ import { AlertTriangle, CheckCircle, XCircle, Users } from 'lucide-react'
 // import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { TreeNode, NodeType, PositioningMode, PositioningConfig } from './types'
 import { obtenerCalendarioLaboral } from '@/lib/utils/calendarioLaboral'
+import RecursoSelect from '@/components/catalogo/RecursoSelect'
+import type { Recurso } from '@/types'
 
 interface TreeNodeFormProps {
   mode: 'create' | 'edit'
@@ -80,6 +82,7 @@ export function TreeNodeForm({
     fechaFinComercial: '',
     horasEstimadas: '',
     personasEstimadas: '1',
+    recursoId: '',
     orden: '',
     prioridad: 'media' as const,
     estado: getDefaultStatus(nodeType),
@@ -337,6 +340,9 @@ export function TreeNodeForm({
     }
   }, [formData.fechaInicioComercial, formData.horasEstimadas])
 
+  // Estado del recurso seleccionado (para auto-fill de personas en cuadrillas)
+  const [recursoInfo, setRecursoInfo] = useState<{ tipo: string; totalPersonas: number } | null>(null)
+
   // ✅ Estado de calendario laboral
   const [calendarioLaboral, setCalendarioLaboral] = useState<any>(null)
 
@@ -381,6 +387,7 @@ export function TreeNodeForm({
           fechaFinComercial: fechaFin,
           horasEstimadas: node.data.horasEstimadas?.toString() || '',
           personasEstimadas: node.data.personasEstimadas?.toString() || '1',
+          recursoId: node.data.recursoId || '',
           orden: node.data.orden?.toString() || '',
           prioridad: node.data.prioridad || 'media',
           estado: node.metadata.status === 'pending' ? 'pendiente' :
@@ -391,6 +398,14 @@ export function TreeNodeForm({
                   node.data.estado || getDefaultStatus(node.type),
           posicionamiento: node.data.posicionamiento || 'despues_ultima'
         })
+
+        // Cargar info del recurso si existe
+        if (node.data.recursoTipo) {
+          setRecursoInfo({
+            tipo: node.data.recursoTipo,
+            totalPersonas: node.data.personasEstimadas || 1
+          })
+        }
       }
     }
   }, [mode, nodeId, nodes, nodeType])
@@ -403,6 +418,7 @@ export function TreeNodeForm({
       ...formData,
       horasEstimadas: formData.horasEstimadas ? parseFloat(formData.horasEstimadas) : undefined,
       personasEstimadas: formData.personasEstimadas ? parseInt(formData.personasEstimadas) : undefined,
+      recursoId: formData.recursoId || null,
       orden: formData.orden ? parseInt(formData.orden) : undefined,
       // Incluir configuración de posicionamiento para creación
       ...(mode === 'create' && {
@@ -546,6 +562,34 @@ export function TreeNodeForm({
               />
             </div>
           </div>
+
+          {/* Recurso (solo para tareas) */}
+          {(nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')) && (
+            <>
+              <RecursoSelect
+                value={formData.recursoId}
+                onChange={(id, recurso) => {
+                  setFormData(prev => ({ ...prev, recursoId: id }))
+                  if (recurso) {
+                    const totalPersonas = recurso.tipo === 'cuadrilla' && recurso.composiciones?.length
+                      ? recurso.composiciones.reduce((sum, c) => sum + (c.cantidad ?? 1), 0)
+                      : 1
+                    setRecursoInfo({ tipo: recurso.tipo, totalPersonas })
+                    if (recurso.tipo === 'cuadrilla') {
+                      setFormData(prev => ({ ...prev, recursoId: id, personasEstimadas: totalPersonas.toString() }))
+                    }
+                  } else {
+                    setRecursoInfo(null)
+                  }
+                }}
+              />
+              {recursoInfo && recursoInfo.tipo === 'cuadrilla' && (
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Cuadrilla de {recursoInfo.totalPersonas} personas — el costo/hora ya incluye a todo el equipo
+                </p>
+              )}
+            </>
+          )}
 
           {/* Prioridad */}
           <div className="space-y-2">

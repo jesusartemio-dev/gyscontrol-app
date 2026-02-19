@@ -27,6 +27,7 @@ const createTareaSchema = z.object({
   prioridad: z.enum(['baja', 'media', 'alta', 'critica']).default('media'),
   dependenciaId: z.string().optional(),
   responsableId: z.string().optional(),
+  recursoId: z.string().optional(),
   posicionamiento: z.enum(['inicio_padre', 'despues_ultima']).optional(),
 })
 
@@ -307,6 +308,7 @@ export async function POST(
       prioridad: validatedData.prioridad as 'baja' | 'media' | 'alta' | 'critica',
       dependenciaId: validatedData.dependenciaId,
       responsableId: validatedData.responsableId,
+      recursoId: validatedData.recursoId,
       estado: 'pendiente' as const,
       porcentajeCompletado: 0
     }

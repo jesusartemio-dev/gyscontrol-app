@@ -84,6 +84,9 @@ export async function GET(
                     include: {
                       user: {
                         select: { id: true, name: true, email: true }
+                      },
+                      recurso: {
+                        select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true }
                       }
                     },
                     orderBy: { orden: 'asc' }
@@ -126,6 +129,9 @@ export async function GET(
                       include: {
                         user: {
                           select: { id: true, name: true, email: true }
+                        },
+                        recurso: {
+                          select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true }
                         }
                       },
                       orderBy: { orden: 'asc' }
@@ -153,6 +159,9 @@ export async function GET(
                       include: {
                         user: {
                           select: { id: true, name: true, email: true }
+                        },
+                        recurso: {
+                          select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true }
                         }
                       },
                       orderBy: { orden: 'asc' }
@@ -283,7 +292,10 @@ export async function GET(
                       personasEstimadas: tarea.personasEstimadas || 1,
                       prioridad: tarea.prioridad,
                       orden: tarea.orden,
-                      responsable: tarea.user
+                      responsable: tarea.user,
+                      recursoId: tarea.recursoId,
+                      recursoNombre: tarea.recurso?.nombre,
+                      recursoTipo: tarea.recurso?.tipo
                     },
                     metadata: {
                       hasChildren: false,

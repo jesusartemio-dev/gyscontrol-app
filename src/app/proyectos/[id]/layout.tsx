@@ -70,6 +70,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     tareasEnProgreso: 0,
     horasPlan: 0,
     horasReales: 0,
+    costoPlanificado: 0,
+    tareasConRecurso: 0,
     activeCronograma: null
   })
 
@@ -196,10 +198,11 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         }
       }
 
-      const [fasesResponse, edtsResponse, tareasResponse] = await Promise.all([
+      const [fasesResponse, edtsResponse, tareasResponse, costoPlanResponse] = await Promise.all([
         fetch(`/api/proyectos/${projectId}/cronograma/fases`),
         fetch(`/api/proyectos/${projectId}/cronograma/edts`),
-        fetch(`/api/proyectos/${projectId}/cronograma/tareas`)
+        fetch(`/api/proyectos/${projectId}/cronograma/tareas`),
+        fetch(`/api/proyectos/${projectId}/cronograma/costo-planificado`)
       ])
 
       let fasesCount = 0
@@ -210,6 +213,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
       let tareasEnProgreso = 0
       let horasPlan = 0
       let horasReales = 0
+      let costoPlanificado = 0
+      let tareasConRecurso = 0
 
       if (fasesResponse.ok) {
         const fasesData = await fasesResponse.json()
@@ -238,6 +243,12 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
           tareasCompletadas = tareasList.filter(t => t.estado === 'completada').length
           tareasEnProgreso = tareasList.filter(t => t.estado === 'en_progreso').length
         }
+      }
+
+      if (costoPlanResponse.ok) {
+        const costoPlanData = await costoPlanResponse.json()
+        costoPlanificado = costoPlanData.costoPlanificado || 0
+        tareasConRecurso = costoPlanData.tareasConRecurso || 0
       }
 
       if (cronogramasList.length === 0) {
@@ -278,6 +289,8 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
         tareasEnProgreso,
         horasPlan,
         horasReales,
+        costoPlanificado,
+        tareasConRecurso,
         activeCronograma
       })
     } catch (error) {
