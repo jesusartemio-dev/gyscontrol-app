@@ -120,6 +120,7 @@ const { fecha, horas, descripcion, proyectoId, edtId, tareaId } = validatedData
 
     // Buscar un recurso disponible o usar el primero disponible
     const recurso = await prisma.recurso.findFirst({
+      where: { activo: true },
       select: { id: true, nombre: true }
     })
 

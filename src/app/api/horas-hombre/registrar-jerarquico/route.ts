@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
 
     // Buscar un recurso disponible o usar el usuario actual
     const recurso = await prisma.recurso.findFirst({
+      where: { activo: true },
       select: { id: true, nombre: true }
     })
 

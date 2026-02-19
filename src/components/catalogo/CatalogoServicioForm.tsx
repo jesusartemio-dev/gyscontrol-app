@@ -40,7 +40,7 @@ export default function CatalogoServicioForm({ onCreated }: Props) {
   useEffect(() => {
     getEdts().then(setCategorias)
     getUnidadesServicio().then(setUnidades)
-    getRecursos().then(setRecursos)
+    getRecursos(true).then(setRecursos)
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {

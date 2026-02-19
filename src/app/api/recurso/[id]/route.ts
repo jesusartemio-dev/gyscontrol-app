@@ -55,6 +55,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (recursoData.costoHora !== undefined) updateData.costoHora = recursoData.costoHora
     if (recursoData.descripcion !== undefined) updateData.descripcion = recursoData.descripcion
     if (recursoData.orden !== undefined) updateData.orden = recursoData.orden
+    if (recursoData.activo !== undefined) updateData.activo = recursoData.activo
 
     // Si se envían composiciones, reemplazar las existentes
     if (composiciones !== undefined) {
@@ -98,9 +99,49 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const data = await prisma.recurso.delete({
+
+    // Pre-flight: check usage across all related models
+    const usage = await prisma.recurso.findUnique({
       where: { id },
+      select: {
+        nombre: true,
+        _count: {
+          select: {
+            catalogoServicio: true,
+            cotizacionServicioItem: true,
+            registroHoras: true,
+            plantillaServicioItem: true,
+            plantillaServicioItemIndependiente: true,
+          }
+        }
+      }
     })
+
+    if (!usage) {
+      return NextResponse.json({ error: 'Recurso no encontrado' }, { status: 404 })
+    }
+
+    const refs = usage._count
+    const totalUsos = refs.catalogoServicio + refs.cotizacionServicioItem +
+      refs.registroHoras + refs.plantillaServicioItem + refs.plantillaServicioItemIndependiente
+
+    if (totalUsos > 0) {
+      const detalles: string[] = []
+      if (refs.catalogoServicio > 0) detalles.push(`${refs.catalogoServicio} servicio(s) del catálogo`)
+      if (refs.cotizacionServicioItem > 0) detalles.push(`${refs.cotizacionServicioItem} ítem(s) de cotización`)
+      if (refs.registroHoras > 0) detalles.push(`${refs.registroHoras} registro(s) de horas`)
+      if (refs.plantillaServicioItem > 0) detalles.push(`${refs.plantillaServicioItem} ítem(s) de plantilla`)
+      if (refs.plantillaServicioItemIndependiente > 0) detalles.push(`${refs.plantillaServicioItemIndependiente} ítem(s) de plantilla independiente`)
+
+      return NextResponse.json({
+        error: `No se puede eliminar "${usage.nombre}" porque está en uso`,
+        detalles,
+        totalUsos,
+        sugerencia: 'Puedes desactivar el recurso en lugar de eliminarlo'
+      }, { status: 409 })
+    }
+
+    const data = await prisma.recurso.delete({ where: { id } })
     return NextResponse.json(data)
   } catch (error) {
     console.error('❌ Error al eliminar recurso:', error)

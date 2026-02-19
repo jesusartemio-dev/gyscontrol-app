@@ -32,7 +32,7 @@ export default function RecursoSelect({ value, onChange, disabled }: Props) {
   const [recursos, setRecursos] = useState<Recurso[]>([])
 
   useEffect(() => {
-    getRecursos().then(setRecursos)
+    getRecursos(true).then(setRecursos)
   }, [])
 
   return (

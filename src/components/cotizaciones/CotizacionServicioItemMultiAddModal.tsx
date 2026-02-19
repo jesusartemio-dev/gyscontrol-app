@@ -118,7 +118,7 @@ export default function CotizacionServicioItemMultiAddModal({
     try {
       const [serviciosData, recursosData, unidadesData] = await Promise.all([
         getCatalogoServicios(),
-        getRecursos(),
+        getRecursos(true),
         getUnidadesServicio()
       ])
 

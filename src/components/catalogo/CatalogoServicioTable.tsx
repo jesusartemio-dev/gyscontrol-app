@@ -88,7 +88,7 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
         setError(null)
         const [unidadesData, recursosData, categoriasData] = await Promise.all([
           getUnidadesServicio(),
-          getRecursos(),
+          getRecursos(true),
           getEdts()
         ])
         setUnidades(unidadesData)

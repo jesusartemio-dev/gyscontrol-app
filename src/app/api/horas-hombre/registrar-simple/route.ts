@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
 
     // Buscar un recurso por defecto
     const recurso = await prisma.recurso.findFirst({
+      where: { activo: true },
       select: { id: true, nombre: true }
     });
 

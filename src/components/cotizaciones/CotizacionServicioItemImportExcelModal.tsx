@@ -98,7 +98,7 @@ export default function CotizacionServicioItemImportExcelModal({
     setLoading(true)
     try {
       const [recursosData, unidadesData] = await Promise.all([
-        getRecursos(),
+        getRecursos(true),
         getUnidadesServicio()
       ])
       setRecursos(recursosData)

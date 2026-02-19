@@ -38,7 +38,7 @@ export default function CatalogoServicioList({ data, onUpdate, onDelete }: Props
   useEffect(() => {
     getEdts().then(setCategorias)
     getUnidadesServicio().then(setUnidades)
-    getRecursos().then(setRecursos)
+    getRecursos(true).then(setRecursos)
   }, [])
 
   const serviciosFiltrados = servicios.filter((s) =>

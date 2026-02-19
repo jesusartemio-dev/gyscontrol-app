@@ -29,7 +29,9 @@ import {
   Filter,
   User,
   UsersRound,
-  Download
+  Download,
+  Power,
+  PowerOff,
 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -53,6 +55,7 @@ export default function RecursosPage() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTipo, setFilterTipo] = useState<'all' | 'individual' | 'cuadrilla'>('all')
+  const [filterEstado, setFilterEstado] = useState<'all' | 'activo' | 'inactivo'>('all')
 
   // Import preview modal state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -108,7 +111,12 @@ export default function RecursosPage() {
 
   const handleDeleted = (id: string) => {
     setRecursos((prev) => prev.filter((r) => r.id !== id))
-    toast.success('Recurso eliminado')
+  }
+
+  const handleToggleActivo = (actualizado: Recurso) => {
+    setRecursos((prev) =>
+      prev.map((r) => (r.id === actualizado.id ? { ...r, activo: actualizado.activo } : r))
+    )
   }
 
   const handleReorder = async (reordered: Recurso[]) => {
@@ -134,7 +142,8 @@ export default function RecursosPage() {
   const filteredRecursos = recursos.filter(recurso => {
     const matchesSearch = recurso.nombre.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesTipo = filterTipo === 'all' || recurso.tipo === filterTipo
-    return matchesSearch && matchesTipo
+    const matchesEstado = filterEstado === 'all' || (filterEstado === 'activo' ? recurso.activo : !recurso.activo)
+    return matchesSearch && matchesTipo && matchesEstado
   })
 
   const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -345,7 +354,30 @@ export default function RecursosPage() {
             </SelectItem>
           </SelectContent>
         </Select>
-        {(searchTerm || filterTipo !== 'all') && (
+        <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v as typeof filterEstado)}>
+          <SelectTrigger className="w-[140px] h-9">
+            <Power className="h-3.5 w-3.5 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">
+              <span>Todos</span>
+            </SelectItem>
+            <SelectItem value="activo">
+              <div className="flex items-center gap-2">
+                <Power className="h-3.5 w-3.5 text-green-600" />
+                <span>Activos ({recursos.filter(r => r.activo).length})</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="inactivo">
+              <div className="flex items-center gap-2">
+                <PowerOff className="h-3.5 w-3.5 text-gray-400" />
+                <span>Inactivos ({recursos.filter(r => !r.activo).length})</span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        {(searchTerm || filterTipo !== 'all' || filterEstado !== 'all') && (
           <Badge variant="outline" className="text-xs">
             {filteredRecursos.length} resultado{filteredRecursos.length !== 1 ? 's' : ''}
           </Badge>
@@ -401,7 +433,8 @@ export default function RecursosPage() {
           data={filteredRecursos}
           onEdit={openEditModal}
           onDelete={handleDeleted}
-          onReorder={!searchTerm && filterTipo === 'all' ? handleReorder : undefined}
+          onToggleActivo={handleToggleActivo}
+          onReorder={!searchTerm && filterTipo === 'all' && filterEstado === 'all' ? handleReorder : undefined}
           loading={loading}
           error={error}
         />

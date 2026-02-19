@@ -27,6 +27,8 @@ const mockRecursos: Recurso[] = [
     nombre: 'Programador Senior',
     tipo: 'individual',
     costoHora: 30.50,
+    orden: 0,
+    activo: true,
     createdAt: '2025-01-23T10:00:00Z',
     updatedAt: '2025-01-23T10:00:00Z'
   },
@@ -35,6 +37,8 @@ const mockRecursos: Recurso[] = [
     nombre: 'Técnico Junior',
     tipo: 'individual',
     costoHora: 20.00,
+    orden: 1,
+    activo: true,
     createdAt: '2025-01-23T10:00:00Z',
     updatedAt: '2025-01-23T10:00:00Z'
   }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Recurso } from '@/types'
-import { deleteRecurso } from '@/lib/services/recurso'
+import { deleteRecurso, toggleRecursoActivo } from '@/lib/services/recurso'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +18,10 @@ import {
   TrendingDown,
   Minus,
   AlertCircle,
-  GripVertical
+  GripVertical,
+  Link,
+  Power,
+  PowerOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -53,6 +56,7 @@ interface Props {
   data?: Recurso[]
   onEdit?: (r: Recurso) => void
   onDelete?: (id: string) => void
+  onToggleActivo?: (recurso: Recurso) => void
   onReorder?: (items: Recurso[]) => void
   loading?: boolean
   error?: string | null
@@ -64,6 +68,8 @@ function SortableRow({
   onEdit,
   eliminando,
   onEliminar,
+  onToggleActivo,
+  toggling,
   draggable,
 }: {
   recurso: Recurso
@@ -71,6 +77,8 @@ function SortableRow({
   onEdit?: (r: Recurso) => void
   eliminando: string | null
   onEliminar: (id: string) => void
+  onToggleActivo?: (recurso: Recurso) => void
+  toggling: string | null
   draggable: boolean
 }) {
   const {
@@ -114,7 +122,8 @@ function SortableRow({
       style={style}
       className={cn(
         'hover:bg-blue-50/50 text-xs',
-        isDragging && 'opacity-50 bg-blue-50 shadow-lg z-50'
+        isDragging && 'opacity-50 bg-blue-50 shadow-lg z-50',
+        !recurso.activo && 'opacity-50 bg-gray-50/50'
       )}
     >
       {draggable && (
@@ -255,8 +264,65 @@ function SortableRow({
           <span className="text-[10px] text-gray-400">-</span>
         )}
       </TableCell>
+      <TableCell className="px-3 py-1.5">
+        {(() => {
+          const counts = recurso._count
+          if (!counts) return <span className="text-[10px] text-gray-400">-</span>
+          const total = counts.catalogoServicio + counts.cotizacionServicioItem +
+            counts.registroHoras + counts.plantillaServicioItem + counts.plantillaServicioItemIndependiente
+          if (total === 0) return <span className="text-[10px] text-gray-400">No</span>
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 cursor-help">
+                  <Link className="h-3 w-3 text-blue-500" />
+                  <span className="text-xs font-medium text-blue-600">{total}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                <div className="space-y-1 text-xs">
+                  <p className="font-semibold mb-1">Referencias:</p>
+                  {counts.catalogoServicio > 0 && <p>{counts.catalogoServicio} servicio(s) catálogo</p>}
+                  {counts.cotizacionServicioItem > 0 && <p>{counts.cotizacionServicioItem} ítem(s) cotización</p>}
+                  {counts.registroHoras > 0 && <p>{counts.registroHoras} registro(s) horas</p>}
+                  {counts.plantillaServicioItem > 0 && <p>{counts.plantillaServicioItem} ítem(s) plantilla</p>}
+                  {counts.plantillaServicioItemIndependiente > 0 && <p>{counts.plantillaServicioItemIndependiente} ítem(s) plantilla indep.</p>}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          )
+        })()}
+      </TableCell>
       <TableCell className="px-3 py-1.5 text-center">
         <div className="flex justify-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onToggleActivo?.(recurso)}
+                disabled={toggling === recurso.id}
+                className={cn(
+                  "h-7 w-7 p-0",
+                  recurso.activo
+                    ? "hover:bg-amber-50 hover:text-amber-600"
+                    : "hover:bg-green-50 hover:text-green-600"
+                )}
+                title={recurso.activo ? 'Desactivar' : 'Activar'}
+              >
+                {toggling === recurso.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : recurso.activo ? (
+                  <Power className="h-3.5 w-3.5 text-green-600" />
+                ) : (
+                  <PowerOff className="h-3.5 w-3.5 text-gray-400" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">{recurso.activo ? 'Desactivar recurso' : 'Activar recurso'}</p>
+            </TooltipContent>
+          </Tooltip>
           <Button
             variant="ghost"
             size="sm"
@@ -287,8 +353,9 @@ function SortableRow({
   )
 }
 
-export default function RecursoTableView({ data, onEdit, onDelete, onReorder, loading = false, error = null }: Props) {
+export default function RecursoTableView({ data, onEdit, onDelete, onToggleActivo, onReorder, loading = false, error = null }: Props) {
   const [eliminando, setEliminando] = useState<string | null>(null)
+  const [toggling, setToggling] = useState<string | null>(null)
   const [config, setConfig] = useState<ConfiguracionCostos>({
     tipoCambio: DEFAULTS.TIPO_CAMBIO,
     horasSemanales: DEFAULTS.HORAS_SEMANALES,
@@ -317,10 +384,23 @@ export default function RecursoTableView({ data, onEdit, onDelete, onReorder, lo
       toast.success('Recurso eliminado correctamente')
       onDelete?.(id)
     } catch (error) {
-      console.error('Error al eliminar recurso:', error)
-      toast.error('Error al eliminar el recurso')
+      const msg = error instanceof Error ? error.message : 'Error al eliminar el recurso'
+      toast.error(msg)
     } finally {
       setEliminando(null)
+    }
+  }
+
+  const handleToggle = async (recurso: Recurso) => {
+    setToggling(recurso.id)
+    try {
+      const updated = await toggleRecursoActivo(recurso.id, !recurso.activo)
+      toast.success(updated.activo ? `"${recurso.nombre}" activado` : `"${recurso.nombre}" desactivado`)
+      onToggleActivo?.(updated)
+    } catch {
+      toast.error('Error al cambiar estado del recurso')
+    } finally {
+      setToggling(null)
     }
   }
 
@@ -396,7 +476,8 @@ export default function RecursoTableView({ data, onEdit, onDelete, onReorder, lo
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo/Hora</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Costo Real</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-28">Diferencia</TableHead>
-                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-20 text-center">Acciones</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-20">En uso</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-semibold text-gray-700 w-24 text-center">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -408,6 +489,8 @@ export default function RecursoTableView({ data, onEdit, onDelete, onReorder, lo
                     onEdit={onEdit}
                     eliminando={eliminando}
                     onEliminar={eliminar}
+                    onToggleActivo={handleToggle}
+                    toggling={toggling}
                     draggable={draggable}
                   />
                 ))}

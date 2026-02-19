@@ -277,6 +277,7 @@ export async function POST(request: NextRequest) {
 
     // ✅ Obtener recurso por defecto (primer recurso disponible)
     const recurso = await prisma.recurso.findFirst({
+      where: { activo: true },
       orderBy: { nombre: 'asc' }
     });
 

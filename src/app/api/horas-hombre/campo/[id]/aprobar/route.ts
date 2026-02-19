@@ -112,6 +112,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     // Obtener un recurso por defecto
     const recurso = await prisma.recurso.findFirst({
+      where: { activo: true },
       select: { id: true, nombre: true }
     })
 

@@ -2,9 +2,13 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url)
+    const soloActivos = searchParams.get('activos') === 'true'
+
     const data = await prisma.recurso.findMany({
+      where: soloActivos ? { activo: true } : undefined,
       orderBy: { orden: 'asc' },
       include: {
         composiciones: {
@@ -27,6 +31,15 @@ export async function GET() {
                 }
               }
             }
+          }
+        },
+        _count: {
+          select: {
+            catalogoServicio: true,
+            cotizacionServicioItem: true,
+            registroHoras: true,
+            plantillaServicioItem: true,
+            plantillaServicioItemIndependiente: true,
           }
         }
       }

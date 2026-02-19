@@ -425,11 +425,19 @@ export interface Recurso {
   costoHora: number
   descripcion?: string
   orden: number
+  activo: boolean
   createdAt: string
   updatedAt: string
   servicios?: CatalogoServicio[]
   plantillaServicioItems?: PlantillaServicioItem[]
   composiciones?: RecursoComposicion[]
+  _count?: {
+    catalogoServicio: number
+    cotizacionServicioItem: number
+    registroHoras: number
+    plantillaServicioItem: number
+    plantillaServicioItemIndependiente: number
+  }
 }
 
 // ======================

@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
       })
     } else {
       recursoSeleccionado = await prisma.recurso.findFirst({
+        where: { activo: true },
         select: { id: true, nombre: true, costoHora: true }
       })
     }

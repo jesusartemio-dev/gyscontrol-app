@@ -128,7 +128,7 @@ export default function PlantillaServicioIndependienteMultiAddModal({
       const [serviciosData, edtsData, recursosData, unidadesData] = await Promise.all([
         getCatalogoServicios(),
         getEdts(),
-        getRecursos(),
+        getRecursos(true),
         getUnidadesServicio()
       ])
 
