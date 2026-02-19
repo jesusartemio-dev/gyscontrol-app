@@ -262,9 +262,16 @@ function SortableRow({
       </TableCell>
       <TableCell className="px-3 py-1.5">
         {recurso.costoHoraProyecto != null ? (
-          <span className="font-mono text-xs font-medium text-emerald-600">
-            {formatUSD(recurso.costoHoraProyecto)}
-          </span>
+          <div className="flex items-baseline gap-1">
+            <span className="font-mono text-xs font-medium text-emerald-600">
+              {formatUSD(recurso.costoHoraProyecto)}
+            </span>
+            {recurso.costoHora > 0 && (
+              <span className="text-[9px] text-muted-foreground">
+                -{(((recurso.costoHora - recurso.costoHoraProyecto) / recurso.costoHora) * 100).toFixed(0)}%
+              </span>
+            )}
+          </div>
         ) : (
           <span className="text-[10px] text-gray-400">–</span>
         )}
