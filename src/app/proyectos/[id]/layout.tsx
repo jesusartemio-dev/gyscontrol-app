@@ -30,7 +30,7 @@ import EstadoProyectoStepper from '@/components/proyectos/EstadoProyectoStepper'
 import ResumenTotalesProyecto from '@/components/proyectos/ResumenTotalesProyecto'
 
 import type { Proyecto, ProyectoCronograma } from '@/types'
-import { ProyectoContext, CronogramaStats } from './ProyectoContext'
+import { ProyectoContext, CronogramaStats, CostosReales } from './ProyectoContext'
 
 // Utility functions
 const formatCurrency = (amount: number): string => {
@@ -74,6 +74,9 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   })
 
   const [oportunidadId, setOportunidadId] = useState<string | null>(null)
+  const [costosReales, setCostosReales] = useState<CostosReales>({
+    equipos: 0, servicios: 0, gastos: 0, total: 0, loading: false,
+  })
 
   // Estado para edición inline de codigo y fecha
   const [editingHeader, setEditingHeader] = useState(false)
@@ -313,6 +316,28 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     }
   }, [id])
 
+  // Fetch transactional real costs (OC, horas, gastos)
+  const fetchCostosReales = async (projectId: string) => {
+    setCostosReales(prev => ({ ...prev, loading: true }))
+    try {
+      const res = await fetch(`/api/proyecto/${projectId}/costos-reales`)
+      if (res.ok) {
+        const data = await res.json()
+        setCostosReales({ ...data, loading: false })
+      } else {
+        setCostosReales(prev => ({ ...prev, loading: false }))
+      }
+    } catch {
+      setCostosReales(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  useEffect(() => {
+    if (typeof id === 'string' && proyecto) {
+      fetchCostosReales(id)
+    }
+  }, [id, proyecto?.id])
+
   const handleDataUpdate = (updatedProyecto: Proyecto) => {
     setProyecto(updatedProyecto)
   }
@@ -363,7 +388,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   if (!proyecto) return null
 
   return (
-    <ProyectoContext.Provider value={{ proyecto, setProyecto: handleDataUpdate, refreshProyecto, loading, cronogramaStats }}>
+    <ProyectoContext.Provider value={{ proyecto, setProyecto: handleDataUpdate, refreshProyecto, loading, cronogramaStats, costosReales, refreshCostosReales: () => { if (typeof id === 'string') fetchCostosReales(id) } }}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="container mx-auto p-4 sm:p-6">
           {/* Header - Hidden on detail views for maximum content space */}
@@ -581,7 +606,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                     </Button>
                   )}
 
-                  <ResumenTotalesProyecto proyecto={proyecto} />
+                  <ResumenTotalesProyecto proyecto={proyecto} costosReales={costosReales} />
 
                   {!isHubPage && (
                     <Button

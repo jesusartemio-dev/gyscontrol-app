@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import type { Proyecto } from '@/types'
+import type { CostosReales } from '@/app/proyectos/[id]/ProyectoContext'
 
 // Configuración de categorías con iconos y colores
 const categoriasConfig = {
@@ -99,9 +100,10 @@ function formatCurrency(amount: number): string {
 
 interface Props {
   proyecto: Proyecto
+  costosReales?: CostosReales
 }
 
-export default function ResumenTotalesProyecto({ proyecto }: Props) {
+export default function ResumenTotalesProyecto({ proyecto, costosReales }: Props) {
   // Calculate stats
   const equiposCount = proyecto.equipos?.length || 0
   const serviciosCount = proyecto.servicios?.length || 0
@@ -120,10 +122,22 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
   const totalServiciosReal = proyecto.servicios?.reduce((acc, s) => acc + (s.subtotalReal || 0), 0) || 0
   const totalGastosReal = proyecto.gastos?.reduce((acc, g) => acc + (g.subtotalReal || 0), 0) || 0
 
+  // Transactional real costs (from OC, horas, gastos) — primary "Ejecutado"
+  const transacLoading = costosReales?.loading ?? false
+  const ejecutadoEquipos = costosReales?.equipos ?? 0
+  const ejecutadoServicios = costosReales?.servicios ?? 0
+  const ejecutadoGastos = costosReales?.gastos ?? 0
+  const ejecutadoTotal = costosReales?.total ?? 0
+
+  // Use transactional as "real" when available and loaded, else fall back to cotizado
+  const realEquipos = !transacLoading && ejecutadoTotal > 0 ? ejecutadoEquipos : totalEquiposReal
+  const realServicios = !transacLoading && ejecutadoTotal > 0 ? ejecutadoServicios : totalServiciosReal
+  const realGastos = !transacLoading && ejecutadoTotal > 0 ? ejecutadoGastos : totalGastosReal
+
   // Calculate varianzas (Plan = Interno, el presupuesto real de ejecución)
-  const varianzaEquipos = calcularVarianza(totalEquiposInterno, totalEquiposReal)
-  const varianzaServicios = calcularVarianza(totalServiciosInterno, totalServiciosReal)
-  const varianzaGastos = calcularVarianza(totalGastosInterno, totalGastosReal)
+  const varianzaEquipos = calcularVarianza(totalEquiposInterno, realEquipos)
+  const varianzaServicios = calcularVarianza(totalServiciosInterno, realServicios)
+  const varianzaGastos = calcularVarianza(totalGastosInterno, realGastos)
 
   const categorias = [
     {
@@ -132,7 +146,8 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
       count: equiposCount,
       totalInterno: totalEquiposInterno,
       totalCliente: totalEquiposCliente,
-      totalReal: totalEquiposReal,
+      totalReal: realEquipos,
+      totalCotizado: totalEquiposReal,
       varianza: varianzaEquipos,
       config: categoriasConfig.equipos
     },
@@ -142,7 +157,8 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
       count: serviciosCount,
       totalInterno: totalServiciosInterno,
       totalCliente: totalServiciosCliente,
-      totalReal: totalServiciosReal,
+      totalReal: realServicios,
+      totalCotizado: totalServiciosReal,
       varianza: varianzaServicios,
       config: categoriasConfig.servicios
     },
@@ -152,7 +168,8 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
       count: gastosCount,
       totalInterno: totalGastosInterno,
       totalCliente: totalGastosCliente,
-      totalReal: totalGastosReal,
+      totalReal: realGastos,
+      totalCotizado: totalGastosReal,
       varianza: varianzaGastos,
       config: categoriasConfig.gastos
     }
@@ -160,8 +177,11 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
 
   const totalInterno = proyecto.totalInterno || (totalEquiposInterno + totalServiciosInterno + totalGastosInterno)
   const totalCliente = proyecto.totalCliente || (totalEquiposCliente + totalServiciosCliente + totalGastosCliente)
-  const totalReal = proyecto.totalReal || (totalEquiposReal + totalServiciosReal + totalGastosReal)
-  const varianzaTotal = calcularVarianza(totalInterno, totalReal)
+  const totalRealDisplay = !transacLoading && ejecutadoTotal > 0
+    ? ejecutadoTotal
+    : (proyecto.totalReal || (totalEquiposReal + totalServiciosReal + totalGastosReal))
+  const totalCotizado = totalEquiposReal + totalServiciosReal + totalGastosReal
+  const varianzaTotal = calcularVarianza(totalInterno, totalRealDisplay)
   const rentabilidadTotal = calcularRenta(totalCliente, totalInterno)
 
   return (
@@ -211,7 +231,7 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
                       </Badge>
                     </div>
 
-                    {/* Plan vs Real progress */}
+                    {/* Plan vs Ejecutado progress */}
                     {categoria.totalInterno > 0 && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px]">
@@ -225,7 +245,7 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
                             ) : categoria.varianza.estado === 'ok' && categoria.totalReal > 0 ? (
                               <TrendingDown className="h-2.5 w-2.5" />
                             ) : null}
-                            Real: {formatCurrency(categoria.totalReal)}
+                            {transacLoading ? '…' : `Ejec: ${formatCurrency(categoria.totalReal)}`}
                           </span>
                         </div>
                         <div className="relative h-1 bg-gray-200 rounded-full overflow-hidden">
@@ -240,8 +260,13 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
                             />
                           )}
                         </div>
-                        <div className="flex justify-end">
-                          <span className={`text-[10px] font-medium ${getStatusColor(categoria.varianza.estado)}`}>
+                        <div className="flex justify-between">
+                          {categoria.totalCotizado > 0 && (
+                            <span className="text-[10px] text-gray-400">
+                              Cotizado: {formatCurrency(categoria.totalCotizado)}
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-medium ${getStatusColor(categoria.varianza.estado)} ml-auto`}>
                             {categoria.varianza.porcentaje.toFixed(0)}% ejecutado
                           </span>
                         </div>
@@ -285,8 +310,8 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
               </div>
             </div>
 
-            {/* Plan vs Real Summary */}
-            {totalReal > 0 && (
+            {/* Plan vs Ejecutado Summary */}
+            {totalRealDisplay > 0 && (
               <div className={`p-2 rounded-lg border ${
                 varianzaTotal.estado === 'danger' ? 'bg-red-50 border-red-200' :
                 varianzaTotal.estado === 'warning' ? 'bg-amber-50 border-amber-200' :
@@ -304,20 +329,25 @@ export default function ResumenTotalesProyecto({ proyecto }: Props) {
                     Ejecución Total
                   </span>
                   <span className={`text-xs font-bold ${getStatusColor(varianzaTotal.estado)}`}>
-                    {varianzaTotal.porcentaje.toFixed(1)}%
+                    {transacLoading ? '…' : `${varianzaTotal.porcentaje.toFixed(1)}%`}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px]">
                   <span className="text-gray-600">Plan: {formatCurrency(totalInterno)}</span>
                   <ArrowRight className="h-2.5 w-2.5 text-gray-400" />
                   <span className={`font-medium ${getStatusColor(varianzaTotal.estado)}`}>
-                    Real: {formatCurrency(totalReal)}
+                    Ejec: {transacLoading ? '…' : formatCurrency(totalRealDisplay)}
                   </span>
                 </div>
-                {varianzaTotal.diferencia !== 0 && (
+                {varianzaTotal.diferencia !== 0 && !transacLoading && (
                   <div className={`text-[10px] mt-1 ${getStatusColor(varianzaTotal.estado)}`}>
                     {varianzaTotal.diferencia > 0 ? '+' : ''}{formatCurrency(varianzaTotal.diferencia)}
                     {varianzaTotal.diferencia > 0 ? ' sobre presupuesto' : ' bajo presupuesto'}
+                  </div>
+                )}
+                {totalCotizado > 0 && (
+                  <div className="text-[10px] mt-1 text-gray-400">
+                    Cotizado: {formatCurrency(totalCotizado)}
                   </div>
                 )}
               </div>

@@ -16,12 +16,22 @@ export interface CronogramaStats {
   activeCronograma: ProyectoCronograma | null
 }
 
+export interface CostosReales {
+  equipos: number
+  servicios: number
+  gastos: number
+  total: number
+  loading: boolean
+}
+
 export interface ProyectoContextType {
   proyecto: Proyecto | null
   setProyecto: (proyecto: Proyecto) => void
   refreshProyecto: () => Promise<void>
   loading: boolean
   cronogramaStats: CronogramaStats
+  costosReales: CostosReales
+  refreshCostosReales: () => void
 }
 
 export const ProyectoContext = createContext<ProyectoContextType | null>(null)

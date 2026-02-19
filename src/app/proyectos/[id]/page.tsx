@@ -64,7 +64,7 @@ type ProyectoCondExcl = {
 
 export default function ProyectoHubPage() {
   const router = useRouter()
-  const { proyecto, cronogramaStats } = useProyectoContext()
+  const { proyecto, cronogramaStats, costosReales } = useProyectoContext()
   const [condExcl, setCondExcl] = useState<ProyectoCondExcl | null>(null)
   const [showCondExcl, setShowCondExcl] = useState(false)
 
@@ -85,6 +85,7 @@ export default function ProyectoHubPage() {
   const totalEquipos = proyecto.equipos?.length || 0
   const totalEquiposItems = proyecto.equipos?.reduce((acc, e) => acc + (e.items?.length || 0), 0) || 0
   const totalEquiposInterno = proyecto.equipos?.reduce((acc, e) => acc + (e.subtotalInterno || 0), 0) || 0
+  const totalEquiposReal = proyecto.equipos?.reduce((acc, e) => acc + (e.subtotalReal || 0), 0) || 0
   // Cobertura: ítems cotizados ya vinculados a listas (en_lista, reemplazado, descartado)
   const equiposItemsEnLista = proyecto.equipos?.reduce((acc, e) =>
     acc + (e.items?.filter((i: any) => i.estado && i.estado !== 'pendiente').length || 0), 0) || 0
@@ -119,9 +120,10 @@ export default function ProyectoHubPage() {
     : null
   const progresoPedidosCosto = calcularProgreso(pedidosCostoReal, pedidosPresupuesto)
 
-  // Calculate progress for each category
-  const progresoServicios = calcularProgreso(totalServiciosReal, totalServiciosInterno)
-  const progresoGastos = calcularProgreso(totalGastosReal, totalGastosInterno)
+  // Calculate progress using transactional real costs (from OC, horas, gastos)
+  const progresoEquiposEjec = costosReales.loading ? null : calcularProgreso(costosReales.equipos, totalEquiposInterno)
+  const progresoServiciosEjec = costosReales.loading ? null : calcularProgreso(costosReales.servicios, totalServiciosInterno)
+  const progresoGastosEjec = costosReales.loading ? null : calcularProgreso(costosReales.gastos, totalGastosInterno)
 
   const baseUrl = `/proyectos/${proyecto.id}`
 
@@ -155,6 +157,11 @@ export default function ProyectoHubPage() {
         { label: 'En listas', value: equiposItemsEnLista },
       ],
       total: totalEquiposInterno,
+      progreso: progresoEquiposEjec,
+      real: costosReales.equipos,
+      plan: totalEquiposInterno,
+      realLabel: costosReales.loading ? 'Cargando...' : `Ejec: ${formatCurrency(costosReales.equipos)}`,
+      cotizado: totalEquiposReal,
       cobertura: progresoCobertura,
     },
     {
@@ -172,9 +179,11 @@ export default function ProyectoHubPage() {
         { label: 'Items', value: totalServiciosItems },
       ],
       total: totalServiciosInterno,
-      progreso: progresoServicios,
-      real: totalServiciosReal,
-      plan: totalServiciosInterno
+      progreso: progresoServiciosEjec,
+      real: costosReales.servicios,
+      plan: totalServiciosInterno,
+      realLabel: costosReales.loading ? 'Cargando...' : `Ejec: ${formatCurrency(costosReales.servicios)}`,
+      cotizado: totalServiciosReal
     },
     {
       id: 'gastos',
@@ -191,9 +200,11 @@ export default function ProyectoHubPage() {
         { label: 'Items', value: totalGastosItems },
       ],
       total: totalGastosInterno,
-      progreso: progresoGastos,
-      real: totalGastosReal,
-      plan: totalGastosInterno
+      progreso: progresoGastosEjec,
+      real: costosReales.gastos,
+      plan: totalGastosInterno,
+      realLabel: costosReales.loading ? 'Cargando...' : `Ejec: ${formatCurrency(costosReales.gastos)}`,
+      cotizado: totalGastosReal
     },
     // Row 2
     {
@@ -378,6 +389,14 @@ export default function ProyectoHubPage() {
                         />
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Secondary: cotizado real (from supply lists / service items) */}
+                {card.cotizado !== undefined && card.cotizado > 0 && (
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>Cotizado:</span>
+                    <span className="font-medium">{formatCurrency(card.cotizado)}</span>
                   </div>
                 )}
 
