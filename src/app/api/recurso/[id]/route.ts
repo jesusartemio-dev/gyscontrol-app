@@ -54,6 +54,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (recursoData.tipo !== undefined) updateData.tipo = recursoData.tipo
     if (recursoData.costoHora !== undefined) updateData.costoHora = recursoData.costoHora
     if (recursoData.descripcion !== undefined) updateData.descripcion = recursoData.descripcion
+    if (recursoData.orden !== undefined) updateData.orden = recursoData.orden
 
     // Si se envían composiciones, reemplazar las existentes
     if (composiciones !== undefined) {

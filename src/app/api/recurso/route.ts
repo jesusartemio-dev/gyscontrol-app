@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto'
 export async function GET() {
   try {
     const data = await prisma.recurso.findMany({
-      orderBy: { nombre: 'asc' },
+      orderBy: { orden: 'asc' },
       include: {
         composiciones: {
           where: { activo: true },
@@ -51,6 +51,7 @@ export async function POST(req: Request) {
         tipo: recursoData.tipo || 'individual',
         costoHora: recursoData.costoHora,
         descripcion: recursoData.descripcion,
+        orden: recursoData.orden ?? 0,
         ...(composiciones?.length > 0 && {
           composiciones: {
             create: composiciones.map((comp: { empleadoId: string; porcentaje?: number; horasAsignadas?: number; rol?: string }) => ({

@@ -424,6 +424,7 @@ export interface Recurso {
   tipo: 'individual' | 'cuadrilla'
   costoHora: number
   descripcion?: string
+  orden: number
   createdAt: string
   updatedAt: string
   servicios?: CatalogoServicio[]

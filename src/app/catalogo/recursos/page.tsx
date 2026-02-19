@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getRecursos } from '@/lib/services/recurso'
+import { getRecursos, reordenarRecursos } from '@/lib/services/recurso'
 import { Recurso } from '@/types'
 import RecursoModal from '@/components/catalogo/RecursoModal'
 import RecursoTableView from '@/components/catalogo/RecursoTableView'
@@ -109,6 +109,17 @@ export default function RecursosPage() {
   const handleDeleted = (id: string) => {
     setRecursos((prev) => prev.filter((r) => r.id !== id))
     toast.success('Recurso eliminado')
+  }
+
+  const handleReorder = async (reordered: Recurso[]) => {
+    // Optimistic update
+    setRecursos(reordered)
+    try {
+      await reordenarRecursos(reordered.map(r => ({ id: r.id, orden: r.orden })))
+    } catch {
+      toast.error('Error al reordenar recursos')
+      await cargarRecursos()
+    }
   }
 
   const handleExportar = () => {
@@ -390,6 +401,7 @@ export default function RecursosPage() {
           data={filteredRecursos}
           onEdit={openEditModal}
           onDelete={handleDeleted}
+          onReorder={!searchTerm && filterTipo === 'all' ? handleReorder : undefined}
           loading={loading}
           error={error}
         />

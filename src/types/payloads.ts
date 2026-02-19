@@ -130,6 +130,7 @@ export interface RecursoPayload {
   tipo?: 'individual' | 'cuadrilla'
   costoHora: number
   descripcion?: string
+  orden?: number
   composiciones?: RecursoComposicionPayload[]
 }
 export interface RecursoUpdatePayload extends Partial<RecursoPayload> {}

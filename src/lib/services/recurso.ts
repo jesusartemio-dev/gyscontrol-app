@@ -37,3 +37,12 @@ export async function deleteRecurso(id: string): Promise<Recurso> {
   if (!res.ok) throw new Error('Error al eliminar recurso')
   return res.json()
 }
+
+export async function reordenarRecursos(items: { id: string; orden: number }[]): Promise<void> {
+  const res = await fetch(`${BASE_URL}/reordenar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) throw new Error('Error al reordenar recursos')
+}

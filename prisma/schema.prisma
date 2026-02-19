@@ -1095,6 +1095,8 @@ model Recurso {
   tipo                               TipoRecurso                          @default(individual)
   costoHora                          Float
   descripcion                        String?
+  orden                              Int                                  @default(0)
+  activo                             Boolean                              @default(true)
   createdAt                          DateTime                             @default(now())
   updatedAt                          DateTime                             @updatedAt
   catalogoServicio                   CatalogoServicio[]
