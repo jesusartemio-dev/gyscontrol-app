@@ -89,7 +89,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
         setCostoHoraProyecto(recurso.costoHoraProyecto ?? null)
         // Calcular % inicial si ambos costos existen
         if (recurso.costoHoraProyecto != null && recurso.costoHora > 0) {
-          setPorcentajeProyecto(((recurso.costoHoraProyecto / recurso.costoHora) * 100).toFixed(1))
+          setPorcentajeProyecto((((recurso.costoHora - recurso.costoHoraProyecto) / recurso.costoHora) * 100).toFixed(1))
         } else {
           setPorcentajeProyecto('')
         }
@@ -412,7 +412,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
                         setPorcentajeProyecto(val)
                         const pct = parseFloat(val)
                         if (!isNaN(pct) && costoHora > 0) {
-                          setCostoHoraProyecto(Math.round(costoHora * pct / 100 * 100) / 100)
+                          setCostoHoraProyecto(Math.round((costoHora - costoHora * pct / 100) * 100) / 100)
                         } else if (val === '') {
                           setCostoHoraProyecto(null)
                         }
@@ -422,7 +422,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
                     />
                     <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground text-center">% del comercial</p>
+                  <p className="text-[10px] text-muted-foreground text-center">% descuento</p>
                 </div>
                 <div className="flex-1 space-y-1">
                   <Input
@@ -437,7 +437,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
                       const monto = val === '' ? null : (parseFloat(val) || 0)
                       setCostoHoraProyecto(monto)
                       if (monto !== null && costoHora > 0) {
-                        setPorcentajeProyecto(((monto / costoHora) * 100).toFixed(1))
+                        setPorcentajeProyecto((((costoHora - monto) / costoHora) * 100).toFixed(1))
                       } else {
                         setPorcentajeProyecto('')
                       }
