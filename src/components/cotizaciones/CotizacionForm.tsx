@@ -6,9 +6,15 @@ import { createCotizacion } from '@/lib/services/cotizacion'
 import { useSession } from 'next-auth/react'
 import type { Cotizacion } from '@/types'
 import { buildApiUrl } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Loader2 } from 'lucide-react'
 
 interface Cliente {
   id: string
+  codigo: string
   nombre: string
 }
 
@@ -28,7 +34,6 @@ export default function CotizacionForm({ onCreated }: Props) {
   const { data: session } = useSession()
   const comercialId = session?.user?.id ?? ''
 
-  // ✅ Cargar clientes desde la API real
   useEffect(() => {
     const fetchClientes = async () => {
       try {
@@ -37,7 +42,7 @@ export default function CotizacionForm({ onCreated }: Props) {
         const data = await res.json()
         setClientes(data)
       } catch (err) {
-        console.error('❌ Error al cargar clientes:', err)
+        console.error('Error al cargar clientes:', err)
         setError('No se pudieron cargar los clientes.')
       }
     }
@@ -70,11 +75,9 @@ export default function CotizacionForm({ onCreated }: Props) {
       onCreated(nueva)
       setNombre('')
       setClienteId('')
-      // Redirect to the detail page of the newly created cotización
       router.push(`/comercial/cotizaciones/${nueva.id}`)
     } catch (err) {
       console.error('Error al crear cotización:', err)
-      // Show specific error message from API if available
       const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error al crear la cotización.'
       setError(errorMessage)
     } finally {
@@ -83,50 +86,59 @@ export default function CotizacionForm({ onCreated }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-2 max-w-md">
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="text-red-600 text-sm bg-red-50 p-2 rounded border border-red-200">
+          {error}
+        </div>
+      )}
 
-      <input
-        type="text"
-        value={nombre}
-        onChange={(e) => setNombre(e.target.value)}
-        placeholder="Nombre de la cotización"
-        className="border px-3 py-2 rounded w-full"
-        disabled={loading}
-      />
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Nombre de la cotización *</Label>
+        <Input
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          placeholder="Ej: Cotización equipos planta norte"
+          className="h-9 text-sm"
+          disabled={loading}
+          required
+        />
+      </div>
 
-      <select
-        value={clienteId}
-        onChange={(e) => setClienteId(e.target.value)}
-        className="border px-3 py-2 rounded w-full"
-        disabled={loading}
-      >
-        <option value="">Seleccionar cliente</option>
-        {clientes.map((cliente) => (
-          <option key={cliente.id} value={cliente.id}>
-            {cliente.nombre}
-          </option>
-        ))}
-      </select>
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Cliente *</Label>
+        <Select value={clienteId} onValueChange={setClienteId} disabled={loading}>
+          <SelectTrigger className="h-9 text-sm">
+            <SelectValue placeholder="Seleccionar cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            {clientes.map((cliente) => (
+              <SelectItem key={cliente.id} value={cliente.id}>
+                <span className="font-mono text-xs text-muted-foreground mr-1.5">{cliente.codigo}</span>
+                {cliente.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <div className="space-y-1">
-        <label className="text-sm text-gray-600">Fecha de cotizacion</label>
-        <input
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Fecha de cotización</Label>
+        <Input
           type="date"
           value={fecha}
           onChange={(e) => setFecha(e.target.value)}
-          className="border px-3 py-2 rounded w-full"
+          className="h-9 text-sm"
           disabled={loading}
         />
       </div>
 
-      <button
-        type="submit"
-        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-        disabled={loading}
-      >
-        {loading ? 'Creando...' : '➕ Crear Cotización'}
-      </button>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button type="submit" size="sm" disabled={loading}>
+          {loading && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+          {loading ? 'Creando...' : 'Crear Cotización'}
+        </Button>
+      </div>
     </form>
   )
 }
