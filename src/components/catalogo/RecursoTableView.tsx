@@ -99,6 +99,7 @@ function SortableRow({
 
   const composiciones = recurso.composiciones || []
   const tienePersonal = composiciones.length > 0
+  const totalPersonas = composiciones.reduce((sum, c) => sum + (c.cantidad ?? 1), 0)
 
   const costoReal = tienePersonal
     ? recurso.tipo === 'cuadrilla'
@@ -210,7 +211,7 @@ function SortableRow({
                   )}
                 </div>
                 <span className="text-[10px] text-muted-foreground ml-1">
-                  {composiciones.length}
+                  {totalPersonas}
                 </span>
               </div>
             </TooltipTrigger>
@@ -221,12 +222,16 @@ function SortableRow({
                 </p>
                 {composiciones.map((comp, idx) => {
                   const costoEmp = getCostoHoraUSD(comp.empleado, config)
+                  const cant = comp.cantidad ?? 1
                   return (
                     <div key={comp.id || idx} className="flex items-center justify-between gap-4 text-xs">
-                      <span>{comp.empleado?.user?.name || 'Sin nombre'}</span>
+                      <span>
+                        {cant > 1 && <span className="font-semibold">{cant}× </span>}
+                        {comp.empleado?.user?.name || 'Sin nombre'}
+                      </span>
                       <span className="text-muted-foreground">
                         {recurso.tipo === 'cuadrilla'
-                          ? `${comp.rol ? `${comp.rol} · ` : ''}${formatUSD(costoEmp)}/h`
+                          ? `${comp.rol ? `${comp.rol} · ` : ''}${cant > 1 ? `${cant}×` : ''}${formatUSD(costoEmp)}/h`
                           : formatUSD(costoEmp) + '/h'
                         }
                       </span>
