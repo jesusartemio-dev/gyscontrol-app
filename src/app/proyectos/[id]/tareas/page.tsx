@@ -55,7 +55,7 @@ interface TareaData {
   proyectoEdt: {
     id: string
     nombre: string
-    edt: { id: string; nombre: string } | null
+    edt: { id: string; nombre: string; descripcion: string | null } | null
   }
   proyectoSubtarea: Array<{
     id: string
@@ -143,13 +143,15 @@ export default function ProyectoTareasPage() {
 
   // Extract unique EDTs for filter dropdown
   const edtsUnicos = useMemo(() => {
-    const map = new Map<string, string>()
+    const map = new Map<string, { nombre: string; descripcion: string }>()
     for (const t of tareas) {
       if (!map.has(t.proyectoEdtId)) {
-        map.set(t.proyectoEdtId, t.proyectoEdt?.edt?.nombre || t.proyectoEdt?.nombre || 'Sin EDT')
+        const nombre = t.proyectoEdt?.edt?.nombre || t.proyectoEdt?.nombre || 'Sin EDT'
+        const descripcion = t.proyectoEdt?.edt?.descripcion || ''
+        map.set(t.proyectoEdtId, { nombre, descripcion })
       }
     }
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+    return Array.from(map.entries()).sort((a, b) => a[1].nombre.localeCompare(b[1].nombre))
   }, [tareas])
 
   // Classify: cronograma (has actividadId) vs extra (no actividadId)
@@ -298,14 +300,14 @@ export default function ProyectoTareasPage() {
         </Select>
 
         <Select value={filtroEdt} onValueChange={setFiltroEdt}>
-          <SelectTrigger className="h-8 w-[180px] text-xs">
+          <SelectTrigger className="h-8 w-auto max-w-[320px] text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">EDT: Todos</SelectItem>
-            {edtsUnicos.map(([edtId, edtNombre]) => (
+            {edtsUnicos.map(([edtId, { nombre, descripcion }]) => (
               <SelectItem key={edtId} value={edtId}>
-                EDT: {edtNombre}
+                {nombre}{descripcion ? ` - ${descripcion}` : ''}
               </SelectItem>
             ))}
           </SelectContent>
