@@ -58,6 +58,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
   const [origen, setOrigen] = useState<'propio' | 'externo'>('propio')
   const [costoHora, setCostoHora] = useState<number>(0)
   const [costoHoraProyecto, setCostoHoraProyecto] = useState<number | null>(null)
+  const [porcentajeProyecto, setPorcentajeProyecto] = useState<string>('')
   const [descripcion, setDescripcion] = useState('')
   const [composiciones, setComposiciones] = useState<ComposicionItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -86,6 +87,12 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
         setOrigen(recurso.origen || 'propio')
         setCostoHora(recurso.costoHora)
         setCostoHoraProyecto(recurso.costoHoraProyecto ?? null)
+        // Calcular % inicial si ambos costos existen
+        if (recurso.costoHoraProyecto != null && recurso.costoHora > 0) {
+          setPorcentajeProyecto(((recurso.costoHoraProyecto / recurso.costoHora) * 100).toFixed(1))
+        } else {
+          setPorcentajeProyecto('')
+        }
         setDescripcion(recurso.descripcion || '')
 
         // Cargar composiciones si existen
@@ -114,6 +121,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
     setOrigen('propio')
     setCostoHora(0)
     setCostoHoraProyecto(null)
+    setPorcentajeProyecto('')
     setDescripcion('')
     setComposiciones([])
   }
@@ -372,7 +380,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
           </div>
 
           {/* Costos */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-3">
             <div className="space-y-2">
               <Label htmlFor="costoHora">Costo/Hora Comercial (USD) *</Label>
               <Input
@@ -390,20 +398,55 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
             </div>
             <div className="space-y-2">
               <Label htmlFor="costoHoraProyecto">Costo/Hora Proyecto (USD)</Label>
-              <Input
-                id="costoHoraProyecto"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="45.00"
-                value={costoHoraProyecto ?? ''}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setCostoHoraProyecto(val === '' ? null : (parseFloat(val) || 0))
-                }}
-                disabled={loading}
-              />
-              <p className="text-[10px] text-muted-foreground">Costo operativo para planificación</p>
+              <div className="flex gap-2 items-start">
+                <div className="w-24 space-y-1">
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="60"
+                      value={porcentajeProyecto}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setPorcentajeProyecto(val)
+                        const pct = parseFloat(val)
+                        if (!isNaN(pct) && costoHora > 0) {
+                          setCostoHoraProyecto(Math.round(costoHora * pct / 100 * 100) / 100)
+                        } else if (val === '') {
+                          setCostoHoraProyecto(null)
+                        }
+                      }}
+                      disabled={loading}
+                      className="pr-7 text-center"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground text-center">% del comercial</p>
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Input
+                    id="costoHoraProyecto"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="45.00"
+                    value={costoHoraProyecto ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      const monto = val === '' ? null : (parseFloat(val) || 0)
+                      setCostoHoraProyecto(monto)
+                      if (monto !== null && costoHora > 0) {
+                        setPorcentajeProyecto(((monto / costoHora) * 100).toFixed(1))
+                      } else {
+                        setPorcentajeProyecto('')
+                      }
+                    }}
+                    disabled={loading}
+                  />
+                  <p className="text-[10px] text-muted-foreground">Costo operativo para planificación</p>
+                </div>
+              </div>
             </div>
           </div>
 
