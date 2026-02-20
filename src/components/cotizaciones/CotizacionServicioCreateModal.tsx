@@ -107,8 +107,6 @@ export default function CotizacionServicioCreateModal({
     }
   }
 
-  const selectedEdtName = edts.find(c => c.id === edt)?.nombre || ''
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
@@ -141,12 +139,24 @@ export default function CotizacionServicioCreateModal({
              ) : (
                <Select value={edt} onValueChange={setEdt} disabled={loading}>
                  <SelectTrigger>
-                   <SelectValue placeholder="Selecciona un EDT" />
+                   <SelectValue placeholder="Selecciona un EDT">
+                     {edt && edts.find(c => c.id === edt) && (
+                       <span>
+                         <span className="font-medium">{edts.find(c => c.id === edt)!.nombre}</span>
+                         {edts.find(c => c.id === edt)!.descripcion && (
+                           <span className="text-muted-foreground"> — {edts.find(c => c.id === edt)!.descripcion}</span>
+                         )}
+                       </span>
+                     )}
+                   </SelectValue>
                  </SelectTrigger>
                  <SelectContent>
                    {edts.map((cat) => (
                      <SelectItem key={cat.id} value={cat.id}>
-                       {cat.nombre}
+                       <span className="font-medium">{cat.nombre}</span>
+                       {cat.descripcion && (
+                         <span className="text-muted-foreground"> — {cat.descripcion}</span>
+                       )}
                      </SelectItem>
                    ))}
                  </SelectContent>
