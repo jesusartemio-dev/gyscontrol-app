@@ -32,7 +32,8 @@ const schema = z.object({
   marca: z.string().optional(),
   precioLista: z.number().min(0, 'Debe ser positivo'),
   factorCosto: z.number().min(0.5).max(3, 'Debe ser entre 0.5 y 3'),
-  factorVenta: z.number().min(1).max(3, 'Debe ser entre 1 y 3')
+  factorVenta: z.number().min(1).max(3, 'Debe ser entre 1 y 3'),
+  precioLogistica: z.number().min(0).optional()
 })
 
 const formatCurrency = (amount: number): string => {
@@ -68,7 +69,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
       marca: equipo?.marca || '',
       precioLista: equipo?.precioLista || 0,
       factorCosto: equipo?.factorCosto || 1.00,
-      factorVenta: equipo?.factorVenta || 1.15
+      factorVenta: equipo?.factorVenta || 1.15,
+      precioLogistica: equipo?.precioLogistica ?? undefined
     }
   })
 
@@ -124,6 +126,7 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
       factorCosto: values.factorCosto,
       factorVenta: values.factorVenta,
       precioVenta: calculados.precioVenta,
+      precioLogistica: values.precioLogistica ?? null,
       categoriaId: values.categoriaId,
       unidadId: values.unidadId,
       estado: equipo?.estado || 'activo'
@@ -292,6 +295,22 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
             <span className="font-mono font-medium text-green-600">
               {formatCurrency(calculados.precioVenta)}
             </span>
+          </div>
+        </div>
+
+        {/* Precio Logística */}
+        <div className="mt-2 pt-2 border-t border-gray-200">
+          <div className="flex items-center gap-2">
+            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">P.Logística</Label>
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              {...register('precioLogistica', { valueAsNumber: true })}
+              onFocus={(e) => e.target.select()}
+              placeholder="0.00"
+              className="h-7 text-xs font-mono flex-1"
+            />
           </div>
         </div>
       </div>

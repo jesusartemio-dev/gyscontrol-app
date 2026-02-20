@@ -169,6 +169,7 @@ export interface CatalogoEquipoPayload {
   factorCosto: number
   factorVenta: number
   precioVenta: number
+  precioLogistica?: number
   categoriaId: string
   unidadId: string
   estado: string

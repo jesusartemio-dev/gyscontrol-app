@@ -41,12 +41,17 @@ model CatalogoEquipo {
   factorVenta                      Float                              @default(1.15)
   precioVenta                      Float
   estado                           String
+  precioLogistica                  Float?
   precioReal                       Float?
   fechaActualizacion               DateTime?
+  createdById                      String?
+  updatedById                      String?
   createdAt                        DateTime                           @default(now())
   updatedAt                        DateTime                           @updatedAt
   categoriaEquipo                  CategoriaEquipo                    @relation(fields: [categoriaId], references: [id])
   unidad                           Unidad                             @relation(fields: [unidadId], references: [id])
+  createdByUser                    User?                              @relation("EquipoCreadoPor", fields: [createdById], references: [id])
+  updatedByUser                    User?                              @relation("EquipoActualizadoPor", fields: [updatedById], references: [id])
   cotizacionEquipoItem             CotizacionEquipoItem[]
   plantillaEquipoItem              PlantillaEquipoItem[]
   proyectoEquipoCotizadoItem       ProyectoEquipoCotizadoItem[]
@@ -1338,6 +1343,9 @@ model User {
   agenteConversaciones                  AgenteConversacion[]
   agenteConversacionMensajes            AgenteConversacionMensaje[]
   agenteUsage                           AgenteUsage[]
+  // Catálogo equipos tracking
+  equiposCreadosPor                     CatalogoEquipo[]             @relation("EquipoCreadoPor")
+  equiposActualizadosPor                CatalogoEquipo[]             @relation("EquipoActualizadoPor")
 
   @@map("user")
 }

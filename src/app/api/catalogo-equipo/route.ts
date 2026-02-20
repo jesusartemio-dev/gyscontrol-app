@@ -1,13 +1,15 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { createId } from '@paralleldrive/cuid2'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 const VALID_VISTAS = ['admin', 'comercial', 'logistica', 'proyectos']
 
 function buildPrismaSelect(columnas: string[]) {
   const select: Record<string, any> = { id: true, createdAt: true, updatedAt: true }
 
-  const directFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado']
+  const directFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'precioLogistica', 'estado']
   for (const col of columnas) {
     if (directFields.includes(col)) {
       select[col] = true
@@ -32,6 +34,12 @@ function buildPrismaSelect(columnas: string[]) {
     }
   }
 
+  // Always include user tracking
+  select.createdById = true
+  select.updatedById = true
+  select.createdByUser = { select: { id: true, name: true } }
+  select.updatedByUser = { select: { id: true, name: true } }
+
   return select
 }
 
@@ -45,6 +53,8 @@ export async function GET(req: NextRequest) {
         include: {
           categoriaEquipo: true,
           unidad: true,
+          createdByUser: { select: { id: true, name: true } },
+          updatedByUser: { select: { id: true, name: true } },
           _count: {
             select: {
               cotizacionEquipoItem: true,
@@ -89,6 +99,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    const userId = (session?.user as any)?.id as string | undefined
+
     const vista = req.nextUrl.searchParams.get('vista')
 
     // Check permission if vista is provided
@@ -120,14 +133,19 @@ export async function POST(req: NextRequest) {
         factorCosto: data.factorCosto,
         factorVenta: data.factorVenta,
         precioVenta: data.precioVenta,
+        precioLogistica: data.precioLogistica ?? null,
         categoriaId: data.categoriaId,
         unidadId: data.unidadId,
         estado: data.estado,
+        createdById: userId ?? null,
+        updatedById: userId ?? null,
         updatedAt: new Date(),
       },
       include: {
         categoriaEquipo: true,
         unidad: true,
+        createdByUser: { select: { id: true, name: true } },
+        updatedByUser: { select: { id: true, name: true } },
       }
     })
 

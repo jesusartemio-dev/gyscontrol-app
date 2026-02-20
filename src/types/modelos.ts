@@ -548,9 +548,14 @@ export interface CatalogoEquipo {
   factorCosto: number
   factorVenta: number
   precioVenta: number
+  precioLogistica?: number
   estado: string
   createdAt: string
   updatedAt: string
+  createdById?: string
+  updatedById?: string
+  createdByUser?: { id: string; name: string | null }
+  updatedByUser?: { id: string; name: string | null }
 
   // 🔗 Relaciones
   listaEquipoItems?: ListaEquipoItem[]

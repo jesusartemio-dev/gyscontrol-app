@@ -55,8 +55,10 @@ const ALL_COLUMNS = [
   { key: 'factorVenta', label: 'Factor\nVenta', align: 'center' as const },
   { key: 'precioInterno', label: 'Precio\nInterno', align: 'right' as const },
   { key: 'precioVenta', label: 'Precio\nVenta', align: 'right' as const },
+  { key: 'precioLogistica', label: 'Precio\nLogística', align: 'right' as const },
   { key: 'estado', label: 'Estado', align: 'left' as const },
   { key: 'updatedAt', label: 'Actualización', align: 'left' as const },
+  { key: 'updatedBy', label: 'Editado\nPor', align: 'left' as const },
 ] as const
 
 type ColumnKey = typeof ALL_COLUMNS[number]['key']
@@ -104,8 +106,8 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
 
   const visibleColumns = useMemo(() =>
     ALL_COLUMNS.filter(col => {
-      // updatedAt always visible
-      if (col.key === 'updatedAt') return true
+      // Always visible columns
+      if (col.key === 'updatedAt' || col.key === 'updatedBy') return true
       // codigo column merges descripcion — show if either is in config
       if (col.key === 'codigo') return vistaConfig?.columnas.includes('codigo') || vistaConfig?.columnas.includes('descripcion')
       return vistaConfig?.columnas.includes(col.key)
@@ -317,6 +319,8 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioInterno)}</span>
       case 'precioVenta':
         return <span className="font-mono text-sm font-medium text-emerald-600">{formatCurrency(eq.precioVenta)}</span>
+      case 'precioLogistica':
+        return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioLogistica)}</span>
       case 'estado':
         if (canEdit) {
           return (
@@ -334,6 +338,8 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
         return <Badge variant="outline" className="text-xs">{eq.estado}</Badge>
       case 'updatedAt':
         return <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(eq.updatedAt)}</span>
+      case 'updatedBy':
+        return <span className="text-xs text-muted-foreground whitespace-nowrap">{eq.updatedByUser?.name || '—'}</span>
       default:
         return null
     }
