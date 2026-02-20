@@ -29,7 +29,8 @@ export async function createCotizacionEquipoItem(data: {
     // 🔁 Transformar datos al formato requerido por la API
     const precioLista = equipo.precioLista ? Number(equipo.precioLista) : undefined
     const precioInterno = Number(equipo.precioInterno) || 0
-    const margen = Number(equipo.margen) || 0.15
+    const factorCosto = Number(equipo.factorCosto) || 1.00
+    const factorVenta = Number(equipo.factorVenta) || 1.15
     const precioCliente = Number(data.precioUnitario) || 0
     const cantidad = Number(data.cantidad) || 1
 
@@ -43,7 +44,8 @@ export async function createCotizacionEquipoItem(data: {
       marca: equipo.marca || 'Sin marca',
       precioLista,
       precioInterno,
-      margen,
+      factorCosto,
+      factorVenta,
       precioCliente,
       cantidad,
       costoInterno: +(precioInterno * cantidad).toFixed(2),

@@ -37,11 +37,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ✅ Crear el ítem
+    // ✅ Crear el ítem (pick only valid fields to avoid unknown fields from frontend)
     const nuevo = await prisma.cotizacionEquipoItem.create({
       data: {
         id: randomUUID(),
-        ...data,
+        cotizacionEquipoId: data.cotizacionEquipoId,
+        catalogoEquipoId: data.catalogoEquipoId,
+        codigo: data.codigo,
+        descripcion: data.descripcion,
+        categoria: data.categoria,
+        unidad: data.unidad,
+        marca: data.marca,
+        precioLista: data.precioLista,
+        precioInterno: data.precioInterno,
+        factorCosto: data.factorCosto,
+        factorVenta: data.factorVenta,
+        precioCliente: data.precioCliente,
+        cantidad: data.cantidad,
+        costoInterno: data.costoInterno,
+        costoCliente: data.costoCliente,
         updatedAt: new Date(),
       },
       select: {

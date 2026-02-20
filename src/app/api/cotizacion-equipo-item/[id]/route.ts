@@ -21,11 +21,24 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
     }
 
-    // 1️⃣ Actualizar ítem
+    // 1️⃣ Actualizar ítem (pick only valid fields to avoid unknown fields)
     const actualizado = await prisma.cotizacionEquipoItem.update({
       where: { id },
       data: {
-        ...data,
+        ...(data.catalogoEquipoId !== undefined && { catalogoEquipoId: data.catalogoEquipoId }),
+        ...(data.codigo !== undefined && { codigo: data.codigo }),
+        ...(data.descripcion !== undefined && { descripcion: data.descripcion }),
+        ...(data.categoria !== undefined && { categoria: data.categoria }),
+        ...(data.unidad !== undefined && { unidad: data.unidad }),
+        ...(data.marca !== undefined && { marca: data.marca }),
+        ...(data.precioLista !== undefined && { precioLista: data.precioLista }),
+        ...(data.precioInterno !== undefined && { precioInterno: data.precioInterno }),
+        ...(data.factorCosto !== undefined && { factorCosto: data.factorCosto }),
+        ...(data.factorVenta !== undefined && { factorVenta: data.factorVenta }),
+        ...(data.precioCliente !== undefined && { precioCliente: data.precioCliente }),
+        ...(data.cantidad !== undefined && { cantidad: data.cantidad }),
+        ...(data.costoInterno !== undefined && { costoInterno: data.costoInterno }),
+        ...(data.costoCliente !== undefined && { costoCliente: data.costoCliente }),
         updatedAt: new Date(),
       },
       select: {
