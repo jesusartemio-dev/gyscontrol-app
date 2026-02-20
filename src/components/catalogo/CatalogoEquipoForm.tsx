@@ -1,29 +1,23 @@
 'use client'
 
-// ===================================================
-// 📁 Archivo: CatalogoEquipoForm.tsx
-// 📌 Ubicación: src/components/catalogo/
-// 🔧 Descripción: Formulario avanzado para crear equipos en el catálogo, validado con Zod + React Hook Form.
-// 🧠 Uso: Utilizado en CatalogoEquipoPage para crear nuevos equipos.
-// ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-04-25
-// ===================================================
-
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { toast } from 'sonner'
-import { createCatalogoEquipo, getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
+import { createCatalogoEquipo, updateCatalogoEquipo, getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { CatalogoEquipo } from '@/types'
 
 interface CatalogoEquipoFormProps {
-  onCreated: (equipo: any) => void
+  equipo?: Partial<CatalogoEquipo>
+  onCreated?: (equipo: any) => void
+  onUpdated?: (equipo: any) => void
 }
 
 const schema = z.object({
@@ -37,7 +31,8 @@ const schema = z.object({
   factorVenta: z.number().min(1).max(3, 'Debe ser entre 1 y 3')
 })
 
-export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProps) {
+export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated }: CatalogoEquipoFormProps) {
+  const isEditMode = !!equipo?.id
   const [precioInterno, setPrecioInterno] = useState(0)
   const [precioVenta, setPrecioVenta] = useState(0)
   const [categorias, setCategorias] = useState<{ value: string; label: string }[]>([])
@@ -55,21 +50,20 @@ export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProp
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
-      categoriaId: '',
-      unidadId: '',
-      codigo: '',
-      descripcion: '',
-      marca: '',
-      precioLista: 0,
-      factorCosto: 1.00,
-      factorVenta: 1.15
+      categoriaId: equipo?.categoriaId || equipo?.categoriaEquipo?.id || '',
+      unidadId: equipo?.unidadId || equipo?.unidad?.id || '',
+      codigo: equipo?.codigo || '',
+      descripcion: equipo?.descripcion || '',
+      marca: equipo?.marca || '',
+      precioLista: equipo?.precioLista || 0,
+      factorCosto: equipo?.factorCosto || 1.00,
+      factorVenta: equipo?.factorVenta || 1.15
     }
   })
 
   const watchPrecioLista = watch('precioLista')
   const watchFactorCosto = watch('factorCosto')
   const watchFactorVenta = watch('factorVenta')
-  const watchCodigo = watch('codigo')
 
   useEffect(() => {
     const pInterno = parseFloat((watchPrecioLista * watchFactorCosto).toFixed(2))
@@ -87,7 +81,12 @@ export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProp
         ])
         setCategorias(cats.map((c: any) => ({ value: c.id, label: c.nombre })))
         setUnidades(unis.map((u: any) => ({ value: u.id, label: u.nombre })))
-        setCodigosExistentes(equipos.map((e: any) => e.codigo.toLowerCase()))
+        const codigos = equipos.map((e: any) => e.codigo.toLowerCase())
+        if (isEditMode) {
+          setCodigosExistentes(codigos.filter((c: string) => c !== equipo!.codigo!.toLowerCase()))
+        } else {
+          setCodigosExistentes(codigos)
+        }
       } catch (error) {
         toast.error('Error cargando datos para el formulario.')
       }
@@ -101,30 +100,36 @@ export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProp
       return
     }
 
+    const equipoData = {
+      codigo: values.codigo,
+      descripcion: values.descripcion,
+      marca: values.marca,
+      precioLista: values.precioLista,
+      precioInterno,
+      factorCosto: values.factorCosto,
+      factorVenta: values.factorVenta,
+      precioVenta,
+      categoriaId: values.categoriaId,
+      unidadId: values.unidadId,
+      estado: equipo?.estado || 'activo'
+    }
+
     try {
-      // ✅ Mapear al formato correcto para la API
-      const equipoData = {
-        codigo: values.codigo,
-        descripcion: values.descripcion,
-        marca: values.marca,
-        precioLista: values.precioLista,
-        precioInterno,
-        factorCosto: values.factorCosto,
-        factorVenta: values.factorVenta,
-        precioVenta,
-        categoriaId: values.categoriaId,
-        unidadId: values.unidadId,
-        estado: 'activo'
+      if (isEditMode) {
+        const actualizado = await updateCatalogoEquipo(equipo!.id!, equipoData)
+        onUpdated?.(actualizado)
+        toast.success('Equipo actualizado exitosamente.')
+      } else {
+        const nuevo = await createCatalogoEquipo(equipoData)
+        onCreated?.(nuevo)
+        reset()
+        setPrecioInterno(0)
+        setPrecioVenta(0)
+        toast.success('Equipo creado exitosamente.')
       }
-      const nuevo = await createCatalogoEquipo(equipoData)
-      onCreated(nuevo)
-      reset()
-      setPrecioInterno(0)
-      setPrecioVenta(0)
-      toast.success('Equipo creado exitosamente.')
     } catch (error) {
-      console.error('❌ Error al crear equipo:', error)
-      toast.error('Error al crear el equipo.')
+      console.error('Error al guardar equipo:', error)
+      toast.error(isEditMode ? 'Error al actualizar el equipo.' : 'Error al crear el equipo.')
     }
   }
 
@@ -217,7 +222,7 @@ export default function CatalogoEquipoForm({ onCreated }: CatalogoEquipoFormProp
 
       <div className="flex justify-end">
         <Button type="submit" disabled={isSubmitting}>
-          Agregar Equipo
+          {isEditMode ? 'Actualizar Equipo' : 'Agregar Equipo'}
         </Button>
       </div>
     </form>

@@ -32,7 +32,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
-  Plus, Search, Package, Pencil, Check, Trash2, X, Loader2, AlertCircle
+  Plus, Search, Package, Pencil, Trash2, X, Loader2, AlertCircle
 } from 'lucide-react'
 
 type CatalogoEquipoConId = CatalogoEquipoPayload & { id: string }
@@ -90,11 +90,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const [usoFiltro, setUsoFiltro] = useState('__ALL__')
 
   // Edit state
-  const [editandoId, setEditandoId] = useState<string | null>(null)
-  const [nuevoPrecioLista, setNuevoPrecioLista] = useState<number | null>(null)
-  const [nuevoFactorCosto, setNuevoFactorCosto] = useState<number | null>(null)
-  const [nuevoFactorVenta, setNuevoFactorVenta] = useState<number | null>(null)
-  const [guardando, setGuardando] = useState(false)
+  const [editTarget, setEditTarget] = useState<Partial<CatalogoEquipo> | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Partial<CatalogoEquipo> | null>(null)
   const [eliminando, setEliminando] = useState(false)
 
@@ -104,7 +100,6 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const canDelete = vistaConfig?.permisos.canDelete ?? false
   const canImport = vistaConfig?.permisos.canImport ?? false
   const canExport = vistaConfig?.permisos.canExport ?? false
-  const hasEditableColumns = canEdit && (hasCol('precioLista') || hasCol('factorCosto') || hasCol('factorVenta'))
   const showActionsColumn = canEdit || canDelete
 
   const visibleColumns = useMemo(() =>
@@ -229,31 +224,9 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     toast.success(`${creados.length} equipos importados`)
   }
 
-  const guardarEdicion = async (equipo: Partial<CatalogoEquipo>) => {
-    if (!equipo.id || nuevoPrecioLista === null || nuevoFactorCosto === null || nuevoFactorVenta === null) return
-    if (nuevoPrecioLista === equipo.precioLista && nuevoFactorCosto === equipo.factorCosto && nuevoFactorVenta === equipo.factorVenta) {
-      cancelarEdicion(); return
-    }
-    setGuardando(true)
-    const precioInterno = parseFloat((nuevoPrecioLista * nuevoFactorCosto).toFixed(2))
-    const precioVenta = parseFloat((precioInterno * nuevoFactorVenta).toFixed(2))
-    try {
-      const actualizado = await updateCatalogoEquipo(equipo.id, {
-        precioLista: nuevoPrecioLista, precioInterno,
-        factorCosto: nuevoFactorCosto, factorVenta: nuevoFactorVenta, precioVenta,
-      })
-      setEquipos(prev => prev.map(eq => eq.id === equipo.id ? actualizado : eq))
-      toast.success('Equipo actualizado')
-      cancelarEdicion()
-    } catch { toast.error('Error al guardar') }
-    finally { setGuardando(false) }
-  }
-
-  const cancelarEdicion = () => {
-    setEditandoId(null)
-    setNuevoPrecioLista(null)
-    setNuevoFactorCosto(null)
-    setNuevoFactorVenta(null)
+  const handleUpdated = (actualizado: any) => {
+    setEquipos(prev => prev.map(eq => eq.id === actualizado.id ? actualizado : eq))
+    setEditTarget(null)
   }
 
   const handleEditField = async (id: string, field: string, value: string | number) => {
@@ -273,11 +246,6 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
       setDeleteTarget(null)
     } catch { toast.error('Error al eliminar') }
     finally { setEliminando(false) }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent, equipo: Partial<CatalogoEquipo>) => {
-    if (e.key === 'Enter') { e.preventDefault(); guardarEdicion(equipo) }
-    else if (e.key === 'Escape') { cancelarEdicion() }
   }
 
   // --- Render helpers ---
@@ -309,8 +277,6 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   }
 
   const renderCell = (eq: Partial<CatalogoEquipo>, colKey: ColumnKey) => {
-    const isEditing = editandoId === eq.id
-
     switch (colKey) {
       case 'codigo':
         return <span className="font-mono text-xs">{eq.codigo}</span>
@@ -325,22 +291,10 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
       case 'uso':
         return renderUsageCell(eq)
       case 'precioLista':
-        if (isEditing && canEdit) {
-          return <Input type="number" value={nuevoPrecioLista ?? ''} onChange={e => setNuevoPrecioLista(parseFloat(e.target.value))}
-            onKeyDown={e => handleKeyDown(e, eq)} className="w-24 h-7 text-right text-xs" step="0.01" autoFocus />
-        }
         return <span className="text-muted-foreground font-mono text-sm">{formatCurrency(eq.precioLista)}</span>
       case 'factorCosto':
-        if (isEditing && canEdit) {
-          return <Input type="number" step="0.01" value={nuevoFactorCosto ?? ''} onChange={e => setNuevoFactorCosto(parseFloat(e.target.value))}
-            onKeyDown={e => handleKeyDown(e, eq)} className="w-16 h-7 text-center text-xs" />
-        }
         return <span className="text-xs text-muted-foreground font-mono">{(eq.factorCosto ?? 1.00).toFixed(2)}</span>
       case 'factorVenta':
-        if (isEditing && canEdit) {
-          return <Input type="number" step="0.01" value={nuevoFactorVenta ?? ''} onChange={e => setNuevoFactorVenta(parseFloat(e.target.value))}
-            onKeyDown={e => handleKeyDown(e, eq)} className="w-16 h-7 text-center text-xs" />
-        }
         return <span className="text-xs text-muted-foreground">{(eq.factorVenta ?? 1.15).toFixed(2)} ({(((eq.factorVenta ?? 1.15) - 1) * 100).toFixed(0)}%)</span>
       case 'precioInterno':
         return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioInterno)}</span>
@@ -550,45 +504,22 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                         {showActionsColumn && (
                           <td className="py-2 px-3">
                             <div className="flex justify-end gap-1">
-                              {editandoId === eq.id ? (
-                                <>
-                                  <Tooltip><TooltipTrigger asChild>
-                                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={cancelarEdicion} disabled={guardando}>
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger><TooltipContent>Cancelar (Esc)</TooltipContent></Tooltip>
-                                  <Tooltip><TooltipTrigger asChild>
-                                    <Button size="sm" className="h-7 w-7 p-0" onClick={() => guardarEdicion(eq)} disabled={guardando}>
-                                      {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                                    </Button>
-                                  </TooltipTrigger><TooltipContent>Guardar (Enter)</TooltipContent></Tooltip>
-                                </>
-                              ) : (
-                                <div className="flex gap-1">
-                                  {canEdit && hasEditableColumns && (
-                                    <Tooltip><TooltipTrigger asChild>
-                                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
-                                        onClick={() => {
-                                          setEditandoId(eq.id!)
-                                          setNuevoPrecioLista(eq.precioLista ?? 0)
-                                          setNuevoFactorCosto(eq.factorCosto ?? 1.00)
-                                          setNuevoFactorVenta(eq.factorVenta ?? 1.15)
-                                        }}
-                                        disabled={editandoId !== null}>
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </TooltipTrigger><TooltipContent>Editar precios</TooltipContent></Tooltip>
-                                  )}
-                                  {canDelete && (
-                                    <Tooltip><TooltipTrigger asChild>
-                                      <Button size="sm" variant="ghost"
-                                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        onClick={() => setDeleteTarget(eq)} disabled={editandoId !== null}>
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </TooltipTrigger><TooltipContent>Eliminar</TooltipContent></Tooltip>
-                                  )}
-                                </div>
+                              {canEdit && (
+                                <Tooltip><TooltipTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
+                                    onClick={() => setEditTarget(eq)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+                              )}
+                              {canDelete && (
+                                <Tooltip><TooltipTrigger asChild>
+                                  <Button size="sm" variant="ghost"
+                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => setDeleteTarget(eq)}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger><TooltipContent>Eliminar</TooltipContent></Tooltip>
                               )}
                             </div>
                           </td>
@@ -647,6 +578,19 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             })()}
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Edit modal */}
+        <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null) }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Equipo</DialogTitle>
+              <DialogDescription>Modifica los datos del equipo <span className="font-mono font-medium">{editTarget?.codigo}</span></DialogDescription>
+            </DialogHeader>
+            {editTarget && (
+              <CatalogoEquipoForm key={editTarget.id} equipo={editTarget} onUpdated={handleUpdated} />
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Duplicate modal */}
         <Dialog open={mostrarModal} onOpenChange={setMostrarModal}>
