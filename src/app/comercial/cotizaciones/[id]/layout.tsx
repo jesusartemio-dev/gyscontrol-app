@@ -16,6 +16,7 @@ import {
   FolderOpen,
   MessageSquare,
   BarChart3,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCotizacionById } from '@/lib/services/cotizacion'
@@ -37,6 +38,7 @@ import { ChatPanel } from '@/components/agente/ChatPanel'
 import type { Cotizacion, EstadoCotizacion } from '@/types'
 import { CotizacionContext } from './cotizacion-context'
 import { formatDisplayCurrency } from '@/lib/utils/currency'
+import { exportarCotizacionAExcel } from '@/lib/utils/cotizacionExportExcel'
 import { cn } from '@/lib/utils'
 
 interface CotizacionLayoutProps {
@@ -271,6 +273,24 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                     </Button>
                     <DescargarPDFButton cotizacion={cotizacion} />
                   </>
+                )}
+                {cotizacion && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-green-700 border-green-300 hover:bg-green-50"
+                    onClick={async () => {
+                      try {
+                        await exportarCotizacionAExcel(cotizacion)
+                        toast.success('Excel exportado')
+                      } catch {
+                        toast.error('Error al exportar Excel')
+                      }
+                    }}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">Excel</span>
+                  </Button>
                 )}
                 {cotizacion.oportunidadCrm ? (
                   <Button
