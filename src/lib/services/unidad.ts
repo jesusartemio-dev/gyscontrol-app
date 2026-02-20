@@ -49,5 +49,8 @@ export async function deleteUnidad(id: string): Promise<void> {
     method: 'DELETE',
   })
 
-  if (!res.ok) throw new Error('Error al eliminar unidad')
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Error al eliminar unidad')
+  }
 }

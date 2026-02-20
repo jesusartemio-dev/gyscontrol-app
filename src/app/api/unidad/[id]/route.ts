@@ -17,6 +17,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 })
     }
 
+    const count = await prisma.catalogoEquipo.count({ where: { unidadId: id } })
+    if (count > 0) {
+      return NextResponse.json(
+        { error: `No se puede eliminar: ${count} equipo(s) del catálogo usan esta unidad` },
+        { status: 409 }
+      )
+    }
+
     await prisma.unidad.delete({ where: { id } })
 
     return NextResponse.json({ message: 'Unidad eliminada' })
@@ -41,7 +49,7 @@ export async function PUT(
 
     const actualizada = await prisma.unidad.update({
       where: { id },
-      data: { nombre },
+      data: { nombre, updatedAt: new Date() },
     })
 
     return NextResponse.json(actualizada)

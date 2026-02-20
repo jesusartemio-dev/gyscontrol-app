@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/badge'
 import { Pencil, Trash2, Check, X, Ruler, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -77,9 +78,9 @@ export default function UnidadTableView({ data, onUpdate, onDelete }: Props) {
       toast.success('Unidad eliminada')
       onDelete?.(deleteTarget.id)
       setDeleteTarget(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al eliminar unidad:', error)
-      toast.error('Error al eliminar')
+      toast.error(error?.message || 'Error al eliminar')
     } finally {
       setEliminando(false)
     }
@@ -115,6 +116,9 @@ export default function UnidadTableView({ data, onUpdate, onDelete }: Props) {
               <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Nombre
               </th>
+              <th className="w-20 py-2 px-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Uso
+              </th>
               <th className="w-24 py-2 px-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Acciones
               </th>
@@ -135,6 +139,15 @@ export default function UnidadTableView({ data, onUpdate, onDelete }: Props) {
                     />
                   ) : (
                     <span className="font-medium text-sm">{unidad.nombre}</span>
+                  )}
+                </td>
+                <td className="py-2 px-3 text-center">
+                  {(unidad as any)._count?.catalogoEquipo > 0 ? (
+                    <Badge variant="secondary" className="text-xs">
+                      {(unidad as any)._count.catalogoEquipo}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </td>
                 <td className="py-2 px-3">
@@ -219,18 +232,28 @@ export default function UnidadTableView({ data, onUpdate, onDelete }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar unidad?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará la unidad "{deleteTarget?.nombre}". Esta acción no se puede deshacer.
+              {(deleteTarget as any)?._count?.catalogoEquipo > 0 ? (
+                <>
+                  La unidad "<span className="font-medium">{deleteTarget?.nombre}</span>" está en uso por{' '}
+                  <span className="font-medium text-destructive">{(deleteTarget as any)._count.catalogoEquipo} equipo(s)</span> del catálogo.
+                  No se puede eliminar mientras tenga equipos asociados.
+                </>
+              ) : (
+                <>Se eliminará la unidad "{deleteTarget?.nombre}". Esta acción no se puede deshacer.</>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmarEliminar}
-              disabled={eliminando}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {eliminando ? 'Eliminando...' : 'Eliminar'}
-            </AlertDialogAction>
+            {!((deleteTarget as any)?._count?.catalogoEquipo > 0) && (
+              <AlertDialogAction
+                onClick={confirmarEliminar}
+                disabled={eliminando}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {eliminando ? 'Eliminando...' : 'Eliminar'}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

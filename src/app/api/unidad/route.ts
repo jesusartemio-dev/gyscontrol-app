@@ -4,7 +4,12 @@ import { prisma } from '@/lib/prisma'
 export async function GET() {
   try {
     const unidades = await prisma.unidad.findMany({
-      orderBy: { nombre: 'asc' }
+      orderBy: { nombre: 'asc' },
+      include: {
+        _count: {
+          select: { catalogoEquipo: true }
+        }
+      }
     })
     return NextResponse.json(unidades)
   } catch (error) {
