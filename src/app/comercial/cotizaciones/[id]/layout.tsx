@@ -39,6 +39,7 @@ import type { Cotizacion, EstadoCotizacion } from '@/types'
 import { CotizacionContext } from './cotizacion-context'
 import { formatDisplayCurrency } from '@/lib/utils/currency'
 import { exportarCotizacionAExcel } from '@/lib/utils/cotizacionExportExcel'
+import { exportarCotizacionAExcelEditable } from '@/lib/utils/cotizacionExportExcelEditable'
 import { cn } from '@/lib/utils'
 
 interface CotizacionLayoutProps {
@@ -216,6 +217,9 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                       className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline max-w-[400px]"
                     >
                       <span className="font-mono">{cotizacion.codigo || 'Sin código'}</span>
+                      {cotizacion.revision && (
+                        <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 font-mono">{cotizacion.revision}</Badge>
+                      )}
                       <span className="mx-1">:</span>
                       <span className="line-clamp-1">{cotizacion.nombre}</span>
                     </Button>
@@ -227,6 +231,9 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="font-mono bg-muted px-2 py-0.5 rounded border text-sm flex-shrink-0">
                       {cotizacion.codigo || 'Sin código'}
+                      {cotizacion.revision && (
+                        <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 font-mono">{cotizacion.revision}</Badge>
+                      )}
                     </span>
                     <h1 className="text-base sm:text-lg font-semibold text-gray-900 line-clamp-2 leading-tight">
                       {cotizacion.nombre}
@@ -290,6 +297,25 @@ export default function CotizacionLayout({ children }: CotizacionLayoutProps) {
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-1" />
                     <span className="hidden sm:inline">Excel</span>
+                  </Button>
+                )}
+                {cotizacion && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-amber-700 border-amber-300 hover:bg-amber-50"
+                    title="Exportar Excel con fórmulas editables"
+                    onClick={async () => {
+                      try {
+                        await exportarCotizacionAExcelEditable(cotizacion)
+                        toast.success('Excel editable exportado')
+                      } catch {
+                        toast.error('Error al exportar Excel editable')
+                      }
+                    }}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">Excel Editable</span>
                   </Button>
                 )}
                 {cotizacion.oportunidadCrm ? (

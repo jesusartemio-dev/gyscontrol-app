@@ -14,7 +14,7 @@ import VersionesCotizacion from '@/components/cotizaciones/VersionesCotizacion'
 import { useCotizacionContext } from '../cotizacion-context'
 
 export default function CotizacionConfiguracionPage() {
-  const { cotizacion, setCotizacion, isLocked } = useCotizacionContext()
+  const { cotizacion, setCotizacion, refreshCotizacion, isLocked } = useCotizacionContext()
   const [activeTab, setActiveTab] = useState('cabecera')
 
   if (!cotizacion) return null
@@ -111,6 +111,7 @@ export default function CotizacionConfiguracionPage() {
               cotizacionId={cotizacion.id}
               cotizacionCodigo={cotizacion.codigo || cotizacion.id}
               cotizacionNombre={cotizacion.nombre}
+              onVersionCreated={refreshCotizacion}
             />
           </TabsContent>
         </div>

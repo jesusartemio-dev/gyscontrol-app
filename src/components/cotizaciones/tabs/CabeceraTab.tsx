@@ -228,9 +228,9 @@ export function CabeceraTab({ cotizacion, onUpdated, isLocked = false }: Cabecer
                 <Input
                   id="revision"
                   value={formData.revision}
-                  onChange={(e) => handleInputChange('revision', e.target.value)}
-                  placeholder="Ej: R01, R02, etc."
-                  disabled={isLocked}
+                  readOnly
+                  className="bg-muted text-muted-foreground cursor-default"
+                  title="Se actualiza automáticamente al crear una versión"
                 />
               </div>
 

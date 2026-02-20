@@ -248,3 +248,19 @@ export async function updateVersionEstado(versionId: string, estado: string): Pr
     throw error
   }
 }
+
+// Restaurar versión como copia nueva
+export async function restoreVersionAsNewCotizacion(versionId: string): Promise<{ success: boolean; cotizacion: any; message: string }> {
+  const response = await fetch(buildApiUrl(`/api/cotizaciones/versions/${versionId}/restore`), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }
+  })
+
+  if (!response.ok) {
+    const data = await response.json()
+    throw new Error(data.error || `Error al restaurar versión: ${response.statusText}`)
+  }
+
+  return await response.json()
+}

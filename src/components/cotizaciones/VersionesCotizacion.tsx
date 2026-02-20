@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,25 +25,34 @@ import {
   Clock,
   User,
   FileText,
-  AlertCircle
+  AlertCircle,
+  ArrowLeftRight,
+  Copy
 } from 'lucide-react'
 import {
   createCotizacionVersion,
   getCotizacionVersions,
+  getCotizacionVersion,
   createCotizacionSnapshot,
+  restoreVersionAsNewCotizacion,
   type CotizacionVersion
 } from '@/lib/services/cotizacion-versions'
+import { updateCotizacion } from '@/lib/services/cotizacion'
+import VersionSnapshotModal from './VersionSnapshotModal'
+import VersionCompareModal from './VersionCompareModal'
 
 interface VersionesCotizacionProps {
   cotizacionId: string
   cotizacionCodigo: string
   cotizacionNombre: string
+  onVersionCreated?: () => void
 }
 
 export default function VersionesCotizacion({
   cotizacionId,
   cotizacionCodigo,
-  cotizacionNombre
+  cotizacionNombre,
+  onVersionCreated
 }: VersionesCotizacionProps) {
   const [versiones, setVersiones] = useState<CotizacionVersion[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,6 +64,11 @@ export default function VersionesCotizacion({
     cambios: '',
     motivoCambio: ''
   })
+  const [viewVersion, setViewVersion] = useState<CotizacionVersion | null>(null)
+  const [showCompare, setShowCompare] = useState(false)
+  const [duplicateVersion, setDuplicateVersion] = useState<CotizacionVersion | null>(null)
+  const [duplicating, setDuplicating] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     loadVersiones()
@@ -90,11 +109,18 @@ export default function VersionesCotizacion({
         snapshot
       })
 
+      // Auto-update revision field on cotización
+      const revisionCode = `R${String(nuevaVersion.version).padStart(2, '0')}`
+      try {
+        await updateCotizacion(cotizacionId, { revision: revisionCode })
+      } catch { /* revision update is non-critical */ }
+
       setVersiones(prev => [nuevaVersion, ...prev])
       setShowCreateDialog(false)
       setFormData({ nombre: '', descripcion: '', cambios: '', motivoCambio: '' })
+      onVersionCreated?.()
 
-      toast.success(`Versión "${nuevaVersion.nombre}" creada exitosamente`)
+      toast.success(`Versión v${nuevaVersion.version} (${revisionCode}) creada exitosamente`)
     } catch (error) {
       console.error('Error creating version:', error)
       toast.error('Error al crear la versión')
@@ -102,6 +128,38 @@ export default function VersionesCotizacion({
       setCreating(false)
     }
   }
+
+  const handleViewVersion = async (version: CotizacionVersion) => {
+    try {
+      // If snapshot is already in the list item, use it directly
+      if (version.snapshot) {
+        setViewVersion(version)
+      } else {
+        const full = await getCotizacionVersion(version.id)
+        setViewVersion(full)
+      }
+    } catch {
+      toast.error('Error al cargar versión')
+    }
+  }
+
+  const handleDuplicateVersion = useCallback(async () => {
+    if (!duplicateVersion) return
+    try {
+      setDuplicating(true)
+      const result = await restoreVersionAsNewCotizacion(duplicateVersion.id)
+      toast.success(result.message || 'Copia creada exitosamente')
+      setDuplicateVersion(null)
+      // Navigate to the new cotización
+      if (result.cotizacion?.id) {
+        router.push(`/comercial/cotizaciones/${result.cotizacion.id}`)
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Error al crear copia')
+    } finally {
+      setDuplicating(false)
+    }
+  }, [duplicateVersion, router])
 
   const getEstadoBadgeVariant = (estado: string) => {
     switch (estado) {
@@ -155,6 +213,13 @@ export default function VersionesCotizacion({
             </CardDescription>
           </div>
 
+          <div className="flex gap-2">
+            {versiones.length >= 2 && (
+              <Button variant="outline" onClick={() => setShowCompare(true)}>
+                <ArrowLeftRight className="h-4 w-4 mr-2" />
+                Comparar
+              </Button>
+            )}
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
               <Button>
@@ -228,6 +293,7 @@ export default function VersionesCotizacion({
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </CardHeader>
 
@@ -299,13 +365,13 @@ export default function VersionesCotizacion({
                       </div>
 
                       <div className="flex gap-2 ml-4">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleViewVersion(version)}>
                           <Eye className="h-3 w-3 mr-1" />
                           Ver
                         </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="h-3 w-3 mr-1" />
-                          Exportar
+                        <Button variant="outline" size="sm" onClick={() => setDuplicateVersion(version)}>
+                          <Copy className="h-3 w-3 mr-1" />
+                          Duplicar
                         </Button>
                       </div>
                     </div>
@@ -326,6 +392,43 @@ export default function VersionesCotizacion({
           </div>
         )}
       </CardContent>
+
+      {/* View version snapshot modal */}
+      {viewVersion && (
+        <VersionSnapshotModal
+          open={!!viewVersion}
+          onOpenChange={(open) => { if (!open) setViewVersion(null) }}
+          versionNumber={viewVersion.version}
+          versionNombre={viewVersion.nombre}
+          snapshot={viewVersion.snapshot}
+        />
+      )}
+
+      {/* Compare versions modal */}
+      <VersionCompareModal
+        open={showCompare}
+        onOpenChange={setShowCompare}
+        versiones={versiones}
+      />
+
+      {/* Duplicate confirmation dialog */}
+      <AlertDialog open={!!duplicateVersion} onOpenChange={(open) => { if (!open) setDuplicateVersion(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Duplicar como nueva cotización</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se creará una <strong>nueva cotización</strong> con los datos de la versión v{duplicateVersion?.version} ({duplicateVersion?.nombre}).
+              La cotización actual no se modificará.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={duplicating}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDuplicateVersion} disabled={duplicating}>
+              {duplicating ? 'Creando...' : 'Crear Copia'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

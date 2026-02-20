@@ -21,14 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Package, Loader2, Calculator, Database } from 'lucide-react'
+import { Package, Loader2, Calculator } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
-import { createCatalogoEquipo } from '@/lib/services/catalogoEquipo'
-import type { CotizacionEquipoItem, CotizacionEquipoItemPayload, CategoriaEquipo, Unidad, CatalogoEquipoPayload } from '@/types'
+import type { CotizacionEquipoItem, CotizacionEquipoItemPayload, CategoriaEquipo, Unidad } from '@/types'
 
 interface Props {
   isOpen: boolean
@@ -40,7 +38,6 @@ interface Props {
   item?: CotizacionEquipoItem // Si se pasa, es modo edición
   onItemCreated: (item: CotizacionEquipoItem) => void
   onItemUpdated?: (item: CotizacionEquipoItem) => void
-  defaultGuardarEnCatalogo?: boolean
 }
 
 const formatCurrency = (amount: number): string => {
@@ -58,7 +55,6 @@ export default function CotizacionEquipoItemCreateModal({
   item,
   onItemCreated,
   onItemUpdated,
-  defaultGuardarEnCatalogo = false
 }: Props) {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -80,17 +76,15 @@ export default function CotizacionEquipoItemCreateModal({
   const [factorVenta, setFactorVenta] = useState(1.15)
   const [factorCostoDisplay, setFactorCostoDisplay] = useState('1.00')
   const [factorVentaDisplay, setFactorVentaDisplay] = useState('1.15')
-  const [guardarEnCatalogo, setGuardarEnCatalogo] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       loadFormData()
       if (!item) {
         resetForm()
-        setGuardarEnCatalogo(defaultGuardarEnCatalogo)
       }
     }
-  }, [isOpen, item, defaultGuardarEnCatalogo])
+  }, [isOpen, item])
 
   // Populate edit mode after data is loaded
   useEffect(() => {
@@ -143,7 +137,6 @@ export default function CotizacionEquipoItemCreateModal({
     setFactorVenta(1.15)
     setFactorCostoDisplay('1.00')
     setFactorVentaDisplay('1.15')
-    setGuardarEnCatalogo(false)
   }
 
   // Calcular costos en tiempo real
@@ -186,47 +179,11 @@ export default function CotizacionEquipoItemCreateModal({
       toast.error('La cantidad debe ser mayor a 0')
       return
     }
-    if (guardarEnCatalogo && !categoriaId) {
-      toast.error('Selecciona una categoría para guardar en catálogo')
-      return
-    }
-    if (guardarEnCatalogo && !unidadId) {
-      toast.error('Selecciona una unidad para guardar en catálogo')
-      return
-    }
 
     setSaving(true)
     try {
-      let catalogoEquipoId: string | undefined = undefined
-
-      // Si "Guardar en Catálogo" está marcado, crear primero en catálogo
-      if (guardarEnCatalogo && !isEditMode) {
-        try {
-          const catalogoPayload: CatalogoEquipoPayload = {
-            codigo: codigo.trim(),
-            descripcion: descripcion.trim(),
-            marca: marca.trim() || 'Sin marca',
-            precioLista,
-            precioInterno: calculados.precioInterno,
-            factorCosto,
-            factorVenta,
-            precioVenta: calculados.precioCliente,
-            categoriaId,
-            unidadId,
-            estado: 'activo'
-          }
-          const catalogoEquipo = await createCatalogoEquipo(catalogoPayload)
-          catalogoEquipoId = catalogoEquipo.id
-          toast.success('Equipo guardado en catálogo')
-        } catch (error) {
-          console.error('Error saving to catalog:', error)
-          toast.warning('No se pudo guardar en catálogo (código duplicado?). Se creará solo en la cotización.')
-        }
-      }
-
       const payload: CotizacionEquipoItemPayload = {
         cotizacionEquipoId: equipo.id,
-        catalogoEquipoId,
         codigo: codigo.trim(),
         descripcion: descripcion.trim(),
         categoria: categoria.trim() || 'Sin categoría',
@@ -496,24 +453,6 @@ export default function CotizacionEquipoItemCreateModal({
               </p>
             </div>
           </div>
-
-          {/* Guardar en Catálogo - solo en modo crear */}
-          {!isEditMode && (
-            <div className="flex items-center space-x-2 pt-1">
-              <Checkbox
-                id="guardarCatalogo"
-                checked={guardarEnCatalogo}
-                onCheckedChange={(checked) => setGuardarEnCatalogo(checked === true)}
-              />
-              <Label
-                htmlFor="guardarCatalogo"
-                className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
-              >
-                <Database className="h-3 w-3" />
-                Guardar en Catálogo de Equipos
-              </Label>
-            </div>
-          )}
 
           {/* Footer */}
           <div className="flex justify-end gap-2 pt-2">
