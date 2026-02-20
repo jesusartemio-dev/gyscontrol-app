@@ -105,6 +105,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const canImport = vistaConfig?.permisos.canImport ?? false
   const canExport = vistaConfig?.permisos.canExport ?? false
   const hasEditableColumns = canEdit && (hasCol('precioLista') || hasCol('factorCosto') || hasCol('factorVenta'))
+  const showActionsColumn = canEdit || canDelete
 
   const visibleColumns = useMemo(() =>
     ALL_COLUMNS.filter(col => vistaConfig?.columnas.includes(col.key)),
@@ -529,7 +530,11 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                           {col.label}
                         </th>
                       ))}
-                      {(hasEditableColumns || canDelete) && <th className="w-24 py-2 px-3"></th>}
+                      {showActionsColumn && (
+                        <th className="w-24 py-2 px-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Acciones
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -542,7 +547,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                             {renderCell(eq, col.key)}
                           </td>
                         ))}
-                        {(hasEditableColumns || canDelete) && (
+                        {showActionsColumn && (
                           <td className="py-2 px-3">
                             <div className="flex justify-end gap-1">
                               {editandoId === eq.id ? (
@@ -560,7 +565,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                                 </>
                               ) : (
                                 <div className="flex gap-1">
-                                  {hasEditableColumns && (
+                                  {canEdit && hasEditableColumns && (
                                     <Tooltip><TooltipTrigger asChild>
                                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
                                         onClick={() => {
