@@ -247,6 +247,14 @@ export async function GET(request: NextRequest) {
               }
             }
           },
+          // ✅ Responsable (quien creó el pedido)
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
           // ✅ Items del pedido para calcular monto total
           pedidoEquipoItem: {
             select: {
@@ -299,6 +307,8 @@ export async function GET(request: NextRequest) {
         observacion: pedido.observacion,
         createdAt: pedido.createdAt,
         updatedAt: pedido.updatedAt,
+        // ✅ Responsable
+        user: pedido.user,
         // ✅ Proyecto del pedido
         proyecto: pedido.proyecto ? {
           id: pedido.proyecto.id,

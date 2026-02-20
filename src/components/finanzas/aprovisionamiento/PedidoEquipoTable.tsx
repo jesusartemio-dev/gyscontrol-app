@@ -75,6 +75,7 @@ import {
   Package,
   ShoppingCart,
   Truck,
+  User,
   X,
 } from 'lucide-react';
 // Removed framer-motion imports as they were causing ref conflicts
@@ -116,9 +117,10 @@ interface PedidoEquipoTableProps {
 }
 
 // ✅ Column configuration
-type ColumnKey = 
+type ColumnKey =
   | 'codigo'
   | 'proyecto'
+  | 'creadoPor'
   | 'lista'
   | 'descripcion'
   | 'fechaPedido'
@@ -144,6 +146,7 @@ interface ColumnConfig {
 const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: 'codigo', label: 'Código', sortable: true, width: '100px' },
   { key: 'proyecto', label: 'Proyecto', sortable: true, width: '140px' },
+  { key: 'creadoPor', label: 'Creado por', sortable: true, width: '130px' },
   { key: 'fechaPedido', label: 'F. Pedido', sortable: true, width: '90px', align: 'center' },
   { key: 'fechaEntregaEstimada', label: 'F. Entrega', sortable: true, width: '90px', align: 'center' },
   { key: 'estado', label: 'Estado', sortable: true, width: '100px', align: 'center' },
@@ -472,6 +475,17 @@ const PedidoEquipoTableRow = memo<PedidoTableRowProps>(({
                 {(pedido as any).proyecto?.nombre || ''}
               </span>
             </div>
+          </div>
+        </TableCell>
+      )}
+
+      {visibleColumns.includes('creadoPor') && (
+        <TableCell className="px-2 py-1.5">
+          <div className="flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <span className="text-xs text-gray-700 truncate max-w-[110px]">
+              {(pedido as any).user?.name || (pedido as any).user?.email || '-'}
+            </span>
           </div>
         </TableCell>
       )}

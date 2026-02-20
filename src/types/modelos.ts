@@ -1318,6 +1318,7 @@ export interface ListaEquipo {
   
   listaEquipoItem: ListaEquipoItem[]
   proyecto?: Proyecto | null       // ✅ incluye info del proyecto si se hace include en la API
+  user?: { id: string; name: string | null; email: string } | null
 }
 
 
@@ -1483,6 +1484,7 @@ export interface PedidoEquipo {
   observacionesLogisticas?: string    // Observaciones específicas de logística
 
   responsable?: User
+  user?: { id: string; name: string | null; email: string } | null
   proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'>
   lista?: ListaEquipo
   responsableLogistico?: User         // Relación con responsable de logística

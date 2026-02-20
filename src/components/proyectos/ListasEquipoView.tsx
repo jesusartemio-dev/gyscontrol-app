@@ -28,12 +28,16 @@ import {
   XCircle,
   LayoutGrid,
   LayoutList,
-  Building2
+  Building2,
+  User,
+  FileSpreadsheet,
+  ClipboardList
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import * as XLSX from 'xlsx'
 import type { ListaEquipo, EstadoListaEquipo } from '@/types'
 
 async function fetchListasEquipo(proyectoId?: string, estado?: EstadoListaEquipo | 'todos' | 'all'): Promise<ListaEquipo[]> {
@@ -103,6 +107,7 @@ export function ListasEquipoView() {
   const [selectedProyecto, setSelectedProyecto] = useState<string>('todos')
   const [selectedEstado, setSelectedEstado] = useState<string>('todos')
   const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -152,6 +157,54 @@ export function ListasEquipoView() {
     rechazadas: filteredListas.filter(l => l.estado === 'rechazada').length
   }
 
+  const handleExportExcel = async () => {
+    if (filteredListas.length === 0) {
+      toast.warning('No hay listas para exportar')
+      return
+    }
+
+    setExporting(true)
+    try {
+      const data = filteredListas.map(lista => ({
+        'Código': lista.codigo,
+        'Nombre': lista.nombre,
+        'Proyecto': lista.proyecto?.codigo || 'N/A',
+        'Proyecto Nombre': lista.proyecto?.nombre || '',
+        'Creado por': lista.user?.name || lista.user?.email || '-',
+        'Estado': estadoLabels[lista.estado] || lista.estado,
+        'Items': lista._count?.listaEquipoItem || 0,
+        'Fecha Creación': format(new Date(lista.createdAt), 'dd/MM/yyyy'),
+        'Fecha Necesaria': lista.fechaNecesaria ? format(new Date(lista.fechaNecesaria), 'dd/MM/yyyy') : '-',
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(data)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Listas')
+
+      ws['!cols'] = [
+        { wch: 14 },
+        { wch: 30 },
+        { wch: 12 },
+        { wch: 30 },
+        { wch: 20 },
+        { wch: 12 },
+        { wch: 8 },
+        { wch: 12 },
+        { wch: 14 },
+      ]
+
+      const fileName = `listas-equipos-${format(new Date(), 'yyyyMMdd-HHmm')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+
+      toast.success('Excel exportado correctamente')
+    } catch (error) {
+      console.error('Error al exportar:', error)
+      toast.error('Error al exportar Excel')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -162,11 +215,11 @@ export function ListasEquipoView() {
 
   return (
     <div className="space-y-4">
-      {/* Stats & View Toggle */}
+      {/* Header: Stats + Actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-xs font-medium">
-            {stats.total} listas
+          <Badge variant="secondary" className="text-xs">
+            {stats.total}
           </Badge>
 
           {/* Inline Stats - Desktop */}
@@ -192,31 +245,48 @@ export function ListasEquipoView() {
           </div>
         </div>
 
-        {/* View Toggle */}
-        <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg">
+        {/* Actions: View Toggle + Export */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border rounded-md">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'h-8 px-2 rounded-r-none',
+                viewMode === 'table' && 'bg-gray-100'
+              )}
+              onClick={() => setViewMode('table')}
+              title="Vista tabla"
+            >
+              <LayoutList className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'h-8 px-2 rounded-l-none border-l',
+                viewMode === 'cards' && 'bg-gray-100'
+              )}
+              onClick={() => setViewMode('cards')}
+              title="Vista cards"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className={cn(
-              "h-7 px-2.5 text-xs",
-              viewMode === 'table' && "bg-white shadow-sm"
-            )}
-            onClick={() => setViewMode('table')}
+            className="h-8"
+            onClick={handleExportExcel}
+            disabled={exporting}
           >
-            <LayoutList className="h-3.5 w-3.5 mr-1.5" />
-            Tabla
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-7 px-2.5 text-xs",
-              viewMode === 'cards' && "bg-white shadow-sm"
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5 text-green-600" />
             )}
-            onClick={() => setViewMode('cards')}
-          >
-            <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
-            Cards
+            Excel
           </Button>
         </div>
       </div>
@@ -289,19 +359,15 @@ export function ListasEquipoView() {
 
       {/* Empty State */}
       {filteredListas.length === 0 ? (
-        <Card className="p-8 text-center">
-          <div className="flex flex-col items-center gap-3">
-            <Package className="h-10 w-10 text-muted-foreground" />
-            <div>
-              <h3 className="font-semibold">No se encontraron listas</h3>
-              <p className="text-sm text-muted-foreground">
-                {searchTerm || selectedProyecto !== 'todos' || selectedEstado !== 'todos'
-                  ? 'Intenta ajustar los filtros de búsqueda'
-                  : 'No hay listas de equipos disponibles'}
-              </p>
-            </div>
-          </div>
-        </Card>
+        <div className="border rounded-lg bg-white p-8 text-center">
+          <ClipboardList className="h-10 w-10 mx-auto mb-3 text-gray-400" />
+          <h3 className="text-base font-medium mb-1">No hay listas</h3>
+          <p className="text-sm text-muted-foreground">
+            {searchTerm || selectedProyecto !== 'todos' || selectedEstado !== 'todos'
+              ? 'No se encontraron listas con los filtros aplicados'
+              : 'No hay listas de equipos disponibles'}
+          </p>
+        </div>
       ) : viewMode === 'table' ? (
         /* TABLE VIEW */
         <div className="border rounded-lg overflow-hidden bg-white">
@@ -311,19 +377,17 @@ export function ListasEquipoView() {
                 <TableHead className="font-semibold text-gray-700">Lista</TableHead>
                 <TableHead className="font-semibold text-gray-700 hidden md:table-cell">Proyecto</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center w-20">Items</TableHead>
+                <TableHead className="font-semibold text-gray-700 hidden lg:table-cell">Creado por</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center hidden sm:table-cell">Fecha</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center">Estado</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center w-20"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredListas.map((lista, idx) => (
+              {filteredListas.map((lista) => (
                 <TableRow
                   key={lista.id}
-                  className={cn(
-                    "hover:bg-blue-50/50 transition-colors",
-                    idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
-                  )}
+                  className="hover:bg-blue-50/50 transition-colors"
                 >
                   {/* Lista Info */}
                   <TableCell>
@@ -358,6 +422,16 @@ export function ListasEquipoView() {
                     <div className="flex items-center justify-center gap-1">
                       <Package className="h-3.5 w-3.5 text-gray-400" />
                       <span className="font-medium">{lista._count?.listaEquipoItem || 0}</span>
+                    </div>
+                  </TableCell>
+
+                  {/* Creado por */}
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="text-sm text-gray-700 truncate max-w-[150px]">
+                        {lista.user?.name || lista.user?.email || '-'}
+                      </span>
                     </div>
                   </TableCell>
 
@@ -399,60 +473,69 @@ export function ListasEquipoView() {
         </div>
       ) : (
         /* CARDS VIEW */
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filteredListas.map((lista) => (
-            <Card key={lista.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2 pt-3 px-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-0.5 min-w-0 flex-1">
-                    <CardTitle className="text-base truncate">{lista.nombre}</CardTitle>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-mono">{lista.codigo}</span>
-                    </div>
+            <Card
+              key={lista.id}
+              className="cursor-pointer hover:shadow-md transition-shadow hover:border-blue-300"
+            >
+              <CardContent className="p-3">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <Link
+                      href={`/proyectos/${lista.proyecto?.id}/equipos/listas/${lista.id}`}
+                      className="font-mono text-sm font-semibold text-blue-600 hover:underline"
+                    >
+                      {lista.codigo}
+                    </Link>
+                    <Badge
+                      variant="outline"
+                      className={cn('ml-2 text-[10px] px-1.5 py-0', estadoColors[lista.estado])}
+                    >
+                      {estadoLabels[lista.estado]}
+                    </Badge>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={cn("text-xs font-medium shrink-0", estadoColors[lista.estado])}
-                  >
-                    {estadoLabels[lista.estado]}
-                  </Badge>
                 </div>
-              </CardHeader>
 
-              <CardContent className="pt-0 pb-3 px-4">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
+                {/* Nombre */}
+                <div className="text-sm font-medium text-gray-900 truncate mb-2">
+                  {lista.nombre}
+                </div>
+
+                {/* Proyecto */}
+                <div className="flex items-center gap-1.5 mb-1.5 text-xs text-muted-foreground">
                   <Building2 className="h-3.5 w-3.5" />
-                  <span className="truncate">{lista.proyecto?.nombre}</span>
+                  <span className="font-medium truncate">
+                    {lista.proyecto?.codigo || 'N/A'}
+                  </span>
+                  <span className="truncate">
+                    {lista.proyecto?.nombre || ''}
+                  </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Package className="h-3.5 w-3.5" />
-                      <span className="font-medium">{lista._count?.listaEquipoItem || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>
-                        {format(new Date(lista.createdAt), 'dd MMM', { locale: es })}
-                      </span>
-                    </div>
+                {/* Creado por */}
+                {lista.user && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+                    <User className="h-3.5 w-3.5" />
+                    <span className="truncate">{lista.user.name || lista.user.email}</span>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span>{lista._count?.listaEquipoItem || 0} items</span>
+                    <span>
+                      {format(new Date(lista.createdAt), 'dd/MM/yy')}
+                    </span>
                     {lista.fechaNecesaria && (
-                      <div className="flex items-center gap-1 text-orange-600">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        <span>
-                          {format(new Date(lista.fechaNecesaria), 'dd MMM', { locale: es })}
-                        </span>
-                      </div>
+                      <span className="flex items-center gap-0.5 text-orange-600">
+                        <AlertCircle className="h-3 w-3" />
+                        {format(new Date(lista.fechaNecesaria), 'dd/MM', { locale: es })}
+                      </span>
                     )}
                   </div>
-
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                    <Link href={`/proyectos/${lista.proyecto?.id}/equipos/listas/${lista.id}`}>
-                      <Eye className="h-3.5 w-3.5 mr-1" />
-                      Ver
-                    </Link>
-                  </Button>
                 </div>
               </CardContent>
             </Card>
