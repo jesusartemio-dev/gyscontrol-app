@@ -349,7 +349,7 @@ export default function CotizacionEquipoItemCreateModal({
                 </SelectTrigger>
                 <SelectContent>
                   {categorias.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id!} className="text-sm">
+                    <SelectItem key={cat.id} value={cat.id!} className="text-sm" title={cat.descripcion || ''}>
                       {cat.nombre}
                     </SelectItem>
                   ))}
