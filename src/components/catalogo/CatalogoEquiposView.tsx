@@ -359,12 +359,12 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                 <DialogTrigger asChild>
                   <Button size="sm"><Plus className="h-4 w-4 mr-1" />Nuevo</Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-lg">
                   <DialogHeader>
                     <DialogTitle>Nuevo Equipo</DialogTitle>
                     <DialogDescription>Agrega un equipo al catálogo</DialogDescription>
                   </DialogHeader>
-                  <CatalogoEquipoForm onCreated={handleCreated} />
+                  <CatalogoEquipoForm onCreated={handleCreated} onCancel={() => setShowCreateModal(false)} />
                 </DialogContent>
               </Dialog>
             )}
@@ -581,13 +581,13 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
 
         {/* Edit modal */}
         <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null) }}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Editar Equipo</DialogTitle>
               <DialogDescription>Modifica los datos del equipo <span className="font-mono font-medium">{editTarget?.codigo}</span></DialogDescription>
             </DialogHeader>
             {editTarget && (
-              <CatalogoEquipoForm key={editTarget.id} equipo={editTarget} onUpdated={handleUpdated} />
+              <CatalogoEquipoForm key={editTarget.id} equipo={editTarget} onUpdated={handleUpdated} onCancel={() => setEditTarget(null)} />
             )}
           </DialogContent>
         </Dialog>

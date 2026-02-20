@@ -20,12 +20,9 @@ import {
   History,
   Plus,
   Eye,
-  Download,
   GitBranch,
   Clock,
   User,
-  FileText,
-  AlertCircle,
   ArrowLeftRight,
   Copy
 } from 'lucide-react'
@@ -38,6 +35,7 @@ import {
   type CotizacionVersion
 } from '@/lib/services/cotizacion-versions'
 import { updateCotizacion } from '@/lib/services/cotizacion'
+import { formatDisplayCurrency } from '@/lib/utils/currency'
 import VersionSnapshotModal from './VersionSnapshotModal'
 import VersionCompareModal from './VersionCompareModal'
 
@@ -180,6 +178,13 @@ export default function VersionesCotizacion({
     })
   }
 
+  const getSnapshotTotal = (snapshot: string): number | null => {
+    try {
+      const data = JSON.parse(snapshot)
+      return data.grandTotal ?? null
+    } catch { return null }
+  }
+
   if (loading) {
     return (
       <Card>
@@ -311,84 +316,103 @@ export default function VersionesCotizacion({
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {versiones.map((version, index) => (
-              <motion.div
-                key={version.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="flex items-center gap-2">
-                            <GitBranch className="h-4 w-4 text-blue-600" />
-                            <span className="font-medium">v{version.version}</span>
-                          </div>
-                          <Badge variant={getEstadoBadgeVariant(version.estado) as any}>
-                            {version.estado}
-                          </Badge>
-                          {index === 0 && (
-                            <Badge variant="default" className="text-xs">
-                              Más Reciente
+          <div className="relative">
+            {/* Vertical timeline line */}
+            <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-border" />
+
+            <div className="space-y-6">
+              {versiones.map((version, index) => {
+                const total = getSnapshotTotal(version.snapshot)
+                const isCurrent = index === 0
+
+                return (
+                  <motion.div
+                    key={version.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.08 }}
+                    className="relative pl-10"
+                  >
+                    {/* Timeline dot */}
+                    <div className={`absolute left-[8px] top-2 w-[15px] h-[15px] rounded-full border-2 z-10 ${
+                      isCurrent
+                        ? 'bg-primary border-primary'
+                        : 'bg-background border-muted-foreground/40'
+                    }`} />
+
+                    <div className={`border rounded-lg p-4 transition-shadow hover:shadow-md ${
+                      isCurrent ? 'border-primary/30 bg-primary/[0.02]' : ''
+                    }`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          {/* Header row */}
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-mono font-semibold text-sm">v{version.version}</span>
+                            <Badge variant={getEstadoBadgeVariant(version.estado) as any} className="text-[10px]">
+                              {version.estado}
                             </Badge>
+                            {isCurrent && (
+                              <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                                Actual
+                              </Badge>
+                            )}
+                            {total != null && (
+                              <span className="ml-auto text-xs font-mono text-muted-foreground">
+                                Total: <span className="font-medium text-foreground">{formatDisplayCurrency(total)}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Name */}
+                          <h4 className="font-medium text-sm mb-1 truncate">{version.nombre}</h4>
+
+                          {version.descripcion && (
+                            <p className="text-xs text-muted-foreground mb-1.5 line-clamp-2">
+                              {version.descripcion}
+                            </p>
                           )}
-                        </div>
 
-                        <h4 className="font-medium mb-1">{version.nombre}</h4>
-
-                        {version.descripcion && (
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {version.descripcion}
-                          </p>
-                        )}
-
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            <span>{version.user.name}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            <span>{formatDate(version.createdAt)}</span>
+                          {/* Meta */}
+                          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {version.user.name}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatDate(version.createdAt)}
+                            </span>
+                            {version.motivoCambio && (
+                              <span className="truncate max-w-[200px]" title={version.motivoCambio}>
+                                Motivo: {version.motivoCambio}
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        {version.motivoCambio && (
-                          <div className="mt-2 text-xs">
-                            <span className="font-medium">Motivo:</span> {version.motivoCambio}
-                          </div>
-                        )}
+                        {/* Actions */}
+                        <div className="flex gap-1.5 shrink-0">
+                          <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => handleViewVersion(version)}>
+                            <Eye className="h-3 w-3 mr-1" />
+                            Ver
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => setDuplicateVersion(version)}>
+                            <Copy className="h-3 w-3 mr-1" />
+                            Duplicar
+                          </Button>
+                        </div>
                       </div>
 
-                      <div className="flex gap-2 ml-4">
-                        <Button variant="outline" size="sm" onClick={() => handleViewVersion(version)}>
-                          <Eye className="h-3 w-3 mr-1" />
-                          Ver
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setDuplicateVersion(version)}>
-                          <Copy className="h-3 w-3 mr-1" />
-                          Duplicar
-                        </Button>
-                      </div>
+                      {version.cambios && (
+                        <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">Cambios:</span> {version.cambios}
+                        </div>
+                      )}
                     </div>
-
-                    {version.cambios && (
-                      <>
-                        <Separator className="my-3" />
-                        <div>
-                          <h5 className="text-sm font-medium mb-1">Cambios realizados:</h5>
-                          <p className="text-sm text-muted-foreground">{version.cambios}</p>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                  </motion.div>
+                )
+              })}
+            </div>
           </div>
         )}
       </CardContent>

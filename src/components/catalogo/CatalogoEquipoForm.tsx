@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -10,14 +10,18 @@ import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Calculator, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { CatalogoEquipo } from '@/types'
 
 interface CatalogoEquipoFormProps {
   equipo?: Partial<CatalogoEquipo>
   onCreated?: (equipo: any) => void
   onUpdated?: (equipo: any) => void
+  onCancel?: () => void
 }
 
 const schema = z.object({
@@ -25,19 +29,26 @@ const schema = z.object({
   unidadId: z.string().min(1, 'Unidad requerida'),
   codigo: z.string().min(1, 'Código requerido'),
   descripcion: z.string().min(1, 'Descripción requerida'),
-  marca: z.string().min(1, 'Marca requerida'),
+  marca: z.string().optional(),
   precioLista: z.number().min(0, 'Debe ser positivo'),
   factorCosto: z.number().min(0.5).max(3, 'Debe ser entre 0.5 y 3'),
   factorVenta: z.number().min(1).max(3, 'Debe ser entre 1 y 3')
 })
 
-export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated }: CatalogoEquipoFormProps) {
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount)
+}
+
+export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCancel }: CatalogoEquipoFormProps) {
   const isEditMode = !!equipo?.id
-  const [precioInterno, setPrecioInterno] = useState(0)
-  const [precioVenta, setPrecioVenta] = useState(0)
   const [categorias, setCategorias] = useState<{ value: string; label: string }[]>([])
   const [unidades, setUnidades] = useState<{ value: string; label: string }[]>([])
   const [codigosExistentes, setCodigosExistentes] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   const {
     register,
@@ -65,14 +76,16 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated }: Cat
   const watchFactorCosto = watch('factorCosto')
   const watchFactorVenta = watch('factorVenta')
 
-  useEffect(() => {
-    const pInterno = parseFloat((watchPrecioLista * watchFactorCosto).toFixed(2))
-    setPrecioInterno(pInterno)
-    setPrecioVenta(parseFloat((pInterno * watchFactorVenta).toFixed(2)))
+  const calculados = useMemo(() => {
+    const pInterno = +(watchPrecioLista * watchFactorCosto).toFixed(2)
+    const pVenta = +(pInterno * watchFactorVenta).toFixed(2)
+    const margen = pInterno > 0 ? ((pVenta - pInterno) / pInterno) * 100 : 0
+    return { precioInterno: pInterno, precioVenta: pVenta, margen }
   }, [watchPrecioLista, watchFactorCosto, watchFactorVenta])
 
   useEffect(() => {
     const cargarDatos = async () => {
+      setLoading(true)
       try {
         const [cats, unis, equipos] = await Promise.all([
           getCategoriasEquipo(),
@@ -89,6 +102,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated }: Cat
         }
       } catch (error) {
         toast.error('Error cargando datos para el formulario.')
+      } finally {
+        setLoading(false)
       }
     }
     cargarDatos()
@@ -103,12 +118,12 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated }: Cat
     const equipoData = {
       codigo: values.codigo,
       descripcion: values.descripcion,
-      marca: values.marca,
+      marca: values.marca || '',
       precioLista: values.precioLista,
-      precioInterno,
+      precioInterno: calculados.precioInterno,
       factorCosto: values.factorCosto,
       factorVenta: values.factorVenta,
-      precioVenta,
+      precioVenta: calculados.precioVenta,
       categoriaId: values.categoriaId,
       unidadId: values.unidadId,
       estado: equipo?.estado || 'activo'
@@ -123,8 +138,6 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated }: Cat
         const nuevo = await createCatalogoEquipo(equipoData)
         onCreated?.(nuevo)
         reset()
-        setPrecioInterno(0)
-        setPrecioVenta(0)
         toast.success('Equipo creado exitosamente.')
       }
     } catch (error) {
@@ -133,96 +146,203 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated }: Cat
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 bg-white p-6 rounded-xl shadow">
-      <div className="grid grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+      {/* Código y Marca */}
+      <div className="grid grid-cols-2 gap-2">
         <div>
-          <Label>Categoría</Label>
+          <Label className="text-xs">Código *</Label>
+          <Input
+            {...register('codigo')}
+            placeholder="EQ-001"
+            className="h-8 text-sm font-mono"
+            onFocus={(e) => e.target.select()}
+          />
+          {errors.codigo && <p className="text-red-500 text-[10px] mt-0.5">{errors.codigo.message}</p>}
+        </div>
+        <div>
+          <Label className="text-xs">Marca</Label>
+          <Input
+            {...register('marca')}
+            placeholder="Siemens"
+            className="h-8 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Descripción */}
+      <div>
+        <Label className="text-xs">Descripción *</Label>
+        <Textarea
+          {...register('descripcion')}
+          placeholder="Descripción del equipo..."
+          rows={2}
+          className="text-sm min-h-[48px] resize-none"
+        />
+        {errors.descripcion && <p className="text-red-500 text-[10px] mt-0.5">{errors.descripcion.message}</p>}
+      </div>
+
+      {/* Categoría y Unidad */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-xs">Categoría *</Label>
           <Select value={watch('categoriaId')} onValueChange={v => setValue('categoriaId', v)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona categoría" />
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="Seleccionar..." />
             </SelectTrigger>
             <SelectContent>
               {categorias.map(cat => (
-                <SelectItem key={cat.value} value={cat.value}>
+                <SelectItem key={cat.value} value={cat.value} className="text-sm">
                   {cat.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {errors.categoriaId && <p className="text-red-500 text-sm">{errors.categoriaId.message}</p>}
+          {errors.categoriaId && <p className="text-red-500 text-[10px] mt-0.5">{errors.categoriaId.message}</p>}
         </div>
-
         <div>
-          <Label>Unidad</Label>
+          <Label className="text-xs">Unidad *</Label>
           <Select value={watch('unidadId')} onValueChange={v => setValue('unidadId', v)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona unidad" />
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="Seleccionar..." />
             </SelectTrigger>
             <SelectContent>
               {unidades.map(u => (
-                <SelectItem key={u.value} value={u.value}>
+                <SelectItem key={u.value} value={u.value} className="text-sm">
                   {u.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {errors.unidadId && <p className="text-red-500 text-sm">{errors.unidadId.message}</p>}
-        </div>
-
-        <div>
-          <Label>Código</Label>
-          <Input {...register('codigo')} placeholder="Código del equipo" />
-          {errors.codigo && <p className="text-red-500 text-sm">{errors.codigo.message}</p>}
-        </div>
-
-        <div>
-          <Label>Descripción</Label>
-          <Input {...register('descripcion')} placeholder="Descripción" />
-          {errors.descripcion && <p className="text-red-500 text-sm">{errors.descripcion.message}</p>}
-        </div>
-
-        <div>
-          <Label>Marca</Label>
-          <Input {...register('marca')} placeholder="Marca" />
-          {errors.marca && <p className="text-red-500 text-sm">{errors.marca.message}</p>}
-        </div>
-
-        <div>
-          <Label>Precio Lista</Label>
-          <Input type="number" step="0.01" {...register('precioLista', { valueAsNumber: true })} />
-          {errors.precioLista && <p className="text-red-500 text-sm">{errors.precioLista.message}</p>}
-        </div>
-
-        <div>
-          <Label>Factor Costo</Label>
-          <Input type="number" step="0.01" {...register('factorCosto', { valueAsNumber: true })} />
-          {errors.factorCosto && <p className="text-red-500 text-sm">{errors.factorCosto.message}</p>}
-        </div>
-
-        <div>
-          <Label>Factor Venta</Label>
-          <Input type="number" step="0.01" {...register('factorVenta', { valueAsNumber: true })} />
-          {errors.factorVenta && <p className="text-red-500 text-sm">{errors.factorVenta.message}</p>}
-          <p className="text-xs text-muted-foreground mt-1">
-            {((watchFactorVenta - 1) * 100).toFixed(0)}% de margen
-          </p>
-        </div>
-
-        <div>
-          <Label>Precio Interno (Calculado)</Label>
-          <Input value={precioInterno} readOnly className="bg-gray-100 text-gray-600" />
-        </div>
-
-        <div>
-          <Label>Precio Venta (Calculado)</Label>
-          <Input value={precioVenta} readOnly className="bg-gray-100 text-gray-600" />
+          {errors.unidadId && <p className="text-red-500 text-[10px] mt-0.5">{errors.unidadId.message}</p>}
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={isSubmitting}>
-          {isEditMode ? 'Actualizar Equipo' : 'Agregar Equipo'}
+      {/* Precios */}
+      <div className="border rounded-lg p-3 bg-gray-50/50">
+        <div className="flex items-center gap-1.5 mb-3">
+          <Calculator className="h-3.5 w-3.5 text-blue-500" />
+          <span className="text-xs font-medium">Precios</span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <Label className="text-[10px] text-muted-foreground">P.Lista *</Label>
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              {...register('precioLista', { valueAsNumber: true })}
+              onFocus={(e) => e.target.select()}
+              placeholder="0.00"
+              className="h-7 text-xs font-mono"
+            />
+            {errors.precioLista && <p className="text-red-500 text-[10px] mt-0.5">{errors.precioLista.message}</p>}
+          </div>
+          <div>
+            <Label className="text-[10px] text-muted-foreground">F.Costo</Label>
+            <Input
+              type="number"
+              min={0.5}
+              max={3}
+              step={0.01}
+              {...register('factorCosto', { valueAsNumber: true })}
+              onFocus={(e) => e.target.select()}
+              placeholder="1.00"
+              className="h-7 text-xs font-mono"
+            />
+            {errors.factorCosto && <p className="text-red-500 text-[10px] mt-0.5">{errors.factorCosto.message}</p>}
+          </div>
+          <div>
+            <Label className="text-[10px] text-muted-foreground">F.Venta</Label>
+            <Input
+              type="number"
+              min={1}
+              max={3}
+              step={0.01}
+              {...register('factorVenta', { valueAsNumber: true })}
+              onFocus={(e) => e.target.select()}
+              placeholder="1.15"
+              className="h-7 text-xs font-mono"
+            />
+            <span className="text-[9px] text-muted-foreground">
+              {((watchFactorVenta - 1) * 100).toFixed(0)}%
+            </span>
+          </div>
+        </div>
+
+        {/* Precios calculados */}
+        <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">P.Interno (P.Lista × F.Costo):</span>
+            <span className="font-mono font-medium text-blue-600">
+              {formatCurrency(calculados.precioInterno)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">P.Venta (P.Interno × F.Venta):</span>
+            <span className="font-mono font-medium text-green-600">
+              {formatCurrency(calculados.precioVenta)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Resumen */}
+      <div className={cn(
+        "grid grid-cols-3 gap-2 p-3 rounded-lg border",
+        calculados.margen >= 15 ? "bg-green-50/50 border-green-200" : "bg-orange-50/50 border-orange-200"
+      )}>
+        <div className="text-center">
+          <p className="text-[10px] text-muted-foreground">P.Interno</p>
+          <p className="text-sm font-semibold text-gray-700">
+            {formatCurrency(calculados.precioInterno)}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] text-muted-foreground">P.Venta</p>
+          <p className="text-sm font-bold text-green-600">
+            {formatCurrency(calculados.precioVenta)}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] text-muted-foreground">Margen</p>
+          <p className={cn(
+            "text-sm font-semibold",
+            calculados.margen >= 20 ? 'text-emerald-600' :
+            calculados.margen >= 10 ? 'text-amber-600' : 'text-red-500'
+          )}>
+            {calculados.margen.toFixed(0)}%
+          </p>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-end gap-2 pt-2">
+        {onCancel && (
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+            Cancelar
+          </Button>
+        )}
+        <Button type="submit" size="sm" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              Guardando...
+            </>
+          ) : isEditMode ? (
+            'Actualizar Equipo'
+          ) : (
+            'Agregar Equipo'
+          )}
         </Button>
       </div>
     </form>

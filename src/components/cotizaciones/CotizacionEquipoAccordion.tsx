@@ -69,7 +69,7 @@ export default function CotizacionEquipoAccordion({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingItem, setEditingItem] = useState<CotizacionEquipoItem | undefined>(undefined)
-  const [createFromCatalog, setCreateFromCatalog] = useState(false)
+
   const [vincularItem, setVincularItem] = useState<CotizacionEquipoItem | null>(null)
 
   useEffect(() => {
@@ -150,13 +150,11 @@ export default function CotizacionEquipoAccordion({
   const handleCloseCreateModal = () => {
     setShowCreateModal(false)
     setEditingItem(undefined)
-    setCreateFromCatalog(false)
   }
 
   const handleRequestCreateFromCatalog = () => {
     setShowMultiAddModal(false)
     setEditingItem(undefined)
-    setCreateFromCatalog(true)
     setShowCreateModal(true)
   }
 
@@ -422,7 +420,6 @@ export default function CotizacionEquipoAccordion({
         item={editingItem}
         onItemCreated={handleItemCreated}
         onItemUpdated={handleItemUpdated}
-        defaultGuardarEnCatalogo={createFromCatalog}
       />
 
       {/* Delete confirmation dialog */}
