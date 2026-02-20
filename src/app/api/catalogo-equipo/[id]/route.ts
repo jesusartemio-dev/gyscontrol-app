@@ -1,17 +1,9 @@
-// ===================================================
-// 📁 Archivo: [id]/route.ts
-// 📌 Ubicación: src/app/api/catalogo-equipo/[id]/
-// 🔧 Descripción: Manejo de actualización y eliminación de equipos del catálogo.
-// 🧠 Uso: PUT y DELETE sobre equipos existentes.
-// ✍️ Autor: Jesús Artemio
-// 📅 Última actualización: 2025-04-25
-// ===================================================
-
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// ✅ GET - Obtener equipo por ID
+const VALID_VISTAS = ['admin', 'comercial', 'logistica', 'proyectos']
+
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
 
@@ -34,12 +26,11 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
 
     return NextResponse.json(equipo)
   } catch (error) {
-    console.error('❌ Error al obtener equipo:', error)
+    console.error('Error al obtener equipo:', error)
     return NextResponse.json({ error: 'Error interno al obtener equipo' }, { status: 500 })
   }
 }
 
-// ✅ PUT - Actualizar equipo
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
 
@@ -48,16 +39,24 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   try {
+    const vista = req.nextUrl.searchParams.get('vista')
+
+    if (vista && VALID_VISTAS.includes(vista)) {
+      const config = await prisma.configuracionCatalogoColumnas.findUnique({ where: { id: vista } })
+      const permisos = config?.permisos as Record<string, boolean> | undefined
+      if (permisos && !permisos.canEdit) {
+        return NextResponse.json({ error: 'No tiene permiso para editar equipos en esta vista' }, { status: 403 })
+      }
+    }
+
     const data = await req.json()
 
-    // 🔎 Validación mínima de campos importantes (actualización parcial permitida)
     const allowedFields = [
       'nombre', 'descripcion', 'categoriaEquipoId', 'unidadId', 'precio',
       'codigo', 'marca', 'precioLista', 'precioInterno', 'factorCosto', 'factorVenta', 'precioVenta', 'categoriaId', 'estado'
     ]
 
     const payload: Record<string, any> = {}
-
     for (const field of allowedFields) {
       if (field in data) {
         payload[field] = data[field]
@@ -79,12 +78,12 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
 
     return NextResponse.json(actualizado)
   } catch (error) {
-    console.error('❌ Error al actualizar equipo:', error)
+    console.error('Error al actualizar equipo:', error)
     return NextResponse.json({ error: 'Error interno al actualizar equipo' }, { status: 500 })
   }
 }
 
-export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
 
   if (!id) {
@@ -92,13 +91,23 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
   }
 
   try {
+    const vista = req.nextUrl.searchParams.get('vista')
+
+    if (vista && VALID_VISTAS.includes(vista)) {
+      const config = await prisma.configuracionCatalogoColumnas.findUnique({ where: { id: vista } })
+      const permisos = config?.permisos as Record<string, boolean> | undefined
+      if (permisos && !permisos.canDelete) {
+        return NextResponse.json({ error: 'No tiene permiso para eliminar equipos en esta vista' }, { status: 403 })
+      }
+    }
+
     const eliminado = await prisma.catalogoEquipo.delete({
       where: { id },
     })
 
     return NextResponse.json(eliminado)
   } catch (error) {
-    console.error('❌ Error al eliminar equipo:', error)
+    console.error('Error al eliminar equipo:', error)
     return NextResponse.json({ error: 'Error interno al eliminar equipo' }, { status: 500 })
   }
 }

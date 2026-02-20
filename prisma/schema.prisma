@@ -2688,6 +2688,16 @@ model ConfiguracionGeneral {
   @@map("configuracion_general")
 }
 
+// Configuración de columnas y permisos del catálogo de equipos por vista
+model ConfiguracionCatalogoColumnas {
+  id        String   @id // 'admin' | 'comercial' | 'logistica' | 'proyectos'
+  columnas  Json     // Array de column keys visibles
+  permisos  Json     // { canCreate, canEdit, canDelete, canImport, canExport }
+  updatedAt DateTime @updatedAt
+
+  @@map("configuracion_catalogo_columnas")
+}
+
 enum DiaSemana {
   lunes
   martes

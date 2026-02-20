@@ -1,39 +1,107 @@
 import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createId } from '@paralleldrive/cuid2'
 
-// 📥 CatalogoEquipo Payload (importar desde tus types si quieres hacerlo aún más estricto)
-// O validar manualmente aquí.
+const VALID_VISTAS = ['admin', 'comercial', 'logistica', 'proyectos']
 
-export async function GET() {
+function buildPrismaSelect(columnas: string[]) {
+  const select: Record<string, any> = { id: true, createdAt: true }
+
+  const directFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado']
+  for (const col of columnas) {
+    if (directFields.includes(col)) {
+      select[col] = true
+    }
+  }
+
+  if (columnas.includes('categoria')) {
+    select.categoriaId = true
+    select.categoriaEquipo = { select: { id: true, nombre: true } }
+  }
+  if (columnas.includes('unidad')) {
+    select.unidadId = true
+    select.unidad = { select: { id: true, nombre: true } }
+  }
+  if (columnas.includes('uso')) {
+    select._count = {
+      select: {
+        cotizacionEquipoItem: true,
+        proyectoEquipoCotizadoItem: true,
+        listaEquipoItem: true,
+      }
+    }
+  }
+
+  return select
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const equipos = await prisma.catalogoEquipo.findMany({
-      include: {
-        categoriaEquipo: true,
-        unidad: true,
-        _count: {
-          select: {
-            cotizacionEquipoItem: true,
-            proyectoEquipoCotizadoItem: true,
-            listaEquipoItem: true,
+    const vista = req.nextUrl.searchParams.get('vista')
+
+    // Without vista param: return everything (backward compatible)
+    if (!vista || !VALID_VISTAS.includes(vista)) {
+      const equipos = await prisma.catalogoEquipo.findMany({
+        include: {
+          categoriaEquipo: true,
+          unidad: true,
+          _count: {
+            select: {
+              cotizacionEquipoItem: true,
+              proyectoEquipoCotizadoItem: true,
+              listaEquipoItem: true,
+            }
           }
-        }
-      },
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+      return NextResponse.json(equipos)
+    }
+
+    // With vista param: filter fields based on config
+    const config = await prisma.configuracionCatalogoColumnas.findUnique({
+      where: { id: vista }
+    })
+
+    if (!config) {
+      // Fallback to full data if config not found
+      const equipos = await prisma.catalogoEquipo.findMany({
+        include: { categoriaEquipo: true, unidad: true },
+        orderBy: { createdAt: 'desc' }
+      })
+      return NextResponse.json(equipos)
+    }
+
+    const columnas = config.columnas as string[]
+    const select = buildPrismaSelect(columnas)
+
+    const equipos = await prisma.catalogoEquipo.findMany({
+      select,
       orderBy: { createdAt: 'desc' }
     })
 
     return NextResponse.json(equipos)
   } catch (error) {
-    console.error('❌ Error al obtener equipos:', error)
+    console.error('Error al obtener equipos:', error)
     return NextResponse.json({ error: 'Error al obtener equipos' }, { status: 500 })
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const vista = req.nextUrl.searchParams.get('vista')
+
+    // Check permission if vista is provided
+    if (vista && VALID_VISTAS.includes(vista)) {
+      const config = await prisma.configuracionCatalogoColumnas.findUnique({ where: { id: vista } })
+      const permisos = config?.permisos as Record<string, boolean> | undefined
+      if (permisos && !permisos.canCreate) {
+        return NextResponse.json({ error: 'No tiene permiso para crear equipos en esta vista' }, { status: 403 })
+      }
+    }
+
     const data = await req.json()
 
-    // 🔎 Validación mínima de campos requeridos
     const requiredFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'categoriaId', 'unidadId', 'estado']
     for (const field of requiredFields) {
       if (!(field in data)) {
@@ -65,7 +133,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(nuevo, { status: 201 })
   } catch (error) {
-    console.error('❌ Error al crear equipo:', error)
+    console.error('Error al crear equipo:', error)
     return NextResponse.json({ error: 'Error al crear equipo' }, { status: 500 })
   }
 }

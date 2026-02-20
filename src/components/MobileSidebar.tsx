@@ -101,6 +101,7 @@ export default function MobileSidebar() {
       links: [
         { href: '/comercial/plantillas', label: 'Plantillas', icon: FileText },
         { href: '/comercial/cotizaciones', label: 'Cotizaciones', icon: Calculator, badge: 'cotizaciones-pendientes' as NotificationBadgeType },
+        { href: '/comercial/catalogo', label: 'Catálogo Equipos', icon: Wrench },
       ],
     },
     {
@@ -128,6 +129,7 @@ export default function MobileSidebar() {
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
+        { href: '/proyectos/catalogo', label: 'Catálogo', icon: Wrench },
       ],
     },
     {
@@ -182,6 +184,7 @@ export default function MobileSidebar() {
         { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
+        { href: '/logistica/catalogo', label: 'Catálogo Equipos', icon: Wrench },
       ],
     },
     {
@@ -269,6 +272,7 @@ export default function MobileSidebar() {
         { href: '/configuracion/duraciones-cronograma', label: 'Duraciones Cronograma', icon: Calendar },
         { href: '/configuracion/calendario-laboral', label: 'Calendarios Laborales', icon: Calendar },
         { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
+        { href: '/configuracion/catalogo-columnas', label: 'Vistas Catálogo', icon: Wrench },
       ],
     },
   ]

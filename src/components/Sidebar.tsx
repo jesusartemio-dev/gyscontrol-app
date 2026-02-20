@@ -147,7 +147,7 @@ export default function Sidebar() {
       links: [
         { href: '/comercial/plantillas', label: 'Plantillas', icon: FileText },
         { href: '/comercial/cotizaciones', label: 'Cotizaciones', icon: Calculator, badge: 'cotizaciones-pendientes' as NotificationBadgeType },
-        { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
+        { href: '/comercial/catalogo', label: 'Catálogo Equipos', icon: Wrench },
       ],
     },
     // 1.1. CRM - Gestión de Relaciones con Clientes
@@ -177,6 +177,7 @@ export default function Sidebar() {
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
         { href: '/proyectos/listas', label: 'Listas', icon: FileText },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart, badge: 'pedidos-pendientes' as NotificationBadgeType },
+        { href: '/proyectos/catalogo', label: 'Catálogo', icon: Wrench },
       ],
     },
     // 2.5. Documentos - Google Drive
@@ -235,7 +236,7 @@ export default function Sidebar() {
         { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
         { href: '/logistica/proveedores', label: 'Proveedores', icon: Building2 },
         { href: '/logistica/cotizaciones', label: 'Cotizaciones Proveedor', icon: Calculator },
-        { href: '/catalogo/equipos', label: 'Catálogo Equipos', icon: Wrench },
+        { href: '/logistica/catalogo', label: 'Catálogo Equipos', icon: Wrench },
       ],
     },
     // 4. Aprovisionamiento - Gestión de adquisiciones y compras
@@ -340,6 +341,8 @@ export default function Sidebar() {
         { href: '/configuracion/tipos-bloqueo', label: 'Tipos de Bloqueo', icon: ShieldAlert },
         // 💰 Centros de costo
         { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
+        // 👁️ Vistas del catálogo
+        { href: '/configuracion/catalogo-columnas', label: 'Vistas Catálogo', icon: Wrench },
       ],
     },
   ]
