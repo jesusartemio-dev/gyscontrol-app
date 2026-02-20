@@ -45,18 +45,18 @@ const VISTA_LABELS: Record<Vista, string> = {
 }
 
 const ALL_COLUMNS = [
-  { key: 'codigo', label: 'Código', align: 'left' as const },
-  { key: 'descripcion', label: 'Descripción', align: 'left' as const },
+  { key: 'codigo', label: 'Código / Descripción', align: 'left' as const },
   { key: 'categoria', label: 'Categoría', align: 'left' as const },
   { key: 'unidad', label: 'Unidad', align: 'left' as const },
   { key: 'marca', label: 'Marca', align: 'left' as const },
   { key: 'uso', label: 'Uso', align: 'center' as const },
-  { key: 'precioLista', label: 'P. Lista', align: 'right' as const },
-  { key: 'factorCosto', label: 'F. Costo', align: 'center' as const },
-  { key: 'factorVenta', label: 'F. Venta', align: 'center' as const },
-  { key: 'precioInterno', label: 'P. Interno', align: 'right' as const },
-  { key: 'precioVenta', label: 'P. Venta', align: 'right' as const },
+  { key: 'precioLista', label: 'Precio\nLista', align: 'right' as const },
+  { key: 'factorCosto', label: 'Factor\nCosto', align: 'center' as const },
+  { key: 'factorVenta', label: 'Factor\nVenta', align: 'center' as const },
+  { key: 'precioInterno', label: 'Precio\nInterno', align: 'right' as const },
+  { key: 'precioVenta', label: 'Precio\nVenta', align: 'right' as const },
   { key: 'estado', label: 'Estado', align: 'left' as const },
+  { key: 'updatedAt', label: 'Actualización', align: 'left' as const },
 ] as const
 
 type ColumnKey = typeof ALL_COLUMNS[number]['key']
@@ -103,7 +103,13 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const showActionsColumn = canEdit || canDelete
 
   const visibleColumns = useMemo(() =>
-    ALL_COLUMNS.filter(col => vistaConfig?.columnas.includes(col.key)),
+    ALL_COLUMNS.filter(col => {
+      // updatedAt always visible
+      if (col.key === 'updatedAt') return true
+      // codigo column merges descripcion — show if either is in config
+      if (col.key === 'codigo') return vistaConfig?.columnas.includes('codigo') || vistaConfig?.columnas.includes('descripcion')
+      return vistaConfig?.columnas.includes(col.key)
+    }),
     [vistaConfig]
   )
 
@@ -276,12 +282,23 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     )
   }
 
+  const formatDate = (date: string | Date | undefined) => {
+    if (!date) return '—'
+    const d = new Date(date)
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
   const renderCell = (eq: Partial<CatalogoEquipo>, colKey: ColumnKey) => {
     switch (colKey) {
       case 'codigo':
-        return <span className="font-mono text-xs">{eq.codigo}</span>
-      case 'descripcion':
-        return <div className="max-w-[250px] truncate text-sm" title={eq.descripcion}>{eq.descripcion}</div>
+        return (
+          <div className="min-w-[200px]">
+            <span className="font-mono text-xs font-medium">{eq.codigo}</span>
+            {eq.descripcion && (
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{eq.descripcion}</p>
+            )}
+          </div>
+        )
       case 'categoria':
         return <Badge variant="secondary" className="text-xs font-normal">{eq.categoriaEquipo?.nombre || '—'}</Badge>
       case 'unidad':
@@ -315,6 +332,8 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           )
         }
         return <Badge variant="outline" className="text-xs">{eq.estado}</Badge>
+      case 'updatedAt':
+        return <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(eq.updatedAt)}</span>
       default:
         return null
     }
@@ -478,9 +497,9 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                   <thead>
                     <tr className="border-b bg-muted/40">
                       {visibleColumns.map(col => (
-                        <th key={col.key} className={`py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider ${
+                        <th key={col.key} className={`py-2 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-pre-line leading-tight ${
                           col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
-                        } ${col.key === 'codigo' ? 'w-[100px]' : col.key === 'descripcion' ? 'min-w-[200px]' : ''}`}>
+                        } ${col.key === 'codigo' ? 'min-w-[200px]' : ''}`}>
                           {col.label}
                         </th>
                       ))}
@@ -495,7 +514,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                     {equiposFiltrados.map(eq => (
                       <tr key={eq.id} className="hover:bg-muted/30 transition-colors">
                         {visibleColumns.map(col => (
-                          <td key={col.key} className={`py-2 px-3 ${
+                          <td key={col.key} className={`py-2 px-3 align-top ${
                             col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                           }`}>
                             {renderCell(eq, col.key)}

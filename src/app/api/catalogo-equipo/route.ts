@@ -5,7 +5,7 @@ import { createId } from '@paralleldrive/cuid2'
 const VALID_VISTAS = ['admin', 'comercial', 'logistica', 'proyectos']
 
 function buildPrismaSelect(columnas: string[]) {
-  const select: Record<string, any> = { id: true, createdAt: true }
+  const select: Record<string, any> = { id: true, createdAt: true, updatedAt: true }
 
   const directFields = ['codigo', 'descripcion', 'marca', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado']
   for (const col of columnas) {

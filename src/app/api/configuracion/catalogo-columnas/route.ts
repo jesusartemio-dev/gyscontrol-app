@@ -6,24 +6,24 @@ type Vista = typeof VALID_VISTAS[number]
 
 const VALID_COLUMNS = [
   'codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso',
-  'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado'
+  'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'
 ]
 
 const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, boolean> }> = {
   admin: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado'],
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'],
     permisos: { canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true }
   },
   comercial: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioVenta', 'estado'],
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioVenta', 'estado', 'updatedAt'],
     permisos: { canCreate: false, canEdit: false, canDelete: false, canImport: false, canExport: true }
   },
   logistica: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'estado'],
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'estado', 'updatedAt'],
     permisos: { canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true }
   },
   proyectos: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'uso', 'estado'],
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'uso', 'estado', 'updatedAt'],
     permisos: { canCreate: false, canEdit: false, canDelete: false, canImport: false, canExport: true }
   }
 }
@@ -41,6 +41,18 @@ async function ensureDefaults() {
           permisos: DEFAULTS[vista].permisos,
         }
       })
+    } else {
+      // Add any new default columns missing from existing config
+      const record = existing.find(e => e.id === vista)
+      const currentCols = (record?.columnas as string[]) || []
+      const defaultCols = DEFAULTS[vista].columnas
+      const missing = defaultCols.filter(c => !currentCols.includes(c))
+      if (missing.length > 0) {
+        await prisma.configuracionCatalogoColumnas.update({
+          where: { id: vista },
+          data: { columnas: [...currentCols, ...missing] }
+        })
+      }
     }
   }
 }
