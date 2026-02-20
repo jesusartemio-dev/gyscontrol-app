@@ -25,7 +25,8 @@ import {
   Search,
   Play,
   Shield,
-  HardHat
+  HardHat,
+  Settings
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useSession } from 'next-auth/react'
@@ -58,10 +59,20 @@ interface PersonalPlanificado {
   rolJornada?: 'trabajador' | 'supervisor' | 'seguridad'
 }
 
-interface IniciarJornadaModalProps {
+interface JornadaEditar {
+  id: string
+  proyecto: { id: string; codigo: string; nombre: string }
+  proyectoEdt?: { id: string; nombre: string; edt?: { id: string; nombre: string } } | null
+  fechaTrabajo: string
+  objetivosDia?: string | null
+  personalPlanificado: PersonalPlanificado[]
+}
+
+interface JornadaFormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess: (jornadaId: string) => void
+  onSuccess: (jornadaId?: string) => void
+  jornada?: JornadaEditar
 }
 
 const ROLE_TABS = [
@@ -74,14 +85,17 @@ const ROLE_TABS = [
 
 const ROLES_PERMITIDOS = ['colaborador', 'coordinador', 'logistico', 'gestor', 'proyectos', 'comercial', 'seguridad', 'presupuestos']
 
-export function IniciarJornadaModal({
+export function JornadaFormModal({
   open,
   onOpenChange,
-  onSuccess
-}: IniciarJornadaModalProps) {
+  onSuccess,
+  jornada
+}: JornadaFormModalProps) {
   const { toast } = useToast()
   const { data: session } = useSession()
   const sessionUserId = session?.user?.id
+
+  const isEditing = !!jornada
 
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -96,34 +110,50 @@ export function IniciarJornadaModal({
   const [objetivosDia, setObjetivosDia] = useState('')
   const [personalSeleccionado, setPersonalSeleccionado] = useState<string[]>([])
 
-  // Responsables
   const [supervisorId, setSupervisorId] = useState('')
   const [seguridadId, setSeguridadId] = useState('')
 
-  // Filtro por rol
   const [filtroRol, setFiltroRol] = useState<string>('proyectos')
   const [busquedaPersonal, setBusquedaPersonal] = useState('')
 
   useEffect(() => {
     if (open) {
-      setProyectoId('')
-      setProyectoEdtId('')
-      setFechaTrabajo(new Date().toISOString().split('T')[0])
-      setObjetivosDia('')
-      setPersonalSeleccionado([])
-      setSupervisorId('')
-      setSeguridadId('')
       setFiltroRol('proyectos')
       setBusquedaPersonal('')
-      cargarProyectos()
+
+      if (isEditing) {
+        setProyectoId(jornada.proyecto.id)
+        setProyectoEdtId(jornada.proyectoEdt?.id || '')
+        setFechaTrabajo(jornada.fechaTrabajo.split('T')[0])
+        setObjetivosDia(jornada.objetivosDia || '')
+
+        const userIds = jornada.personalPlanificado.map(p => p.userId)
+        setPersonalSeleccionado(userIds)
+
+        const sup = jornada.personalPlanificado.find(p => p.rolJornada === 'supervisor')
+        setSupervisorId(sup?.userId || '')
+
+        const seg = jornada.personalPlanificado.find(p => p.rolJornada === 'seguridad')
+        setSeguridadId(seg?.userId || '')
+      } else {
+        setProyectoId('')
+        setProyectoEdtId('')
+        setFechaTrabajo(new Date().toISOString().split('T')[0])
+        setObjetivosDia('')
+        setPersonalSeleccionado([])
+        setSupervisorId('')
+        setSeguridadId('')
+        cargarProyectos()
+      }
+
       cargarUsuarios()
     }
   }, [open])
 
   useEffect(() => {
-    if (proyectoId) {
+    if (!isEditing && proyectoId) {
       cargarEdts()
-    } else {
+    } else if (!isEditing) {
       setEdts([])
       setProyectoEdtId('')
     }
@@ -158,7 +188,6 @@ export function IniciarJornadaModal({
           return true
         })
         setEdts(edtsUnicos)
-        // Auto-seleccionar EDT "CON" (Construcción) si existe
         const conEdt = edtsUnicos.find((e: EdtProyecto) =>
           e.edt?.nombre?.toUpperCase().startsWith('CON')
         )
@@ -180,8 +209,9 @@ export function IniciarJornadaModal({
           ROLES_PERMITIDOS.includes(u.role)
         )
         setUsuarios(usuariosFiltrados)
-        // Auto-seleccionar al usuario actual como parte del equipo y supervisor
-        if (sessionUserId) {
+
+        // Auto-seleccionar al usuario actual solo en modo crear
+        if (!isEditing && sessionUserId) {
           const currentUser = usuariosFiltrados.find((u: Usuario) => u.id === sessionUserId)
           if (currentUser) {
             setPersonalSeleccionado([currentUser.id])
@@ -201,11 +231,9 @@ export function IniciarJornadaModal({
         ? prev.filter(id => id !== userId)
         : [...prev, userId]
     )
-    // Auto-asignar seguridad si se selecciona desde el tab "Seguridad"
     if (isAdding && filtroRol === 'seguridad') {
       setSeguridadId(userId)
     }
-    // Si se deselecciona alguien que era supervisor o seguridad, limpiar
     if (!isAdding) {
       if (userId === supervisorId) setSupervisorId('')
       if (userId === seguridadId) setSeguridadId('')
@@ -222,10 +250,12 @@ export function IniciarJornadaModal({
 
   const deseleccionarTodos = () => {
     setPersonalSeleccionado([])
+    setSupervisorId('')
+    setSeguridadId('')
   }
 
   const handleSubmit = async () => {
-    if (!proyectoId) {
+    if (!isEditing && !proyectoId) {
       toast({ variant: 'destructive', title: 'Error', description: 'Selecciona un proyecto' })
       return
     }
@@ -256,45 +286,68 @@ export function IniciarJornadaModal({
 
     try {
       setSubmitting(true)
-      const response = await fetch('/api/horas-hombre/jornada/iniciar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          proyectoId,
-          proyectoEdtId: proyectoEdtId || undefined,
-          fechaTrabajo,
-          objetivosDia: objetivosDia.trim(),
-          personalPlanificado
+
+      if (isEditing) {
+        const response = await fetch(`/api/horas-hombre/jornada/${jornada.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            objetivosDia: objetivosDia.trim(),
+            personalPlanificado
+          })
         })
-      })
 
-      const data = await response.json()
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || 'Error actualizando jornada')
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Error iniciando jornada')
+        toast({
+          title: 'Jornada actualizada',
+          description: 'Los cambios se guardaron correctamente'
+        })
+
+        onSuccess()
+        onOpenChange(false)
+      } else {
+        const response = await fetch('/api/horas-hombre/jornada/iniciar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            proyectoId,
+            proyectoEdtId: proyectoEdtId || undefined,
+            fechaTrabajo,
+            objetivosDia: objetivosDia.trim(),
+            personalPlanificado
+          })
+        })
+
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || 'Error iniciando jornada')
+        }
+
+        toast({
+          title: 'Jornada iniciada',
+          description: data.message
+        })
+
+        onSuccess(data.data.id)
+        onOpenChange(false)
       }
-
-      toast({
-        title: 'Jornada iniciada',
-        description: data.message
-      })
-
-      onSuccess(data.data.id)
-      onOpenChange(false)
 
     } catch (error) {
       console.error('Error:', error)
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Error iniciando jornada'
+        description: error instanceof Error ? error.message : isEditing ? 'Error actualizando jornada' : 'Error iniciando jornada'
       })
     } finally {
       setSubmitting(false)
     }
   }
 
-  // Filtrar usuarios por rol y búsqueda
   const usuariosPorRol = filtroRol === 'todos'
     ? usuarios
     : usuarios.filter(u => u.role === filtroRol)
@@ -304,7 +357,6 @@ export function IniciarJornadaModal({
     u.email.toLowerCase().includes(busquedaPersonal.toLowerCase())
   )
 
-  // Usuarios seleccionados para los selects de responsable
   const usuariosSeleccionados = usuarios.filter(u => personalSeleccionado.includes(u.id))
 
   const formatRol = (role: string) => {
@@ -321,74 +373,110 @@ export function IniciarJornadaModal({
     return roles[role] || role
   }
 
+  const formatFechaCorta = (fecha: string) => {
+    return new Date(fecha).toLocaleDateString('es-CL', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short'
+    })
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Play className="h-4 w-4 text-green-600" />
-            Nueva Jornada
+            {isEditing ? (
+              <>
+                <Settings className="h-4 w-4 text-blue-600" />
+                Editar Jornada
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 text-green-600" />
+                Nueva Jornada
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Proyecto, EDT y Fecha */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
-                <Building className="h-3.5 w-3.5" />
-                Proyecto *
-              </Label>
-              <Select value={proyectoId} onValueChange={setProyectoId} disabled={loading}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Seleccionar" />
-                </SelectTrigger>
-                <SelectContent position="popper" className="max-h-[250px]">
-                  {proyectos.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.codigo}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {isEditing ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+              <span className="flex items-center gap-1.5">
+                <Building className="h-3.5 w-3.5 text-gray-400" />
+                <span className="font-medium">{jornada.proyecto.codigo}</span>
+              </span>
+              {jornada.proyectoEdt && (
+                <span className="flex items-center gap-1.5">
+                  <FolderOpen className="h-3.5 w-3.5 text-gray-400" />
+                  {jornada.proyectoEdt.edt?.nombre ? `${jornada.proyectoEdt.edt.nombre} - ${jornada.proyectoEdt.nombre}` : jornada.proyectoEdt.nombre}
+                </span>
+              )}
+              <span className="flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                {formatFechaCorta(jornada.fechaTrabajo)}
+              </span>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <Building className="h-3.5 w-3.5" />
+                  Proyecto *
+                </Label>
+                <Select value={proyectoId} onValueChange={setProyectoId} disabled={loading}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Seleccionar" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[250px]">
+                    {proyectos.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.codigo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
-                <FolderOpen className="h-3.5 w-3.5" />
-                EDT
-              </Label>
-              <Select
-                value={proyectoEdtId}
-                onValueChange={setProyectoEdtId}
-                disabled={!proyectoId || edts.length === 0}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder={!proyectoId ? 'Proyecto primero' : edts.length === 0 ? 'Sin cronograma' : 'Seleccionar'} />
-                </SelectTrigger>
-                <SelectContent position="popper" className="max-h-[250px]">
-                  {edts.map(e => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.edt?.nombre ? `${e.edt.nombre} - ${e.nombre}` : e.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  EDT
+                </Label>
+                <Select
+                  value={proyectoEdtId}
+                  onValueChange={setProyectoEdtId}
+                  disabled={!proyectoId || edts.length === 0}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={!proyectoId ? 'Proyecto primero' : edts.length === 0 ? 'Sin cronograma' : 'Seleccionar'} />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[250px]">
+                    {edts.map(e => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.edt?.nombre ? `${e.edt.nombre} - ${e.nombre}` : e.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5 text-xs text-gray-600">
-                <Calendar className="h-3.5 w-3.5" />
-                Fecha *
-              </Label>
-              <Input
-                type="date"
-                value={fechaTrabajo}
-                onChange={e => setFechaTrabajo(e.target.value)}
-                className="h-9"
-              />
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <Calendar className="h-3.5 w-3.5" />
+                  Fecha *
+                </Label>
+                <Input
+                  type="date"
+                  value={fechaTrabajo}
+                  onChange={e => setFechaTrabajo(e.target.value)}
+                  className="h-9"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Objetivos del día */}
           <div className="space-y-1.5">
@@ -423,7 +511,7 @@ export function IniciarJornadaModal({
               </div>
             </div>
 
-            {/* Filtro por rol + búsqueda en una fila */}
+            {/* Filtro por rol + búsqueda */}
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex flex-wrap gap-1 flex-1">
                 {ROLE_TABS.map(tab => (
@@ -582,14 +670,16 @@ export function IniciarJornadaModal({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !proyectoId || !objetivosDia || personalSeleccionado.length === 0 || !supervisorId}
-              className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700"
+              disabled={submitting || (!isEditing && !proyectoId) || !objetivosDia || personalSeleccionado.length === 0 || !supervisorId}
+              className={`flex-1 sm:flex-none ${isEditing ? '' : 'bg-green-600 hover:bg-green-700'}`}
             >
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  Iniciando...
+                  {isEditing ? 'Guardando...' : 'Iniciando...'}
                 </>
+              ) : isEditing ? (
+                'Guardar Cambios'
               ) : (
                 <>
                   <Play className="h-4 w-4 mr-1.5" />

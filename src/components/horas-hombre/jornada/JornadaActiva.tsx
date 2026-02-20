@@ -8,7 +8,6 @@ import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  MapPin,
   Target,
   Users,
   ListTodo,
@@ -30,7 +29,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { AgregarTareaModal } from './AgregarTareaModal'
 import { EditarTareaModal } from './EditarTareaModal'
-import { EditarJornadaModal } from './EditarJornadaModal'
+import { JornadaFormModal } from './JornadaFormModal'
 import { CerrarJornadaModal } from './CerrarJornadaModal'
 import {
   AlertDialog,
@@ -262,12 +261,6 @@ export function JornadaActiva({
                     {jornada.proyectoEdt.edt?.nombre ? `${jornada.proyectoEdt.edt.nombre} - ${jornada.proyectoEdt.nombre}` : jornada.proyectoEdt.nombre}
                   </span>
                 )}
-                {jornada.ubicacion && (
-                  <span className="hidden sm:flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {jornada.ubicacion}
-                  </span>
-                )}
                 <span className="text-gray-200">|</span>
                 <span className="flex items-center gap-1 text-blue-600 font-medium">
                   <ListTodo className="h-3.5 w-3.5" />
@@ -335,14 +328,6 @@ export function JornadaActiva({
           <div className="mx-4 mb-2 flex items-center gap-1.5 text-xs text-gray-500 min-w-0" title={jornada.objetivosDia}>
             <Target className="h-3 w-3 text-gray-400 flex-shrink-0" />
             <span className="truncate">{jornada.objetivosDia}</span>
-          </div>
-        )}
-
-        {/* Ubicacion mobile */}
-        {jornada.ubicacion && (
-          <div className="mx-4 mb-2 sm:hidden flex items-center gap-1.5 text-xs text-gray-500">
-            <MapPin className="h-3 w-3" />
-            <span className="truncate">{jornada.ubicacion}</span>
           </div>
         )}
 
@@ -449,12 +434,10 @@ export function JornadaActiva({
         />
       )}
 
-      <EditarJornadaModal
+      <JornadaFormModal
         open={editarJornadaOpen}
         onOpenChange={setEditarJornadaOpen}
-        jornadaId={jornada.id}
-        objetivosDia={jornada.objetivosDia}
-        ubicacion={jornada.ubicacion}
+        jornada={jornada}
         onSuccess={onRefresh}
       />
 

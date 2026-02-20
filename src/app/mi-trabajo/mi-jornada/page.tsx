@@ -36,7 +36,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import {
-  IniciarJornadaModal,
+  JornadaFormModal,
   JornadaActiva,
   MiJornadaTimeline
 } from '@/components/horas-hombre/jornada'
@@ -330,8 +330,8 @@ export default function MiJornadaPage() {
         </div>
       )}
 
-      {/* Modal Iniciar Jornada */}
-      <IniciarJornadaModal
+      {/* Modal Crear Jornada */}
+      <JornadaFormModal
         open={iniciarModalOpen}
         onOpenChange={setIniciarModalOpen}
         onSuccess={handleJornadaIniciada}
