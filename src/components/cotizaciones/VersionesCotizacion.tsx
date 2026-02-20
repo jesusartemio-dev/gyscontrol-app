@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
@@ -113,12 +113,18 @@ export default function VersionesCotizacion({
         await updateCotizacion(cotizacionId, { revision: revisionCode })
       } catch { /* revision update is non-critical */ }
 
-      setVersiones(prev => [nuevaVersion, ...prev])
+      // Close dialog first, then refresh data
       setShowCreateDialog(false)
       setFormData({ nombre: '', descripcion: '', cambios: '', motivoCambio: '' })
-      onVersionCreated?.()
 
       toast.success(`Versión v${nuevaVersion.version} (${revisionCode}) creada exitosamente`)
+
+      // Reload versions from server (avoids stale state from optimistic update)
+      const data = await getCotizacionVersions(cotizacionId)
+      setVersiones(data)
+
+      // Refresh parent context (updates revision badge, etc)
+      onVersionCreated?.()
     } catch (error) {
       console.error('Error creating version:', error)
       toast.error('Error al crear la versión')
@@ -235,6 +241,7 @@ export default function VersionesCotizacion({
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Crear Nueva Versión</DialogTitle>
+                <DialogDescription>Guarda un snapshot de la cotización actual como nueva versión</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
@@ -376,7 +383,7 @@ export default function VersionesCotizacion({
                           <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <User className="h-3 w-3" />
-                              {version.user.name}
+                              {version.user?.name || 'Usuario'}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
@@ -429,11 +436,13 @@ export default function VersionesCotizacion({
       )}
 
       {/* Compare versions modal */}
-      <VersionCompareModal
-        open={showCompare}
-        onOpenChange={setShowCompare}
-        versiones={versiones}
-      />
+      {showCompare && (
+        <VersionCompareModal
+          open={showCompare}
+          onOpenChange={setShowCompare}
+          versiones={versiones}
+        />
+      )}
 
       {/* Duplicate confirmation dialog */}
       <AlertDialog open={!!duplicateVersion} onOpenChange={(open) => { if (!open) setDuplicateVersion(null) }}>
