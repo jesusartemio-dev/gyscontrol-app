@@ -6,12 +6,12 @@ type Vista = typeof VALID_VISTAS[number]
 
 const VALID_COLUMNS = [
   'codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso',
-  'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'precioLogistica', 'estado', 'updatedAt'
+  'precioLogistica', 'precioReal', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'
 ]
 
 const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, boolean> }> = {
   admin: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'precioLogistica', 'estado', 'updatedAt'],
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLogistica', 'precioReal', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'],
     permisos: { canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true }
   },
   comercial: {
@@ -19,7 +19,7 @@ const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, boo
     permisos: { canCreate: false, canEdit: false, canDelete: false, canImport: false, canExport: true }
   },
   logistica: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'precioLogistica', 'estado', 'updatedAt'],
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'precioLogistica', 'precioReal', 'estado', 'updatedAt'],
     permisos: { canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true }
   },
   proyectos: {
