@@ -10,9 +10,14 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const userId = (session?.user as any)?.id as string | undefined
     const body = await request.json()
     const { listaEquipoItemId, cotizacionProveedorItemId } = body
 
@@ -79,6 +84,20 @@ export async function POST(request: Request) {
         },
       })
     })
+
+    // Propagar precioLogistica al catálogo
+    const listaItem = await prisma.listaEquipoItem.findUnique({
+      where: { id: listaEquipoItemId },
+      select: { catalogoEquipoId: true },
+    })
+    if (listaItem?.catalogoEquipoId && cotizacionItem.precioUnitario != null) {
+      propagarPrecioLogisticaCatalogo({
+        catalogoEquipoId: listaItem.catalogoEquipoId,
+        precioLogistica: cotizacionItem.precioUnitario,
+        userId,
+        metadata: { origen: 'cotizacion-proveedor-seleccionar', listaEquipoItemId },
+      }).catch(err => console.error('Error propagating precioLogistica:', err))
+    }
 
     return NextResponse.json({ success: true, message: 'Cotización seleccionada correctamente' })
   } catch (error) {

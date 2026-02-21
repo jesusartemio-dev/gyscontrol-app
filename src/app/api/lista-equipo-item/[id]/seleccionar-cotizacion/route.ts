@@ -6,6 +6,9 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
 
 export async function PATCH(
   req: Request,
@@ -14,6 +17,8 @@ export async function PATCH(
   try {
     const { id } = await params
     const { cotizacionProveedorItemId } = await req.json()
+    const session = await getServerSession(authOptions)
+    const userId = (session?.user as any)?.id as string | undefined
 
     // 🔄 Paso 1: desmarcar todas las cotizaciones previas del ítem
     await prisma.cotizacionProveedorItem.updateMany({
@@ -201,6 +206,14 @@ export async function PATCH(
         data: { presupuestoTotal: nuevoPresupuestoTotal }
       })
     }
+
+    // 🔄 Paso 8: propagar precioLogistica al catálogo (si el item está vinculado)
+    propagarPrecioLogisticaCatalogo({
+      catalogoEquipoId: updatedItem.catalogoEquipoId,
+      precioLogistica: precioUnitario,
+      userId,
+      metadata: { origen: 'seleccionar-cotizacion', listaEquipoItemId: id },
+    }).catch(err => console.error('Error propagating precioLogistica:', err))
 
     // 🎉 Listo - devolver información completa de la operación
     return NextResponse.json({

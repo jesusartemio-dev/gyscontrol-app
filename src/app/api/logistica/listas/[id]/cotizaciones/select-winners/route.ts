@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
 
 export async function POST(
   request: NextRequest,
@@ -78,6 +79,25 @@ export async function POST(
         }
       }
     })
+
+    // Propagar precioLogistica al catálogo para cada item seleccionado
+    const userId = (session.user as any)?.id as string | undefined
+    const listaItems = await prisma.listaEquipoItem.findMany({
+      where: { id: { in: Object.keys(selections) } },
+      select: { id: true, catalogoEquipoId: true },
+    })
+    for (const [itemId, quotationId] of Object.entries(selections)) {
+      const listaItem = listaItems.find(li => li.id === itemId)
+      const winner = validQuotations.find(q => q.id === quotationId)
+      if (listaItem?.catalogoEquipoId && winner?.precioUnitario != null) {
+        propagarPrecioLogisticaCatalogo({
+          catalogoEquipoId: listaItem.catalogoEquipoId,
+          precioLogistica: winner.precioUnitario,
+          userId,
+          metadata: { origen: 'select-winners-bulk', listaEquipoItemId: itemId },
+        }).catch(err => console.error('Error propagating precioLogistica:', err))
+      }
+    }
 
     return NextResponse.json({
       success: true,

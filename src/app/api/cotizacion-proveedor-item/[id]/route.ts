@@ -8,6 +8,9 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
 import type { CotizacionProveedorItemUpdatePayload } from '@/types'
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -83,6 +86,24 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
       return item
     })
+
+    // Propagar precioLogistica al catálogo si fue seleccionada
+    if (updated.esSeleccionada && updated.listaEquipoItemId && updated.precioUnitario != null) {
+      const session = await getServerSession(authOptions)
+      const userId = (session?.user as any)?.id as string | undefined
+      const listaItem = await prisma.listaEquipoItem.findUnique({
+        where: { id: updated.listaEquipoItemId },
+        select: { catalogoEquipoId: true },
+      })
+      if (listaItem?.catalogoEquipoId) {
+        propagarPrecioLogisticaCatalogo({
+          catalogoEquipoId: listaItem.catalogoEquipoId,
+          precioLogistica: updated.precioUnitario,
+          userId,
+          metadata: { origen: 'cotizacion-proveedor-item-put', cotizacionItemId: id },
+        }).catch(err => console.error('Error propagating precioLogistica:', err))
+      }
+    }
 
     return NextResponse.json(updated)
   } catch (error) {
