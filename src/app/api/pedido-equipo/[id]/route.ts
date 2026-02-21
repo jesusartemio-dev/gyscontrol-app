@@ -50,6 +50,14 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
                 proveedor: true,
               },
             },
+            proveedor: { select: { id: true, nombre: true } },
+            ordenCompraItems: {
+              select: {
+                id: true,
+                ordenCompraId: true,
+                ordenCompra: { select: { id: true, numero: true, estado: true } },
+              },
+            },
           },
         },
       },

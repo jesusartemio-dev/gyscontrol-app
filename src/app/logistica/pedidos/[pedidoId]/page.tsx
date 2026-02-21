@@ -24,6 +24,7 @@ import {
   updatePedidoEquipoItem
 } from '@/lib/services/pedidoEquipoItem'
 import { obtenerEventosTrazabilidad } from '@/lib/services/trazabilidad'
+import { generarOCsDesdePedido } from '@/lib/services/ordenCompra'
 
 // 🎨 UI Components
 import { Button } from '@/components/ui/button'
@@ -62,7 +63,8 @@ import {
   Building2,
   ExternalLink,
   List,
-  History
+  History,
+  ShoppingCart
 } from 'lucide-react'
 
 // 🔧 Utility functions
@@ -108,6 +110,12 @@ export default function PedidoLogisticaDetailPage() {
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState(false)
+
+  // 🛒 Estado para generar OCs
+  const [showGenerarOC, setShowGenerarOC] = useState(false)
+  const [generandoOC, setGenerandoOC] = useState(false)
+  const [monedaOC, setMonedaOC] = useState('USD')
+  const [condicionPagoOC, setCondicionPagoOC] = useState('contado')
 
   // 📦 Estado para edición de items
   const [editingItem, setEditingItem] = useState<{
@@ -231,6 +239,72 @@ export default function PedidoLogisticaDetailPage() {
 
   const { progreso, itemsEntregados, totalItems } = calcularProgreso()
 
+  // 🛒 Calcular agrupación por proveedor para el dialog de OCs
+  const calcularGruposProveedor = () => {
+    if (!pedido?.items) return { grupos: [], sinProveedor: 0, conOC: 0 }
+
+    const sinProveedor: any[] = []
+    const conOC: any[] = []
+    const elegibles: any[] = []
+
+    for (const item of pedido.items) {
+      const provId = (item as any).proveedorId
+      const ocItems = (item as any).ordenCompraItems || []
+
+      if (!provId) {
+        sinProveedor.push(item)
+      } else if (ocItems.length > 0) {
+        conOC.push(item)
+      } else {
+        elegibles.push(item)
+      }
+    }
+
+    // Agrupar elegibles por proveedor
+    const mapaProveedores = new Map<string, { nombre: string; items: any[]; monto: number }>()
+    for (const item of elegibles) {
+      const provId = (item as any).proveedorId
+      const provNombre = (item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || 'Sin nombre'
+      if (!mapaProveedores.has(provId)) {
+        mapaProveedores.set(provId, { nombre: provNombre, items: [], monto: 0 })
+      }
+      const grupo = mapaProveedores.get(provId)!
+      grupo.items.push(item)
+      grupo.monto += item.costoTotal || (item.cantidadPedida * (item.precioUnitario || 0))
+    }
+
+    return {
+      grupos: Array.from(mapaProveedores.entries()).map(([id, g]) => ({ id, ...g })),
+      sinProveedor: sinProveedor.length,
+      conOC: conOC.length,
+    }
+  }
+
+  const handleGenerarOCs = async () => {
+    if (!pedido) return
+    try {
+      setGenerandoOC(true)
+      const resultado = await generarOCsDesdePedido({
+        pedidoId: pedido.id,
+        moneda: monedaOC,
+        condicionPago: condicionPagoOC,
+      })
+      toast.success(`Se generaron ${resultado.resumen.totalOCs} orden(es) de compra con ${resultado.resumen.totalItems} items`)
+      setShowGenerarOC(false)
+      await cargarDatos()
+    } catch (err: any) {
+      console.error('Error generando OCs:', err)
+      toast.error(err.message || 'Error al generar órdenes de compra')
+    } finally {
+      setGenerandoOC(false)
+    }
+  }
+
+  // Permisos para generar OCs
+  const userRole = session?.user?.role || ''
+  const puedeGenerarOC = ['admin', 'gerente', 'logistico'].includes(userRole)
+    && pedido !== null
+    && ['enviado', 'atendido', 'parcial'].includes(pedido?.estado || '')
 
   // 🔄 Loading state
   if (loading) {
@@ -308,16 +382,29 @@ export default function PedidoLogisticaDetailPage() {
               </Badge>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={cargarDatos}
-              disabled={loading}
-              className="h-7 text-xs"
-            >
-              <RefreshCw className={cn('h-3 w-3 mr-1', loading && 'animate-spin')} />
-              Actualizar
-            </Button>
+            <div className="flex items-center gap-2">
+              {puedeGenerarOC && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowGenerarOC(true)}
+                  className="h-7 text-xs"
+                >
+                  <ShoppingCart className="h-3 w-3 mr-1" />
+                  Generar OCs
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={cargarDatos}
+                disabled={loading}
+                className="h-7 text-xs"
+              >
+                <RefreshCw className={cn('h-3 w-3 mr-1', loading && 'animate-spin')} />
+                Actualizar
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -459,8 +546,17 @@ export default function PedidoLogisticaDetailPage() {
                       <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate" title={item.descripcion}>
                         {item.descripcion}
                       </td>
-                      <td className="px-3 py-2 text-gray-600 max-w-[120px] truncate">
-                        {(item as any).listaEquipoItem?.proveedor?.nombre || '—'}
+                      <td className="px-3 py-2 text-gray-600 max-w-[140px]">
+                        <div className="truncate">{(item as any).proveedor?.nombre || (item as any).proveedorNombre || (item as any).listaEquipoItem?.proveedor?.nombre || '—'}</div>
+                        {(item as any).ordenCompraItems?.length > 0 && (
+                          <Link
+                            href={`/logistica/ordenes-compra/${(item as any).ordenCompraItems[0].ordenCompra?.id}`}
+                            className="inline-flex items-center gap-0.5 text-[9px] text-blue-600 hover:underline mt-0.5"
+                          >
+                            <ShoppingCart className="h-2.5 w-2.5" />
+                            {(item as any).ordenCompraItems[0].ordenCompra?.numero}
+                          </Link>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center text-gray-500">{item.unidad}</td>
                       <td className="px-3 py-2 text-center font-medium text-blue-600">
@@ -726,6 +822,137 @@ export default function PedidoLogisticaDetailPage() {
                   >
                     <Save className="h-3 w-3 mr-1" />
                     {updating ? 'Guardando...' : esCompleta ? 'Confirmar Entrega' : 'Guardar'}
+                  </Button>
+                </div>
+              </div>
+            )
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Generar OCs */}
+      <Dialog open={showGenerarOC} onOpenChange={setShowGenerarOC}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-blue-600" />
+              Generar Órdenes de Compra
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const { grupos, sinProveedor, conOC } = calcularGruposProveedor()
+            const totalItems = grupos.reduce((s, g) => s + g.items.length, 0)
+            const totalMonto = grupos.reduce((s, g) => s + g.monto, 0)
+
+            return (
+              <div className="space-y-4">
+                {/* Resumen */}
+                <div className="bg-blue-50 rounded-lg p-3 text-xs">
+                  <p className="font-medium text-blue-800 mb-1">
+                    Se crearán {grupos.length} OC{grupos.length !== 1 ? 's' : ''} con {totalItems} items
+                  </p>
+                  <p className="text-blue-600">
+                    Cada OC se genera por proveedor en estado borrador
+                  </p>
+                </div>
+
+                {/* Grupos por proveedor */}
+                {grupos.length > 0 ? (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {grupos.map(grupo => (
+                      <div key={grupo.id} className="flex items-center justify-between bg-white border rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Building2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium truncate">{grupo.nombre}</p>
+                            <p className="text-[10px] text-muted-foreground">{grupo.items.length} item{grupo.items.length !== 1 ? 's' : ''}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium text-emerald-600 flex-shrink-0">
+                          {formatCurrency(grupo.monto)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <AlertTriangle className="h-8 w-8 text-amber-400 mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">No hay items elegibles para generar OCs</p>
+                  </div>
+                )}
+
+                {/* Warnings */}
+                {(sinProveedor > 0 || conOC > 0) && (
+                  <div className="space-y-1.5">
+                    {sinProveedor > 0 && (
+                      <div className="flex items-center gap-2 text-[10px] text-amber-600 bg-amber-50 rounded px-2.5 py-1.5">
+                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                        {sinProveedor} item{sinProveedor !== 1 ? 's' : ''} sin proveedor (excluidos)
+                      </div>
+                    )}
+                    {conOC > 0 && (
+                      <div className="flex items-center gap-2 text-[10px] text-blue-600 bg-blue-50 rounded px-2.5 py-1.5">
+                        <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+                        {conOC} item{conOC !== 1 ? 's' : ''} ya tienen OC vinculada
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Opciones */}
+                {grupos.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Moneda</label>
+                      <select
+                        value={monedaOC}
+                        onChange={(e) => setMonedaOC(e.target.value)}
+                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="USD">USD</option>
+                        <option value="PEN">PEN</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Condición de Pago</label>
+                      <select
+                        value={condicionPagoOC}
+                        onChange={(e) => setCondicionPagoOC(e.target.value)}
+                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="contado">Contado</option>
+                        <option value="credito">Crédito</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Total */}
+                {grupos.length > 0 && (
+                  <div className="flex items-center justify-between border-t pt-3">
+                    <span className="text-xs text-muted-foreground">Total estimado</span>
+                    <span className="text-sm font-bold text-emerald-600">{formatCurrency(totalMonto)}</span>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowGenerarOC(false)}
+                    className="h-8 text-xs"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleGenerarOCs}
+                    disabled={generandoOC || grupos.length === 0}
+                    className="h-8 text-xs"
+                  >
+                    <ShoppingCart className="h-3 w-3 mr-1" />
+                    {generandoOC ? 'Generando...' : `Generar ${grupos.length} OC${grupos.length !== 1 ? 's' : ''}`}
                   </Button>
                 </div>
               </div>

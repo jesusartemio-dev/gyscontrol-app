@@ -57,6 +57,7 @@ model CatalogoEquipo {
   proyectoEquipoCotizadoItem       ProyectoEquipoCotizadoItem[]
   plantillaEquipoItemIndependiente PlantillaEquipoItemIndependiente[]
   listaEquipoItem                  ListaEquipoItem[]
+  pedidoEquipoItems                PedidoEquipoItem[]
 
   @@map("catalogo_equipo")
 }
@@ -675,7 +676,8 @@ model PedidoEquipoItem {
   listaEquipoItem             ListaEquipoItem?  @relation(fields: [listaEquipoItemId], references: [id])
   listaEquipo                 ListaEquipo?      @relation(fields: [listaId], references: [id])
   pedidoEquipo                PedidoEquipo      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  // proveedor FK pendiente de migración de datos (proveedorId era texto libre)
+  proveedor                   Proveedor?        @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  catalogoEquipo              CatalogoEquipo?   @relation(fields: [catalogoEquipoId], references: [id], onDelete: SetNull)
   user                        User              @relation(fields: [responsableId], references: [id])
   comentarioLogisticaPor      User?             @relation("PedidoEquipoItemComentarioLogistica", fields: [comentarioLogisticaPorId], references: [id])
   ordenCompraItems            OrdenCompraItem[]
@@ -853,6 +855,7 @@ model Proveedor {
   listaEquipoItem     ListaEquipoItem[]
   ordenesCompra       OrdenCompra[]
   cuentasPorPagar     CuentaPorPagar[]
+  pedidoEquipoItems   PedidoEquipoItem[]
 
   @@map("proveedor")
 }

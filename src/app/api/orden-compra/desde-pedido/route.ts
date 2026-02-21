@@ -1,0 +1,177 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+
+async function generarNumeroOC(): Promise<string> {
+  const now = new Date()
+  const yy = String(now.getFullYear()).slice(-2)
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const prefix = `OC-${yy}${mm}${dd}`
+
+  const ultimo = await prisma.ordenCompra.findFirst({
+    where: { numero: { startsWith: prefix } },
+    orderBy: { numero: 'desc' },
+  })
+
+  let correlativo = 1
+  if (ultimo) {
+    const parts = ultimo.numero.split('-')
+    correlativo = parseInt(parts[parts.length - 1]) + 1
+  }
+
+  return `${prefix}-${String(correlativo).padStart(3, '0')}`
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const role = session.user.role
+    if (!['admin', 'gerente', 'logistico'].includes(role)) {
+      return NextResponse.json({ error: 'Sin permisos para generar órdenes de compra' }, { status: 403 })
+    }
+
+    const { pedidoId, itemIds, moneda = 'USD', condicionPago = 'contado', observaciones } = await req.json()
+
+    if (!pedidoId) {
+      return NextResponse.json({ error: 'pedidoId es requerido' }, { status: 400 })
+    }
+
+    // 1. Buscar pedido con items y relaciones
+    const pedido = await prisma.pedidoEquipo.findUnique({
+      where: { id: pedidoId },
+      include: {
+        proyecto: { select: { id: true, codigo: true, nombre: true } },
+        pedidoEquipoItem: {
+          include: {
+            ordenCompraItems: { select: { id: true } },
+            listaEquipoItem: {
+              select: { id: true, proveedorId: true, proveedor: { select: { id: true, nombre: true } } }
+            },
+            proveedor: { select: { id: true, nombre: true } },
+          }
+        }
+      }
+    })
+
+    if (!pedido) {
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
+    }
+
+    if (!['enviado', 'atendido', 'parcial'].includes(pedido.estado)) {
+      return NextResponse.json(
+        { error: `No se pueden generar OCs para un pedido en estado "${pedido.estado}". El pedido debe estar enviado o atendido.` },
+        { status: 400 }
+      )
+    }
+
+    // 2. Filtrar items elegibles
+    let items = pedido.pedidoEquipoItem
+
+    // Si se especificaron itemIds, filtrar
+    if (itemIds && Array.isArray(itemIds) && itemIds.length > 0) {
+      items = items.filter(item => itemIds.includes(item.id))
+    }
+
+    // Excluir items sin proveedor
+    const itemsSinProveedor = items.filter(item => !item.proveedorId)
+    items = items.filter(item => !!item.proveedorId)
+
+    // Excluir items que ya tienen OC vinculada
+    const itemsConOC = items.filter(item => item.ordenCompraItems.length > 0)
+    items = items.filter(item => item.ordenCompraItems.length === 0)
+
+    if (items.length === 0) {
+      const razones: string[] = []
+      if (itemsSinProveedor.length > 0) razones.push(`${itemsSinProveedor.length} sin proveedor`)
+      if (itemsConOC.length > 0) razones.push(`${itemsConOC.length} ya tienen OC`)
+      return NextResponse.json(
+        { error: `No hay items elegibles para generar OCs. ${razones.join(', ')}.` },
+        { status: 400 }
+      )
+    }
+
+    // 3. Agrupar por proveedorId
+    const gruposPorProveedor = new Map<string, typeof items>()
+    for (const item of items) {
+      const provId = item.proveedorId!
+      if (!gruposPorProveedor.has(provId)) {
+        gruposPorProveedor.set(provId, [])
+      }
+      gruposPorProveedor.get(provId)!.push(item)
+    }
+
+    // 4. Crear OCs en transacción
+    const ordenesCreadas = await prisma.$transaction(async (tx) => {
+      const ocs = []
+
+      for (const [proveedorId, grupoItems] of gruposPorProveedor) {
+        const numero = await generarNumeroOC()
+
+        const ocItems = grupoItems.map(item => ({
+          codigo: item.codigo,
+          descripcion: item.descripcion,
+          unidad: item.unidad,
+          cantidad: item.cantidadPedida,
+          precioUnitario: item.precioUnitario || 0,
+          costoTotal: item.cantidadPedida * (item.precioUnitario || 0),
+          pedidoEquipoItemId: item.id,
+          listaEquipoItemId: item.listaEquipoItemId || null,
+          updatedAt: new Date(),
+        }))
+
+        const subtotal = ocItems.reduce((sum, i) => sum + i.costoTotal, 0)
+        const igv = moneda === 'USD' ? 0 : subtotal * 0.18
+        const total = subtotal + igv
+
+        const oc = await tx.ordenCompra.create({
+          data: {
+            numero,
+            proveedorId,
+            pedidoEquipoId: pedido.id,
+            proyectoId: pedido.proyectoId || null,
+            categoriaCosto: 'equipos',
+            solicitanteId: session.user.id,
+            condicionPago,
+            moneda,
+            subtotal,
+            igv,
+            total,
+            observaciones: observaciones || `Generada desde pedido ${pedido.codigo}`,
+            updatedAt: new Date(),
+            items: { create: ocItems },
+          },
+          include: {
+            proveedor: { select: { id: true, nombre: true } },
+            items: true,
+          },
+        })
+
+        ocs.push(oc)
+      }
+
+      return ocs
+    })
+
+    return NextResponse.json({
+      ordenesCreadas,
+      resumen: {
+        totalOCs: ordenesCreadas.length,
+        totalItems: items.length,
+        itemsSinProveedor: itemsSinProveedor.length,
+        itemsConOCExistente: itemsConOC.length,
+      }
+    })
+  } catch (error) {
+    console.error('Error al generar OCs desde pedido:', error)
+    return NextResponse.json(
+      { error: 'Error interno al generar órdenes de compra' },
+      { status: 500 }
+    )
+  }
+}

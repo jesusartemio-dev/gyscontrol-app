@@ -88,3 +88,22 @@ export const cancelarOC = (id: string, motivo?: string) =>
   postAction(id, 'cancelar', { motivo })
 export const registrarRecepcionOC = (id: string, items: { itemId: string; cantidadRecibida: number }[]) =>
   postAction(id, 'recepcion', { items })
+
+export async function generarOCsDesdePedido(payload: {
+  pedidoId: string
+  itemIds?: string[]
+  moneda?: string
+  condicionPago?: string
+  observaciones?: string
+}): Promise<{ ordenesCreadas: OrdenCompra[]; resumen: { totalOCs: number; totalItems: number; itemsSinProveedor: number; itemsConOCExistente: number } }> {
+  const res = await fetch(`${BASE_URL}/desde-pedido`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err.error || 'Error al generar OCs desde pedido')
+  }
+  return res.json()
+}
