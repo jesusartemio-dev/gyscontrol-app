@@ -79,6 +79,7 @@ export async function PATCH(
         responsableId: session.user.id,
         estado: 'borrador',
         origen: 'reemplazo',
+        catalogoEquipoId: nuevo.catalogoEquipoId || proyectoItem?.catalogoEquipoId || null,
         comentarioRevision: nuevo.comentarioRevision || '',
         verificado: false,
         cotizacionSeleccionadaId: nuevo.cotizacionSeleccionadaId || undefined,

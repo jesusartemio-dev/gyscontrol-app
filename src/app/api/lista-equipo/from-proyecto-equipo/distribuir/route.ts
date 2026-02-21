@@ -150,6 +150,7 @@ export async function POST(req: Request) {
             cantidad: proyectoItem.cantidad,
             cantidadPedida: 0,
             presupuesto: proyectoItem.precioCliente || 0,
+            catalogoEquipoId: proyectoItem.catalogoEquipoId ?? null,
             estado: 'borrador',
             origen: 'cotizado' as const,
             responsableId: session.user.id,

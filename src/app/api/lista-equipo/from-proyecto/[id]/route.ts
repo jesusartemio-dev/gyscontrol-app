@@ -69,6 +69,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
             unidad: item.unidad || 'UND',
             cantidad: item.cantidad,
             presupuesto: item.precioCliente || 0,
+            catalogoEquipoId: item.catalogoEquipoId ?? null,
             origen: 'cotizado', // ✅ Campo requerido
             estado: 'borrador', // ✅ Campo requerido
             updatedAt: new Date()

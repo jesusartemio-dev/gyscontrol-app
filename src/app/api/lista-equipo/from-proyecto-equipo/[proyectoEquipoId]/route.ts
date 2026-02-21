@@ -139,6 +139,7 @@ export async function POST(req: Request, context: { params: Promise<{ proyectoEq
             cantidad: item.cantidad,
             cantidadPedida: 0,
             presupuesto: item.precioCliente || 0, // ✅ Copiar presupuesto
+            catalogoEquipoId: item.catalogoEquipoId ?? null,
             estado: 'borrador',
             origen: 'cotizado' as const,
             responsableId: session.user.id,

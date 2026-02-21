@@ -278,6 +278,15 @@ export default function LogisticaListaDetalleItemTableProfessional({ items, onUp
                       <span className="truncate block" title={item.descripcion}>
                         {item.descripcion}
                       </span>
+                      {item.catalogoEquipoId ? (
+                        <Badge variant="outline" className="text-[9px] h-4 mt-0.5 bg-blue-50 text-blue-600 border-blue-200">
+                          Catálogo
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[9px] h-4 mt-0.5 bg-amber-50 text-amber-600 border-amber-200">
+                          Sin catálogo
+                        </Badge>
+                      )}
                     </td>
 
                     {/* Proveedor */}

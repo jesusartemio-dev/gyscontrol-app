@@ -61,6 +61,7 @@ export async function POST(req: Request) {
         unidad: item.unidad || '',
         cantidad: item.cantidad,
         presupuesto: item.precioCliente || 0,
+        catalogoEquipoId: item.catalogoEquipoId ?? null,
         origen: 'cotizado',
         estado: 'borrador',
         updatedAt: new Date(),
