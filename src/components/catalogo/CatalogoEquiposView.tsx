@@ -500,7 +500,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                   {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, equiposFiltrados.length)} de {equiposFiltrados.length}
                 </span>
                 <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1) }}>
-                  <SelectTrigger className="h-7 w-[60px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 w-[72px] text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {PAGE_SIZE_OPTIONS.map(n => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}
                   </SelectContent>
