@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calculator, Loader2, Lock } from 'lucide-react'
+import { Calculator, Loader2, Lock, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CatalogoEquipo } from '@/types'
 
@@ -37,7 +37,8 @@ const schema = z.object({
   factorCosto: z.number().min(0.5).max(3, 'Debe ser entre 0.5 y 3'),
   factorVenta: z.number().min(1).max(3, 'Debe ser entre 1 y 3'),
   precioLogistica: z.number().min(0).optional(),
-  precioReal: z.number().min(0).optional()
+  precioReal: z.number().min(0).optional(),
+  estado: z.string().min(1, 'Estado requerido')
 })
 
 const formatCurrency = (amount: number): string => {
@@ -47,6 +48,13 @@ const formatCurrency = (amount: number): string => {
     minimumFractionDigits: 2
   }).format(amount)
 }
+
+const STATUS_OPTIONS = [
+  { value: 'pendiente', label: 'Pendiente', icon: Clock, color: 'text-amber-700' },
+  { value: 'activo', label: 'Activo', icon: CheckCircle, color: 'text-emerald-700' },
+  { value: 'aprobado', label: 'Aprobado', icon: CheckCircle, color: 'text-blue-700' },
+  { value: 'rechazado', label: 'Rechazado', icon: XCircle, color: 'text-red-700' },
+]
 
 export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onCreated, onUpdated, onCancel }: CatalogoEquipoFormProps) {
   const isEditMode = !!equipo?.id
@@ -78,7 +86,8 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
       factorCosto: equipo?.factorCosto || 1.00,
       factorVenta: equipo?.factorVenta || 1.15,
       precioLogistica: equipo?.precioLogistica ?? undefined,
-      precioReal: equipo?.precioReal ?? undefined
+      precioReal: equipo?.precioReal ?? undefined,
+      estado: equipo?.estado || 'pendiente'
     }
   })
 
@@ -138,7 +147,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
       precioReal: values.precioReal,
       categoriaId: values.categoriaId,
       unidadId: values.unidadId,
-      estado: equipo?.estado || 'activo'
+      estado: values.estado || 'pendiente'
     }
 
     try {
@@ -211,8 +220,8 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
         {errors.descripcion && <p className="text-red-500 text-[10px] mt-0.5">{errors.descripcion.message}</p>}
       </div>
 
-      {/* Categoría y Unidad */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Categoría, Unidad y Estado */}
+      <div className="grid grid-cols-3 gap-2">
         <div>
           <Label className="text-xs">Categoría *</Label>
           <Select
@@ -252,6 +261,32 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
             </SelectContent>
           </Select>
           {errors.unidadId && <p className="text-red-500 text-[10px] mt-0.5">{errors.unidadId.message}</p>}
+        </div>
+        <div>
+          <Label className="text-xs">Estado *</Label>
+          <Select
+            value={watch('estado')}
+            onValueChange={v => setValue('estado', v)}
+            disabled={!canEditField('estado')}
+          >
+            <SelectTrigger className={cn("h-8 text-sm", !canEditField('estado') && disabledClass)}>
+              <SelectValue placeholder="Seleccionar..." />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map(opt => {
+                const Icon = opt.icon
+                return (
+                  <SelectItem key={opt.value} value={opt.value} className="text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <Icon className={`h-3 w-3 ${opt.color}`} />
+                      {opt.label}
+                    </div>
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+          {errors.estado && <p className="text-red-500 text-[10px] mt-0.5">{errors.estado.message}</p>}
         </div>
       </div>
 

@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
           precioVenta: precioVentaCalc,
           categoriaId,
           unidadId,
-          estado: 'activo',
+          estado: 'pendiente',
         },
         select: { id: true, codigo: true, precioLista: true },
       })

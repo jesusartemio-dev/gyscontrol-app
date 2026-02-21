@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
               precioVenta: item.precioCliente,
               categoriaId,
               unidadId,
-              estado: 'activo',
+              estado: 'pendiente',
             },
           })
           catalogoEquipoMap.set(key, newId)
