@@ -923,9 +923,24 @@ export default function PedidoLogisticaDetailPage() {
                 )}
 
                 {/* Opciones */}
-                {grupos.length > 0 && (
+                {grupos.length > 0 && (() => {
+                  const fechaNecStr = pedido?.fechaNecesaria
+                    ? new Date(pedido.fechaNecesaria).toISOString().split('T')[0]
+                    : ''
+                  const fechaNecFormateada = pedido?.fechaNecesaria
+                    ? new Date(pedido.fechaNecesaria).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                    : ''
+                  const superaFechaNecesaria = fechaEntregaOC && fechaNecStr && fechaEntregaOC > fechaNecStr
+
+                  return (
                   <div className="space-y-3">
                     <div>
+                      {fechaNecFormateada && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mb-1.5">
+                          <Calendar className="h-3 w-3" />
+                          <span>El proyecto necesita este pedido para: <strong className="text-gray-700">{fechaNecFormateada}</strong></span>
+                        </div>
+                      )}
                       <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
                         Fecha de Entrega Estimada <span className="text-red-500">*</span>
                       </label>
@@ -937,6 +952,12 @@ export default function PedidoLogisticaDetailPage() {
                       />
                       {!fechaEntregaOC && (
                         <p className="text-[10px] text-red-500 mt-0.5">Requerido para generar las OCs</p>
+                      )}
+                      {superaFechaNecesaria && (
+                        <div className="flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-1.5">
+                          <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                          <span>La fecha de entrega supera la fecha necesaria del proyecto ({fechaNecFormateada}). El proveedor podría no entregar a tiempo.</span>
+                        </div>
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -964,7 +985,8 @@ export default function PedidoLogisticaDetailPage() {
                       </div>
                     </div>
                   </div>
-                )}
+                  )
+                })()}
 
                 {/* Total */}
                 {grupos.length > 0 && (
