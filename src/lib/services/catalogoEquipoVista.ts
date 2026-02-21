@@ -11,6 +11,7 @@ export interface VistaConfig {
     canDelete: boolean
     canImport: boolean
     canExport: boolean
+    camposEditables?: string[]
   }
 }
 

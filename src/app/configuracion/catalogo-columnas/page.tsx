@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import {
-  Settings, Save, Loader2, Package, Eye, Shield, Truck, FolderOpen, Calculator
+  Settings, Save, Loader2, Package, Eye, Shield, Truck, FolderOpen, Calculator, PencilLine
 } from 'lucide-react'
 import { buildApiUrl } from '@/lib/utils'
 
@@ -24,6 +24,7 @@ interface VistaConfig {
     canDelete: boolean
     canImport: boolean
     canExport: boolean
+    camposEditables?: string[]
   }
 }
 
@@ -42,6 +43,8 @@ const ALL_COLUMNS = [
   { key: 'marca', label: 'Marca' },
   { key: 'uso', label: 'Uso (conteos)' },
   { key: 'precioLista', label: 'Precio Lista' },
+  { key: 'precioReal', label: 'Precio Real' },
+  { key: 'precioLogistica', label: 'Precio Logística' },
   { key: 'factorCosto', label: 'Factor Costo' },
   { key: 'factorVenta', label: 'Factor Venta' },
   { key: 'precioInterno', label: 'Precio Interno' },
@@ -55,6 +58,14 @@ const ALL_PERMISOS = [
   { key: 'canDelete', label: 'Eliminar' },
   { key: 'canImport', label: 'Importar' },
   { key: 'canExport', label: 'Exportar' },
+]
+
+const CAMPOS_EDITABLES_PRECIO = [
+  { key: 'precioLista', label: 'Precio Lista' },
+  { key: 'precioLogistica', label: 'Precio Logistica' },
+  { key: 'precioReal', label: 'Precio Real' },
+  { key: 'factorCosto', label: 'Factor Costo' },
+  { key: 'factorVenta', label: 'Factor Venta' },
 ]
 
 const VISTAS_ORDER: Vista[] = ['admin', 'comercial', 'logistica', 'proyectos']
@@ -106,6 +117,25 @@ export default function CatalogoColumnasPage() {
             ...current.permisos,
             [permisoKey]: !current.permisos[permisoKey as keyof typeof current.permisos]
           }
+        }
+      }
+    })
+  }
+
+  const toggleCampoEditable = (vista: Vista, fieldKey: string) => {
+    if (!configs) return
+    setConfigs(prev => {
+      if (!prev) return prev
+      const current = prev[vista]
+      const campos = current.permisos.camposEditables || []
+      const updated = campos.includes(fieldKey)
+        ? campos.filter(c => c !== fieldKey)
+        : [...campos, fieldKey]
+      return {
+        ...prev,
+        [vista]: {
+          ...current,
+          permisos: { ...current.permisos, camposEditables: updated }
         }
       }
     })
@@ -226,7 +256,7 @@ export default function CatalogoColumnasPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {ALL_PERMISOS.map(perm => {
-                      const isActive = config.permisos[perm.key as keyof typeof config.permisos]
+                      const isActive = config.permisos[perm.key as keyof typeof config.permisos] as boolean
                       return (
                         <div key={perm.key} className="flex items-center justify-between py-1">
                           <Label htmlFor={`${vista}-${perm.key}`} className="text-sm">
@@ -236,6 +266,33 @@ export default function CatalogoColumnasPage() {
                             id={`${vista}-${perm.key}`}
                             checked={isActive}
                             onCheckedChange={() => togglePermiso(vista, perm.key)}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Editable price fields section */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <PencilLine className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Campos Editables (Precios)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {CAMPOS_EDITABLES_PRECIO.map(campo => {
+                      const isActive = (config.permisos.camposEditables || []).includes(campo.key)
+                      return (
+                        <div key={campo.key} className="flex items-center justify-between py-1">
+                          <Label htmlFor={`${vista}-campo-${campo.key}`} className="text-sm">
+                            {campo.label}
+                          </Label>
+                          <Switch
+                            id={`${vista}-campo-${campo.key}`}
+                            checked={isActive}
+                            onCheckedChange={() => toggleCampoEditable(vista, campo.key)}
                           />
                         </div>
                       )

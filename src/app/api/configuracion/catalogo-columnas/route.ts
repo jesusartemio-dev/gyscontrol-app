@@ -9,22 +9,34 @@ const VALID_COLUMNS = [
   'precioLogistica', 'precioReal', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'
 ]
 
-const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, boolean> }> = {
+const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, any> }> = {
   admin: {
     columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLogistica', 'precioReal', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'],
-    permisos: { canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true }
+    permisos: {
+      canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true,
+      camposEditables: ['codigo', 'descripcion', 'marca', 'categoriaId', 'unidadId', 'estado', 'precioLista', 'factorCosto', 'factorVenta', 'precioLogistica', 'precioReal']
+    }
   },
   comercial: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioVenta', 'estado', 'updatedAt'],
-    permisos: { canCreate: false, canEdit: false, canDelete: false, canImport: false, canExport: true }
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioLista', 'precioVenta', 'estado', 'updatedAt'],
+    permisos: {
+      canCreate: false, canEdit: true, canDelete: false, canImport: false, canExport: true,
+      camposEditables: ['precioLista']
+    }
   },
   logistica: {
     columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'precioLogistica', 'precioReal', 'estado', 'updatedAt'],
-    permisos: { canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true }
+    permisos: {
+      canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true,
+      camposEditables: ['codigo', 'descripcion', 'marca', 'categoriaId', 'unidadId', 'estado', 'precioLogistica']
+    }
   },
   proyectos: {
     columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'uso', 'estado', 'updatedAt'],
-    permisos: { canCreate: false, canEdit: false, canDelete: false, canImport: false, canExport: true }
+    permisos: {
+      canCreate: false, canEdit: false, canDelete: false, canImport: false, canExport: true,
+      camposEditables: []
+    }
   }
 }
 
@@ -47,10 +59,24 @@ async function ensureDefaults() {
       const currentCols = (record?.columnas as string[]) || []
       const defaultCols = DEFAULTS[vista].columnas
       const missing = defaultCols.filter(c => !currentCols.includes(c))
-      if (missing.length > 0) {
+
+      const currentPermisos = (record?.permisos as Record<string, any>) || {}
+      const needsCamposEditables = !('camposEditables' in currentPermisos)
+
+      if (missing.length > 0 || needsCamposEditables) {
+        const updateData: Record<string, any> = {}
+        if (missing.length > 0) {
+          updateData.columnas = [...currentCols, ...missing]
+        }
+        if (needsCamposEditables) {
+          updateData.permisos = {
+            ...currentPermisos,
+            camposEditables: DEFAULTS[vista].permisos.camposEditables
+          }
+        }
         await prisma.configuracionCatalogoColumnas.update({
           where: { id: vista },
-          data: { columnas: [...currentCols, ...missing] }
+          data: updateData
         })
       }
     }
@@ -63,12 +89,12 @@ export async function GET() {
     await ensureDefaults()
 
     const configs = await prisma.configuracionCatalogoColumnas.findMany()
-    const result: Record<string, { columnas: string[], permisos: Record<string, boolean> }> = {}
+    const result: Record<string, { columnas: string[], permisos: Record<string, any> }> = {}
 
     for (const config of configs) {
       result[config.id] = {
         columnas: config.columnas as string[],
-        permisos: config.permisos as Record<string, boolean>,
+        permisos: config.permisos as Record<string, any>,
       }
     }
 

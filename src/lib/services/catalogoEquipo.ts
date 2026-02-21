@@ -47,6 +47,7 @@ export async function createCatalogoEquipo(data: {
   factorVenta: number
   precioVenta: number
   precioLogistica?: number | null
+  precioReal?: number | null
   categoriaId: string
   unidadId: string
   estado: string
@@ -78,6 +79,7 @@ export async function updateCatalogoEquipo(id: string, data: {
   factorVenta?: number
   precioVenta?: number
   precioLogistica?: number | null
+  precioReal?: number | null
 }): Promise<CatalogoEquipo> {
   try {
     const res = await fetch(buildApiUrl(`/api/catalogo-equipo/${id}`), {

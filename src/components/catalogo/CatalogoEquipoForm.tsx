@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { toast } from 'sonner'
 import { createCatalogoEquipo, updateCatalogoEquipo, getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
+import { updateEquipoVista, createEquipoVista, type Vista } from '@/lib/services/catalogoEquipoVista'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
 import { Label } from '@/components/ui/label'
@@ -13,12 +14,14 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calculator, Loader2 } from 'lucide-react'
+import { Calculator, Loader2, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CatalogoEquipo } from '@/types'
 
 interface CatalogoEquipoFormProps {
   equipo?: Partial<CatalogoEquipo>
+  vista?: Vista
+  camposEditables?: string[]
   onCreated?: (equipo: any) => void
   onUpdated?: (equipo: any) => void
   onCancel?: () => void
@@ -33,7 +36,8 @@ const schema = z.object({
   precioLista: z.number().min(0, 'Debe ser positivo'),
   factorCosto: z.number().min(0.5).max(3, 'Debe ser entre 0.5 y 3'),
   factorVenta: z.number().min(1).max(3, 'Debe ser entre 1 y 3'),
-  precioLogistica: z.number().min(0).optional()
+  precioLogistica: z.number().min(0).optional(),
+  precioReal: z.number().min(0).optional()
 })
 
 const formatCurrency = (amount: number): string => {
@@ -44,12 +48,15 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCancel }: CatalogoEquipoFormProps) {
+export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onCreated, onUpdated, onCancel }: CatalogoEquipoFormProps) {
   const isEditMode = !!equipo?.id
   const [categorias, setCategorias] = useState<{ value: string; label: string }[]>([])
   const [unidades, setUnidades] = useState<{ value: string; label: string }[]>([])
   const [codigosExistentes, setCodigosExistentes] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Field-level permission helper
+  const canEditField = (field: string) => !camposEditables || camposEditables.includes(field)
 
   const {
     register,
@@ -70,7 +77,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
       precioLista: equipo?.precioLista || 0,
       factorCosto: equipo?.factorCosto || 1.00,
       factorVenta: equipo?.factorVenta || 1.15,
-      precioLogistica: equipo?.precioLogistica ?? undefined
+      precioLogistica: equipo?.precioLogistica ?? undefined,
+      precioReal: equipo?.precioReal ?? undefined
     }
   })
 
@@ -126,7 +134,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
       factorCosto: values.factorCosto,
       factorVenta: values.factorVenta,
       precioVenta: calculados.precioVenta,
-      precioLogistica: values.precioLogistica ?? null,
+      precioLogistica: values.precioLogistica,
+      precioReal: values.precioReal,
       categoriaId: values.categoriaId,
       unidadId: values.unidadId,
       estado: equipo?.estado || 'activo'
@@ -134,20 +143,26 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
 
     try {
       if (isEditMode) {
-        const actualizado = await updateCatalogoEquipo(equipo!.id!, equipoData)
+        const actualizado = vista
+          ? await updateEquipoVista(vista, equipo!.id!, equipoData)
+          : await updateCatalogoEquipo(equipo!.id!, equipoData)
         onUpdated?.(actualizado)
         toast.success('Equipo actualizado exitosamente.')
       } else {
-        const nuevo = await createCatalogoEquipo(equipoData)
+        const nuevo = vista
+          ? await createEquipoVista(vista, equipoData)
+          : await createCatalogoEquipo(equipoData)
         onCreated?.(nuevo)
         reset()
         toast.success('Equipo creado exitosamente.')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al guardar equipo:', error)
-      toast.error(isEditMode ? 'Error al actualizar el equipo.' : 'Error al crear el equipo.')
+      toast.error(error.message || (isEditMode ? 'Error al actualizar el equipo.' : 'Error al crear el equipo.'))
     }
   }
+
+  const disabledClass = "bg-muted opacity-60 cursor-not-allowed"
 
   if (loading) {
     return (
@@ -166,7 +181,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
           <Input
             {...register('codigo')}
             placeholder="EQ-001"
-            className="h-8 text-sm font-mono"
+            className={cn("h-8 text-sm font-mono", !canEditField('codigo') && disabledClass)}
+            disabled={!canEditField('codigo')}
             onFocus={(e) => e.target.select()}
           />
           {errors.codigo && <p className="text-red-500 text-[10px] mt-0.5">{errors.codigo.message}</p>}
@@ -176,7 +192,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
           <Input
             {...register('marca')}
             placeholder="Siemens"
-            className="h-8 text-sm"
+            className={cn("h-8 text-sm", !canEditField('marca') && disabledClass)}
+            disabled={!canEditField('marca')}
           />
         </div>
       </div>
@@ -188,7 +205,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
           {...register('descripcion')}
           placeholder="Descripción del equipo..."
           rows={2}
-          className="text-sm min-h-[48px] resize-none"
+          className={cn("text-sm min-h-[48px] resize-none", !canEditField('descripcion') && disabledClass)}
+          disabled={!canEditField('descripcion')}
         />
         {errors.descripcion && <p className="text-red-500 text-[10px] mt-0.5">{errors.descripcion.message}</p>}
       </div>
@@ -197,8 +215,12 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label className="text-xs">Categoría *</Label>
-          <Select value={watch('categoriaId')} onValueChange={v => setValue('categoriaId', v)}>
-            <SelectTrigger className="h-8 text-sm">
+          <Select
+            value={watch('categoriaId')}
+            onValueChange={v => setValue('categoriaId', v)}
+            disabled={!canEditField('categoriaId')}
+          >
+            <SelectTrigger className={cn("h-8 text-sm", !canEditField('categoriaId') && disabledClass)}>
               <SelectValue placeholder="Seleccionar..." />
             </SelectTrigger>
             <SelectContent>
@@ -213,8 +235,12 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
         </div>
         <div>
           <Label className="text-xs">Unidad *</Label>
-          <Select value={watch('unidadId')} onValueChange={v => setValue('unidadId', v)}>
-            <SelectTrigger className="h-8 text-sm">
+          <Select
+            value={watch('unidadId')}
+            onValueChange={v => setValue('unidadId', v)}
+            disabled={!canEditField('unidadId')}
+          >
+            <SelectTrigger className={cn("h-8 text-sm", !canEditField('unidadId') && disabledClass)}>
               <SelectValue placeholder="Seleccionar..." />
             </SelectTrigger>
             <SelectContent>
@@ -234,6 +260,7 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
         <div className="flex items-center gap-1.5 mb-3">
           <Calculator className="h-3.5 w-3.5 text-blue-500" />
           <span className="text-xs font-medium">Precios</span>
+          {camposEditables && <Lock className="h-3 w-3 text-muted-foreground ml-auto" />}
         </div>
 
         <div className="grid grid-cols-3 gap-2">
@@ -246,7 +273,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
               {...register('precioLista', { valueAsNumber: true })}
               onFocus={(e) => e.target.select()}
               placeholder="0.00"
-              className="h-7 text-xs font-mono"
+              className={cn("h-7 text-xs font-mono", !canEditField('precioLista') && disabledClass)}
+              disabled={!canEditField('precioLista')}
             />
             {errors.precioLista && <p className="text-red-500 text-[10px] mt-0.5">{errors.precioLista.message}</p>}
           </div>
@@ -260,7 +288,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
               {...register('factorCosto', { valueAsNumber: true })}
               onFocus={(e) => e.target.select()}
               placeholder="1.00"
-              className="h-7 text-xs font-mono"
+              className={cn("h-7 text-xs font-mono", !canEditField('factorCosto') && disabledClass)}
+              disabled={!canEditField('factorCosto')}
             />
             {errors.factorCosto && <p className="text-red-500 text-[10px] mt-0.5">{errors.factorCosto.message}</p>}
           </div>
@@ -274,7 +303,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
               {...register('factorVenta', { valueAsNumber: true })}
               onFocus={(e) => e.target.select()}
               placeholder="1.15"
-              className="h-7 text-xs font-mono"
+              className={cn("h-7 text-xs font-mono", !canEditField('factorVenta') && disabledClass)}
+              disabled={!canEditField('factorVenta')}
             />
             <span className="text-[9px] text-muted-foreground">
               {((watchFactorVenta - 1) * 100).toFixed(0)}%
@@ -298,8 +328,8 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
           </div>
         </div>
 
-        {/* Precio Logística */}
-        <div className="mt-2 pt-2 border-t border-gray-200">
+        {/* Precio Logística y Precio Real */}
+        <div className="mt-2 pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
           <div className="flex items-center gap-2">
             <Label className="text-[10px] text-muted-foreground whitespace-nowrap">P.Logística</Label>
             <Input
@@ -309,7 +339,21 @@ export default function CatalogoEquipoForm({ equipo, onCreated, onUpdated, onCan
               {...register('precioLogistica', { valueAsNumber: true })}
               onFocus={(e) => e.target.select()}
               placeholder="0.00"
-              className="h-7 text-xs font-mono flex-1"
+              className={cn("h-7 text-xs font-mono flex-1", !canEditField('precioLogistica') && disabledClass)}
+              disabled={!canEditField('precioLogistica')}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">P.Real</Label>
+            <Input
+              type="number"
+              min={0}
+              step={0.01}
+              {...register('precioReal', { valueAsNumber: true })}
+              onFocus={(e) => e.target.select()}
+              placeholder="0.00"
+              className={cn("h-7 text-xs font-mono flex-1", !canEditField('precioReal') && disabledClass)}
+              disabled={!canEditField('precioReal')}
             />
           </div>
         </div>

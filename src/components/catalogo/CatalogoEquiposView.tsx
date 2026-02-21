@@ -11,7 +11,8 @@ import { recalcularCatalogoEquipo } from '@/lib/utils/recalculoCatalogoEquipo'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
 import { getCatalogoEquipos, createCatalogoEquipo, updateCatalogoEquipo, deleteCatalogoEquipo } from '@/lib/services/catalogoEquipo'
-import { getVistaConfig, getCatalogoEquiposVista, type Vista, type VistaConfig } from '@/lib/services/catalogoEquipoVista'
+import { getVistaConfig, getCatalogoEquiposVista, updateEquipoVista, type Vista, type VistaConfig } from '@/lib/services/catalogoEquipoVista'
+import CatalogoEquipoPrecioHistorial from '@/components/catalogo/CatalogoEquipoPrecioHistorial'
 import type { CatalogoEquipo, CatalogoEquipoPayload } from '@/types'
 
 import { Button } from '@/components/ui/button'
@@ -130,6 +131,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
   const canDelete = vistaConfig?.permisos.canDelete ?? false
   const canImport = vistaConfig?.permisos.canImport ?? false
   const canExport = vistaConfig?.permisos.canExport ?? false
+  const camposEditables = vistaConfig?.permisos.camposEditables ?? []
   const showActionsColumn = canEdit || canDelete
 
   const visibleColumns = useMemo(() =>
@@ -311,9 +313,11 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
 
   const handleEditField = async (id: string, field: string, value: string | number) => {
     try {
-      const updated = await updateCatalogoEquipo(id, { [field]: value })
+      const updated = await updateEquipoVista(vista, id, { [field]: value })
       setEquipos(prev => prev.map(eq => eq.id === id ? updated : eq))
-    } catch { toast.error('Error al actualizar') }
+    } catch (err: any) {
+      toast.error(err.message || 'Error al actualizar')
+    }
   }
 
   const confirmDelete = async () => {
@@ -823,6 +827,11 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                                   <p className="font-medium font-mono">{(eq.factorCosto ?? 1).toFixed(2)} / {(eq.factorVenta ?? 1.15).toFixed(2)}</p>
                                 </div>
                               </div>
+                              {eq.id && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <CatalogoEquipoPrecioHistorial equipoId={eq.id} />
+                                </div>
+                              )}
                             </td>
                           </motion.tr>
                         )
@@ -929,7 +938,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
               <DialogDescription>Modifica los datos del equipo <span className="font-mono font-medium">{editTarget?.codigo}</span></DialogDescription>
             </DialogHeader>
             {editTarget && (
-              <CatalogoEquipoForm key={editTarget.id} equipo={editTarget} onUpdated={handleUpdated} onCancel={() => setEditTarget(null)} />
+              <CatalogoEquipoForm key={editTarget.id} equipo={editTarget} vista={vista} camposEditables={camposEditables} onUpdated={handleUpdated} onCancel={() => setEditTarget(null)} />
             )}
           </DialogContent>
         </Dialog>

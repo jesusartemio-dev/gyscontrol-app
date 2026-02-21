@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
         factorVenta: data.factorVenta,
         precioVenta: data.precioVenta,
         precioLogistica: data.precioLogistica ?? null,
+        precioReal: data.precioReal ?? null,
         categoriaId: data.categoriaId,
         unidadId: data.unidadId,
         estado: data.estado,
