@@ -415,10 +415,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           return (
             <Select value={eq.estado} onValueChange={(value) => eq.id && handleEditField(eq.id, 'estado', value)}>
               <SelectTrigger className={`h-7 w-[110px] text-xs border ${config.bg} ${config.color}`}>
-                <div className="flex items-center gap-1">
-                  <StatusIcon className="h-3 w-3 shrink-0" />
-                  <SelectValue />
-                </div>
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(STATUS_CONFIG).map(([value, cfg]) => {
